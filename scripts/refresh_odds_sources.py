@@ -236,32 +236,26 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("ncaab", "NCAAB")
-    python_exe = _venv_python(source_root)
-    env_updates = {
-        "PYTHONPATH": _merge_pythonpath(os.environ.get("PYTHONPATH"), str(source_root / "src"))
-    }
+    python_exe = _venv_python(REPO_ROOT)
     return [
         RefreshStep(
             name="ncaab_odds_history_snapshot",
             phases=("pregame", "live"),
-            cwd=source_root,
+            cwd=REPO_ROOT,
             command=(
                 python_exe,
-                "-m",
-                "ncaab_model.cli",
-                "fetch-odds-history",
-                "--start",
-                args.date,
-                "--end",
+                "scripts/refresh_ncaab_odds_history.py",
+                "--date",
                 args.date,
                 "--region",
                 args.regions,
+                "--source-root",
+                str(source_root),
                 "--out-dir",
                 str(source_root / "outputs" / "odds_history"),
                 "--mode",
                 "current",
             ),
-            env_updates=env_updates,
             description="Refresh NCAAB current-day odds snapshot with full-game and derivative markets.",
         )
     ]
@@ -337,7 +331,7 @@ REGISTRY: dict[str, SportSpec] = {
         step_builder=_build_ncaab_steps,
         ingest_contract_kind="existing_raw_outputs",
         ingest_contract_notes="Hosted-safe ingest can rebuild the local API bundle from the mirrored raw bundle under data/ncaab_source/raw_outputs.",
-        notes="Uses the existing TheOddsAPI adapter through the source CLI so period markets keep the same event-level fetch behavior.",
+        notes="Uses the existing TheOddsAPI adapter through a Syndicate-owned runner so period markets keep the same event-level fetch behavior while the planner stops shelling directly into the source CLI.",
     ),
     "ncaaf": SportSpec(
         slug="ncaaf",

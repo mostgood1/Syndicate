@@ -274,6 +274,13 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
+        refresh_steps = result.get("refresh_steps") or []
+        self.assertEqual(len(refresh_steps), 1)
+        step = refresh_steps[0]
+        command = step.get("command") or []
+        self.assertIn("scripts/refresh_ncaab_odds_history.py", " ".join(str(part) for part in command))
+        self.assertNotIn("ncaab_model.cli", " ".join(str(part) for part in command))
+        self.assertIn("--source-root", command)
         mirror = result.get("mirror") or {}
         command = mirror.get("command") or []
         self.assertIn("refresh_ncaab_source_mirror.ps1", " ".join(str(part) for part in command))

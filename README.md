@@ -195,7 +195,7 @@ The central tool is intentionally an orchestrator, not a new fetcher. It reuses 
 - NHL: `nhl_betting.cli team-odds-collect` plus `props-collect`
 - NFL: `nfl_compare/src/odds_api_client.py` plus `scripts/fetch_oddsapi_props.py`
 - WNBA: `wnba_betting.refresh_oddsapi_props_job`
-- NCAAB: `ncaab_model.cli fetch-odds-history --mode current`
+- NCAAB: `scripts/refresh_ncaab_odds_history.py --mode current --source-root <NCAAB>`
 - NCAAF: `fetch_2025_lines.py`
 
 That keeps Syndicate aligned with the existing source models for pregame and live odds, while the mirror scripts now also copy the refreshed odds artifacts that those source refreshes produce.
