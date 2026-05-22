@@ -101,7 +101,7 @@ class NcaabMirrorExportTests(unittest.TestCase):
             date_root.mkdir(parents=True, exist_ok=True)
             for name in [
                 f"live_features_{self.selected_date}.csv",
-                f"predictions_display_{self.selected_date}.csv",
+                f"predictions_unified_enriched_{self.selected_date}.csv",
             ]:
                 shutil.copy2(self.raw_root / "by_date" / self.selected_date / name, date_root / name)
 
@@ -138,3 +138,4 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.assertNotIn("--allow-source-app-fallback", content)
         self.assertNotIn("def _run_source_app_fallback", content)
         self.assertNotIn("live_snapshot_lines_", content)
+        self.assertNotIn("predictions_display_", content)

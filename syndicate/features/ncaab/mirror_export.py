@@ -206,8 +206,6 @@ def _base_row(prediction: dict[str, str], *, book: str | None = None) -> dict[st
 
 def build_recommendations_payload_from_raw(raw_root: Path, selected_date: str) -> dict[str, Any] | None:
     prediction_path = raw_root / "by_date" / selected_date / f"predictions_unified_enriched_{selected_date}.csv"
-    if not prediction_path.exists():
-        prediction_path = raw_root / "by_date" / selected_date / f"predictions_display_{selected_date}.csv"
     prediction_rows = _read_csv_rows(prediction_path)
     if not prediction_rows:
         return None
@@ -382,8 +380,6 @@ def build_results_payload_from_raw(raw_root: Path, selected_date: str) -> dict[s
     live_features_path = raw_root / "by_date" / selected_date / f"live_features_{selected_date}.csv"
     prediction_path = raw_root / "by_date" / selected_date / f"predictions_{selected_date}.csv"
     metadata_path = raw_root / "by_date" / selected_date / f"predictions_unified_enriched_{selected_date}.csv"
-    if not metadata_path.exists():
-        metadata_path = raw_root / "by_date" / selected_date / f"predictions_display_{selected_date}.csv"
 
     live_rows = _read_csv_rows(live_features_path)
     prediction_rows = _read_csv_rows(prediction_path)
@@ -484,8 +480,6 @@ def build_results_payload_from_raw(raw_root: Path, selected_date: str) -> dict[s
 def build_live_state_payload_from_raw(raw_root: Path, selected_date: str) -> dict[str, Any] | None:
     live_features_path = raw_root / "by_date" / selected_date / f"live_features_{selected_date}.csv"
     prediction_path = raw_root / "by_date" / selected_date / f"predictions_unified_enriched_{selected_date}.csv"
-    if not prediction_path.exists():
-        prediction_path = raw_root / "by_date" / selected_date / f"predictions_display_{selected_date}.csv"
 
     live_rows = _read_csv_rows(live_features_path)
     prediction_rows = _read_csv_rows(prediction_path)
@@ -564,8 +558,6 @@ def build_live_state_payload_from_raw(raw_root: Path, selected_date: str) -> dic
 def build_live_lines_payload_from_raw(raw_root: Path, selected_date: str) -> dict[str, Any] | None:
     live_features_path = raw_root / "by_date" / selected_date / f"live_features_{selected_date}.csv"
     prediction_path = raw_root / "by_date" / selected_date / f"predictions_unified_enriched_{selected_date}.csv"
-    if not prediction_path.exists():
-        prediction_path = raw_root / "by_date" / selected_date / f"predictions_display_{selected_date}.csv"
 
     live_rows = _read_csv_rows(live_features_path)
     prediction_rows = _read_csv_rows(prediction_path)
