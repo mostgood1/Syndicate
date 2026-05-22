@@ -256,6 +256,68 @@ class NcaabMirrorExportTests(unittest.TestCase):
                 ).exists()
             )
 
+    def test_collect_raw_output_artifacts_copies_predictions_model_snapshot(self) -> None:
+        module = self._load_export_script_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_outputs_root = Path(tmp_dir) / "source_outputs"
+            mirror_root = Path(tmp_dir) / "mirror"
+            source_outputs_root.mkdir(parents=True, exist_ok=True)
+            (source_outputs_root / f"predictions_model_{self.selected_date}.csv").write_text(
+                "game_id,pred_total\n401856600,144.1\n",
+                encoding="utf-8",
+            )
+
+            result = module.collect_raw_output_artifacts(
+                source_outputs_root=source_outputs_root,
+                mirror_root=mirror_root,
+                target_date=self.selected_date,
+            )
+
+            self.assertIn(
+                f"raw_outputs/by_date/{self.selected_date}/predictions_model_{self.selected_date}.csv",
+                result["date_files"],
+            )
+            self.assertTrue(
+                (
+                    mirror_root
+                    / "raw_outputs"
+                    / "by_date"
+                    / self.selected_date
+                    / f"predictions_model_{self.selected_date}.csv"
+                ).exists()
+            )
+
+    def test_collect_raw_output_artifacts_copies_align_period_snapshot(self) -> None:
+        module = self._load_export_script_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_outputs_root = Path(tmp_dir) / "source_outputs"
+            mirror_root = Path(tmp_dir) / "mirror"
+            source_outputs_root.mkdir(parents=True, exist_ok=True)
+            (source_outputs_root / f"align_period_{self.selected_date}.csv").write_text(
+                "game_id,period\n401856600,full_game\n",
+                encoding="utf-8",
+            )
+
+            result = module.collect_raw_output_artifacts(
+                source_outputs_root=source_outputs_root,
+                mirror_root=mirror_root,
+                target_date=self.selected_date,
+            )
+
+            self.assertIn(
+                f"raw_outputs/by_date/{self.selected_date}/align_period_{self.selected_date}.csv",
+                result["date_files"],
+            )
+            self.assertTrue(
+                (
+                    mirror_root
+                    / "raw_outputs"
+                    / "by_date"
+                    / self.selected_date
+                    / f"align_period_{self.selected_date}.csv"
+                ).exists()
+            )
+
     def test_build_results_payload_from_raw_generates_settled_rows(self) -> None:
         payload = build_results_payload_from_raw(self.raw_root, self.selected_date)
 
