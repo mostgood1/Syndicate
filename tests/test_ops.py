@@ -381,6 +381,24 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("refresh_nba_source_mirror.ps1", " ".join(str(part) for part in command))
         self.assertIn("-UseExistingMirrorArtifacts", command)
 
+    def test_build_refresh_plan_uses_nba_syndicate_runner_in_source_mode(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="nba", execution_mode="source")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        refresh_steps = result.get("refresh_steps") or []
+        self.assertEqual(len(refresh_steps), 1)
+        step = refresh_steps[0]
+        command = step.get("command") or []
+        self.assertIn("scripts/refresh_nba_oddsapi_props.py", " ".join(str(part) for part in command))
+        self.assertNotIn("nba_betting.refresh_oddsapi_props_job", " ".join(str(part) for part in command))
+        self.assertIn("--source-root", command)
+        self.assertIn("--log-file", command)
+        self.assertIn("--do-edges", command)
+        self.assertIn("--do-export", command)
+
     def test_build_refresh_plan_uses_nba_artifact_root_when_configured(self) -> None:
         from syndicate.features.shared import ops_refresh
 

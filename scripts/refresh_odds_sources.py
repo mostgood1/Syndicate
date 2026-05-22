@@ -149,16 +149,34 @@ def _build_nba_payload(args: argparse.Namespace, *, env_key: str) -> dict[str, s
 
 def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("nba", "NBA-Betting")
-    python_exe = _venv_python(source_root)
-    env_updates = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")
-    env_updates["PYTHONPATH"] = _merge_pythonpath(os.environ.get("PYTHONPATH"), str(source_root / "src"))
+    python_exe = _venv_python(REPO_ROOT)
+    payload = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")["NBA_BETTING_ODDSAPI_PROPS_JOB"]
+    payload_data = json.loads(payload)
     return [
         RefreshStep(
             name="nba_oddsapi_props_job",
             phases=("pregame", "live"),
-            cwd=source_root,
-            command=(python_exe, "-m", "nba_betting.refresh_oddsapi_props_job"),
-            env_updates=env_updates,
+            cwd=REPO_ROOT,
+            command=(
+                python_exe,
+                "scripts/refresh_nba_oddsapi_props.py",
+                "--date",
+                args.date,
+                "--regions",
+                args.regions,
+                "--bookmakers",
+                str(args.bookmakers or ""),
+                "--markets",
+                str(args.markets or ""),
+                "--source-root",
+                str(source_root),
+                "--log-file",
+                str(payload_data.get("log_file") or ""),
+                "--started-at",
+                str(payload_data.get("started_at") or ""),
+                "--do-edges",
+                "--do-export",
+            ),
             description="Refresh NBA OddsAPI props snapshot, edges, and recommendations.",
         )
     ]
