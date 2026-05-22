@@ -97,9 +97,38 @@ def _pid_is_running(pid: int | None) -> bool:
 
 def _resolve_launch_mode() -> str:
     value = str(os.environ.get("SYNDICATE_REFRESH_LAUNCH_MODE") or "detached_subprocess").strip().lower()
-    if value in {"detached_subprocess", "manifest_only"}:
+    if value in {"detached_subprocess", "manifest_only", "external_runner"}:
         return value
     return "detached_subprocess"
+
+
+def _is_external_runner_mode(launch_mode: str) -> bool:
+    return launch_mode in {"manifest_only", "external_runner"}
+
+
+def _external_runner_payload(
+    *,
+    selected_date: str,
+    run_stamp: str,
+    refresh_status_manifest_path: Path,
+    refresh_status_latest_path: Path,
+    refresh_and_gate_run_path: Path,
+    odds_refresh_path: Path,
+    odds_refresh_stderr_path: Path,
+    refresh_command: list[str],
+) -> dict[str, Any]:
+    return {
+        "kind": "external_runner",
+        "queue_state": "queued",
+        "date": selected_date,
+        "runStamp": run_stamp,
+        "manifestPath": str(refresh_status_manifest_path),
+        "latestPath": str(refresh_status_latest_path),
+        "runSummaryPath": str(refresh_and_gate_run_path),
+        "stdoutPath": str(odds_refresh_path),
+        "stderrPath": str(odds_refresh_stderr_path),
+        "command": list(refresh_command),
+    }
 
 
 def _derive_refresh_runtime_state(
@@ -113,6 +142,8 @@ def _derive_refresh_runtime_state(
     odds_refresh_payload = ((artifacts.get("odds_refresh") or {}).get("payload") if isinstance(artifacts.get("odds_refresh"), dict) else None)
     odds_refresh_stderr = ((artifacts.get("odds_refresh_stderr") or {}).get("payload") if isinstance(artifacts.get("odds_refresh_stderr"), dict) else None)
     pid_running = _pid_is_running(pid)
+    launch_owner = str(manifest.get("launchOwner") or "").strip() or None
+    external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else None
 
     state = manifest_state or "unknown"
     detail = "No refresh run has been recorded yet."
@@ -145,6 +176,8 @@ def _derive_refresh_runtime_state(
         "detail": detail,
         "pid": pid,
         "pid_running": pid_running,
+        "launch_owner": launch_owner,
+        "external_runner": external_runner,
         "exit_code": manifest.get("exitCode"),
         "finished_at": manifest.get("finishedAt"),
         "run_stamp": manifest.get("runStamp"),
@@ -467,6 +500,17 @@ def launch_refresh_run(
     if dry_run:
         refresh_command.append("--dry-run")
 
+    external_runner = _external_runner_payload(
+        selected_date=selected_date,
+        run_stamp=run_stamp,
+        refresh_status_manifest_path=refresh_status_manifest_path,
+        refresh_status_latest_path=refresh_status_latest_path,
+        refresh_and_gate_run_path=refresh_and_gate_run_path,
+        odds_refresh_path=odds_refresh_path,
+        odds_refresh_stderr_path=odds_refresh_stderr_path,
+        refresh_command=refresh_command,
+    )
+
     command = [
         sys.executable,
         str(REPO_ROOT / "scripts" / "run_refresh_odds_job.py"),
@@ -498,13 +542,15 @@ def launch_refresh_run(
         "mirrorOnly": bool(mirror_only),
         "executionMode": execution_mode_text,
         "launchMode": launch_mode,
+        "launchOwner": "external_runner" if _is_external_runner_mode(launch_mode) else "web_process",
         "dryRun": bool(dry_run),
-        "state": "pending_external" if launch_mode == "manifest_only" else "running",
+        "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",
         "generatedAt": _utc_now(),
         "command": refresh_command,
         "launcherCommand": command,
         "oddsRefreshPath": str(odds_refresh_path),
         "oddsRefreshStderrPath": str(odds_refresh_stderr_path),
+        "externalRunner": external_runner,
     }
     refresh_and_gate_run_path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
 
@@ -525,13 +571,15 @@ def launch_refresh_run(
         "migrationGateConsolePath": str(artifacts_dir / "migration_gate_console.txt"),
         "executionMode": execution_mode_text,
         "launchMode": launch_mode,
+        "launchOwner": "external_runner" if _is_external_runner_mode(launch_mode) else "web_process",
         "dryRun": bool(dry_run),
-        "state": "pending_external" if launch_mode == "manifest_only" else "running",
+        "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",
+        "externalRunner": external_runner,
     }
     refresh_status_manifest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
     refresh_status_latest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
 
-    if launch_mode == "manifest_only":
+    if _is_external_runner_mode(launch_mode):
         return {
             "ok": True,
             "pid": None,
@@ -544,6 +592,8 @@ def launch_refresh_run(
             "skip_mirror": bool(skip_mirror),
             "mirror_only": bool(mirror_only),
             "launch_mode": launch_mode,
+            "launch_owner": "external_runner",
+            "external_runner": external_runner,
             "state": "pending_external",
         }
 
@@ -577,5 +627,6 @@ def launch_refresh_run(
         "skip_mirror": bool(skip_mirror),
         "mirror_only": bool(mirror_only),
         "launch_mode": launch_mode,
+        "launch_owner": "web_process",
         "state": "running",
     }

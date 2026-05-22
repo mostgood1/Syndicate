@@ -141,6 +141,42 @@ class OpsRefreshApiTests(unittest.TestCase):
         payload = response.get_json()
         self.assertEqual(payload["status"]["refresh_status"]["runtime"]["state"], "running")
 
+    def test_status_surfaces_external_runner_contract(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            refresh_latest = reports_root / "refresh_status" / "latest"
+            artifacts_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
+            refresh_latest.mkdir(parents=True, exist_ok=True)
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            (refresh_latest / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-22",
+                        "artifactsDir": str(artifacts_dir),
+                        "state": "pending_external",
+                        "launchOwner": "external_runner",
+                        "externalRunner": {"kind": "external_runner", "queue_state": "queued", "runStamp": "20260522_120000"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root):
+                response = self.client.get(
+                    "/api/ops/odds-refresh/status",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        runtime = payload["status"]["refresh_status"]["runtime"]
+        self.assertEqual(runtime["state"], "pending_external")
+        self.assertEqual(runtime["launch_owner"], "external_runner")
+        self.assertEqual((runtime.get("external_runner") or {}).get("queue_state"), "queued")
+
     def test_status_reads_from_env_configured_reports_and_data_roots(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -543,12 +579,35 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertIsNone(result["pid"])
             self.assertEqual(result["launch_mode"], "manifest_only")
+            self.assertEqual(result["launch_owner"], "external_runner")
             self.assertEqual(result["state"], "pending_external")
+            self.assertEqual((result.get("external_runner") or {}).get("kind"), "external_runner")
 
             latest_manifest = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
             payload = json.loads(latest_manifest.read_text(encoding="utf-8"))
             self.assertEqual(payload["state"], "pending_external")
             self.assertEqual(payload["launchMode"], "manifest_only")
+            self.assertEqual(payload["launchOwner"], "external_runner")
+            self.assertEqual((payload.get("externalRunner") or {}).get("queue_state"), "queued")
+
+    def test_launch_refresh_run_supports_external_runner_mode_alias(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REFRESH_LAUNCH_MODE": "external_runner"}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
+
+            mocked_popen.assert_not_called()
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["launch_mode"], "external_runner")
+            self.assertEqual(result["launch_owner"], "external_runner")
+            self.assertEqual(result["state"], "pending_external")
 
     def test_cancel_latest_refresh_run_supports_manifest_only_queue(self) -> None:
         with TemporaryDirectory() as tmp_dir:

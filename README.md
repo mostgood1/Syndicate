@@ -75,7 +75,7 @@ Hosted state overrides:
 - `SYNDICATE_REPORTS_ROOT`: optional absolute path for refresh status, latest manifests, logs, and daily-update state. Defaults to `reports/` under the repo.
 - `SYNDICATE_DATA_ROOT`: optional absolute path for mirrored data roots such as `mlb_source/` and `nba_source/`. Defaults to `data/` under the repo.
 - `SYNDICATE_STATE_ROOT`: optional fallback root for reports-style state when `SYNDICATE_REPORTS_ROOT` is not set. This is mainly useful when the hosted runtime mounts one persistent state directory and you want Syndicate to treat it as the reports root.
-- `SYNDICATE_REFRESH_LAUNCH_MODE`: controls how the ops refresh endpoint launches work. Defaults to `detached_subprocess`, which preserves the current local behavior. Set it to `manifest_only` when a hosted deployment should only record queued refresh manifests and let an external runner or worker pick them up.
+- `SYNDICATE_REFRESH_LAUNCH_MODE`: controls how the ops refresh endpoint launches work. Defaults to `detached_subprocess`, which preserves the current local behavior. Set it to `manifest_only` or `external_runner` when a hosted deployment should only record queued refresh manifests and let an external runner or worker pick them up. In those queued modes the persisted run manifests now include an explicit `externalRunner` contract describing the command plus status file paths the worker should own.
 
 These overrides are part of the self-hosting path. They are not required for the current read-only repo-backed Render deployment, but they are now supported by the ops/status layer so hosted refresh state can move onto durable storage without changing the public ops endpoints.
 
