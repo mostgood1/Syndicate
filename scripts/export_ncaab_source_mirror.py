@@ -108,6 +108,8 @@ def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path
     file_names = [
         f"games_{target_date}.csv",
         f"games_with_odds_{target_date}.csv",
+        f"games_with_odds_{target_date}_edges.csv",
+        f"merged_odds_predictions_{target_date}.csv",
         f"predictions_{target_date}.csv",
         f"predictions_unified_{target_date}.csv",
         f"predictions_unified_enriched_{target_date}.csv",

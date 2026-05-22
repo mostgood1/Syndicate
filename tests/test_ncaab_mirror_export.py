@@ -318,6 +318,54 @@ class NcaabMirrorExportTests(unittest.TestCase):
                 ).exists()
             )
 
+    def test_collect_raw_output_artifacts_copies_joined_odds_priority_snapshots(self) -> None:
+        module = self._load_export_script_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_outputs_root = Path(tmp_dir) / "source_outputs"
+            mirror_root = Path(tmp_dir) / "mirror"
+            source_outputs_root.mkdir(parents=True, exist_ok=True)
+            (source_outputs_root / f"games_with_odds_{self.selected_date}_edges.csv").write_text(
+                "game_id,market,edge\n401856600,totals,3.2\n",
+                encoding="utf-8",
+            )
+            (source_outputs_root / f"merged_odds_predictions_{self.selected_date}.csv").write_text(
+                "game_id,total\n401856600,132.5\n",
+                encoding="utf-8",
+            )
+
+            result = module.collect_raw_output_artifacts(
+                source_outputs_root=source_outputs_root,
+                mirror_root=mirror_root,
+                target_date=self.selected_date,
+            )
+
+            self.assertIn(
+                f"raw_outputs/by_date/{self.selected_date}/games_with_odds_{self.selected_date}_edges.csv",
+                result["date_files"],
+            )
+            self.assertIn(
+                f"raw_outputs/by_date/{self.selected_date}/merged_odds_predictions_{self.selected_date}.csv",
+                result["date_files"],
+            )
+            self.assertTrue(
+                (
+                    mirror_root
+                    / "raw_outputs"
+                    / "by_date"
+                    / self.selected_date
+                    / f"games_with_odds_{self.selected_date}_edges.csv"
+                ).exists()
+            )
+            self.assertTrue(
+                (
+                    mirror_root
+                    / "raw_outputs"
+                    / "by_date"
+                    / self.selected_date
+                    / f"merged_odds_predictions_{self.selected_date}.csv"
+                ).exists()
+            )
+
     def test_build_results_payload_from_raw_generates_settled_rows(self) -> None:
         payload = build_results_payload_from_raw(self.raw_root, self.selected_date)
 
