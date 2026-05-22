@@ -417,6 +417,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         command.append("-UseExistingMirrorArtifacts")
     if mirror_only and sport == "nhl":
         command.append("-UseExistingMirrorArtifacts")
+    if mirror_only and sport == "wnba":
+        command.append("-UseExistingMirrorArtifacts")
     return RefreshStep(
         name=script_name.replace(".ps1", ""),
         phases=("pregame", "live", "all"),

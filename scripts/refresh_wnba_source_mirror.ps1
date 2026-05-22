@@ -1,23 +1,28 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\WNBA-Betting"
+    [string]$SourceRepo = "..\WNBA-Betting",
+    [switch]$UseExistingMirrorArtifacts
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_WNBA'
-$sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
-if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
-    $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
-}
-if (-not (Test-Path $sourceRootCandidate)) {
-    throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar or pass -SourceRepo."
-}
-$sourceRoot = (Resolve-Path $sourceRootCandidate).Path
+$sourceRoot = $null
 $destDataRoot = Join-Path $repoRoot 'data\wnba_source\data\processed'
 $destRawRoot = Join-Path $repoRoot 'data\wnba_source\data\raw'
 $destLiveLensRoot = Join-Path $repoRoot 'data\wnba_source\data\live_lens'
+
+if (-not $UseExistingMirrorArtifacts) {
+    $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
+    if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
+        $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
+    }
+    if (-not (Test-Path $sourceRootCandidate)) {
+        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, or use -UseExistingMirrorArtifacts."
+    }
+    $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
+}
 
 function Copy-IfExists {
     param(
@@ -32,6 +37,15 @@ function Copy-IfExists {
     $parent = Split-Path -Parent $DestinationPath
     if ($parent) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    $resolvedSourcePath = (Resolve-Path $SourcePath).Path
+    $resolvedDestinationPath = $DestinationPath
+    if (Test-Path $DestinationPath) {
+        $resolvedDestinationPath = (Resolve-Path $DestinationPath).Path
+    }
+    if ($resolvedSourcePath -eq $resolvedDestinationPath) {
+        return $true
     }
 
     Copy-Item -Path $SourcePath -Destination $DestinationPath -Force
@@ -76,8 +90,8 @@ $files = @(
 )
 
 foreach ($name in $files) {
-    $src = Join-Path $sourceRoot (Join-Path 'data\processed' $name)
     $dst = Join-Path $destDataRoot $name
+    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot (Join-Path 'data\processed' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add($name) | Out-Null
     }
@@ -90,8 +104,8 @@ $liveLensFiles = @(
 )
 
 foreach ($name in $liveLensFiles) {
-    $src = Join-Path $sourceRoot (Join-Path 'data\live_lens' $name)
     $dst = Join-Path $destLiveLensRoot $name
+    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot (Join-Path 'data\live_lens' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add((Join-Path 'live_lens' $name)) | Out-Null
     }
@@ -103,8 +117,8 @@ $rawFiles = @(
 )
 
 foreach ($name in $rawFiles) {
-    $src = Join-Path $sourceRoot (Join-Path 'data\raw' $name)
     $dst = Join-Path $destRawRoot $name
+    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot (Join-Path 'data\raw' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add((Join-Path 'raw' $name)) | Out-Null
     }
@@ -139,6 +153,7 @@ $manifest = [pscustomobject]@{
     sourceRepo = $sourceRoot
     sourceRootEnvVar = $sourceRootEnvVar
     destinationRoot = $destDataRoot
+    usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
     copiedArtifactCount = $copied.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copied)
