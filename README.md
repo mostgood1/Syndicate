@@ -77,6 +77,16 @@ Hosted state overrides:
 - `SYNDICATE_STATE_ROOT`: optional fallback root for reports-style state when `SYNDICATE_REPORTS_ROOT` is not set. This is mainly useful when the hosted runtime mounts one persistent state directory and you want Syndicate to treat it as the reports root.
 - `SYNDICATE_REFRESH_LAUNCH_MODE`: controls how the ops refresh endpoint launches work. Defaults to `detached_subprocess`, which preserves the current local behavior. Set it to `manifest_only` or `external_runner` when a hosted deployment should only record queued refresh manifests and let an external runner or worker pick them up. In those queued modes the persisted run manifests now include an explicit `externalRunner` contract describing the command plus status file paths the worker should own.
 
+When the site is running in one of those queued hosted modes, a worker can pick up the latest queued refresh contract with:
+
+```powershell
+python .\scripts\run_queued_refresh_job.py
+python .\scripts\run_queued_refresh_job.py --run-stamp 20260522_120000
+python .\scripts\run_queued_refresh_job.py --dry-run
+```
+
+That runner script claims the queued manifest, marks it `running`, and executes the persisted `externalRunner` contract through [scripts/run_refresh_odds_job.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_odds_job.py). This is the first worker-side pickup path for the hosted refresh contract.
+
 These overrides are part of the self-hosting path. They are not required for the current read-only repo-backed Render deployment, but they are now supported by the ops/status layer so hosted refresh state can move onto durable storage without changing the public ops endpoints.
 
 If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, start with [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md) for the execution order and use [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) for the architectural rationale behind that backlog.

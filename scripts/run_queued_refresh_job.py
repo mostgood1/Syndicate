@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+REPORTS_ROOT = REPO_ROOT / "reports"
+
+
+def _utc_now() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _reports_root() -> Path:
+    override = str(os.environ.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_STATE_ROOT") or "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return REPORTS_ROOT
+
+
+def _default_latest_manifest_path() -> Path:
+    return _reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_stamp: str | None = None) -> dict[str, Any]:
+    latest_manifest = _read_json(latest_manifest_path)
+    if not latest_manifest:
+        raise ValueError(f"Latest refresh manifest not found or invalid: {latest_manifest_path}")
+
+    manifest_state = str(latest_manifest.get("state") or "").strip().lower()
+    if manifest_state != "pending_external":
+        raise ValueError(f"Latest refresh manifest is not queued for an external runner: {manifest_state or 'missing state'}")
+
+    contract = latest_manifest.get("externalRunner")
+    if not isinstance(contract, dict):
+        raise ValueError("Latest refresh manifest is missing an externalRunner contract.")
+
+    if expected_run_stamp and str(contract.get("runStamp") or "") != str(expected_run_stamp):
+        raise ValueError(
+            f"Latest queued run does not match expected run stamp {expected_run_stamp}: {contract.get('runStamp') or 'missing'}"
+        )
+
+    manifest_path = Path(str(contract.get("manifestPath") or "").strip())
+    run_summary_path = Path(str(contract.get("runSummaryPath") or "").strip())
+    if not str(manifest_path):
+        raise ValueError("External runner contract is missing manifestPath.")
+    if not str(run_summary_path):
+        raise ValueError("External runner contract is missing runSummaryPath.")
+
+    manifest = _read_json(manifest_path)
+    if not manifest:
+        raise ValueError(f"Queued refresh manifest is missing or invalid: {manifest_path}")
+
+    claimed_at = _utc_now()
+    latest_manifest["state"] = "running"
+    latest_manifest["runnerClaimedAt"] = claimed_at
+    latest_manifest["runnerKind"] = "external_runner"
+    _write_json(latest_manifest_path, latest_manifest)
+
+    manifest["state"] = "running"
+    manifest["runnerClaimedAt"] = claimed_at
+    manifest["runnerKind"] = "external_runner"
+    _write_json(manifest_path, manifest)
+
+    run_summary = _read_json(run_summary_path)
+    if run_summary:
+        run_summary["state"] = "running"
+        run_summary["runnerClaimedAt"] = claimed_at
+        run_summary["runnerKind"] = "external_runner"
+        _write_json(run_summary_path, run_summary)
+
+    return contract
+
+
+def _build_wrapper_command(contract: dict[str, Any]) -> list[str]:
+    required = {
+        "manifestPath": "manifest path",
+        "latestPath": "latest status path",
+        "runSummaryPath": "run summary path",
+        "stdoutPath": "stdout path",
+        "stderrPath": "stderr path",
+    }
+    missing = [label for key, label in required.items() if not str(contract.get(key) or "").strip()]
+    if missing:
+        raise ValueError(f"External runner contract is missing required fields: {', '.join(missing)}")
+
+    command = contract.get("command")
+    if not isinstance(command, list) or not command:
+        raise ValueError("External runner contract is missing a refresh command.")
+
+    return [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "run_refresh_odds_job.py"),
+        "--manifest-path",
+        str(contract["manifestPath"]),
+        "--latest-path",
+        str(contract["latestPath"]),
+        "--run-summary-path",
+        str(contract["runSummaryPath"]),
+        "--stdout-path",
+        str(contract["stdoutPath"]),
+        "--stderr-path",
+        str(contract["stderrPath"]),
+        "--",
+        *[str(part) for part in command],
+    ]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Claim the latest queued Syndicate refresh contract and run it through the refresh job wrapper.")
+    parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
+    parser.add_argument("--run-stamp", default="")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    latest_manifest_path = Path(str(args.latest_manifest or "").strip()).expanduser().resolve()
+    contract = _claim_external_runner_contract(
+        latest_manifest_path=latest_manifest_path,
+        expected_run_stamp=str(args.run_stamp or "").strip() or None,
+    )
+    wrapper_command = _build_wrapper_command(contract)
+
+    if args.dry_run:
+        print(json.dumps({"ok": True, "latest_manifest": str(latest_manifest_path), "wrapper_command": wrapper_command}, indent=2))
+        return 0
+
+    result = subprocess.run(wrapper_command)
+    return int(result.returncode)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
