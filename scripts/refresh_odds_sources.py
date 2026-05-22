@@ -308,8 +308,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NHL-Betting",
         mirror_script_name="refresh_nhl_source_mirror.ps1",
         step_builder=_build_nhl_steps,
-        ingest_contract_kind="existing_mirror_artifacts",
-        ingest_contract_notes="Hosted-safe ingest can rebuild the mirror manifest from existing files under data/nhl_source.",
+        ingest_contract_kind="artifact_bundle_or_existing_mirror",
+        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/nhl_source or from a published NHL artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NHL.",
         notes="Refreshes both team odds and player props using the source CLI instead of a new Syndicate fetcher.",
     ),
     "nfl": SportSpec(
@@ -458,6 +458,10 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         command.extend(["-Date", date])
     if sport == "mlb":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_MLB") or "").strip()
+        if artifact_root:
+            command.extend(["-SourceArtifactRoot", artifact_root])
+    if sport == "nhl":
+        artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NHL") or "").strip()
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if mirror_only and sport == "ncaab":

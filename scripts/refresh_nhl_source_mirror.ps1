@@ -1,6 +1,7 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
     [string]$SourceRepo = "..\NHL-Betting",
+    [string]$SourceArtifactRoot = "",
     [switch]$UseExistingMirrorArtifacts
 )
 
@@ -8,7 +9,9 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_NHL'
+$sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_NHL'
 $sourceRoot = $null
+$artifactRoot = $null
 $destDataRoot = Join-Path $repoRoot 'data\nhl_source\data\processed'
 $destLiveLensRoot = Join-Path $repoRoot 'data\nhl_source\data\live_lens'
 $destOddsRoot = Join-Path $repoRoot (Join-Path 'data\nhl_source\data\odds\games' ("date=" + $Date))
@@ -16,12 +19,25 @@ $destTeamOddsRoot = Join-Path $repoRoot (Join-Path 'data\nhl_source\data\odds\te
 $destPropsRoot = Join-Path $repoRoot (Join-Path 'data\nhl_source\data\props\player_props_lines' ("date=" + $Date))
 
 if (-not $UseExistingMirrorArtifacts) {
+    $artifactRootCandidate = $SourceArtifactRoot
+    if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        $artifactRootCandidate = [Environment]::GetEnvironmentVariable($sourceArtifactRootEnvVar)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        if (-not (Test-Path $artifactRootCandidate)) {
+            throw "Artifact root path not found: $artifactRootCandidate. Set $sourceArtifactRootEnvVar or pass -SourceArtifactRoot with a published NHL artifact bundle path."
+        }
+        $artifactRoot = (Resolve-Path $artifactRootCandidate).Path
+    }
+}
+
+if ((-not $UseExistingMirrorArtifacts) -and (-not $artifactRoot)) {
     $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
     if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
         $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
     }
     if (-not (Test-Path $sourceRootCandidate)) {
-        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, or use -UseExistingMirrorArtifacts."
+        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, set $sourceArtifactRootEnvVar / -SourceArtifactRoot, or use -UseExistingMirrorArtifacts."
     }
     $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
 }
@@ -111,7 +127,7 @@ foreach ($name in $files) {
         Add-IfExists -SourcePath $dst -ArtifactLabel $name -TargetList $copied | Out-Null
     }
     else {
-        $src = Join-Path $sourceRoot (Join-Path 'data\processed' $name)
+        $src = if ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\processed' $name) } else { Join-Path $sourceRoot (Join-Path 'data\processed' $name) }
         if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
             $copied.Add($name) | Out-Null
         }
@@ -135,9 +151,9 @@ foreach ($name in $liveLensFiles) {
     }
     else {
         $sources = @(
-            (Join-Path $sourceRoot (Join-Path 'data\processed' $name)),
-            (Join-Path $sourceRoot (Join-Path 'data\processed\live_lens' $name)),
-            (Join-Path $sourceRoot (Join-Path 'data\live_lens' $name))
+            ($(if ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\processed' $name) } else { Join-Path $sourceRoot (Join-Path 'data\processed' $name) })),
+            ($(if ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\processed\live_lens' $name) } else { Join-Path $sourceRoot (Join-Path 'data\processed\live_lens' $name) })),
+            ($(if ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\live_lens' $name) } else { Join-Path $sourceRoot (Join-Path 'data\live_lens' $name) }))
         )
         if (Copy-FirstExisting -SourcePaths $sources -DestinationPath $processedDst) {
             $copied.Add($name) | Out-Null
@@ -149,14 +165,14 @@ foreach ($name in $liveLensFiles) {
 }
 
 $scoreboardDst = Join-Path $destOddsRoot 'scoreboard.csv'
-if (($UseExistingMirrorArtifacts -and (Test-Path $scoreboardDst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path $sourceRoot (Join-Path 'data\odds\games' ("date=" + $Date + '\\scoreboard.csv'))) -DestinationPath $scoreboardDst))) {
+if (($UseExistingMirrorArtifacts -and (Test-Path $scoreboardDst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path ($(if ($artifactRoot) { $artifactRoot } else { $sourceRoot })) (Join-Path 'data\odds\games' ("date=" + $Date + '\\scoreboard.csv'))) -DestinationPath $scoreboardDst))) {
     $copied.Add((Join-Path (Join-Path 'odds\games' ("date=" + $Date)) 'scoreboard.csv')) | Out-Null
 }
 
 $teamOddsFiles = @('oddsapi.csv', 'oddsapi.parquet')
 foreach ($name in $teamOddsFiles) {
     $dst = Join-Path $destTeamOddsRoot $name
-    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path $sourceRoot (Join-Path 'data\odds\team' ("date=" + $Date + ('\\' + $name)))) -DestinationPath $dst))) {
+    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path ($(if ($artifactRoot) { $artifactRoot } else { $sourceRoot })) (Join-Path 'data\odds\team' ("date=" + $Date + ('\\' + $name)))) -DestinationPath $dst))) {
         $copied.Add((Join-Path (Join-Path 'odds\team' ("date=" + $Date)) $name)) | Out-Null
     }
 }
@@ -164,7 +180,7 @@ foreach ($name in $teamOddsFiles) {
 $propsFiles = @('oddsapi.csv', 'oddsapi.parquet')
 foreach ($name in $propsFiles) {
     $dst = Join-Path $destPropsRoot $name
-    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path $sourceRoot (Join-Path 'data\props\player_props_lines' ("date=" + $Date + ('\\' + $name)))) -DestinationPath $dst))) {
+    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path ($(if ($artifactRoot) { $artifactRoot } else { $sourceRoot })) (Join-Path 'data\props\player_props_lines' ("date=" + $Date + ('\\' + $name)))) -DestinationPath $dst))) {
         $copied.Add((Join-Path (Join-Path 'props\player_props_lines' ("date=" + $Date)) $name)) | Out-Null
     }
 }
@@ -200,9 +216,12 @@ $manifest = [pscustomobject]@{
     date = $Date
     refreshedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
     sourceRepo = $sourceRoot
+    sourceArtifactRoot = $artifactRoot
     sourceRootEnvVar = $sourceRootEnvVar
+    sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
     destinationRoot = (Join-Path $repoRoot 'data\nhl_source')
     usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
+    usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
     copiedArtifactCount = $copied.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copied)
