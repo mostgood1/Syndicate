@@ -13,7 +13,7 @@ Syndicate is not yet a self-refreshing hosted system. The remaining gap is not t
 Today that path still depends on three assumptions:
 
 1. [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) resolves sibling repo roots by default and runs source-owned commands inside those repos.
-2. The per-sport mirror scripts under [scripts](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts) mostly copy files out of those source repos after the source refresh completes.
+2. The generation layer is still source-owned even though the per-sport mirror scripts under [scripts](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts) can now import from neutral artifact bundles instead of only from sibling repo layouts.
 3. [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) launches background refresh jobs with `subprocess.Popen` and persists run state under repo-local `reports/`, which implies writable durable storage and a process model friendlier than a standard Render web dyno.
 
 Render can host the web app now. Render cannot yet replace the whole local multi-repo refresh workflow.
@@ -158,6 +158,11 @@ Render-safe shape:
 What must change:
 - replace `SourceRepo` defaults like `..\NBA-Betting` and `..\NHL-Betting`
 - define a stable ingest contract per sport that no longer assumes source repo layout details
+
+Current implementation progress:
+- MLB, NBA, NHL, NFL, WNBA, and NCAAF now support neutral `artifact_bundle_or_existing_mirror` ingestion via `SYNDICATE_ARTIFACT_ROOT_*` overrides or local existing-mirror mode.
+- NCAAB already supports a hosted-safe `existing_raw_outputs` bundle path for rebuilding the local API bundle.
+- The remaining work in this refactor is no longer the ingest contract itself. It is the generation/export side: publishing those bundles from source-owned jobs or replacing those jobs with Syndicate-owned generation.
 
 ### 4. Remove source Flask app bootstrapping from normal refresh
 

@@ -61,7 +61,8 @@ Current hosted boundary:
 
 - The web app itself is deployable on Render now.
 - The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
-- Public module data is still mirror-first with respect to sibling source repos. Hosted refreshes can safely own status and worker execution now, but sports that still depend on sibling repo generation or source-app export are not yet fully self-refreshing on Render.
+- The per-sport ingest boundary is now hosted-safe across MLB, NBA, NHL, NFL, WNBA, NCAAF, and NCAAB: each module can import from a neutral artifact bundle or an already mirrored local bundle instead of requiring a sibling source checkout during ingest.
+- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for most sports, and the remaining normal source-app bootstrap blockers are the NCAAB exporter path plus the NBA live-state fallback.
 
 Render setup:
 
@@ -96,6 +97,7 @@ Blueprint defaults:
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` for both the web service and the worker.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) leaves `SYNDICATE_DATA_ROOT` unset, so public mirrored artifacts still come from the repo-backed `data/` tree unless you deliberately introduce a separate hosted artifact strategy.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) intentionally does not hardcode any `SYNDICATE_ARTIFACT_ROOT_*` values. Published bundle locations are deployment-specific, so set the matching artifact-root overrides on both the web service and the worker when you want hosted ingest to pull from neutral artifact bundles instead of the repo-backed `data/` tree.
 
 When the site is running in one of those queued hosted modes, a worker can pick up the latest queued refresh contract with:
 
@@ -125,9 +127,10 @@ Hosted smoke checklist:
 
 1. Open the web root and confirm the main Syndicate routes still render from the deployed web service.
 2. Open `/ops/odds-refresh` with the admin token and confirm the page loads without filesystem-state errors.
-3. Trigger one dry-run refresh from the ops surface and confirm the web status moves to `pending_external`, then `running`, then `finished` or `failed` as the worker picks it up.
-4. Restart or redeploy the web service and confirm the latest refresh status still appears, proving that refresh state is coming from Key Value instead of the web filesystem.
-5. Treat any sport-level refresh failure as an artifact-generation ownership issue, not a refresh-state or worker-wiring failure, unless the status itself fails to update.
+3. If the deployment should ingest published bundles, set the relevant `SYNDICATE_ARTIFACT_ROOT_*` overrides on both the web service and the worker, then verify a dry-run refresh plan shows `artifact_bundle_or_existing_mirror` and includes `-SourceArtifactRoot` for the configured sports.
+4. Trigger one dry-run refresh from the ops surface and confirm the web status moves to `pending_external`, then `running`, then `finished` or `failed` as the worker picks it up.
+5. Restart or redeploy the web service and confirm the latest refresh status still appears, proving that refresh state is coming from Key Value instead of the web filesystem.
+6. Treat any sport-level refresh failure as an artifact-generation ownership issue, not a refresh-state or worker-wiring failure, unless the status itself fails to update.
 
 If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, start with [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md) for the execution order and use [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) for the architectural rationale behind that backlog.
 

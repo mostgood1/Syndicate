@@ -8,8 +8,8 @@ Today Syndicate is safe to run on Render as a read-only web app backed by mirror
 
 Today Syndicate is not yet safe to run on Render as a self-refreshing system because:
 
-- [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) still resolves sibling repo roots and executes source-owned commands.
-- [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) still launches refresh work from the web-side control path and stores status under repo-local `reports/`.
+- [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) still resolves sibling repo roots and executes source-owned generation commands by default, even though all per-sport ingestion contracts can now target neutral artifact bundles.
+- Deployment proof is still incomplete: the Render blueprint and docs need manual `SYNDICATE_ARTIFACT_ROOT_*` wiring per environment before hosted refreshes can actually ingest published bundles.
 - [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) and [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) still rely on source-app execution for part of their artifact generation path.
 
 ## Delivery strategy
@@ -114,6 +114,12 @@ Tasks:
   - durable mounted data written by a separate worker.
 - Keep a local compatibility wrapper only while the hosted-safe path is being phased in.
 
+Current status:
+- The planner now exposes a hosted-safe ingest contract for every current sport module.
+- MLB, NBA, NHL, NFL, WNBA, and NCAAF mirror scripts all support `artifact_bundle_or_existing_mirror` via `SYNDICATE_ARTIFACT_ROOT_*` or `-UseExistingMirrorArtifacts`.
+- NCAAB already supports the hosted-safe raw-output bundle path via `existing_raw_outputs`.
+- The remaining gap in this milestone is not neutral ingest shape; it is generation ownership and actual hosted publication/wiring of those artifact bundles.
+
 Exit criteria:
 - Refresh planning can target hosted-safe generation or hosted-safe ingestion without assuming sibling repos.
 - Mirror/import jobs operate on neutral artifact contracts instead of source repo directories.
@@ -211,4 +217,4 @@ Treat Render self-hosting as done only when all of the following are true:
 
 Start with Milestone 1A.
 
-The highest-leverage first code change is to make NCAAB mirror export artifact-only by default. That removes the largest explicit source-app dependency, gives the hosted plan a real first win, and provides the template for the remaining source-export removals.
+The highest-leverage next code change is to make NCAAB mirror export artifact-only by default. That removes the largest explicit source-app dependency, gives the hosted plan a real first win on the generation/export side, and provides the template for removing the remaining NBA bootstrap fallback.
