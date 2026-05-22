@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 from datetime import datetime
@@ -9,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import write_text_file
 from syndicate.features.shared.refresh_state_store import write_json_file
 
 
@@ -62,8 +62,8 @@ def main() -> int:
     stderr_path = Path(args.stderr_path)
 
     result = subprocess.run(command, capture_output=True, text=True)
-    stdout_path.write_text(result.stdout or "", encoding="utf-8")
-    stderr_path.write_text(result.stderr or "", encoding="utf-8")
+    write_text_file(stdout_path, result.stdout or "")
+    write_text_file(stderr_path, result.stderr or "")
 
     state = "finished" if result.returncode == 0 else "failed"
     _update_state(

@@ -141,6 +141,11 @@ Tasks:
 - Preserve the current UI endpoint `/ops/odds-refresh` and JSON ops endpoints while swapping the backend state store.
 - Add tests that simulate missing local `reports/` state but valid external or mounted state.
 
+Current status:
+- The worker-oriented execution contract is now in place via [scripts/run_queued_refresh_job.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_queued_refresh_job.py) and [scripts/run_refresh_worker.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_worker.py).
+- The refresh-state abstraction now exists in [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py) and supports both filesystem and Key Value-backed refresh status/log storage.
+- The remaining hosted gap in this milestone is deployment wiring and proving the shared backend in a real hosted configuration, not the absence of a worker/read abstraction.
+
 Exit criteria:
 - The web service does not own long-running refresh subprocesses.
 - Refresh state survives web restarts.
@@ -160,7 +165,7 @@ Tasks:
 - Extend [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) to represent the hosted runtime model actually required:
   - web service
   - worker or job service
-  - persistent disk or other durable state dependency
+  - shared durable state dependency such as Render Key Value for refresh status, or another external store if that proves a better fit
 - Document exact environment variables, mounted paths, and responsibilities per service in [README.md](c:/Users/mostg/OneDrive/Coding/Syndicate/README.md).
 - Add a hosted smoke checklist that verifies:
   - the web app reads current status

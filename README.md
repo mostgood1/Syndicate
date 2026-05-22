@@ -75,6 +75,9 @@ Hosted state overrides:
 - `SYNDICATE_REPORTS_ROOT`: optional absolute path for refresh status, latest manifests, logs, and daily-update state. Defaults to `reports/` under the repo.
 - `SYNDICATE_DATA_ROOT`: optional absolute path for mirrored data roots such as `mlb_source/` and `nba_source/`. Defaults to `data/` under the repo.
 - `SYNDICATE_STATE_ROOT`: optional fallback root for reports-style state when `SYNDICATE_REPORTS_ROOT` is not set. This is mainly useful when the hosted runtime mounts one persistent state directory and you want Syndicate to treat it as the reports root.
+- `SYNDICATE_REFRESH_STATE_BACKEND`: controls how refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest are stored. Defaults to `filesystem`. Set it to `keyvalue` for a shared Redis or Render Key Value-backed state store that both the web service and worker can read.
+- `SYNDICATE_REFRESH_STATE_URL`: connection URL used when `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`. `REDIS_URL` is also accepted as a fallback.
+- `SYNDICATE_REFRESH_STATE_NAMESPACE`: optional key prefix for the shared refresh-state backend. Defaults to `syndicate`.
 - `SYNDICATE_REFRESH_LAUNCH_MODE`: controls how the ops refresh endpoint launches work. Defaults to `detached_subprocess`, which preserves the current local behavior. Set it to `manifest_only` or `external_runner` when a hosted deployment should only record queued refresh manifests and let an external runner or worker pick them up. In those queued modes the persisted run manifests now include an explicit `externalRunner` contract describing the command plus status file paths the worker should own.
 
 When the site is running in one of those queued hosted modes, a worker can pick up the latest queued refresh contract with:
@@ -95,8 +98,9 @@ That runner script claims the queued manifest, marks it `running`, and executes 
 Important Render constraint:
 
 - Render persistent disks are attached to only one service instance and cannot be shared between the web service and a background worker.
-- Because Syndicate's current refresh state is still file-backed, a worker-plus-disk `render.yaml` expansion by itself would be incorrect: the worker could own the disk, or the web app could own the disk, but not both.
-- The current code now has an explicit shared refresh-state seam in [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py). The next self-hosting step is to put that seam on a Render-safe external store instead of assuming a shared local filesystem.
+- Because of that single-service disk limit, a self-refreshing Render deployment should use the shared state backend in [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py) with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` instead of trying to share a local `reports/` disk between web and worker.
+- The current refresh-state abstraction now supports both the default filesystem mode and a shared Key Value mode for refresh manifests, recent run history, stdout/stderr log payloads, and the latest daily-update manifest.
+- `SYNDICATE_DATA_ROOT` is still separate from the shared refresh-state backend. Public mirrored artifacts and per-sport source data are still file-backed, so the remaining self-hosting work is now about deployment wiring and broader artifact ownership rather than only report-state sharing.
 
 These overrides are part of the self-hosting path. They are not required for the current read-only repo-backed Render deployment, but they are now supported by the ops/status layer so hosted refresh state can move onto durable storage without changing the public ops endpoints.
 

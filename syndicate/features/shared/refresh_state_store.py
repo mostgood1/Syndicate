@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,77 @@ from syndicate.features.shared.source_roots import repo_root_from
 
 REPO_ROOT = repo_root_from(__file__)
 REPORTS_ROOT = REPO_ROOT / "reports"
+
+
+def _state_backend_kind() -> str:
+    value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "filesystem").strip().lower()
+    if value in {"redis", "keyvalue", "valkey"}:
+        return "keyvalue"
+    return "filesystem"
+
+
+def _state_namespace() -> str:
+    value = str(os.environ.get("SYNDICATE_REFRESH_STATE_NAMESPACE") or "syndicate").strip()
+    return value or "syndicate"
+
+
+@lru_cache(maxsize=1)
+def _get_keyvalue_client() -> Any:
+    url = str(os.environ.get("SYNDICATE_REFRESH_STATE_URL") or os.environ.get("REDIS_URL") or "").strip()
+    if not url:
+        raise RuntimeError("SYNDICATE_REFRESH_STATE_URL or REDIS_URL must be set when SYNDICATE_REFRESH_STATE_BACKEND uses keyvalue.")
+    try:
+        import redis
+    except ImportError as exc:
+        raise RuntimeError("redis package is required when SYNDICATE_REFRESH_STATE_BACKEND uses keyvalue.") from exc
+    return redis.Redis.from_url(url, decode_responses=True)
+
+
+def _normalize_state_path(path: Path) -> str:
+    try:
+        normalized = path.expanduser().resolve()
+    except Exception:
+        normalized = path.expanduser()
+    return str(normalized).replace("\\", "/")
+
+
+def _state_key_for_path(path: Path) -> str:
+    return f"{_state_namespace()}:refresh-state:{_normalize_state_path(path)}"
+
+
+def _history_index_key() -> str:
+    return f"{_state_namespace()}:refresh-state-history"
+
+
+def _refresh_status_history_relative_path(path: Path) -> str | None:
+    try:
+        relative = path.expanduser().resolve().relative_to(reports_root())
+    except Exception:
+        return None
+    parts = relative.parts
+    if len(parts) != 4:
+        return None
+    if parts[0] != "refresh_status" or parts[1] == "latest" or parts[3] != "refresh_status_manifest.json":
+        return None
+    return "/".join(parts)
+
+
+def _record_refresh_status_history(path: Path) -> None:
+    if _state_backend_kind() != "keyvalue":
+        return
+    relative_path = _refresh_status_history_relative_path(path)
+    if not relative_path:
+        return
+    client = _get_keyvalue_client()
+    raw_paths = client.get(_history_index_key())
+    try:
+        existing_paths = json.loads(raw_paths) if raw_paths else []
+    except Exception:
+        existing_paths = []
+    if not isinstance(existing_paths, list):
+        existing_paths = []
+    updated_paths = [relative_path, *[item for item in existing_paths if item != relative_path]]
+    client.set(_history_index_key(), json.dumps(updated_paths[:50]))
 
 
 def reports_root() -> Path:
@@ -27,6 +99,18 @@ def data_root() -> Path:
 
 
 def read_json_file(path: Path) -> dict[str, Any] | None:
+    if _state_backend_kind() == "keyvalue":
+        try:
+            payload_text = _get_keyvalue_client().get(_state_key_for_path(path))
+        except Exception:
+            return None
+        if not payload_text:
+            return None
+        try:
+            payload = json.loads(str(payload_text))
+        except Exception:
+            return None
+        return payload if isinstance(payload, dict) else None
     try:
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except Exception:
@@ -35,6 +119,14 @@ def read_json_file(path: Path) -> dict[str, Any] | None:
 
 
 def read_text_file(path: Path) -> str | None:
+    if _state_backend_kind() == "keyvalue":
+        try:
+            payload_text = _get_keyvalue_client().get(_state_key_for_path(path))
+        except Exception:
+            return None
+        if payload_text is None:
+            return None
+        return str(payload_text).strip()
     try:
         return path.read_text(encoding="utf-8").strip()
     except Exception:
@@ -42,8 +134,80 @@ def read_text_file(path: Path) -> str | None:
 
 
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
+    if _state_backend_kind() == "keyvalue":
+        _get_keyvalue_client().set(_state_key_for_path(path), json.dumps(payload, indent=2))
+        _record_refresh_status_history(path)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def write_text_file(path: Path, payload: str) -> None:
+    if _state_backend_kind() == "keyvalue":
+        _get_keyvalue_client().set(_state_key_for_path(path), str(payload or ""))
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(payload or ""), encoding="utf-8")
+
+
+def path_exists(path: Path) -> bool:
+    if _state_backend_kind() == "keyvalue":
+        try:
+            return bool(_get_keyvalue_client().exists(_state_key_for_path(path)))
+        except Exception:
+            return False
+    return path.exists()
+
+
+def path_size(path: Path) -> int:
+    if _state_backend_kind() == "keyvalue":
+        try:
+            payload_text = _get_keyvalue_client().get(_state_key_for_path(path))
+        except Exception:
+            return 0
+        if payload_text is None:
+            return 0
+        return len(str(payload_text).encode("utf-8"))
+    return path.stat().st_size if path.exists() else 0
+
+
+def list_refresh_status_manifest_paths(*, limit: int = 6) -> list[Path]:
+    if _state_backend_kind() == "keyvalue":
+        try:
+            raw_paths = _get_keyvalue_client().get(_history_index_key())
+        except Exception:
+            raw_paths = None
+        try:
+            relative_paths = json.loads(raw_paths) if raw_paths else []
+        except Exception:
+            relative_paths = []
+        if not isinstance(relative_paths, list):
+            return []
+        output: list[Path] = []
+        for item in relative_paths:
+            if not isinstance(item, str) or not item.strip():
+                continue
+            output.append(reports_root() / Path(item))
+            if len(output) >= limit:
+                break
+        return output
+
+    refresh_root = reports_root() / "refresh_status"
+    if not refresh_root.exists():
+        return []
+    manifest_paths: list[Path] = []
+    for date_dir in sorted((path for path in refresh_root.iterdir() if path.is_dir() and path.name != "latest"), reverse=True):
+        for run_dir in sorted((path for path in date_dir.iterdir() if path.is_dir()), reverse=True):
+            manifest_path = run_dir / "refresh_status_manifest.json"
+            if manifest_path.exists():
+                manifest_paths.append(manifest_path)
+                if len(manifest_paths) >= limit:
+                    return manifest_paths
+    return manifest_paths
+
+
+def reset_state_store_caches() -> None:
+    _get_keyvalue_client.cache_clear()
 
 
 def latest_refresh_manifest_context() -> dict[str, Any]:

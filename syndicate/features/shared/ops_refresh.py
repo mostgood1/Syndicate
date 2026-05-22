@@ -12,6 +12,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.refresh_state_store import list_refresh_status_manifest_paths
+from syndicate.features.shared.refresh_state_store import path_exists
+from syndicate.features.shared.refresh_state_store import path_size
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import read_text_file
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -170,40 +173,35 @@ def _derive_refresh_runtime_state(
 
 
 def _load_recent_refresh_history(*, limit: int = 6) -> list[dict[str, Any]]:
-    refresh_root = _reports_root() / "refresh_status"
-    if not refresh_root.exists():
-        return []
     history: list[dict[str, Any]] = []
-    for date_dir in sorted((path for path in refresh_root.iterdir() if path.is_dir() and path.name != "latest"), reverse=True):
-        for run_dir in sorted((path for path in date_dir.iterdir() if path.is_dir()), reverse=True):
-            manifest_path = run_dir / "refresh_status_manifest.json"
-            manifest = read_json_file(manifest_path)
-            if not manifest:
-                continue
-            artifacts_dir_raw = str(manifest.get("artifactsDir") or "").strip()
-            artifacts: dict[str, Any] = {}
-            if artifacts_dir_raw:
-                artifacts_dir = Path(artifacts_dir_raw)
-                for key, (path, kind) in {
-                    "odds_refresh": (artifacts_dir / "odds_refresh.json", "json"),
-                    "odds_refresh_stderr": (artifacts_dir / "odds_refresh.stderr.txt", "text"),
-                }.items():
-                    payload: Any = read_json_file(path) if kind == "json" else read_text_file(path)
-                    artifacts[key] = {"path": str(path), "exists": path.exists(), "payload": payload}
-            runtime = _derive_refresh_runtime_state(manifest, artifacts)
-            history.append(
-                {
-                    "date": manifest.get("date") or date_dir.name,
-                    "run_stamp": manifest.get("runStamp") or run_dir.name,
-                    "artifacts_dir": artifacts_dir_raw,
-                    "phase": manifest.get("oddsPhase") or "all",
-                    "sports": manifest.get("oddsSports") or "all",
-                    "dry_run": bool(manifest.get("dryRun")),
-                    "runtime": runtime,
-                }
-            )
-            if len(history) >= limit:
-                return history
+    for manifest_path in list_refresh_status_manifest_paths(limit=limit):
+        manifest = read_json_file(manifest_path)
+        if not manifest:
+            continue
+        artifacts_dir_raw = str(manifest.get("artifactsDir") or "").strip()
+        artifacts: dict[str, Any] = {}
+        if artifacts_dir_raw:
+            artifacts_dir = Path(artifacts_dir_raw)
+            for key, (path, kind) in {
+                "odds_refresh": (artifacts_dir / "odds_refresh.json", "json"),
+                "odds_refresh_stderr": (artifacts_dir / "odds_refresh.stderr.txt", "text"),
+            }.items():
+                payload: Any = read_json_file(path) if kind == "json" else read_text_file(path)
+                artifacts[key] = {"path": str(path), "exists": path_exists(path), "payload": payload}
+        runtime = _derive_refresh_runtime_state(manifest, artifacts)
+        history.append(
+            {
+                "date": manifest.get("date"),
+                "run_stamp": manifest.get("runStamp"),
+                "artifacts_dir": artifacts_dir_raw,
+                "phase": manifest.get("oddsPhase") or "all",
+                "sports": manifest.get("oddsSports") or "all",
+                "dry_run": bool(manifest.get("dryRun")),
+                "runtime": runtime,
+            }
+        )
+        if len(history) >= limit:
+            return history
     return history
 
 
@@ -295,14 +293,14 @@ def load_latest_refresh_log(*, stream: str = "stderr") -> dict[str, Any]:
     if artifacts_dir is None:
         raise ValueError("No latest refresh artifacts directory is available.")
     path = artifacts_dir / ("odds_refresh.json" if stream_key == "stdout" else "odds_refresh.stderr.txt")
-    content = path.read_text(encoding="utf-8") if path.exists() else ""
+    content = read_text_file(path) or ""
     lines = content.splitlines()
     tail = "\n".join(lines[-80:]) if lines else ""
     return {
         "stream": stream_key,
         "path": str(path),
-        "exists": path.exists(),
-        "size": path.stat().st_size if path.exists() else 0,
+        "exists": path_exists(path),
+        "size": path_size(path),
         "content": content,
         "tail": tail,
         "run_stamp": manifest.get("runStamp"),
@@ -379,7 +377,7 @@ def load_latest_refresh_status() -> dict[str, Any]:
             payload: Any = read_json_file(path) if kind == "json" else read_text_file(path)
             refresh_artifacts[key] = {
                 "path": str(path),
-                "exists": path.exists(),
+                "exists": path_exists(path),
                 "payload": payload,
             }
     runtime_state = _derive_refresh_runtime_state(refresh_manifest, refresh_artifacts)
@@ -392,7 +390,7 @@ def load_latest_refresh_status() -> dict[str, Any]:
         "reports_root": str(current_reports_root),
         "refresh_status": {
             "manifest_path": str(refresh_manifest_path),
-            "manifest_exists": refresh_manifest_path.exists(),
+            "manifest_exists": path_exists(refresh_manifest_path),
             "manifest": refresh_manifest,
             "artifacts": refresh_artifacts,
             "mirror_manifests": _load_mirror_manifest_summaries_from_current_data_root(),
@@ -401,7 +399,7 @@ def load_latest_refresh_status() -> dict[str, Any]:
         },
         "daily_update": {
             "manifest_path": str(daily_update_manifest_path),
-            "manifest_exists": daily_update_manifest_path.exists(),
+            "manifest_exists": path_exists(daily_update_manifest_path),
             "manifest": daily_update_manifest,
         },
     }

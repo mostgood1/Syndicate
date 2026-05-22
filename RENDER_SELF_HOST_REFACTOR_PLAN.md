@@ -142,6 +142,11 @@ What must change:
 - persist latest status outside ephemeral app storage
 - treat the web service as a reader of job state, not the parent process of the job
 
+Current implementation progress:
+- [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py) now provides the shared state seam for refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest.
+- That seam supports both the existing filesystem mode and a Key Value-backed mode suitable for Render-style shared status storage.
+- [scripts/run_refresh_worker.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_worker.py) now provides the long-running worker loop that can consume queued refresh manifests outside the web process.
+
 ### 3. Convert mirror scripts from source-repo copy jobs into neutral import jobs
 
 Right now the mirror scripts assume a checked-out sibling source repo and mostly perform `Copy-Item` against that tree.
