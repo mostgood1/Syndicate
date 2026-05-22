@@ -131,65 +131,6 @@ function Copy-LatestDatedArtifact {
     return $true
 }
 
-function Ensure-LiveStateSnapshot {
-    param(
-        [string]$SourceRoot,
-        [string]$Date,
-        [string]$LiveLensDir
-    )
-
-    $snapshotPath = Join-Path $SourceRoot (Join-Path 'data\processed\live_snapshots' ("live_state_{0}.jsonl" -f $Date))
-    if (Test-Path $snapshotPath) {
-        return $snapshotPath
-    }
-
-    $sourcePython = Join-Path $SourceRoot '.venv\Scripts\python.exe'
-    if (-not (Test-Path $sourcePython)) {
-        return $null
-    }
-
-    $tmpPy = Join-Path ([System.IO.Path]::GetTempPath()) ("syndicate_emit_nba_live_state_{0}_{1}.py" -f $Date, [guid]::NewGuid().ToString('N'))
-    try {
-        $script = @"
-import os
-import sys
-from pathlib import Path
-
-repo_root = Path(r'{REPO_ROOT}')
-if str(repo_root) not in sys.path:
-    sys.path.insert(0, str(repo_root))
-
-os.environ['NBA_LIVE_LENS_DIR'] = r'{LIVE_LENS_DIR}'
-os.environ['LIVE_LENS_SNAPSHOTS'] = '1'
-
-import app
-
-date_str = r'{DATE}'
-client = app.app.test_client()
-resp = client.get(f'/api/live_state?date={date_str}&ttl=12')
-if resp is None or int(resp.status_code or 0) >= 400:
-    raise RuntimeError(f'/api/live_state failed for {date_str}: {getattr(resp, "status_code", None)}')
-print('OK')
-"@
-        $script = $script.Replace('{REPO_ROOT}', $SourceRoot)
-        $script = $script.Replace('{LIVE_LENS_DIR}', $LiveLensDir)
-        $script = $script.Replace('{DATE}', $Date)
-        Set-Content -Path $tmpPy -Value $script -Encoding UTF8
-        & $sourcePython $tmpPy | Out-Null
-    }
-    catch {
-        return $null
-    }
-    finally {
-        Remove-Item -Path $tmpPy -ErrorAction SilentlyContinue
-    }
-
-    if (Test-Path $snapshotPath) {
-        return $snapshotPath
-    }
-    return $null
-}
-
 $copied = New-Object System.Collections.Generic.List[string]
 
 $datedProcessedArtifacts = @(
@@ -279,8 +220,6 @@ $datedLiveSnapshotArtifacts = @(
     @{ Prefix = 'live_player_boxscore_'; Suffix = '.jsonl' },
     @{ Prefix = 'live_player_lens_'; Suffix = '.jsonl' }
 )
-
-[void](Ensure-LiveStateSnapshot -SourceRoot $sourceRoot -Date $Date -LiveLensDir (Join-Path $sourceRoot 'data\processed'))
 
 foreach ($artifact in $datedLiveSnapshotArtifacts) {
     Copy-LatestDatedArtifact -SourceDirectory (Join-Path $sourceRoot 'data\processed\live_snapshots') -DestinationDirectory $destLiveSnapshotsRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate -ManifestPrefix 'live_snapshots' | Out-Null

@@ -101,10 +101,16 @@ class NcaabMirrorExportTests(unittest.TestCase):
             self.assertTrue((api_root / "live_state" / f"live_state_{self.selected_date}.json").exists())
             self.assertTrue((api_root / "live_lines" / f"live_lines_{self.selected_date}.json").exists())
 
-    def test_refresh_ncaab_mirror_script_keeps_source_fallback_opt_in(self) -> None:
+    def test_refresh_ncaab_mirror_script_has_no_source_fallback_switch(self) -> None:
         script_path = self.repo_root / "scripts" / "refresh_ncaab_source_mirror.ps1"
         content = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("[switch]$AllowSourceAppFallback", content)
-        self.assertIn("if ($AllowSourceAppFallback)", content)
-        self.assertNotIn("@('--source-root', $sourceRoot, '--allow-source-app-fallback')", content)
+        self.assertNotIn("[switch]$AllowSourceAppFallback", content)
+        self.assertNotIn("--allow-source-app-fallback", content)
+
+    def test_export_ncaab_source_mirror_script_has_no_source_app_fallback_flag(self) -> None:
+        script_path = self.repo_root / "scripts" / "export_ncaab_source_mirror.py"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertNotIn("--allow-source-app-fallback", content)
+        self.assertNotIn("def _run_source_app_fallback", content)
