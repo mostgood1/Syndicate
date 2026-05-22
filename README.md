@@ -240,6 +240,7 @@ To refresh the local artifact mirrors for the in-season board modules:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_nba_source_mirror.ps1 -Date 2026-05-17
+powershell -ExecutionPolicy Bypass -File .\scripts\refresh_nba_source_mirror.ps1 -Date 2026-05-17 -UseExistingMirrorArtifacts
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_nhl_source_mirror.ps1 -Date 2026-05-17
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_nhl_source_mirror.ps1 -Date 2026-05-17 -UseExistingMirrorArtifacts
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_wnba_source_mirror.ps1 -Date 2026-05-17
@@ -248,6 +249,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\refresh_ncaab_source_mirror.p
 ```
 
 These scripts populate [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nba_source), [data/nhl_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nhl_source), and [data/wnba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/wnba_source) with the date-scoped processed artifacts that Syndicate already reads for cards, archive, picks, props, and sim-backed detail lanes.
+
+NBA now supports the same two mirror modes. The default run still copies fresh artifacts from the sibling NBA repo when that checkout is available. The `-UseExistingMirrorArtifacts` switch skips the sibling repo requirement and rewrites the NBA mirror manifest from the already mirrored files under [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nba_source). That gives the shared ingest path a hosted-safe local mirror mode without changing the default source-backed refresh flow.
 
 NHL now supports two mirror modes as well. The default run still copies fresh artifacts from the sibling NHL repo when that checkout is available. The `-UseExistingMirrorArtifacts` switch skips the sibling repo requirement and rewrites the NHL mirror manifest from the already mirrored files under [data/nhl_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nhl_source). That gives the shared ingest path a hosted-safe local mirror mode without changing the default source-backed refresh flow.
 

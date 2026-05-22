@@ -1,20 +1,14 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\NBA-Betting"
+    [string]$SourceRepo = "..\NBA-Betting",
+    [switch]$UseExistingMirrorArtifacts
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_NBA'
-$sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
-if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
-    $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
-}
-if (-not (Test-Path $sourceRootCandidate)) {
-    throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar or pass -SourceRepo."
-}
-$sourceRoot = (Resolve-Path $sourceRootCandidate).Path
+$sourceRoot = $null
 $destDataRoot = Join-Path $repoRoot 'data\nba_source\data\processed'
 $destRawRoot = Join-Path $repoRoot 'data\nba_source\data\raw'
 $destWebRoot = Join-Path $repoRoot 'data\nba_source\web'
@@ -22,6 +16,17 @@ $destLiveLensRoot = Join-Path $repoRoot 'data\nba_source\data\live_lens'
 $destLiveSnapshotsRoot = Join-Path $repoRoot 'data\nba_source\data\processed\live_snapshots'
 $targetDate = [datetime]::ParseExact($Date, 'yyyy-MM-dd', $null)
 $targetSeason = $targetDate.Year
+
+if (-not $UseExistingMirrorArtifacts) {
+    $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
+    if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
+        $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
+    }
+    if (-not (Test-Path $sourceRootCandidate)) {
+        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, or use -UseExistingMirrorArtifacts."
+    }
+    $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
+}
 
 function Copy-IfExists {
     param(
@@ -36,6 +41,15 @@ function Copy-IfExists {
     $parent = Split-Path -Parent $DestinationPath
     if ($parent) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    $resolvedSourcePath = (Resolve-Path $SourcePath).Path
+    $resolvedDestinationPath = $DestinationPath
+    if (Test-Path $DestinationPath) {
+        $resolvedDestinationPath = (Resolve-Path $DestinationPath).Path
+    }
+    if ($resolvedSourcePath -eq $resolvedDestinationPath) {
+        return $true
     }
 
     Copy-Item -Path $SourcePath -Destination $DestinationPath -Force
@@ -154,7 +168,8 @@ $datedProcessedArtifacts = @(
 )
 
 foreach ($artifact in $datedProcessedArtifacts) {
-    Copy-LatestDatedArtifact -SourceDirectory (Join-Path $sourceRoot 'data\processed') -DestinationDirectory $destDataRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate | Out-Null
+    $sourceDirectory = if ($UseExistingMirrorArtifacts) { $destDataRoot } else { Join-Path $sourceRoot 'data\processed' }
+    Copy-LatestDatedArtifact -SourceDirectory $sourceDirectory -DestinationDirectory $destDataRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate | Out-Null
 }
 
 $processedStaticFiles = @(
@@ -163,9 +178,8 @@ $processedStaticFiles = @(
 )
 
 foreach ($name in $processedStaticFiles) {
-    $src = Join-Path $sourceRoot (Join-Path 'data\processed' $name)
     $dst = Join-Path $destDataRoot $name
-    if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
+    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path $sourceRoot (Join-Path 'data\processed' $name)) -DestinationPath $dst))) {
         $copied.Add($name) | Out-Null
     }
 }
@@ -175,9 +189,8 @@ $dataStaticFiles = @(
 )
 
 foreach ($name in $dataStaticFiles) {
-    $src = Join-Path $sourceRoot (Join-Path 'data' $name)
     $dst = Join-Path (Join-Path $repoRoot 'data\nba_source\data') $name
-    if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
+    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path $sourceRoot (Join-Path 'data' $name)) -DestinationPath $dst))) {
         $copied.Add((Join-Path 'data' $name)) | Out-Null
     }
 }
@@ -189,7 +202,8 @@ $seasonBettingCardArtifacts = @(
 )
 
 foreach ($artifact in $seasonBettingCardArtifacts) {
-    Copy-LatestDatedArtifact -SourceDirectory (Join-Path $sourceRoot 'data\processed') -DestinationDirectory $destDataRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate | Out-Null
+    $sourceDirectory = if ($UseExistingMirrorArtifacts) { $destDataRoot } else { Join-Path $sourceRoot 'data\processed' }
+    Copy-LatestDatedArtifact -SourceDirectory $sourceDirectory -DestinationDirectory $destDataRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate | Out-Null
 }
 
 $datedLiveLensArtifacts = @(
@@ -198,7 +212,8 @@ $datedLiveLensArtifacts = @(
 )
 
 foreach ($artifact in $datedLiveLensArtifacts) {
-    Copy-LatestDatedArtifact -SourceDirectory (Join-Path $sourceRoot 'data\live_lens') -DestinationDirectory $destLiveLensRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate -ManifestPrefix 'live_lens' | Out-Null
+    $sourceDirectory = if ($UseExistingMirrorArtifacts) { $destLiveLensRoot } else { Join-Path $sourceRoot 'data\live_lens' }
+    Copy-LatestDatedArtifact -SourceDirectory $sourceDirectory -DestinationDirectory $destLiveLensRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate -ManifestPrefix 'live_lens' | Out-Null
 }
 
 $liveLensStaticFiles = @(
@@ -206,9 +221,8 @@ $liveLensStaticFiles = @(
 )
 
 foreach ($name in $liveLensStaticFiles) {
-    $src = Join-Path $sourceRoot (Join-Path 'data\live_lens' $name)
     $dst = Join-Path $destLiveLensRoot $name
-    if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
+    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path $sourceRoot (Join-Path 'data\live_lens' $name)) -DestinationPath $dst))) {
         $copied.Add((Join-Path 'live_lens' $name)) | Out-Null
     }
 }
@@ -222,7 +236,8 @@ $datedLiveSnapshotArtifacts = @(
 )
 
 foreach ($artifact in $datedLiveSnapshotArtifacts) {
-    Copy-LatestDatedArtifact -SourceDirectory (Join-Path $sourceRoot 'data\processed\live_snapshots') -DestinationDirectory $destLiveSnapshotsRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate -ManifestPrefix 'live_snapshots' | Out-Null
+    $sourceDirectory = if ($UseExistingMirrorArtifacts) { $destLiveSnapshotsRoot } else { Join-Path $sourceRoot 'data\processed\live_snapshots' }
+    Copy-LatestDatedArtifact -SourceDirectory $sourceDirectory -DestinationDirectory $destLiveSnapshotsRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate -ManifestPrefix 'live_snapshots' | Out-Null
 }
 
 $datedRawArtifacts = @(
@@ -230,7 +245,8 @@ $datedRawArtifacts = @(
 )
 
 foreach ($artifact in $datedRawArtifacts) {
-    Copy-LatestDatedArtifact -SourceDirectory (Join-Path $sourceRoot 'data\raw') -DestinationDirectory $destRawRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate -ManifestPrefix 'raw' | Out-Null
+    $sourceDirectory = if ($UseExistingMirrorArtifacts) { $destRawRoot } else { Join-Path $sourceRoot 'data\raw' }
+    Copy-LatestDatedArtifact -SourceDirectory $sourceDirectory -DestinationDirectory $destRawRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate -ManifestPrefix 'raw' | Out-Null
 }
 
 $webFiles = @(
@@ -239,9 +255,8 @@ $webFiles = @(
 )
 
 foreach ($name in $webFiles) {
-    $src = Join-Path $sourceRoot (Join-Path 'web' $name)
     $dst = Join-Path $destWebRoot $name
-    if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
+    if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path $sourceRoot (Join-Path 'web' $name)) -DestinationPath $dst))) {
         $copied.Add((Join-Path 'web' $name)) | Out-Null
     }
 }
@@ -282,6 +297,7 @@ $manifest = [pscustomobject]@{
     sourceRepo = $sourceRoot
     sourceRootEnvVar = $sourceRootEnvVar
     destinationRoot = (Join-Path $repoRoot 'data\nba_source')
+    usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
     copiedArtifactCount = $copied.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copied)
