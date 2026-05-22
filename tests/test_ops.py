@@ -395,9 +395,15 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("scripts/refresh_nba_oddsapi_props.py", " ".join(str(part) for part in command))
         self.assertNotIn("nba_betting.refresh_oddsapi_props_job", " ".join(str(part) for part in command))
         self.assertIn("--source-root", command)
+        self.assertIn("--artifact-root", command)
+        self.assertIn("data/nba_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
         self.assertIn("--log-file", command)
         self.assertIn("--do-edges", command)
         self.assertIn("--do-export", command)
+        mirror = result.get("mirror") or {}
+        mirror_command = mirror.get("command") or []
+        self.assertIn("-SourceArtifactRoot", mirror_command)
+        self.assertIn("data/nba_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in mirror_command))
 
     def test_build_refresh_plan_uses_nba_artifact_root_when_configured(self) -> None:
         from syndicate.features.shared import ops_refresh
@@ -447,9 +453,15 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("scripts/refresh_wnba_oddsapi_props.py", " ".join(str(part) for part in command))
         self.assertNotIn("wnba_betting.refresh_oddsapi_props_job", " ".join(str(part) for part in command))
         self.assertIn("--source-root", command)
+        self.assertIn("--artifact-root", command)
+        self.assertIn("data/wnba_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
         self.assertIn("--log-file", command)
         self.assertIn("--do-edges", command)
         self.assertIn("--do-export", command)
+        mirror = result.get("mirror") or {}
+        mirror_command = mirror.get("command") or []
+        self.assertIn("-SourceArtifactRoot", mirror_command)
+        self.assertIn("data/wnba_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in mirror_command))
 
     def test_build_refresh_plan_uses_wnba_artifact_root_when_configured(self) -> None:
         from syndicate.features.shared import ops_refresh

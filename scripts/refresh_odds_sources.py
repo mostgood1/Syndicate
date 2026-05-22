@@ -147,11 +147,16 @@ def _build_nba_payload(args: argparse.Namespace, *, env_key: str) -> dict[str, s
     return {env_key: _json_payload(payload)}
 
 
+def _local_source_artifact_root(slug: str) -> Path:
+    return REPO_ROOT / "data" / f"{slug}_source" / "source_artifacts"
+
+
 def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("nba", "NBA-Betting")
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")["NBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
+    artifact_root = _local_source_artifact_root("nba")
     return [
         RefreshStep(
             name="nba_oddsapi_props_job",
@@ -170,6 +175,8 @@ def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 str(args.markets or ""),
                 "--source-root",
                 str(source_root),
+                "--artifact-root",
+                str(artifact_root),
                 "--log-file",
                 str(payload_data.get("log_file") or ""),
                 "--started-at",
@@ -187,6 +194,7 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="WNBA_BETTING_ODDSAPI_PROPS_JOB")["WNBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
+    artifact_root = _local_source_artifact_root("wnba")
     return [
         RefreshStep(
             name="wnba_oddsapi_props_job",
@@ -205,6 +213,8 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 str(args.markets or ""),
                 "--source-root",
                 str(source_root),
+                "--artifact-root",
+                str(artifact_root),
                 "--log-file",
                 str(payload_data.get("log_file") or ""),
                 "--started-at",
@@ -399,9 +409,14 @@ def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Pa
 def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: str) -> dict[str, Any] | None:
     if skip_mirror:
         return None
+    source_dependency = "source_repo_artifacts"
+    if execution_mode == "ingest" and _ingest_is_hosted_safe(spec):
+        source_dependency = "local_artifacts"
+    elif execution_mode == "source" and spec.slug in {"nba", "wnba"}:
+        source_dependency = "local_artifact_bundle"
     return {
         "kind": "mirror_script",
-        "source_dependency": "local_artifacts" if execution_mode == "ingest" and _ingest_is_hosted_safe(spec) else "source_repo_artifacts",
+        "source_dependency": source_dependency,
         "hosted_safe": execution_mode == "ingest" and _ingest_is_hosted_safe(spec),
         "contract": {
             "kind": spec.ingest_contract_kind,
@@ -493,6 +508,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "nba":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NBA") or "").strip()
+        if (not artifact_root) and (not mirror_only):
+            artifact_root = str(_local_source_artifact_root("nba"))
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "nhl":
@@ -509,6 +526,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "wnba":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_WNBA") or "").strip()
+        if (not artifact_root) and (not mirror_only):
+            artifact_root = str(_local_source_artifact_root("wnba"))
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "ncaab" and not mirror_only:

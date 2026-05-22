@@ -57,3 +57,57 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(fake_source.calls[0]["date_str"], "2026-05-22")
         self.assertTrue(fake_source.calls[0]["do_edges"])
         self.assertTrue(fake_source.calls[0]["do_export"])
+
+    def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
+        module = self._load_module()
+
+        class _FakeSourceModule:
+            def run_refresh_oddsapi_props_job(self, **kwargs):
+                return {
+                    "snapshot_rows": 12,
+                    "snapshot_alias_rows": 12,
+                    "edges_rows": 5,
+                    "recs_rows": 3,
+                    "error": None,
+                    "snapshot_path": kwargs["log_file"].parent / "odds_wnba_player_props_2026-05-22.csv",
+                    "snapshot_alias_path": kwargs["log_file"].parent / "oddsapi_player_props_2026-05-22.csv",
+                    "predictions_path": kwargs["log_file"].parent / "props_predictions_2026-05-22.csv",
+                    "edges_path": kwargs["log_file"].parent / "props_edges_2026-05-22.csv",
+                    "recs_path": kwargs["log_file"].parent / "props_recommendations_2026-05-22.csv",
+                }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            for name in [
+                "odds_wnba_player_props_2026-05-22.csv",
+                "oddsapi_player_props_2026-05-22.csv",
+                "props_predictions_2026-05-22.csv",
+                "props_edges_2026-05-22.csv",
+                "props_recommendations_2026-05-22.csv",
+            ]:
+                (tmp_root / name).write_text("id\n1\n", encoding="utf-8")
+            artifact_root = tmp_root / "bundle"
+            argv = [
+                "refresh_wnba_oddsapi_props.py",
+                "--date",
+                "2026-05-22",
+                "--regions",
+                "us",
+                "--source-root",
+                tmp_dir,
+                "--artifact-root",
+                str(artifact_root),
+                "--log-file",
+                str(tmp_root / "refresh.log"),
+                "--do-edges",
+                "--do-export",
+            ]
+            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            self.assertTrue((artifact_root / "data" / "raw" / "odds_wnba_player_props_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "oddsapi_player_props_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "props_predictions_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "props_edges_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_2026-05-22.csv").exists())
