@@ -113,6 +113,18 @@ foreach ($name in $files) {
     }
 }
 
+$smartSimSourceRoot = if ($UseExistingMirrorArtifacts) { $destDataRoot } elseif ($artifactRoot) { Join-Path $artifactRoot 'data\processed' } else { Join-Path $sourceRoot 'data\processed' }
+if (Test-Path $smartSimSourceRoot) {
+    foreach ($source in Get-ChildItem -Path $smartSimSourceRoot -Filter ("smart_sim_{0}_*.json" -f $Date) -File -ErrorAction SilentlyContinue) {
+        $destination = Join-Path $destDataRoot $source.Name
+        if (Copy-IfExists -SourcePath $source.FullName -DestinationPath $destination) {
+            if (-not $copied.Contains($source.Name)) {
+                $copied.Add($source.Name) | Out-Null
+            }
+        }
+    }
+}
+
 $liveLensFiles = @(
     "live_lens_projections_$Date.jsonl",
     "live_lens_signals_$Date.jsonl",

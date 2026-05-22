@@ -64,6 +64,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         class _FakeSourceModule:
             def run_refresh_oddsapi_props_job(self, **kwargs):
                 return {
+                    "date": "2026-05-22",
                     "snapshot_rows": 12,
                     "snapshot_alias_rows": 12,
                     "edges_rows": 5,
@@ -84,6 +85,8 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 "props_predictions_2026-05-22.csv",
                 "props_edges_2026-05-22.csv",
                 "props_recommendations_2026-05-22.csv",
+                "smart_sim_2026-05-22_BOS_NYK.json",
+                "smart_sim_2026-05-22_LAL_GSW.json",
             ]:
                 (tmp_root / name).write_text("id\n1\n", encoding="utf-8")
             artifact_root = tmp_root / "bundle"
@@ -111,3 +114,5 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "props_predictions_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_edges_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_BOS_NYK.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_LAL_GSW.json").exists())

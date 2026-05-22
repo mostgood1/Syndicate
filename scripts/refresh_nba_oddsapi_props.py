@@ -33,6 +33,31 @@ def _copy_if_exists(source_path: str | None, destination_path: Path) -> bool:
     return True
 
 
+def _copy_matching_files(*, source_directory: Path, pattern: str, destination_directory: Path) -> list[str]:
+    if not source_directory.exists() or not source_directory.is_dir():
+        return []
+    copied: list[str] = []
+    for source in sorted(source_directory.glob(pattern)):
+        if not source.is_file():
+            continue
+        destination = destination_directory / source.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        copied.append(str(destination))
+    return copied
+
+
+def _processed_source_directory(state: dict[str, object]) -> Path | None:
+    for key in ("snapshot_alias_path", "predictions_path", "edges_path", "recs_path"):
+        source_text = str(state.get(key) or "").strip()
+        if not source_text:
+            continue
+        source = Path(source_text)
+        if source.exists():
+            return source.resolve().parent
+    return None
+
+
 def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path) -> dict[str, str]:
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
@@ -47,6 +72,16 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
     for key, destination in artifact_map.items():
         if _copy_if_exists(str(state.get(key) or ""), destination):
             copied[key] = str(destination)
+    date_text = str(state.get("date") or "").strip()
+    source_directory = _processed_source_directory(state)
+    if date_text and source_directory is not None:
+        smart_sim_files = _copy_matching_files(
+            source_directory=source_directory,
+            pattern=f"smart_sim_{date_text}_*.json",
+            destination_directory=processed_root,
+        )
+        if smart_sim_files:
+            copied["smart_sim_paths"] = smart_sim_files
     return copied
 
 

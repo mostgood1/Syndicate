@@ -170,6 +170,7 @@ $datedProcessedArtifacts = @(
     @{ Prefix = 'cards_sim_detail_'; Suffix = '.json' },
     @{ Prefix = 'cards_props_snapshot_'; Suffix = '.json' },
     @{ Prefix = 'props_recommendations_top_by_game_'; Suffix = '.json' },
+    @{ Prefix = 'smart_sim_'; Suffix = '.json' },
     @{ Prefix = 'oddsapi_player_props_'; Suffix = '.csv' },
     @{ Prefix = 'props_predictions_'; Suffix = '.csv' },
     @{ Prefix = 'props_edges_'; Suffix = '.csv' },
