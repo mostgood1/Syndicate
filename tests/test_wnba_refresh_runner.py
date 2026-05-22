@@ -122,6 +122,8 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                                     return b'{"kind":"signal"}\n'
                                 if "download_live_lens_projections" in query:
                                     return b'{"kind":"projection"}\n'
+                                if "download_live_lens_tuning" in query:
+                                    return b'{"alpha": 1.25}\n'
                                 return b""
 
                             status_code = 200
@@ -154,5 +156,9 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_projections_2026-05-22.jsonl").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "live_lens_tuning_override.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "recon_players_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_player_lens_tuning_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_signals_2026-05-22.jsonl").exists())
+            self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_projections_2026-05-22.jsonl").exists())
+            self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_tuning_override.json").exists())

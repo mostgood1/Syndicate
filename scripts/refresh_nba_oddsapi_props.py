@@ -127,23 +127,34 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
     return str(out_path)
 
 
-def _export_live_lens_jsonl_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
+def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_root: Path, live_lens_root: Path) -> dict[str, str]:
     source_app = _load_source_app(source_root)
     client = source_app.app.test_client()
     exports = (
         (
             f"/api/download_live_lens_signals?date={date_str}",
-            processed_root / f"live_lens_signals_{date_str}.jsonl",
-            "live_lens_signals_path",
+            (
+                (processed_root / f"live_lens_signals_{date_str}.jsonl", "live_lens_signals_path"),
+                (live_lens_root / f"live_lens_signals_{date_str}.jsonl", None),
+            ),
         ),
         (
             f"/api/download_live_lens_projections?date={date_str}",
-            processed_root / f"live_lens_projections_{date_str}.jsonl",
-            "live_lens_projections_path",
+            (
+                (processed_root / f"live_lens_projections_{date_str}.jsonl", "live_lens_projections_path"),
+                (live_lens_root / f"live_lens_projections_{date_str}.jsonl", None),
+            ),
+        ),
+        (
+            "/api/download_live_lens_tuning",
+            (
+                (processed_root / "live_lens_tuning_override.json", "live_lens_tuning_override_path"),
+                (live_lens_root / "live_lens_tuning_override.json", "live_lens_tuning_override_live_lens_path"),
+            ),
         ),
     )
     copied: dict[str, str] = {}
-    for query, out_path, copied_key in exports:
+    for query, destinations in exports:
         try:
             response = client.get(query)
             status_code = int(getattr(response, "status_code", 0) or 0)
@@ -157,9 +168,11 @@ def _export_live_lens_jsonl_artifacts(*, source_root: Path, date_str: str, proce
                 raw = getattr(response, "data") or b""
             if not isinstance(raw, (bytes, bytearray)) or not raw:
                 continue
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_bytes(bytes(raw))
-            copied[copied_key] = str(out_path)
+            for out_path, copied_key in destinations:
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_bytes(bytes(raw))
+                if copied_key:
+                    copied[copied_key] = str(out_path)
         except Exception:
             continue
     return copied
@@ -168,6 +181,7 @@ def _export_live_lens_jsonl_artifacts(*, source_root: Path, date_str: str, proce
 def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path) -> dict[str, object]:
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
+    live_lens_root = artifact_root / "data" / "live_lens"
     copied: dict[str, object] = {}
     artifact_map = {
         "snapshot_alias_path": processed_root / Path(str(state.get("snapshot_alias_path") or "")).name,
@@ -192,7 +206,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
-        copied.update(_export_live_lens_jsonl_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+        copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
         copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     return copied
 
