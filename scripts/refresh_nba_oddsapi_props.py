@@ -59,14 +59,51 @@ def _processed_source_directory(state: dict[str, object]) -> Path | None:
     return None
 
 
-def _load_source_app(source_root: Path):
-    app_path = source_root / "app.py"
-    spec = importlib.util.spec_from_file_location("syndicate_nba_source_app", app_path)
+def _load_module_from_path(module_name: str, module_path: Path):
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load source app from {app_path}")
+        raise RuntimeError(f"Unable to load module from {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _load_source_app(source_root: Path):
+    app_path = source_root / "app.py"
+    return _load_module_from_path("syndicate_nba_source_app", app_path)
+
+
+def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
+    copied: dict[str, str] = {}
+    tool_specs = (
+        (
+            source_root / "tools" / "build_recon_players.py",
+            "syndicate_nba_build_recon_players",
+            "build_recon_players",
+            processed_root / f"recon_players_{date_str}.csv",
+            "recon_players_path",
+        ),
+        (
+            source_root / "tools" / "build_live_player_lens_tuning.py",
+            "syndicate_nba_build_live_player_lens_tuning",
+            "build_live_player_lens_tuning",
+            processed_root / f"live_player_lens_tuning_{date_str}.csv",
+            "live_player_lens_tuning_path",
+        ),
+    )
+    for module_path, module_name, function_name, out_path, copied_key in tool_specs:
+        try:
+            module = _load_module_from_path(module_name, module_path)
+            builder = getattr(module, function_name, None)
+            if builder is None:
+                continue
+            df = builder(date_str)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            df.to_csv(out_path, index=False)
+            copied[copied_key] = str(out_path)
+        except Exception:
+            continue
+    return copied
 
 
 def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
@@ -117,6 +154,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
+        copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     return copied
 
 

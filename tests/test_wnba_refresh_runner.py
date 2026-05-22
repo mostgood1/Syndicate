@@ -122,7 +122,17 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
                 app = type("_App", (), {"test_client": staticmethod(lambda: _FakeSourceApp._Client())})()
 
-            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch("sys.argv", argv):
+            def _fake_optional_artifacts(*, source_root, date_str, processed_root):
+                recon_path = processed_root / f"recon_players_{date_str}.csv"
+                tuning_path = processed_root / f"live_player_lens_tuning_{date_str}.csv"
+                recon_path.write_text("player\nTest WNBA Player\n", encoding="utf-8")
+                tuning_path.write_text("player\nTest WNBA Player\n", encoding="utf-8")
+                return {
+                    "recon_players_path": str(recon_path),
+                    "live_player_lens_tuning_path": str(tuning_path),
+                }
+
+            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -134,3 +144,5 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_ATL_DAL.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_IND_GSV.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "recon_players_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "live_player_lens_tuning_2026-05-22.csv").exists())

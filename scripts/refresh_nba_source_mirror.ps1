@@ -179,6 +179,7 @@ $datedProcessedArtifacts = @(
     @{ Prefix = 'recon_quarters_'; Suffix = '.csv' },
     @{ Prefix = 'recon_props_'; Suffix = '.csv' },
     @{ Prefix = 'recon_players_'; Suffix = '.csv' },
+    @{ Prefix = 'live_player_lens_tuning_'; Suffix = '.csv' },
     @{ Prefix = 'boxscores_'; Suffix = '.csv' },
     @{ Prefix = 'live_lens_projections_'; Suffix = '.jsonl' },
     @{ Prefix = 'live_lens_signals_'; Suffix = '.jsonl' }

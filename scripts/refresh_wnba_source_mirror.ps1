@@ -99,6 +99,7 @@ $files = @(
     "recon_quarters_$Date.csv",
     "recon_props_$Date.csv",
     "recon_players_$Date.csv",
+    "live_player_lens_tuning_$Date.csv",
     "boxscores_$Date.csv",
     "live_lens_projections_$Date.jsonl",
     "live_lens_signals_$Date.jsonl",
