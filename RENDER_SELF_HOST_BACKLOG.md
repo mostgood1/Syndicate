@@ -10,7 +10,7 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 
 - [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) still resolves sibling repo roots and executes source-owned generation commands by default, even though all per-sport ingestion contracts can now target neutral artifact bundles.
 - Deployment proof is still incomplete: the Render blueprint and docs need manual `SYNDICATE_ARTIFACT_ROOT_*` wiring per environment before hosted refreshes can actually ingest published bundles.
-- [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) and [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) still rely on source-app execution for part of their artifact generation path.
+- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) still relies on source-app execution for part of its artifact generation path, and NCAAB still depends on source-owned odds-history generation when fresh raw outputs must be republished.
 
 ## Delivery strategy
 
@@ -40,12 +40,14 @@ Exit criteria:
 ## Milestone 1: Remove source-app bootstrapping blockers
 
 Purpose:
-Remove the two highest-risk hosted blockers first: NCAAB source-app export and NBA source-app bootstrap fallback.
+Remove the highest-risk remaining hosted bootstrap blocker first and then continue stripping source-owned generation assumptions.
 
 ### Workstream 1A: NCAAB exporter replacement
 
-Why first:
-NCAAB is the largest explicit source-app export dependency in the repo and the clearest self-host blocker.
+Current status:
+- Completed. The normal NCAAB mirror path is now artifact-only by default.
+- [scripts/export_ncaab_source_mirror.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/export_ncaab_source_mirror.py) rebuilds the local API bundle from mirrored raw outputs.
+- [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) keeps source-backed raw-output sync only behind the explicit manual switch `-RefreshRawOutputsFromSource`.
 
 Owning files:
 - [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1)
@@ -53,17 +55,13 @@ Owning files:
 - [syndicate/features/ncaab](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/ncaab)
 - [data/ncaab_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/ncaab_source)
 
-Tasks:
-- Audit exactly which NCAAB API payloads are still synthesized by booting the source app instead of reading mirrored raw artifacts directly.
-- Refactor [scripts/export_ncaab_source_mirror.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/export_ncaab_source_mirror.py) so the default path builds the API bundle entirely from raw outputs already mirrored into `data/ncaab_source/raw_outputs`.
-- Remove `--allow-source-app-fallback` from the normal mirror path in [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1).
-- Keep a temporary fallback path only behind an explicit manual-only switch if needed during migration.
-- Add focused regression coverage proving the local API bundle can be rebuilt without booting the NCAAB source Flask app.
-
-Exit criteria:
+Outcome:
 - Normal NCAAB mirror refresh no longer boots the source app.
 - NCAAB API exports are rebuilt from mirrored artifacts only.
-- Tests cover the artifact-only export path.
+- Focused regression coverage exists for the artifact-only export path and the explicit manual source-sync path.
+
+Next NCAAB gap:
+- Fresh raw-output generation is still source-owned through `ncaab_model.cli fetch-odds-history --mode current`; replacing that generation step is now separate from the completed API export cutover.
 
 ### Workstream 1B: NBA live-state bootstrap removal
 
@@ -215,6 +213,6 @@ Treat Render self-hosting as done only when all of the following are true:
 
 ## Recommended next implementation slice
 
-Start with Milestone 1A.
+Start with Milestone 1B.
 
-The highest-leverage next code change is to make NCAAB mirror export artifact-only by default. That removes the largest explicit source-app dependency, gives the hosted plan a real first win on the generation/export side, and provides the template for removing the remaining NBA bootstrap fallback.
+The highest-leverage next code change is to remove the NBA live-state bootstrap fallback. NCAAB's API export path is already artifact-only by default, so the next remaining normal source-app bootstrap dependency is the NBA mirror script.

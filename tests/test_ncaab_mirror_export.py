@@ -227,6 +227,16 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.assertNotIn("[switch]$AllowSourceAppFallback", content)
         self.assertNotIn("--allow-source-app-fallback", content)
 
+    def test_refresh_ncaab_mirror_script_defaults_to_existing_raw_outputs(self) -> None:
+        script_path = self.repo_root / "scripts" / "refresh_ncaab_source_mirror.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$RefreshRawOutputsFromSource", content)
+        self.assertIn("artifact-only path", content)
+        self.assertIn("--raw-root", content)
+        self.assertIn("--source-root", content)
+        self.assertIn("usedExistingRawOutputs = [bool](-not $RefreshRawOutputsFromSource)", content)
+
     def test_export_ncaab_source_mirror_script_has_no_source_app_fallback_flag(self) -> None:
         script_path = self.repo_root / "scripts" / "export_ncaab_source_mirror.py"
         content = script_path.read_text(encoding="utf-8")

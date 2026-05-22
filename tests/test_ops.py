@@ -267,6 +267,19 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("refresh_ncaab_source_mirror.ps1", " ".join(str(part) for part in command))
         self.assertIn("-UseExistingRawOutputs", command)
 
+    def test_build_refresh_plan_uses_ncaab_source_raw_sync_in_source_mode(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-04-06", sports="ncaab", execution_mode="source")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        mirror = result.get("mirror") or {}
+        command = mirror.get("command") or []
+        self.assertIn("refresh_ncaab_source_mirror.ps1", " ".join(str(part) for part in command))
+        self.assertIn("-RefreshRawOutputsFromSource", command)
+        self.assertNotIn("-UseExistingRawOutputs", command)
+
     def test_build_refresh_plan_uses_mlb_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
 

@@ -90,7 +90,7 @@ if (-not $SkipNCAAF) {
     $refreshSteps += ,@('NCAAF mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaaf_source_mirror.ps1')))
 }
 if (-not $SkipNCAAB) {
-    $refreshSteps += ,@('NCAAB mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaab_source_mirror.ps1'), '-Date', $Date))
+    $refreshSteps += ,@('NCAAB mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaab_source_mirror.ps1'), '-Date', $Date, '-RefreshRawOutputsFromSource'))
 }
 
 Push-Location $repoRoot

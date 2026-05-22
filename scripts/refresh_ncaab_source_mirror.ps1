@@ -1,6 +1,7 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
     [string]$SourceRepo = "..\NCAAB",
+    [switch]$RefreshRawOutputsFromSource,
     [switch]$UseExistingRawOutputs
 )
 
@@ -15,13 +16,17 @@ $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_NCAAB'
 $sourceRoot = $null
 $sourcePython = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'py' }
 
-if (-not $UseExistingRawOutputs) {
+if ($RefreshRawOutputsFromSource -and $UseExistingRawOutputs) {
+    throw "Choose either -RefreshRawOutputsFromSource or -UseExistingRawOutputs, not both."
+}
+
+if ($RefreshRawOutputsFromSource) {
     $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
     if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
         $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
     }
     if (-not (Test-Path $sourceRootCandidate)) {
-        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, or use -UseExistingRawOutputs."
+        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, or omit -RefreshRawOutputsFromSource to rebuild from existing raw outputs only."
     }
     $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
     $sourcePythonCandidate = Join-Path $sourceRoot '.venv\Scripts\python.exe'
@@ -29,7 +34,7 @@ if (-not $UseExistingRawOutputs) {
         $sourcePython = $sourcePythonCandidate
     }
 } elseif (-not (Test-Path $rawOutputsRoot)) {
-    throw "Existing raw outputs not found: $rawOutputsRoot. Run a source-backed refresh first or omit -UseExistingRawOutputs."
+    throw "Existing raw outputs not found: $rawOutputsRoot. Run the mirror with -RefreshRawOutputsFromSource once or populate the raw bundle before using the default artifact-only path."
 }
 
 New-Item -ItemType Directory -Path $destApiRoot -Force | Out-Null
@@ -37,10 +42,10 @@ New-Item -ItemType Directory -Path $manifestRoot -Force | Out-Null
 
 $exportScriptPath = Join-Path $repoRoot 'scripts\export_ncaab_source_mirror.py'
 $exportArgs = @($exportScriptPath, $destApiRoot, $Date)
-if ($UseExistingRawOutputs) {
-    $exportArgs += @('--raw-root', $rawOutputsRoot)
-} else {
+if ($RefreshRawOutputsFromSource) {
     $exportArgs += @('--source-root', $sourceRoot)
+} else {
+    $exportArgs += @('--raw-root', $rawOutputsRoot)
 }
 & $sourcePython @exportArgs
 if ($LASTEXITCODE -ne 0) {
@@ -92,7 +97,8 @@ $mirrorManifest = [pscustomobject]@{
     sourceRepo = $sourceRoot
     sourceRootEnvVar = $sourceRootEnvVar
     destinationRoot = $destRoot
-    usedExistingRawOutputs = [bool]$UseExistingRawOutputs
+    usedExistingRawOutputs = [bool](-not $RefreshRawOutputsFromSource)
+    refreshedRawOutputsFromSource = [bool]$RefreshRawOutputsFromSource
     copiedArtifactCount = $copiedArtifacts.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copiedArtifacts)

@@ -62,7 +62,7 @@ Current hosted boundary:
 - The web app itself is deployable on Render now.
 - The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
 - The per-sport ingest boundary is now hosted-safe across MLB, NBA, NHL, NFL, WNBA, NCAAF, and NCAAB: each module can import from a neutral artifact bundle or an already mirrored local bundle instead of requiring a sibling source checkout during ingest.
-- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for most sports, and the remaining normal source-app bootstrap blockers are the NCAAB exporter path plus the NBA live-state fallback.
+- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for most sports, and the remaining normal source-app bootstrap blocker is the NBA live-state fallback while NCAAB still depends on source-owned odds-history generation for fresh raw outputs.
 
 Render setup:
 
@@ -302,7 +302,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\refresh_nhl_source_mirror.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_wnba_source_mirror.ps1 -Date 2026-05-17
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_wnba_source_mirror.ps1 -Date 2026-05-17 -UseExistingMirrorArtifacts
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_ncaab_source_mirror.ps1 -Date 2026-04-06
-powershell -ExecutionPolicy Bypass -File .\scripts\refresh_ncaab_source_mirror.ps1 -Date 2026-04-06 -UseExistingRawOutputs
+powershell -ExecutionPolicy Bypass -File .\scripts\refresh_ncaab_source_mirror.ps1 -Date 2026-04-06 -RefreshRawOutputsFromSource
 ```
 
 These scripts populate [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nba_source), [data/nhl_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nhl_source), and [data/wnba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/wnba_source) with the date-scoped processed artifacts that Syndicate already reads for cards, archive, picks, props, and sim-backed detail lanes.
@@ -313,7 +313,7 @@ NHL now supports two mirror modes as well. The default run still copies fresh ar
 
 WNBA now supports the same two mirror modes. The default run still copies fresh artifacts from the sibling WNBA repo when that checkout is available. The `-UseExistingMirrorArtifacts` switch skips the sibling repo requirement and rewrites the WNBA mirror manifest from the already mirrored files under [data/wnba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/wnba_source). That gives the shared ingest path a hosted-safe local mirror mode without changing the default source-backed refresh flow.
 
-NCAAB now supports two mirror modes. The default source-backed run still copies fresh artifacts from the sibling NCAAB repo when that checkout is available. The `-UseExistingRawOutputs` switch skips the sibling repo requirement and rebuilds `data/ncaab_source/api` directly from the already mirrored bundle under [data/ncaab_source/raw_outputs](c:/Users/mostg/OneDrive/Coding/Syndicate/data/ncaab_source/raw_outputs). That raw-only mode is the new hosted-friendly boundary for local API regeneration and Render-style rebuilds.
+NCAAB now defaults to the artifact-only mirror path. Running [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) without extra switches rebuilds `data/ncaab_source/api` directly from the already mirrored bundle under [data/ncaab_source/raw_outputs](c:/Users/mostg/OneDrive/Coding/Syndicate/data/ncaab_source/raw_outputs). Use `-RefreshRawOutputsFromSource` only when you explicitly want a local compatibility run that re-syncs those raw outputs from a sibling `NCAAB` checkout before exporting the API bundle.
 
 The source-backed NCAAB raw mirror contract is now intentionally narrow. Syndicate only mirrors the files currently needed to regenerate the local API bundle: `live_lens_tuning.json` plus `predictions_<date>.csv`, `predictions_unified_enriched_<date>.csv`, and `live_features_<date>.csv`.
 

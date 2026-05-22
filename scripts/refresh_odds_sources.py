@@ -480,6 +480,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_WNBA") or "").strip()
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
+    if sport == "ncaab" and not mirror_only:
+        command.append("-RefreshRawOutputsFromSource")
     if mirror_only and sport == "ncaab":
         command.append("-UseExistingRawOutputs")
     if mirror_only and sport == "mlb":

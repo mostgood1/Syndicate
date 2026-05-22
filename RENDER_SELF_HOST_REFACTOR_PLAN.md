@@ -99,16 +99,15 @@ Required Render-safe refactor:
 
 Current source refresh owner:
 - `ncaab_model.cli fetch-odds-history --mode current`
-- the source Flask app itself for API export
 
 Current Syndicate mirror behavior:
 - [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) is not just a copy script.
-- It boots the source app under a temporary Python script, calls source APIs with `app.test_client()`, exports recommendations, results, live state, live lines, date metadata, and also copies raw outputs from the source `outputs` tree.
+- By default it rebuilds the local API bundle from mirrored raw outputs already stored under `data/ncaab_source/raw_outputs`.
+- A manual compatibility switch can still resync those raw outputs from the sibling source repo before exporting the API bundle.
 
 Required Render-safe refactor:
-- This is the highest-priority self-host blocker.
-- Replace the source-app API export path with a Syndicate-owned exporter that reads mirrored or persisted NCAAB artifacts directly.
-- Replace the dependence on the source CLI for odds-history refresh with Syndicate-owned code or a shared package.
+- The source-app API export path has been replaced with a Syndicate-owned exporter that reads mirrored NCAAB artifacts directly.
+- The remaining NCAAB self-host gap is fresh raw-output generation: replace the dependence on the source CLI for odds-history refresh with Syndicate-owned code or a shared package.
 
 ## Cross-cutting refactors
 
@@ -168,7 +167,6 @@ Current implementation progress:
 
 Current offenders:
 - [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) can boot the NBA source app to force a live-state snapshot
-- [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) boots the NCAAB source app and exports APIs via `app.test_client()`
 
 Render-safe shape:
 - export artifacts directly from data contracts, not from source web routes
@@ -180,7 +178,7 @@ What must change:
 
 1. Decide whether Render should be read-only or self-refreshing.
 2. If read-only, deploy now and keep refresh outside Render.
-3. If self-refreshing, first eliminate NCAAB and NBA source-app bootstrapping.
+3. If self-refreshing, first eliminate the remaining NBA source-app bootstrap path and then replace the remaining source-owned generation jobs.
 4. Next replace [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) with a Syndicate-owned refresh runner or a remote artifact puller.
 5. Then move [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) off detached subprocess execution and onto durable hosted job state.
 6. Only after that expand [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) into a full self-refreshing deployment blueprint.
