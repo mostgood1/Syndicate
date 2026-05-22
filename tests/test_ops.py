@@ -243,6 +243,10 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(result["sport"], "mlb")
         self.assertEqual(result["generation_mode"], "none")
         self.assertEqual(result["ingestion_mode"], "mirror_script")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "none")
+        self.assertEqual((result.get("ingestion") or {}).get("kind"), "mirror_script")
+        self.assertTrue((result.get("ingestion") or {}).get("hosted_safe"))
+        self.assertEqual(((result.get("ingestion") or {}).get("contract") or {}).get("kind"), "existing_mirror_artifacts")
         self.assertEqual(result["refresh_steps"], [])
         mirror = result.get("mirror") or {}
         self.assertTrue(mirror.get("ok"))
@@ -322,8 +326,24 @@ class OpsRefreshApiTests(unittest.TestCase):
         result = plan["results"][0]
         self.assertEqual(result["generation_mode"], "none")
         self.assertEqual(result["ingestion_mode"], "mirror_script")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "none")
+        self.assertEqual((result.get("ingestion") or {}).get("kind"), "mirror_script")
+        self.assertTrue((result.get("ingestion") or {}).get("hosted_safe"))
+        self.assertEqual(((result.get("ingestion") or {}).get("contract") or {}).get("kind"), "existing_mirror_artifacts")
         self.assertEqual(result["refresh_steps"], [])
         self.assertTrue((result.get("mirror") or {}).get("dry_run"))
+
+    def test_build_refresh_plan_marks_nfl_ingest_as_not_hosted_safe(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-10-01", sports="nfl", execution_mode="ingest")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        self.assertEqual((result.get("generation") or {}).get("kind"), "none")
+        self.assertEqual((result.get("ingestion") or {}).get("kind"), "mirror_script")
+        self.assertFalse((result.get("ingestion") or {}).get("hosted_safe"))
+        self.assertEqual(((result.get("ingestion") or {}).get("contract") or {}).get("kind"), "source_repo_artifacts")
 
     def test_ops_page_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
@@ -366,6 +386,8 @@ class OpsRefreshApiTests(unittest.TestCase):
                     "ok": True,
                     "notes": "MLB live refresh",
                     "source_repo": "C:/repos/MLB-BettingV2",
+                    "generation": {"kind": "source_repo", "source_dependency": "source_repo", "hosted_safe": False},
+                    "ingestion": {"kind": "mirror_script", "source_dependency": "local_artifacts", "hosted_safe": True, "contract": {"kind": "existing_mirror_artifacts"}},
                     "refresh_steps": [
                         {
                             "name": "mlb_oddsapi_markets",
@@ -404,6 +426,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("Run state: finished", html)
         self.assertIn("Mirror manifests", html)
         self.assertIn("Copied 14 artifacts", html)
+        self.assertIn("Contract: existing_mirror_artifacts", html)
 
     def test_run_endpoint_returns_launch_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(

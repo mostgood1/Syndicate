@@ -31,6 +31,8 @@ class SportSpec:
     source_repo_name: str
     mirror_script_name: str
     step_builder: Callable[[argparse.Namespace], list[RefreshStep]]
+    ingest_contract_kind: str
+    ingest_contract_notes: str = ""
     notes: str = ""
 
 
@@ -288,6 +290,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="MLB-BettingV2",
         mirror_script_name="refresh_mlb_source_mirror.ps1",
         step_builder=_build_mlb_steps,
+        ingest_contract_kind="existing_mirror_artifacts",
+        ingest_contract_notes="Hosted-safe ingest can rebuild the mirror manifest from existing files under data/mlb_source.",
         notes="Uses the canonical current-day OddsAPI market refresh script that writes game lines plus hitter/pitcher props.",
     ),
     "nba": SportSpec(
@@ -295,6 +299,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NBA-Betting",
         mirror_script_name="refresh_nba_source_mirror.ps1",
         step_builder=_build_nba_steps,
+        ingest_contract_kind="existing_mirror_artifacts",
+        ingest_contract_notes="Hosted-safe ingest can rebuild the mirror manifest from existing files under data/nba_source.",
         notes="Runs the existing OddsAPI props refresh job with the same env-payload contract the source app and workflows already use.",
     ),
     "nhl": SportSpec(
@@ -302,6 +308,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NHL-Betting",
         mirror_script_name="refresh_nhl_source_mirror.ps1",
         step_builder=_build_nhl_steps,
+        ingest_contract_kind="existing_mirror_artifacts",
+        ingest_contract_notes="Hosted-safe ingest can rebuild the mirror manifest from existing files under data/nhl_source.",
         notes="Refreshes both team odds and player props using the source CLI instead of a new Syndicate fetcher.",
     ),
     "nfl": SportSpec(
@@ -309,6 +317,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NFL-Betting",
         mirror_script_name="refresh_nfl_source_mirror.ps1",
         step_builder=_build_nfl_steps,
+        ingest_contract_kind="source_repo_artifacts",
+        ingest_contract_notes="Mirror import still expects source-generated weekly artifacts from the sibling NFL repo layout.",
         notes="Uses the source team's JSON odds snapshot plus weekly player-props CSV flow.",
     ),
     "wnba": SportSpec(
@@ -316,6 +326,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="WNBA-Betting",
         mirror_script_name="refresh_wnba_source_mirror.ps1",
         step_builder=_build_wnba_steps,
+        ingest_contract_kind="existing_mirror_artifacts",
+        ingest_contract_notes="Hosted-safe ingest can rebuild the mirror manifest from existing files under data/wnba_source.",
         notes="Reuses the WNBA repo's existing OddsAPI props job rather than duplicating the shared NBA logic.",
     ),
     "ncaab": SportSpec(
@@ -323,6 +335,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NCAAB",
         mirror_script_name="refresh_ncaab_source_mirror.ps1",
         step_builder=_build_ncaab_steps,
+        ingest_contract_kind="existing_raw_outputs",
+        ingest_contract_notes="Hosted-safe ingest can rebuild the local API bundle from the mirrored raw bundle under data/ncaab_source/raw_outputs.",
         notes="Uses the existing TheOddsAPI adapter through the source CLI so period markets keep the same event-level fetch behavior.",
     ),
     "ncaaf": SportSpec(
@@ -330,9 +344,40 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NCAAFCompare",
         mirror_script_name="refresh_ncaaf_source_mirror.ps1",
         step_builder=_build_ncaaf_steps,
+        ingest_contract_kind="source_repo_artifacts",
+        ingest_contract_notes="Mirror import still expects source-generated artifacts from the sibling NCAAF repo layout.",
         notes="Uses the existing NCAAF lines fetcher that merges provider lines into the source CSV used by the app.",
     ),
 }
+
+
+def _ingest_is_hosted_safe(spec: SportSpec) -> bool:
+    return spec.ingest_contract_kind in {"existing_mirror_artifacts", "existing_raw_outputs"}
+
+
+def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Path) -> dict[str, Any]:
+    return {
+        "kind": "source_repo" if execution_mode == "source" else "none",
+        "source_dependency": "source_repo" if execution_mode == "source" else "none",
+        "hosted_safe": execution_mode != "source",
+        "source_repo": str(source_root),
+        "steps": [],
+    }
+
+
+def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: str) -> dict[str, Any] | None:
+    if skip_mirror:
+        return None
+    return {
+        "kind": "mirror_script",
+        "source_dependency": "local_artifacts" if execution_mode == "ingest" and _ingest_is_hosted_safe(spec) else "source_repo_artifacts",
+        "hosted_safe": execution_mode == "ingest" and _ingest_is_hosted_safe(spec),
+        "contract": {
+            "kind": spec.ingest_contract_kind,
+            "notes": spec.ingest_contract_notes,
+        },
+        "step": None,
+    }
 
 
 def _parse_sports(raw: str) -> list[str]:
@@ -462,6 +507,8 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
             "notes": spec.notes,
             "generation_mode": "source_repo" if execution_mode == "source" else "none",
             "ingestion_mode": None if args.skip_mirror else "mirror_script",
+            "generation": _generation_payload(spec, execution_mode=execution_mode, source_root=source_root),
+            "ingestion": _ingestion_payload(spec, skip_mirror=bool(args.skip_mirror), execution_mode=execution_mode),
             "refresh_steps": [],
             "mirror": None,
             "ok": True,
@@ -484,6 +531,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         for step in refresh_steps:
             step_result = _run_command(step, dry_run=bool(args.dry_run))
             sport_result["refresh_steps"].append(step_result)
+            sport_result["generation"]["steps"].append(step_result)
             if not step_result["ok"]:
                 any_failure = True
                 sport_result["ok"] = False
@@ -504,6 +552,8 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 dry_run=bool(args.dry_run),
             )
             sport_result["mirror"] = mirror_result
+            if isinstance(sport_result.get("ingestion"), dict):
+                sport_result["ingestion"]["step"] = mirror_result
             if not mirror_result["ok"]:
                 any_failure = True
                 sport_result["ok"] = False

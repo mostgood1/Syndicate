@@ -459,6 +459,15 @@
                   {% if sport.get('error') %}
                     <p class="ops-error">{{ sport.get('error') }}</p>
                   {% endif %}
+                  {% if sport.get('generation') %}
+                    <div class="ops-artifact-item">
+                      <div class="ops-artifact-top">
+                        <strong>generation</strong>
+                        <span class="ops-badge {% if sport.get('generation', {}).get('hosted_safe') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'hosted-safe' if sport.get('generation', {}).get('hosted_safe') else 'source-owned' }}</span>
+                      </div>
+                      <div class="ops-note">Kind: {{ sport.get('generation', {}).get('kind') }} · Source dependency: {{ sport.get('generation', {}).get('source_dependency') }}</div>
+                    </div>
+                  {% endif %}
                   {% if sport.get('refresh_steps') %}
                     <div class="ops-artifact-list">
                       {% for step in sport.get('refresh_steps') %}
@@ -471,6 +480,18 @@
                           <pre class="ops-code">{{ step.get('command')|tojson(indent=2) }}</pre>
                         </div>
                       {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if sport.get('ingestion') %}
+                    <div class="ops-artifact-item">
+                      <div class="ops-artifact-top">
+                        <strong>ingestion</strong>
+                        <span class="ops-badge {% if sport.get('ingestion', {}).get('hosted_safe') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'hosted-safe' if sport.get('ingestion', {}).get('hosted_safe') else 'source-shaped' }}</span>
+                      </div>
+                      <div class="ops-note">Kind: {{ sport.get('ingestion', {}).get('kind') }} · Source dependency: {{ sport.get('ingestion', {}).get('source_dependency') }}</div>
+                      {% if sport.get('ingestion', {}).get('contract') %}
+                        <div class="ops-note">Contract: {{ sport.get('ingestion', {}).get('contract', {}).get('kind') }}</div>
+                      {% endif %}
                     </div>
                   {% endif %}
                   {% if sport.get('mirror') %}
