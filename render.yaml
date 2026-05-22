@@ -35,7 +35,7 @@ services:
     plan: starter
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: python .\scripts\run_refresh_worker.py
+    startCommand: python ./scripts/run_refresh_worker.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
