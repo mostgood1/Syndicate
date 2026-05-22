@@ -237,6 +237,7 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
 def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("ncaab", "NCAAB")
     python_exe = _venv_python(REPO_ROOT)
+    raw_outputs_root = REPO_ROOT / "data" / "ncaab_source" / "raw_outputs" / "by_date" / args.date
     return [
         RefreshStep(
             name="ncaab_odds_history_snapshot",
@@ -252,7 +253,7 @@ def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 "--source-root",
                 str(source_root),
                 "--out-dir",
-                str(source_root / "outputs" / "odds_history"),
+                str(raw_outputs_root),
                 "--mode",
                 "current",
             ),

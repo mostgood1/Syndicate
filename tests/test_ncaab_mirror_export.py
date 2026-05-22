@@ -152,6 +152,29 @@ class NcaabMirrorExportTests(unittest.TestCase):
                 (mirror_root / "raw_outputs" / "by_date" / self.selected_date / f"odds_{self.selected_date}.csv").exists()
             )
 
+    def test_collect_raw_output_artifacts_merges_existing_raw_bundle_files(self) -> None:
+        module = self._load_export_script_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_outputs_root = Path(tmp_dir) / "source_outputs"
+            mirror_root = Path(tmp_dir) / "mirror"
+            raw_root = mirror_root / "raw_outputs"
+            existing_date_root = raw_root / "by_date" / self.selected_date
+            source_outputs_root.mkdir(parents=True, exist_ok=True)
+            existing_date_root.mkdir(parents=True, exist_ok=True)
+
+            (source_outputs_root / f"predictions_{self.selected_date}.csv").write_text("game_id\n1\n", encoding="utf-8")
+            (existing_date_root / f"odds_{self.selected_date}.csv").write_text("event_id,market,book\nevt-1,h2h,DraftKings\n", encoding="utf-8")
+
+            result = module.collect_raw_output_artifacts(
+                source_outputs_root=source_outputs_root,
+                mirror_root=mirror_root,
+                target_date=self.selected_date,
+                existing_raw_root=raw_root,
+            )
+
+            self.assertIn(f"raw_outputs/by_date/{self.selected_date}/predictions_{self.selected_date}.csv", result["date_files"])
+            self.assertIn(f"raw_outputs/by_date/{self.selected_date}/odds_{self.selected_date}.csv", result["date_files"])
+
     def test_build_results_payload_from_raw_generates_settled_rows(self) -> None:
         payload = build_results_payload_from_raw(self.raw_root, self.selected_date)
 

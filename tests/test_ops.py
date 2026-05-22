@@ -281,6 +281,8 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("scripts/refresh_ncaab_odds_history.py", " ".join(str(part) for part in command))
         self.assertNotIn("ncaab_model.cli", " ".join(str(part) for part in command))
         self.assertIn("--source-root", command)
+        self.assertIn("--out-dir", command)
+        self.assertIn("data/ncaab_source/raw_outputs/by_date/2026-04-06", " ".join(str(part).replace("\\", "/") for part in command))
         mirror = result.get("mirror") or {}
         command = mirror.get("command") or []
         self.assertIn("refresh_ncaab_source_mirror.ps1", " ".join(str(part) for part in command))

@@ -75,16 +75,25 @@ def _summarize_existing_raw_outputs(*, raw_root: Path, target_date: str, mirror_
     }
 
 
-def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path, target_date: str) -> dict:
+def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path, target_date: str, existing_raw_root: Path | None = None) -> dict:
     raw_outputs_root = mirror_root / "raw_outputs"
+    existing = (
+        _summarize_existing_raw_outputs(raw_root=existing_raw_root, target_date=target_date, mirror_root=mirror_root)
+        if existing_raw_root is not None and existing_raw_root.exists()
+        else {"config_files": [], "date_files": []}
+    )
     result = {
         "source_root": str(source_outputs_root),
         "date": target_date,
-        "config_files": [],
-        "date_files": [],
+        "config_files": list(existing.get("config_files") or []),
+        "date_files": list(existing.get("date_files") or []),
     }
     if not source_outputs_root.exists() or not target_date:
         return result
+
+    def _add_unique(items: list[str], rel_path: str) -> None:
+        if rel_path not in items:
+            items.append(rel_path)
 
     config_names = [
         "live_lens_tuning.json",
@@ -94,7 +103,7 @@ def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path
         if not source_path.exists():
             continue
         rel_path = _copy_output_file(source_path, raw_outputs_root / "config" / name, mirror_root=mirror_root)
-        result["config_files"].append(rel_path)
+        _add_unique(result["config_files"], rel_path)
 
     file_names = [
         f"predictions_{target_date}.csv",
@@ -111,7 +120,7 @@ def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path
             raw_outputs_root / "by_date" / target_date / source_path.name,
             mirror_root=mirror_root,
         )
-        result["date_files"].append(rel_path)
+        _add_unique(result["date_files"], rel_path)
 
     odds_history_path = source_outputs_root / "odds_history" / f"odds_{target_date}.csv"
     if odds_history_path.is_file():
@@ -120,7 +129,7 @@ def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path
             raw_outputs_root / "by_date" / target_date / odds_history_path.name,
             mirror_root=mirror_root,
         )
-        result["date_files"].append(rel_path)
+        _add_unique(result["date_files"], rel_path)
 
     manifest = {
         "source_root": result["source_root"],
@@ -149,7 +158,12 @@ def main() -> int:
 
     if source_root is not None:
         source_outputs_root = source_root / "outputs"
-        raw_outputs = collect_raw_output_artifacts(source_outputs_root=source_outputs_root, mirror_root=mirror_root, target_date=args.date)
+        raw_outputs = collect_raw_output_artifacts(
+            source_outputs_root=source_outputs_root,
+            mirror_root=mirror_root,
+            target_date=args.date,
+            existing_raw_root=raw_root,
+        )
     elif raw_root.exists():
         raw_outputs = _summarize_existing_raw_outputs(raw_root=raw_root, target_date=args.date, mirror_root=mirror_root)
     else:
