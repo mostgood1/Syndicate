@@ -115,6 +115,8 @@ def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path
         f"predictions_unified_enriched_{target_date}.csv",
         f"predictions_unified_enriched_{target_date}_force_fill.csv",
         f"predictions_model_{target_date}.csv",
+        f"predictions_model_calibrated_{target_date}.csv",
+        f"predictions_model_interval_{target_date}.csv",
         f"align_period_{target_date}.csv",
         f"live_features_{target_date}.csv",
     ]
