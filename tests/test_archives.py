@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import date, timedelta
 from tempfile import TemporaryDirectory
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 from syndicate.app import create_app
 from syndicate.features.mlb.cards import source_card_detail_payload
 from syndicate.features.mlb.cards import source_cards_api_payload
@@ -1291,7 +1293,7 @@ class HomeBoardTests(unittest.TestCase):
         self.assertRegex(body, r'data-home-preserve-src="/mlb/cards\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}&amp;client=source&amp;embed=home-cards"')
 
     def test_mlb_cards_source_js_skips_auto_refresh_for_embeds(self) -> None:
-        content = Path("c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/static/mlb/cards_source.js").read_text(encoding="utf-8")
+        content = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")
 
         self.assertIn('if (state.embedMode) {', content)
         self.assertIn('state.autoRefreshHandle = { stop: function () {} };', content)
@@ -2828,7 +2830,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("setEmpty(String(emptyState?.body || 'No predictions rows available for this date yet.'), emptyItems);", html)
 
     def test_nba_cards_source_js_recomputes_betting_card_season_path_from_date(self) -> None:
-        content = Path("c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/static/nba/cards_source.js").read_text(encoding="utf-8")
+        content = (REPO_ROOT / "syndicate" / "static" / "nba" / "cards_source.js").read_text(encoding="utf-8")
 
         self.assertIn("const seasonYear = Number(String(state.date || getLocalDateISO()).slice(0, 4))", content)
         self.assertIn("seasonBettingCardLink.href = `/nba/season/${encodeURIComponent(seasonYear)}/betting-card?profile=retuned&date=${encodeURIComponent(state.date || getLocalDateISO())}`", content)
