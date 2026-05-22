@@ -45,20 +45,29 @@ def _relative_display_path(path: Path, *roots: Path) -> str:
 
 def _summarize_existing_raw_outputs(*, raw_root: Path, target_date: str, mirror_root: Path) -> dict:
     raw_manifest = _read_json(raw_root / "manifest.json") or {}
-    config_files = sorted(
-        _relative_display_path(path, mirror_root, raw_root.parent)
-        for path in (raw_root / "config").glob("*")
-        if path.is_file()
-    ) if (raw_root / "config").exists() else list(raw_manifest.get("config_files") or [])
-    date_files = sorted(
-        _relative_display_path(path, mirror_root, raw_root.parent)
-        for path in (raw_root / "by_date" / target_date).glob("*")
-        if path.is_file()
-    ) if (raw_root / "by_date" / target_date).exists() else []
-    if not date_files:
-        for raw_path in list(raw_manifest.get("date_files") or []):
-            if f"/by_date/{target_date}/" in str(raw_path).replace("\\", "/"):
-                date_files.append(str(raw_path))
+    manifest_config_files = [str(item) for item in list(raw_manifest.get("config_files") or []) if str(item).strip()]
+    if manifest_config_files:
+        config_files = sorted(manifest_config_files)
+    else:
+        config_files = sorted(
+            _relative_display_path(path, mirror_root, raw_root.parent)
+            for path in (raw_root / "config").glob("*")
+            if path.is_file()
+        ) if (raw_root / "config").exists() else []
+
+    manifest_date_files = [
+        str(item)
+        for item in list(raw_manifest.get("date_files") or [])
+        if f"/by_date/{target_date}/" in str(item).replace("\\", "/") and str(item).strip()
+    ]
+    if manifest_date_files:
+        date_files = sorted(manifest_date_files)
+    else:
+        date_files = sorted(
+            _relative_display_path(path, mirror_root, raw_root.parent)
+            for path in (raw_root / "by_date" / target_date).glob("*")
+            if path.is_file()
+        ) if (raw_root / "by_date" / target_date).exists() else []
     return {
         "source_root": str(raw_manifest.get("source_root") or raw_root),
         "config_files": config_files,

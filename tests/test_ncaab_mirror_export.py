@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import shutil
 import tempfile
@@ -18,6 +19,14 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.repo_root = Path(__file__).resolve().parents[1]
         self.raw_root = self.repo_root / "data" / "ncaab_source" / "raw_outputs"
         self.selected_date = "2026-04-06"
+
+    def _load_export_script_module(self):
+        script_path = self.repo_root / "scripts" / "export_ncaab_source_mirror.py"
+        spec = importlib.util.spec_from_file_location("test_export_ncaab_source_mirror", script_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
 
     def test_build_recommendations_payload_from_raw_generates_local_rows(self) -> None:
         payload = build_recommendations_payload_from_raw(self.raw_root, self.selected_date)
@@ -86,6 +95,36 @@ class NcaabMirrorExportTests(unittest.TestCase):
 
         self.assertIn(self.selected_date, manifest["display_dates"])
         self.assertIn(self.selected_date, dates_payload.get("dates") or [])
+
+    def test_summarize_existing_raw_outputs_ignores_stale_date_files_when_manifest_exists(self) -> None:
+        module = self._load_export_script_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            mirror_root = Path(tmp_dir)
+            raw_root = mirror_root / "raw_outputs"
+            date_root = raw_root / "by_date" / self.selected_date
+            config_root = raw_root / "config"
+            date_root.mkdir(parents=True, exist_ok=True)
+            config_root.mkdir(parents=True, exist_ok=True)
+
+            kept_rel = f"raw_outputs/by_date/{self.selected_date}/predictions_unified_enriched_{self.selected_date}.csv"
+            stale_path = date_root / f"games_with_odds_{self.selected_date}.csv"
+            stale_path.write_text("stale\n", encoding="utf-8")
+            kept_path = date_root / f"predictions_unified_enriched_{self.selected_date}.csv"
+            kept_path.write_text("fresh\n", encoding="utf-8")
+            (raw_root / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "source_root": "C:/source/outputs",
+                        "config_files": ["raw_outputs/config/live_lens_tuning.json"],
+                        "date_files": [kept_rel],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            summary = module._summarize_existing_raw_outputs(raw_root=raw_root, target_date=self.selected_date, mirror_root=mirror_root)
+
+        self.assertEqual(summary["date_files"], [kept_rel])
 
     def test_build_results_payload_from_raw_generates_settled_rows(self) -> None:
         payload = build_results_payload_from_raw(self.raw_root, self.selected_date)
