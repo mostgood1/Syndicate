@@ -290,8 +290,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="MLB-BettingV2",
         mirror_script_name="refresh_mlb_source_mirror.ps1",
         step_builder=_build_mlb_steps,
-        ingest_contract_kind="existing_mirror_artifacts",
-        ingest_contract_notes="Hosted-safe ingest can rebuild the mirror manifest from existing files under data/mlb_source.",
+        ingest_contract_kind="artifact_bundle_or_existing_mirror",
+        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/mlb_source or from a published MLB artifact bundle root via SYNDICATE_ARTIFACT_ROOT_MLB.",
         notes="Uses the canonical current-day OddsAPI market refresh script that writes game lines plus hitter/pitcher props.",
     ),
     "nba": SportSpec(
@@ -352,7 +352,7 @@ REGISTRY: dict[str, SportSpec] = {
 
 
 def _ingest_is_hosted_safe(spec: SportSpec) -> bool:
-    return spec.ingest_contract_kind in {"existing_mirror_artifacts", "existing_raw_outputs"}
+    return spec.ingest_contract_kind in {"existing_mirror_artifacts", "existing_raw_outputs", "artifact_bundle_or_existing_mirror"}
 
 
 def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Path) -> dict[str, Any]:
@@ -456,6 +456,10 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
     command = [_powershell(), "-ExecutionPolicy", "Bypass", "-File", str(REPO_ROOT / "scripts" / script_name)]
     if script_name not in {"refresh_nfl_source_mirror.ps1", "refresh_ncaaf_source_mirror.ps1"}:
         command.extend(["-Date", date])
+    if sport == "mlb":
+        artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_MLB") or "").strip()
+        if artifact_root:
+            command.extend(["-SourceArtifactRoot", artifact_root])
     if mirror_only and sport == "ncaab":
         command.append("-UseExistingRawOutputs")
     if mirror_only and sport == "mlb":

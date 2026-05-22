@@ -78,6 +78,7 @@ Hosted state overrides:
 
 - `SYNDICATE_REPORTS_ROOT`: optional absolute path for refresh status, latest manifests, logs, and daily-update state. Defaults to `reports/` under the repo.
 - `SYNDICATE_DATA_ROOT`: optional absolute path for mirrored data roots such as `mlb_source/` and `nba_source/`. Defaults to `data/` under the repo.
+- `SYNDICATE_ARTIFACT_ROOT_MLB`: optional published MLB artifact bundle root used by [scripts/refresh_mlb_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_source_mirror.ps1) during ingest mode. When set, Syndicate can import MLB daily/live/eval artifacts from that neutral bundle path instead of a sibling `MLB-BettingV2` checkout.
 - `SYNDICATE_STATE_ROOT`: optional fallback root for reports-style state when `SYNDICATE_REPORTS_ROOT` is not set. This is mainly useful when the hosted runtime mounts one persistent state directory and you want Syndicate to treat it as the reports root.
 - `SYNDICATE_REFRESH_STATE_BACKEND`: controls how refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest are stored. Defaults to `filesystem`. Set it to `keyvalue` for a shared Redis or Render Key Value-backed state store that both the web service and worker can read.
 - `SYNDICATE_REFRESH_STATE_URL`: connection URL used when `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`. `REDIS_URL` is also accepted as a fallback.
