@@ -2,6 +2,8 @@
 
 This document answers the stricter question behind Render readiness: what still has to change before Syndicate can refresh itself on Render without sibling source repos.
 
+For the execution-ordered version of this plan, use [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md). This file remains the architectural overview; the backlog file is the implementation tracker.
+
 ## Current state
 
 Syndicate is already close to deployable as a read-only web app that serves mirrored artifacts already present inside this repo.

@@ -70,7 +70,7 @@ Render setup:
 3. Set `ADMIN_TOKEN` in Render if you want the protected ops/status endpoints enabled for the deployed instance.
 4. Deploy the service and verify the root page plus any needed public module routes.
 
-If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, use [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) as the implementation plan before moving the refresh jobs onto Render.
+If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, start with [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md) for the execution order and use [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) for the architectural rationale behind that backlog.
 
 ## GitHub automation
 
