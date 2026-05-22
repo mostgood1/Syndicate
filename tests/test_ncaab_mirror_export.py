@@ -137,11 +137,23 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.assertEqual(rows[0]["game_id"], 401856600)
         self.assertEqual(rows[0]["home_score"], 69)
         self.assertEqual(rows[0]["away_score"], 63)
+        self.assertEqual(rows[0]["pred_total"], 156.76637)
+        self.assertEqual(rows[0]["pred_margin"], -13.0720005)
         self.assertEqual(rows[0]["actual_ats"], "Away Cover")
         self.assertEqual(rows[0]["actual_ou"], "Under")
         summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
         self.assertEqual(summary.get("ats_correct"), 1)
         self.assertEqual(summary.get("totals_correct"), 0)
+
+    def test_build_results_payload_from_raw_uses_predictions_file_not_enriched_values(self) -> None:
+        payload = build_results_payload_from_raw(self.raw_root, self.selected_date)
+
+        self.assertIsNotNone(payload)
+        assert payload is not None
+        rows = payload.get("rows") if isinstance(payload.get("rows"), list) else []
+        self.assertTrue(rows)
+        self.assertNotEqual(rows[0]["pred_total"], 141.5705956528953)
+        self.assertNotEqual(rows[0]["pred_margin"], 4.269936511134031)
 
     def test_export_api_bundle_from_raw_writes_results_payload(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

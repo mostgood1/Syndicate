@@ -252,6 +252,8 @@ NCAAB now supports two mirror modes. The default source-backed run still copies 
 
 The source-backed NCAAB raw mirror contract is now intentionally narrow. Syndicate only mirrors the files currently needed to regenerate the local API bundle: `live_lens_tuning.json` plus `predictions_<date>.csv`, `predictions_unified_enriched_<date>.csv`, and `live_features_<date>.csv`.
 
+`predictions_<date>.csv` is intentionally still part of that contract. The local settled-results export uses its `pred_total` and `pred_margin` values, while `predictions_unified_enriched_<date>.csv` supplies display and market metadata. Those two files are not interchangeable in the current raw-output lane.
+
 ## Next implementation steps
 
 1. Keep NFL stable as the next module-family completion candidate, and only reopen its weekly snapshot family if a focused payload or view audit exposes a real artifact-backed gap.
