@@ -60,15 +60,19 @@ This repo is ready to deploy to Render as a Blueprint-backed Flask app using [re
 Current hosted boundary:
 
 - The web app itself is deployable on Render now.
-- The current production-safe model is mirror-first and read-only with respect to the sibling source repos.
-- Source-refresh jobs that require the separate MLB, NBA, NHL, NFL, WNBA, NCAAB, or NCAAF checkouts are not expected to run inside the Render service yet.
+- The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
+- Public module data is still mirror-first with respect to sibling source repos. Hosted refreshes can safely own status and worker execution now, but sports that still depend on sibling repo generation or source-app export are not yet fully self-refreshing on Render.
 
 Render setup:
 
 1. In Render, choose New + and create a Blueprint instance from the GitHub repo `mostgood1/Syndicate`.
-2. Let Render read [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml), which defines the `syndicate` web service, Python runtime, build command, and Gunicorn start command.
+2. Let Render read [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml), which now defines three resources:
+  - `syndicate`: the public Flask web service.
+  - `syndicate-refresh-worker`: the background worker that polls for queued refresh jobs.
+  - `syndicate-refresh-state`: the shared Render Key Value instance used for refresh state and logs.
 3. Set `ADMIN_TOKEN` in Render if you want the protected ops/status endpoints enabled for the deployed instance.
-4. Deploy the service and verify the root page plus any needed public module routes.
+4. Deploy the Blueprint and verify that all three resources become healthy.
+5. Verify the root page plus any needed public module routes from the web service.
 
 Hosted state overrides:
 
@@ -79,6 +83,13 @@ Hosted state overrides:
 - `SYNDICATE_REFRESH_STATE_URL`: connection URL used when `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`. `REDIS_URL` is also accepted as a fallback.
 - `SYNDICATE_REFRESH_STATE_NAMESPACE`: optional key prefix for the shared refresh-state backend. Defaults to `syndicate`.
 - `SYNDICATE_REFRESH_LAUNCH_MODE`: controls how the ops refresh endpoint launches work. Defaults to `detached_subprocess`, which preserves the current local behavior. Set it to `manifest_only` or `external_runner` when a hosted deployment should only record queued refresh manifests and let an external runner or worker pick them up. In those queued modes the persisted run manifests now include an explicit `externalRunner` contract describing the command plus status file paths the worker should own.
+
+Blueprint defaults:
+
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=external_runner` on the web service.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` for both the web service and the worker.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) leaves `SYNDICATE_DATA_ROOT` unset, so public mirrored artifacts still come from the repo-backed `data/` tree unless you deliberately introduce a separate hosted artifact strategy.
 
 When the site is running in one of those queued hosted modes, a worker can pick up the latest queued refresh contract with:
 
@@ -103,6 +114,14 @@ Important Render constraint:
 - `SYNDICATE_DATA_ROOT` is still separate from the shared refresh-state backend. Public mirrored artifacts and per-sport source data are still file-backed, so the remaining self-hosting work is now about deployment wiring and broader artifact ownership rather than only report-state sharing.
 
 These overrides are part of the self-hosting path. They are not required for the current read-only repo-backed Render deployment, but they are now supported by the ops/status layer so hosted refresh state can move onto durable storage without changing the public ops endpoints.
+
+Hosted smoke checklist:
+
+1. Open the web root and confirm the main Syndicate routes still render from the deployed web service.
+2. Open `/ops/odds-refresh` with the admin token and confirm the page loads without filesystem-state errors.
+3. Trigger one dry-run refresh from the ops surface and confirm the web status moves to `pending_external`, then `running`, then `finished` or `failed` as the worker picks it up.
+4. Restart or redeploy the web service and confirm the latest refresh status still appears, proving that refresh state is coming from Key Value instead of the web filesystem.
+5. Treat any sport-level refresh failure as an artifact-generation ownership issue, not a refresh-state or worker-wiring failure, unless the status itself fails to update.
 
 If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, start with [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md) for the execution order and use [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) for the architectural rationale behind that backlog.
 

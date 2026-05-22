@@ -1,4 +1,9 @@
 services:
+  - type: keyvalue
+    name: syndicate-refresh-state
+    plan: starter
+    ipAllowList: []
+
   - type: web
     name: syndicate
     env: python
@@ -12,3 +17,36 @@ services:
         value: 3.11.9
       - key: ADMIN_TOKEN
         generateValue: true
+      - key: SYNDICATE_REFRESH_LAUNCH_MODE
+        value: external_runner
+      - key: SYNDICATE_REFRESH_STATE_BACKEND
+        value: keyvalue
+      - key: SYNDICATE_REFRESH_STATE_NAMESPACE
+        value: syndicate
+      - key: SYNDICATE_REFRESH_STATE_URL
+        fromService:
+          name: syndicate-refresh-state
+          type: keyvalue
+          property: connectionString
+
+  - type: worker
+    name: syndicate-refresh-worker
+    env: python
+    plan: starter
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python .\scripts\run_refresh_worker.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SYNDICATE_REFRESH_STATE_BACKEND
+        value: keyvalue
+      - key: SYNDICATE_REFRESH_STATE_NAMESPACE
+        value: syndicate
+      - key: SYNDICATE_REFRESH_STATE_URL
+        fromService:
+          name: syndicate-refresh-state
+          type: keyvalue
+          property: connectionString
+      - key: SYNDICATE_REFRESH_WORKER_POLL_SECONDS
+        value: 15
