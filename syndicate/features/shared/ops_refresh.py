@@ -291,6 +291,7 @@ def build_refresh_plan(
     week: int | None = None,
     skip_mirror: bool = False,
     mirror_only: bool = False,
+    execution_mode: str | None = None,
 ) -> dict[str, Any]:
     module = _refresh_script_module()
     args = argparse.Namespace(
@@ -304,6 +305,7 @@ def build_refresh_plan(
         week=week,
         skip_mirror=bool(skip_mirror),
         mirror_only=bool(mirror_only),
+        execution_mode=str(execution_mode or "source").strip() or "source",
         continue_on_error=True,
         dry_run=True,
         json=True,
@@ -382,6 +384,7 @@ def launch_refresh_run(
     week: int | None = None,
     skip_mirror: bool = False,
     mirror_only: bool = False,
+    execution_mode: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     selected_date = date or _today_date()
@@ -424,6 +427,8 @@ def launch_refresh_run(
         refresh_command.extend(["--season", str(season)])
     if week is not None:
         refresh_command.extend(["--week", str(week)])
+    execution_mode_text = str(execution_mode or "source").strip() or "source"
+    refresh_command.extend(["--execution-mode", execution_mode_text])
     if skip_mirror:
         refresh_command.append("--skip-mirror")
     if mirror_only:
@@ -460,6 +465,7 @@ def launch_refresh_run(
         "oddsRegions": str(regions or "us").strip() or "us",
         "skipMirror": bool(skip_mirror),
         "mirrorOnly": bool(mirror_only),
+        "executionMode": execution_mode_text,
         "dryRun": bool(dry_run),
         "state": "running",
         "generatedAt": _utc_now(),
@@ -485,6 +491,7 @@ def launch_refresh_run(
         "oddsRefreshPath": str(odds_refresh_path),
         "migrationGateReportPath": str(artifacts_dir / "migration_gate_report.json"),
         "migrationGateConsolePath": str(artifacts_dir / "migration_gate_console.txt"),
+        "executionMode": execution_mode_text,
         "dryRun": bool(dry_run),
         "state": "running",
     }

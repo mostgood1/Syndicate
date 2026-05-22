@@ -163,10 +163,13 @@ class OpsRefreshApiTests(unittest.TestCase):
         plan = ops_refresh.build_refresh_plan(date="2026-04-06", sports="ncaab", mirror_only=True)
 
         self.assertTrue(plan["ok"])
+        self.assertEqual(plan["execution_mode"], "ingest")
         self.assertEqual(plan["sports"], ["ncaab"])
         self.assertEqual(len(plan["results"]), 1)
         result = plan["results"][0]
         self.assertEqual(result["sport"], "ncaab")
+        self.assertEqual(result["generation_mode"], "none")
+        self.assertEqual(result["ingestion_mode"], "mirror_script")
         self.assertEqual(result["refresh_steps"], [])
         mirror = result.get("mirror") or {}
         self.assertTrue(mirror.get("ok"))
@@ -174,6 +177,20 @@ class OpsRefreshApiTests(unittest.TestCase):
         command = mirror.get("command") or []
         self.assertIn("refresh_ncaab_source_mirror.ps1", " ".join(str(part) for part in command))
         self.assertIn("-UseExistingRawOutputs", command)
+
+    def test_build_refresh_plan_supports_explicit_ingest_execution_mode(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="mlb", execution_mode="ingest")
+
+        self.assertTrue(plan["ok"])
+        self.assertEqual(plan["execution_mode"], "ingest")
+        self.assertEqual(plan["sports"], ["mlb"])
+        result = plan["results"][0]
+        self.assertEqual(result["generation_mode"], "none")
+        self.assertEqual(result["ingestion_mode"], "mirror_script")
+        self.assertEqual(result["refresh_steps"], [])
+        self.assertTrue((result.get("mirror") or {}).get("dry_run"))
 
     def test_ops_page_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
@@ -335,6 +352,23 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertIn(str(repo_root / "scripts" / "run_refresh_odds_job.py"), called_command)
             self.assertIn("--", called_command)
             self.assertIn(str(repo_root / "scripts" / "refresh_odds_sources.py"), called_command)
+
+    def test_launch_refresh_run_includes_execution_mode_flag(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                mocked_popen.return_value.pid = 2468
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", execution_mode="ingest", dry_run=True)
+
+            self.assertTrue(result["ok"])
+            called_command = mocked_popen.call_args.args[0]
+            self.assertIn("--execution-mode", called_command)
+            self.assertIn("ingest", called_command)
 
     def test_ops_page_renders_recent_history(self) -> None:
         fake_status = {

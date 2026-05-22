@@ -240,7 +240,7 @@
       <p class="ops-note">{{ runtime.get('detail') }}</p>
       <div class="action-row action-row--compact">
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/status?admin_token={{ request.args.get('admin_token', '') }}">Status JSON</a>
-        <a class="cards-nav-pill" href="/api/ops/odds-refresh/plan?admin_token={{ request.args.get('admin_token', '') }}&sports={{ form_state.sports }}&phase={{ form_state.phase }}{% if form_state.date %}&date={{ form_state.date }}{% endif %}{% if form_state.skip_mirror %}&skip_mirror=1{% endif %}{% if form_state.mirror_only %}&mirror_only=1{% endif %}">Plan JSON</a>
+        <a class="cards-nav-pill" href="/api/ops/odds-refresh/plan?admin_token={{ request.args.get('admin_token', '') }}&sports={{ form_state.sports }}&phase={{ form_state.phase }}&execution_mode={{ form_state.execution_mode }}{% if form_state.date %}&date={{ form_state.date }}{% endif %}{% if form_state.skip_mirror %}&skip_mirror=1{% endif %}{% if form_state.mirror_only %}&mirror_only=1{% endif %}">Plan JSON</a>
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/run?admin_token={{ request.args.get('admin_token', '') }}">Run API</a>
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/logs?stream=stdout&raw=1&admin_token={{ request.args.get('admin_token', '') }}">Stdout log</a>
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/logs?stream=stderr&raw=1&admin_token={{ request.args.get('admin_token', '') }}">Stderr log</a>
@@ -266,6 +266,13 @@
                 <option value="all"{% if form_state.phase == 'all' %} selected{% endif %}>all</option>
                 <option value="pregame"{% if form_state.phase == 'pregame' %} selected{% endif %}>pregame</option>
                 <option value="live"{% if form_state.phase == 'live' %} selected{% endif %}>live</option>
+              </select>
+            </div>
+            <div class="ops-field">
+              <label for="execution_mode">Execution mode</label>
+              <select id="execution_mode" name="execution_mode">
+                <option value="source"{% if form_state.execution_mode == 'source' %} selected{% endif %}>source</option>
+                <option value="ingest"{% if form_state.execution_mode == 'ingest' %} selected{% endif %}>ingest</option>
               </select>
             </div>
             <div class="ops-field ops-field--full">
@@ -309,6 +316,7 @@
           <input type="hidden" name="date" value="{{ form_state.date }}" />
           <input type="hidden" name="sports" value="{{ form_state.sports }}" />
           <input type="hidden" name="phase" value="{{ form_state.phase }}" />
+          <input type="hidden" name="execution_mode" value="{{ form_state.execution_mode }}" />
           <input type="hidden" name="regions" value="{{ form_state.regions }}" />
           <input type="hidden" name="bookmakers" value="{{ form_state.bookmakers }}" />
           <input type="hidden" name="markets" value="{{ form_state.markets }}" />

@@ -345,6 +345,15 @@ def _parse_sports(raw: str) -> list[str]:
     return cleaned
 
 
+def _resolve_execution_mode(raw: str | None, *, mirror_only: bool = False) -> str:
+    if mirror_only:
+        return "ingest"
+    value = str(raw or "source").strip().lower()
+    if value in {"source", "ingest"}:
+        return value
+    raise ValueError("execution_mode must be 'source' or 'ingest'.")
+
+
 def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     env = os.environ.copy()
     if step.env_updates:
@@ -394,7 +403,7 @@ def _validate_source_root(spec: SportSpec) -> str | None:
     env_var = _source_root_env_var(spec.slug)
     return (
         f"Source repo root not found for {spec.slug}: {source_root}. "
-        f"Set {env_var} to an absolute path for this sport or use --mirror-only."
+        f"Set {env_var} to an absolute path for this sport or use --execution-mode ingest / --mirror-only."
     )
 
 
@@ -421,12 +430,14 @@ def _filter_steps(steps: Sequence[RefreshStep], phase: str) -> list[RefreshStep]
 
 def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     selected = _parse_sports(args.sports)
+    execution_mode = _resolve_execution_mode(getattr(args, "execution_mode", None), mirror_only=bool(args.mirror_only))
     summary: dict[str, Any] = {
         "date": args.date,
         "phase": args.phase,
         "sports": selected,
         "skip_mirror": bool(args.skip_mirror),
-        "mirror_only": bool(args.mirror_only),
+        "mirror_only": execution_mode == "ingest",
+        "execution_mode": execution_mode,
         "dry_run": bool(args.dry_run),
         "results": [],
         "started_at": _utc_now(),
@@ -441,12 +452,14 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
             "source_repo": str(source_root),
             "source_root_env_var": _source_root_env_var(spec.slug),
             "notes": spec.notes,
+            "generation_mode": "source_repo" if execution_mode == "source" else "none",
+            "ingestion_mode": None if args.skip_mirror else "mirror_script",
             "refresh_steps": [],
             "mirror": None,
             "ok": True,
         }
 
-        refresh_steps = [] if args.mirror_only else _filter_steps(spec.step_builder(args), args.phase)
+        refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase)
         if refresh_steps:
             source_error = _validate_source_root(spec)
             if source_error is not None:
@@ -472,13 +485,13 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                     summary["ok"] = False
                     return summary
 
-        if not args.skip_mirror and (args.mirror_only or sport_result["ok"]):
+        if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
             mirror_result = _run_command(
                 _mirror_command(
                     spec.mirror_script_name,
                     date=args.date,
                     sport=spec.slug,
-                    mirror_only=bool(args.mirror_only),
+                    mirror_only=execution_mode == "ingest",
                 ),
                 dry_run=bool(args.dry_run),
             )
@@ -512,6 +525,7 @@ def main() -> int:
     parser.add_argument("--season", type=int, default=None, help="Optional season override for weekly sports like NFL.")
     parser.add_argument("--week", type=int, default=None, help="Optional week override for weekly sports like NFL/NCAAF.")
     parser.add_argument("--skip-mirror", action="store_true", help="Refresh source repos only; do not run the Syndicate mirror scripts.")
+    parser.add_argument("--execution-mode", choices=("source", "ingest"), default="source", help="Choose whether to run source-owned refresh generation or ingest-only mirror/import steps.")
     parser.add_argument("--mirror-only", action="store_true", help="Skip source refresh and only run the Syndicate mirror scripts.")
     parser.add_argument("--continue-on-error", action="store_true", default=True, help="Continue across sports even when one refresh fails.")
     parser.add_argument("--no-continue-on-error", action="store_false", dest="continue_on_error")
