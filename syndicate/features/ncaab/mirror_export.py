@@ -660,7 +660,7 @@ def export_api_bundle_from_raw(api_root: Path, raw_root: Path, selected_date: st
     schedule_dates = sorted(
         {
             str(item).strip()
-            for item in existing_schedule_dates | _dates_from_raw_dirs(raw_root, "games_with_odds")
+            for item in existing_schedule_dates | _dates_from_raw_dirs(raw_root, "predictions_unified_enriched")
             if str(item).strip()
         }
     )

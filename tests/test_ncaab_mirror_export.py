@@ -32,6 +32,25 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.assertTrue(any(str(row.get("rec_code")) == "OU" for row in rows))
         self.assertTrue(any(str(row.get("game_id")) == "401856600" for row in rows))
 
+    def test_build_recommendations_payload_from_raw_does_not_require_games_with_odds_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            raw_root = Path(tmp_dir) / "raw_outputs"
+            date_root = raw_root / "by_date" / self.selected_date
+            date_root.mkdir(parents=True, exist_ok=True)
+            for name in [
+                f"predictions_unified_enriched_{self.selected_date}.csv",
+            ]:
+                shutil.copy2(self.raw_root / "by_date" / self.selected_date / name, date_root / name)
+
+            payload = build_recommendations_payload_from_raw(raw_root, self.selected_date)
+
+        self.assertIsNotNone(payload)
+        assert payload is not None
+        self.assertEqual(payload["status"], "ok")
+        rows = payload.get("data") if isinstance(payload.get("data"), list) else []
+        self.assertTrue(rows)
+        self.assertTrue(all(str(row.get("book") or "") in {"Mirror model", ""} for row in rows))
+
     def test_export_api_bundle_from_raw_writes_dates_and_recommendations(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             api_root = Path(tmp_dir) / "api"
@@ -56,7 +75,6 @@ class NcaabMirrorExportTests(unittest.TestCase):
             ]:
                 shutil.copy2(self.raw_root / "config" / name, config_root / name)
             for name in [
-                f"games_with_odds_{self.selected_date}.csv",
                 f"predictions_{self.selected_date}.csv",
                 f"predictions_unified_enriched_{self.selected_date}.csv",
                 f"live_features_{self.selected_date}.csv",
@@ -167,3 +185,4 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.assertNotIn("live_snapshot_lines_", content)
         self.assertNotIn("predictions_display_", content)
         self.assertNotIn('f"games_{target_date}.csv"', content)
+        self.assertNotIn('f"games_with_odds_{target_date}.csv"', content)
