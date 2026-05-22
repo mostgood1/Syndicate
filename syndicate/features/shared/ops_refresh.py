@@ -95,6 +95,13 @@ def _pid_is_running(pid: int | None) -> bool:
     return True
 
 
+def _resolve_launch_mode() -> str:
+    value = str(os.environ.get("SYNDICATE_REFRESH_LAUNCH_MODE") or "detached_subprocess").strip().lower()
+    if value in {"detached_subprocess", "manifest_only"}:
+        return value
+    return "detached_subprocess"
+
+
 def _derive_refresh_runtime_state(
     manifest: dict[str, Any] | None,
     artifacts: dict[str, Any],
@@ -112,6 +119,9 @@ def _derive_refresh_runtime_state(
     if pid_running:
         state = "running"
         detail = f"Refresh process {pid} is still running."
+    elif manifest_state == "pending_external":
+        state = "pending_external"
+        detail = "Refresh run has been recorded and is waiting for an external runner."
     elif isinstance(odds_refresh_payload, dict):
         if bool(odds_refresh_payload.get("ok")):
             state = "finished"
@@ -225,8 +235,12 @@ def _update_latest_state(*, state: str, exit_code: int | None = None, canceled_a
 def cancel_latest_refresh_run() -> dict[str, Any]:
     context = _latest_refresh_manifest_context()
     manifest: dict[str, Any] = context["manifest"]
+    manifest_state = str(manifest.get("state") or "").strip().lower()
     pid_raw = manifest.get("pid")
     pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
+    if pid is None and manifest_state == "pending_external":
+        updated = _update_latest_state(state="canceled", exit_code=0, canceled_at=_utc_now())
+        return {"ok": True, "pid": None, "state": updated.get("state"), "detail": "Queued external refresh run canceled."}
     if pid is None:
         raise ValueError("No running refresh PID is recorded in the latest manifest.")
     if not _pid_is_running(pid):
@@ -404,6 +418,7 @@ def launch_refresh_run(
 ) -> dict[str, Any]:
     selected_date = date or _today_date()
     run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    launch_mode = _resolve_launch_mode()
     reports_root = _reports_root()
     refresh_status_root = reports_root / "refresh_status"
     refresh_status_run_dir = refresh_status_root / selected_date / run_stamp
@@ -482,8 +497,9 @@ def launch_refresh_run(
         "skipMirror": bool(skip_mirror),
         "mirrorOnly": bool(mirror_only),
         "executionMode": execution_mode_text,
+        "launchMode": launch_mode,
         "dryRun": bool(dry_run),
-        "state": "running",
+        "state": "pending_external" if launch_mode == "manifest_only" else "running",
         "generatedAt": _utc_now(),
         "command": refresh_command,
         "launcherCommand": command,
@@ -508,11 +524,28 @@ def launch_refresh_run(
         "migrationGateReportPath": str(artifacts_dir / "migration_gate_report.json"),
         "migrationGateConsolePath": str(artifacts_dir / "migration_gate_console.txt"),
         "executionMode": execution_mode_text,
+        "launchMode": launch_mode,
         "dryRun": bool(dry_run),
-        "state": "running",
+        "state": "pending_external" if launch_mode == "manifest_only" else "running",
     }
     refresh_status_manifest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
     refresh_status_latest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
+
+    if launch_mode == "manifest_only":
+        return {
+            "ok": True,
+            "pid": None,
+            "date": selected_date,
+            "run_stamp": run_stamp,
+            "artifacts_dir": str(artifacts_dir),
+            "refresh_status_dir": str(refresh_status_run_dir),
+            "command": command,
+            "dry_run": bool(dry_run),
+            "skip_mirror": bool(skip_mirror),
+            "mirror_only": bool(mirror_only),
+            "launch_mode": launch_mode,
+            "state": "pending_external",
+        }
 
     popen_kwargs: dict[str, Any] = {
         "cwd": str(REPO_ROOT),
@@ -543,4 +576,6 @@ def launch_refresh_run(
         "dry_run": bool(dry_run),
         "skip_mirror": bool(skip_mirror),
         "mirror_only": bool(mirror_only),
+        "launch_mode": launch_mode,
+        "state": "running",
     }

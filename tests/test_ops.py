@@ -423,6 +423,67 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertIn("--execution-mode", called_command)
             self.assertIn("ingest", called_command)
 
+    def test_launch_refresh_run_supports_manifest_only_mode(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REFRESH_LAUNCH_MODE": "manifest_only"}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
+
+            mocked_popen.assert_not_called()
+            self.assertTrue(result["ok"])
+            self.assertIsNone(result["pid"])
+            self.assertEqual(result["launch_mode"], "manifest_only")
+            self.assertEqual(result["state"], "pending_external")
+
+            latest_manifest = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+            payload = json.loads(latest_manifest.read_text(encoding="utf-8"))
+            self.assertEqual(payload["state"], "pending_external")
+            self.assertEqual(payload["launchMode"], "manifest_only")
+
+    def test_cancel_latest_refresh_run_supports_manifest_only_queue(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            run_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "refresh_and_gate_run.json").write_text(
+                json.dumps({"state": "pending_external"}),
+                encoding="utf-8",
+            )
+            latest_manifest = latest_dir / "refresh_status_latest.json"
+            latest_manifest.write_text(
+                json.dumps(
+                    {
+                        "date": "2026-05-22",
+                        "runStamp": "20260522_120000",
+                        "artifactsDir": str(run_dir),
+                        "runSummaryPath": str(run_dir / "refresh_and_gate_run.json"),
+                        "state": "pending_external",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
+                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.cancel_latest_refresh_run()
+
+            self.assertTrue(result["ok"])
+            self.assertIsNone(result["pid"])
+            self.assertEqual(result["state"], "canceled")
+
     def test_ops_page_renders_recent_history(self) -> None:
         fake_status = {
             "refresh_status": {
