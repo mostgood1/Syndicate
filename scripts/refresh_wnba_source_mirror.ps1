@@ -1,6 +1,7 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
     [string]$SourceRepo = "..\WNBA-Betting",
+    [string]$SourceArtifactRoot = "",
     [switch]$UseExistingMirrorArtifacts
 )
 
@@ -8,18 +9,33 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_WNBA'
+$sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_WNBA'
 $sourceRoot = $null
+$artifactRoot = $null
 $destDataRoot = Join-Path $repoRoot 'data\wnba_source\data\processed'
 $destRawRoot = Join-Path $repoRoot 'data\wnba_source\data\raw'
 $destLiveLensRoot = Join-Path $repoRoot 'data\wnba_source\data\live_lens'
 
 if (-not $UseExistingMirrorArtifacts) {
+    $artifactRootCandidate = $SourceArtifactRoot
+    if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        $artifactRootCandidate = [Environment]::GetEnvironmentVariable($sourceArtifactRootEnvVar)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        if (-not (Test-Path $artifactRootCandidate)) {
+            throw "Artifact root path not found: $artifactRootCandidate. Set $sourceArtifactRootEnvVar or pass -SourceArtifactRoot with a published WNBA artifact bundle path."
+        }
+        $artifactRoot = (Resolve-Path $artifactRootCandidate).Path
+    }
+}
+
+if ((-not $UseExistingMirrorArtifacts) -and (-not $artifactRoot)) {
     $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
     if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
         $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
     }
     if (-not (Test-Path $sourceRootCandidate)) {
-        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, or use -UseExistingMirrorArtifacts."
+        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, set $sourceArtifactRootEnvVar / -SourceArtifactRoot, or use -UseExistingMirrorArtifacts."
     }
     $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
 }
@@ -91,7 +107,7 @@ $files = @(
 
 foreach ($name in $files) {
     $dst = Join-Path $destDataRoot $name
-    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot (Join-Path 'data\processed' $name) }
+    $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\processed' $name) } else { Join-Path $sourceRoot (Join-Path 'data\processed' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add($name) | Out-Null
     }
@@ -105,7 +121,7 @@ $liveLensFiles = @(
 
 foreach ($name in $liveLensFiles) {
     $dst = Join-Path $destLiveLensRoot $name
-    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot (Join-Path 'data\live_lens' $name) }
+    $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\live_lens' $name) } else { Join-Path $sourceRoot (Join-Path 'data\live_lens' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add((Join-Path 'live_lens' $name)) | Out-Null
     }
@@ -118,7 +134,7 @@ $rawFiles = @(
 
 foreach ($name in $rawFiles) {
     $dst = Join-Path $destRawRoot $name
-    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot (Join-Path 'data\raw' $name) }
+    $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\raw' $name) } else { Join-Path $sourceRoot (Join-Path 'data\raw' $name) }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add((Join-Path 'raw' $name)) | Out-Null
     }
@@ -151,9 +167,12 @@ $manifest = [pscustomobject]@{
     date = $Date
     refreshedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
     sourceRepo = $sourceRoot
+    sourceArtifactRoot = $artifactRoot
     sourceRootEnvVar = $sourceRootEnvVar
+    sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
     destinationRoot = $destDataRoot
     usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
+    usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
     copiedArtifactCount = $copied.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copied)

@@ -60,5 +60,8 @@ class WnbaMirrorScriptTests(unittest.TestCase):
         content = script_path.read_text(encoding="utf-8")
 
         self.assertIn("[switch]$UseExistingMirrorArtifacts", content)
+        self.assertIn("[string]$SourceArtifactRoot", content)
+        self.assertIn("SYNDICATE_ARTIFACT_ROOT_WNBA", content)
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
+        self.assertIn("usedArtifactBundle", content)
