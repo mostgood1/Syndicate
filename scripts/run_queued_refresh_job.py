@@ -9,41 +9,24 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import reports_root
+from syndicate.features.shared.refresh_state_store import write_json_file
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REPORTS_ROOT = REPO_ROOT / "reports"
 
 
 def _utc_now() -> str:
     return datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
 
-def _reports_root() -> Path:
-    override = str(os.environ.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_STATE_ROOT") or "").strip()
-    if override:
-        return Path(override).expanduser().resolve()
-    return REPORTS_ROOT
-
-
 def _default_latest_manifest_path() -> Path:
-    return _reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
 
 
 def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_stamp: str | None = None) -> dict[str, Any]:
-    latest_manifest = _read_json(latest_manifest_path)
+    latest_manifest = read_json_file(latest_manifest_path) or {}
     if not latest_manifest:
         raise ValueError(f"Latest refresh manifest not found or invalid: {latest_manifest_path}")
 
@@ -67,7 +50,7 @@ def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_
     if not str(run_summary_path):
         raise ValueError("External runner contract is missing runSummaryPath.")
 
-    manifest = _read_json(manifest_path)
+    manifest = read_json_file(manifest_path) or {}
     if not manifest:
         raise ValueError(f"Queued refresh manifest is missing or invalid: {manifest_path}")
 
@@ -75,19 +58,19 @@ def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_
     latest_manifest["state"] = "running"
     latest_manifest["runnerClaimedAt"] = claimed_at
     latest_manifest["runnerKind"] = "external_runner"
-    _write_json(latest_manifest_path, latest_manifest)
+    write_json_file(latest_manifest_path, latest_manifest)
 
     manifest["state"] = "running"
     manifest["runnerClaimedAt"] = claimed_at
     manifest["runnerKind"] = "external_runner"
-    _write_json(manifest_path, manifest)
+    write_json_file(manifest_path, manifest)
 
-    run_summary = _read_json(run_summary_path)
+    run_summary = read_json_file(run_summary_path) or {}
     if run_summary:
         run_summary["state"] = "running"
         run_summary["runnerClaimedAt"] = claimed_at
         run_summary["runnerKind"] = "external_runner"
-        _write_json(run_summary_path, run_summary)
+        write_json_file(run_summary_path, run_summary)
 
     return contract
 

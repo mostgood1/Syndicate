@@ -8,22 +8,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import write_json_file
+
 
 def _utc_now() -> str:
     return datetime.utcnow().isoformat(timespec="seconds") + "Z"
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def _update_state(
@@ -35,18 +25,18 @@ def _update_state(
     exit_code: int,
 ) -> None:
     finished_at = _utc_now()
-    manifest = _read_json(manifest_path)
+    manifest = read_json_file(manifest_path) or {}
     manifest["state"] = state
     manifest["exitCode"] = int(exit_code)
     manifest["finishedAt"] = finished_at
-    _write_json(manifest_path, manifest)
-    _write_json(latest_path, manifest)
+    write_json_file(manifest_path, manifest)
+    write_json_file(latest_path, manifest)
 
-    run_summary = _read_json(run_summary_path)
+    run_summary = read_json_file(run_summary_path) or {}
     run_summary["state"] = state
     run_summary["exitCode"] = int(exit_code)
     run_summary["finishedAt"] = finished_at
-    _write_json(run_summary_path, run_summary)
+    write_json_file(run_summary_path, run_summary)
 
 
 def main() -> int:

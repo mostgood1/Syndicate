@@ -136,6 +136,7 @@ Tasks:
   - recent run history
   - stdout/stderr log payloads
   - latest daily-update summary
+- Keep the state boundary independent from Render local disks. Render persistent disks are single-service mounts, so the final hosted state backend must be readable by both the web control plane and the worker without assuming a shared filesystem path.
 - Make [syndicate/blueprints/ops.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/blueprints/ops.py) read job state through an abstraction layer instead of assuming repo-local reports.
 - Preserve the current UI endpoint `/ops/odds-refresh` and JSON ops endpoints while swapping the backend state store.
 - Add tests that simulate missing local `reports/` state but valid external or mounted state.

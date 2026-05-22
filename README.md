@@ -83,9 +83,20 @@ When the site is running in one of those queued hosted modes, a worker can pick 
 python .\scripts\run_queued_refresh_job.py
 python .\scripts\run_queued_refresh_job.py --run-stamp 20260522_120000
 python .\scripts\run_queued_refresh_job.py --dry-run
+python .\scripts\run_refresh_worker.py
+python .\scripts\run_refresh_worker.py --poll-seconds 30
+python .\scripts\run_refresh_worker.py --run-once
 ```
 
 That runner script claims the queued manifest, marks it `running`, and executes the persisted `externalRunner` contract through [scripts/run_refresh_odds_job.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_odds_job.py). This is the first worker-side pickup path for the hosted refresh contract.
+
+[scripts/run_refresh_worker.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_refresh_worker.py) is the long-running worker entrypoint for hosted environments. It polls the latest queued manifest and invokes [scripts/run_queued_refresh_job.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/run_queued_refresh_job.py) whenever the ops control plane records a new `pending_external` refresh run. Use `SYNDICATE_REFRESH_WORKER_POLL_SECONDS` to control the polling interval when the default 15-second loop is not appropriate.
+
+Important Render constraint:
+
+- Render persistent disks are attached to only one service instance and cannot be shared between the web service and a background worker.
+- Because Syndicate's current refresh state is still file-backed, a worker-plus-disk `render.yaml` expansion by itself would be incorrect: the worker could own the disk, or the web app could own the disk, but not both.
+- The current code now has an explicit shared refresh-state seam in [syndicate/features/shared/refresh_state_store.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/refresh_state_store.py). The next self-hosting step is to put that seam on a Render-safe external store instead of assuming a shared local filesystem.
 
 These overrides are part of the self-hosting path. They are not required for the current read-only repo-backed Render deployment, but they are now supported by the ops/status layer so hosted refresh state can move onto durable storage without changing the public ops endpoints.
 
