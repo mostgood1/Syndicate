@@ -127,6 +127,44 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
     return str(out_path)
 
 
+def _export_live_lens_jsonl_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
+    source_app = _load_source_app(source_root)
+    client = source_app.app.test_client()
+    exports = (
+        (
+            f"/api/download_live_lens_signals?date={date_str}",
+            processed_root / f"live_lens_signals_{date_str}.jsonl",
+            "live_lens_signals_path",
+        ),
+        (
+            f"/api/download_live_lens_projections?date={date_str}",
+            processed_root / f"live_lens_projections_{date_str}.jsonl",
+            "live_lens_projections_path",
+        ),
+    )
+    copied: dict[str, str] = {}
+    for query, out_path, copied_key in exports:
+        try:
+            response = client.get(query)
+            status_code = int(getattr(response, "status_code", 0) or 0)
+            if status_code != 200:
+                continue
+            raw = b""
+            get_data = getattr(response, "get_data", None)
+            if callable(get_data):
+                raw = get_data()
+            elif hasattr(response, "data"):
+                raw = getattr(response, "data") or b""
+            if not isinstance(raw, (bytes, bytearray)) or not raw:
+                continue
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_bytes(bytes(raw))
+            copied[copied_key] = str(out_path)
+        except Exception:
+            continue
+    return copied
+
+
 def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path) -> dict[str, object]:
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
@@ -154,6 +192,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
+        copied.update(_export_live_lens_jsonl_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
         copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     return copied
 
