@@ -459,6 +459,41 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("-SourceArtifactRoot", command)
         self.assertIn("C:/published/nfl-bundle", command)
 
+    def test_build_refresh_plan_uses_ncaaf_existing_mirror_command_in_mirror_only_mode(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-10-01", sports="ncaaf", mirror_only=True)
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        self.assertEqual((result.get("generation") or {}).get("kind"), "none")
+        self.assertEqual((result.get("ingestion") or {}).get("kind"), "mirror_script")
+        self.assertTrue((result.get("ingestion") or {}).get("hosted_safe"))
+        self.assertEqual(((result.get("ingestion") or {}).get("contract") or {}).get("kind"), "artifact_bundle_or_existing_mirror")
+        self.assertEqual(result["refresh_steps"], [])
+        mirror = result.get("mirror") or {}
+        self.assertTrue(mirror.get("ok"))
+        self.assertTrue(mirror.get("dry_run"))
+        command = mirror.get("command") or []
+        self.assertIn("refresh_ncaaf_source_mirror.ps1", " ".join(str(part) for part in command))
+        self.assertIn("-UseExistingMirrorArtifacts", command)
+
+    def test_build_refresh_plan_uses_ncaaf_artifact_root_when_configured(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        with patch.dict(os.environ, {"SYNDICATE_ARTIFACT_ROOT_NCAAF": "C:/published/ncaaf-bundle"}, clear=False):
+            plan = ops_refresh.build_refresh_plan(date="2026-10-01", sports="ncaaf", execution_mode="ingest")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        self.assertEqual((result.get("generation") or {}).get("kind"), "none")
+        self.assertEqual((result.get("ingestion") or {}).get("kind"), "mirror_script")
+        self.assertTrue((result.get("ingestion") or {}).get("hosted_safe"))
+        self.assertEqual(((result.get("ingestion") or {}).get("contract") or {}).get("kind"), "artifact_bundle_or_existing_mirror")
+        command = ((result.get("mirror") or {}).get("command") or [])
+        self.assertIn("-SourceArtifactRoot", command)
+        self.assertIn("C:/published/ncaaf-bundle", command)
+
     def test_ops_page_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.get("/ops/odds-refresh")

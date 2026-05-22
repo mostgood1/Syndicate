@@ -70,6 +70,20 @@ class NflMirrorScriptTests(unittest.TestCase):
         self.assertIn("usedArtifactBundle", content)
 
 
+class NcaafMirrorScriptTests(unittest.TestCase):
+    def test_refresh_ncaaf_mirror_script_supports_existing_artifact_mode(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "refresh_ncaaf_source_mirror.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$UseExistingMirrorArtifacts", content)
+        self.assertIn("[string]$SourceArtifactRoot", content)
+        self.assertIn("SYNDICATE_ARTIFACT_ROOT_NCAAF", content)
+        self.assertIn("or use -UseExistingMirrorArtifacts", content)
+        self.assertIn("usedExistingMirrorArtifacts", content)
+        self.assertIn("usedArtifactBundle", content)
+
+
 class WnbaMirrorScriptTests(unittest.TestCase):
     def test_refresh_wnba_mirror_script_supports_existing_artifact_mode(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

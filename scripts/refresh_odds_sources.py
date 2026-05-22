@@ -344,8 +344,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NCAAFCompare",
         mirror_script_name="refresh_ncaaf_source_mirror.ps1",
         step_builder=_build_ncaaf_steps,
-        ingest_contract_kind="source_repo_artifacts",
-        ingest_contract_notes="Mirror import still expects source-generated artifacts from the sibling NCAAF repo layout.",
+        ingest_contract_kind="artifact_bundle_or_existing_mirror",
+        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/ncaaf_source/data or from a published NCAAF artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NCAAF.",
         notes="Uses the existing NCAAF lines fetcher that merges provider lines into the source CSV used by the app.",
     ),
 }
@@ -472,6 +472,10 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NFL") or "").strip()
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
+    if sport == "ncaaf":
+        artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NCAAF") or "").strip()
+        if artifact_root:
+            command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "wnba":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_WNBA") or "").strip()
         if artifact_root:
@@ -485,6 +489,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
     if mirror_only and sport == "nhl":
         command.append("-UseExistingMirrorArtifacts")
     if mirror_only and sport == "nfl":
+        command.append("-UseExistingMirrorArtifacts")
+    if mirror_only and sport == "ncaaf":
         command.append("-UseExistingMirrorArtifacts")
     if mirror_only and sport == "wnba":
         command.append("-UseExistingMirrorArtifacts")
