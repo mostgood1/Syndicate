@@ -3,9 +3,12 @@ services:
     name: syndicate
     env: python
     plan: starter
+    autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn wsgi:application
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: ADMIN_TOKEN
+        generateValue: true

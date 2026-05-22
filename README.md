@@ -1,5 +1,8 @@
 # Syndicate
 
+[![CI](https://github.com/mostgood1/Syndicate/actions/workflows/ci.yml/badge.svg)](https://github.com/mostgood1/Syndicate/actions/workflows/ci.yml)
+[![Render Blueprint](https://img.shields.io/badge/Render-Blueprint-46E3B7?logo=render&logoColor=white)](https://github.com/mostgood1/Syndicate/blob/main/render.yaml)
+
 Syndicate is the new unified multi-sport app that will eventually replace the separate sport-specific frontends.
 
 ## Core principles
@@ -49,6 +52,29 @@ Syndicate is the new unified multi-sport app that will eventually replace the se
 py -3 -m pip install -r requirements.txt
 py -3 app.py
 ```
+
+## Render deploy
+
+This repo is ready to deploy to Render as a Blueprint-backed Flask app using [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml).
+
+Current hosted boundary:
+
+- The web app itself is deployable on Render now.
+- The current production-safe model is mirror-first and read-only with respect to the sibling source repos.
+- Source-refresh jobs that require the separate MLB, NBA, NHL, NFL, WNBA, NCAAB, or NCAAF checkouts are not expected to run inside the Render service yet.
+
+Render setup:
+
+1. In Render, choose New + and create a Blueprint instance from the GitHub repo `mostgood1/Syndicate`.
+2. Let Render read [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml), which defines the `syndicate` web service, Python runtime, build command, and Gunicorn start command.
+3. Set `ADMIN_TOKEN` in Render if you want the protected ops/status endpoints enabled for the deployed instance.
+4. Deploy the service and verify the root page plus any needed public module routes.
+
+If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, use [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) as the implementation plan before moving the refresh jobs onto Render.
+
+## GitHub automation
+
+The repo now includes a GitHub Actions workflow at [.github/workflows/ci.yml](c:/Users/mostg/OneDrive/Coding/Syndicate/.github/workflows/ci.yml). It runs on pushes and pull requests to `main`, installs the app dependencies, and executes the archive regression suite so the repo badge reflects real app health instead of a placeholder status image.
 
 ## Regression checks
 

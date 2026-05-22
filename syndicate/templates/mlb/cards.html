@@ -22,7 +22,7 @@
       </header>
 
       {% set client_query = '&client=' ~ cards_client if cards_client else '' %}
-      {% with action=route_path, prev_href=route_path ~ '?date=' ~ prev_date ~ client_query, next_href=route_path ~ '?date=' ~ next_date ~ client_query, date_value=date, links=([] if source_preview_shell else module_links), cards_control_links=cards_control_links, source_meta_loading_text=('Loading slate…' if source_client_shell else none) %}
+      {% with action=route_path, prev_href=route_path ~ '?date=' ~ prev_date ~ client_query, next_href=route_path ~ '?date=' ~ next_date ~ client_query, date_value=date, links=([] if source_preview_shell or cards_client == 'source' else module_links), cards_control_links=cards_control_links, source_meta_loading_text=('Loading slate…' if source_client_shell else none) %}
         {% include 'shared/_date_controls.html' %}
       {% endwith %}
 
