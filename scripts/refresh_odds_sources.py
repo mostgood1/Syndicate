@@ -317,8 +317,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NFL-Betting",
         mirror_script_name="refresh_nfl_source_mirror.ps1",
         step_builder=_build_nfl_steps,
-        ingest_contract_kind="source_repo_artifacts",
-        ingest_contract_notes="Mirror import still expects source-generated weekly artifacts from the sibling NFL repo layout.",
+        ingest_contract_kind="artifact_bundle_or_existing_mirror",
+        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/nfl_source or from a published NFL artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NFL.",
         notes="Uses the source team's JSON odds snapshot plus weekly player-props CSV flow.",
     ),
     "wnba": SportSpec(
@@ -468,6 +468,10 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NHL") or "").strip()
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
+    if sport == "nfl":
+        artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NFL") or "").strip()
+        if artifact_root:
+            command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "wnba":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_WNBA") or "").strip()
         if artifact_root:
@@ -479,6 +483,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
     if mirror_only and sport == "nba":
         command.append("-UseExistingMirrorArtifacts")
     if mirror_only and sport == "nhl":
+        command.append("-UseExistingMirrorArtifacts")
+    if mirror_only and sport == "nfl":
         command.append("-UseExistingMirrorArtifacts")
     if mirror_only and sport == "wnba":
         command.append("-UseExistingMirrorArtifacts")

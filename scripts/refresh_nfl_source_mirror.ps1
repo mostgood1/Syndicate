@@ -1,22 +1,44 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\NFL-Betting"
+    [string]$SourceRepo = "..\NFL-Betting",
+    [string]$SourceArtifactRoot = "",
+    [switch]$UseExistingMirrorArtifacts
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_NFL'
-$sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
-if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
-    $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
-}
-if (-not (Test-Path $sourceRootCandidate)) {
-    throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar or pass -SourceRepo."
-}
-$sourceRoot = (Resolve-Path $sourceRootCandidate).Path
-$sourceDataRoot = Join-Path $sourceRoot 'nfl_compare\data'
+$sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_NFL'
+$sourceRoot = $null
+$artifactRoot = $null
 $destRoot = Join-Path $repoRoot 'data\nfl_source'
+
+if (-not $UseExistingMirrorArtifacts) {
+    $artifactRootCandidate = $SourceArtifactRoot
+    if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        $artifactRootCandidate = [Environment]::GetEnvironmentVariable($sourceArtifactRootEnvVar)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        if (-not (Test-Path $artifactRootCandidate)) {
+            throw "Artifact root path not found: $artifactRootCandidate. Set $sourceArtifactRootEnvVar or pass -SourceArtifactRoot with a published NFL artifact bundle path."
+        }
+        $artifactRoot = (Resolve-Path $artifactRootCandidate).Path
+    }
+}
+
+if ((-not $UseExistingMirrorArtifacts) -and (-not $artifactRoot)) {
+    $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
+    if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
+        $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
+    }
+    if (-not (Test-Path $sourceRootCandidate)) {
+        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, set $sourceArtifactRootEnvVar / -SourceArtifactRoot, or use -UseExistingMirrorArtifacts."
+    }
+    $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
+}
+
+$sourceDataRoot = if ($UseExistingMirrorArtifacts) { $destRoot } elseif ($artifactRoot) { $artifactRoot } else { Join-Path $sourceRoot 'nfl_compare\data' }
 
 function Copy-IfExists {
     param(
@@ -32,6 +54,15 @@ function Copy-IfExists {
     $parent = Split-Path -Parent $DestinationPath
     if ($parent) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    $resolvedSourcePath = (Resolve-Path $SourcePath).Path
+    $resolvedDestinationPath = $DestinationPath
+    if (Test-Path $DestinationPath) {
+        $resolvedDestinationPath = (Resolve-Path $DestinationPath).Path
+    }
+    if ($resolvedSourcePath -eq $resolvedDestinationPath) {
+        return $true
     }
 
     if ($Recurse) {
@@ -143,9 +174,13 @@ $manifest = [pscustomobject]@{
     date = $Date
     refreshedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
     sourceRepo = $sourceRoot
+    sourceArtifactRoot = $artifactRoot
     sourceRootEnvVar = $sourceRootEnvVar
+    sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
     sourceDataRoot = $sourceDataRoot
     destinationRoot = $destRoot
+    usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
+    usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
     copiedArtifactCount = $copied.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copied)
