@@ -39,11 +39,10 @@ Current source refresh owner:
 
 Current Syndicate mirror behavior:
 - [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) copies processed and raw artifacts out of `NBA-Betting`.
-- If a live-state snapshot is missing, the mirror script can boot the source Flask app with a temporary script and hit `/api/live_state` to force snapshot generation.
 
 Required Render-safe refactor:
-- Move the props refresh job into Syndicate-owned code or a shared installable package.
-- Remove the source-app bootstrap fallback used to emit live-state snapshots and replace it with a direct exporter owned by Syndicate.
+- The source-app bootstrap fallback used to emit live-state snapshots has already been removed from the mirror layer.
+- The remaining NBA gap is generation ownership: move the props refresh job into Syndicate-owned code or a shared installable package.
 
 ### WNBA
 
@@ -166,7 +165,7 @@ Current implementation progress:
 ### 4. Remove source Flask app bootstrapping from normal refresh
 
 Current offenders:
-- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) can boot the NBA source app to force a live-state snapshot
+- No normal mirror path should still boot a source Flask app.
 
 Render-safe shape:
 - export artifacts directly from data contracts, not from source web routes
@@ -178,7 +177,7 @@ What must change:
 
 1. Decide whether Render should be read-only or self-refreshing.
 2. If read-only, deploy now and keep refresh outside Render.
-3. If self-refreshing, first eliminate the remaining NBA source-app bootstrap path and then replace the remaining source-owned generation jobs.
+3. If self-refreshing, replace the remaining source-owned generation jobs now that the normal mirror bootstrap paths are gone.
 4. Next replace [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) with a Syndicate-owned refresh runner or a remote artifact puller.
 5. Then move [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) off detached subprocess execution and onto durable hosted job state.
 6. Only after that expand [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) into a full self-refreshing deployment blueprint.

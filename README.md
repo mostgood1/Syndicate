@@ -62,7 +62,7 @@ Current hosted boundary:
 - The web app itself is deployable on Render now.
 - The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
 - The per-sport ingest boundary is now hosted-safe across MLB, NBA, NHL, NFL, WNBA, NCAAF, and NCAAB: each module can import from a neutral artifact bundle or an already mirrored local bundle instead of requiring a sibling source checkout during ingest.
-- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for most sports, and the remaining normal source-app bootstrap blocker is the NBA live-state fallback while NCAAB still depends on source-owned odds-history generation for fresh raw outputs.
+- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for most sports. The remaining blockers are the source-owned refresh jobs themselves, including NCAAB odds-history generation and the broader per-sport refresh commands that still live outside Syndicate.
 
 Render setup:
 

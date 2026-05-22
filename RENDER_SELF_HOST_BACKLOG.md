@@ -10,7 +10,7 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 
 - [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) still resolves sibling repo roots and executes source-owned generation commands by default, even though all per-sport ingestion contracts can now target neutral artifact bundles.
 - Deployment proof is still incomplete: the Render blueprint and docs need manual `SYNDICATE_ARTIFACT_ROOT_*` wiring per environment before hosted refreshes can actually ingest published bundles.
-- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) still relies on source-app execution for part of its artifact generation path, and NCAAB still depends on source-owned odds-history generation when fresh raw outputs must be republished.
+- The normal mirror bootstrap blockers are closed, but multiple sports still depend on source-owned generation jobs, and NCAAB still depends on source-owned odds-history generation when fresh raw outputs must be republished.
 
 ## Delivery strategy
 
@@ -40,7 +40,7 @@ Exit criteria:
 ## Milestone 1: Remove source-app bootstrapping blockers
 
 Purpose:
-Remove the highest-risk remaining hosted bootstrap blocker first and then continue stripping source-owned generation assumptions.
+Continue stripping source-owned generation assumptions now that the normal mirror bootstrap blockers are closed.
 
 ### Workstream 1A: NCAAB exporter replacement
 
@@ -65,25 +65,21 @@ Next NCAAB gap:
 
 ### Workstream 1B: NBA live-state bootstrap removal
 
-Why second:
-NBA has a smaller but still invalid hosted dependency: the mirror script can boot the source app to materialize missing live-state snapshots.
+Current status:
+- Completed. [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) no longer contains the source-app bootstrap helper or the `/api/live_state` fallback path.
+- Focused regression coverage in [tests/test_nba_mirror_script.py](c:/Users/mostg/OneDrive/Coding/Syndicate/tests/test_nba_mirror_script.py) asserts that the bootstrap helper and source-app fallback hooks are absent.
 
 Owning files:
 - [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1)
 - [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/nba_source)
 - [syndicate/features/nba](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/nba)
 
-Tasks:
-- Isolate exactly which NBA pages or APIs depend on `live_state_<date>.jsonl` versus mirrored processed artifacts already present.
-- Replace `Ensure-LiveStateSnapshot` in [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) with either:
-  - a direct artifact exporter owned by Syndicate, or
-  - a hard failure that requires a published artifact instead of source-app execution.
-- Update the manifest written by the NBA mirror script so missing hosted-required live-state artifacts are visible as explicit ingest failures, not silently backfilled via source-app boot.
-- Add focused regression coverage for the no-bootstrap path.
+Outcome:
+- Normal NBA mirror refresh no longer boots the source Flask app.
+- NBA ingest now either consumes existing or published artifacts, or fails based on artifact availability rather than a hidden source-app fallback.
 
-Exit criteria:
-- Normal NBA mirror refresh never boots the source Flask app.
-- NBA mirror artifacts are either directly exported or explicitly required from a published source.
+Next NBA gap:
+- NBA still depends on the source-owned props refresh job for generation. The remaining work is generation ownership, not mirror bootstrap removal.
 
 ## Milestone 2: Split refresh generation from artifact ingestion
 
@@ -213,6 +209,6 @@ Treat Render self-hosting as done only when all of the following are true:
 
 ## Recommended next implementation slice
 
-Start with Milestone 1B.
+Start with the first source-owned generation job you want Syndicate to own directly.
 
-The highest-leverage next code change is to remove the NBA live-state bootstrap fallback. NCAAB's API export path is already artifact-only by default, so the next remaining normal source-app bootstrap dependency is the NBA mirror script.
+The highest-leverage next code change is replacing one source-owned generation command with a Syndicate-owned job or a published artifact producer, with NCAAB odds-history generation and the NBA props refresh job as the clearest near-term candidates.
