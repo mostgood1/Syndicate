@@ -126,6 +126,32 @@ class NcaabMirrorExportTests(unittest.TestCase):
 
         self.assertEqual(summary["date_files"], [kept_rel])
 
+    def test_collect_raw_output_artifacts_copies_odds_history_snapshot(self) -> None:
+        module = self._load_export_script_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_outputs_root = Path(tmp_dir) / "source_outputs"
+            mirror_root = Path(tmp_dir) / "mirror"
+            (source_outputs_root / "odds_history").mkdir(parents=True, exist_ok=True)
+            (source_outputs_root / "live_lens_tuning.json").write_text("{}", encoding="utf-8")
+            (source_outputs_root / "odds_history" / f"odds_{self.selected_date}.csv").write_text(
+                "event_id,market,book\nevt-1,h2h,DraftKings\n",
+                encoding="utf-8",
+            )
+
+            result = module.collect_raw_output_artifacts(
+                source_outputs_root=source_outputs_root,
+                mirror_root=mirror_root,
+                target_date=self.selected_date,
+            )
+
+            self.assertIn(
+                f"raw_outputs/by_date/{self.selected_date}/odds_{self.selected_date}.csv",
+                result["date_files"],
+            )
+            self.assertTrue(
+                (mirror_root / "raw_outputs" / "by_date" / self.selected_date / f"odds_{self.selected_date}.csv").exists()
+            )
+
     def test_build_results_payload_from_raw_generates_settled_rows(self) -> None:
         payload = build_results_payload_from_raw(self.raw_root, self.selected_date)
 

@@ -113,6 +113,15 @@ def collect_raw_output_artifacts(*, source_outputs_root: Path, mirror_root: Path
         )
         result["date_files"].append(rel_path)
 
+    odds_history_path = source_outputs_root / "odds_history" / f"odds_{target_date}.csv"
+    if odds_history_path.is_file():
+        rel_path = _copy_output_file(
+            odds_history_path,
+            raw_outputs_root / "by_date" / target_date / odds_history_path.name,
+            mirror_root=mirror_root,
+        )
+        result["date_files"].append(rel_path)
+
     manifest = {
         "source_root": result["source_root"],
         "date": target_date,

@@ -22,6 +22,13 @@ def _load_source_adapter(source_root: Path):
     return TheOddsAPIAdapter
 
 
+def _target_timezone() -> ZoneInfo | dt.tzinfo:
+    try:
+        return ZoneInfo("America/Chicago")
+    except Exception:
+        return dt.timezone.utc
+
+
 def _event_on_target_date(ct_raw: object, *, target_date: dt.date, tz: ZoneInfo) -> bool:
     if not ct_raw:
         return False
@@ -45,7 +52,7 @@ def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str
     if not wants_period:
         return [row.model_dump() for row in adapter.iter_current_odds_expanded(markets=markets, date_iso=date_iso, bookmakers=bookmakers)]
 
-    tz = ZoneInfo("America/Chicago")
+    tz = _target_timezone()
     target_date = dt.date.fromisoformat(date_iso)
     event_ids: set[str] = set()
 
@@ -78,7 +85,7 @@ def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str
 
 
 def _discover_event_ids(*, adapter, date_iso: str) -> list[str]:
-    tz = ZoneInfo("America/Chicago")
+    tz = _target_timezone()
     target_date = dt.date.fromisoformat(date_iso)
     event_ids: set[str] = set()
 
@@ -150,7 +157,7 @@ def main() -> int:
     else:
         rows = _fetch_current_rows(adapter=adapter, date_iso=date_iso, markets=str(args.markets or ""), bookmakers=args.bookmakers)
 
-    out_path = out_dir / f"odds_history_{date_iso}.csv"
+    out_path = out_dir / f"odds_{date_iso}.csv"
     _write_rows(out_path, rows)
     print(f"Wrote {len(rows)} odds rows to {out_path}")
     return 0
