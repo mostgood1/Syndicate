@@ -1,0 +1,34 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | NHL{% endblock %}
+{% block page_title %}NHL Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/nhl', title='NHL has a first real Syndicate module', status='In progress', body='Syndicate starts NHL with persisted daily predictions and recommendation snapshots from the source app, and the hub, betting-card lane, live-lens board, and daily archive lane now ride those same stored dates instead of placeholder shells.', action_href='/nhl/cards?date=' ~ today_date, action_label='Open NHL cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Stored daily slates', title='Recent NHL recommendation snapshots', body='The hub surfaces the dates that already have stored recommendation artifacts, so the first Syndicate NHL module is driven by real source outputs rather than placeholder dates.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="Available NHL slates">
+    {% for slate in recent_slates %}
+      <article class="sport-card">
+        <div class="section-label">{{ slate.kind }}</div>
+        <h3>{{ slate.date }}</h3>
+        <p>Open the NHL daily archive, betting-card board, cards board, ranked live-lens board, or picks board for this stored slate snapshot.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/nhl/archive?date={{ slate.date }}">Daily archive</a>
+          <a class="cards-nav-pill" href="/nhl/season/{{ slate.date[:4] }}/betting-card?date={{ slate.date }}">Betting Card</a>
+          <a class="cards-nav-pill" href="/nhl/cards?date={{ slate.date }}">Cards</a>
+          <a class="cards-nav-pill" href="/nhl/reconciliation?date={{ slate.date }}">Betting Recap</a>
+          <a class="cards-nav-pill" href="/nhl/props/reconciliation?date={{ slate.date }}">Props Reconciliation</a>
+          <a class="cards-nav-pill" href="/nhl/props/lines?date={{ slate.date }}">Props Lines</a>
+          <a class="cards-nav-pill" href="/nhl/live-lens?date={{ slate.date }}">Live Lens</a>
+          <a class="cards-nav-pill" href="/nhl/picks?date={{ slate.date }}">Picks</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}

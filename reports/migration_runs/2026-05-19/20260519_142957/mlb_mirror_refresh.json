@@ -1,0 +1,20 @@
+﻿{
+    "date":  "2026-05-19",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data",
+    "copiedArtifacts":  [
+                            "daily\\daily_summary_2026_05_19.json",
+                            "daily\\daily_summary_2026_05_19_profile_bundle.json",
+                            "daily\\daily_summary_2026_05_19_locked_policy.json",
+                            "daily\\daily_summary_2026_05_19_hr_targets.json",
+                            "daily\\daily_summary_2026_05_19_rfi_targets.json",
+                            "daily\\ladders\\daily_ladders_2026_05_19.json",
+                            "daily\\top_props\\daily_top_props_2026_05_19.json",
+                            "daily\\ops\\daily_ops_2026_05_19.json",
+                            "daily\\snapshots\\2026-05-19",
+                            "daily\\sims\\2026-05-19",
+                            "eval\\seasons\\2026\\season_eval_manifest.json",
+                            "eval\\seasons\\2026\\betting_day_payloads_retuned\\season_betting_day_2026_05_19.json"
+                        ]
+}
+

@@ -1,0 +1,4128 @@
+{
+  "schema_version": 4,
+  "meta": {
+    "date": "2026-05-21",
+    "stats_season": 2026,
+    "spring_mode": false,
+    "context_refresh_rev": 2,
+    "game_pk": 824031,
+    "away_abbr": "ATH",
+    "home_abbr": "LAA",
+    "statcast_starter_splits": "starter",
+    "roster_builder": {
+      "as_of_date": "2026-05-21",
+      "roster_type": "active",
+      "fallback_roster_types": null,
+      "exclude_injured": true,
+      "enable_batter_vs_pitch_type": true,
+      "enable_batter_platoon": true,
+      "enable_pitcher_platoon": true,
+      "batter_platoon_alpha": 0.55,
+      "pitcher_platoon_alpha": 0.55,
+      "away_probable_pitcher_id": 622663,
+      "home_probable_pitcher_id": 667755,
+      "away_lineup_ids": [
+        701762,
+        669127,
+        691016,
+        667670,
+        666126,
+        680869,
+        671732,
+        687231,
+        643446
+      ],
+      "home_lineup_ids": [
+        687093,
+        545361,
+        694384,
+        624585,
+        666176,
+        687263,
+        660162,
+        666139,
+        681351
+      ],
+      "away_lineup_source": "projected_rotowire_default_vs_rhp",
+      "home_lineup_source": "projected_rotowire_default_vs_rhp"
+    }
+  },
+  "away": {
+    "schema_version": 4,
+    "team": {
+      "team_id": 133,
+      "name": "Athletics",
+      "abbreviation": "ATH"
+    },
+    "manager": {
+      "pull_starter_pitch_count": 82,
+      "pull_starter_third_time_penalty": 0.04,
+      "starter_min_innings": 4,
+      "starter_blowup_run_diff": 6,
+      "closer_leverage_max_run_diff": 3,
+      "use_closer_in_9th_only": true,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "lineup": {
+      "batters": [
+        {
+          "player": {
+            "mlbam_id": 701762,
+            "full_name": "Nick Kurtz",
+            "primary_position": "1B",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.31354567307692305,
+          "bb_rate": 0.215125,
+          "hbp_rate": 0.00904977375565611,
+          "hr_rate": 0.045292479559021825,
+          "inplay_hit_rate": 0.40081157374735366,
+          "xb_hit_share": 0.24296063562090303,
+          "triple_share_of_xb": 0.0904998282416265,
+          "sb_attempt_rate": 0.09090909090909091,
+          "sb_success_rate": 0.8571428571428571,
+          "vs_pitch_type": {
+            "SI": 0.927588600210919,
+            "CH": 0.9886486310494372,
+            "FF": 0.9253507901877379,
+            "OTHER": 0.9280405102520696,
+            "SL": 0.9018018404969771,
+            "FC": 0.85,
+            "CU": 1.0106559748077322,
+            "FS": 0.85
+          },
+          "vs_pitch_type_hr": {
+            "SI": 0.8,
+            "CH": 1.25,
+            "FF": 1.25,
+            "OTHER": 1.25,
+            "SL": 1.25,
+            "FC": 1.0,
+            "CU": 1.0,
+            "FS": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.0507295923913187,
+            "bb": 0.8352490985648675,
+            "hr": 0.78,
+            "inplay": 0.9836395026948772
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9122370674427254,
+            "bb": 1.0546139108312262,
+            "hr": 1.0243450958478575,
+            "inplay": 0.9387344173409051
+          },
+          "venue_mult_home": {
+            "k": 0.9625541457430905,
+            "bb": 1.0567402672864614,
+            "hr": 0.9591020879472105,
+            "inplay": 0.9798862380295604
+          },
+          "venue_mult_away": {
+            "k": 0.9821118431744763,
+            "bb": 0.9323651442319236,
+            "hr": 0.9054562710307525,
+            "inplay": 0.9638164120961351
+          },
+          "statcast_quality_mult": {
+            "k": 1.15,
+            "bb": 1.0802051056343753,
+            "hr": 1.2434899606682093,
+            "inplay": 1.1,
+            "csw_rate": 0.29628710311304174,
+            "zone_rate": 0.4644120384734719,
+            "chase_swing_rate": 0.282109162073705,
+            "contact_rate": 0.6758969909960617,
+            "xwoba": 0.5046696473209207,
+            "ev_mean": 94.07098138397114,
+            "ev_max": 115.31573033707865,
+            "la_mean": 13.543057340685767,
+            "pulled_air_rate": 0.12877814171400143,
+            "sweet_spot_rate": 0.41672540320908824,
+            "hardhit_rate": 0.5619843277084456,
+            "barrel_rate": 0.1728098179858203,
+            "pitch_velo_mean": 89.34342439639761,
+            "pitch_spin_mean": 2221.8537081146433,
+            "pitch_pfx_x_mean": -0.1434359430135476,
+            "pitch_pfx_z_mean": 0.5457294504187807,
+            "pitch_extension_mean": 6.404412416278731
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.41020357702134674,
+          "bb_fb_rate": 0.23609165086952938,
+          "bb_ld_rate": 0.2708728261765433,
+          "bb_pu_rate": 0.08283194593258057,
+          "bb_inplay_n": 98
+        },
+        {
+          "player": {
+            "mlbam_id": 669127,
+            "full_name": "Shea Langeliers",
+            "primary_position": "C",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.19025434259023097,
+          "bb_rate": 0.09621678315350027,
+          "hbp_rate": 0.014778325123152709,
+          "hr_rate": 0.0695303507914794,
+          "inplay_hit_rate": 0.33514530128149633,
+          "xb_hit_share": 0.19475507924276236,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "CH": 0.9806977945082264,
+            "OTHER": 1.0509124150440092,
+            "FF": 1.0144845803329587,
+            "FC": 0.9076665118408858,
+            "SI": 1.0196807602122182,
+            "SL": 0.9955474116669996,
+            "CU": 1.0910696804300475
+          },
+          "vs_pitch_type_hr": {
+            "CH": 0.8469684783355306,
+            "OTHER": 1.25,
+            "FF": 1.25,
+            "FC": 1.0156361425159408,
+            "SI": 1.25,
+            "SL": 1.203862390536156,
+            "CU": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.1045359238133188,
+            "bb": 0.8814157322848938,
+            "hr": 0.8977479995040266,
+            "inplay": 1.026595412510151
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.008900952722817,
+            "bb": 1.0216258452774845,
+            "hr": 0.9246128794742681,
+            "inplay": 0.9757826726474194
+          },
+          "venue_mult_home": {
+            "k": 0.969937849452887,
+            "bb": 1.1225,
+            "hr": 0.8688596940922185,
+            "inplay": 1.0579387342660869
+          },
+          "venue_mult_away": {
+            "k": 1.064333926656329,
+            "bb": 0.8793993973677046,
+            "hr": 1.0127944478645785,
+            "inplay": 0.938562978344011
+          },
+          "statcast_quality_mult": {
+            "k": 0.9778150767981033,
+            "bb": 0.9842839680890507,
+            "hr": 1.2055638002852085,
+            "inplay": 1.0575169720711233,
+            "csw_rate": 0.24396159557035785,
+            "zone_rate": 0.47012298645906664,
+            "chase_swing_rate": 0.3234790220188545,
+            "contact_rate": 0.7744841598355217,
+            "xwoba": 0.457704685581575,
+            "ev_mean": 92.23683728269995,
+            "ev_max": 116.19108910891089,
+            "la_mean": 18.220519738349157,
+            "pulled_air_rate": 0.1702766677696047,
+            "sweet_spot_rate": 0.3868640077375347,
+            "hardhit_rate": 0.471264221537835,
+            "barrel_rate": 0.1388556593448548,
+            "pitch_velo_mean": 89.30938433332177,
+            "pitch_spin_mean": 2288.033248944265,
+            "pitch_pfx_x_mean": -0.03995968231336426,
+            "pitch_pfx_z_mean": 0.5575500189475187,
+            "pitch_extension_mean": 6.429553209020662
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.3793473379571878,
+          "bb_fb_rate": 0.2512599171698019,
+          "bb_ld_rate": 0.22623621575769673,
+          "bb_pu_rate": 0.1431565291153136,
+          "bb_inplay_n": 122
+        },
+        {
+          "player": {
+            "mlbam_id": 691016,
+            "full_name": "Tyler Soderstrom",
+            "primary_position": "LF",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2049133711255019,
+          "bb_rate": 0.09359941036341504,
+          "hbp_rate": 0.00510204081632653,
+          "hr_rate": 0.026862225464825917,
+          "inplay_hit_rate": 0.20564730241214912,
+          "xb_hit_share": 0.43733333640768696,
+          "triple_share_of_xb": 0.06504165870145764,
+          "sb_attempt_rate": 0.029411764705882353,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "CU": 1.023907395160395,
+            "SI": 1.0218986331691788,
+            "CH": 1.0721755445662624,
+            "SL": 0.8733781512935077,
+            "FC": 1.0576779700343797,
+            "FF": 0.9956441969246411,
+            "FS": 1.074680242743317,
+            "OTHER": 1.1395398302760833
+          },
+          "vs_pitch_type_hr": {
+            "CU": 1.0,
+            "SI": 0.9397700763306902,
+            "CH": 0.8,
+            "SL": 1.25,
+            "FC": 1.25,
+            "FF": 0.844238769227228,
+            "FS": 1.0,
+            "OTHER": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.1925000000000001,
+            "bb": 0.8075,
+            "hr": 0.8514676200083069,
+            "inplay": 0.881368057732004
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.8942583822549355,
+            "bb": 1.0983978364476472,
+            "hr": 1.0148234102185834,
+            "inplay": 1.0671881441396367
+          },
+          "venue_mult_home": {
+            "k": 0.9832758743449812,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 1.035345599428521
+          },
+          "venue_mult_away": {
+            "k": 1.0245699245653572,
+            "bb": 0.8796085839294524,
+            "hr": 1.1071736534065886,
+            "inplay": 1.0028418547612779
+          },
+          "statcast_quality_mult": {
+            "k": 0.9633677350985532,
+            "bb": 1.0103961748812877,
+            "hr": 1.1195528563251158,
+            "inplay": 1.006043456044373,
+            "csw_rate": 0.2501846134004714,
+            "zone_rate": 0.47899082168044305,
+            "chase_swing_rate": 0.31620816274439223,
+            "contact_rate": 0.7800294881768316,
+            "xwoba": 0.3815983468112413,
+            "ev_mean": 91.01466493895555,
+            "ev_max": 113.76243654822335,
+            "la_mean": 11.870564091333256,
+            "pulled_air_rate": 0.1370201738014004,
+            "sweet_spot_rate": 0.3342764417075809,
+            "hardhit_rate": 0.4928613036293822,
+            "barrel_rate": 0.12274278106016476,
+            "pitch_velo_mean": 89.07900669415477,
+            "pitch_spin_mean": 2228.7007983715303,
+            "pitch_pfx_x_mean": -0.22933282833065055,
+            "pitch_pfx_z_mean": 0.4677767699585713,
+            "pitch_extension_mean": 6.408017327494651
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.45056679653185183,
+          "bb_fb_rate": 0.22810248677132816,
+          "bb_ld_rate": 0.2078087582753793,
+          "bb_pu_rate": 0.11352195842144062,
+          "bb_inplay_n": 118
+        },
+        {
+          "player": {
+            "mlbam_id": 667670,
+            "full_name": "Brent Rooker",
+            "primary_position": "DH",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.33155941118718923,
+          "bb_rate": 0.11028218358622596,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.06106808291123836,
+          "inplay_hit_rate": 0.2278604853246275,
+          "xb_hit_share": 0.10288341020070253,
+          "triple_share_of_xb": 0.02125408361072281,
+          "sb_attempt_rate": 0.06451612903225806,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "CH": 0.85,
+            "SI": 0.9988536018361002,
+            "OTHER": 0.85,
+            "FF": 0.8966471203423693,
+            "SL": 0.85,
+            "FC": 1.10987355326209
+          },
+          "vs_pitch_type_hr": {
+            "CH": 1.0,
+            "SI": 1.054578049273261,
+            "OTHER": 1.0,
+            "FF": 1.25,
+            "SL": 1.126918858464435,
+            "FC": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.1135311578466827,
+            "bb": 0.8774748251243839,
+            "hr": 0.78,
+            "inplay": 1.120488248807681
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.8995888686344344,
+            "bb": 1.009312855302932,
+            "hr": 0.9550284866507806,
+            "inplay": 0.92543712188181
+          },
+          "venue_mult_home": {
+            "k": 0.9013375597904101,
+            "bb": 1.002630747998229,
+            "hr": 1.0138925796069598,
+            "inplay": 0.9497127072275576
+          },
+          "venue_mult_away": {
+            "k": 1.0241430003968637,
+            "bb": 0.9713849855173734,
+            "hr": 0.8676446124864411,
+            "inplay": 1.007215726637496
+          },
+          "statcast_quality_mult": {
+            "k": 1.1352818370090076,
+            "bb": 1.009147250689668,
+            "hr": 1.222680077633687,
+            "inplay": 1.0284232262655755,
+            "csw_rate": 0.28808889952439354,
+            "zone_rate": 0.4653525171248243,
+            "chase_swing_rate": 0.29252373066704995,
+            "contact_rate": 0.6840759475795257,
+            "xwoba": 0.41334127482832317,
+            "ev_mean": 90.37008064970959,
+            "ev_max": 112.42013422818792,
+            "la_mean": 17.566409113981162,
+            "pulled_air_rate": 0.19440527889007952,
+            "sweet_spot_rate": 0.39890587107326153,
+            "hardhit_rate": 0.45056680390276915,
+            "barrel_rate": 0.15498279848852292,
+            "pitch_velo_mean": 89.24693563370843,
+            "pitch_spin_mean": 2260.2025558991545,
+            "pitch_pfx_x_mean": -0.09255383210059796,
+            "pitch_pfx_z_mean": 0.522810617926645,
+            "pitch_extension_mean": 6.421959909372366
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.3899490738149869,
+          "bb_fb_rate": 0.3034864849739773,
+          "bb_ld_rate": 0.20991661536739603,
+          "bb_pu_rate": 0.09664782584363982,
+          "bb_inplay_n": 69
+        },
+        {
+          "player": {
+            "mlbam_id": 666126,
+            "full_name": "Carlos Cortes",
+            "primary_position": "RF",
+            "bat_side": "L",
+            "throw_side": "S"
+          },
+          "k_rate": 0.10302842885966323,
+          "bb_rate": 0.10625210126260802,
+          "hbp_rate": 0.016,
+          "hr_rate": 0.02835597270758387,
+          "inplay_hit_rate": 0.3680228013929583,
+          "xb_hit_share": 0.2376905257255839,
+          "triple_share_of_xb": 0.11438536550644174,
+          "sb_attempt_rate": 0.025,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "SI": 0.9815970674366788,
+            "SL": 1.0117596927119645,
+            "CH": 1.0256785986373107,
+            "FF": 1.0741240165590746,
+            "OTHER": 0.9677999704845148,
+            "CU": 0.9903324806071169,
+            "FC": 1.0191031155023316,
+            "FS": 1.15
+          },
+          "vs_pitch_type_hr": {
+            "SI": 0.8710919011885468,
+            "SL": 1.0,
+            "CH": 0.9956050012527654,
+            "FF": 0.9272765822028555,
+            "OTHER": 1.0,
+            "CU": 1.0,
+            "FC": 1.0,
+            "FS": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.1925000000000001,
+            "bb": 0.8075,
+            "hr": 0.78,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9102010690469852,
+            "bb": 1.030110231252191,
+            "hr": 1.1188367716021586,
+            "inplay": 0.9210837604659039
+          },
+          "venue_mult_home": {
+            "k": 1.1073046986823538,
+            "bb": 1.0300829809925598,
+            "hr": 0.86,
+            "inplay": 1.0254058015262029
+          },
+          "venue_mult_away": {
+            "k": 0.9292153933246465,
+            "bb": 0.9658680481308031,
+            "hr": 1.175,
+            "inplay": 0.9562632640699644
+          },
+          "statcast_quality_mult": {
+            "k": 0.8993101481330018,
+            "bb": 1.035590711647815,
+            "hr": 1.0424989966023481,
+            "inplay": 1.076244805986564,
+            "csw_rate": 0.2374727668845316,
+            "zone_rate": 0.4880174291938998,
+            "chase_swing_rate": 0.27230046948356806,
+            "contact_rate": 0.8028169014084507,
+            "xwoba": 0.4047710843373496,
+            "ev_mean": 89.82676330162377,
+            "ev_max": 110.4,
+            "la_mean": 7.055555555555555,
+            "pulled_air_rate": 0.13949088957820466,
+            "sweet_spot_rate": 0.3699625164941547,
+            "hardhit_rate": 0.4260347973709769,
+            "barrel_rate": 0.09310767917633567,
+            "pitch_velo_mean": 89.1858387799565,
+            "pitch_spin_mean": 2191.7167755991286,
+            "pitch_pfx_x_mean": -0.3917211328976034,
+            "pitch_pfx_z_mean": 0.45888888888888857,
+            "pitch_extension_mean": 6.442265795206976
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.5222222222222223,
+          "bb_fb_rate": 0.2222222222222222,
+          "bb_ld_rate": 0.2222222222222222,
+          "bb_pu_rate": 0.03333333333333333,
+          "bb_inplay_n": 92
+        },
+        {
+          "player": {
+            "mlbam_id": 680869,
+            "full_name": "Zack Gelof",
+            "primary_position": "3B",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.25080374934701294,
+          "bb_rate": 0.055559902683923586,
+          "hbp_rate": 0.009345794392523364,
+          "hr_rate": 0.059016023743745864,
+          "inplay_hit_rate": 0.2362002083503939,
+          "xb_hit_share": 0.12833199249128452,
+          "triple_share_of_xb": 0.24275620050267938,
+          "sb_attempt_rate": 0.17391304347826086,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "FF": 0.9165447062572645,
+            "FC": 0.9995186318069093,
+            "SI": 0.9586652353538571,
+            "SL": 1.15
+          },
+          "vs_pitch_type_hr": {
+            "FF": 0.844816901728403,
+            "FC": 1.0,
+            "SI": 0.8780096544131916,
+            "SL": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.9297077408660873,
+            "bb": 0.8075,
+            "hr": 0.78,
+            "inplay": 1.1291554833376554
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9470685924402885,
+            "bb": 1.1099483601557183,
+            "hr": 1.0713001883332127,
+            "inplay": 0.9873537890144086
+          },
+          "venue_mult_home": {
+            "k": 0.8915311702262817,
+            "bb": 1.0134331004354042,
+            "hr": 0.9921495792394441,
+            "inplay": 0.9463587563655224
+          },
+          "venue_mult_away": {
+            "k": 1.030594571265656,
+            "bb": 0.9936094767752913,
+            "hr": 0.9734868749172926,
+            "inplay": 1.1027703222251035
+          },
+          "statcast_quality_mult": {
+            "k": 1.128800323718588,
+            "bb": 1.0056486063263863,
+            "hr": 1.0248194014432292,
+            "inplay": 0.9434631653463915,
+            "csw_rate": 0.3172460110914128,
+            "zone_rate": 0.5011284006340773,
+            "chase_swing_rate": 0.23765247570753212,
+            "contact_rate": 0.64082200705821,
+            "xwoba": 0.3680318744752298,
+            "ev_mean": 87.31186868686868,
+            "ev_max": 107.43333333333332,
+            "la_mean": 11.863636363636363,
+            "pulled_air_rate": 0.15151515151515152,
+            "sweet_spot_rate": 0.3459595959595959,
+            "hardhit_rate": 0.4494949494949495,
+            "barrel_rate": 0.09848484848484848,
+            "pitch_velo_mean": 89.5879992923006,
+            "pitch_spin_mean": 2276.6378101943237,
+            "pitch_pfx_x_mean": -0.11311481381262625,
+            "pitch_pfx_z_mean": 0.5912794788002417,
+            "pitch_extension_mean": 6.416298940532438
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.43092909535452323,
+          "bb_fb_rate": 0.1815403422982885,
+          "bb_ld_rate": 0.21821515892420537,
+          "bb_pu_rate": 0.16931540342298287,
+          "bb_inplay_n": 52
+        },
+        {
+          "player": {
+            "mlbam_id": 671732,
+            "full_name": "Lawrence Butler",
+            "primary_position": "RF",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.30774831678168446,
+          "bb_rate": 0.12910749588895848,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.017070536212504615,
+          "inplay_hit_rate": 0.2321017601593413,
+          "xb_hit_share": 0.14633765108170016,
+          "triple_share_of_xb": 0.020739424116178032,
+          "sb_attempt_rate": 0.17142857142857143,
+          "sb_success_rate": 0.6666666666666666,
+          "vs_pitch_type": {
+            "FC": 1.0013075416919905,
+            "SI": 0.9988536018361002,
+            "CH": 0.9292588887361622,
+            "FF": 0.9743339177910456,
+            "SL": 1.0794487363206,
+            "OTHER": 0.9677999704845148,
+            "CU": 0.85
+          },
+          "vs_pitch_type_hr": {
+            "FC": 1.1132819551277875,
+            "SI": 0.8835637530183157,
+            "CH": 1.25,
+            "FF": 0.8,
+            "SL": 1.0,
+            "OTHER": 1.0,
+            "CU": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.9688571655718049,
+            "bb": 0.9996794856630254,
+            "hr": 0.78,
+            "inplay": 0.9765889502014756
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9456030629131246,
+            "bb": 0.9511783545751115,
+            "hr": 1.262250186278889,
+            "inplay": 0.9765889502014756
+          },
+          "venue_mult_home": {
+            "k": 0.9844979350240097,
+            "bb": 0.9290652201611416,
+            "hr": 1.175,
+            "inplay": 0.9810154487408389
+          },
+          "venue_mult_away": {
+            "k": 0.9551273846316577,
+            "bb": 1.0136599036246234,
+            "hr": 0.86,
+            "inplay": 0.9885214679866628
+          },
+          "statcast_quality_mult": {
+            "k": 1.094033175332155,
+            "bb": 1.0335616212023795,
+            "hr": 1.0041491889708598,
+            "inplay": 1.0302446126082776,
+            "csw_rate": 0.27771685124830736,
+            "zone_rate": 0.48744870586902683,
+            "chase_swing_rate": 0.27836302788486855,
+            "contact_rate": 0.7236532655763317,
+            "xwoba": 0.37913439958608486,
+            "ev_mean": 89.92675766356562,
+            "ev_max": 113.13373493975904,
+            "la_mean": 7.526155253927101,
+            "pulled_air_rate": 0.10667988409333537,
+            "sweet_spot_rate": 0.34192466066798843,
+            "hardhit_rate": 0.46172029891718774,
+            "barrel_rate": 0.08853134055208176,
+            "pitch_velo_mean": 89.06879796719679,
+            "pitch_spin_mean": 2204.6715365771797,
+            "pitch_pfx_x_mean": -0.29851637893219723,
+            "pitch_pfx_z_mean": 0.5623613816036838,
+            "pitch_extension_mean": 6.382257537879043
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.5006110107266327,
+          "bb_fb_rate": 0.2169766980353655,
+          "bb_ld_rate": 0.21696625340755982,
+          "bb_pu_rate": 0.06544603783044191,
+          "bb_inplay_n": 87
+        },
+        {
+          "player": {
+            "mlbam_id": 687231,
+            "full_name": "Darell Hernaiz",
+            "primary_position": "3B",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.14856814381270902,
+          "bb_rate": 0.10133060713131922,
+          "hbp_rate": 0.010869565217391304,
+          "hr_rate": 0.007853260869565216,
+          "inplay_hit_rate": 0.2981251588580104,
+          "xb_hit_share": 0.05784915140714806,
+          "triple_share_of_xb": 0.024901104224038177,
+          "sb_attempt_rate": 0.06666666666666667,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "FF": 1.0207883185375242,
+            "SL": 1.0838292138737289,
+            "CH": 1.15,
+            "SI": 1.0894231646569734
+          },
+          "vs_pitch_type_hr": {
+            "FF": 0.9189557570343652,
+            "SL": 1.0,
+            "CH": 0.9223840072650997,
+            "SI": 0.8742169647835896
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.0670008207292767,
+            "bb": 1.0961640004913493,
+            "hr": 1.275,
+            "inplay": 1.064954249536016
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.0423207879001055,
+            "bb": 0.9927777604127335,
+            "hr": 0.78,
+            "inplay": 0.9624618746133468
+          },
+          "venue_mult_home": {
+            "k": 0.944477664438973,
+            "bb": 0.9583964547799622,
+            "hr": 1.175,
+            "inplay": 1.0502284888509195
+          },
+          "venue_mult_away": {
+            "k": 1.1225,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 0.9168189925672797
+          },
+          "statcast_quality_mult": {
+            "k": 0.8500000000000001,
+            "bb": 0.9718679287697538,
+            "hr": 0.85,
+            "inplay": 0.9286455747260572,
+            "csw_rate": 0.2316692479676022,
+            "zone_rate": 0.4713083881232034,
+            "chase_swing_rate": 0.33794978587597657,
+            "contact_rate": 0.8373765669917279,
+            "xwoba": 0.2748000538719287,
+            "ev_mean": 83.51495400274027,
+            "ev_max": 108.92748091603053,
+            "la_mean": 9.770796633392054,
+            "pulled_air_rate": 0.07751027598355843,
+            "sweet_spot_rate": 0.32198081816402424,
+            "hardhit_rate": 0.27559209238598553,
+            "barrel_rate": 0.019573302016050106,
+            "pitch_velo_mean": 89.3296221537667,
+            "pitch_spin_mean": 2271.9605401238346,
+            "pitch_pfx_x_mean": 0.03979866366187121,
+            "pitch_pfx_z_mean": 0.5828245708024337,
+            "pitch_extension_mean": 6.431320002303419
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.49239885375686043,
+          "bb_fb_rate": 0.21307494293069112,
+          "bb_ld_rate": 0.1822818009616786,
+          "bb_pu_rate": 0.11224440235076984,
+          "bb_inplay_n": 51
+        },
+        {
+          "player": {
+            "mlbam_id": 643446,
+            "full_name": "Jeff McNeil",
+            "primary_position": "2B",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.1312374971584451,
+          "bb_rate": 0.07319093559063626,
+          "hbp_rate": 0.018072289156626505,
+          "hr_rate": 0.011619884525269493,
+          "inplay_hit_rate": 0.29771866977153055,
+          "xb_hit_share": 0.2295708448350966,
+          "triple_share_of_xb": 0.027412274632021214,
+          "sb_attempt_rate": 0.06521739130434782,
+          "sb_success_rate": 0.4,
+          "vs_pitch_type": {
+            "OTHER": 1.0741104895040647,
+            "SI": 1.0562132620381441,
+            "SL": 1.0907338246721734,
+            "FC": 1.0421322894720473,
+            "CH": 1.1450819880853738,
+            "FF": 1.0641338534786648,
+            "CU": 0.9957339346677461
+          },
+          "vs_pitch_type_hr": {
+            "OTHER": 1.002646089567935,
+            "SI": 0.9710192711973585,
+            "SL": 1.0,
+            "FC": 0.9036352520580413,
+            "CH": 0.8590995867506961,
+            "FF": 1.0827365435101057,
+            "CU": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.8309886738363672,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 0.8933715900359788
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.0802068289022615,
+            "bb": 0.9020055181689706,
+            "hr": 1.1617692670476436,
+            "inplay": 1.0476822904896772
+          },
+          "venue_mult_home": {
+            "k": 0.8775000000000001,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 0.9830885051406659
+          },
+          "venue_mult_away": {
+            "k": 1.1225,
+            "bb": 0.8775000000000001,
+            "hr": 1.175,
+            "inplay": 1.036020041076101
+          },
+          "statcast_quality_mult": {
+            "k": 0.8499999999999999,
+            "bb": 0.9719693525594091,
+            "hr": 0.8582879473176581,
+            "inplay": 0.9932324487592458,
+            "csw_rate": 0.19172817949505772,
+            "zone_rate": 0.5057471092093135,
+            "chase_swing_rate": 0.2612972271683176,
+            "contact_rate": 0.8544310911696656,
+            "xwoba": 0.3230530574244612,
+            "ev_mean": 85.62828136330677,
+            "ev_max": 105.85279187817258,
+            "la_mean": 14.133284989122552,
+            "pulled_air_rate": 0.19738941261783902,
+            "sweet_spot_rate": 0.39985496736765774,
+            "hardhit_rate": 0.30601885424220454,
+            "barrel_rate": 0.025960841189267586,
+            "pitch_velo_mean": 89.36047668788515,
+            "pitch_spin_mean": 2239.8896720926996,
+            "pitch_pfx_x_mean": -0.2192442272134253,
+            "pitch_pfx_z_mean": 0.5464784297625356,
+            "pitch_extension_mean": 6.421279073112068
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.4116026105873821,
+          "bb_fb_rate": 0.23480783176214648,
+          "bb_ld_rate": 0.25873821609862224,
+          "bb_pu_rate": 0.09485134155184916,
+          "bb_inplay_n": 117
+        }
+      ],
+      "pitcher": {
+        "player": {
+          "mlbam_id": 622663,
+          "full_name": "Luis Severino",
+          "primary_position": "P",
+          "bat_side": "R",
+          "throw_side": "R"
+        },
+        "k_rate": 0.1965139839595629,
+        "bb_rate": 0.12674314963523844,
+        "hbp_rate": 0.008298755186721992,
+        "hr_rate": 0.02864265981071819,
+        "inplay_hit_rate": 0.35787704827064126,
+        "batters_faced": 241.0,
+        "balls_in_play": 154.0,
+        "arsenal": {
+          "FF": 0.21118012190062108,
+          "OTHER": 0.23809524214285718,
+          "CH": 0.05486542449378882,
+          "SI": 0.2463768122173913,
+          "SL": 0.04451345740062111,
+          "FC": 0.20496894184472045
+        },
+        "pitch_type_whiff_mult": {
+          "OTHER": 0.9042576677400422,
+          "FC": 0.8,
+          "FF": 1.0543030524572357,
+          "SI": 1.0673200128680327,
+          "CH": 0.9747941946038675,
+          "SL": 1.1376442176439097
+        },
+        "pitch_type_inplay_mult": {
+          "OTHER": 0.9428844928223584,
+          "FC": 0.8518139963167299,
+          "FF": 0.8531118710211479,
+          "SI": 1.0353920968414916,
+          "CH": 0.8,
+          "SL": 0.8
+        },
+        "pitch_type_hr_mult": {
+          "OTHER": 0.8,
+          "FC": 0.8989580684183277,
+          "FF": 1.25,
+          "SI": 1.0311934378090124,
+          "CH": 1.0,
+          "SL": 1.0
+        },
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 966,
+        "stamina_pitches": 94,
+        "role": "SP",
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1496957530935492,
+          "bb": 1.0079337890670896,
+          "hr": 0.8614741565063739,
+          "inplay": 1.0647362650471708
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9765037350010864,
+          "bb": 1.0085475776139181,
+          "hr": 1.2104802892527045,
+          "inplay": 0.9177341147098037
+        },
+        "venue_mult_home": {
+          "k": 1.070057484704532,
+          "bb": 0.9365697658730335,
+          "hr": 1.175,
+          "inplay": 1.009554967858472
+        },
+        "venue_mult_away": {
+          "k": 1.0325945801427352,
+          "bb": 1.059109699428169,
+          "hr": 0.86,
+          "inplay": 0.9911591322936201
+        },
+        "statcast_quality_mult": {
+          "k": 0.8793702819325986,
+          "bb": 1.0264406817957599,
+          "hr": 0.9641599969958017,
+          "inplay": 1.0081939130198663,
+          "csw_rate": 0.2452832724566766,
+          "zone_rate": 0.4791289314276319,
+          "chase_swing_rate": 0.3022321557070707,
+          "contact_rate": 0.8185676822176389,
+          "xwoba": 0.368655452826125,
+          "ev_mean": 87.97706972963051,
+          "ev_max": 113.1695067264574,
+          "la_mean": 12.288411611989616,
+          "pulled_air_rate": 0.12041189171234015,
+          "sweet_spot_rate": 0.36016923224853364,
+          "hardhit_rate": 0.41113995751711113,
+          "barrel_rate": 0.08445878023409295,
+          "pitch_velo_mean": 92.04108779976166,
+          "pitch_spin_mean": 2282.666078846536,
+          "pitch_pfx_x_mean": -0.11297546591640012,
+          "pitch_pfx_z_mean": 0.835331564829981,
+          "pitch_extension_mean": 6.482689272369301
+        },
+        "bb_gb_rate": 0.46981227803145614,
+        "bb_fb_rate": 0.22340605445628275,
+        "bb_ld_rate": 0.20581768983595466,
+        "bb_pu_rate": 0.10096397767630644,
+        "bb_inplay_n": 143,
+        "leverage_skill": 0.5
+      },
+      "bench": [
+        {
+          "player": {
+            "mlbam_id": 675961,
+            "full_name": "Alika Williams",
+            "primary_position": "2B",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.0,
+          "bb_rate": 0.0,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.0,
+          "xb_hit_share": 0.22,
+          "triple_share_of_xb": 0.12,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {},
+          "platoon_mult_vs_rhp": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_home": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_away": {},
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 687515,
+            "full_name": "Colby Thomas",
+            "primary_position": "RF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2476221198156682,
+          "bb_rate": 0.05339170506912442,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.034077062663845345,
+          "inplay_hit_rate": 0.39951394538403906,
+          "xb_hit_share": 0.18224191562232517,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "FF": 0.8645457560568163,
+            "CH": 0.9404084618465651
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.0,
+            "CH": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.9682628007096686,
+            "bb": 1.1367483744749411,
+            "hr": 0.9879962913524353,
+            "inplay": 1.0400026480620135
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.8942252577511445,
+            "bb": 0.8075,
+            "hr": 0.78,
+            "inplay": 0.8075
+          },
+          "venue_mult_home": {
+            "k": 0.9192274289400876,
+            "bb": 1.1225,
+            "hr": 1.1390875375931229,
+            "inplay": 0.9420215126771583
+          },
+          "venue_mult_away": {
+            "k": 1.0538411434101314,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 1.0880322690157374
+          },
+          "statcast_quality_mult": {
+            "k": 1.15,
+            "bb": 0.9,
+            "hr": 1.2039321817940114,
+            "inplay": 1.009599839364821,
+            "csw_rate": 0.31674062410535353,
+            "zone_rate": 0.4788147724019467,
+            "chase_swing_rate": 0.34886706761706765,
+            "contact_rate": 0.6701409513909513,
+            "xwoba": 0.4064847094776789,
+            "ev_mean": 91.30564564564561,
+            "ev_max": 114.35495495495495,
+            "la_mean": 18.284084084084085,
+            "pulled_air_rate": 0.1891891891891892,
+            "sweet_spot_rate": 0.27207207207207207,
+            "hardhit_rate": 0.4906906906906907,
+            "barrel_rate": 0.15015015015015015,
+            "pitch_velo_mean": 89.66703771615946,
+            "pitch_spin_mean": 2291.5389044732988,
+            "pitch_pfx_x_mean": 0.23525854586423944,
+            "pitch_pfx_z_mean": 0.6544566252743115,
+            "pitch_extension_mean": 6.431473864423588
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.3678768652332276,
+          "bb_fb_rate": 0.24521207848666432,
+          "bb_ld_rate": 0.21713077194219246,
+          "bb_pu_rate": 0.16978028433791562,
+          "bb_inplay_n": 31
+        },
+        {
+          "player": {
+            "mlbam_id": 703607,
+            "full_name": "Henry Bolte",
+            "primary_position": "CF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.24137931034482757,
+          "bb_rate": 0.06896551724137931,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.35,
+          "xb_hit_share": 0.14285714285714285,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.35,
+          "sb_success_rate": 0.6666666666666666,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 1.1925000000000001,
+            "bb": 1.1925000000000001,
+            "hr": 1.0,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9453416149068323,
+            "bb": 0.8075,
+            "hr": 1.0,
+            "inplay": 0.8197478991596638
+          },
+          "venue_mult_home": {
+            "k": 0.9400000000000001,
+            "bb": 0.9883333333333333,
+            "hr": 1.0,
+            "inplay": 1.1045454545454545
+          },
+          "venue_mult_away": {
+            "k": 1.0642857142857143,
+            "bb": 1.0125,
+            "hr": 1.0,
+            "inplay": 0.8775000000000001
+          },
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 641680,
+            "full_name": "Jonah Heim",
+            "primary_position": "C",
+            "bat_side": "S",
+            "throw_side": "R"
+          },
+          "k_rate": 0.14648363872622,
+          "bb_rate": 0.07182356491734686,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.014499139791745693,
+          "inplay_hit_rate": 0.1887031065856457,
+          "xb_hit_share": 0.43132176475114753,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "FF": 0.9608723172374536,
+            "FC": 1.15,
+            "SL": 1.1255162389254778,
+            "CH": 1.0587278519340888
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.0,
+            "FC": 1.0,
+            "SL": 1.0,
+            "CH": 0.9956367784692806
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.075780923137723,
+            "bb": 1.0881378226780782,
+            "hr": 1.275,
+            "inplay": 1.097695866982189
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9678876605277708,
+            "bb": 0.9781140601473751,
+            "hr": 0.78,
+            "inplay": 0.9568924176382348
+          },
+          "venue_mult_home": {
+            "k": 1.1225,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 0.8818456796583972
+          },
+          "venue_mult_away": {
+            "k": 0.941383578401157,
+            "bb": 0.8877098762969339,
+            "hr": 1.175,
+            "inplay": 1.0864153970040418
+          },
+          "statcast_quality_mult": {
+            "k": 0.9493304538388037,
+            "bb": 1.0008560241426516,
+            "hr": 0.8647026799445079,
+            "inplay": 0.9242597601013215,
+            "csw_rate": 0.2590397910532684,
+            "zone_rate": 0.4992565527216888,
+            "chase_swing_rate": 0.3126293175406438,
+            "contact_rate": 0.7858462612500018,
+            "xwoba": 0.28579126180405506,
+            "ev_mean": 86.83889175068069,
+            "ev_max": 107.74960629921259,
+            "la_mean": 14.287610076777785,
+            "pulled_air_rate": 0.15129884465376406,
+            "sweet_spot_rate": 0.3378958471312581,
+            "hardhit_rate": 0.3240856575171094,
+            "barrel_rate": 0.05303309048985699,
+            "pitch_velo_mean": 89.82084202728575,
+            "pitch_spin_mean": 2221.612826995979,
+            "pitch_pfx_x_mean": -0.09487894314463868,
+            "pitch_pfx_z_mean": 0.6498655472560029,
+            "pitch_extension_mean": 6.38429368067989
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.42431378320700563,
+          "bb_fb_rate": 0.26725047219564846,
+          "bb_ld_rate": 0.18269678906959058,
+          "bb_pu_rate": 0.1257389555277553,
+          "bb_inplay_n": 47
+        }
+      ],
+      "bullpen": [
+        {
+          "player": {
+            "mlbam_id": 663687,
+            "full_name": "Hogan Harris",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "L"
+          },
+          "k_rate": 0.22821381327098217,
+          "bb_rate": 0.1666978581475722,
+          "hbp_rate": 0.017543859649122806,
+          "hr_rate": 0.012675438596491227,
+          "inplay_hit_rate": 0.30635009892516996,
+          "batters_faced": 114.0,
+          "balls_in_play": 67.0,
+          "arsenal": {
+            "FF": 0.5683297096616051,
+            "CU": 0.2364425240195229,
+            "CH": 0.04772234381127984,
+            "SL": 0.1301518422125813,
+            "FC": 0.017353580295010863
+          },
+          "pitch_type_whiff_mult": {
+            "SL": 1.1048234517653175,
+            "CU": 1.0161593051352025,
+            "FF": 0.9239755495172164
+          },
+          "pitch_type_inplay_mult": {
+            "SL": 0.8444499274380695,
+            "CU": 1.004903023174708,
+            "FF": 0.9645094135225615
+          },
+          "pitch_type_hr_mult": {
+            "SL": 1.0,
+            "CU": 1.25,
+            "FF": 0.8
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 461,
+          "stamina_pitches": 21,
+          "role": "SU",
+          "availability_mult": 0.6403333333333333,
+          "platoon_mult_vs_lhb": {
+            "k": 1.052505159653644,
+            "bb": 0.8075,
+            "hr": 1.2248393475037074,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9486249597133605,
+            "bb": 1.1895167726740281,
+            "hr": 1.1981207493139243,
+            "inplay": 0.8075
+          },
+          "venue_mult_home": {
+            "k": 0.9316907239939115,
+            "bb": 1.0356421132226201,
+            "hr": 1.175,
+            "inplay": 1.1225
+          },
+          "venue_mult_away": {
+            "k": 1.0511083300631252,
+            "bb": 0.9730164709044168,
+            "hr": 0.86,
+            "inplay": 0.8970235065736357
+          },
+          "statcast_quality_mult": {
+            "k": 0.9310165439811258,
+            "bb": 1.0323057366566595,
+            "hr": 0.85,
+            "inplay": 0.9622104553493773,
+            "csw_rate": 0.25935262405528237,
+            "zone_rate": 0.490272373540856,
+            "chase_swing_rate": 0.23645364880295527,
+            "contact_rate": 0.7923424271562851,
+            "xwoba": 0.32872913211787685,
+            "ev_mean": 86.34502294666882,
+            "ev_max": 110.15352112676057,
+            "la_mean": 13.600965342617503,
+            "pulled_air_rate": 0.11750276942554201,
+            "sweet_spot_rate": 0.32789998417471117,
+            "hardhit_rate": 0.29624940655166954,
+            "barrel_rate": 0.059819591707548664,
+            "pitch_velo_mean": 87.40006631916398,
+            "pitch_spin_mean": 2357.022107407679,
+            "pitch_pfx_x_mean": 0.3341843905244347,
+            "pitch_pfx_z_mean": 0.7079890732447442,
+            "pitch_extension_mean": 6.565471453393036
+          },
+          "bb_gb_rate": 0.4518067647738655,
+          "bb_fb_rate": 0.20729640187995996,
+          "bb_ld_rate": 0.2053316896525156,
+          "bb_pu_rate": 0.135565143693659,
+          "bb_inplay_n": 62,
+          "leverage_skill": 0.7
+        },
+        {
+          "player": {
+            "mlbam_id": 678022,
+            "full_name": "Jack Perkins",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2757724252491694,
+          "bb_rate": 0.058507255437764125,
+          "hbp_rate": 0.05813953488372093,
+          "hr_rate": 0.0017,
+          "inplay_hit_rate": 0.3446855445318645,
+          "batters_faced": 86.0,
+          "balls_in_play": 54.0,
+          "arsenal": {
+            "FF": 0.4194528837750759,
+            "OTHER": 0.3161094228449848,
+            "CH": 0.17325228155927053,
+            "SI": 0.00911854108206687,
+            "FC": 0.08206687073860183
+          },
+          "pitch_type_whiff_mult": {
+            "OTHER": 1.191012525023657,
+            "FF": 1.082725445697112,
+            "FC": 1.25,
+            "CH": 1.1080653286428166
+          },
+          "pitch_type_inplay_mult": {
+            "OTHER": 0.8,
+            "FF": 0.9551070766368622,
+            "FC": 0.9401083495176796,
+            "CH": 1.109087288393115
+          },
+          "pitch_type_hr_mult": {
+            "OTHER": 1.0,
+            "FF": 0.8,
+            "FC": 1.0,
+            "CH": 0.9214402157450899
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 329,
+          "stamina_pitches": 25,
+          "role": "MR",
+          "availability_mult": 0.89,
+          "platoon_mult_vs_lhb": {
+            "k": 1.100347205399198,
+            "bb": 0.8587192827511431,
+            "hr": 0.78,
+            "inplay": 0.8967840396647776
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8075,
+            "bb": 1.1550407627457218,
+            "hr": 0.78,
+            "inplay": 1.110271979800164
+          },
+          "venue_mult_home": {
+            "k": 0.9384460057004707,
+            "bb": 1.0578748214231448,
+            "hr": 0.86,
+            "inplay": 1.0636889256155346
+          },
+          "venue_mult_away": {
+            "k": 1.0126178357377345,
+            "bb": 0.9348649546447361,
+            "hr": 0.86,
+            "inplay": 0.9508646731749344
+          },
+          "statcast_quality_mult": {
+            "k": 1.15,
+            "bb": 1.0104661436482019,
+            "hr": 0.9244086075210289,
+            "inplay": 0.9853262789300733,
+            "csw_rate": 0.2865748506617274,
+            "zone_rate": 0.4703256364314792,
+            "chase_swing_rate": 0.34810593642977206,
+            "contact_rate": 0.6908665850258523,
+            "xwoba": 0.3456424934839813,
+            "ev_mean": 86.33977340488966,
+            "ev_max": 109.18217054263565,
+            "la_mean": 13.833631484794276,
+            "pulled_air_rate": 0.08706022659511031,
+            "sweet_spot_rate": 0.34406678592725104,
+            "hardhit_rate": 0.38342277877161596,
+            "barrel_rate": 0.07513416815742396,
+            "pitch_velo_mean": 91.74339718097747,
+            "pitch_spin_mean": 2288.8040903727656,
+            "pitch_pfx_x_mean": -0.20249540303685276,
+            "pitch_pfx_z_mean": 0.6607950645255634,
+            "pitch_extension_mean": 6.274098675872916
+          },
+          "bb_gb_rate": 0.41147416869960224,
+          "bb_fb_rate": 0.25244853568552994,
+          "bb_ld_rate": 0.20931825556103015,
+          "bb_pu_rate": 0.12675904005383773,
+          "bb_inplay_n": 50,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 669270,
+            "full_name": "Joel Kuhnel",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.13585147247119078,
+          "bb_rate": 0.04834181536747963,
+          "hbp_rate": 0.028169014084507043,
+          "hr_rate": 0.016994238156209988,
+          "inplay_hit_rate": 0.24847550962176507,
+          "batters_faced": 71.0,
+          "balls_in_play": 55.0,
+          "arsenal": {
+            "FF": 0.04166666691666666,
+            "CU": 0.016666667566666644,
+            "CH": 0.09583332750833348,
+            "SI": 0.5541666855916663,
+            "SL": 0.03749999902500003,
+            "FC": 0.254166653391667
+          },
+          "pitch_type_whiff_mult": {
+            "SI": 0.8,
+            "FC": 1.2331181026886946
+          },
+          "pitch_type_inplay_mult": {
+            "SI": 1.2349027645994168,
+            "FC": 1.0605587605775324
+          },
+          "pitch_type_hr_mult": {
+            "SI": 0.8,
+            "FC": 0.8
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 240,
+          "stamina_pitches": 19,
+          "role": "CL",
+          "availability_mult": 0.925,
+          "platoon_mult_vs_lhb": {
+            "k": 0.8652347809275236,
+            "bb": 1.0334519864577174,
+            "hr": 1.275,
+            "inplay": 0.9195298415697356
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.1925000000000001,
+            "bb": 1.161082108495343,
+            "hr": 0.78,
+            "inplay": 1.1542947623546034
+          },
+          "venue_mult_home": {
+            "k": 1.0793905120955074,
+            "bb": 1.1225,
+            "hr": 1.175,
+            "inplay": 1.0292356412678634
+          },
+          "venue_mult_away": {
+            "k": 0.9444392082940622,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 0.9900043680332569
+          },
+          "statcast_quality_mult": {
+            "k": 0.85,
+            "bb": 1.0094908503208981,
+            "hr": 0.85,
+            "inplay": 0.9852921477822558,
+            "csw_rate": 0.22127659574468084,
+            "zone_rate": 0.49361702127659574,
+            "chase_swing_rate": 0.2920353982300885,
+            "contact_rate": 0.8495575221238938,
+            "xwoba": 0.3120869565217391,
+            "ev_mean": 87.8687033185327,
+            "ev_max": 105.2,
+            "la_mean": 6.864406779661017,
+            "pulled_air_rate": 0.1274349009229841,
+            "sweet_spot_rate": 0.30139300578421796,
+            "hardhit_rate": 0.39874759390695014,
+            "barrel_rate": 0.06351298892069829,
+            "pitch_velo_mean": 92.92255319148937,
+            "pitch_spin_mean": 2245.8297872340427,
+            "pitch_pfx_x_mean": -0.6954468085106382,
+            "pitch_pfx_z_mean": 0.47297872340425573,
+            "pitch_extension_mean": 6.663829787234046
+          },
+          "bb_gb_rate": 0.5593220338983051,
+          "bb_fb_rate": 0.11864406779661016,
+          "bb_ld_rate": 0.22033898305084745,
+          "bb_pu_rate": 0.10169491525423728,
+          "bb_inplay_n": 60,
+          "leverage_skill": 0.85
+        },
+        {
+          "player": {
+            "mlbam_id": 660761,
+            "full_name": "Jos\u00e9 Suarez",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.2838454172760776,
+          "bb_rate": 0.16106418521052268,
+          "hbp_rate": 0.00980392156862745,
+          "hr_rate": 0.01014455782312925,
+          "inplay_hit_rate": 0.4545,
+          "batters_faced": 102.0,
+          "balls_in_play": 60.0,
+          "arsenal": {
+            "FF": 0.41504854373543687,
+            "CH": 0.2815534025339806,
+            "SI": 0.08495145076456304,
+            "SL": 0.20145631181310678,
+            "FC": 0.016990291152912618
+          },
+          "pitch_type_whiff_mult": {
+            "CH": 1.1822521980551113,
+            "FF": 1.0967198477603601,
+            "SL": 0.8373310845528599,
+            "SI": 1.0335508472517503
+          },
+          "pitch_type_inplay_mult": {
+            "CH": 0.8803440010916808,
+            "FF": 0.8,
+            "SL": 1.0189171985110559,
+            "SI": 1.2103125337826355
+          },
+          "pitch_type_hr_mult": {
+            "CH": 0.8027811622987464,
+            "FF": 1.1380069105404405,
+            "SL": 0.9766623235615408,
+            "SI": 0.8
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 412,
+          "stamina_pitches": 29,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 1.095891468295284,
+            "bb": 0.9378268155563569,
+            "hr": 0.78,
+            "inplay": 0.8900440044004401
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8375348809771704,
+            "bb": 0.9622181563341748,
+            "hr": 1.275,
+            "inplay": 1.1187510856348792
+          },
+          "venue_mult_home": {
+            "k": 0.9634912365377727,
+            "bb": 0.9446504032328074,
+            "hr": 1.175,
+            "inplay": 1.1225
+          },
+          "venue_mult_away": {
+            "k": 0.9654353682372318,
+            "bb": 1.0037517922533414,
+            "hr": 0.86,
+            "inplay": 0.8775000000000001
+          },
+          "statcast_quality_mult": {
+            "k": 1.1122535742412374,
+            "bb": 1.043615522500508,
+            "hr": 0.85,
+            "inplay": 1.064497107849364,
+            "csw_rate": 0.2608695652173913,
+            "zone_rate": 0.4189723320158103,
+            "chase_swing_rate": 0.3760330578512397,
+            "contact_rate": 0.71900826446281,
+            "xwoba": 0.3567551020408163,
+            "ev_mean": 88.57091347239245,
+            "ev_max": 114.9,
+            "la_mean": 12.342465753424657,
+            "pulled_air_rate": 0.16806177273395287,
+            "sweet_spot_rate": 0.3130302470850085,
+            "hardhit_rate": 0.41454846766709846,
+            "barrel_rate": 0.06423729058808536,
+            "pitch_velo_mean": 87.72747035573117,
+            "pitch_spin_mean": 2229.3557312252965,
+            "pitch_pfx_x_mean": 0.6204150197628455,
+            "pitch_pfx_z_mean": 0.6872529644268768,
+            "pitch_extension_mean": 6.005138339920951
+          },
+          "bb_gb_rate": 0.5068493150684932,
+          "bb_fb_rate": 0.09589041095890412,
+          "bb_ld_rate": 0.2602739726027397,
+          "bb_pu_rate": 0.13698630136986303,
+          "bb_inplay_n": 74,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 686993,
+            "full_name": "Justin Sterner",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2560211955990379,
+          "bb_rate": 0.07015557063158137,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.026632188618771053,
+          "inplay_hit_rate": 0.31148231317318653,
+          "batters_faced": 97.0,
+          "balls_in_play": 67.0,
+          "arsenal": {
+            "FF": 0.41253263412532637,
+            "OTHER": 0.284595302845953,
+            "FC": 0.30287206302872066
+          },
+          "pitch_type_whiff_mult": {
+            "OTHER": 1.25,
+            "FF": 0.9495832285425183,
+            "FC": 1.208719682299586
+          },
+          "pitch_type_inplay_mult": {
+            "OTHER": 0.8881006382960623,
+            "FF": 1.010912189935485,
+            "FC": 1.129629553004898
+          },
+          "pitch_type_hr_mult": {
+            "OTHER": 1.1436680027028738,
+            "FF": 0.9947894288333725,
+            "FC": 1.2485481380272094
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 383,
+          "stamina_pitches": 21,
+          "role": "MR",
+          "availability_mult": 0.98,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0126394279996105,
+            "bb": 1.0099799692603362,
+            "hr": 0.9417071699472808,
+            "inplay": 0.954500096785542
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9187111929120721,
+            "bb": 1.0201614232468879,
+            "hr": 1.200970950464938,
+            "inplay": 1.129134745672845
+          },
+          "venue_mult_home": {
+            "k": 0.9289947576857572,
+            "bb": 0.955443619596547,
+            "hr": 1.175,
+            "inplay": 1.086978619185457
+          },
+          "venue_mult_away": {
+            "k": 1.0202492930121403,
+            "bb": 1.0657427044508556,
+            "hr": 0.9237914923570086,
+            "inplay": 0.9762236696223228
+          },
+          "statcast_quality_mult": {
+            "k": 1.1307381571921575,
+            "bb": 0.9908765296240998,
+            "hr": 1.0130675670669773,
+            "inplay": 0.9389675182917392,
+            "csw_rate": 0.28069987831409715,
+            "zone_rate": 0.46034514546996574,
+            "chase_swing_rate": 0.3319148936170213,
+            "contact_rate": 0.7132138857782755,
+            "xwoba": 0.330288315387655,
+            "ev_mean": 88.50810904071771,
+            "ev_max": 112.2159420289855,
+            "la_mean": 17.06418219461698,
+            "pulled_air_rate": 0.14699792960662528,
+            "sweet_spot_rate": 0.31953071083505863,
+            "hardhit_rate": 0.43064182194616973,
+            "barrel_rate": 0.08764665286404416,
+            "pitch_velo_mean": 89.11664976137753,
+            "pitch_spin_mean": 2531.9572124267056,
+            "pitch_pfx_x_mean": 0.0031131634323123616,
+            "pitch_pfx_z_mean": 0.8946980887281255,
+            "pitch_extension_mean": 6.519058650465082
+          },
+          "bb_gb_rate": 0.3844127146013938,
+          "bb_fb_rate": 0.2599014108448071,
+          "bb_ld_rate": 0.22072072072072071,
+          "bb_pu_rate": 0.13496515383307836,
+          "bb_inplay_n": 58,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 665622,
+            "full_name": "Luis Medina",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.24282731607581104,
+          "bb_rate": 0.12218024920477029,
+          "hbp_rate": 0.012658227848101266,
+          "hr_rate": 0.012484886809848012,
+          "inplay_hit_rate": 0.2578430147136616,
+          "batters_faced": 79.0,
+          "balls_in_play": 51.0,
+          "arsenal": {
+            "FF": 0.3292307632923076,
+            "CU": 0.0492307704923077,
+            "CH": 0.132307701323077,
+            "SI": 0.335384603353846,
+            "SL": 0.15384616153846162
+          },
+          "pitch_type_whiff_mult": {
+            "FF": 1.1564677804154697,
+            "SL": 1.25,
+            "CH": 1.25,
+            "SI": 0.8438217542175586
+          },
+          "pitch_type_inplay_mult": {
+            "FF": 0.9135687865983843,
+            "SL": 0.831611563269605,
+            "CH": 0.9320950087050985,
+            "SI": 0.8616047274628852
+          },
+          "pitch_type_hr_mult": {
+            "FF": 1.25,
+            "SL": 1.0,
+            "CH": 1.0,
+            "SI": 1.0857576576691808
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 325,
+          "stamina_pitches": 24,
+          "role": "MR",
+          "availability_mult": 0.7166666666666667,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0162460147484902,
+            "bb": 1.0126932376343178,
+            "hr": 0.78,
+            "inplay": 0.8075
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9319115019136087,
+            "bb": 0.9288878618164408,
+            "hr": 1.275,
+            "inplay": 1.1380906005374487
+          },
+          "venue_mult_home": {
+            "k": 0.909443628575672,
+            "bb": 1.108339219018499,
+            "hr": 1.175,
+            "inplay": 1.0741922168085978
+          },
+          "venue_mult_away": {
+            "k": 1.0973166009925377,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 0.8775000000000001
+          },
+          "statcast_quality_mult": {
+            "k": 1.090759550842079,
+            "bb": 1.0986759824998984,
+            "hr": 1.1603600682094035,
+            "inplay": 1.0036541507494443,
+            "csw_rate": 0.2564935064935065,
+            "zone_rate": 0.4155844155844156,
+            "chase_swing_rate": 0.288,
+            "contact_rate": 0.728,
+            "xwoba": 0.4015833333333334,
+            "ev_mean": 88.98820944126865,
+            "ev_max": 112.0,
+            "la_mean": 13.116279069767442,
+            "pulled_air_rate": 0.17653212380727473,
+            "sweet_spot_rate": 0.3731189252358236,
+            "hardhit_rate": 0.4018367118135453,
+            "barrel_rate": 0.10429516634127692,
+            "pitch_velo_mean": 94.30625000000006,
+            "pitch_spin_mean": 2310.6348684210525,
+            "pitch_pfx_x_mean": -0.6301315789473684,
+            "pitch_pfx_z_mean": 0.8073355263157893,
+            "pitch_extension_mean": 6.2059210526315844
+          },
+          "bb_gb_rate": 0.3488372093023256,
+          "bb_fb_rate": 0.27906976744186046,
+          "bb_ld_rate": 0.27906976744186046,
+          "bb_pu_rate": 0.0930232558139535,
+          "bb_inplay_n": 44,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 643410,
+            "full_name": "Mark Leiter Jr.",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.27062076453806594,
+          "bb_rate": 0.0591634625639537,
+          "hbp_rate": 0.010638297872340425,
+          "hr_rate": 0.01613976652974229,
+          "inplay_hit_rate": 0.4210283692553944,
+          "batters_faced": 94.0,
+          "balls_in_play": 64.0,
+          "arsenal": {
+            "FF": 0.15759311968481374,
+            "CU": 0.17478509965042976,
+            "SI": 0.24928366950143263,
+            "SL": 0.014326647971346702,
+            "FS": 0.32951289934097416,
+            "FC": 0.07449856385100287
+          },
+          "pitch_type_whiff_mult": {
+            "FS": 1.1411480496647215,
+            "SI": 0.8,
+            "CU": 1.0584063512287727,
+            "FF": 0.8
+          },
+          "pitch_type_inplay_mult": {
+            "FS": 0.9046263451882586,
+            "SI": 1.0272677601329758,
+            "CU": 0.9959660333965068,
+            "FF": 1.2095983196493196
+          },
+          "pitch_type_hr_mult": {
+            "FS": 1.0556939153490392,
+            "SI": 0.9457764079973885,
+            "CU": 1.0,
+            "FF": 1.0505424371474184
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 349,
+          "stamina_pitches": 20,
+          "role": "SU",
+          "availability_mult": 0.9083333333333333,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0412332716711918,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 1.021517307552351
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.814783348707386,
+            "bb": 0.8075,
+            "hr": 1.275,
+            "inplay": 0.939871977902015
+          },
+          "venue_mult_home": {
+            "k": 1.0479454713171483,
+            "bb": 1.1225,
+            "hr": 1.175,
+            "inplay": 0.8775000000000001
+          },
+          "venue_mult_away": {
+            "k": 0.9086645563561465,
+            "bb": 0.8775000000000001,
+            "hr": 1.044283049380515,
+            "inplay": 1.0656489509471643
+          },
+          "statcast_quality_mult": {
+            "k": 1.1022351250211975,
+            "bb": 0.9951291342078283,
+            "hr": 0.8924341492916326,
+            "inplay": 1.045512019563133,
+            "csw_rate": 0.2980400949124676,
+            "zone_rate": 0.47211479177176163,
+            "chase_swing_rate": 0.3418231899819255,
+            "contact_rate": 0.72499187750575,
+            "xwoba": 0.3972755504442538,
+            "ev_mean": 87.41372076199659,
+            "ev_max": 110.38321678321677,
+            "la_mean": 14.743187846636122,
+            "pulled_air_rate": 0.15481070653484447,
+            "sweet_spot_rate": 0.3764166867615143,
+            "hardhit_rate": 0.3537496985772848,
+            "barrel_rate": 0.0588377140101278,
+            "pitch_velo_mean": 86.1446280905394,
+            "pitch_spin_mean": 1681.7478885646353,
+            "pitch_pfx_x_mean": -0.4387977612234833,
+            "pitch_pfx_z_mean": 0.26117361258285626,
+            "pitch_extension_mean": 6.634277129325705
+          },
+          "bb_gb_rate": 0.43004135012982014,
+          "bb_fb_rate": 0.20982786806423695,
+          "bb_ld_rate": 0.2449273968650832,
+          "bb_pu_rate": 0.11520338494085969,
+          "bb_inplay_n": 63,
+          "leverage_skill": 0.7
+        },
+        {
+          "player": {
+            "mlbam_id": 605130,
+            "full_name": "Scott Barlow",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2533970363314513,
+          "bb_rate": 0.0905115818813074,
+          "hbp_rate": 0.05263157894736842,
+          "hr_rate": 0.016029871665392253,
+          "inplay_hit_rate": 0.18562823889674918,
+          "batters_faced": 95.0,
+          "balls_in_play": 60.0,
+          "arsenal": {
+            "FF": 0.11898016928611897,
+            "OTHER": 0.32861189802832863,
+            "CU": 0.3456090679263456,
+            "SI": 0.17280452896317283,
+            "SL": 0.03399433579603398
+          },
+          "pitch_type_whiff_mult": {
+            "CU": 1.25,
+            "FF": 0.8,
+            "SI": 1.25,
+            "OTHER": 1.017537251046958
+          },
+          "pitch_type_inplay_mult": {
+            "CU": 1.178906842384258,
+            "FF": 0.8,
+            "SI": 0.8603370398650629,
+            "OTHER": 0.9741599168873396
+          },
+          "pitch_type_hr_mult": {
+            "CU": 0.971313144122051,
+            "FF": 1.0,
+            "SI": 1.25,
+            "OTHER": 0.9676264067559706
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 353,
+          "stamina_pitches": 20,
+          "role": "MR",
+          "availability_mult": 0.68,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0323311027866233,
+            "bb": 1.0428361373214217,
+            "hr": 0.78,
+            "inplay": 0.820363908037938
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8519457106776357,
+            "bb": 1.0126454081059788,
+            "hr": 1.275,
+            "inplay": 1.1084247254007786
+          },
+          "venue_mult_home": {
+            "k": 0.9011330225390848,
+            "bb": 1.089421413768719,
+            "hr": 1.175,
+            "inplay": 1.1225
+          },
+          "venue_mult_away": {
+            "k": 1.0020786492459717,
+            "bb": 0.9532869365619394,
+            "hr": 0.86,
+            "inplay": 0.8775000000000001
+          },
+          "statcast_quality_mult": {
+            "k": 1.1490318460217295,
+            "bb": 1.046385657349569,
+            "hr": 0.8957869460072143,
+            "inplay": 0.9647109385006868,
+            "csw_rate": 0.31278884559778486,
+            "zone_rate": 0.4347766424073121,
+            "chase_swing_rate": 0.4030928175492393,
+            "contact_rate": 0.6838259228682628,
+            "xwoba": 0.33179795095895426,
+            "ev_mean": 86.58530219780218,
+            "ev_max": 111.975,
+            "la_mean": 17.058121565934066,
+            "pulled_air_rate": 0.16552197802197802,
+            "sweet_spot_rate": 0.35697115384615385,
+            "hardhit_rate": 0.3094951923076923,
+            "barrel_rate": 0.06026785714285714,
+            "pitch_velo_mean": 84.11030852600055,
+            "pitch_spin_mean": 2462.069501969864,
+            "pitch_pfx_x_mean": 0.42638227371411397,
+            "pitch_pfx_z_mean": 0.3397219817848517,
+            "pitch_extension_mean": 6.6406662769315385
+          },
+          "bb_gb_rate": 0.4128255654557916,
+          "bb_fb_rate": 0.25222755311857437,
+          "bb_ld_rate": 0.21350239890335845,
+          "bb_pu_rate": 0.12144448252227553,
+          "bb_inplay_n": 48,
+          "leverage_skill": 0.5
+        }
+      ]
+    }
+  },
+  "home": {
+    "schema_version": 4,
+    "team": {
+      "team_id": 108,
+      "name": "Los Angeles Angels",
+      "abbreviation": "LAA"
+    },
+    "manager": {
+      "pull_starter_pitch_count": 83,
+      "pull_starter_third_time_penalty": 0.04,
+      "starter_min_innings": 4,
+      "starter_blowup_run_diff": 6,
+      "closer_leverage_max_run_diff": 3,
+      "use_closer_in_9th_only": true,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "lineup": {
+      "batters": [
+        {
+          "player": {
+            "mlbam_id": 687093,
+            "full_name": "Vaughn Grissom",
+            "primary_position": "2B",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.08554258241758242,
+          "bb_rate": 0.10193534560277392,
+          "hbp_rate": 0.009615384615384616,
+          "hr_rate": 0.016994092719276693,
+          "inplay_hit_rate": 0.2163409353577783,
+          "xb_hit_share": 0.29486178920812384,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "SI": 0.9904024445599059,
+            "OTHER": 1.15,
+            "FC": 1.038486994523188,
+            "FF": 0.999492389742118,
+            "SL": 1.009703430349768,
+            "CH": 1.15
+          },
+          "vs_pitch_type_hr": {
+            "SI": 1.0,
+            "OTHER": 1.0,
+            "FC": 1.0,
+            "FF": 1.25,
+            "SL": 1.0,
+            "CH": 0.8606147096442642
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.1925000000000001,
+            "bb": 1.0847737575255776,
+            "hr": 0.78,
+            "inplay": 1.1018675755580742
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9352487824091257,
+            "bb": 0.9590166923554161,
+            "hr": 1.275,
+            "inplay": 0.9821058581881026
+          },
+          "venue_mult_home": {
+            "k": 1.114946534798,
+            "bb": 0.9621408146510072,
+            "hr": 0.86,
+            "inplay": 0.8775000000000001
+          },
+          "venue_mult_away": {
+            "k": 0.9909607921852001,
+            "bb": 1.0505807121354593,
+            "hr": 1.175,
+            "inplay": 1.1225
+          },
+          "statcast_quality_mult": {
+            "k": 0.85,
+            "bb": 0.9848576256504114,
+            "hr": 0.8757730671960867,
+            "inplay": 0.9799766790095656,
+            "csw_rate": 0.27147766323024053,
+            "zone_rate": 0.5051546391752577,
+            "chase_swing_rate": 0.27692307692307694,
+            "contact_rate": 0.8384615384615385,
+            "xwoba": 0.35601612903225827,
+            "ev_mean": 89.85069763130099,
+            "ev_max": 107.2,
+            "la_mean": 11.714285714285714,
+            "pulled_air_rate": 0.17282133726080273,
+            "sweet_spot_rate": 0.3209344601678762,
+            "hardhit_rate": 0.443537871000462,
+            "barrel_rate": 0.07572241580403538,
+            "pitch_velo_mean": 89.54295532646046,
+            "pitch_spin_mean": 2267.320557491289,
+            "pitch_pfx_x_mean": 0.13075601374570447,
+            "pitch_pfx_z_mean": 0.5640206185567014,
+            "pitch_extension_mean": 6.292041522491353
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.47619047619047616,
+          "bb_fb_rate": 0.2222222222222222,
+          "bb_ld_rate": 0.23809523809523808,
+          "bb_pu_rate": 0.06349206349206349,
+          "bb_inplay_n": 63
+        },
+        {
+          "player": {
+            "mlbam_id": 545361,
+            "full_name": "Mike Trout",
+            "primary_position": "CF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.23386522242821736,
+          "bb_rate": 0.21449305552675646,
+          "hbp_rate": 0.013574660633484163,
+          "hr_rate": 0.0626923076923077,
+          "inplay_hit_rate": 0.2481666666666667,
+          "xb_hit_share": 0.18296886453427758,
+          "triple_share_of_xb": 0.020842400502925674,
+          "sb_attempt_rate": 0.07246376811594203,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "FF": 1.0467433262566943,
+            "SI": 1.0053133440558533,
+            "OTHER": 1.1451437865846559,
+            "FC": 1.0829782445327822,
+            "SL": 0.8717124987335193,
+            "CU": 1.0152442613269157,
+            "CH": 0.9646909377800283
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.25,
+            "SI": 1.25,
+            "OTHER": 1.0,
+            "FC": 1.25,
+            "SL": 1.0,
+            "CU": 1.0,
+            "CH": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.0189794948878093,
+            "bb": 1.0703674790414528,
+            "hr": 0.8745002968533544,
+            "inplay": 1.0040631296171927
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.012061085935295,
+            "bb": 0.9338086000071708,
+            "hr": 0.9465852529227919,
+            "inplay": 0.9536937541974478
+          },
+          "venue_mult_home": {
+            "k": 1.0091812375000861,
+            "bb": 0.9437158028043533,
+            "hr": 0.86,
+            "inplay": 0.9522162525184688
+          },
+          "venue_mult_away": {
+            "k": 1.0086864975035295,
+            "bb": 1.0141104993442396,
+            "hr": 1.0652512295289762,
+            "inplay": 1.0025856279382135
+          },
+          "statcast_quality_mult": {
+            "k": 0.975565242100689,
+            "bb": 1.0804043208212597,
+            "hr": 1.25,
+            "inplay": 1.1,
+            "csw_rate": 0.2829889932061995,
+            "zone_rate": 0.4750583975435056,
+            "chase_swing_rate": 0.2631160585867354,
+            "contact_rate": 0.7743278780606122,
+            "xwoba": 0.5175608808117738,
+            "ev_mean": 91.37928755187502,
+            "ev_max": 114.9497267759563,
+            "la_mean": 18.25817800733588,
+            "pulled_air_rate": 0.19082493005088913,
+            "sweet_spot_rate": 0.4198824479372054,
+            "hardhit_rate": 0.504441064353182,
+            "barrel_rate": 0.18932266726757177,
+            "pitch_velo_mean": 90.65791950579268,
+            "pitch_spin_mean": 2289.6168772312203,
+            "pitch_pfx_x_mean": -0.12660939717613565,
+            "pitch_pfx_z_mean": 0.7260426385708016,
+            "pitch_extension_mean": 6.367972145892266
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.3564113096937248,
+          "bb_fb_rate": 0.30724064545925034,
+          "bb_ld_rate": 0.2338385702051814,
+          "bb_pu_rate": 0.10250947464184347,
+          "bb_inplay_n": 104
+        },
+        {
+          "player": {
+            "mlbam_id": 694384,
+            "full_name": "Nolan Schanuel",
+            "primary_position": "1B",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.14899366643209008,
+          "bb_rate": 0.06468358102387503,
+          "hbp_rate": 0.01020408163265306,
+          "hr_rate": 0.011058673469387756,
+          "inplay_hit_rate": 0.28599530150294056,
+          "xb_hit_share": 0.24405553629065269,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.021739130434782608,
+          "sb_success_rate": 0.4,
+          "vs_pitch_type": {
+            "FF": 1.1174305403150755,
+            "SI": 1.0437037349043388,
+            "FC": 1.1385318213867246,
+            "CH": 1.0528371989305498,
+            "CU": 1.067552690186943,
+            "FS": 0.85,
+            "OTHER": 0.9107181700859902,
+            "SL": 1.007997960478558
+          },
+          "vs_pitch_type_hr": {
+            "FF": 0.8655321821246921,
+            "SI": 0.9793011802524482,
+            "FC": 0.9457764079973885,
+            "CH": 0.9482441260087211,
+            "CU": 1.0,
+            "FS": 1.0,
+            "OTHER": 0.9169679116024435,
+            "SL": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.1091843000188928,
+            "bb": 1.0573521852665164,
+            "hr": 1.275,
+            "inplay": 0.8346217033004963
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.0300821840166257,
+            "bb": 0.9966169667398649,
+            "hr": 1.160495963091119,
+            "inplay": 1.0498687115695815
+          },
+          "venue_mult_home": {
+            "k": 1.0415155236475848,
+            "bb": 0.9318206162695011,
+            "hr": 0.9796808919646289,
+            "inplay": 1.0138313409599289
+          },
+          "venue_mult_away": {
+            "k": 1.0258549027016814,
+            "bb": 1.0828764665899537,
+            "hr": 1.175,
+            "inplay": 0.976345687648906
+          },
+          "statcast_quality_mult": {
+            "k": 0.85,
+            "bb": 1.0097097036658003,
+            "hr": 0.8500000000000001,
+            "inplay": 0.9898194884563483,
+            "csw_rate": 0.2489118321796808,
+            "zone_rate": 0.5043655372946139,
+            "chase_swing_rate": 0.2627559901936862,
+            "contact_rate": 0.8469442623662111,
+            "xwoba": 0.32655864424734626,
+            "ev_mean": 86.81062265566393,
+            "ev_max": 107.7906976744186,
+            "la_mean": 10.417039974279284,
+            "pulled_air_rate": 0.1602614939449148,
+            "sweet_spot_rate": 0.3702282713535527,
+            "hardhit_rate": 0.3097417211445719,
+            "barrel_rate": 0.030243275104490406,
+            "pitch_velo_mean": 89.78536557216218,
+            "pitch_spin_mean": 2257.0100835407234,
+            "pitch_pfx_x_mean": -0.20325910663186175,
+            "pitch_pfx_z_mean": 0.5988310312872329,
+            "pitch_extension_mean": 6.36753034603014
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.47649828087807455,
+          "bb_fb_rate": 0.18474477651414972,
+          "bb_ld_rate": 0.26610949484263424,
+          "bb_pu_rate": 0.0726474477651415,
+          "bb_inplay_n": 135
+        },
+        {
+          "player": {
+            "mlbam_id": 624585,
+            "full_name": "Jorge Soler",
+            "primary_position": "DH",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.3651381879321413,
+          "bb_rate": 0.09534210704259807,
+          "hbp_rate": 0.020512820512820513,
+          "hr_rate": 0.052257288651814525,
+          "inplay_hit_rate": 0.24186868118103727,
+          "xb_hit_share": 0.2507828864902898,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "FF": 0.9562355788053142,
+            "FC": 0.85,
+            "CU": 0.9370045614065685,
+            "OTHER": 0.85,
+            "SI": 0.9453344786150404,
+            "SL": 0.9453062381930535,
+            "CH": 0.9404084618465651
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.25,
+            "FC": 1.25,
+            "CU": 1.0,
+            "OTHER": 1.25,
+            "SI": 0.8266483868237691,
+            "SL": 1.25,
+            "CH": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.8803654406371244,
+            "bb": 1.171087483091632,
+            "hr": 0.78,
+            "inplay": 1.1606128795209851
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.959317373991417,
+            "bb": 0.9480172545093286,
+            "hr": 1.0557466255072088,
+            "inplay": 0.9520433850122284
+          },
+          "venue_mult_home": {
+            "k": 0.9440978708486134,
+            "bb": 0.9420106336486774,
+            "hr": 1.0305471762774499,
+            "inplay": 0.997295894573165
+          },
+          "venue_mult_away": {
+            "k": 0.9724998459149904,
+            "bb": 1.061699905384517,
+            "hr": 0.9003787028965651,
+            "inplay": 1.0178981934037765
+          },
+          "statcast_quality_mult": {
+            "k": 1.1475620288845483,
+            "bb": 1.0240915971739477,
+            "hr": 1.1978896075333525,
+            "inplay": 1.0020701428385546,
+            "csw_rate": 0.31616965710280953,
+            "zone_rate": 0.45853845318154995,
+            "chase_swing_rate": 0.3033363792181096,
+            "contact_rate": 0.6722073606894634,
+            "xwoba": 0.39316368420894954,
+            "ev_mean": 89.09240852780178,
+            "ev_max": 112.7,
+            "la_mean": 14.82800345721694,
+            "pulled_air_rate": 0.19273984442523767,
+            "sweet_spot_rate": 0.34975511380005764,
+            "hardhit_rate": 0.437481993661769,
+            "barrel_rate": 0.13627196773264189,
+            "pitch_velo_mean": 88.89982664551025,
+            "pitch_spin_mean": 2317.1140623046595,
+            "pitch_pfx_x_mean": -0.04902758048324305,
+            "pitch_pfx_z_mean": 0.4387247503008357,
+            "pitch_extension_mean": 6.380532226670743
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.4203637599864015,
+          "bb_fb_rate": 0.2512040342229021,
+          "bb_ld_rate": 0.23074961754207038,
+          "bb_pu_rate": 0.09768258824862598,
+          "bb_inplay_n": 98
+        },
+        {
+          "player": {
+            "mlbam_id": 666176,
+            "full_name": "Jo Adell",
+            "primary_position": "RF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.24823817958420422,
+          "bb_rate": 0.03549127656720574,
+          "hbp_rate": 0.028985507246376812,
+          "hr_rate": 0.03968280717707506,
+          "inplay_hit_rate": 0.28780589103563237,
+          "xb_hit_share": 0.14883895037620254,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.041666666666666664,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "FF": 0.9881187036940156,
+            "SI": 0.9713695123351535,
+            "CU": 1.0648080653605565,
+            "FC": 1.0576779700343797,
+            "OTHER": 1.0412072259204335,
+            "CH": 0.9228552676797059,
+            "SL": 0.9271399365426582
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.25,
+            "SI": 0.9211073380219276,
+            "CU": 1.0,
+            "FC": 0.8233461847343114,
+            "OTHER": 0.9470904766135543,
+            "CH": 0.9373830436447766,
+            "SL": 1.0050835507872644
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.9199787392176411,
+            "bb": 1.1543984442954702,
+            "hr": 1.275,
+            "inplay": 0.8972577117588684
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9685479706261511,
+            "bb": 0.8896245609787332,
+            "hr": 0.78,
+            "inplay": 1.0424131691206102
+          },
+          "venue_mult_home": {
+            "k": 1.0399823580742127,
+            "bb": 0.964731219791593,
+            "hr": 0.86,
+            "inplay": 0.997456404176311
+          },
+          "venue_mult_away": {
+            "k": 0.9120235448735521,
+            "bb": 0.9990824148720914,
+            "hr": 1.0402628560174938,
+            "inplay": 0.997456404176311
+          },
+          "statcast_quality_mult": {
+            "k": 1.080936580262264,
+            "bb": 0.9393524503529862,
+            "hr": 1.0851754480408768,
+            "inplay": 1.0649850415192705,
+            "csw_rate": 0.26534806489758994,
+            "zone_rate": 0.4639495181211173,
+            "chase_swing_rate": 0.34954518688501196,
+            "contact_rate": 0.7333826755130943,
+            "xwoba": 0.4292333536056345,
+            "ev_mean": 91.61006840736097,
+            "ev_max": 114.94859813084113,
+            "la_mean": 17.501393460346442,
+            "pulled_air_rate": 0.1287214567877445,
+            "sweet_spot_rate": 0.3525869544272088,
+            "hardhit_rate": 0.48598130841121495,
+            "barrel_rate": 0.11224588110607958,
+            "pitch_velo_mean": 89.3373296822264,
+            "pitch_spin_mean": 2307.2890648848215,
+            "pitch_pfx_x_mean": -0.0871042998180799,
+            "pitch_pfx_z_mean": 0.5317925078432996,
+            "pitch_extension_mean": 6.378262714416646
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.41354298191400257,
+          "bb_fb_rate": 0.23632128013373688,
+          "bb_ld_rate": 0.2133706752896717,
+          "bb_pu_rate": 0.13676506266258895,
+          "bb_inplay_n": 135
+        },
+        {
+          "player": {
+            "mlbam_id": 687263,
+            "full_name": "Zach Neto",
+            "primary_position": "SS",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.338186152112919,
+          "bb_rate": 0.12395497596168381,
+          "hbp_rate": 0.017391304347826087,
+          "hr_rate": 0.04110235760463163,
+          "inplay_hit_rate": 0.2824018159086437,
+          "xb_hit_share": 0.27310854478847435,
+          "triple_share_of_xb": 0.08739251341723764,
+          "sb_attempt_rate": 0.19298245614035087,
+          "sb_success_rate": 0.6363636363636364,
+          "vs_pitch_type": {
+            "SI": 0.9330291682010197,
+            "FF": 0.9700730071159209,
+            "FC": 1.0234277009824357,
+            "OTHER": 0.85,
+            "SL": 0.924197709513984,
+            "CU": 0.8844545047140392,
+            "CH": 1.0221664586080679,
+            "KC": 0.9412035137742025
+          },
+          "vs_pitch_type_hr": {
+            "SI": 1.25,
+            "FF": 1.25,
+            "FC": 1.0,
+            "OTHER": 1.1895225047317333,
+            "SL": 1.1521750951308043,
+            "CU": 1.0,
+            "CH": 0.935501880402252,
+            "KC": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.8689014416514746,
+            "bb": 1.1925000000000001,
+            "hr": 0.8554917439769582,
+            "inplay": 1.099193181507874
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.985496677921756,
+            "bb": 0.8828873138739702,
+            "hr": 0.9395571055331567,
+            "inplay": 0.94771477248937
+          },
+          "venue_mult_home": {
+            "k": 0.962432595771133,
+            "bb": 0.9962912881783411,
+            "hr": 0.9713330801326838,
+            "inplay": 0.9491579864628761
+          },
+          "venue_mult_away": {
+            "k": 0.9755031126305101,
+            "bb": 1.0143362436417287,
+            "hr": 0.9246879555972942,
+            "inplay": 1.0327462473863267
+          },
+          "statcast_quality_mult": {
+            "k": 1.1346030020952371,
+            "bb": 1.001067388959592,
+            "hr": 1.1486301626776667,
+            "inplay": 1.0331588221289163,
+            "csw_rate": 0.27796564628161535,
+            "zone_rate": 0.4503436085459537,
+            "chase_swing_rate": 0.3517951431058478,
+            "contact_rate": 0.7107638219243058,
+            "xwoba": 0.4196847013139452,
+            "ev_mean": 89.43988366065771,
+            "ev_max": 108.77319587628865,
+            "la_mean": 20.08302136727524,
+            "pulled_air_rate": 0.2537003973967632,
+            "sweet_spot_rate": 0.3817600645049819,
+            "hardhit_rate": 0.40885791625871104,
+            "barrel_rate": 0.11944940390485514,
+            "pitch_velo_mean": 89.14128728735434,
+            "pitch_spin_mean": 2288.0643007254826,
+            "pitch_pfx_x_mean": -0.11703337891523638,
+            "pitch_pfx_z_mean": 0.49488456582924534,
+            "pitch_extension_mean": 6.373166016669939
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.33130795369463806,
+          "bb_fb_rate": 0.22798479525427634,
+          "bb_ld_rate": 0.2812302021540056,
+          "bb_pu_rate": 0.15947704889707998,
+          "bb_inplay_n": 114
+        },
+        {
+          "player": {
+            "mlbam_id": 660162,
+            "full_name": "Yo\u00e1n Moncada",
+            "primary_position": "3B",
+            "bat_side": "S",
+            "throw_side": "R"
+          },
+          "k_rate": 0.4009124258468177,
+          "bb_rate": 0.12605061127141307,
+          "hbp_rate": 0.015503875968992248,
+          "hr_rate": 0.022715885413596346,
+          "inplay_hit_rate": 0.27322375208070865,
+          "xb_hit_share": 0.11656759945680001,
+          "triple_share_of_xb": 0.24791265253692998,
+          "sb_attempt_rate": 0.02857142857142857,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "SL": 0.85,
+            "SI": 0.9855557413840799,
+            "FF": 0.9754350037885946,
+            "CU": 1.023907395160395,
+            "FC": 0.85,
+            "CH": 0.9577869710209638,
+            "OTHER": 0.9842790950568614
+          },
+          "vs_pitch_type_hr": {
+            "SL": 1.0,
+            "SI": 1.25,
+            "FF": 0.9765810475778423,
+            "CU": 1.0,
+            "FC": 1.0,
+            "CH": 1.0,
+            "OTHER": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.0831710804671952,
+            "bb": 1.1212810335619094,
+            "hr": 0.78,
+            "inplay": 0.8075
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.8895313811010142,
+            "bb": 1.0007111391842847,
+            "hr": 1.1552077074724063,
+            "inplay": 1.0610899379822785
+          },
+          "venue_mult_home": {
+            "k": 1.0309492120496844,
+            "bb": 1.0033934036189556,
+            "hr": 0.9301403620317383,
+            "inplay": 0.9284785581132914
+          },
+          "venue_mult_away": {
+            "k": 0.8977456868904198,
+            "bb": 1.025224656352173,
+            "hr": 1.0664248624796109,
+            "inplay": 1.0465004232184483
+          },
+          "statcast_quality_mult": {
+            "k": 1.141312495012797,
+            "bb": 1.050901650796698,
+            "hr": 1.149156556217227,
+            "inplay": 0.9595161122107849,
+            "csw_rate": 0.30341379790065115,
+            "zone_rate": 0.4887515650874429,
+            "chase_swing_rate": 0.28756108886164783,
+            "contact_rate": 0.7042314714364152,
+            "xwoba": 0.36377831262148,
+            "ev_mean": 90.42228174603173,
+            "ev_max": 111.73333333333335,
+            "la_mean": 15.54702380952381,
+            "pulled_air_rate": 0.22103174603174602,
+            "sweet_spot_rate": 0.3926587301587302,
+            "hardhit_rate": 0.44960317460317456,
+            "barrel_rate": 0.12103174603174602,
+            "pitch_velo_mean": 89.3734701243391,
+            "pitch_spin_mean": 2243.8633854326317,
+            "pitch_pfx_x_mean": -0.23200801256022985,
+            "pitch_pfx_z_mean": 0.526169671376753,
+            "pitch_extension_mean": 6.349124805133366
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.3862798131300713,
+          "bb_fb_rate": 0.32456356036390466,
+          "bb_ld_rate": 0.20678632898942712,
+          "bb_pu_rate": 0.08237029751659702,
+          "bb_inplay_n": 65
+        },
+        {
+          "player": {
+            "mlbam_id": 666139,
+            "full_name": "Josh Lowe",
+            "primary_position": "LF",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.3013087761852298,
+          "bb_rate": 0.0407522008718834,
+          "hbp_rate": 0.007692307692307693,
+          "hr_rate": 0.035048256009758416,
+          "inplay_hit_rate": 0.20500718988916608,
+          "xb_hit_share": 0.10924517202973066,
+          "triple_share_of_xb": 0.04574269257759034,
+          "sb_attempt_rate": 0.045454545454545456,
+          "sb_success_rate": 0.95,
+          "vs_pitch_type": {
+            "FF": 0.9758593401388392,
+            "CH": 1.15,
+            "CU": 1.0708700560799351,
+            "FC": 0.9234720749714728,
+            "SL": 0.8953479497365002,
+            "SI": 1.0369228299972433,
+            "OTHER": 0.8693306833917236
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.25,
+            "CH": 1.0142774631415954,
+            "CU": 1.25,
+            "FC": 1.0,
+            "SL": 1.0,
+            "SI": 0.9507999223166521,
+            "OTHER": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.088879499087874,
+            "bb": 0.8075,
+            "hr": 0.78,
+            "inplay": 1.0691152466003553
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9644224538110155,
+            "bb": 1.1861565598460282,
+            "hr": 1.163302253699565,
+            "inplay": 0.9716619207465956
+          },
+          "venue_mult_home": {
+            "k": 0.9685029760848639,
+            "bb": 0.9270481676839891,
+            "hr": 0.9721365016707713,
+            "inplay": 0.9345428658617795
+          },
+          "venue_mult_away": {
+            "k": 1.0087291305038866,
+            "bb": 1.1225,
+            "hr": 1.0905690390497313,
+            "inplay": 1.0470365570164364
+          },
+          "statcast_quality_mult": {
+            "k": 1.0220509649299618,
+            "bb": 0.9381623958054901,
+            "hr": 0.9513212674192356,
+            "inplay": 0.9588658228774474,
+            "csw_rate": 0.26864848408710984,
+            "zone_rate": 0.4943995172993707,
+            "chase_swing_rate": 0.3298457227859574,
+            "contact_rate": 0.7573886411789497,
+            "xwoba": 0.3439952148460004,
+            "ev_mean": 87.1062267851926,
+            "ev_max": 109.30184049079756,
+            "la_mean": 14.149200784608322,
+            "pulled_air_rate": 0.14206418763824546,
+            "sweet_spot_rate": 0.3676808146571512,
+            "hardhit_rate": 0.3531572138057677,
+            "barrel_rate": 0.07299361462376361,
+            "pitch_velo_mean": 89.28132574229963,
+            "pitch_spin_mean": 2246.0444081813257,
+            "pitch_pfx_x_mean": -0.2769156634431944,
+            "pitch_pfx_z_mean": 0.5576576912846124,
+            "pitch_extension_mean": 6.338794296924357
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.4184200322442399,
+          "bb_fb_rate": 0.27638211465072143,
+          "bb_ld_rate": 0.20989367563927266,
+          "bb_pu_rate": 0.095304177465766,
+          "bb_inplay_n": 83
+        },
+        {
+          "player": {
+            "mlbam_id": 681351,
+            "full_name": "Logan O'Hoppe",
+            "primary_position": "C",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2852144368768521,
+          "bb_rate": 0.10103103427180897,
+          "hbp_rate": 0.02631578947368421,
+          "hr_rate": 0.007896528908379333,
+          "inplay_hit_rate": 0.2466770859733706,
+          "xb_hit_share": 0.10894648757905856,
+          "triple_share_of_xb": 0.02264301375323899,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "FF": 0.9699609262290139,
+            "SI": 1.0173121623315098,
+            "OTHER": 1.0895656785573697,
+            "CH": 0.9618513601538227,
+            "SL": 0.8924926726970588
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.25,
+            "SI": 1.0,
+            "OTHER": 1.0,
+            "CH": 1.0,
+            "SL": 1.038004327556403
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.8075,
+            "bb": 1.0385266827962252,
+            "hr": 0.78,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.0510515221660734,
+            "bb": 1.0155970717781904,
+            "hr": 1.275,
+            "inplay": 0.8746924855161216
+          },
+          "venue_mult_home": {
+            "k": 1.0322260704485071,
+            "bb": 0.9907490555384999,
+            "hr": 0.86,
+            "inplay": 1.0255803197445381
+          },
+          "venue_mult_away": {
+            "k": 0.8775000000000001,
+            "bb": 1.0421828752424245,
+            "hr": 1.175,
+            "inplay": 0.9951278613868728
+          },
+          "statcast_quality_mult": {
+            "k": 1.1266573867210563,
+            "bb": 0.9894645006849239,
+            "hr": 1.0590638771238168,
+            "inplay": 0.9706910525561642,
+            "csw_rate": 0.291486819631303,
+            "zone_rate": 0.45558724789862937,
+            "chase_swing_rate": 0.3374672878382653,
+            "contact_rate": 0.7081158513789434,
+            "xwoba": 0.36619219139616144,
+            "ev_mean": 89.11393903730726,
+            "ev_max": 113.25172413793103,
+            "la_mean": 17.343980228315875,
+            "pulled_air_rate": 0.18696010356596446,
+            "sweet_spot_rate": 0.3256208073437684,
+            "hardhit_rate": 0.43038719548075793,
+            "barrel_rate": 0.112933976697658,
+            "pitch_velo_mean": 89.08602269589443,
+            "pitch_spin_mean": 2322.8985533337764,
+            "pitch_pfx_x_mean": -0.06503669418601785,
+            "pitch_pfx_z_mean": 0.5553879071178802,
+            "pitch_extension_mean": 6.386502667961306
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.40596034260237013,
+          "bb_fb_rate": 0.2603543353279361,
+          "bb_ld_rate": 0.20251085298603777,
+          "bb_pu_rate": 0.131174469083656,
+          "bb_inplay_n": 65
+        }
+      ],
+      "pitcher": {
+        "player": {
+          "mlbam_id": 667755,
+          "full_name": "Jos\u00e9 Soriano",
+          "primary_position": "P",
+          "bat_side": "R",
+          "throw_side": "R"
+        },
+        "k_rate": 0.301742642362186,
+        "bb_rate": 0.11211920028059336,
+        "hbp_rate": 0.0041841004184100415,
+        "hr_rate": 0.021026578002952337,
+        "inplay_hit_rate": 0.2763812288871169,
+        "batters_faced": 239.0,
+        "balls_in_play": 145.0,
+        "arsenal": {
+          "FF": 0.2344245007032735,
+          "SI": 0.28405490085216467,
+          "KC": 0.24498416073495247,
+          "SL": 0.05702217717106653,
+          "FS": 0.17951426053854277
+        },
+        "pitch_type_whiff_mult": {
+          "FS": 1.0881112531614523,
+          "SL": 0.8,
+          "FF": 1.1063685196240152,
+          "KC": 1.1125206898768916,
+          "SI": 1.25
+        },
+        "pitch_type_inplay_mult": {
+          "FS": 0.9693172857397384,
+          "SL": 0.8035749115882296,
+          "FF": 0.9600388021422032,
+          "KC": 0.8319452757828892,
+          "SI": 0.9607616978107967
+        },
+        "pitch_type_hr_mult": {
+          "FS": 0.8,
+          "SL": 1.0,
+          "FF": 1.25,
+          "KC": 0.8182531701667218,
+          "SI": 0.8
+        },
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 947,
+        "stamina_pitches": 93,
+        "role": "SP",
+        "availability_mult": 1.0,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9751978143711194,
+          "bb": 1.03200769471088,
+          "hr": 1.275,
+          "inplay": 1.0754301117090095
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9471123697523429,
+          "bb": 0.936495215885836,
+          "hr": 0.78,
+          "inplay": 0.8745343788570247
+        },
+        "venue_mult_home": {
+          "k": 0.9799797626804345,
+          "bb": 0.9998431832627312,
+          "hr": 1.0804896468013048,
+          "inplay": 1.035415968947521
+        },
+        "venue_mult_away": {
+          "k": 0.9706307425502917,
+          "bb": 0.9799334086055026,
+          "hr": 0.9206601573384897,
+          "inplay": 0.9332662478542871
+        },
+        "statcast_quality_mult": {
+          "k": 1.1067209680455883,
+          "bb": 1.018307124824032,
+          "hr": 0.9448218794767134,
+          "inplay": 1.0213064872119675,
+          "csw_rate": 0.29385189346651897,
+          "zone_rate": 0.46691406202484254,
+          "chase_swing_rate": 0.3538156299531662,
+          "contact_rate": 0.7207332241414659,
+          "xwoba": 0.37581313913876135,
+          "ev_mean": 88.81853353246574,
+          "ev_max": 111.34862385321102,
+          "la_mean": 4.347519046861466,
+          "pulled_air_rate": 0.11631462911599459,
+          "sweet_spot_rate": 0.3282127871417395,
+          "hardhit_rate": 0.4025673849655075,
+          "barrel_rate": 0.08523575848090463,
+          "pitch_velo_mean": 93.27952958414012,
+          "pitch_spin_mean": 2089.402039380813,
+          "pitch_pfx_x_mean": -0.4439703649389512,
+          "pitch_pfx_z_mean": 0.12814191536420852,
+          "pitch_extension_mean": 6.709281092197267
+        },
+        "bb_gb_rate": 0.5668112583771336,
+        "bb_fb_rate": 0.19816831762856307,
+        "bb_ld_rate": 0.2043320534961223,
+        "bb_pu_rate": 0.030688370498180913,
+        "bb_inplay_n": 139,
+        "leverage_skill": 0.5
+      },
+      "bench": [
+        {
+          "player": {
+            "mlbam_id": 624428,
+            "full_name": "Adam Frazier",
+            "primary_position": "2B",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.25593380679101374,
+          "bb_rate": 0.06391725822853554,
+          "hbp_rate": 0.013157894736842105,
+          "hr_rate": 0.00950657894736842,
+          "inplay_hit_rate": 0.29762704000730533,
+          "xb_hit_share": 0.36457338715122056,
+          "triple_share_of_xb": 0.1596115081546637,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "FF": 1.0635172804559394,
+            "SL": 0.9009344987174994,
+            "SI": 1.004301531646808,
+            "OTHER": 0.9037394399337741,
+            "CH": 0.9806977945082264
+          },
+          "vs_pitch_type_hr": {
+            "FF": 1.1824195510198885,
+            "SL": 1.0,
+            "SI": 1.0138285047684008,
+            "OTHER": 1.0,
+            "CH": 1.0
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 0.8075,
+            "bb": 1.111913440598806,
+            "hr": 0.78,
+            "inplay": 0.8606556387458015
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.132220050537322,
+            "bb": 1.1329265656971808,
+            "hr": 1.275,
+            "inplay": 1.0821935491218262
+          },
+          "venue_mult_home": {
+            "k": 1.1225,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 1.0241717700142532
+          },
+          "venue_mult_away": {
+            "k": 0.9576967477934808,
+            "bb": 1.1225,
+            "hr": 1.175,
+            "inplay": 1.0263098944143345
+          },
+          "statcast_quality_mult": {
+            "k": 0.8877523698458312,
+            "bb": 0.9524924755624904,
+            "hr": 0.85,
+            "inplay": 0.9391517777300106,
+            "csw_rate": 0.2500648651867479,
+            "zone_rate": 0.5049595283769241,
+            "chase_swing_rate": 0.28114478928940395,
+            "contact_rate": 0.811420448772953,
+            "xwoba": 0.29473132202011537,
+            "ev_mean": 82.90697290152016,
+            "ev_max": 104.39411764705882,
+            "la_mean": 13.770406477197621,
+            "pulled_air_rate": 0.17927957699933905,
+            "sweet_spot_rate": 0.3842531394580304,
+            "hardhit_rate": 0.18514540647719763,
+            "barrel_rate": 0.02627230667547918,
+            "pitch_velo_mean": 89.6466720702436,
+            "pitch_spin_mean": 2267.9359928026342,
+            "pitch_pfx_x_mean": -0.21049537327680368,
+            "pitch_pfx_z_mean": 0.6268547957103912,
+            "pitch_extension_mean": 6.367513753106009
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.4209528519617541,
+          "bb_fb_rate": 0.2532970656116057,
+          "bb_ld_rate": 0.2583250906693043,
+          "bb_pu_rate": 0.06742499175733598,
+          "bb_inplay_n": 56
+        },
+        {
+          "player": {
+            "mlbam_id": 642350,
+            "full_name": "Jose Siri",
+            "primary_position": "LF",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.4,
+          "bb_rate": 0.0,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.6666666666666666,
+          "xb_hit_share": 0.45,
+          "triple_share_of_xb": 0.02,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {},
+          "vs_pitch_type_hr": {},
+          "platoon_mult_vs_lhp": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "platoon_mult_vs_rhp": {},
+          "venue_mult_home": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_away": {},
+          "statcast_quality_mult": {},
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0
+        },
+        {
+          "player": {
+            "mlbam_id": 672724,
+            "full_name": "Oswald Peraza",
+            "primary_position": "2B",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.25204582077577975,
+          "bb_rate": 0.050219665752518204,
+          "hbp_rate": 0.03571428571428571,
+          "hr_rate": 0.031493182980597355,
+          "inplay_hit_rate": 0.28034160593489094,
+          "xb_hit_share": 0.20435259945378348,
+          "triple_share_of_xb": 0.1279795232762758,
+          "sb_attempt_rate": 0.17647058823529413,
+          "sb_success_rate": 0.8333333333333334,
+          "vs_pitch_type": {
+            "FF": 0.9917336080685599,
+            "SI": 1.0142483208408257,
+            "OTHER": 1.067311108466458,
+            "CU": 1.023907395160395,
+            "CH": 0.928537091085274,
+            "SL": 0.9647962042368888
+          },
+          "vs_pitch_type_hr": {
+            "FF": 0.8,
+            "SI": 0.8,
+            "OTHER": 1.218484353550986,
+            "CU": 1.0,
+            "CH": 1.25,
+            "SL": 1.1666499904398593
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.0047820949547488,
+            "bb": 0.8212503362425363,
+            "hr": 1.275,
+            "inplay": 1.0720633691559183
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 0.9349206459604471,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 1.0052524993191432
+          },
+          "venue_mult_home": {
+            "k": 0.923519289973558,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 0.9995735129046825
+          },
+          "venue_mult_away": {
+            "k": 1.025307133851452,
+            "bb": 1.1225,
+            "hr": 1.175,
+            "inplay": 1.0472426283007754
+          },
+          "statcast_quality_mult": {
+            "k": 1.097554898702644,
+            "bb": 0.9604048831400807,
+            "hr": 0.919775439360854,
+            "inplay": 0.9961496200789812,
+            "csw_rate": 0.28123951997369717,
+            "zone_rate": 0.49051126089100766,
+            "chase_swing_rate": 0.29906288723667906,
+            "contact_rate": 0.7201194097104877,
+            "xwoba": 0.36016031538949933,
+            "ev_mean": 85.5252642706131,
+            "ev_max": 111.07674418604651,
+            "la_mean": 9.04862579281184,
+            "pulled_air_rate": 0.13794926004228328,
+            "sweet_spot_rate": 0.35782241014799154,
+            "hardhit_rate": 0.3488372093023256,
+            "barrel_rate": 0.06976744186046512,
+            "pitch_velo_mean": 89.3199993424297,
+            "pitch_spin_mean": 2271.209813876484,
+            "pitch_pfx_x_mean": -0.06237823442380405,
+            "pitch_pfx_z_mean": 0.591016669406543,
+            "pitch_extension_mean": 6.3871366102252125
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.48789984783983864,
+          "bb_fb_rate": 0.15539997606469372,
+          "bb_ld_rate": 0.25465028807850776,
+          "bb_pu_rate": 0.10204988801695987,
+          "bb_inplay_n": 93
+        },
+        {
+          "player": {
+            "mlbam_id": 665861,
+            "full_name": "Sebasti\u00e1n Rivero",
+            "primary_position": "C",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.16048312567604378,
+          "bb_rate": 0.034386299688991914,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.0017,
+          "inplay_hit_rate": 0.16636363636363638,
+          "xb_hit_share": 0.05,
+          "triple_share_of_xb": 0.12,
+          "sb_attempt_rate": 0.0,
+          "sb_success_rate": 0.72,
+          "vs_pitch_type": {
+            "SL": 1.027170613590854,
+            "FF": 1.0348535365070552
+          },
+          "vs_pitch_type_hr": {
+            "SL": 1.0,
+            "FF": 0.94434635101184
+          },
+          "platoon_mult_vs_lhp": {
+            "k": 1.1354303188364454,
+            "bb": 0.8075,
+            "hr": 0.78,
+            "inplay": 0.8632513661202186
+          },
+          "platoon_mult_vs_rhp": {
+            "k": 1.0211919323637044,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 1.158430913348946
+          },
+          "venue_mult_home": {
+            "k": 1.1225,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 1.0006375227686704
+          },
+          "venue_mult_away": {
+            "k": 0.9771371976264852,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 1.044467213114754
+          },
+          "statcast_quality_mult": {
+            "k": 0.8808300044539354,
+            "bb": 0.956254577990322,
+            "hr": 0.85,
+            "inplay": 0.9,
+            "csw_rate": 0.2064516129032258,
+            "zone_rate": 0.38064516129032255,
+            "chase_swing_rate": 0.4523809523809524,
+            "contact_rate": 0.8095238095238095,
+            "xwoba": 0.24874999999999997,
+            "ev_mean": 87.70590692069129,
+            "ev_max": 106.3,
+            "la_mean": 19.433333333333334,
+            "pulled_air_rate": 0.14284955662086174,
+            "sweet_spot_rate": 0.3444875254909663,
+            "hardhit_rate": 0.3584174141187825,
+            "barrel_rate": 0.07116641327251874,
+            "pitch_velo_mean": 89.44350649350649,
+            "pitch_spin_mean": 2232.396103896104,
+            "pitch_pfx_x_mean": 0.010584415584415618,
+            "pitch_pfx_z_mean": 0.6162337662337665,
+            "pitch_extension_mean": 6.3461038961038945
+          },
+          "vs_pitcher_hr_mult": {},
+          "vs_pitcher_k_mult": {},
+          "vs_pitcher_bb_mult": {},
+          "vs_pitcher_inplay_mult": {},
+          "vs_pitcher_history": {},
+          "bb_gb_rate": 0.4,
+          "bb_fb_rate": 0.1,
+          "bb_ld_rate": 0.26666666666666666,
+          "bb_pu_rate": 0.23333333333333334,
+          "bb_inplay_n": 30
+        }
+      ],
+      "bullpen": [
+        {
+          "player": {
+            "mlbam_id": 681217,
+            "full_name": "Chase Silseth",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.2432894736842105,
+          "bb_rate": 0.16807409451392594,
+          "hbp_rate": 0.013157894736842105,
+          "hr_rate": 0.00950657894736842,
+          "inplay_hit_rate": 0.2846359466604711,
+          "batters_faced": 76.0,
+          "balls_in_play": 46.0,
+          "arsenal": {
+            "FF": 0.32565789674342105,
+            "OTHER": 0.1414473685855263,
+            "SI": 0.1414473685855263,
+            "FS": 0.3914473660855264
+          },
+          "pitch_type_whiff_mult": {
+            "OTHER": 0.8983474493783319,
+            "FF": 1.25,
+            "FS": 1.122414359014025,
+            "SI": 1.25
+          },
+          "pitch_type_inplay_mult": {
+            "OTHER": 1.0130316677066842,
+            "FF": 0.8561370960477708,
+            "FS": 0.9417878276189268,
+            "SI": 0.9771390166827777
+          },
+          "pitch_type_hr_mult": {
+            "OTHER": 1.0,
+            "FF": 0.830370263285054,
+            "FS": 0.8,
+            "SI": 1.0
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 304,
+          "stamina_pitches": 20,
+          "role": "MR",
+          "availability_mult": 0.8616666666666667,
+          "platoon_mult_vs_lhb": {
+            "k": 0.8806059903680239,
+            "bb": 1.1925000000000001,
+            "hr": 0.78,
+            "inplay": 0.8525610070607647
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9819250469252061,
+            "bb": 0.8075,
+            "hr": 1.275,
+            "inplay": 1.1925000000000001
+          },
+          "venue_mult_home": {
+            "k": 1.0776964904331048,
+            "bb": 0.8775000000000001,
+            "hr": 1.175,
+            "inplay": 1.1225
+          },
+          "venue_mult_away": {
+            "k": 0.8775000000000001,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 0.9173132378901521
+          },
+          "statcast_quality_mult": {
+            "k": 1.15,
+            "bb": 1.0270254464306219,
+            "hr": 0.85,
+            "inplay": 0.945651558519468,
+            "csw_rate": 0.2950310559006211,
+            "zone_rate": 0.40683229813664595,
+            "chase_swing_rate": 0.43790849673202614,
+            "contact_rate": 0.6666666666666666,
+            "xwoba": 0.3132222222222222,
+            "ev_mean": 88.66913875996909,
+            "ev_max": 113.0,
+            "la_mean": 7.5625,
+            "pulled_air_rate": 0.13838633772105305,
+            "sweet_spot_rate": 0.3351064672187992,
+            "hardhit_rate": 0.37051496525832867,
+            "barrel_rate": 0.07678363640607079,
+            "pitch_velo_mean": 91.33593749999991,
+            "pitch_spin_mean": 1973.2971246006389,
+            "pitch_pfx_x_mean": -0.5872187499999997,
+            "pitch_pfx_z_mean": 0.6014062500000001,
+            "pitch_extension_mean": 5.8512499999999985
+          },
+          "bb_gb_rate": 0.5625,
+          "bb_fb_rate": 0.1875,
+          "bb_ld_rate": 0.16666666666666666,
+          "bb_pu_rate": 0.08333333333333333,
+          "bb_inplay_n": 48,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 820862,
+            "full_name": "Jos\u00e9 Fermin",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.24039204545454543,
+          "bb_rate": 0.11401035063299869,
+          "hbp_rate": 0.05,
+          "hr_rate": 0.025797603783991176,
+          "inplay_hit_rate": 0.22579833960801904,
+          "batters_faced": 40.0,
+          "balls_in_play": 25.0,
+          "arsenal": {
+            "FF": 0.13664596491925476,
+            "CH": 0.09937888757763996,
+            "SI": 0.18012422648447218,
+            "SL": 0.5838509210186331
+          },
+          "pitch_type_whiff_mult": {
+            "SL": 1.2186455763224509,
+            "FF": 1.0763409782551763
+          },
+          "pitch_type_inplay_mult": {
+            "SL": 0.8326845590716075,
+            "FF": 0.8857959116853324
+          },
+          "pitch_type_hr_mult": {
+            "SL": 1.25,
+            "FF": 1.25
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 161,
+          "stamina_pitches": 22,
+          "role": "MR",
+          "availability_mult": 0.925,
+          "platoon_mult_vs_lhb": {
+            "k": 0.9699839277695054,
+            "bb": 0.8885566724634579,
+            "hr": 1.275,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9584287293746274,
+            "bb": 0.9860137107886707,
+            "hr": 0.78,
+            "inplay": 0.8075
+          },
+          "venue_mult_home": {
+            "k": 0.9925776465304976,
+            "bb": 0.8775000000000001,
+            "hr": 1.175,
+            "inplay": 1.1225
+          },
+          "venue_mult_away": {
+            "k": 0.966511956033612,
+            "bb": 1.0504213096405486,
+            "hr": 0.86,
+            "inplay": 0.8775000000000001
+          },
+          "statcast_quality_mult": {
+            "k": 1.15,
+            "bb": 1.020442627767899,
+            "hr": 1.214004883952526,
+            "inplay": 0.910776174549113,
+            "csw_rate": 0.3033033033033033,
+            "zone_rate": 0.5105105105105106,
+            "chase_swing_rate": 0.2709030100334448,
+            "contact_rate": 0.6923076923076923,
+            "xwoba": 0.3578773942179124,
+            "ev_mean": 91.57555555555555,
+            "ev_max": 113.5,
+            "la_mean": 20.88888888888889,
+            "pulled_air_rate": 0.2111111111111111,
+            "sweet_spot_rate": 0.35555555555555557,
+            "hardhit_rate": 0.4666666666666667,
+            "barrel_rate": 0.13333333333333333,
+            "pitch_velo_mean": 93.25868902439035,
+            "pitch_spin_mean": 2446.1554878048782,
+            "pitch_pfx_x_mean": -0.40455792682926833,
+            "pitch_pfx_z_mean": 0.7969054878048787,
+            "pitch_extension_mean": 6.134298780487807
+          },
+          "bb_gb_rate": 0.34444444444444444,
+          "bb_fb_rate": 0.3333333333333333,
+          "bb_ld_rate": 0.15555555555555556,
+          "bb_pu_rate": 0.16666666666666666,
+          "bb_inplay_n": 90,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 489446,
+            "full_name": "Kirby Yates",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "R"
+          },
+          "k_rate": 0.39462499999999995,
+          "bb_rate": 0.10169407499480464,
+          "hbp_rate": 0.05,
+          "hr_rate": 0.05854005140127,
+          "inplay_hit_rate": 0.4025342962197509,
+          "batters_faced": 20.0,
+          "balls_in_play": 10.0,
+          "arsenal": {
+            "FF": 0.5632183977471263,
+            "OTHER": 0.05747126377011494,
+            "FS": 0.37931033848275864
+          },
+          "pitch_type_whiff_mult": {
+            "FF": 1.25,
+            "FS": 1.051291505607052
+          },
+          "pitch_type_inplay_mult": {
+            "FF": 0.8463178784651889,
+            "FS": 0.9386826663246857
+          },
+          "pitch_type_hr_mult": {
+            "FF": 1.25,
+            "FS": 0.927453553177079
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 87,
+          "stamina_pitches": 23,
+          "role": "MR",
+          "availability_mult": 0.8333333333333334,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0074912891986063,
+            "bb": 0.9908378020333029,
+            "hr": 1.275,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8681184668989548,
+            "bb": 0.9908378020333029,
+            "hr": 0.78,
+            "inplay": 0.8075
+          },
+          "venue_mult_home": {
+            "k": 1.0531445273130418,
+            "bb": 0.9628813730771173,
+            "hr": 1.175,
+            "inplay": 0.8775000000000001
+          },
+          "venue_mult_away": {
+            "k": 0.8775000000000001,
+            "bb": 1.0324105670942545,
+            "hr": 0.86,
+            "inplay": 1.0847455648958275
+          },
+          "statcast_quality_mult": {
+            "k": 1.15,
+            "bb": 1.0199302940565251,
+            "hr": 1.2009423859122352,
+            "inplay": 1.023496593159695,
+            "csw_rate": 0.2812903225806452,
+            "zone_rate": 0.4838709677419355,
+            "chase_swing_rate": 0.29396984924623115,
+            "contact_rate": 0.678391959798995,
+            "xwoba": 0.4048110603930263,
+            "ev_mean": 87.78888888888888,
+            "ev_max": 113.3,
+            "la_mean": 17.824074074074073,
+            "pulled_air_rate": 0.24074074074074073,
+            "sweet_spot_rate": 0.3888888888888889,
+            "hardhit_rate": 0.42592592592592593,
+            "barrel_rate": 0.12962962962962962,
+            "pitch_velo_mean": 89.85754838709678,
+            "pitch_spin_mean": 1858.7205298013246,
+            "pitch_pfx_x_mean": -1.081264516129033,
+            "pitch_pfx_z_mean": 0.669987096774193,
+            "pitch_extension_mean": 6.097677419354843
+          },
+          "bb_gb_rate": 0.324074074074074,
+          "bb_fb_rate": 0.287037037037037,
+          "bb_ld_rate": 0.2685185185185185,
+          "bb_pu_rate": 0.12037037037037034,
+          "bb_inplay_n": 108,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 815083,
+            "full_name": "Mitch Farris",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.19128518089643662,
+          "bb_rate": 0.06708018566745266,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.03965766843317189,
+          "inplay_hit_rate": 0.4243933619394535,
+          "batters_faced": 72.0,
+          "balls_in_play": 53.0,
+          "arsenal": {
+            "FF": 0.40830449183391015,
+            "CH": 0.2941176541176469,
+            "SL": 0.13148788737024222,
+            "FC": 0.16608996667820064
+          },
+          "pitch_type_whiff_mult": {
+            "FF": 0.8,
+            "FC": 1.0016337941245883,
+            "SL": 0.8580932271892893,
+            "CH": 1.2340440726770474
+          },
+          "pitch_type_inplay_mult": {
+            "FF": 1.0238035387403477,
+            "FC": 1.25,
+            "SL": 1.163438278836746,
+            "CH": 0.863836683126172
+          },
+          "pitch_type_hr_mult": {
+            "FF": 1.2184842311546746,
+            "FC": 0.8599030357415101,
+            "SL": 1.0,
+            "CH": 1.25
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 289,
+          "stamina_pitches": 29,
+          "role": "MR",
+          "availability_mult": 1.0,
+          "platoon_mult_vs_lhb": {
+            "k": 1.1072087033879978,
+            "bb": 1.1527836413060328,
+            "hr": 0.78,
+            "inplay": 0.9359878087099412
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.9162629314577011,
+            "bb": 0.8931968909137145,
+            "hr": 1.275,
+            "inplay": 0.9862624096109697
+          },
+          "venue_mult_home": {
+            "k": 1.0420847378167033,
+            "bb": 1.022688294631987,
+            "hr": 0.86,
+            "inplay": 0.9798826337909905
+          },
+          "venue_mult_away": {
+            "k": 0.982677959359627,
+            "bb": 1.0057479176032604,
+            "hr": 1.175,
+            "inplay": 0.9748844120668846
+          },
+          "statcast_quality_mult": {
+            "k": 0.9705045052755237,
+            "bb": 0.9869362942140077,
+            "hr": 0.9328947211580715,
+            "inplay": 1.081952279147957,
+            "csw_rate": 0.26373626373626374,
+            "zone_rate": 0.4432234432234432,
+            "chase_swing_rate": 0.39552238805970147,
+            "contact_rate": 0.7761194029850746,
+            "xwoba": 0.40178431372549017,
+            "ev_mean": 87.81315609981988,
+            "ev_max": 112.6,
+            "la_mean": 12.641509433962264,
+            "pulled_air_rate": 0.16325903179169016,
+            "sweet_spot_rate": 0.39017765266170146,
+            "hardhit_rate": 0.3866610191959855,
+            "barrel_rate": 0.07389703353366212,
+            "pitch_velo_mean": 85.95750915750916,
+            "pitch_spin_mean": 2049.003663003663,
+            "pitch_pfx_x_mean": 0.652161172161172,
+            "pitch_pfx_z_mean": 0.6543223443223446,
+            "pitch_extension_mean": 6.735471698113215
+          },
+          "bb_gb_rate": 0.4339622641509434,
+          "bb_fb_rate": 0.1320754716981132,
+          "bb_ld_rate": 0.33962264150943394,
+          "bb_pu_rate": 0.09433962264150944,
+          "bb_inplay_n": 53,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 666171,
+            "full_name": "Ryan Zeferjahn",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.31382355555575736,
+          "bb_rate": 0.1411370237671364,
+          "hbp_rate": 0.050505050505050504,
+          "hr_rate": 0.0017,
+          "inplay_hit_rate": 0.2475030558392035,
+          "batters_faced": 99.0,
+          "balls_in_play": 52.0,
+          "arsenal": {
+            "FF": 0.23333333433571424,
+            "OTHER": 0.36666666967380945,
+            "SI": 0.21666665614166672,
+            "SL": 0.18333333984880945
+          },
+          "pitch_type_whiff_mult": {
+            "FF": 1.1908227338756843,
+            "SI": 0.8812432350467084,
+            "OTHER": 1.1754093415084592,
+            "SL": 0.8
+          },
+          "pitch_type_inplay_mult": {
+            "FF": 0.8,
+            "SI": 0.8479279473375524,
+            "OTHER": 0.8206007594479565,
+            "SL": 1.1329520377982722
+          },
+          "pitch_type_hr_mult": {
+            "FF": 1.0242922656257742,
+            "SI": 0.8606147096442642,
+            "OTHER": 0.9190322371517231,
+            "SL": 0.8264177545309891
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 421,
+          "stamina_pitches": 25,
+          "role": "CL",
+          "availability_mult": 0.8283333333333334,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0580369785903776,
+            "bb": 0.9271741459323012,
+            "hr": 0.78,
+            "inplay": 1.0297029874361607
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8706185216601672,
+            "bb": 0.9955691068492644,
+            "hr": 0.78,
+            "inplay": 1.0630192510819172
+          },
+          "venue_mult_home": {
+            "k": 0.9073714730438086,
+            "bb": 1.1225,
+            "hr": 0.86,
+            "inplay": 1.1025196653441063
+          },
+          "venue_mult_away": {
+            "k": 1.053397840728239,
+            "bb": 0.8775000000000001,
+            "hr": 0.86,
+            "inplay": 0.9642497676000737
+          },
+          "statcast_quality_mult": {
+            "k": 1.0941979827944035,
+            "bb": 1.0327801380416557,
+            "hr": 1.003832072485232,
+            "inplay": 0.958626798625091,
+            "csw_rate": 0.2864982737945072,
+            "zone_rate": 0.4739617712008792,
+            "chase_swing_rate": 0.290818276648136,
+            "contact_rate": 0.7282841399318569,
+            "xwoba": 0.3256014796200074,
+            "ev_mean": 87.7915705203673,
+            "ev_max": 111.9043795620438,
+            "la_mean": 15.875441488109253,
+            "pulled_air_rate": 0.1601130209559689,
+            "sweet_spot_rate": 0.3433011537555921,
+            "hardhit_rate": 0.3682599481987285,
+            "barrel_rate": 0.08594301860136566,
+            "pitch_velo_mean": 90.69183567957666,
+            "pitch_spin_mean": 2412.3551534909025,
+            "pitch_pfx_x_mean": 0.3109749753161882,
+            "pitch_pfx_z_mean": 0.5925228148761352,
+            "pitch_extension_mean": 6.545889595822853
+          },
+          "bb_gb_rate": 0.38964220624582724,
+          "bb_fb_rate": 0.32398749127199716,
+          "bb_ld_rate": 0.16789335206045292,
+          "bb_pu_rate": 0.1184769504217226,
+          "bb_inplay_n": 59,
+          "leverage_skill": 0.85
+        },
+        {
+          "player": {
+            "mlbam_id": 696147,
+            "full_name": "Sam Bachman",
+            "primary_position": "P",
+            "bat_side": "R",
+            "throw_side": "R"
+          },
+          "k_rate": 0.3173491379310344,
+          "bb_rate": 0.09831077669739556,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.021091431901757093,
+          "inplay_hit_rate": 0.1981578947368421,
+          "batters_faced": 92.0,
+          "balls_in_play": 57.0,
+          "arsenal": {
+            "CH": 0.14000000280000005,
+            "SI": 0.3114285862285717,
+            "SL": 0.5485714109714281
+          },
+          "pitch_type_whiff_mult": {
+            "SL": 1.0870382571755757,
+            "CH": 0.8,
+            "SI": 1.25
+          },
+          "pitch_type_inplay_mult": {
+            "SL": 1.0835252406213776,
+            "CH": 0.8534287870609488,
+            "SI": 0.8
+          },
+          "pitch_type_hr_mult": {
+            "SL": 1.0233050147365648,
+            "CH": 1.0,
+            "SI": 0.9848372871154618
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 350,
+          "stamina_pitches": 23,
+          "role": "MR",
+          "availability_mult": 0.8033333333333333,
+          "platoon_mult_vs_lhb": {
+            "k": 1.0689667717681302,
+            "bb": 1.1925000000000001,
+            "hr": 1.0708795190499678,
+            "inplay": 1.1925000000000001
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 0.8075,
+            "bb": 0.8075,
+            "hr": 0.9715387960019731,
+            "inplay": 0.9751067800868599
+          },
+          "venue_mult_home": {
+            "k": 1.010126121756003,
+            "bb": 0.8775000000000001,
+            "hr": 0.988661555845437,
+            "inplay": 1.036371181938911
+          },
+          "venue_mult_away": {
+            "k": 0.8808366565325543,
+            "bb": 1.1225,
+            "hr": 1.0359166566610796,
+            "inplay": 1.0739043824701195
+          },
+          "statcast_quality_mult": {
+            "k": 1.15,
+            "bb": 1.0640695830776932,
+            "hr": 0.8614998035271386,
+            "inplay": 0.9,
+            "csw_rate": 0.30864197530864196,
+            "zone_rate": 0.4506172839506173,
+            "chase_swing_rate": 0.34057971014492755,
+            "contact_rate": 0.6666666666666666,
+            "xwoba": 0.28365116279069763,
+            "ev_mean": 87.39418419593832,
+            "ev_max": 104.7,
+            "la_mean": 6.122448979591836,
+            "pulled_air_rate": 0.15281745138213015,
+            "sweet_spot_rate": 0.3170048666977232,
+            "hardhit_rate": 0.35989081824082225,
+            "barrel_rate": 0.07618841441842683,
+            "pitch_velo_mean": 92.34969135802476,
+            "pitch_spin_mean": 2453.404984423676,
+            "pitch_pfx_x_mean": -0.5387962962962963,
+            "pitch_pfx_z_mean": 0.186574074074074,
+            "pitch_extension_mean": 6.193518518518528
+          },
+          "bb_gb_rate": 0.5306122448979591,
+          "bb_fb_rate": 0.30612244897959184,
+          "bb_ld_rate": 0.12244897959183673,
+          "bb_pu_rate": 0.04081632653061224,
+          "bb_inplay_n": 51,
+          "leverage_skill": 0.5
+        },
+        {
+          "player": {
+            "mlbam_id": 642048,
+            "full_name": "Tayler Saucedo",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.5,
+          "bb_rate": 0.0,
+          "hbp_rate": 0.25,
+          "hr_rate": 0.0,
+          "inplay_hit_rate": 0.0,
+          "batters_faced": 4.0,
+          "balls_in_play": 1.0,
+          "arsenal": {
+            "FF": 0.07142857214285711,
+            "OTHER": 0.3571428557142858,
+            "CH": 0.21428571142857156,
+            "SI": 0.07142857214285711,
+            "SL": 0.28571428857142844
+          },
+          "pitch_type_whiff_mult": {},
+          "pitch_type_inplay_mult": {},
+          "pitch_type_hr_mult": {},
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 14,
+          "stamina_pitches": 23,
+          "role": "SU",
+          "availability_mult": 0.975,
+          "platoon_mult_vs_lhb": {
+            "k": 0.8166666666666667,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.1925000000000001,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_home": {
+            "k": 1.0,
+            "bb": 1.0,
+            "hr": 1.0,
+            "inplay": 1.0
+          },
+          "venue_mult_away": {},
+          "statcast_quality_mult": {},
+          "bb_gb_rate": 0.44,
+          "bb_fb_rate": 0.25,
+          "bb_ld_rate": 0.2,
+          "bb_pu_rate": 0.11,
+          "bb_inplay_n": 0,
+          "leverage_skill": 0.7
+        },
+        {
+          "player": {
+            "mlbam_id": 608718,
+            "full_name": "Brent Suter",
+            "primary_position": "P",
+            "bat_side": "L",
+            "throw_side": "L"
+          },
+          "k_rate": 0.20773553768279768,
+          "bb_rate": 0.10365781663599943,
+          "hbp_rate": 0.0,
+          "hr_rate": 0.02402834983351716,
+          "inplay_hit_rate": 0.3213308985402259,
+          "batters_faced": 107.0,
+          "balls_in_play": 72.0,
+          "arsenal": {
+            "FF": 0.269736849210526,
+            "CH": 0.3179824572807017,
+            "SI": 0.23684210052631594,
+            "SL": 0.17543859298245623
+          },
+          "pitch_type_whiff_mult": {
+            "SI": 1.0074924584091,
+            "CH": 1.1814638546837224,
+            "SL": 0.8727204406133757,
+            "FF": 0.808610177258344
+          },
+          "pitch_type_inplay_mult": {
+            "SI": 0.9006781742976047,
+            "CH": 0.9049308773830032,
+            "SL": 0.8,
+            "FF": 1.0291825635106588
+          },
+          "pitch_type_hr_mult": {
+            "SI": 1.155392605193686,
+            "CH": 0.8,
+            "SL": 1.0,
+            "FF": 1.25
+          },
+          "statcast_splits_source": "",
+          "statcast_splits_n_pitches": 0,
+          "statcast_splits_start_date": "",
+          "statcast_splits_end_date": "",
+          "arsenal_source": "statsapi_pitchArsenal",
+          "arsenal_sample_size": 456,
+          "stamina_pitches": 25,
+          "role": "SU",
+          "availability_mult": 0.9,
+          "platoon_mult_vs_lhb": {
+            "k": 1.007388855926113,
+            "bb": 1.1481472637684196,
+            "hr": 1.0523586434694305,
+            "inplay": 1.134652490623958
+          },
+          "platoon_mult_vs_rhb": {
+            "k": 1.0639355514548492,
+            "bb": 0.9113842786643469,
+            "hr": 1.1134674913576337,
+            "inplay": 0.9598475994008198
+          },
+          "venue_mult_home": {
+            "k": 0.9938437747596152,
+            "bb": 1.0634482497122069,
+            "hr": 0.9472679019719268,
+            "inplay": 1.013073290482402
+          },
+          "venue_mult_away": {
+            "k": 1.056684188767407,
+            "bb": 0.9410770723548584,
+            "hr": 1.1522802481594625,
+            "inplay": 1.013073290482402
+          },
+          "statcast_quality_mult": {
+            "k": 0.9490995638964669,
+            "bb": 1.0023255104715596,
+            "hr": 1.0082484047789553,
+            "inplay": 0.975285524259621,
+            "csw_rate": 0.265562250508398,
+            "zone_rate": 0.4847081418995255,
+            "chase_swing_rate": 0.31150517536121336,
+            "contact_rate": 0.7849363777260615,
+            "xwoba": 0.3604822402551153,
+            "ev_mean": 84.7076058470677,
+            "ev_max": 110.05064935064934,
+            "la_mean": 11.7014734144779,
+            "pulled_air_rate": 0.18359443247335624,
+            "sweet_spot_rate": 0.34686389843340515,
+            "hardhit_rate": 0.33239182342321355,
+            "barrel_rate": 0.08738570846194164,
+            "pitch_velo_mean": 83.19866527978321,
+            "pitch_spin_mean": 2050.5027873297927,
+            "pitch_pfx_x_mean": 0.27729663798621546,
+            "pitch_pfx_z_mean": 0.895262059559075,
+            "pitch_extension_mean": 7.336151150653609
+          },
+          "bb_gb_rate": 0.45989743842987896,
+          "bb_fb_rate": 0.24239854568125666,
+          "bb_ld_rate": 0.21108609400294134,
+          "bb_pu_rate": 0.08661792188592302,
+          "bb_inplay_n": 75,
+          "leverage_skill": 0.7
+        }
+      ]
+    }
+  }
+}

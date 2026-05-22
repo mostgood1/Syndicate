@@ -1,0 +1,2 @@
+game_id,season,date,start_time,start_time_local,start_tz_abbr,home_team,away_team,home_score,away_score,home_score_1h,away_score_1h,home_score_2h,away_score_2h,status,completed,neutral_site,venue,tournament_label,tournament_note
+401856600,2026,2026-04-06,2026-04-07 00:50:00+00:00,2026-04-06 20:50,EDT,Michigan Wolverines,UConn Huskies,0,0,,,,,STATUS_SCHEDULED,False,True,Lucas Oil Stadium,NCAA Tournament,NCAA Men's Basketball Championship - National Championship

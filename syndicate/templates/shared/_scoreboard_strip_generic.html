@@ -1,0 +1,47 @@
+<section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+  {% if games %}
+    <div class="cards-scoreboard-strip">
+      {% for game in games %}
+        {% set primary_panel = game.panels[0] if game.panels|length > 0 else None %}
+        <a class="cards-strip-card" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
+          <div class="cards-strip-head">
+            <span class="cards-status-badge">{{ game.status }}</span>
+            <span data-role="strip-detail">{{ game.detail }}</span>
+          </div>
+          <div class="cards-head-left cards-head-matchup">
+            <div class="cards-head-team">
+              <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+              <div>
+                <div class="cards-head-team-name">{{ game.away.name }}</div>
+                <div class="cards-mini-copy">{{ game.away.abbr }}</div>
+              </div>
+            </div>
+            <span class="cards-score-divider">@</span>
+            <div class="cards-head-team">
+              <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+              <div>
+                <div class="cards-head-team-name">{{ game.home.name }}</div>
+                <div class="cards-mini-copy">{{ game.home.abbr }}</div>
+              </div>
+            </div>
+          </div>
+          {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
+          <div class="cards-mini-metrics cards-mini-metrics--strip">
+            {% for metric in metrics[:3] %}
+              <div class="cards-mini-metric">
+                <span>{{ metric.label }}</span>
+                <strong>{{ metric.value }}</strong>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="cards-strip-live">{{ game.summary }}</div>
+          {% if primary_panel %}
+            <div class="cards-strip-lens">{{ primary_panel.title }}{% if primary_panel.body %}: {{ primary_panel.body }}{% endif %}</div>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="cards-loading-strip">{{ empty_text }}</div>
+  {% endif %}
+</section>

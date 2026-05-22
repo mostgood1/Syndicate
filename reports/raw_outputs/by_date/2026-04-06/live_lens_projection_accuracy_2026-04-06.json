@@ -1,0 +1,178 @@
+{
+  "by_lens": [
+    {
+      "lens": "full_game",
+      "mae_proj_blend": 17.934711071470566,
+      "mae_proj_final": 17.3546142747379,
+      "n": 19,
+      "rmse_proj_blend": 19.408893334597607,
+      "rmse_proj_final": 18.955063333415733
+    }
+  ],
+  "by_remaining_bucket": [
+    {
+      "mae_proj_blend": 23.753228038298033,
+      "mae_proj_final": 23.753228038298033,
+      "n": 1,
+      "remaining_bucket": 37,
+      "rmse_proj_blend": 23.753228038298033,
+      "rmse_proj_final": 23.753228038298033
+    },
+    {
+      "mae_proj_blend": 25.448479450645806,
+      "mae_proj_final": 26.016519220040607,
+      "n": 1,
+      "remaining_bucket": 36,
+      "rmse_proj_blend": 25.448479450645806,
+      "rmse_proj_final": 26.016519220040607
+    },
+    {
+      "mae_proj_blend": 21.42241713357768,
+      "mae_proj_final": 22.13350244334589,
+      "n": 1,
+      "remaining_bucket": 35,
+      "rmse_proj_blend": 21.42241713357768,
+      "rmse_proj_final": 22.13350244334589
+    },
+    {
+      "mae_proj_blend": 21.935058619747878,
+      "mae_proj_final": 22.850295732668002,
+      "n": 1,
+      "remaining_bucket": 34,
+      "rmse_proj_blend": 21.935058619747878,
+      "rmse_proj_final": 22.850295732668002
+    },
+    {
+      "mae_proj_blend": 25.071376735458273,
+      "mae_proj_final": 22.44692024774392,
+      "n": 1,
+      "remaining_bucket": 33,
+      "rmse_proj_blend": 25.071376735458273,
+      "rmse_proj_final": 22.44692024774392
+    },
+    {
+      "mae_proj_blend": 23.05795434051535,
+      "mae_proj_final": 20.58008489077264,
+      "n": 1,
+      "remaining_bucket": 32,
+      "rmse_proj_blend": 23.05795434051535,
+      "rmse_proj_final": 20.58008489077264
+    },
+    {
+      "mae_proj_blend": 26.119451317424193,
+      "mae_proj_final": 24.566993079326608,
+      "n": 1,
+      "remaining_bucket": 31,
+      "rmse_proj_blend": 26.119451317424193,
+      "rmse_proj_final": 24.566993079326608
+    },
+    {
+      "mae_proj_blend": 30.068152368236014,
+      "mae_proj_final": 29.05425174141709,
+      "n": 1,
+      "remaining_bucket": 30,
+      "rmse_proj_blend": 30.068152368236014,
+      "rmse_proj_final": 29.05425174141709
+    },
+    {
+      "mae_proj_blend": 23.701541459949993,
+      "mae_proj_final": 23.063065475169992,
+      "n": 1,
+      "remaining_bucket": 29,
+      "rmse_proj_blend": 23.701541459949993,
+      "rmse_proj_final": 23.063065475169992
+    },
+    {
+      "mae_proj_blend": 21.031931517099196,
+      "mae_proj_final": 20.135369084520164,
+      "n": 1,
+      "remaining_bucket": 28,
+      "rmse_proj_blend": 21.031931517099196,
+      "rmse_proj_final": 20.135369084520164
+    },
+    {
+      "mae_proj_blend": 14.916418246010863,
+      "mae_proj_final": 14.634178043980228,
+      "n": 1,
+      "remaining_bucket": 27,
+      "rmse_proj_blend": 14.916418246010863,
+      "rmse_proj_final": 14.634178043980228
+    },
+    {
+      "mae_proj_blend": 14.444981097902826,
+      "mae_proj_final": 14.171140107548524,
+      "n": 1,
+      "remaining_bucket": 26,
+      "rmse_proj_blend": 14.444981097902826,
+      "rmse_proj_final": 14.171140107548524
+    },
+    {
+      "mae_proj_blend": 15.975816309046792,
+      "mae_proj_final": 15.766140191490138,
+      "n": 1,
+      "remaining_bucket": 25,
+      "rmse_proj_blend": 15.975816309046792,
+      "rmse_proj_final": 15.766140191490138
+    },
+    {
+      "mae_proj_blend": 14.426129273587748,
+      "mae_proj_final": 15.1988195875756,
+      "n": 1,
+      "remaining_bucket": 24,
+      "rmse_proj_blend": 14.426129273587748,
+      "rmse_proj_final": 15.1988195875756
+    },
+    {
+      "mae_proj_blend": 12.096294758317782,
+      "mae_proj_final": 12.675275328405291,
+      "n": 1,
+      "remaining_bucket": 23,
+      "rmse_proj_blend": 12.096294758317782,
+      "rmse_proj_final": 12.675275328405291
+    },
+    {
+      "mae_proj_blend": 6.776716065978633,
+      "mae_proj_final": 8.751503249615581,
+      "n": 1,
+      "remaining_bucket": 13,
+      "rmse_proj_blend": 6.776716065978633,
+      "rmse_proj_final": 8.751503249615581
+    },
+    {
+      "mae_proj_blend": 5.712539244156261,
+      "mae_proj_final": 2.8723554999388625,
+      "n": 1,
+      "remaining_bucket": 3,
+      "rmse_proj_blend": 5.712539244156261,
+      "rmse_proj_final": 2.8723554999388625
+    },
+    {
+      "mae_proj_blend": 3.8010243819874745,
+      "mae_proj_final": 0.06802925816299421,
+      "n": 1,
+      "remaining_bucket": 1,
+      "rmse_proj_blend": 3.8010243819874745,
+      "rmse_proj_final": 0.06802925816299421
+    },
+    {
+      "mae_proj_blend": 11.0,
+      "mae_proj_final": 11.0,
+      "n": 1,
+      "remaining_bucket": 0,
+      "rmse_proj_blend": 11.0,
+      "rmse_proj_final": 11.0
+    }
+  ],
+  "date": "2026-04-06",
+  "full_game_only": true,
+  "mae_proj_blend": 17.934711071470566,
+  "mae_proj_final": 17.3546142747379,
+  "n_games": 1,
+  "n_projections": 19,
+  "n_settled": 19,
+  "projections_path": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\live_lens_projections_2026-04-06.jsonl",
+  "results_path": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\daily_results\\results_2026-04-06.csv",
+  "rmse_proj_blend": 19.408893334597607,
+  "rmse_proj_final": 18.955063333415733,
+  "status": "ok"
+}

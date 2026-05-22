@@ -1,0 +1,12 @@
+﻿{
+    "date":  "2026-05-18",
+    "baseUrl":  "http://127.0.0.1:5000",
+    "artifactsDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-18\\20260518_130944\\migration",
+    "jsonMode":  true,
+    "skipTests":  false,
+    "skipSmoke":  false,
+    "skipMLB":  false,
+    "skipNBA":  false,
+    "skipNHL":  false,
+    "skipWNBA":  false
+}

@@ -1,0 +1,35 @@
+﻿{
+    "sport":  "mlb",
+    "date":  "2026-05-22",
+    "refreshedAtUtc":  "2026-05-22T17:22:50.4297217Z",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2",
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_MLB",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data",
+    "copiedArtifactCount":  16,
+    "artifactGroups":  {
+                           "daily":  10,
+                           "eval":  4,
+                           "live_lens":  0,
+                           "market":  0,
+                           "raw":  0,
+                           "other":  2
+                       },
+    "copiedArtifacts":  [
+                            "daily\\daily_summary_2026_05_22.json",
+                            "daily\\daily_summary_2026_05_22_profile_bundle.json",
+                            "daily\\daily_summary_2026_05_22_locked_policy.json",
+                            "daily\\daily_summary_2026_05_22_hr_targets.json",
+                            "daily\\daily_summary_2026_05_22_rfi_targets.json",
+                            "daily\\ladders\\daily_ladders_2026_05_22.json",
+                            "daily\\top_props\\daily_top_props_2026_05_22.json",
+                            "daily\\ops\\daily_ops_2026_05_22.json",
+                            "tuning\\live_prop_ranking\\default.json",
+                            "..\\sim_engine\\live_prop_ranking.py",
+                            "daily\\snapshots\\2026-05-22",
+                            "daily\\sims\\2026-05-22",
+                            "eval\\seasons\\2026\\season_eval_manifest.json",
+                            "eval\\seasons\\2026\\season_betting_cards_retuned_manifest.json",
+                            "eval\\seasons\\2026\\season_betting_cards_retuned_hrr_manifest.json",
+                            "eval\\seasons\\2026\\betting_day_payloads_retuned\\season_betting_day_2026_05_22.json"
+                        ]
+}

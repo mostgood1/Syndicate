@@ -1,0 +1,14 @@
+﻿{
+    "date":  "2026-05-18",
+    "baseUrl":  "",
+    "artifactsDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\wrapper_smoke_after_gate_fix",
+    "jsonMode":  false,
+    "skipTests":  true,
+    "skipSmoke":  true,
+    "skipNFL":  false,
+    "skipNCAAF":  false,
+    "skipMLB":  true,
+    "skipNBA":  true,
+    "skipNHL":  true,
+    "skipWNBA":  true
+}

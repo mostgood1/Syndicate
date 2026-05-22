@@ -1,0 +1,16 @@
+﻿{
+    "date":  "2026-05-18",
+    "runDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-18\\20260518_173808",
+    "skipped":  {
+                    "sourceUpdates":  false,
+                    "refreshGate":  false,
+                    "mlb":  false,
+                    "nba":  false,
+                    "nhl":  false,
+                    "wnba":  false,
+                    "nfl":  false,
+                    "ncaaf":  false,
+                    "ncaab":  false
+                },
+    "dryRun":  true
+}

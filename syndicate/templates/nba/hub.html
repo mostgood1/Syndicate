@@ -1,0 +1,34 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | NBA{% endblock %}
+{% block page_title %}NBA Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/nba', title='NBA is now running a real stored-date lane', status='In progress', body='NBA now has cards, picks, props-adjacent ranked boards, live lens, season betting-card routes, recap surfaces, a real hub, and a stored-date daily archive backed by processed slate artifacts rather than a static placeholder.', action_href='/nba/cards?date=' ~ today_date, action_label='Open NBA cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Stored daily slates', title='Recent NBA processed dates', body='The hub now surfaces stored NBA slate dates already present in the source repo, so historical dates can launch the daily archive, cards, picks, props, and live-lens family from real processed artifacts.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="Available NBA slates">
+    {% for slate_date in recent_slates %}
+      <article class="sport-card">
+        <div class="section-label">Stored slate</div>
+        <h3>{{ slate_date }}</h3>
+        <p>Open the daily archive, betting-card, recap, feature catalog, cards board, picks board, props board, or live-lens board for this stored NBA date.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/nba/archive?date={{ slate_date }}">Daily archive</a>
+          <a class="cards-nav-pill" href="/nba/season/{{ slate_date[:4] }}/betting-card?profile=retuned&date={{ slate_date }}">Betting Card</a>
+          <a class="cards-nav-pill" href="/nba/season/{{ slate_date[:4] }}/reconciliation?date={{ slate_date }}&profile=retuned">Recap</a>
+          <a class="cards-nav-pill" href="/nba/features?date={{ slate_date }}&profile=retuned">Features</a>
+          <a class="cards-nav-pill" href="/nba/cards?date={{ slate_date }}">Cards</a>
+          <a class="cards-nav-pill" href="/nba/picks?date={{ slate_date }}">Picks</a>
+          <a class="cards-nav-pill" href="/nba/props?date={{ slate_date }}">Props</a>
+          <a class="cards-nav-pill" href="/nba/season/{{ slate_date[:4] }}/live-lens?date={{ slate_date }}&profile=retuned">Live Lens</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}

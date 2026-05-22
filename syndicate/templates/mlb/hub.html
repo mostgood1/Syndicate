@@ -1,0 +1,35 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | MLB{% endblock %}
+{% block page_title %}MLB Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/mlb', title='MLB is the reference migration module', status='Active', body='The target is full MLB-BettingV2 usability inside Syndicate. The hub should launch real current workflows, not just expose a route list.' , action_href='/mlb/cards?date=' ~ launch_date, action_label='Open MLB cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Current launch points', title='MLB hub now follows real current-day workflows', body='The primary launch links target today first, while the surrounding route groups still expose the stored artifact lanes that back historical review and archive navigation.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="MLB route groups">
+    {% for group in route_groups %}
+      <article class="sport-card">
+        <div class="section-label">{{ group.eyebrow }}</div>
+        <h3>{{ group.title }}</h3>
+        <p>{{ group.body }}</p>
+        <div class="action-row">
+          {% for link in group.links %}
+            <a class="cards-nav-pill" href="{{ link.href }}">{{ link.label }}</a>
+          {% endfor %}
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+
+  {% if profiles %}
+    {% with eyebrow='Betting card coverage', title='Available official card profiles', body='Syndicate should keep the official betting-card lane usable across the same stored profiles that exist in the source repo.', list_items=profiles | map(attribute='label') | list %}
+      {% include 'shared/_content_panel.html' %}
+    {% endwith %}
+  {% endif %}
+{% endblock %}

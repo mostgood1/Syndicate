@@ -1,0 +1,5 @@
+{% if game.card_variant == 'mlb_main' %}
+  {% include 'shared/_game_card_mlb.html' %}
+{% else %}
+  {% include 'shared/_game_card_generic.html' %}
+{% endif %}

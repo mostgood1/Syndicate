@@ -1,0 +1,18 @@
+{
+  "bookmakers": "draftkings,fanduel",
+  "count": 1,
+  "date": "2026-04-06",
+  "lines": {
+    "401856600": {
+      "book": "DraftKings",
+      "event_id": "401856600",
+      "last_update": "2026-04-07T03:09:35Z",
+      "provider_event_id": "479832d80b884a38e48c830266b6238e",
+      "spread_away": 7.0,
+      "spread_home": -7.0,
+      "total": 132.5
+    }
+  },
+  "source": "local_raw_outputs",
+  "status": "ok"
+}

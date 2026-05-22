@@ -1,0 +1,31 @@
+{
+  "created_utc": "2026-02-08T15:32:30Z",
+  "season": 2025,
+  "week": 22,
+  "bundle_dir": "calibration_bundles/2025_wk22_20260208_153230Z",
+  "params": {
+    "sigma_lookback": 6,
+    "prob_lookback": 8,
+    "totals_weeks": 8
+  },
+  "files": {
+    "sigma": {
+      "src": "sigma_calibration.json",
+      "dst": "calibration_bundles/2025_wk22_20260208_153230Z/sigma_calibration.json",
+      "exists": true,
+      "sha256": "07baa95a5b005043b2eca54c179df8ca7bd5610f34ed41ce0d7068a3ab5a3135"
+    },
+    "totals": {
+      "src": "totals_calibration.json",
+      "dst": "calibration_bundles/2025_wk22_20260208_153230Z/totals_calibration.json",
+      "exists": true,
+      "sha256": "6674bf9d09a2e08389db9a6b610ffaca7b78fe7d5d4e515d0204035dc516d0c2"
+    },
+    "prob": {
+      "src": "prob_calibration.json",
+      "dst": "calibration_bundles/2025_wk22_20260208_153230Z/prob_calibration.json",
+      "exists": true,
+      "sha256": "5253ae9d26282539eaac2937dd7657793ee68e39d190eb08337211cac9d56805"
+    }
+  }
+}

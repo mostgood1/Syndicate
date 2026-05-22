@@ -1,0 +1,4 @@
+type,confidence,ev_pct,odds,home_team,away_team,game_date,season,week
+MONEYLINE,High,160.0,160,New England Patriots,Los Angeles Chargers,2026-01-11,2025,19
+SPREAD,High,13.964735199442767,-110,New England Patriots,Los Angeles Chargers,2026-01-11,2025,19
+TOTAL,High,28.239313103391595,-110,New England Patriots,Los Angeles Chargers,2026-01-11,2025,19

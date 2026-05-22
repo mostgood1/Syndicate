@@ -1,0 +1,871 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate{% endblock %}
+{% block page_title %}Syndicate Home{% endblock %}
+
+{% block extra_head %}
+  <style>
+    .syndicate-home-shell {
+      width: min(1560px, calc(100vw - 20px));
+      padding-top: 14px;
+    }
+
+    .home-board {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .home-topbar,
+    .sport-stack-card {
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(12, 24, 39, 0.96), rgba(7, 15, 26, 0.99));
+      box-shadow: var(--cards-shadow);
+    }
+
+    .home-topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+      padding: 1rem 1.2rem;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .home-topbar__brand {
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .home-topbar__controls {
+      display: grid;
+      gap: 0.7rem;
+      justify-items: end;
+    }
+
+    .home-topbar__title {
+      margin: 0;
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      font-size: clamp(1.25rem, 2vw, 1.7rem);
+      letter-spacing: -0.04em;
+    }
+
+    .home-topbar__meta {
+      color: rgba(237, 244, 251, 0.68);
+      font-size: 0.92rem;
+    }
+
+    .home-topbar__tracker {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      margin-top: 0.4rem;
+    }
+
+    .home-topbar__tracker-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      min-height: 28px;
+      padding: 0.12rem 0.62rem;
+      border-radius: 999px;
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(237, 244, 251, 0.78);
+      font-size: 0.78rem;
+    }
+
+    .home-topbar__nav {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .home-topbar__date-form {
+      display: flex;
+      gap: 0.55rem;
+      align-items: end;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .home-topbar__date-field {
+      display: grid;
+      gap: 0.25rem;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(154, 243, 222, 0.82);
+    }
+
+    .home-topbar__date-input {
+      min-height: 36px;
+      min-width: 166px;
+      padding: 0 0.72rem;
+      border-radius: 999px;
+      border: 1px solid rgba(132, 166, 196, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(237, 244, 251, 0.94);
+      font: inherit;
+    }
+
+    .home-topbar__date-input::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      filter: invert(0.96);
+    }
+
+    .home-topbar__date-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .home-topbar__selection {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 0 0.72rem;
+      border-radius: 999px;
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(237, 244, 251, 0.78);
+      font-size: 0.82rem;
+    }
+
+    .home-topbar__nav .cards-nav-pill {
+      min-height: 36px;
+      padding: 0 0.9rem;
+    }
+
+    .sport-stack {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .sport-stack-card {
+      display: grid;
+      gap: 0.72rem;
+      padding: 0.85rem 0.95rem 0.95rem;
+    }
+
+    .sport-stack-card__header {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+      gap: 0.8rem;
+      align-items: center;
+    }
+
+    .sport-stack-card__identity {
+      display: grid;
+      gap: 0.15rem;
+    }
+
+    .sport-stack-card__identity h3 {
+      font-size: clamp(1.05rem, 1.55vw, 1.3rem);
+    }
+
+    .sport-stack-card__statusline {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      align-items: center;
+      color: rgba(237, 244, 251, 0.7);
+    }
+
+    .sport-stack-card__statusline .sport-board-chip,
+    .sport-stack-card__statusline .status-pill {
+      min-height: 28px;
+      padding: 0.08rem 0.58rem;
+    }
+
+    .sport-stack-card__stats {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-content: center;
+    }
+
+    .sport-stack-stat {
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      min-width: auto;
+      padding: 0.42rem 0.62rem;
+      border-radius: 999px;
+      border: 1px solid rgba(132, 166, 196, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .sport-stack-stat__label {
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(154, 243, 222, 0.82);
+    }
+
+    .sport-stack-stat__value {
+      color: rgba(237, 244, 251, 0.92);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .sport-rails {
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .sport-scroll-row {
+      display: grid;
+      gap: 0.55rem;
+      padding: 0.85rem 0.9rem 0.92rem;
+      border-radius: 18px;
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .sport-scroll-row--games {
+      border-color: rgba(90, 208, 255, 0.22);
+      background: linear-gradient(135deg, rgba(12, 44, 69, 0.94), rgba(8, 18, 31, 0.98));
+    }
+
+    .sport-scroll-row--props {
+      border-color: rgba(255, 192, 122, 0.2);
+      background: linear-gradient(135deg, rgba(54, 36, 18, 0.92), rgba(20, 12, 6, 0.98));
+    }
+
+    .sport-scroll-row__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.8rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .sport-scroll-row__title {
+      display: grid;
+      gap: 0.12rem;
+    }
+
+    .sport-scroll-row__meta,
+    .sport-scroll-row__links,
+    .sport-board-rail,
+    .sport-stack-card__feature-nav {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .sport-scroll-row__headline {
+      margin: 0;
+      font-size: 0.98rem;
+    }
+
+    .sport-scroll-row__tag {
+      font-size: 0.74rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(154, 243, 222, 0.82);
+    }
+
+    .sport-scroll-row__kicker {
+      margin: 0;
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(244, 246, 255, 0.56);
+    }
+
+    .sport-scroll-row__summary {
+      margin: 0;
+      color: rgba(237, 244, 251, 0.74);
+      font-size: 0.76rem;
+      line-height: 1.28;
+    }
+
+    .sport-scroll-row__links .cards-nav-pill,
+    .sport-stack-card__feature-nav .cards-nav-pill {
+      min-height: 30px;
+      padding: 0 0.72rem;
+      font-size: 0.72rem;
+    }
+
+    .sport-scroll-row__strip {
+      display: flex;
+      gap: 0.7rem;
+      overflow-x: auto;
+      padding: 0.12rem 0.1rem 0.45rem;
+      scroll-snap-type: x proximity;
+    }
+
+    .sport-scroll-row__strip::-webkit-scrollbar {
+      height: 10px;
+    }
+
+    .sport-scroll-row__strip::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 999px;
+    }
+
+    .sport-scroll-row__strip::-webkit-scrollbar-thumb {
+      background: rgba(154, 243, 222, 0.3);
+      border-radius: 999px;
+    }
+
+    .sport-scroll-row--mlb-embed {
+      gap: 0.8rem;
+    }
+
+    .sport-embed-shell {
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      background: linear-gradient(180deg, rgba(10, 20, 32, 0.95), rgba(7, 15, 26, 0.98));
+      overflow: hidden;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .sport-embed-frame {
+      display: block;
+      width: 100%;
+      min-height: 720px;
+      border: 0;
+      background: transparent;
+    }
+
+    .sport-embed-frame--mlb-compact-home {
+      min-height: 272px;
+    }
+
+    .sport-embed-frame--mlb-props {
+      min-height: 520px;
+    }
+
+    .sport-board-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.28rem 0.62rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(244, 246, 255, 0.82);
+      font-size: 0.8rem;
+      letter-spacing: 0.02em;
+    }
+
+    .sport-board-rail__chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: rgba(244, 246, 255, 0.86);
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .sport-compact-card {
+      display: grid;
+      gap: 0.55rem;
+      align-content: start;
+      min-width: 0;
+      width: min(22rem, calc(100vw - 6rem));
+      flex: 0 0 min(22rem, calc(100vw - 6rem));
+      scroll-snap-align: start;
+      padding: 0.78rem 0.82rem;
+      border-radius: 18px;
+      border: 1px solid rgba(132, 166, 196, 0.16);
+      background: linear-gradient(180deg, rgba(13, 28, 42, 0.96), rgba(8, 17, 28, 0.92));
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .sport-compact-card__scoreboard {
+      display: grid;
+      gap: 0.48rem;
+    }
+
+    .sport-compact-card__statusline {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.55rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .sport-compact-card__badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 0.62rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #9af3de, #ffbf69);
+      color: #08131f;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .sport-compact-card__clock {
+      color: rgba(191, 208, 223, 0.92);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .sport-compact-card__teams {
+      display: grid;
+      gap: 0.42rem;
+      padding: 0.64rem 0.72rem;
+      border-radius: 14px;
+      background: rgba(5, 13, 22, 0.28);
+      border: 1px solid rgba(132, 166, 196, 0.12);
+    }
+
+    .sport-compact-card__team-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    .sport-compact-card__team-name {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(237, 244, 251, 0.96);
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .sport-compact-card__team-logo {
+      width: 1.1rem;
+      height: 1.1rem;
+      object-fit: contain;
+      flex: 0 0 auto;
+      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
+    }
+
+    .sport-compact-card__team-score {
+      color: rgba(237, 244, 251, 0.98);
+      font-size: 1.22rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .sport-compact-card__team-score--empty {
+      color: rgba(147, 169, 188, 0.7);
+    }
+
+    .sport-compact-card__ribbon {
+      display: grid;
+      gap: 0.22rem;
+      min-width: 0;
+      padding: 0.58rem 0.7rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 196, 115, 0.18);
+      background: rgba(255, 196, 115, 0.08);
+    }
+
+    .sport-compact-card__score-kind {
+      color: rgba(147, 169, 188, 0.9);
+      font-size: 0.64rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .sport-compact-card__ribbon-label {
+      color: rgba(147, 169, 188, 0.92);
+      font-size: 0.64rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .sport-compact-card__top {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.6rem;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+
+    .sport-compact-card__title {
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: rgba(244, 246, 255, 0.96);
+      letter-spacing: -0.02em;
+    }
+
+    .sport-compact-card__detail {
+      font-size: 0.74rem;
+      color: rgba(154, 243, 222, 0.82);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .sport-compact-card__summary {
+      color: rgba(237, 244, 251, 0.74);
+      font-size: 0.96rem;
+      line-height: 1.3;
+    }
+
+    .sport-compact-card__chip-row {
+      display: flex;
+      gap: 0.42rem;
+      flex-wrap: wrap;
+    }
+
+    .sport-compact-card__chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.24rem;
+      padding: 0.24rem 0.52rem;
+      border-radius: 999px;
+      border: 1px solid rgba(154, 243, 222, 0.18);
+      background: rgba(154, 243, 222, 0.08);
+      color: rgba(224, 244, 239, 0.92);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .sport-compact-card__link {
+      color: rgba(154, 243, 222, 0.9);
+      text-decoration: none;
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    .sport-compact-card__value {
+      color: rgba(255, 219, 165, 0.92);
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .sport-compact-card__meta {
+      color: rgba(191, 208, 223, 0.92);
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .sport-compact-card__signal-box {
+      display: grid;
+      gap: 0.3rem;
+      min-width: 0;
+      padding: 0.62rem 0.72rem;
+      border-radius: 12px;
+      border: 1px solid rgba(154, 243, 222, 0.16);
+      background: rgba(154, 243, 222, 0.06);
+      color: rgba(191, 208, 223, 0.94);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .sport-compact-card__signal-box--props {
+      border-color: rgba(255, 196, 115, 0.18);
+      background: rgba(255, 196, 115, 0.08);
+    }
+
+    .sport-compact-card__signal-box span {
+      display: block;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .sport-stack-card__footer {
+      color: rgba(237, 244, 251, 0.62);
+      font-size: 0.86rem;
+    }
+
+    @media (max-width: 780px) {
+      .home-topbar,
+      .sport-stack-card__header {
+        grid-template-columns: 1fr;
+      }
+
+      .home-topbar__controls {
+        justify-items: stretch;
+      }
+
+      .home-topbar {
+        position: static;
+      }
+
+      .home-topbar__date-form,
+      .home-topbar__date-actions {
+        justify-content: flex-start;
+      }
+
+      .sport-stack-card__stats,
+      .sport-scroll-row__header {
+        justify-content: flex-start;
+        align-items: flex-start;
+      }
+
+      .sport-compact-card {
+        width: min(19rem, calc(100vw - 5rem));
+        flex-basis: min(19rem, calc(100vw - 5rem));
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <section class="home-board">
+    {% set selected_home_date = request.args.get('date', '') %}
+    {% set home_href = '/?date=' ~ selected_home_date if selected_home_date else '/' %}
+    {% set admin_token = request.args.get('admin_token', '') %}
+    {% set dated_home_reset_href = '/?admin_token=' ~ admin_token if admin_token else '/' %}
+    <header class="home-topbar" aria-label="Syndicate home navigation">
+      <div class="home-topbar__brand">
+        <div class="section-label">Syndicate</div>
+        <h1 class="home-topbar__title">Cross-sport daily board</h1>
+        <div class="home-topbar__meta">Horizontal game and props rows with full compact-card scroll for the active slate.</div>
+        {% if tracker_sports %}
+          <div class="home-topbar__tracker" aria-label="Migration tracker summary">
+            {% for sport in tracker_sports %}
+              {% if sport.phase %}
+                <span class="home-topbar__tracker-chip">{{ sport.name }}: {{ sport.phase }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="home-topbar__controls">
+        <form class="home-topbar__date-form" method="get" action="/" aria-label="Select home board date">
+          {% if admin_token %}
+            <input type="hidden" name="admin_token" value="{{ admin_token }}">
+          {% endif %}
+          <label class="home-topbar__date-field" for="home-board-date">Board Date</label>
+          <input id="home-board-date" class="home-topbar__date-input" type="date" name="date" value="{{ selected_home_date }}">
+          <div class="home-topbar__date-actions">
+            {% if selected_home_date %}
+              <span class="home-topbar__selection">Selected: {{ selected_home_date }}</span>
+            {% endif %}
+            <button class="cards-nav-pill" type="submit">Load Date</button>
+            {% if selected_home_date %}
+              <a class="cards-nav-pill" href="{{ dated_home_reset_href }}">Use Today</a>
+            {% endif %}
+          </div>
+        </form>
+
+        <nav class="home-topbar__nav" aria-label="Sports">
+          <a class="cards-nav-pill cards-nav-pill--active" href="{{ home_href }}">Home</a>
+          {% for sport in syndicate_sports %}
+            {% set sport_href = sport.primary_href or ('/' ~ sport.slug) %}
+            {% if selected_home_date and sport.slug in ['mlb', 'nba', 'nhl', 'wnba', 'ncaab'] %}
+              {% set sport_href = sport_href ~ '?date=' ~ selected_home_date %}
+            {% endif %}
+            <a class="cards-nav-pill" href="{{ sport_href }}">{{ sport.name }}</a>
+          {% endfor %}
+          {% if admin_token %}
+            <a class="cards-nav-pill" href="/ops/odds-refresh?admin_token={{ admin_token }}">Ops</a>
+          {% endif %}
+        </nav>
+      </div>
+    </header>
+
+    <div id="syndicate-home-sport-stack">
+      {% include "shared/_home_sport_stack.html" %}
+    </div>
+  </section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    (function () {
+      const stackRoot = document.getElementById('syndicate-home-sport-stack');
+      if (!window.SyndicatePolling) {
+        return;
+      }
+
+      function buildNextRoot(html) {
+        const nextRoot = document.createElement('div');
+        nextRoot.innerHTML = html;
+        return nextRoot;
+      }
+
+      function syncElementAttributes(currentNode, nextNode) {
+        if (!(currentNode instanceof Element) || !(nextNode instanceof Element)) {
+          return;
+        }
+        const nextNames = new Set(nextNode.getAttributeNames());
+        currentNode.getAttributeNames().forEach(function (name) {
+          if (!nextNames.has(name)) {
+            currentNode.removeAttribute(name);
+          }
+        });
+        nextNames.forEach(function (name) {
+          const nextValue = nextNode.getAttribute(name);
+          if (currentNode.getAttribute(name) !== nextValue) {
+            currentNode.setAttribute(name, nextValue);
+          }
+        });
+      }
+
+      function preservePersistentNodes(html) {
+        return buildNextRoot(html);
+      }
+
+      function patchLiveNode(currentNode, nextNode) {
+        if (!currentNode || !nextNode) {
+          return currentNode;
+        }
+        if (currentNode.nodeType !== nextNode.nodeType) {
+          const replacement = nextNode.cloneNode(true);
+          currentNode.replaceWith(replacement);
+          return replacement;
+        }
+        if (currentNode.nodeType === Node.TEXT_NODE || currentNode.nodeType === Node.COMMENT_NODE) {
+          if (currentNode.textContent !== nextNode.textContent) {
+            currentNode.textContent = nextNode.textContent;
+          }
+          return currentNode;
+        }
+        if (!(currentNode instanceof Element) || !(nextNode instanceof Element)) {
+          return currentNode;
+        }
+        if (currentNode.tagName !== nextNode.tagName) {
+          const replacement = nextNode.cloneNode(true);
+          currentNode.replaceWith(replacement);
+          return replacement;
+        }
+
+        const currentKey = currentNode.getAttribute('data-home-preserve-key') || '';
+        const nextKey = nextNode.getAttribute('data-home-preserve-key') || '';
+        if (currentKey || nextKey) {
+          if (!currentKey || currentKey !== nextKey) {
+            const replacement = nextNode.cloneNode(true);
+            currentNode.replaceWith(replacement);
+            return replacement;
+          }
+          const currentSrc = currentNode.getAttribute('data-home-preserve-src') || '';
+          const nextSrc = nextNode.getAttribute('data-home-preserve-src') || '';
+          syncElementAttributes(currentNode, nextNode);
+          if (!currentSrc || !nextSrc || currentSrc === nextSrc) {
+            return currentNode;
+          }
+          const replacement = nextNode.cloneNode(true);
+          currentNode.replaceWith(replacement);
+          return replacement;
+        }
+
+        syncElementAttributes(currentNode, nextNode);
+        patchChildElements(currentNode, nextNode);
+        return currentNode;
+      }
+
+      function patchChildElements(currentParent, nextParent) {
+        if (!currentParent || !nextParent) {
+          return;
+        }
+        const currentChildren = Array.from(currentParent.children);
+        const nextChildren = Array.from(nextParent.children);
+        if (!currentChildren.length && !nextChildren.length) {
+          if (currentParent.innerHTML !== nextParent.innerHTML) {
+            currentParent.innerHTML = nextParent.innerHTML;
+          }
+          return;
+        }
+        nextChildren.forEach(function (nextChild, index) {
+          const currentChild = currentChildren[index];
+          if (!currentChild) {
+            currentParent.appendChild(nextChild.cloneNode(true));
+            return;
+          }
+          patchLiveNode(currentChild, nextChild);
+        });
+        while (currentParent.children.length > nextChildren.length) {
+          currentParent.removeChild(currentParent.lastElementChild);
+        }
+      }
+
+      function replaceStackRoot(nextRoot) {
+        if (!stackRoot || !nextRoot) {
+          return;
+        }
+        patchChildElements(stackRoot, nextRoot);
+      }
+
+      function applyEmbedHeight(event) {
+        const data = event && event.data;
+        if (!data || data.type !== 'syndicate:mlb-embed-height' || !data.key || !data.height) {
+          return;
+        }
+        const shell = stackRoot ? stackRoot.querySelector('[data-home-preserve-key="' + CSS.escape(String(data.key)) + '"]') : null;
+        if (!shell) {
+          return;
+        }
+        const frame = shell.querySelector('iframe');
+        if (!frame) {
+          return;
+        }
+        const height = Number(data.height);
+        if (!Number.isFinite(height) || height <= 0) {
+          return;
+        }
+        let minHeight = 520;
+        if (String(data.key) === 'home-cards') {
+          minHeight = 272;
+        } else if (String(data.key).indexOf('props') >= 0) {
+          minHeight = 420;
+        }
+        frame.style.height = Math.max(minHeight, Math.ceil(height) + 8) + 'px';
+      }
+
+      window.addEventListener('message', applyEmbedHeight);
+
+      async function hydrateHomeRails() {
+        if (!stackRoot) {
+          return;
+        }
+        const url = new URL('/api/home', window.location.origin);
+        const currentParams = new URLSearchParams(window.location.search || '');
+        const selectedDate = currentParams.get('date');
+        if (selectedDate) {
+          url.searchParams.set('date', selectedDate);
+        }
+        url.searchParams.set('_poll_ts', String(Date.now()));
+        const response = await window.fetch(url.toString(), {
+          headers: {
+            'Accept': 'application/json',
+          },
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          throw new Error('Failed to refresh home rails.');
+        }
+        const payload = await response.json();
+        if (!payload || payload.ok !== true || typeof payload.html !== 'string') {
+          throw new Error('Invalid home rails payload.');
+        }
+        replaceStackRoot(preservePersistentNodes(payload.html));
+      }
+
+      void hydrateHomeRails();
+
+      window.SyndicatePolling.start({
+        intervalMs: 15000,
+        refreshOnVisible: true,
+        refreshOnFocus: true,
+        onTick: hydrateHomeRails,
+      });
+    })();
+  </script>
+{% endblock %}

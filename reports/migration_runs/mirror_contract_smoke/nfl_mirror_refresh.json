@@ -1,0 +1,19 @@
+﻿{
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\NFL-Betting",
+    "sourceDataRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\NFL-Betting\\nfl_compare\\data",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\nfl_source",
+    "copiedArtifacts":  [
+                            "current_week.json",
+                            "calibration_active.json",
+                            "prob_calibration.json",
+                            "sigma_calibration.json",
+                            "totals_calibration.json",
+                            "upcoming_recs_2025_wk17.csv",
+                            "upcoming_recs_2025_wk17_publish.csv",
+                            "upcoming_recs_2025_wk19.csv",
+                            "upcoming_recs_2025_wk19_publish.csv",
+                            "upcoming_recs_2025_wk21.csv",
+                            "manifests"
+                        ]
+}
+

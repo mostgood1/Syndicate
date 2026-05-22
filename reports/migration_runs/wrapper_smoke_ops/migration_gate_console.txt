@@ -1,0 +1,28 @@
+﻿Migration gate: PASS
+
+Audit: PASS
+  Allowed findings: 4
+  Actual findings: 4
+
+audit: PASS
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe scripts/audit_migration.py --format json
+  Output: [
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/mlb.py",
+    "line": 242,
+    "summary": "Source shell route points at mlb/cards_source.js.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nba.py",
+    "line": 136,
+    "summary": "Source shell route points at nba/cards_source.html.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nhl.py",
+    ...
+

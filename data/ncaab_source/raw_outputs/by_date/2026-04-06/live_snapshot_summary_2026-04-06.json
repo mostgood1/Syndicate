@@ -1,0 +1,41 @@
+{
+  "bad_lines": 0,
+  "cadence_avg_seconds": {
+    "live_lines": 231.90138427813847,
+    "live_pbp_stats": 46.98471307478888,
+    "live_state": 579.2459456587947
+  },
+  "counts_by_endpoint": {
+    "live_lines": 181,
+    "live_pbp_stats": 176,
+    "live_state": 130
+  },
+  "date": "2026-04-06",
+  "distinct_event_ids": 3,
+  "endpoint_time_range": {
+    "live_lines": {
+      "first_ts": "2026-04-06T15:34:43.241484Z",
+      "last_ts": "2026-04-07T03:10:25.490654Z"
+    },
+    "live_pbp_stats": {
+      "first_ts": "2026-04-07T00:50:31.152162Z",
+      "last_ts": "2026-04-07T03:10:49.308858Z"
+    },
+    "live_state": {
+      "first_ts": "2026-04-06T15:34:40.677123Z",
+      "last_ts": "2026-04-07T12:20:03.404113Z"
+    }
+  },
+  "input": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\live_snapshots\\live_2026-04-06.jsonl",
+  "live_lines": {
+    "events_with_any_line": 1,
+    "line_change_events": 1,
+    "line_change_rows": 165
+  },
+  "live_state": {
+    "events_with_score": 1,
+    "events_with_score_changes": 1
+  },
+  "read_lines": 487,
+  "status": "ok"
+}

@@ -1,0 +1,91 @@
+.standalone-app-header {
+  width: min(1640px, calc(100vw - 16px));
+  margin: 0 auto 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--cards-line);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.94), rgba(8, 18, 30, 0.98));
+  box-shadow: var(--cards-shadow);
+}
+
+.standalone-app-header__inner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.standalone-app-header__brand {
+  display: grid;
+  gap: 4px;
+}
+
+.standalone-app-header__eyebrow {
+  color: var(--cards-accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.standalone-app-header__title {
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  font-size: clamp(18px, 2vw, 24px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--cards-text);
+}
+
+.standalone-app-header__meta {
+  color: var(--cards-text-soft);
+  font-size: 12px;
+}
+
+.standalone-app-header__nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.standalone-app-header__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--cards-line-strong);
+  border-radius: 999px;
+  background: rgba(4, 12, 20, 0.72);
+  color: var(--cards-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.standalone-app-header__link:hover,
+.standalone-app-header__link:focus-visible {
+  border-color: rgba(154, 243, 222, 0.36);
+  color: var(--cards-text);
+}
+
+.standalone-app-header__link--active {
+  background: linear-gradient(135deg, var(--cards-accent), var(--cards-accent-strong));
+  border-color: rgba(154, 243, 222, 0.44);
+  color: #08211d;
+}
+
+@media (max-width: 767px) {
+  .standalone-app-header {
+    width: min(100vw - 16px, 100%);
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .standalone-app-header__nav {
+    justify-content: flex-start;
+  }
+}

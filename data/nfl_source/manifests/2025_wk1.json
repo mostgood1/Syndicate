@@ -1,0 +1,543 @@
+{
+  "artifacts": [
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-17T22:50:13Z",
+      "note": null,
+      "rel_path": "games.csv",
+      "rows": null,
+      "sha256": "53aa19d0ae893afe3cf196c02c83dc21cf0fbaa088fb6f51c5e1e664c85215fd",
+      "size_bytes": 130496
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:27:24Z",
+      "note": null,
+      "rel_path": "lines.csv",
+      "rows": null,
+      "sha256": "05d60942606a997a2fdf9a32379ba29446d19ae73e33ad56c03998c0b4487ecd",
+      "size_bytes": 26468
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:27:30Z",
+      "note": null,
+      "rel_path": "predictions.csv",
+      "rows": null,
+      "sha256": "cfa1fb897538842878d712500aef62b050db4dfd92151a97aa24e4bf6a6f5ff0",
+      "size_bytes": 17077
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:27:35Z",
+      "note": null,
+      "rel_path": "predictions_week.csv",
+      "rows": null,
+      "sha256": "e43c04652428746d5a7c43dcfb020a8ec97cfc74c7de868064e12969d2eb4547",
+      "size_bytes": 16411
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:28:23Z",
+      "note": null,
+      "rel_path": "predictions_locked.csv",
+      "rows": null,
+      "sha256": "82597d7b7b5cce602a5b066950fe335dec7202eaf4b9469d06e6860ac4f5c619",
+      "size_bytes": 462477
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2025-09-02T15:11:38Z",
+      "note": null,
+      "rel_path": "nfl_team_assets.json",
+      "rows": null,
+      "sha256": "ed3b2bf99ca1f7f0774330ec4da111210bd0141920b6ec3f5883ab20b7bb1298",
+      "size_bytes": 3155
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-17T20:35:25Z",
+      "note": null,
+      "rel_path": "pfr_drive_stats.csv",
+      "rows": null,
+      "sha256": "40a5e222ae539c99446eadb2e51d4cd89f83139ea0b2f5b813dcf96945efc99c",
+      "size_bytes": 39889
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2025-10-16T15:49:51Z",
+      "note": null,
+      "rel_path": "player_props_2025_wk1.csv",
+      "rows": null,
+      "sha256": "e451d83e9b09d52c549bc007fffd7eb8ea0eeab73008000251a35b080928a118",
+      "size_bytes": 93373
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2025-09-16T14:42:00Z",
+      "note": null,
+      "rel_path": "player_props_vs_actuals_2025_wk1.csv",
+      "rows": null,
+      "sha256": "ddac7cdcf6f3e3fba9e1fb3d768243160584173ab3a01f8d361d49cef46abad9",
+      "size_bytes": 189833
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "oddsapi_player_props_2025_wk1.csv",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "bovada_player_props_2025_wk1.csv",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "edges_player_props_2025_wk1.csv",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "edges_player_props_2025_wk1.json",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "ladder_options_2025_wk1.csv",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "ladder_options_2025_wk1.json",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "player_props_market_source_2025_wk1.json",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2025-09-18T15:07:45Z",
+      "note": null,
+      "rel_path": "bovada_game_props_2025_wk1.csv",
+      "rows": null,
+      "sha256": "317ee0020c6d1a4d036b5529e2c5580f3f8e6798975f806914a0100a1212c9b9",
+      "size_bytes": 130433
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2025-10-13T00:00:49Z",
+      "note": null,
+      "rel_path": "edges_game_props_2025_wk1.csv",
+      "rows": null,
+      "sha256": "5aef078b2a6d3bd1ac751199fae0194cc0bfd412b124cbf7edddad88dcf3b50e",
+      "size_bytes": 11775
+    },
+    {
+      "cols": null,
+      "exists": false,
+      "mtime_utc": null,
+      "note": null,
+      "rel_path": "game_props_market_source_2025_wk1.json",
+      "rows": null,
+      "sha256": null,
+      "size_bytes": null
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:29:26Z",
+      "note": null,
+      "rel_path": "sigma_calibration.json",
+      "rows": null,
+      "sha256": "65ad262b686ecf5a2c55320a7d7940d3faf2d1ee10c52915f0dbd1c948403115",
+      "size_bytes": 65
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:28:48Z",
+      "note": null,
+      "rel_path": "totals_calibration.json",
+      "rows": null,
+      "sha256": "d9cc6afb7888e7892012a1c1028d0be64e3c086f1a7324ff7be318ad3fb08a58",
+      "size_bytes": 533
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:29:33Z",
+      "note": null,
+      "rel_path": "prob_calibration.json",
+      "rows": null,
+      "sha256": "7ae01135d652894a4e1554929c3548f0c7f47266d51b061afc51d9d02dec547f",
+      "size_bytes": 323
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T18:30:24Z",
+      "note": null,
+      "rel_path": "calibration_active.json",
+      "rows": null,
+      "sha256": "07490dd419455494363da283fa46a063e250cd39019f7a71569769d311a510a8",
+      "size_bytes": 1036
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-17T21:53:33Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_probs.csv",
+      "rows": null,
+      "sha256": "67d87c1c3650e1ff3ac236713fdadc7e3da9a730c45ed57a63535b28d02761ec",
+      "size_bytes": 3438
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:57:36Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_probs_scenarios.csv",
+      "rows": null,
+      "sha256": "666a736068b5d4211f3156dd7f7f0a22ec75f856d8abb0d9ee42393e7d3c232d",
+      "size_bytes": 85412
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:57:36Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_scenario_inputs.csv",
+      "rows": null,
+      "sha256": "4c8c66ffc762912ca2f8948a622bcfa2642cb39af4e4ca673c0ce0a74c8111e5",
+      "size_bytes": 86944
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:57:36Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_scenario_deltas.csv",
+      "rows": null,
+      "sha256": "7b614e97e93e84e9aabb095ec7a1258babd53961fbef1d5831f018442234202e",
+      "size_bytes": 85720
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:57:37Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_scenario_summary.csv",
+      "rows": null,
+      "sha256": "bf681c734e8b9a1edb33e35bd01995a81b883d00f159a0bbe2a25a1a15267e45",
+      "size_bytes": 4461
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-17T21:53:33Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_quarters.csv",
+      "rows": null,
+      "sha256": "1a2bdd83503fde66c557564e4dbf9bdd2d8220c2030de338346d10fb55c891c0",
+      "size_bytes": 3371
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-17T21:53:33Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_drives.csv",
+      "rows": null,
+      "sha256": "441661ca1ff17e5817a5ed6db2e756b7bc37928a0138f0ba8b0e14c495f3b078",
+      "size_bytes": 132628
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:38:57Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_drives_scenarios.csv",
+      "rows": null,
+      "sha256": "eae44e774d1c7feef8c54875cba8ad388bf4c2bb3620a7094224255042bb3502",
+      "size_bytes": 949796
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:38:57Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_drives_scenarios_summary.csv",
+      "rows": null,
+      "sha256": "60d6e0a3402df357b331221a481bc8421f2d85a3d9a02506aa85715b57bf4f49",
+      "size_bytes": 29137
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:57:36Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_scenarios.json",
+      "rows": null,
+      "sha256": "795c3829b50e1da8a89b99711d7d18ef77e24a9f564723f896e9fd502a4a2bce",
+      "size_bytes": 18969
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T20:57:37Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/sim_scenarios_meta.json",
+      "rows": null,
+      "sha256": "76feb6e3c542751cb3da5b1949c8e26e3053deef47c977d1c642b78b16200319",
+      "size_bytes": 2348
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:02:34Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios.csv",
+      "rows": null,
+      "sha256": "9ff15fe0c85fdf9973ea907cefe76bb5740b26ef70b77d183822f95ab872555d",
+      "size_bytes": 4303252
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:02:34Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios_summary.csv",
+      "rows": null,
+      "sha256": "679e387f858d3eab3153259cfc552f98a6e2b907549767ad8968443280a8a3fa",
+      "size_bytes": 188783
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:02:34Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios_meta.json",
+      "rows": null,
+      "sha256": "1099c6bd2336b6a0d6693607793f8ca67632656ea6a2f58b9530b237ec98281b",
+      "size_bytes": 2382
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:03:42Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios_accuracy.csv",
+      "rows": null,
+      "sha256": "915e752ace927708acf61a4a02c269f85e635f4f4191f71238e713f929b167c2",
+      "size_bytes": 6861
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:03:42Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios_accuracy_by_position.csv",
+      "rows": null,
+      "sha256": "bb19493ac58ee478dfb971c9e33de8d37dd84210baa33e7ed2d6001aae9ee1a8",
+      "size_bytes": 25750
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:03:42Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios_coverage.csv",
+      "rows": null,
+      "sha256": "b6a7ad2f8c08bc5f4a0d1ce663a703d0b90dc5f6322d9ed8caeb031ecf82e90e",
+      "size_bytes": 778
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:03:42Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios_top_errors.csv",
+      "rows": null,
+      "sha256": "adb98d116d96ee59ebc09faae2b2e109a4494be0ecfa4f0fa5c40668a5ca1a94",
+      "size_bytes": 10248
+    },
+    {
+      "cols": null,
+      "exists": true,
+      "mtime_utc": "2026-01-18T21:03:42Z",
+      "note": null,
+      "rel_path": "backtests/2025_wk1/player_props_scenarios_accuracy.md",
+      "rows": null,
+      "sha256": "259b2be27005e66e09b7eb5567d4d02dd4b351ec455bcd5307e7e8029a8875e4",
+      "size_bytes": 8279
+    }
+  ],
+  "checks": {
+    "backtest_dir": "C:/Users/mostg/OneDrive/Coding/NFL-Betting/nfl_compare/data/backtests/2025_wk1",
+    "notes": [
+      "Rows/cols are recorded for CSVs when include_rows_cols=true.",
+      "This manifest is shipped-only in production; no computation at request time."
+    ],
+    "schema": {
+      "backtests/2025_wk1/player_props_scenarios.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/player_props_scenarios_accuracy.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/player_props_scenarios_accuracy_by_position.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/player_props_scenarios_coverage.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/player_props_scenarios_summary.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/player_props_scenarios_top_errors.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_drives.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_drives_scenarios.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_drives_scenarios_summary.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_probs.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_quarters.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_scenario_deltas.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_scenario_inputs.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "backtests/2025_wk1/sim_scenario_summary.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "edges_game_props_2025_wk1.csv": {
+        "exists": true,
+        "missing_columns": [
+          "market"
+        ],
+        "ok": false
+      },
+      "edges_player_props_2025_wk1.csv": {
+        "exists": false,
+        "missing_columns": [
+          "player",
+          "market",
+          "line"
+        ],
+        "ok": false
+      },
+      "games.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      },
+      "ladder_options_2025_wk1.csv": {
+        "exists": false,
+        "missing_columns": [
+          "player",
+          "market",
+          "line"
+        ],
+        "ok": false
+      },
+      "player_props_2025_wk1.csv": {
+        "exists": true,
+        "missing_columns": [],
+        "ok": true
+      }
+    }
+  },
+  "created_utc": "2026-01-18T21:03:58Z",
+  "data_dir": "C:/Users/mostg/OneDrive/Coding/NFL-Betting/nfl_compare/data",
+  "manifest_version": "1.6",
+  "season": 2025,
+  "week": 1
+}

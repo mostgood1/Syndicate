@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NBA Game Cards</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css', v=asset_version) }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='nba/cards_source.css', v=asset_version) }}" />
+</head>
+<body data-cards-base-path="/nba/cards" data-cards-api-base-path="/nba/api" data-cards-betting-card-base-path="{{ '/nba/season/' ~ date[:4] ~ '/betting-card' }}" class="cards-body cards-app-shell">
+  {% with active_sport_slug='nba', active_sport_name='NBA' %}
+    {% include 'shared/_standalone_app_header.html' %}
+  {% endwith %}
+  <div class="site-chrome">
+    <main class="site-main">
+      <div class="cards-shell cards-page-shell">
+        <header class="cards-header">
+          <div class="cards-title-row">
+            <h1>NBA Game Cards</h1>
+            <div class="cards-header-meta" id="cardsHeaderMeta">Loading slate...</div>
+          </div>
+        </header>
+
+        <section class="cards-control-card" aria-label="Slate controls">
+          <form id="controls" class="cards-date-form" onsubmit="return false;">
+            <a class="cards-nav-pill" id="cardsPrevDateLink" href="/nba/cards?date={{ date }}" rel="prev">Prev</a>
+            <span class="cards-nav-pill cards-form-pill" aria-hidden="true">Date</span>
+            <input type="date" id="datePicker" aria-label="Select slate date" title="Select slate date" />
+            <button type="button" id="applyBtn">Load</button>
+            <a class="cards-nav-pill" id="cardsNextDateLink" href="/nba/cards?date={{ date }}" rel="next">Next</a>
+            <a class="cards-nav-pill" id="cardsSeasonBettingCardLink" href="{{ '/nba/season/' ~ date[:4] ~ '/betting-card?profile=retuned&date=' ~ date }}">Betting Card</a>
+            <a class="cards-nav-pill" id="cardsPicksLink" href="/nba/picks?date={{ date }}">Picks</a>
+            <a class="cards-nav-pill" id="cardsPropsLink" href="/nba/prop-ladders?date={{ date }}">Prop Ladders</a>
+            <a class="cards-nav-pill" id="cardsLiveAuditLink" href="{{ '/nba/season/' ~ date[:4] ~ '/live-lens?date=' ~ date ~ '&profile=retuned' }}">Live Prop Audit</a>
+            <a class="cards-nav-pill" id="cardsArchiveLink" href="/nba/archive?date={{ date }}">Daily Archive</a>
+            <a class="cards-nav-pill" id="cardsHubLink" href="/nba/hub">NBA Hub</a>
+          </form>
+
+          <div class="cards-toolbar-rail">
+            <div class="cards-source-meta" id="cardsSourceMeta">Loading slate...</div>
+            <div class="cards-filters" id="cardsFilters" aria-label="Slate filters"></div>
+          </div>
+        </section>
+
+        <div id="note" class="alert hidden"></div>
+
+        <section class="cards-props-strip-shell hidden" id="cardsPropsStrip" aria-label="Live player props"></section>
+
+        <section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+          <div class="cards-loading-strip">Loading scoreboard...</div>
+        </section>
+
+        <main class="cards-grid" id="cardsGrid" aria-live="polite">
+          <div class="cards-loading-state">Loading cards...</div>
+        </main>
+      </div>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='nba/cards_source.js', v=asset_version) }}"></script>
+</body>
+</html>

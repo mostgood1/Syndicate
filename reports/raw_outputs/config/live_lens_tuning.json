@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-04-07T12:18:30.427252Z",
+  "tuning": {
+    "pace_hi": 3.725,
+    "pace_lo": 3.025,
+    "pps_hi": 1.203268765133172,
+    "pps_lo": 0.903268765133172,
+    "pbp_n_scale": 70.0,
+    "shot_proxy_ft_weight": 0.44,
+    "late_over_strength_penalty": 1.5,
+    "late_over_remaining_lo": 5.0,
+    "late_over_remaining_hi": 10.0,
+    "late_over_margin_abs_min": 0.0,
+    "late_over_period_min": 2.0,
+    "early_over_strength_penalty": 2.0,
+    "early_over_remaining_min": 20.0,
+    "early_over_period_max": 1.0,
+    "market_blend_max_w": 0.45,
+    "market_blend_start_min": 2.0,
+    "driver_tag_strength_penalties": {
+      "pace_hi": 2.0
+    }
+  },
+  "meta": {
+    "source": "cache_espn_pbp",
+    "days": 21,
+    "files": 104,
+    "samples": 1351,
+    "medians": {
+      "shot_rate_per_min": 3.375,
+      "pps": 1.053268765133172
+    }
+  }
+}

@@ -1,0 +1,462 @@
+<article class="feature-game-card cards-game-card" id="game-{{ game.gamePk }}">
+  {% set starter_panel = game.panels[0] if game.panels|length > 0 else None %}
+  {% set outlook_panel = game.panels[1] if game.panels|length > 1 else None %}
+  {% set official_panel = game.panels[2] if game.panels|length > 2 else None %}
+  {% set hitter_panel = game.panels[3] if game.panels|length > 3 else None %}
+  {% set sim_panel = game.panels[4] if game.panels|length > 4 else None %}
+  {% set actual_box_panel = sim_panel.get('actual_box_panel') if sim_panel else None %}
+  {% set actual_box = actual_box_panel.get('actual_box') if actual_box_panel else None %}
+  {% set sim_box = sim_panel.get('sim_box') if sim_panel else None %}
+  {% set game_status_abstract = game.status.abstract if game.status and game.status is defined and game.status.abstract is defined else game.status %}
+  {% set game_status_detailed = game.status.detailed if game.status and game.status is defined and game.status.detailed is defined else game.detail %}
+  {% set game_status_line = game_status_detailed if game_status_detailed and game_status_detailed != game_status_abstract else game_status_abstract or game.detail %}
+
+  <div class="cards-strip-head">
+    <div class="cards-head-left cards-head-matchup">
+      <div class="cards-head-team">
+        <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+        <div>
+          <div class="cards-head-team-name">{{ game.away.name }}</div>
+          <div class="cards-mini-copy">{{ game.away.abbr }}</div>
+        </div>
+      </div>
+      <span class="cards-score-divider">@</span>
+      <div class="cards-head-team">
+        <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+        <div>
+          <div class="cards-head-team-name">{{ game.home.name }}</div>
+          <div class="cards-mini-copy">{{ game.home.abbr }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="cards-status-cluster">
+      <div class="cards-game-time-row">
+        <span class="cards-game-time-label">{{ game.detail_label or 'First pitch' }}</span>
+        <span class="cards-game-time-value">{{ game.detail }}</span>
+      </div>
+      <span class="cards-status-badge">{{ game.status_badge or game_status_abstract or game.detail }}</span>
+      <div class="cards-start-time">{{ game_status_line }}</div>
+      {% if game.href %}
+        <a class="cards-game-link" href="{{ game.href }}">{{ game.href_label or 'Open game detail' }}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cards-score-ribbon">
+    <div class="cards-score-meta">
+      <div class="cards-live-line">{{ game.summary }}</div>
+      <div class="cards-sim-line">{{ game.hero_note }}</div>
+      <div class="cards-mini-copy">Probables: {{ starter_panel.title if starter_panel else game.summary }}</div>
+    </div>
+  </div>
+
+  <div class="cards-market-row">
+    {% if game.get('market_tiles') %}
+      {% for tile in game.get('market_tiles') %}
+        <div class="cards-market-tile">
+          <div class="cards-market-label">{{ tile.label }}</div>
+          <div class="cards-market-main">{{ tile.title }}</div>
+          <div class="cards-market-sub">{{ tile.sub }}</div>
+        </div>
+      {% endfor %}
+    {% else %}
+      {% for metric in game.metrics[:5] %}
+        <div class="cards-market-tile">
+          <div class="cards-market-label">{{ metric.label }}</div>
+          <div class="cards-market-main">{{ metric.value }}</div>
+          <div class="cards-market-sub">{{ game.away.abbr }} @ {{ game.home.abbr }}</div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="cards-tabs-rail">
+    <div class="cards-tabs">
+      <button class="cards-tab is-active" type="button" data-tab-target="overview">Game</button>
+      <button class="cards-tab" type="button" data-tab-target="boxscore">Box Score</button>
+      <button class="cards-tab" type="button" data-tab-target="props">Props</button>
+    </div>
+    <div class="cards-mini-metrics cards-mini-metrics--rail">
+      {% if game.get('starter_metrics') %}
+        {% for metric in game.get('starter_metrics') %}
+          <div class="cards-mini-metric">
+            <span>{{ metric.label }}</span>
+            <strong>{{ metric.value }}</strong>
+          </div>
+        {% endfor %}
+      {% else %}
+        {% for metric in game.metrics[:3] %}
+          <span class="cards-source-meta-pill">{{ metric.label }} {{ metric.value }}</span>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="cards-panel is-active" data-panel-id="overview">
+    <div class="cards-overview-grid">
+      <div class="cards-panel-card cards-panel-card--overview-main">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>Game lens</strong></div>
+          <span class="cards-overview-badge">MLB</span>
+        </div>
+        <div class="cards-overview-main-grid">
+          <div class="cards-live-lens-grid">
+            {% if game.get('segment_overview_cards') %}
+              {% for row in game.get('segment_overview_cards') %}
+                <div class="cards-prop-overview-card">
+                  <div class="cards-lens-head">
+                    <div>
+                      <div class="cards-lens-label">{{ row.label }}</div>
+                      <div class="cards-lens-main">{{ row.main }}</div>
+                      <div class="cards-subcopy">{{ row.subtitle }}</div>
+                    </div>
+                    <span class="cards-lens-badge{% if row.badge_class %} {{ row.badge_class }}{% endif %}">{{ row.badge }}</span>
+                  </div>
+                  <div class="cards-prop-overview-metrics">
+                    <div class="cards-data-pair"><span>Score</span><strong>{{ row.score }}</strong></div>
+                    <div class="cards-data-pair"><span>Home win</span><strong>{{ row.home_win }}</strong></div>
+                    <div class="cards-data-pair"><span>Market</span><strong>{{ row.market }}</strong></div>
+                    <div class="cards-data-pair{% if row.best_edge_class %} {{ row.best_edge_class }}{% endif %}"><span>Best edge</span><strong>{{ row.best_edge }}</strong></div>
+                  </div>
+                  <div class="cards-live-lens-market">{{ row.live_market }}</div>
+                  <div class="cards-live-lens-reasons">
+                    <div class="cards-live-lens-reason">{{ row.reason }}</div>
+                  </div>
+                  <div class="cards-prop-overview-foot">
+                    <span>{{ row.foot_left }}</span>
+                    <span>{{ row.foot_right }}</span>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              {% for metric in game.metrics %}
+                <div class="cards-live-lens-card">
+                  <div class="cards-lens-label">{{ metric.label }}</div>
+                  <div class="cards-market-main">{{ metric.value }}</div>
+                </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+          <div>
+            {% if game.get('probability_rows') or game.get('run_projection_rows') %}
+              <div class="cards-prob-groups">
+                {% if game.get('probability_rows') %}
+                  <section class="cards-prob-group">
+                    <div class="cards-table-title"><strong>Win Probability</strong></div>
+                    <div class="cards-prob-grid">
+                      {% for row in game.get('probability_rows') %}
+                        <div class="cards-prob-row">
+                          <div class="cards-prob-label">{{ row.label }}</div>
+                          <div class="cards-prob-bar" data-away-pct="{{ row.away_pct }}" data-home-pct="{{ row.home_pct }}">
+                            <span class="cards-prob-away"></span>
+                            <span class="cards-prob-home"></span>
+                          </div>
+                          <div class="cards-mini-copy">{{ row.summary }}</div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </section>
+                {% endif %}
+                {% if game.get('run_projection_rows') %}
+                  <section class="cards-prob-group">
+                    <div class="cards-table-title"><strong>Run Projections</strong></div>
+                    <div class="cards-prob-grid">
+                      {% for row in game.get('run_projection_rows') %}
+                        <div class="cards-prob-row">
+                          <div class="cards-prob-label">{{ row.label }}</div>
+                          <div class="cards-run-dist-bar{% if not row.bins %} is-empty{% endif %}">
+                            {% for bin in row.bins %}
+                              <span class="cards-run-dist-bin" data-bin-width="{{ bin.width }}" title="{{ bin.total }} runs: {{ bin.pct }}%"></span>
+                            {% endfor %}
+                          </div>
+                          <div class="cards-mini-copy">{{ row.summary }}</div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </section>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="cards-panel-card cards-panel-card--compact">
+                <div class="cards-box-head">
+                  <div class="cards-table-title"><strong>{{ outlook_panel.eyebrow if outlook_panel else 'Game outlook' }}</strong></div>
+                </div>
+                <div class="cards-callout-copy">{{ outlook_panel.body if outlook_panel else game.summary }}</div>
+                {% if outlook_panel and outlook_panel.get('items') %}
+                  <div class="cards-callout-list">
+                    {% for item in outlook_panel.get('items') %}
+                      <div>{{ item }}</div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="cards-panel-card">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>{{ official_panel.eyebrow if official_panel and official_panel.get('eyebrow') else 'Official card' }}</strong></div>
+          <span class="cards-chip">{{ official_panel.title if official_panel else 'Model only' }}</span>
+        </div>
+        <div class="cards-callout-copy">{{ official_panel.body if official_panel else game.hero_note }}</div>
+        <div class="cards-callout-list">
+          {% if official_panel and official_panel.get('items') %}
+            {% for item in official_panel.get('items') %}
+              <div class="cards-callout"><strong>{{ item.split(':', 1)[0] if ':' in item else 'Pick' }}</strong><span class="cards-callout-copy">{{ item.split(':', 1)[1].strip() if ':' in item else item }}</span></div>
+            {% endfor %}
+          {% else %}
+            <div class="cards-callout"><strong>Market board</strong><span class="cards-callout-copy">No saved game or player market snapshot was captured for this matchup, so only model outputs are available.</span></div>
+          {% endif %}
+        </div>
+        <div class="cards-lens-shell">
+          <div class="cards-box-head">
+            <div class="cards-table-title"><strong>{{ hitter_panel.eyebrow if hitter_panel and hitter_panel.get('eyebrow') else 'Props lens' }}</strong></div>
+            <span class="cards-overview-badge">Props</span>
+          </div>
+          <div class="cards-callout-copy">{{ hitter_panel.body if hitter_panel else 'No hitter look summary was available for this game.' }}</div>
+          <div class="cards-callout-list">
+            {% if hitter_panel and hitter_panel.get('items') %}
+              {% for item in hitter_panel.get('items')[:3] %}
+                <div>{{ item }}</div>
+              {% endfor %}
+            {% else %}
+              <div>No hitter look summary was available for this game.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cards-panel" data-panel-id="boxscore">
+    <div class="cards-box-grid">
+      <div class="cards-panel-card cards-box-panel">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>Live / final box</strong></div>
+          <span class="cards-overview-badge{% if actual_box_panel and actual_box_panel.get('badge_class') %} {{ actual_box_panel.get('badge_class') }}{% endif %}">{{ actual_box_panel.badge if actual_box_panel else 'Artifact pending' }}</span>
+        </div>
+        <div class="cards-callout-copy">{{ actual_box_panel.body if actual_box_panel else 'Committed daily snapshot box artifacts are not wired yet, so the live/final lane stays stubbed until that source is available.' }}</div>
+        {% if actual_box and actual_box.get('totals') %}
+          <div class="cards-box-totals">
+            <div class="cards-linescore is-compact">
+              <div class="cards-linescore-head">
+                <span class="cards-linescore-team-label">Team</span>
+                <span class="cards-linescore-stat-head">R</span>
+                <span class="cards-linescore-stat-head">H</span>
+                <span class="cards-linescore-stat-head">E</span>
+              </div>
+              {% for line in actual_box.get('totals') %}
+                <div class="cards-linescore-row">
+                  <div class="cards-linescore-team"><strong>{{ line.team }}</strong></div>
+                  <span class="cards-linescore-stat">{{ line.totals.R }}</span>
+                  <span class="cards-linescore-stat">{{ line.totals.H }}</span>
+                  <span class="cards-linescore-stat">{{ line.totals.E }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="cards-box-table-grid">
+            <div class="cards-box-panel cards-box-panel--nested">
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.away.abbr }} batting</div></div>
+              {% with columns=actual_box.get('batting_columns'), rows=actual_box.get('away', {}).get('batting') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.away.abbr }} pitching</div></div>
+              {% with columns=actual_box.get('pitching_columns'), rows=actual_box.get('away', {}).get('pitching') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+            </div>
+            <div class="cards-box-panel cards-box-panel--nested">
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.home.abbr }} batting</div></div>
+              {% with columns=actual_box.get('batting_columns'), rows=actual_box.get('home', {}).get('batting') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.home.abbr }} pitching</div></div>
+              {% with columns=actual_box.get('pitching_columns'), rows=actual_box.get('home', {}).get('pitching') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+            </div>
+          </div>
+        {% else %}
+          <div class="cards-box-totals">
+            <div class="cards-empty-copy">{{ actual_box_panel.title if actual_box_panel else 'Committed daily snapshot box artifacts are not wired yet, so the live/final lane stays stubbed until that source is available.' }}</div>
+          </div>
+        {% endif %}
+        {% if actual_box_panel and actual_box_panel.get('items') %}
+          <div class="cards-callout-list">
+            {% for item in actual_box_panel.get('items') %}
+              <div>{{ item }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="cards-panel-card cards-box-panel">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>Sim box</strong></div>
+          <span class="cards-chip">{{ sim_panel.title if sim_panel else 'Unavailable' }}</span>
+        </div>
+        {% if sim_box and sim_box.get('totals') %}
+          <div class="cards-box-totals">
+            <div class="cards-linescore is-compact">
+              <div class="cards-linescore-head">
+                <span class="cards-linescore-team-label">Team</span>
+                <span class="cards-linescore-stat-head">R</span>
+                <span class="cards-linescore-stat-head">H</span>
+                <span class="cards-linescore-stat-head">E</span>
+              </div>
+              {% for line in sim_box.get('totals') %}
+                <div class="cards-linescore-row">
+                  <div class="cards-linescore-team"><strong>{{ line.team }}</strong></div>
+                  <span class="cards-linescore-stat">{{ line.totals.R }}</span>
+                  <span class="cards-linescore-stat">{{ line.totals.H }}</span>
+                  <span class="cards-linescore-stat">{{ line.totals.E }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+        {% if sim_box %}
+          <div class="cards-box-table-grid">
+            <div class="cards-box-panel cards-box-panel--nested">
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.away.abbr }} batting (mean)</div></div>
+              {% with columns=sim_box.get('batting_columns'), rows=sim_box.get('away', {}).get('batting') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.away.abbr }} pitching (mean)</div></div>
+              {% with columns=sim_box.get('pitching_columns'), rows=sim_box.get('away', {}).get('pitching') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+            </div>
+            <div class="cards-box-panel cards-box-panel--nested">
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.home.abbr }} batting (mean)</div></div>
+              {% with columns=sim_box.get('batting_columns'), rows=sim_box.get('home', {}).get('batting') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+              <div class="cards-table-head"><div class="cards-table-title">{{ game.home.abbr }} pitching (mean)</div></div>
+              {% with columns=sim_box.get('pitching_columns'), rows=sim_box.get('home', {}).get('pitching') %}
+                {% include 'shared/_data_table.html' %}
+              {% endwith %}
+            </div>
+          </div>
+        {% else %}
+          <div class="cards-box-totals">
+            <div class="cards-empty-copy">{{ sim_panel.body if sim_panel else 'No sim box was available for this game.' }}</div>
+          </div>
+        {% endif %}
+        {% if sim_panel and sim_panel.get('items') %}
+          <div class="cards-callout-list">
+            {% for item in sim_panel.get('items') %}
+              <div>{{ item }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="cards-panel" data-panel-id="props">
+    <div class="cards-props-grid">
+      <div class="cards-panel-card">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>Props board</strong></div>
+          <span class="cards-chip" data-role="prop-summary-chip">{{ hitter_panel.get('prop_summary') if hitter_panel and hitter_panel.get('prop_summary') else hitter_panel.title if hitter_panel else 'Unavailable' }}</span>
+        </div>
+        <div class="cards-callout-copy">{{ hitter_panel.body if hitter_panel else 'No hitter look summary was available for this game.' }}</div>
+        <div class="cards-prop-filter-shell" data-role="prop-filters">
+          {% if hitter_panel and hitter_panel.get('prop_filter_groups') %}
+            {% for filter_group in hitter_panel.get('prop_filter_groups') %}
+              <div class="cards-prop-filter-group">
+                <div class="cards-section-label">{{ filter_group.label }}</div>
+                <div class="cards-prop-filter-pills">
+                  {% for option in filter_group.options %}
+                    <button class="cards-prop-button cards-prop-filter-pill{% if option.active %} is-active{% endif %}" type="button"{% if option.disabled %} disabled{% endif %}>
+                      <span>{{ option.label }}</span>
+                      <span class="cards-prop-filter-count">{{ option.count }}</span>
+                    </button>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+        <div class="cards-prop-groups" data-role="prop-groups">
+          {% if hitter_panel and hitter_panel.get('prop_groups') %}
+            {% for group in hitter_panel.get('prop_groups') %}
+              <div class="cards-prop-group{% if group.variant == 'secondary' %} is-secondary{% endif %}">
+                <div class="cards-box-head">
+                  <div class="cards-table-title"><strong>{{ group.title }}</strong></div>
+                  <span class="cards-chip {% if group.variant == 'official' %}is-official{% else %}is-candidate{% endif %}">{{ group.count }} plays</span>
+                </div>
+                {% if group.body %}
+                  <div class="cards-callout-copy">{{ group.body }}</div>
+                {% endif %}
+                {% for section in group.sections %}
+                  <div class="cards-prop-stack">
+                    <div class="cards-section-label">{{ section.title }}</div>
+                    <div class="cards-prop-list">
+                      {% for item in section.get('items', []) %}
+                        <div class="cards-prop-button {% if group.variant == 'official' %}is-official{% else %}is-candidate{% endif %}">
+                          <span>{{ item.title }}</span>
+                          <small>{{ item.detail }}</small>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          {% elif hitter_panel %}
+            <div class="cards-empty-copy">{{ hitter_panel.get('empty_copy') if hitter_panel and hitter_panel.get('empty_copy') else 'No hitter look summary was available for this game.' }}</div>
+          {% else %}
+            <div class="cards-empty-copy">No hitter look summary was available for this game.</div>
+          {% endif %}
+        </div>
+      </div>
+      {% set prop_lens = hitter_panel.get('prop_lens') if hitter_panel else None %}
+      <div class="cards-lens-shell" data-role="prop-lens">
+        <div class="cards-lens-head">
+          <div>
+            <div class="cards-lens-label">Prop lens</div>
+            <div class="cards-lens-main">{{ prop_lens.main if prop_lens and prop_lens.get('main') else 'No prop selected' }}</div>
+          </div>
+          <span class="cards-lens-badge{% if prop_lens and prop_lens.get('badge_class') %} {{ prop_lens.get('badge_class') }}{% endif %}">{{ prop_lens.badge if prop_lens and prop_lens.get('badge') else 'Pregame' }}</span>
+        </div>
+        <div class="cards-callout-copy">{{ prop_lens.copy if prop_lens and prop_lens.get('copy') else hitter_panel.body if hitter_panel else starter_panel.body if starter_panel else game.summary }}</div>
+        {% if prop_lens and prop_lens.get('metrics') %}
+          <div class="cards-detail-grid">
+            {% for metric in prop_lens.get('metrics') %}
+              <div class="cards-data-pair">
+                <span>{{ metric.label }}</span>
+                <strong>{{ metric.value }}</strong>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="cards-prop-groups">
+          {% if prop_lens and prop_lens.get('sections') %}
+            {% for section in prop_lens.get('sections') %}
+              <div class="cards-prop-stack">
+                <div class="cards-section-label">{{ section.title }}</div>
+                <div class="cards-callout-list">
+                  {% for item in section.get('items', []) %}
+                    <div>{{ item }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="cards-prop-stack">
+              <div class="cards-section-label">Top prop context</div>
+              <div class="cards-callout-list">
+                <div>No hitter look summary was available for this game.</div>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+</article>

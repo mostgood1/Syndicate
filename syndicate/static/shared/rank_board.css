@@ -1,0 +1,58 @@
+.hr-targets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.rank-card {
+  border: 1px solid #dbe2ec;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #f9fbff);
+  box-shadow: 0 10px 22px rgba(19, 34, 58, 0.08);
+  padding: 18px;
+}
+
+.rank-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rank-card__meta {
+  margin: 10px 0 14px;
+  color: #4b5b70;
+  font-weight: 600;
+}
+
+.cards-date-form select,
+.cards-date-form input[type="text"] {
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid #cfd8e6;
+  padding: 0 10px;
+  background: #fff;
+  color: #13223a;
+}
+
+.rank-section {
+  margin: 20px 0;
+}
+
+.rank-section__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.rank-section__header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.rank-section__meta {
+  color: #4b5b70;
+  font-size: 0.95rem;
+}

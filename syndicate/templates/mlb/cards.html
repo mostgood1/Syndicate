@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MLB Game Cards — {{ date }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css', v=asset_version if cards_script == 'mlb/cards_source.js' else none) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename=cards_stylesheet, v=asset_version if cards_script == 'mlb/cards_source.js' else none) }}" />
+  </head>
+  <body class="cards-body">
+    {% if cards_client != 'source' %}
+      {% with active_sport_slug='mlb', active_sport_name='MLB' %}
+        {% include 'shared/_standalone_app_header.html' %}
+      {% endwith %}
+    {% endif %}
+    <div class="cards-shell">
+      <header class="cards-header">
+        <div class="cards-title-row">
+          <h1>{{ cards_header_title or 'MLB Game Cards' }}</h1>
+          <div class="cards-header-meta" id="cardsHeaderMeta">{{ 'Loading slate...' if source_client_shell else (cards_header_meta or ('Artifact-backed slate | ' ~ date)) }}</div>
+        </div>
+      </header>
+
+      {% set client_query = '&client=' ~ cards_client if cards_client else '' %}
+      {% with action=route_path, prev_href=route_path ~ '?date=' ~ prev_date ~ client_query, next_href=route_path ~ '?date=' ~ next_date ~ client_query, date_value=date, links=([] if source_preview_shell else module_links), cards_control_links=cards_control_links, source_meta_loading_text=('Loading slate…' if source_client_shell else none) %}
+        {% include 'shared/_date_controls.html' %}
+      {% endwith %}
+
+      {% if source_client_shell %}
+        <section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+          <div class="cards-loading-strip">Loading scoreboard…</div>
+        </section>
+      {% else %}
+        {% with items=scoreboard_items, games=games, empty_text='Scoreboard placeholder for ' ~ date %}
+          {% include 'shared/_scoreboard_strip.html' %}
+        {% endwith %}
+      {% endif %}
+
+      {% if source_client_shell %}
+        <section class="cards-hr-targets" id="cardsHrTargets" aria-label="Home run targets">
+          <div class="cards-loading-state">Loading HR targets…</div>
+        </section>
+      {% elif hr_targets_shelf %}
+        <section class="cards-hr-targets" id="cardsHrTargets" aria-label="{{ hr_targets_shelf.label }}">
+          <div class="cards-hr-targets-card">
+            <div class="cards-hr-targets-head">
+              <div class="cards-hr-targets-copy">
+                <div class="cards-hr-targets-kicker">{{ hr_targets_shelf.kicker }}</div>
+                <div class="cards-table-title">{{ hr_targets_shelf.title }}</div>
+                <div class="cards-mini-copy">{{ hr_targets_shelf.body }}</div>
+              </div>
+              <div class="cards-hr-targets-actions">
+                {% if hr_targets_shelf.source_path %}
+                  <span class="cards-source-meta-pill">{{ hr_targets_shelf.source_path }}</span>
+                {% endif %}
+                <a class="cards-nav-pill" href="{{ hr_targets_shelf.href }}">{{ hr_targets_shelf.cta }}</a>
+              </div>
+            </div>
+            <div class="cards-hr-targets-grid">
+              {% for row in hr_targets_shelf.rows %}
+                <a class="cards-hr-target-chip" href="{{ hr_targets_shelf.href }}">
+                  <div class="cards-hr-target-chip-top">
+                    <span class="cards-hr-target-rank">{{ row.rank }}</span>
+                    <span class="cards-source-meta-pill">{{ row.team }}</span>
+                  </div>
+                  <div class="cards-hr-target-identity">
+                    <div class="cards-hr-target-identity-main">
+                      <div class="cards-hr-target-headshot cards-hr-target-headshot-fallback">{{ row.player_name[:2]|upper }}</div>
+                      <div class="cards-hr-target-name-block">
+                        <div class="cards-hr-target-name">{{ row.player_name }}</div>
+                        <div class="cards-hr-target-meta">
+                          <span>{{ row.team }}</span>
+                          <span>{{ row.matchup }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="cards-hr-target-prob">{{ row.probability }}<span class="cards-hr-target-prob-label">1+ HR</span></div>
+                  </div>
+                  <div class="cards-hr-target-metrics">
+                    <div class="cards-hr-target-pill"><strong>{{ row.support }}</strong><span>support</span></div>
+                  </div>
+                  <div class="cards-hr-target-summary">{{ row.summary }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      {% elif teaser %}
+        <section class="cards-hr-targets" id="cardsHrTargets" aria-label="{{ teaser.label }}">
+          <div class="cards-loading-state">{{ teaser.body }}</div>
+          {% if teaser.href %}
+            <div class="action-row">
+              <a class="cards-nav-pill" href="{{ teaser.href }}">{{ teaser.cta }}</a>
+            </div>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      <main class="{{ cards_grid_class }}" id="cardsGrid" aria-label="{{ intro_title }} grid">
+        {% if source_client_shell %}
+          <div class="cards-loading-state">Loading cards…</div>
+        {% else %}
+          {% for game in games %}
+            {% include 'shared/_game_card.html' %}
+          {% endfor %}
+        {% endif %}
+      </main>
+    </div>
+
+    <script>
+      window.MLBCardsBootstrap = {
+        date: {{ date|tojson }},
+        client: {{ (cards_client or ('source' if source_client_shell else 'board'))|tojson }},
+        preserveClientParam: {{ (cards_client is defined and cards_client is not none)|tojson }},
+      };
+    </script>
+    {% if cards_script %}
+      <script src="{{ url_for('static', filename=cards_script, v=asset_version if cards_script == 'mlb/cards_source.js' else none) }}"></script>
+    {% endif %}
+    <script src="{{ url_for('static', filename='mlb/back_to_top.js', v=asset_version if cards_script == 'mlb/cards_source.js' else none) }}"></script>
+  </body>
+</html>

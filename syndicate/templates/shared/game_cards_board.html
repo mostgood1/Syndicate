@@ -1,0 +1,123 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | {{ intro_title }}{% endblock %}
+{% block page_title %}{{ intro_title }}{% endblock %}
+
+{% block extra_head %}
+  {% if show_standalone_cards_header %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css') }}" />
+  {% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/dense_cards.css') }}" />
+  {% if cards_stylesheet %}
+    <link rel="stylesheet" href="{{ url_for('static', filename=cards_stylesheet) }}" />
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if show_standalone_cards_header %}
+    {% with active_sport_slug=active_sport_slug, active_sport_name=active_sport_name %}
+      {% include 'shared/_standalone_app_header.html' %}
+    {% endwith %}
+  {% endif %}
+
+  {% if board_header_title or board_header_meta or cards_header_title or cards_header_meta %}
+    {% include 'shared/_board_header.html' %}
+  {% endif %}
+
+  {% if show_intro is not defined or show_intro %}
+    {% with route_label=route_path, title=intro_title, status='Feature module', body=intro_body %}
+      {% include 'shared/_module_intro.html' %}
+    {% endwith %}
+  {% endif %}
+
+  {% if show_source_summary is not defined or show_source_summary %}
+    {% with source_title=source_title, source_date=date, source_path=source_path, stats=header_stats %}
+      {% include 'shared/_source_summary.html' %}
+    {% endwith %}
+  {% endif %}
+
+  {% with action=(control_action or route_path), prev_href=(controls_prev_href or (route_path ~ '?date=' ~ prev_date)), next_href=(controls_next_href or (route_path ~ '?date=' ~ next_date)), control_label=control_label, control_type=control_type, control_name=control_name, date_value=(control_value or date), links=module_links, hidden_fields=hidden_fields, cards_control_links=cards_control_links, show_home_link=false %}
+    {% include 'shared/_date_controls.html' %}
+  {% endwith %}
+
+  {% with items=scoreboard_items, games=games, empty_text='Scoreboard placeholder for ' ~ date %}
+    {% include 'shared/_scoreboard_strip.html' %}
+  {% endwith %}
+
+  {% if hr_targets_shelf %}
+    <section class="cards-hr-targets" id="cardsHrTargets" aria-label="{{ hr_targets_shelf.label }}">
+      <div class="cards-hr-targets-card">
+        <div class="cards-hr-targets-head">
+          <div class="cards-hr-targets-copy">
+            <div class="cards-hr-targets-kicker">{{ hr_targets_shelf.kicker }}</div>
+            <div class="cards-table-title">{{ hr_targets_shelf.title }}</div>
+            <div class="cards-mini-copy">{{ hr_targets_shelf.body }}</div>
+          </div>
+          <div class="cards-hr-targets-actions">
+            {% if hr_targets_shelf.source_path %}
+              <span class="cards-source-meta-pill">{{ hr_targets_shelf.source_path }}</span>
+            {% endif %}
+            <a class="cards-nav-pill" href="{{ hr_targets_shelf.href }}">{{ hr_targets_shelf.cta }}</a>
+          </div>
+        </div>
+        <div class="cards-hr-targets-grid">
+          {% for row in hr_targets_shelf.rows %}
+            <a class="cards-hr-target-chip" href="{{ hr_targets_shelf.href }}">
+              <div class="cards-hr-target-chip-top">
+                <span class="cards-hr-target-rank">{{ row.rank }}</span>
+                <span class="cards-source-meta-pill">{{ row.team }}</span>
+              </div>
+              <div class="cards-hr-target-identity">
+                <div class="cards-hr-target-identity-main">
+                  <div class="cards-hr-target-headshot cards-hr-target-headshot-fallback">{{ row.player_name[:2]|upper }}</div>
+                  <div class="cards-hr-target-name-block">
+                    <div class="cards-hr-target-name">{{ row.player_name }}</div>
+                    <div class="cards-hr-target-meta">
+                      <span>{{ row.team }}</span>
+                      <span>{{ row.matchup }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="cards-hr-target-prob">{{ row.probability }}<span class="cards-hr-target-prob-label">1+ HR</span></div>
+              </div>
+              <div class="cards-hr-target-metrics">
+                <div class="cards-hr-target-pill"><strong>{{ row.support }}</strong><span>support</span></div>
+              </div>
+              <div class="cards-hr-target-summary">{{ row.summary }}</div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  {% elif teaser %}
+    <section class="cards-hr-targets" id="cardsHrTargets" aria-label="{{ teaser.label }}">
+      <div class="cards-loading-state">{{ teaser.body }}</div>
+      {% if teaser.href %}
+        <div class="action-row">
+          <a class="cards-nav-pill" href="{{ teaser.href }}">{{ teaser.cta }}</a>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <main class="{{ cards_grid_class }}" id="cardsGrid" aria-label="{{ intro_title }} grid">
+    {% if games %}
+      {% for game in games %}
+        {% include 'shared/_game_card.html' %}
+      {% endfor %}
+    {% elif empty_state %}
+      {% with eyebrow=empty_state.eyebrow, title=empty_state.title, body=empty_state.body, list_items=empty_state.list_items %}
+        {% include 'shared/_content_panel.html' %}
+      {% endwith %}
+    {% endif %}
+  </main>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{{ url_for('static', filename='shared/game_board.js') }}"></script>
+  {% if cards_script %}
+    {% if cards_script != 'mlb/board.js' %}
+      <script src="{{ url_for('static', filename=cards_script) }}"></script>
+    {% endif %}
+  {% endif %}
+{% endblock %}

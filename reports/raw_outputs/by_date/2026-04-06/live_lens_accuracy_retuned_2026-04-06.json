@@ -1,0 +1,57 @@
+{
+  "assume_price": -110.0,
+  "by_elapsed_bucket": [
+    {
+      "elapsed_bucket": 5,
+      "losses": 29,
+      "n": 29,
+      "pushes": 0,
+      "roi_units_per_bet": -1.0,
+      "win_rate": 0.0,
+      "wins": 0
+    },
+    {
+      "elapsed_bucket": 10,
+      "losses": 26,
+      "n": 26,
+      "pushes": 0,
+      "roi_units_per_bet": -1.0,
+      "win_rate": 0.0,
+      "wins": 0
+    },
+    {
+      "elapsed_bucket": 15,
+      "losses": 6,
+      "n": 6,
+      "pushes": 0,
+      "roi_units_per_bet": -1.0,
+      "win_rate": 0.0,
+      "wins": 0
+    }
+  ],
+  "date": "2026-04-06",
+  "driver_tag_penalties": {
+    "pace_hi": 2.0
+  },
+  "losses": 61,
+  "n_settled": 61,
+  "n_signals": 61,
+  "policy": "retuned",
+  "pushes": 0,
+  "results_path": "outputs\\daily_results\\results_2026-04-06.csv",
+  "retune": {
+    "early_over_period_max": 1.0,
+    "early_over_remaining_min": 20.0,
+    "early_over_strength_penalty": 2.0,
+    "late_over_margin_abs_min": 0.0,
+    "late_over_period_min": 2.0,
+    "late_over_remaining_hi": 10.0,
+    "late_over_remaining_lo": 5.0,
+    "late_over_strength_penalty": 1.5
+  },
+  "roi_units_per_bet": -1.0,
+  "signals_path": "outputs\\live_lens_signals_2026-04-06.jsonl",
+  "status": "ok",
+  "win_rate": 0.0,
+  "wins": 0
+}

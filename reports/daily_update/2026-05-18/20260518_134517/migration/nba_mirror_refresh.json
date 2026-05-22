@@ -1,0 +1,12 @@
+﻿{
+    "date":  "2026-05-18",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\nba_source",
+    "copiedArtifacts":  [
+                            "game_cards_2026-05-18.csv",
+                            "cards_sim_detail_2026-05-18.json",
+                            "web\\betting-card-v2.css",
+                            "web\\betting-card-v2.js"
+                        ]
+}
+

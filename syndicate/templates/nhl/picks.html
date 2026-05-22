@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NHL Picks</title>
+    <link rel="stylesheet" href="/static/shared/app.css" />
+    <style>
+      .season-summary-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+
+      .season-metric-card,
+      .season-breakdown-card,
+      .season-game-card,
+      .season-day-rail {
+        padding: 18px;
+        border: 1px solid rgba(132, 166, 196, 0.18);
+        border-radius: 22px;
+        background: rgba(8, 18, 30, 0.78);
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      }
+
+      .season-metric-label,
+      .season-card-eyebrow,
+      .season-source-label,
+      .season-kicker {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(154, 243, 222, 0.82);
+      }
+
+      .season-metric-value {
+        margin-top: 8px;
+        font-size: 28px;
+        font-weight: 700;
+      }
+
+      .season-metric-sub,
+      .season-card-meta,
+      .season-inline-note,
+      .season-card-summary,
+      .season-day-meta,
+      .season-source-path {
+        color: rgba(237, 244, 251, 0.76);
+        font-size: 14px;
+      }
+
+      .season-shell {
+        width: min(1400px, calc(100vw - 24px));
+        margin: 0 auto;
+        padding: 18px 0 32px;
+      }
+
+      .season-header,
+      .season-layout {
+        display: grid;
+        gap: 16px;
+      }
+
+      .season-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+      }
+
+      .season-title-row,
+      .season-header-actions,
+      .season-day-list,
+      .season-months {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .season-layout {
+        grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+        align-items: start;
+      }
+
+      .season-side-panel {
+        display: grid;
+        gap: 16px;
+      }
+
+      .season-card-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .season-breakdown-card h3,
+      .season-game-card h3 {
+        margin: 8px 0 10px;
+        font-size: 18px;
+      }
+
+      .season-card-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 14px 0;
+      }
+
+      .season-card-metrics strong {
+        display: block;
+        font-size: 16px;
+        color: #f8fafc;
+      }
+
+      .season-link-list,
+      .season-reason-list {
+        display: grid;
+        gap: 6px;
+        margin: 12px 0 0;
+        color: rgba(237, 244, 251, 0.76);
+      }
+
+      .season-list-item {
+        position: relative;
+        padding-left: 16px;
+      }
+
+      .season-list-item::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(147, 197, 253, 0.85);
+      }
+
+      .season-source-pill,
+      .cards-nav-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: auto;
+        flex: 0 0 auto;
+      }
+
+      .season-source-pill {
+        min-height: 0;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(30, 41, 59, 0.92);
+        color: #f8fafc;
+        font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+        font-size: 12px;
+      }
+
+      .season-source-path {
+        display: block;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(2, 6, 23, 0.38);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+
+      .season-source-heading,
+      .season-day-list-wrap {
+        margin-top: 14px;
+      }
+
+      body {
+        background: linear-gradient(180deg, #08121d, #050b12);
+        color: #f8fafc;
+      }
+
+      @media (max-width: 960px) {
+        .season-header,
+        .season-layout {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="season-shell">
+      <header class="season-header">
+        <div class="season-title-block">
+          <div class="season-kicker">Top recommendation snapshot</div>
+          <div class="season-title-row">
+            <h1>NHL Picks</h1>
+            <span class="cards-nav-pill is-active">{{ source_date_display or date }}</span>
+            <span class="cards-nav-pill">{{ (summary_panel.summary_stats if summary_panel else header_stats or [])|length }} stats</span>
+          </div>
+          <p class="season-day-meta">{{ intro_body }}</p>
+        </div>
+        <div class="season-header-actions">
+          <a class="cards-nav-pill" href="/nhl/cards?date={{ source_date_display or date }}">Cards</a>
+          <a class="cards-nav-pill" href="/nhl/live-lens?date={{ source_date_display or date }}">Live lens</a>
+          <a class="cards-nav-pill" href="/nhl/archive?date={{ source_date_display or date }}">Archive</a>
+        </div>
+      </header>
+
+      <section class="season-summary-grid">
+        {% for stat in summary_panel.summary_stats if summary_panel and summary_panel.summary_stats %}
+          <article class="season-metric-card">
+            <div class="season-metric-label">{{ stat.label }}</div>
+            <div class="season-metric-value">{{ stat.value }}</div>
+            <div class="season-metric-sub">{{ source_title }}</div>
+          </article>
+        {% endfor %}
+      </section>
+
+      <section class="season-months" aria-label="Picks navigation">
+        {% for link in module_links or [] %}
+          <a class="cards-nav-pill{% if link.active %} is-active{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+        {% endfor %}
+      </section>
+
+      <main class="season-layout">
+        <aside class="season-side-panel">
+          <section class="season-day-rail">
+            <div class="season-kicker">Browse date</div>
+            <form method="get" action="{{ route_path }}" class="season-day-list season-day-list-wrap" id="picksDateForm">
+              <a class="cards-nav-pill" href="{{ prev_href }}" rel="prev">Prev</a>
+              <input class="cards-nav-pill" type="date" name="date" value="{{ control_value or date }}" aria-label="Select NHL picks date" />
+              <button class="cards-nav-pill is-active" type="submit">{{ submit_label }}</button>
+              <a class="cards-nav-pill" href="{{ reset_href or route_path }}">Reset</a>
+              <a class="cards-nav-pill" href="{{ next_href }}" rel="next">Next</a>
+            </form>
+            <div class="season-source-label season-source-heading">Source artifact</div>
+            <div class="season-source-pill">{{ source_path.rsplit('\\', 1)[-1].rsplit('/', 1)[-1] }}</div>
+            <span class="season-source-path">{{ source_path }}</span>
+          </section>
+
+          {% if warning_panel %}
+          <section class="season-breakdown-card">
+            <div class="season-card-eyebrow">{{ warning_panel.eyebrow }}</div>
+            <h3>{{ warning_panel.title }}</h3>
+            <div class="season-card-summary">{{ warning_panel.body }}</div>
+            <div class="season-link-list">{% for item in warning_panel.list_items or [] %}<div class="season-list-item">{{ item }}</div>{% endfor %}</div>
+          </section>
+          {% endif %}
+        </aside>
+
+        <section class="season-main">
+          <div class="season-kicker">Selected slate</div>
+          <h2>{{ source_date_display or date }}</h2>
+          <p class="season-day-meta">{{ source_title }}</p>
+
+          {% if rank_cards %}
+            <section class="season-card-grid">
+              {% for card in rank_cards %}
+                <article class="season-game-card">
+                  <div class="season-card-eyebrow">{{ card.eyebrow }}</div>
+                  <h3>{{ card.title }}</h3>
+                  <div class="season-card-meta">{{ card.meta }}</div>
+                  <div class="season-card-metrics">
+                    {% for metric in card.metrics or [] %}
+                      <div>
+                        <div class="season-card-eyebrow">{{ metric.label }}</div>
+                        <strong>{{ metric.value }}</strong>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <div class="season-card-summary">{{ card.summary }}</div>
+                  {% if card.list_items %}
+                    <div class="season-reason-list">{% for item in card.list_items %}<div class="season-list-item">{{ item }}</div>{% endfor %}</div>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </section>
+          {% elif empty_state %}
+            <section class="season-breakdown-card">
+              <div class="season-card-eyebrow">{{ empty_state.eyebrow }}</div>
+              <h3>{{ empty_state.title }}</h3>
+              <div class="season-card-summary">{{ empty_state.body }}</div>
+              {% if empty_state.list_items %}
+                <div class="season-reason-list">{% for item in empty_state.list_items %}<div class="season-list-item">{{ item }}</div>{% endfor %}</div>
+              {% endif %}
+            </section>
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

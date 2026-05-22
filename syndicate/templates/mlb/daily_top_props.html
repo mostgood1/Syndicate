@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }} - {{ date }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='mlb/cards.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='mlb/daily_top_props.css') }}" />
+  </head>
+  <body class="cards-body top-props-body{% if embed_mode %} top-props-body--embed{% endif %}">
+    <div class="top-props-shell{% if embed_mode %} top-props-shell--embed{% endif %}">
+      <header class="top-props-header{% if embed_mode %} top-props-header--embed{% endif %}">
+        <div class="top-props-title-block">
+          <div class="top-props-kicker">Daily raw-edge prop board</div>
+          <div class="top-props-title-row">
+            <h1>{{ title }}</h1>
+            <span class="cards-nav-pill is-active" id="topPropsDatePill">{{ date }}</span>
+          </div>
+          <p class="top-props-header-meta" id="topPropsHeaderMeta">Loading top-props board...</p>
+        </div>
+        <div class="top-props-header-actions">
+          <a class="cards-nav-pill" href="/mlb/cards?date={{ date }}&client=source{% if embed_mode %}&embed={{ embed_mode }}{% endif %}"{% if embed_mode %} target="_top"{% endif %}>Daily cards</a>
+          {% if group == 'pitcher' %}
+          <a class="cards-nav-pill" href="/mlb/hitter-top-props?date={{ date }}{% if embed_mode %}&embed={{ embed_mode }}{% endif %}">Hitter top props</a>
+          <a class="cards-nav-pill" href="/mlb/pitcher-ladders?date={{ date }}"{% if embed_mode %} target="_top"{% endif %}>Pitcher ladders</a>
+          {% else %}
+          <a class="cards-nav-pill" href="/mlb/pitcher-top-props?date={{ date }}{% if embed_mode %}&embed={{ embed_mode }}{% endif %}">Pitcher top props</a>
+          <a class="cards-nav-pill" href="/mlb/hitter-ladders?date={{ date }}"{% if embed_mode %} target="_top"{% endif %}>Hitter ladders</a>
+          <a class="cards-nav-pill" href="/mlb/hr-targets?date={{ date }}"{% if embed_mode %} target="_top"{% endif %}>HR targets</a>
+          {% endif %}
+          <a class="cards-nav-pill" href="/mlb/season/{{ season }}?date={{ date }}"{% if embed_mode %} target="_top"{% endif %}>Season review</a>
+        </div>
+      </header>
+
+      <section class="cards-control-card top-props-controls" aria-label="Daily top props controls">
+        <form class="cards-date-form top-props-form" method="get" action="/mlb/{{ group }}-top-props">
+          <a class="cards-nav-pill" href="/mlb/{{ group }}-top-props?date={{ date }}{% if embed_mode %}&embed={{ embed_mode }}{% endif %}" rel="prev" id="topPropsPrevLink">Prev</a>
+          <span class="cards-nav-pill cards-form-pill" aria-hidden="true">Date</span>
+          <input type="date" name="date" value="{{ date }}" aria-label="Top props date" id="topPropsDateInput" />
+          {% if embed_mode %}
+          <input type="hidden" name="embed" value="{{ embed_mode }}" />
+          {% endif %}
+          <button type="submit">Load</button>
+          <a class="cards-nav-pill" href="/mlb/{{ group }}-top-props?date={{ date }}{% if embed_mode %}&embed={{ embed_mode }}{% endif %}" rel="next" id="topPropsNextLink">Next</a>
+        </form>
+        <div class="top-props-toolbar-meta">
+          <label class="top-props-filter-control">
+            <span class="top-props-filter-label">Stat</span>
+            <select id="topPropsStatFilter" aria-label="Filter by stat" disabled>
+              <option value="">Loading stats...</option>
+            </select>
+          </label>
+          <label class="top-props-filter-control">
+            <span class="top-props-filter-label">Game</span>
+            <select id="topPropsGameFilter" aria-label="Filter by game" disabled>
+              <option value="">All games</option>
+            </select>
+          </label>
+          <div class="top-props-source-meta" id="topPropsSourceMeta"></div>
+        </div>
+      </section>
+
+      <main class="top-props-grid" id="topPropsSections">
+        <div class="cards-loading-state">Loading top-props board...</div>
+      </main>
+    </div>
+    <script>
+      window.MLBDailyTopPropsBootstrap = {
+        group: {{ group|tojson }},
+        groupLabel: {{ groupLabel|tojson }},
+        title: {{ title|tojson }},
+        date: {{ date|tojson }},
+        season: {{ season|tojson }},
+        embedMode: {{ (embed_mode or '')|tojson }}
+      };
+    </script>
+    <script src="{{ url_for('static', filename='mlb/daily_top_props.js') }}"></script>
+  </body>
+</html>

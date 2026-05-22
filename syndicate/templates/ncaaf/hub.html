@@ -1,0 +1,65 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | NCAAF{% endblock %}
+{% block page_title %}NCAAF Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/ncaaf', title='NCAAF now has cards, picks, a live-lens monitor, a daily archive, and a betting card in Syndicate', status='Active migration', body='The live NCAAF recommendation feed is offseason-empty, so Syndicate starts with historical weekly cards, picks, a read-only live-lens monitor, a daily archive lane, and a season betting-card companion backed by stored recommendation summaries from the source app.', action_href='/ncaaf/cards?week=' ~ launch_week, action_label='Open NCAAF cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Historical coverage', title='Available weekly recommendation summaries', body='The hub now surfaces the actual weekly artifacts found in the source repo, so you can jump straight into populated weeks and still see the empty tracked weeks.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="Available NCAAF weeks">
+    {% for week in available_weeks %}
+      <article class="sport-card">
+        <div class="section-label">Week {{ week.week }}</div>
+        <h3>Cards board</h3>
+        <p>Open the historical matchup cards board for this populated week summary artifact.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/ncaaf/cards?week={{ week.week }}">Launch week {{ week.week }} cards</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">Week {{ week.week }}</div>
+        <h3>{{ week.count }} recommendation rows</h3>
+        <p>Open the historical picks board for this populated week summary artifact.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/ncaaf/picks?week={{ week.week }}">Launch week {{ week.week }}</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">Week {{ week.week }}</div>
+        <h3>Live lens</h3>
+        <p>Open the read-only NCAAF live-lens monitor for this populated week summary artifact.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/ncaaf/live-lens?week={{ week.week }}">Launch week {{ week.week }} live lens</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">Week {{ week.week }}</div>
+        <h3>Daily archive</h3>
+        <p>Open the weekly daily-archive lane so historical NCAAF snapshots can relaunch the module family from stored artifacts.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/ncaaf/archive?week={{ week.week }}">Launch week {{ week.week }} archive</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">Week {{ week.week }}</div>
+        <h3>Betting card</h3>
+        <p>Open the season-scoped betting-card companion for this populated week summary artifact.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/ncaaf/season/{{ week.season }}/betting-card?week={{ week.week }}">Launch week {{ week.week }} betting card</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+
+  {% if unavailable_weeks %}
+    {% with eyebrow='Tracked but empty', title='Weeks without recommendation rows', body='These weeks exist in the source summary index, but the source app currently has no matched recommendation rows stored for them.', list_items=unavailable_weeks | map(attribute='week') | map('string') | map('replace', '', 'Week ') | list %}
+      {% include 'shared/_content_panel.html' %}
+    {% endwith %}
+  {% endif %}
+{% endblock %}

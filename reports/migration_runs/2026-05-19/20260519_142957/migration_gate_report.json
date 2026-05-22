@@ -1,0 +1,81 @@
+{
+  "ok": false,
+  "generated_at": "2026-05-19T19:37:08.395042+00:00",
+  "audit": {
+    "ok": false,
+    "parse_error": null,
+    "allowed_count": 3,
+    "actual_count": 4,
+    "unexpected_findings": [
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/mlb.py",
+        "line": 242,
+        "summary": "Source shell route points at mlb/cards_source.js."
+      },
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/nhl.py",
+        "line": 72,
+        "summary": "Source shell route points at nhl/cards_source.html."
+      },
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/wnba.py",
+        "line": 107,
+        "summary": "Source shell route points at wnba/cards_source.html."
+      }
+    ],
+    "missing_allowed_findings": [
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/mlb.py",
+        "line": 241
+      },
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/nhl.py",
+        "line": 70
+      }
+    ]
+  },
+  "commands": [
+    {
+      "name": "audit",
+      "command": [
+        "C:\\Users\\mostg\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "scripts/audit_migration.py",
+        "--format",
+        "json"
+      ],
+      "ok": true,
+      "returncode": 0,
+      "stdout_excerpt": "[\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/mlb.py\",\n    \"line\": 242,\n    \"summary\": \"Source shell route points at mlb/cards_source.js.\",\n    \"detail\": \"Use these routes as the primary client-parity audit surface.\"\n  },\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/nba.py\",\n    \"line\": 136,\n    \"summary\": \"Source shell route points at nba/cards_source.html.\",\n    \"detail\": \"Use these routes as the primary client-parity audit surface.\"\n  },\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/nhl.py\",\n    ...",
+      "stderr_excerpt": ""
+    },
+    {
+      "name": "tests",
+      "command": [
+        "C:\\Users\\mostg\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "-m",
+        "unittest",
+        "tests.test_archives"
+      ],
+      "ok": false,
+      "returncode": 1,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "FF......................................................F...........F.................................F.................................................\n======================================================================\nFAIL: test_archive_launch_links_and_tracker_copy (tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\tests\\test_archives.py\", line 991, in test_archive_launch_links_and_tracker_copy\n    s..."
+    },
+    {
+      "name": "browser_smoke",
+      "command": [
+        "C:\\Users\\mostg\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "scripts/browser_parity_smoke.py"
+      ],
+      "ok": false,
+      "returncode": 1,
+      "stdout_excerpt": "[FAIL] Syndicate home\n  URL: http://127.0.0.1:57102/\n  Board: timeout\n  Board excerpt: /mlb MLB Phase-1 complete Live today 2026-05-19 Reference module Games 15 Tracked dates 119 Focus Cards + betting Game board Live market view Live lanes on 2026-05-19 Active gam...\n  Failure: timeout\n[PASS] MLB source cards\n  URL: http://127.0.0.1:57102/mlb/cards?client=source\n  Board: populated\n  Header: 15 games on the slate | 15 with official plays\n  Board excerpt: ATL Atlanta Braves - @ MIA Miami Marlins - First pitch 3:10 PM Preview 3:10 PM Open game view Loading live box... Loading sim box... Probab...",
+      "stderr_excerpt": "127.0.0.1 - - [19/May/2026 14:34:19] \"GET / HTTP/1.1\" 200 -\n127.0.0.1 - - [19/May/2026 14:34:23] \"GET /mlb/cards?client=source HTTP/1.1\" 200 -\n127.0.0.1 - - [19/May/2026 14:34:26] \"GET /mlb/cards?client=board HTTP/1.1\" 200 -\n127.0.0.1 - - [19/May/2026 14:34:29] \"GET /nba/cards HTTP/1.1\" 200 -\n127.0.0.1 - - [19/May/2026 14:34:29] \"GET /nba/cards?client=board HTTP/1.1\" 200 -\n127.0.0.1 - - [19/May/2026 14:34:29] \"GET /nhl/cards HTTP/1.1\" 200 -\n127.0.0.1 - - [19/May/2026 14:34:29] \"GET /nhl/cards?client=board HTTP/1.1\" 200 -\n127.0.0.1 - - [19/May/2026 14:34:29] \"GET /wnba/cards HTTP/1.1\" 200 -\n..."
+    }
+  ]
+}

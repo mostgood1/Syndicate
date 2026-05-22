@@ -1,0 +1,229 @@
+{
+  "date": "2026-05-18",
+  "season": 2026,
+  "stats_season": 2026,
+  "spring_mode": false,
+  "seed": 1337,
+  "seed_source": "default_fixed",
+  "seed_explicit_cli": false,
+  "cfg_kwargs": {
+    "bip_baserunning": true,
+    "bip_dp_rate": 0.06,
+    "bip_sf_rate_flypop": 0.48,
+    "bip_sf_rate_line": 0.36,
+    "bip_1b_p2_scores_mult": 1.15,
+    "bip_2b_p1_scores_mult": 1.15,
+    "bip_1b_p1_to_3b_rate": 0.24,
+    "bip_ground_rbi_out_rate": 0.18,
+    "bip_out_2b_to_3b_rate": 0.24,
+    "bip_out_1b_to_2b_rate": 0.14,
+    "bip_misc_advance_pitch_rate": 0.004,
+    "bip_roe_rate": 0.012,
+    "bip_fc_rate": 0.04,
+    "pitcher_rate_sampling": true,
+    "manager_pitching": "v2",
+    "manager_pitching_overrides": {
+      "bullpen_tax_scale": 0.18,
+      "bullpen_tax_pitches": 110.0,
+      "reliever_hard_cap_buffer": 24,
+      "reliever_hook_spread": 6.5,
+      "starter_hard_cap_buffer": 10,
+      "starter_hook_add_pitches": -8,
+      "starter_hook_spread": 5.0,
+      "starter_leash_pc_buffer": 0,
+      "starter_leash_tto_max": 1.6,
+      "starter_leash_lev_max": 0.65,
+      "starter_leash_runner_max": 0.5,
+      "starter_pull_bias": 0.08
+    },
+    "pitch_model_overrides": {
+      "hr_bb_hbp_runner_mult": 1.04,
+      "hr_starter_bb_hbp_runner_mult": 1.04
+    },
+    "pitcher_distribution_overrides": {}
+  },
+  "hitter_hr_prob_calibration": {
+    "enabled": true,
+    "mode": "affine_logit",
+    "a": 1.5848232776277673,
+    "b": 1.849232734329709,
+    "diag": {
+      "n": 20322,
+      "iters": 5,
+      "nll_before": 7028.14240749011,
+      "nll_after": 6810.263480819774,
+      "sum_w": 20322.0,
+      "prior_a": 1.0,
+      "prior_b": 0.0,
+      "l2_a": 0.001,
+      "l2_b": 0.001,
+      "rank_weight_alpha": 0.0
+    }
+  },
+  "hitter_props_prob_calibration": {
+    "enabled": true,
+    "default": {
+      "enabled": true,
+      "mode": "affine_logit",
+      "a": 1.0,
+      "b": 0.0
+    },
+    "props": {
+      "hits_1plus": {
+        "enabled": true,
+        "mode": "affine_logit",
+        "a": 0.720764644786424,
+        "b": -0.21991521654444263,
+        "diag": {
+          "n": 5880,
+          "iters": 6,
+          "nll_before": 5168.797667143041,
+          "nll_after": 3885.275466208933,
+          "sum_w": 5880.0,
+          "prior_a": 1.0,
+          "prior_b": 0.0,
+          "l2_a": 0.0,
+          "l2_b": 0.0,
+          "val_logloss": 0.6657632510330034,
+          "val_brier": 0.2364979716911678,
+          "selected_l2": 0.0,
+          "selected_l2_b": 0.0,
+          "rank_weight_alpha": 0.0
+        }
+      },
+      "hits_2plus": {
+        "enabled": true,
+        "mode": "affine_logit",
+        "a": 1.0513607438535388,
+        "b": -0.32538529683931583,
+        "diag": {
+          "n": 5880,
+          "iters": 5,
+          "nll_before": 4656.778179755729,
+          "nll_after": 3225.8831078684916,
+          "sum_w": 5880.0,
+          "prior_a": 1.0,
+          "prior_b": 0.0,
+          "l2_a": 0.0,
+          "l2_b": 0.0,
+          "val_logloss": 0.529150220202657,
+          "val_brier": 0.17343409561504042,
+          "selected_l2": 0.0,
+          "selected_l2_b": 0.0,
+          "rank_weight_alpha": 0.0
+        }
+      },
+      "doubles_1plus": {
+        "enabled": true,
+        "mode": "affine_logit",
+        "a": 0.5871271567269746,
+        "b": -0.8090569755584679,
+        "diag": {
+          "n": 5880,
+          "iters": 5,
+          "nll_before": 2858.1490756445282,
+          "nll_after": 2600.028081269776,
+          "sum_w": 5880.0,
+          "prior_a": 1.0,
+          "prior_b": 0.0,
+          "l2_a": 3.0,
+          "l2_b": 3.0,
+          "val_logloss": 0.4309843041018146,
+          "val_brier": 0.13136587534961522,
+          "selected_l2": 3.0,
+          "selected_l2_b": 3.0,
+          "rank_weight_alpha": 0.0
+        }
+      },
+      "triples_1plus": {
+        "enabled": true,
+        "mode": "affine_logit",
+        "a": 1.018906936327287,
+        "b": -0.057270724083279476,
+        "diag": {
+          "n": 5880,
+          "iters": 4,
+          "nll_before": 586.9708784926979,
+          "nll_after": 577.5690242834963,
+          "sum_w": 5880.0,
+          "prior_a": 1.0,
+          "prior_b": 0.0,
+          "l2_a": 3.0,
+          "l2_b": 3.0,
+          "val_logloss": 0.09858393591519904,
+          "val_brier": 0.021055607888030927,
+          "selected_l2": 3.0,
+          "selected_l2_b": 3.0,
+          "rank_weight_alpha": 0.0
+        }
+      },
+      "runs_1plus": {
+        "enabled": true,
+        "mode": "affine_logit",
+        "a": 0.6826218068377331,
+        "b": -0.020058805367552203,
+        "diag": {
+          "n": 5880,
+          "iters": 4,
+          "nll_before": 1899.8586274700624,
+          "nll_after": 1690.8441246970997,
+          "sum_w": 2491.177877202579,
+          "prior_a": 1.0,
+          "prior_b": 0.0,
+          "l2_a": 0.0,
+          "l2_b": 0.0,
+          "val_logloss": 0.6719755840069231,
+          "val_brier": 0.23955758176893546,
+          "selected_l2": 0.0,
+          "selected_l2_b": 0.0,
+          "rank_weight_alpha": 0.75
+        }
+      },
+      "rbi_1plus": {
+        "enabled": true,
+        "mode": "affine_logit",
+        "a": 0.4310097248939278,
+        "b": -0.41118767232461834,
+        "diag": {
+          "n": 5880,
+          "iters": 4,
+          "nll_before": 3725.0251114800167,
+          "nll_after": 3647.5615147718654,
+          "sum_w": 5880.0,
+          "prior_a": 1.0,
+          "prior_b": 0.0,
+          "l2_a": 0.0,
+          "l2_b": 0.0,
+          "val_logloss": 0.6103698685239848,
+          "val_brier": 0.20983588579663118,
+          "selected_l2": 0.0,
+          "selected_l2_b": 0.0,
+          "rank_weight_alpha": 0.0
+        }
+      },
+      "sb_1plus": {
+        "enabled": true,
+        "mode": "affine_logit",
+        "a": 0.86165747895047,
+        "b": -0.0520493255454471,
+        "diag": {
+          "n": 5880,
+          "iters": 6,
+          "nll_before": 2167.4173727715715,
+          "nll_after": 1674.6755223035398,
+          "sum_w": 5880.0,
+          "prior_a": 1.0,
+          "prior_b": 0.0,
+          "l2_a": 0.0,
+          "l2_b": 0.0,
+          "val_logloss": 0.29608560941098283,
+          "val_brier": 0.08151689160442933,
+          "selected_l2": 0.0,
+          "selected_l2_b": 0.0,
+          "rank_weight_alpha": 0.0
+        }
+      }
+    }
+  },
+  "generated_at": "2026-05-18T09:13:34.330743"
+}

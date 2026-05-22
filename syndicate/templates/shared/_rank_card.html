@@ -1,0 +1,21 @@
+<article class="rank-card">
+  <div class="rank-card__header">
+    <div>
+      {% if card.eyebrow %}<div class="section-label">{{ card.eyebrow }}</div>{% endif %}
+      <h3>{{ card.title }}</h3>
+    </div>
+    {% if card.badge %}<span class="status-pill">{{ card.badge }}</span>{% endif %}
+  </div>
+  {% if card.meta %}<div class="rank-card__meta">{{ card.meta }}</div>{% endif %}
+  {% with metrics=card.metrics %}
+    {% include 'shared/_metric_list.html' %}
+  {% endwith %}
+  {% with eyebrow='Summary', title='Why it stands out', body=card.summary, list_items=card.list_items %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+  {% if card.href %}
+    <div class="action-row">
+      <a class="cards-nav-pill" href="{{ card.href }}">{{ card.href_label or 'Open details' }}</a>
+    </div>
+  {% endif %}
+</article>

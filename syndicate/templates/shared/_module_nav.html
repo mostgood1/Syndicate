@@ -1,0 +1,7 @@
+{% if links %}
+  <div class="module-nav" aria-label="Module navigation">
+    {% for link in links %}
+      <a class="cards-nav-pill{% if link.active %} cards-nav-pill--active{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+    {% endfor %}
+  </div>
+{% endif %}

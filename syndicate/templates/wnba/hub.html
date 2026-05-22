@@ -1,0 +1,32 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | WNBA{% endblock %}
+{% block page_title %}WNBA Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/wnba', title='WNBA is now the first non-MLB module', status='In progress', body='WNBA now has cards, picks, props, a real hub, a betting-card lane, live lens, and a stored-date daily archive running on shared Syndicate surfaces, so the second sport has a real historical lane instead of only day-of boards.', action_href='/wnba/cards?date=' ~ today_date, action_label='Open WNBA cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Stored daily slates', title='Recent WNBA processed dates', body='The hub now surfaces the stored WNBA slate dates already present in the source repo, so you can launch the shared board family from real processed artifacts instead of a static landing page.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="Available WNBA slates">
+    {% for slate_date in recent_slates %}
+      <article class="sport-card">
+        <div class="section-label">Stored slate</div>
+        <h3>{{ slate_date }}</h3>
+        <p>Open the daily archive, betting-card board, cards board, picks board, props board, or live-lens board for this stored WNBA date.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/wnba/archive?date={{ slate_date }}">Daily archive</a>
+          <a class="cards-nav-pill" href="/wnba/season/{{ slate_date[:4] }}/betting-card?date={{ slate_date }}">Betting Card</a>
+          <a class="cards-nav-pill" href="/wnba/cards?date={{ slate_date }}">Cards</a>
+          <a class="cards-nav-pill" href="/wnba/picks?date={{ slate_date }}">Picks</a>
+          <a class="cards-nav-pill" href="/wnba/props?date={{ slate_date }}">Props</a>
+          <a class="cards-nav-pill" href="/wnba/live-lens?date={{ slate_date }}">Live Lens</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}

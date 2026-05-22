@@ -1,0 +1,109 @@
+{% extends "shared/base.html" %}
+
+{% block title %}{% if season %}Syndicate | {{ intro_title }}{% else %}{{ intro_title }} - {{ date }}{% endif %}{% endblock %}
+{% block page_title %}{{ intro_title }}{% endblock %}
+
+{% block extra_head %}
+  {% if season %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='mlb/cards.css') }}" />
+  {% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='mlb/live_lens.css') }}" />
+{% endblock %}
+
+{% block content %}
+  {% if season %}
+    <div class="season-shell">
+      <header class="season-header">
+        <div class="season-title-block">
+          <div class="season-kicker">Intraday recommendation monitor</div>
+          <div class="season-title-row">
+            <h1>{{ intro_title }}</h1>
+            <span class="cards-nav-pill is-active">{{ season }}</span>
+          </div>
+          <p id="liveLensMeta" class="season-header-meta">Loading live lens…</p>
+        </div>
+        <div class="season-header-actions">
+          <a class="cards-nav-pill" href="{{ back_href }}">{{ back_label }}</a>
+          <a class="cards-nav-pill" href="{{ daily_accuracy_href }}">Live Lens Accuracy</a>
+          <a class="cards-nav-pill" href="{{ market_accuracy_href }}">Market Accuracy</a>
+          <a class="cards-nav-pill" href="/mlb/season/{{ season }}?date={{ date }}">Season review</a>
+          <a class="cards-nav-pill" href="/mlb/season/{{ season }}/betting-card?date={{ date }}">Betting card</a>
+          <a class="cards-nav-pill" href="/mlb/cards?date={{ date }}">Cards board</a>
+          <form class="date-form" method="get" action="{{ form_action }}">
+            <label>
+              Date
+              <input type="date" name="date" value="{{ date }}" />
+            </label>
+            <button type="submit">Load</button>
+          </form>
+        </div>
+      </header>
+
+      <section id="liveLensMonths" class="season-months" aria-label="Live lens month filters"></section>
+
+      <main class="season-layout">
+        <aside class="season-day-rail">
+          <div class="season-rail-head">
+            <div>
+              <div class="season-kicker">Live-lens days</div>
+              <div class="season-rail-title">Browse the slate</div>
+            </div>
+          </div>
+          <div class="season-day-list" id="liveLensDays">
+            <div class="cards-loading-state">Loading season days...</div>
+          </div>
+        </aside>
+
+        <section class="season-main">
+          <section class="panel">
+            <div class="panel-title">Overview</div>
+            <pre id="liveLensOverview" class="pre"></pre>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">Games</div>
+            <div id="liveLensGames"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+  {% else %}
+    <div class="container">
+      <header class="header">
+        <div class="breadcrumbs">
+          <a href="{{ back_href }}">← {{ back_label }}</a>
+        </div>
+        <h1>{{ intro_title }} - {{ date }}</h1>
+        <form class="date-form" method="get" action="{{ form_action }}">
+          <label>
+            Date
+            <input type="date" name="date" value="{{ date }}" />
+          </label>
+          <button type="submit">Load</button>
+        </form>
+        <div id="liveLensMeta" class="status-line">Loading live lens…</div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-title">Overview</div>
+        <pre id="liveLensOverview" class="pre"></pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Games</div>
+        <div id="liveLensGames"></div>
+      </section>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    window.MLBLiveLensBootstrap = {
+      date: {{ date|tojson }},
+      season: {{ season|tojson }},
+      apiPath: {{ api_path|tojson }}
+    };
+  </script>
+  <script src="{{ url_for('static', filename='mlb/live_lens.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,3989 @@
+from __future__ import annotations
+
+import json
+import re
+import sys
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+from datetime import date, timedelta
+from tempfile import TemporaryDirectory
+
+from syndicate.app import create_app
+from syndicate.features.mlb.cards import source_card_detail_payload
+from syndicate.features.mlb.cards import source_cards_api_payload
+from syndicate.features.mlb.cards import _apply_source_live_prop_ranking_scores
+from syndicate.features.mlb.sources import daily_artifact_path
+from syndicate.features.mlb.sources import available_daily_summary_dates
+from syndicate.features.mlb.sources import raw_feed_live_path
+from syndicate.features.nba.cards import build_cards_api_payload as build_nba_cards_api_payload
+from syndicate.features.nba.cards import build_cards_page_context as build_nba_cards_page_context
+from syndicate.features.nba.betting_card import build_season_betting_card_manifest_payload
+from syndicate.features.nba.betting_card import build_season_betting_card_day_payload
+from syndicate.features.nba.live_game_accuracy import build_live_game_accuracy_payload
+from syndicate.features.nba.live_prop_accuracy import build_live_prop_accuracy_payload
+from syndicate.features.nba.betting_card import source_betting_card_js
+from syndicate.features.nba.betting_card import source_web_text
+from syndicate.features.nba.live_prop_audit import build_live_prop_audit_payload
+from syndicate.features.nba.sources import default_date_for_season as default_nba_date_for_season
+from syndicate.features.nba.sources import processed_path as nba_processed_path
+from syndicate.features.wnba.sources import default_date_for_season as default_wnba_date_for_season
+from syndicate.features.nhl.cards import build_source_bundle_payload as build_nhl_source_bundle_payload
+from syndicate.features.nfl.cards import build_cards_page_context as build_nfl_cards_page_context
+from syndicate.features.nfl.game_detail import build_game_detail_page_context as build_nfl_game_detail_page_context
+from syndicate.features.nfl.picks import build_picks_page_context as build_nfl_picks_page_context
+from syndicate.features.nfl.sources import available_weeks as available_nfl_weeks
+from syndicate.features.nfl.sources import data_path as nfl_data_path
+from syndicate.features.nfl.sources import week_summaries as nfl_week_summaries
+from syndicate.features.ncaaf.cards import build_cards_page_context as build_ncaaf_cards_page_context
+from syndicate.features.ncaaf.game_detail import build_game_detail_page_context as build_ncaaf_game_detail_page_context
+from syndicate.features.ncaaf.picks import build_picks_page_context as build_ncaaf_picks_page_context
+from syndicate.features.mlb.hub import build_hub_context as build_mlb_hub_context
+from syndicate.features.nhl.sources import processed_path as nhl_processed_path
+from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
+from syndicate.features.ncaab.season import build_season_page_context
+from syndicate.features.ncaab.cards import build_cards_page_context as build_ncaab_cards_page_context
+from syndicate.features.ncaab.game_detail import build_game_detail_page_context as build_ncaab_game_detail_page_context
+from syndicate.features.ncaab.results_archive import build_results_archive_page_context as build_ncaab_results_archive_page_context
+from syndicate.features.ncaab.sources import _mirror_path as ncaab_mirror_path
+from syndicate.features.ncaab.sources import default_season_date as default_ncaab_season_date
+from syndicate.features.ncaab.sources import latest_date as latest_ncaab_date
+from syndicate.features.ncaab.sources import season_for_date as ncaab_season_for_date
+from syndicate.features.ncaaf.sources import data_path as ncaaf_data_path
+from syndicate.features.ncaaf.sources import default_season as default_ncaaf_season
+from syndicate.features.shared.discrete_nav import neighboring_values
+from syndicate.features.shared.date_archive import selected_first_rank_cards
+from syndicate.features.shared.date_archive import windowed_discrete_dates
+from syndicate.features.shared.rank_board import build_rank_page_context
+from syndicate.features.wnba.live_game_accuracy import build_live_game_accuracy_payload as build_wnba_live_game_accuracy_payload
+from syndicate.features.wnba.live_prop_accuracy import build_live_prop_accuracy_payload as build_wnba_live_prop_accuracy_payload
+from syndicate.features.wnba.live_prop_audit import build_live_prop_audit_payload as build_wnba_live_prop_audit_payload
+from syndicate.features.wnba.sources import processed_path as wnba_processed_path
+from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
+from syndicate.features.wnba.sources import available_dates as wnba_available_dates
+
+
+class DateArchiveHelperTests(unittest.TestCase):
+    def test_rank_board_preserves_explicit_source_title_for_sample_backed_contexts(self) -> None:
+        context = build_rank_page_context(
+            selected_date="2026-05-17",
+            route_path="/test",
+            intro_title="Test",
+            intro_body="Test body",
+            aria_label="Test board",
+            source_path="artifact.json",
+            source_title="NCAAF recommendations snapshot",
+            rank_cards=[{"title": "Sample row"}],
+            using_sample_data=True,
+            header_stats=[],
+            module_links=[],
+        )
+
+        self.assertTrue(context["using_sample_data"])
+        self.assertEqual(context["source_title"], "NCAAF recommendations snapshot")
+
+    def test_mlb_cards_api_payload_exposes_artifact_data_alias(self) -> None:
+        payload = source_cards_api_payload(
+            {
+                "date": "2026-05-17",
+                "prev_date": "2026-05-16",
+                "next_date": "2026-05-18",
+                "games": [],
+                "scoreboard_items": [],
+                "source_path": "artifact.json",
+                "using_sample_data": False,
+                "board_contract": {},
+            }
+        )
+
+        self.assertFalse(payload["using_sample_data"])
+        self.assertFalse(payload["usingSampleData"])
+        self.assertTrue(payload["hasSampleData"])
+        self.assertTrue(payload["hasArtifactData"])
+
+    def test_mlb_source_card_detail_preserves_source_snapshot_status_and_ids(self) -> None:
+        actual_payload = {
+            "gameData": {
+                "status": {
+                    "abstractGameCode": "F",
+                    "abstractGameState": "Final",
+                    "codedGameState": "O",
+                    "detailedState": "Game Over",
+                    "startTimeTBD": False,
+                    "statusCode": "O",
+                },
+                "teams": {
+                    "away": {"abbreviation": "TEX"},
+                    "home": {"abbreviation": "COL"},
+                },
+            },
+            "liveData": {
+                "linescore": {
+                    "currentInning": 9,
+                    "inningHalf": "Bottom",
+                    "outs": 3,
+                    "teams": {
+                        "away": {"runs": 3},
+                        "home": {"runs": 4},
+                    },
+                },
+                "boxscore": {
+                    "teams": {
+                        "away": {"players": {}},
+                        "home": {"players": {}},
+                    }
+                },
+                "plays": {
+                    "currentPlay": {
+                        "count": {"balls": 1, "strikes": 0},
+                        "matchup": {
+                            "batter": {"id": 664983, "fullName": "Jake McCarthy"},
+                            "pitcher": {"id": 656641, "fullName": "Jacob Latz"},
+                        },
+                    }
+                },
+            },
+        }
+
+        with patch("syndicate.features.mlb.cards._daily_sim_by_game", return_value={}):
+            with patch("syndicate.features.mlb.cards._daily_actual_by_game", return_value={824355: actual_payload}):
+                with patch("syndicate.features.mlb.cards._live_lens_game_row", return_value=None):
+                    payload = source_card_detail_payload("2026-05-20", 824355)
+
+        self.assertEqual(payload.get("snapshot", {}).get("status", {}).get("abstractGameCode"), "F")
+        self.assertEqual(payload.get("snapshot", {}).get("status", {}).get("statusCode"), "O")
+        self.assertEqual(payload.get("snapshot", {}).get("current", {}).get("halfInning"), "bottom")
+        self.assertEqual(payload.get("snapshot", {}).get("current", {}).get("batter", {}).get("id"), 664983)
+        self.assertEqual(payload.get("snapshot", {}).get("current", {}).get("pitcher", {}).get("id"), 656641)
+
+    def test_mlb_games_from_daily_summary_sets_first1_signal(self) -> None:
+        from syndicate.features.mlb.cards import _games_from_daily_summary
+
+        summary = {
+            "date": "2026-05-20",
+            "outputs": [
+                {
+                    "game_pk": 123,
+                    "away": "CIN",
+                    "home": "PHI",
+                    "starter_names": {"away": "Away Starter", "home": "Home Starter"},
+                    "first1": {
+                        "nrfi_prob": 0.61,
+                        "away_runs_mean": 0.31,
+                        "home_runs_mean": 0.35,
+                        "away_win_prob": 0.42,
+                        "home_win_prob": 0.58,
+                    },
+                    "first3": {},
+                    "first5": {},
+                    "full": {},
+                }
+            ],
+        }
+
+        games = _games_from_daily_summary(summary)
+
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0].get("first1BetSignal", {}).get("label"), "F1 NRFI")
+        self.assertEqual(games[0].get("first1BetSignal", {}).get("tone"), "nrfi")
+
+    def test_mlb_source_probable_keeps_pregame_badges_out_of_mini_lane(self) -> None:
+        from syndicate.features.mlb.cards import _source_probable
+
+        output = {"starter_names": {"away": "Away Starter", "home": "Home Starter"}}
+        betting_game = {
+            "markets": {
+                "pitcherProps": [
+                    {
+                        "pitcher_name": "Away Starter",
+                        "pitcher_id": 101,
+                        "prop": "outs",
+                        "selection": "over",
+                        "market_line": 13.5,
+                        "model_prob_over": 0.61,
+                        "odds": -110,
+                        "edge": 0.04,
+                    }
+                ]
+            }
+        }
+
+        probable = _source_probable(output, betting_game=betting_game)
+
+        self.assertIn("ladderBadges", probable["away"])
+        self.assertIn("pregameLadderBadges", probable["away"])
+        self.assertNotIn("miniLadderBadges", probable["away"])
+        self.assertEqual(probable["away"]["ladderBadges"][0]["label"], probable["away"]["pregameLadderBadges"][0]["label"])
+
+    def test_mlb_live_prop_ranking_scores_can_load_from_local_mirror_only(self) -> None:
+        module_name = "syndicate_mlb_source_live_prop_ranking"
+        sys.modules.pop(module_name, None)
+        try:
+            with TemporaryDirectory() as temp_dir:
+                mirror_root = Path(temp_dir)
+                cfg_path = mirror_root / "data" / "tuning" / "live_prop_ranking" / "default.json"
+                cfg_path.parent.mkdir(parents=True, exist_ok=True)
+                cfg_path.write_text(
+                    json.dumps(
+                        {
+                            "enabled": True,
+                            "default": {
+                                "enabled": True,
+                                "mode": "logistic_linear",
+                                "intercept": 0.0,
+                                "weights": {"live_edge": 2.0},
+                                "feature_names": ["live_edge"],
+                                "probability_floor": 0.03,
+                                "probability_ceiling": 0.9,
+                            },
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                predictor_path = mirror_root / "sim_engine" / "live_prop_ranking.py"
+                predictor_path.parent.mkdir(parents=True, exist_ok=True)
+                predictor_path.write_text(
+                    "from __future__ import annotations\n"
+                    "def predict_live_prop_win_probability(row, cfg, *, prop_key=None):\n"
+                    "    return 0.77\n",
+                    encoding="utf-8",
+                )
+
+                with patch("syndicate.features.mlb.cards._source_live_prop_ranking_roots", return_value=[mirror_root]):
+                    rows = _apply_source_live_prop_ranking_scores(
+                        [
+                            {
+                                "pitcher_name": "Test Pitcher",
+                                "prop": "outs",
+                                "market": "pitcher",
+                                "selection": "over",
+                                "live_edge": 0.12,
+                                "market_line": 15.5,
+                                "model_prob_over": 0.61,
+                            }
+                        ]
+                    )
+
+            self.assertEqual(len(rows), 1)
+            self.assertAlmostEqual(rows[0]["ranking_score"], 0.77)
+            self.assertAlmostEqual(rows[0]["estimated_win_prob"], 0.77)
+            self.assertEqual(rows[0]["rank"], 1)
+        finally:
+            sys.modules.pop(module_name, None)
+
+    def test_mlb_daily_artifact_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "mlb_source"
+            sibling_root = root / "MLB-BettingV2"
+            sibling_file = sibling_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(
+                    daily_artifact_path("2026-05-17"),
+                    local_root / "data" / "daily" / "daily_summary_2026_05_17.json",
+                )
+
+    def test_mlb_available_daily_summary_dates_do_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "mlb_source"
+            sibling_root = root / "MLB-BettingV2"
+            sibling_file = sibling_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(available_daily_summary_dates(), [])
+
+    def test_mlb_raw_feed_live_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "mlb_source"
+            sibling_root = root / "MLB-BettingV2"
+            sibling_file = sibling_root / "data" / "raw" / "statsapi" / "feed_live" / "2026" / "2026-05-17" / "123.json"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertIsNone(raw_feed_live_path("2026-05-17", 123))
+
+    def test_mlb_hr_targets_context_backfills_from_daily_summary_when_artifact_is_sparse(self) -> None:
+        from syndicate.features.mlb.hr_targets import build_hr_targets_page_context
+
+        hr_targets_summary = {
+            "rows": [
+                {
+                    "player_name": "Juan Soto",
+                    "team": "NYM",
+                    "matchup": "NYM @ WSH",
+                    "p_hr_1plus": 0.136,
+                    "hr_support_score": 88.2,
+                    "hr_target_summary": "Strong blend of power and matchup.",
+                    "hr_target_reasons": ["Elite power form."],
+                },
+                {
+                    "player_name": "Aaron Judge",
+                    "team": "NYY",
+                    "matchup": "TOR @ NYY",
+                    "p_hr_1plus": 0.107,
+                    "hr_support_score": 84.6,
+                    "hr_target_summary": "Top raw HR probability on the slate.",
+                    "hr_target_reasons": ["Massive power ceiling."],
+                },
+            ]
+        }
+        daily_summary = {
+            "outputs": [
+                {
+                    "away": "TOR",
+                    "home": "NYY",
+                    "hitter_hr_likelihood_all": {
+                        "overall": [
+                            {
+                                "name": "Ben Rice",
+                                "team": "NYY",
+                                "p_hr_1plus_cal": 0.138,
+                                "hr_mean": 0.15,
+                                "pa_mean": 4.8,
+                                "lineup_order": 1,
+                            },
+                            {
+                                "name": "Aaron Judge",
+                                "team": "NYY",
+                                "p_hr_1plus_cal": 0.107,
+                                "hr_mean": 0.12,
+                                "pa_mean": 4.6,
+                                "lineup_order": 2,
+                            },
+                        ]
+                    },
+                },
+                {
+                    "away": "ATL",
+                    "home": "MIA",
+                    "hitter_hr_likelihood_all": {
+                        "overall": [
+                            {
+                                "name": "Matt Olson",
+                                "team": "ATL",
+                                "p_hr_1plus_cal": 0.101,
+                                "hr_mean": 0.10,
+                                "pa_mean": 4.4,
+                                "lineup_order": 3,
+                            }
+                        ]
+                    },
+                },
+            ]
+        }
+
+        def _load_json_side_effect(path):
+            path_text = str(path)
+            if path_text.endswith("_hr_targets.json"):
+                return hr_targets_summary
+            if path_text.endswith("daily_summary_2026_05_21.json"):
+                return daily_summary
+            return None
+
+        with patch("syndicate.features.mlb.hr_targets.load_json_file", side_effect=_load_json_side_effect):
+            context = build_hr_targets_page_context("2026-05-21")
+
+        targets = context.get("targets") or []
+        self.assertEqual([target.get("player_name") for target in targets[:4]], ["Juan Soto", "Aaron Judge", "Ben Rice", "Matt Olson"])
+        self.assertEqual(targets[2].get("matchup"), "TOR @ NYY")
+        self.assertEqual(targets[3].get("matchup"), "ATL @ MIA")
+
+    def test_mlb_pregame_badges_attach_from_daily_ladders(self) -> None:
+        from syndicate.features.mlb.cards import _attach_cards_pregame_starter_ladder_badges
+
+        games = [
+            {
+                "gamePk": 824031,
+                "status": {"abstract": "Pregame", "detailed": "Scheduled"},
+                "probable": {
+                    "away": {"id": 622663, "fullName": "Luis Severino"},
+                    "home": {"id": 1001, "fullName": "Home Starter"},
+                },
+            }
+        ]
+        ladders_doc = {
+            "groups": {
+                "pitcher": {
+                    "strikeouts": {
+                        "rows": [
+                            {
+                                "gamePk": 824031,
+                                "pitcherId": 622663,
+                                "pitcherName": "Luis Severino",
+                                "marketLine": 5.5,
+                                "ladder": [
+                                    {"total": 6, "hitProb": 0.399},
+                                    {"total": 7, "hitProb": 0.217},
+                                    {"total": 8, "hitProb": 0.11},
+                                ],
+                                "matchupSummary": "Projected lineup baseline K rate is elevated.",
+                            }
+                        ]
+                    },
+                    "outs": {
+                        "rows": [
+                            {
+                                "gamePk": 824031,
+                                "pitcherId": 622663,
+                                "pitcherName": "Luis Severino",
+                                "marketLine": 17.5,
+                                "ladder": [
+                                    {"total": 18, "hitProb": 0.33},
+                                    {"total": 19, "hitProb": 0.27},
+                                    {"total": 20, "hitProb": 0.21},
+                                ],
+                                "matchupSummary": "Workload projects deep enough for an outs ladder.",
+                            }
+                        ]
+                    },
+                }
+            }
+        }
+
+        with patch("syndicate.features.mlb.cards.load_json_file", return_value=ladders_doc):
+            _attach_cards_pregame_starter_ladder_badges(games, selected_date="2026-05-21")
+
+        away_badges = games[0]["probable"]["away"].get("pregameLadderBadges") or []
+        self.assertEqual([badge.get("stat") for badge in away_badges], ["strikeouts", "outs"])
+        self.assertEqual(away_badges[0].get("label"), "K up to 7")
+        self.assertEqual(away_badges[1].get("label"), "O up to 19")
+        self.assertEqual(games[0]["probable"]["away"].get("ladderBadges"), away_badges)
+
+    def test_mlb_stateful_badges_attach_final_mini_ladder_settlement(self) -> None:
+        from syndicate.features.mlb.cards import _attach_cards_stateful_starter_ladder_badges
+
+        games = [
+            {
+                "gamePk": 321,
+                "status": {"abstract": "Final", "detailed": "Game Over"},
+                "probable": {
+                    "away": {
+                        "fullName": "Away Starter",
+                        "pregameLadderBadges": [
+                            {"label": "O 14+", "stat": "outs", "targets": [14, 15]}
+                        ],
+                    }
+                },
+            }
+        ]
+
+        actual_payload = {
+            "liveData": {
+                "boxscore": {
+                    "teams": {
+                        "away": {
+                            "players": {
+                                "ID101": {
+                                    "person": {"fullName": "Away Starter"},
+                                    "stats": {"pitching": {"outs": 15}},
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        _attach_cards_stateful_starter_ladder_badges(
+            games,
+            selected_date="2026-05-20",
+            sim_games={},
+            actual_games={321: actual_payload},
+        )
+
+        settled = games[0]["probable"]["away"].get("miniLadderBadges") or []
+        self.assertEqual(settled[0].get("source"), "final")
+        self.assertEqual(settled[0].get("label"), "O +2 (15)")
+
+    def test_mlb_stateful_badges_attach_live_mini_ladder_rows(self) -> None:
+        from syndicate.features.mlb.cards import _attach_cards_stateful_starter_ladder_badges
+
+        games = [
+            {
+                "gamePk": 654,
+                "status": {"abstract": "Live", "detailed": "In Progress"},
+                "probable": {
+                    "away": {"fullName": "Away Starter"},
+                    "home": {"fullName": "Home Starter"},
+                },
+            }
+        ]
+
+        sim_payload = {
+            "sim": {
+                "pitcher_props": {
+                    "101": {
+                        "outs_mean": 18.0,
+                        "outs_dist": {"14": 0.05, "15": 0.20, "16": 0.35, "17": 0.25, "18": 0.15},
+                    }
+                }
+            }
+        }
+        actual_payload = {
+            "gameData": {
+                "probablePitchers": {
+                    "away": {"id": 101, "fullName": "Away Starter"},
+                    "home": {"id": 202, "fullName": "Home Starter"},
+                }
+            },
+            "liveData": {
+                "linescore": {"currentInning": 1, "inningHalf": "Top", "outs": 0},
+                "boxscore": {
+                    "teams": {
+                        "away": {
+                            "players": {
+                                "ID101": {
+                                    "person": {"fullName": "Away Starter"},
+                                    "stats": {"pitching": {"outs": 6}},
+                                }
+                            }
+                        },
+                        "home": {"players": {}},
+                    }
+                },
+            },
+        }
+        market_lines = {
+            "away starter": {
+                "outs": {
+                    "line": 13.5,
+                    "over_odds": -110,
+                    "under_odds": -110,
+                    "alternates": [
+                        {"line": 14.5, "over_odds": 115, "under_odds": -145},
+                        {"line": 15.5, "over_odds": 170, "under_odds": -210},
+                    ],
+                }
+            }
+        }
+
+        with patch("syndicate.features.mlb.cards._pitcher_snapshot_market_lines", return_value=market_lines):
+            _attach_cards_stateful_starter_ladder_badges(
+                games,
+                selected_date="2026-05-20",
+                sim_games={654: sim_payload},
+                actual_games={654: actual_payload},
+            )
+
+        live_badges = games[0]["probable"]["away"].get("miniLadderBadges") or []
+        self.assertEqual(live_badges[0].get("source"), "live")
+        self.assertEqual(live_badges[0].get("label"), "O 15/16")
+        self.assertEqual(live_badges[0].get("targets"), [15, 16])
+        self.assertNotIn("miniLadderBadges", games[0]["probable"]["home"])
+
+    def test_nba_cards_api_fast_path_normalizes_artifact_flags(self) -> None:
+        with patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={
+                "date": "2026-05-17",
+                "requested_date": "2026-05-17",
+                "games": [{"gamePk": "1"}],
+                "scoreboard_items": [],
+                "source_path": "artifact.json",
+                "using_sample_data": False,
+                "board_contract": {},
+            },
+        ):
+            payload = build_nba_cards_api_payload("2026-05-17")
+
+        self.assertFalse(payload["using_sample_data"])
+        self.assertFalse(payload["usingSampleData"])
+        self.assertTrue(payload["hasSampleData"])
+        self.assertTrue(payload["hasArtifactData"])
+
+    def test_windowed_discrete_dates_centers_selected_date(self) -> None:
+        dates = [f"2026-05-{day:02d}" for day in range(1, 19)]
+
+        window = windowed_discrete_dates(dates, "2026-05-10", limit=5)
+
+        self.assertEqual(window, ["2026-05-12", "2026-05-11", "2026-05-10", "2026-05-09", "2026-05-08"])
+
+    def test_windowed_discrete_dates_falls_back_to_latest(self) -> None:
+        dates = ["2026-05-09", "2026-05-15", "2026-05-18"]
+
+        window = windowed_discrete_dates(dates, "2026-05-01", limit=12)
+
+        self.assertEqual(window, ["2026-05-18", "2026-05-15", "2026-05-09"])
+
+    def test_selected_first_rank_cards_prioritizes_selected_title(self) -> None:
+        cards = [
+            {"title": "2026-05-18", "badge": "3"},
+            {"title": "2026-05-15", "badge": "2"},
+            {"title": "2026-05-09", "badge": "1"},
+        ]
+
+        ordered = selected_first_rank_cards(cards, "2026-05-15")
+
+        self.assertEqual([card["title"] for card in ordered], ["2026-05-15", "2026-05-09", "2026-05-18"])
+
+    def test_nba_processed_path_prefers_local_artifact_mirror(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nba_source"
+            local_file = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            sibling_root = root.parent / "NBA-Betting"
+            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text("local", encoding="utf-8")
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(nba_processed_path("game_cards_2026-05-17.csv"), local_file)
+
+    def test_nba_processed_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nba_source"
+            sibling_root = root.parent / "NBA-Betting"
+            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(
+                    nba_processed_path("game_cards_2026-05-17.csv"),
+                    local_root / "data" / "processed" / "game_cards_2026-05-17.csv",
+                )
+
+    def test_nba_available_dates_do_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nba_source"
+            sibling_root = root.parent / "NBA-Betting"
+            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, sibling_root]):
+                from syndicate.features.nba.sources import available_dates as nba_available_dates
+
+                self.assertEqual(nba_available_dates(), [])
+
+    def test_nba_source_web_text_prefers_local_mirror(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nba_source"
+            local_file = local_root / "web" / "betting-card-v2.css"
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text("local-css", encoding="utf-8")
+
+            with patch("syndicate.features.nba.betting_card._artifact_root", return_value=local_root):
+                self.assertEqual(source_web_text("betting-card-v2.css"), "local-css")
+
+    def test_nba_source_web_text_returns_none_when_local_mirror_asset_is_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nba_source"
+            local_root.mkdir(parents=True, exist_ok=True)
+
+            with patch("syndicate.features.nba.betting_card._artifact_root", return_value=local_root):
+                self.assertIsNone(source_web_text("betting-card-v2.css"))
+
+    def test_nhl_processed_path_prefers_local_artifact_mirror(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nhl_source"
+            sibling_root = root / "NHL-Betting"
+            local_file = local_root / "data" / "processed" / "recommendations_2026-05-17.csv"
+            sibling_file = sibling_root / "data" / "processed" / "recommendations_2026-05-17.csv"
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text("local", encoding="utf-8")
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(nhl_processed_path("recommendations_2026-05-17.csv"), local_file)
+
+    def test_nhl_processed_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nhl_source"
+            sibling_root = root / "NHL-Betting"
+            sibling_file = sibling_root / "data" / "processed" / "recommendations_2026-05-17.csv"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(
+                    nhl_processed_path("recommendations_2026-05-17.csv"),
+                    local_root / "data" / "processed" / "recommendations_2026-05-17.csv",
+                )
+
+    def test_nhl_scoreboard_snapshot_path_prefers_local_artifact_mirror(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nhl_source"
+            sibling_root = root / "NHL-Betting"
+            local_file = local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
+            sibling_file = sibling_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text("local", encoding="utf-8")
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(nhl_scoreboard_snapshot_path("2026-05-17"), local_file)
+
+    def test_nhl_scoreboard_snapshot_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nhl_source"
+            sibling_root = root / "NHL-Betting"
+            sibling_file = sibling_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(
+                    nhl_scoreboard_snapshot_path("2026-05-17"),
+                    local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv",
+                )
+
+    def test_nhl_slate_summaries_do_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nhl_source"
+            sibling_root = root / "NHL-Betting"
+            sibling_file = sibling_root / "data" / "processed" / "recommendations_2026-05-17.csv"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("col\nvalue\n", encoding="utf-8")
+
+            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
+                from syndicate.features.nhl.sources import slate_summaries as nhl_slate_summaries
+
+                self.assertEqual(nhl_slate_summaries(), [])
+
+    def test_ncaaf_data_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "ncaaf_source"
+            sibling_root = root / "NCAAFCompare"
+            sibling_file = sibling_root / "data" / "recommendations_summary" / "index.json"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.ncaaf.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(
+                    ncaaf_data_path("recommendations_summary", "index.json"),
+                    local_root / "data" / "recommendations_summary" / "index.json",
+                )
+
+    def test_ncaab_mirror_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "ncaab_source"
+            sibling_root = root / "NCAAB"
+            sibling_file = sibling_root / "api" / "display_prediction_dates.json"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.ncaab.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(
+                    ncaab_mirror_path("display_prediction_dates.json"),
+                    local_root / "api" / "display_prediction_dates.json",
+                )
+
+    def test_nfl_data_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nfl_source"
+            sibling_root = root / "NFL-Betting" / "nfl_compare" / "data"
+            sibling_file = sibling_root / "current_week.json"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.nfl.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(
+                    nfl_data_path("current_week.json"),
+                    local_root / "current_week.json",
+                )
+
+    def test_nfl_week_summaries_do_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nfl_source"
+            sibling_root = root / "NFL-Betting" / "nfl_compare" / "data"
+            sibling_file = sibling_root / "upcoming_recs_2025_wk7.csv"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("col\nvalue\n", encoding="utf-8")
+
+            with patch("syndicate.features.nfl.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(nfl_week_summaries(), [])
+
+    def test_wnba_api_live_state_uses_local_builder_without_source_proxy(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "date": "2026-05-21",
+            "ttl": 12,
+            "games": [{"game_id": "77", "away": "NYL", "home": "LAS", "status": "Live", "in_progress": True, "final": False}],
+        }
+
+        with patch(
+            "syndicate.blueprints.wnba.build_live_state_payload",
+            return_value=local_payload,
+        ), patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for live state"),
+        ):
+            response = client.get("/wnba/api/live_state?date=2026-05-21&ttl=12")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+
+    def test_wnba_api_live_lines_uses_local_builder_without_source_proxy(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-05-21",
+            "games": [{"event_id": "evt-1", "found": False}],
+        }
+
+        with patch(
+            "syndicate.blueprints.wnba.build_live_lines_payload",
+            return_value=local_payload,
+        ), patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for live lines"),
+        ):
+            response = client.get("/wnba/api/live_lines?date=2026-05-21&event_ids=evt-1&include_period_totals=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+
+    def test_wnba_api_source_team_logo_fetches_official_logo_without_source_proxy(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        class _FakeLogoResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return b"<svg xmlns='http://www.w3.org/2000/svg'></svg>"
+
+        with patch(
+            "syndicate.blueprints.wnba.urlopen",
+            return_value=_FakeLogoResponse(),
+        ):
+            response = client.get("/wnba/api/source/team-logo/LAS")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "image/svg+xml")
+        self.assertEqual(response.headers.get("Cache-Control"), "public, max-age=86400")
+
+    def test_wnba_api_source_cards_uses_local_builder_without_source_proxy(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {"date": "2026-05-21", "games": [{"away_tri": "GSV", "home_tri": "NYL"}]}
+
+        with patch(
+            "syndicate.blueprints.wnba.build_source_cards_payload",
+            return_value=local_payload,
+        ), patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for source cards"),
+        ):
+            response = client.get("/wnba/api/source/cards?date=2026-05-21")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+
+    def test_wnba_api_source_cards_sim_detail_uses_local_builder_without_source_proxy(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {"date": "2026-05-21", "players_included": True, "games": [{"away_tri": "GSV", "home_tri": "NYL"}]}
+
+        with patch(
+            "syndicate.blueprints.wnba.build_source_cards_sim_detail_payload",
+            return_value=local_payload,
+        ), patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for source card sim detail"),
+        ):
+            response = client.get("/wnba/api/source/cards/sim-detail?date=2026-05-21&away=GSV&home=NYL")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+
+    def test_wnba_api_source_cards_props_strip_uses_local_builder_without_source_proxy(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {"ok": True, "date": "2026-05-21", "items": [{"game_key": "GSV@NYL"}]}
+
+        with patch(
+            "syndicate.blueprints.wnba.build_source_cards_props_strip_payload",
+            return_value=local_payload,
+        ), patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for source props strip"),
+        ):
+            response = client.get("/wnba/api/source/cards/props-strip?date=2026-05-21&limit=12&per_game_limit=4")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+
+    def test_wnba_source_asset_routes_use_vendored_static_files_without_sibling_lookup(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        script_response = client.get("/wnba/cards-parity.js")
+        cards_css_response = client.get("/wnba/cards-parity.css")
+        base_css_response = client.get("/wnba/styles.css")
+
+        self.assertEqual(script_response.status_code, 200)
+        self.assertEqual(script_response.mimetype, "application/javascript")
+        self.assertIn("function viewportMode()", script_response.get_data(as_text=True))
+
+        self.assertEqual(cards_css_response.status_code, 200)
+        self.assertEqual(cards_css_response.mimetype, "text/css")
+        self.assertIn("--cards-bg:", cards_css_response.get_data(as_text=True))
+
+        self.assertEqual(base_css_response.status_code, 200)
+        self.assertEqual(base_css_response.mimetype, "text/css")
+        self.assertIn("scoreboard-strip", base_css_response.get_data(as_text=True))
+
+    def test_nhl_cards_empty_slate_does_not_inject_fake_sample_game(self) -> None:
+        with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-05-17", "2026-05-17", False)):
+            with patch("syndicate.features.nhl.cards._games_from_artifact", return_value=([], "missing_predictions.csv")):
+                with patch("syndicate.features.nhl.cards._games_from_scoreboard_snapshot", return_value=([], "missing_scoreboard.csv")):
+                    from syndicate.features.nhl.cards import build_cards_page_context as build_nhl_cards_page_context
+
+                    context = build_nhl_cards_page_context("2026-05-17")
+
+        self.assertEqual(context.get("date"), "2026-05-17")
+        self.assertEqual(context.get("requested_date"), "2026-05-17")
+        self.assertFalse(context.get("lookahead_applied"))
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("scoreboard_items"), [])
+        self.assertEqual(context.get("source_title"), "NHL cards unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        self.assertEqual((context.get("header_stats") or [None, None])[1], {"label": "Source", "value": "No data"})
+
+    def test_nhl_cards_bundle_empty_slate_preserves_empty_state(self) -> None:
+        with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-05-17", "2026-05-17", False)):
+            with patch("syndicate.features.nhl.cards._prediction_bundle_rows", return_value=([], "missing_predictions.csv")):
+                with patch("syndicate.features.nhl.cards._recommendation_rows", return_value=([], "missing_recommendations.csv")):
+                    with patch("syndicate.features.nhl.cards._props_recommendation_rows", return_value=([], "missing_props.csv")):
+                        payload = build_nhl_source_bundle_payload("2026-05-17")
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("source_title"), "NHL cards unavailable")
+        self.assertEqual((payload.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        self.assertEqual((((payload.get("data") or {}).get("games") or {}).get("predictions") or {}).get("rows"), [])
+
+    def test_nhl_cards_use_archived_scoreboard_when_predictions_missing(self) -> None:
+        scoreboard_games = [
+            {
+                "gamePk": "2025020819",
+                "away_tri": "COL",
+                "away_name": "Colorado Avalanche",
+                "home_tri": "TOR",
+                "home_name": "Toronto Maple Leafs",
+                "away": {"abbr": "COL", "name": "Colorado Avalanche"},
+                "home": {"abbr": "TOR", "name": "Toronto Maple Leafs"},
+                "status": "Archived scoreboard",
+                "detail": "Final",
+                "summary": "Score COL 4 - 1 TOR",
+                "gameType": "NHL",
+                "metrics": [],
+                "panels": [],
+                "href": "/nhl",
+                "href_label": "Open NHL hub",
+            }
+        ]
+
+        with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-05-17", "2026-05-17", False)):
+            with patch("syndicate.features.nhl.cards._games_from_artifact", return_value=([], "missing_predictions.csv")):
+                with patch("syndicate.features.nhl.cards._games_from_scoreboard_snapshot", return_value=(scoreboard_games, "scoreboard.csv")):
+                    from syndicate.features.nhl.cards import build_cards_page_context as build_nhl_cards_page_context
+
+                    context = build_nhl_cards_page_context("2026-05-17")
+
+        self.assertEqual(context.get("date"), "2026-05-17")
+        self.assertEqual(context.get("requested_date"), "2026-05-17")
+        self.assertFalse(context.get("lookahead_applied"))
+        self.assertEqual([(game.get("away_tri"), game.get("home_tri")) for game in (context.get("games") or [])], [("COL", "TOR")])
+        self.assertEqual((context.get("scoreboard_items") or [{}])[0].get("label"), "COL @ TOR")
+        self.assertEqual(context.get("source_title"), "NHL archived scoreboard")
+        self.assertEqual((context.get("header_stats") or [None, None])[1], {"label": "Source", "value": "scoreboard.csv"})
+
+    def test_nhl_api_scoreboard_uses_local_snapshot_rows(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        with TemporaryDirectory() as temp_dir:
+            scoreboard_path = Path(temp_dir) / "scoreboard.csv"
+            scoreboard_path.write_text(
+                "gamePk,away,home,away_abbr,home_abbr,away_goals,home_goals,gameState,period,clock,period_disp,intermission\n"
+                "2025020819,Colorado Avalanche,Toronto Maple Leafs,COL,TOR,4,1,OFF,3,00:00,3rd,0\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.blueprints.nhl.scoreboard_snapshot_path", return_value=scoreboard_path):
+                response = client.get("/nhl/api/scoreboard?date=2026-05-17")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload, list)
+        self.assertEqual(payload[0]["gamePk"], "2025020819")
+        self.assertEqual(payload[0]["away"], "Colorado Avalanche")
+        self.assertEqual(payload[0]["home"], "Toronto Maple Leafs")
+        self.assertEqual(payload[0]["away_abbr"], "COL")
+        self.assertEqual(payload[0]["home_abbr"], "TOR")
+        self.assertEqual(payload[0]["away_goals"], "4")
+        self.assertEqual(payload[0]["home_goals"], "1")
+        self.assertEqual(payload[0]["gameState"], "OFF")
+
+
+class HomeBoardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        self.client = app.test_client()
+
+    def test_home_api_returns_rendered_sport_stack_html(self) -> None:
+        response = self.client.get("/api/home?date=2026-05-20")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        self.assertTrue(payload.get("ok"))
+        self.assertIsInstance(payload.get("sports"), list)
+        self.assertIn('class="sport-stack"', payload.get("html") or "")
+        self.assertIn('/mlb/cards?date=', payload.get("html") or "")
+        self.assertIn('client=source&amp;embed=home-cards', payload.get("html") or "")
+        self.assertIn('/mlb/hr-targets?date=', payload.get("html") or "")
+        self.assertIn('/mlb/pitcher-top-props?date=', payload.get("html") or "")
+        self.assertIn('/mlb/hitter-top-props?date=', payload.get("html") or "")
+        self.assertIn('>Compact game cards</h4>', payload.get("html") or "")
+        self.assertIn('>HR targets</h4>', payload.get("html") or "")
+        self.assertIn('>Pregame props</h4>', payload.get("html") or "")
+        self.assertIn('>Live props</h4>', payload.get("html") or "")
+
+    def test_home_api_honors_explicit_date_query(self) -> None:
+        response = self.client.get("/api/home?date=2026-05-20")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        html = payload.get("html") or ""
+        self.assertIn('/mlb/cards?date=2026-05-20&amp;client=source&amp;embed=home-cards', html)
+        self.assertIn('/mlb/hr-targets?date=2026-05-20', html)
+        self.assertIn('/mlb/pitcher-top-props?date=2026-05-20', html)
+        self.assertIn('/mlb/live-lens?date=2026-05-20', html)
+
+    def test_home_payload_force_refresh_bypasses_cached_html(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        home_module._HOME_PAYLOAD_CACHE.clear()
+        home_module._HOME_OVERVIEW_CACHE.clear()
+        app = self.client.application
+        with app.app_context():
+            with patch(
+                "syndicate.blueprints.home.build_home_overview",
+                side_effect=[
+                    [{"slug": "first", "show_on_home": True}],
+                    [{"slug": "second", "show_on_home": True}],
+                ],
+            ):
+                with patch(
+                    "syndicate.blueprints.home.render_template",
+                    side_effect=lambda template, sports: ",".join(str(item.get("slug") or "") for item in sports),
+                ):
+                    first = home_module._home_payload(selected_date="2026-05-20")
+                    second = home_module._home_payload(selected_date="2026-05-20", force_refresh=True)
+
+        self.assertEqual(first.get("html"), "first")
+        self.assertEqual(second.get("html"), "second")
+
+    def test_home_api_forces_refresh_for_poll_hydration(self) -> None:
+        with patch(
+            "syndicate.blueprints.home._home_payload",
+            return_value={"sports": [], "html": "<div></div>", "polled_at": 1.0},
+        ) as payload_mock:
+            response = self.client.get("/api/home?date=2026-05-20&_poll_ts=123")
+
+        self.assertEqual(response.status_code, 200)
+        payload_mock.assert_called_once_with(selected_date="2026-05-20", force_refresh=True)
+
+    def test_home_page_mounts_hydrated_sport_stack_container(self) -> None:
+        response = self.client.get("/")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="syndicate-home-sport-stack"', body)
+        self.assertIn('/api/home', body)
+
+    def test_home_page_renders_global_date_control_and_preserves_date_links(self) -> None:
+        response = self.client.get("/?date=2026-05-20")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="home-board-date"', body)
+        self.assertIn('value="2026-05-20"', body)
+        self.assertIn('href="/?date=2026-05-20"', body)
+        self.assertIn('href="/nba?date=2026-05-20"', body)
+        self.assertIn('href="/wnba?date=2026-05-20"', body)
+        self.assertIn('href="/ncaab?date=2026-05-20"', body)
+
+    def test_home_page_poll_preserves_date_query(self) -> None:
+        response = self.client.get("/")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("const selectedDate = currentParams.get('date');", body)
+        self.assertIn("url.searchParams.set('date', selectedDate);", body)
+
+    def test_home_page_poll_preserves_existing_embed_nodes(self) -> None:
+        response = self.client.get("/")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("function replaceStackRoot(nextRoot)", body)
+        self.assertIn("function patchLiveNode(currentNode, nextNode)", body)
+        self.assertIn("function patchChildElements(currentParent, nextParent)", body)
+        self.assertIn("patchChildElements(stackRoot, nextRoot);", body)
+        self.assertIn("replaceStackRoot(preservePersistentNodes(payload.html));", body)
+
+    def test_home_wnba_compact_game_items_use_local_cards_without_source_proxy(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        local_games = [
+            {
+                "away": {"abbr": "LAS", "name": "Las Vegas"},
+                "home": {"abbr": "NYL", "name": "New York"},
+                "detail": "Scheduled",
+                "summary": "Local WNBA board card.",
+                "sim": {"score": {"away_mean": 82, "home_mean": 85}},
+                "href": "/wnba/game/1?date=2026-05-20",
+                "href_label": "Open WNBA game",
+            }
+        ]
+
+        with patch("syndicate.blueprints.home._load_home_games", return_value=local_games), patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for home compact games"),
+        ):
+            items, count = home_module._load_home_game_items(
+                "wnba",
+                context_label="2026-05-20",
+                is_active_today=True,
+            )
+
+        self.assertEqual(count, 1)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["away_label"], "LAS")
+        self.assertEqual(items[0]["home_label"], "NYL")
+        self.assertEqual(items[0]["href"], "/wnba/game/1?date=2026-05-20")
+
+    def test_home_wnba_prop_items_use_local_props_board_without_source_proxy(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        local_props_context = {
+            "rank_cards": [
+                {
+                    "title": "A'ja Wilson Over 22.5 Points",
+                    "eyebrow": "WNBA props",
+                    "meta": "LAS vs NYL",
+                    "summary": "Local WNBA props board row.",
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.wnba.props.build_props_page_context",
+            return_value=local_props_context,
+        ), patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for home props"),
+        ):
+            rows = home_module._load_home_prop_items(
+                "wnba",
+                context_label="2026-05-20",
+                home_games=[],
+                is_active_today=True,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "A'ja Wilson Over 22.5 Points")
+        self.assertEqual(rows[0]["href"], "/wnba/props?date=2026-05-20")
+
+    def test_home_nhl_compact_game_items_use_local_live_lens_without_source_proxy(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        local_live_lens_context = {
+            "rank_cards": [
+                {
+                    "title": "COL @ TOR",
+                    "eyebrow": "Live",
+                    "meta": "LIVE",
+                    "badge": "+6.2%",
+                    "summary": "Local NHL live-lens row.",
+                    "metrics": [{"label": "Score", "value": "2-1"}],
+                    "href": "/nhl/game/77?date=2026-05-20",
+                    "href_label": "Open game detail",
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.nhl.live_lens.build_live_lens_page_context",
+            return_value=local_live_lens_context,
+        ):
+            items, count = home_module._load_home_game_items(
+                "nhl",
+                context_label="2026-05-20",
+                is_active_today=True,
+            )
+
+        self.assertEqual(count, 1)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["away_label"], "COL")
+        self.assertEqual(items[0]["home_label"], "TOR")
+        self.assertEqual(items[0]["away_score"], "2")
+        self.assertEqual(items[0]["home_score"], "1")
+        self.assertEqual(items[0]["href"], "/nhl/game/77?date=2026-05-20")
+
+    def test_mlb_cards_embed_mode_renders_compact_source_shell(self) -> None:
+        response = self.client.get('/mlb/cards?date=2026-05-20&client=source&embed=home-cards')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="cardsScoreboard"', body)
+        self.assertIn('embedMode', body)
+        self.assertNotIn('id="cardsGrid"', body)
+        self.assertNotIn('id="cardsHrTargets"', body)
+
+    def test_home_page_preserves_only_mlb_embed_shell(self) -> None:
+        response = self.client.get('/')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('data-home-preserve-key="home-cards-section"', body)
+        self.assertIn('data-home-preserve-key="home-cards"', body)
+        self.assertRegex(body, r'data-home-preserve-src="/mlb/cards\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}&amp;client=source&amp;embed=home-cards"')
+
+    def test_mlb_cards_source_js_skips_auto_refresh_for_embeds(self) -> None:
+        content = Path("c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/static/mlb/cards_source.js").read_text(encoding="utf-8")
+
+        self.assertIn('if (state.embedMode) {', content)
+        self.assertIn('state.autoRefreshHandle = { stop: function () {} };', content)
+        self.assertIn('state.autoRefreshHandle = window.SyndicatePolling.start({', content)
+
+    def test_mlb_cards_source_shell_omits_shared_syndicate_chrome(self) -> None:
+        response = self.client.get('/mlb/cards?date=2026-05-20&client=source')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<title>MLB Game Cards — 2026-05-20</title>', body)
+        self.assertNotIn('Syndicate app navigation', body)
+        self.assertNotIn('Module navigation', body)
+
+    def test_mlb_cards_source_shell_uses_versioned_assets(self) -> None:
+        response = self.client.get('/mlb/cards?date=2026-05-20&client=source')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('/static/shared/standalone_shell.css?v=', body)
+        self.assertIn('/static/mlb/cards_exact.css?v=', body)
+        self.assertIn('/static/mlb/cards_source.js?v=', body)
+        self.assertIn('/static/mlb/back_to_top.js?v=', body)
+
+    def test_mlb_default_cards_page_keeps_syndicate_menu(self) -> None:
+        response = self.client.get('/mlb/cards?date=2026-05-20')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Syndicate app navigation', body)
+        self.assertIn('Module navigation', body)
+
+    def test_mlb_pitcher_top_props_embed_mode_renders_standalone_style_shell(self) -> None:
+        response = self.client.get('/mlb/pitcher-top-props?date=2026-05-20&embed=mlb-pitcher-props-embed')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="topPropsSections"', body)
+        self.assertIn('MLBDailyTopPropsBootstrap', body)
+        self.assertIn('embedMode', body)
+        self.assertIn('mlb/daily_top_props.js', body)
+
+    def test_mlb_hitter_top_props_embed_mode_renders_standalone_style_shell(self) -> None:
+        response = self.client.get('/mlb/hitter-top-props?date=2026-05-20&embed=mlb-hitter-props-embed')
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="topPropsSections"', body)
+        self.assertIn('MLBDailyTopPropsBootstrap', body)
+        self.assertIn('embedMode', body)
+        self.assertIn('mlb/daily_top_props.js', body)
+
+    def test_wnba_processed_path_prefers_local_artifact_mirror(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "wnba_source"
+            sibling_root = root / "WNBA-Betting"
+            local_file = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text("local", encoding="utf-8")
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(wnba_processed_path("game_cards_2026-05-17.csv"), local_file)
+
+    def test_wnba_live_snapshot_path_does_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "wnba_source"
+            sibling_root = root / "WNBA-Betting"
+            local_file = local_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
+            sibling_file = sibling_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(wnba_live_snapshot_path("live_state_2026-05-17.json"), local_file)
+
+    def test_wnba_available_dates_do_not_fall_back_to_sibling_repo(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "wnba_source"
+            sibling_root = root / "WNBA-Betting"
+            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text("sibling", encoding="utf-8")
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, sibling_root]):
+                self.assertEqual(wnba_available_dates(), [])
+
+    def test_wnba_cards_empty_slate_does_not_inject_fake_sample_game(self) -> None:
+        with patch("syndicate.features.wnba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recommendations.json")):
+            from syndicate.features.wnba.cards import build_cards_page_context as build_wnba_cards_page_context
+
+            context = build_wnba_cards_page_context("1900-01-01")
+
+        self.assertEqual(context.get("date"), "1900-01-01")
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("scoreboard_items"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "WNBA cards unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+
+    def test_nba_picks_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.nba.picks.load_json", return_value=None):
+            from syndicate.features.nba.picks import build_picks_page_context as build_nba_picks_page_context
+
+            context = build_nba_picks_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NBA picks unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "NBA picks")
+
+    def test_nba_picks_page_uses_standalone_shell(self) -> None:
+        response = self.client.get('/nba/picks?date=2026-05-16')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="picksDateForm"', html)
+        self.assertIn('NBA Picks', html)
+        self.assertIn('Source artifact', html)
+        self.assertIn('/nba/prop-ladders?date=2026-05-16', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_nba_picks_page_empty_state_renders_in_standalone_shell(self) -> None:
+        with patch('syndicate.features.nba.picks.load_json', return_value=None):
+            response = self.client.get('/nba/picks?date=1900-01-01')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('No stored NBA picks were available for this date', html)
+        self.assertIn('Stored slate navigation', html)
+
+    def test_nba_props_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.nba.props.load_json", return_value=None):
+            from syndicate.features.nba.props import build_props_page_context as build_nba_props_page_context
+
+            context = build_nba_props_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NBA top props by game")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "NBA props")
+
+    def test_nba_game_detail_missing_artifact_does_not_inject_fake_matchup(self) -> None:
+        with patch("syndicate.features.nba.game_detail._game_by_id_from_artifacts", return_value=(None, {"paths": {"cards": "missing_cards.csv"}})):
+            from syndicate.features.nba.game_detail import build_game_detail_page_context as build_nba_game_detail_page_context
+
+            context = build_nba_game_detail_page_context("1900-01-01", "999")
+
+        game = (context.get("games") or [{}])[0]
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NBA game unavailable")
+        self.assertEqual(game.get("status"), "NBA game unavailable")
+        self.assertEqual((game.get("away") or {}).get("abbr"), "AWY")
+        self.assertEqual((game.get("home") or {}).get("abbr"), "HOM")
+
+    def test_nba_archive_without_dates_uses_empty_state_not_sample_card(self) -> None:
+        with patch("syndicate.features.nba.archive.available_dates", return_value=[]):
+            from syndicate.features.nba.archive import build_archive_page_context as build_nba_archive_page_context
+
+            context = build_nba_archive_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NBA archive unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "NBA daily archive")
+        self.assertEqual((context.get("header_stats") or [None, None, None, None])[3], {"label": "Artifacts", "value": "No data"})
+
+    def test_nba_archive_page_uses_standalone_shell(self) -> None:
+        response = self.client.get('/nba/archive?date=2026-05-22')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="archiveDateForm"', html)
+        self.assertIn('NBA Daily Archive', html)
+        self.assertIn('/nba/cards?date=', html)
+        self.assertIn('Source artifacts', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_nba_archive_page_empty_state_renders_in_standalone_shell(self) -> None:
+        with patch('syndicate.features.nba.archive.available_dates', return_value=[]):
+            response = self.client.get('/nba/archive?date=1900-01-01')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('No stored NBA archive dates were available', html)
+        self.assertIn('Stored archive navigation', html)
+
+    def test_nhl_picks_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.nhl.picks.available_dates", return_value=[]):
+            with patch("syndicate.features.nhl.picks._read_rows", return_value=[]):
+                from syndicate.features.nhl.picks import build_picks_page_context as build_nhl_picks_page_context
+
+                context = build_nhl_picks_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NHL picks unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "NHL picks")
+
+    def test_nhl_picks_page_uses_standalone_shell(self) -> None:
+        response = self.client.get('/nhl/picks?date=2026-05-16')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="picksDateForm"', html)
+        self.assertIn('NHL Picks', html)
+        self.assertIn('Source artifact', html)
+        self.assertIn('/nhl/live-lens?date=', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_nhl_picks_page_empty_state_renders_in_standalone_shell(self) -> None:
+        with patch('syndicate.features.nhl.picks.available_dates', return_value=[]):
+            with patch('syndicate.features.nhl.picks._read_rows', return_value=[]):
+                response = self.client.get('/nhl/picks?date=1900-01-01')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('No stored NHL picks were available for this date', html)
+        self.assertIn('Source artifact', html)
+
+    def test_nhl_archive_without_dates_uses_empty_state_not_sample_card(self) -> None:
+        with patch("syndicate.features.nhl.archive.available_dates", return_value=[]):
+            from syndicate.features.nhl.archive import build_archive_page_context as build_nhl_archive_page_context
+
+            context = build_nhl_archive_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NHL archive unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "NHL daily archive")
+
+    def test_nhl_archive_page_uses_standalone_shell(self) -> None:
+        response = self.client.get('/nhl/archive?date=2026-05-16')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="archiveDateForm"', html)
+        self.assertIn('NHL Daily Archive', html)
+        self.assertIn('/nhl/live-lens?date=', html)
+        self.assertIn('Source artifacts', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_nhl_archive_page_empty_state_renders_in_standalone_shell(self) -> None:
+        with patch('syndicate.features.nhl.archive.available_dates', return_value=[]):
+            response = self.client.get('/nhl/archive?date=1900-01-01')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('No stored NHL archive dates were available', html)
+        self.assertIn('Source artifacts', html)
+
+
+    def test_wnba_game_detail_missing_artifact_does_not_inject_fake_matchup(self) -> None:
+        with patch("syndicate.features.wnba.game_detail._game_by_id_from_artifacts", return_value=(None, {"paths": {"cards": "missing_cards.csv"}})):
+            from syndicate.features.wnba.game_detail import build_game_detail_page_context as build_wnba_game_detail_page_context
+
+            context = build_wnba_game_detail_page_context("1900-01-01", "999")
+
+        game = (context.get("games") or [{}])[0]
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "WNBA game unavailable")
+        self.assertEqual(game.get("status"), "WNBA game unavailable")
+        self.assertEqual((game.get("away") or {}).get("abbr"), "AWY")
+        self.assertEqual((game.get("home") or {}).get("abbr"), "HOM")
+
+    def test_wnba_picks_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.wnba.picks.load_json", return_value=None):
+            from syndicate.features.wnba.picks import build_picks_page_context as build_wnba_picks_page_context
+
+            context = build_wnba_picks_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "WNBA picks unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "WNBA picks")
+
+    def test_wnba_picks_page_uses_standalone_shell(self) -> None:
+        response = self.client.get('/wnba/picks?date=2026-05-22')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="picksDateForm"', html)
+        self.assertIn('WNBA Picks', html)
+        self.assertIn('/wnba/cards?date=2026-05-22', html)
+        self.assertIn('/wnba/season/2026/betting-card?date=2026-05-22', html)
+        self.assertIn('Source artifact', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_wnba_picks_page_empty_state_renders_in_standalone_shell(self) -> None:
+        response = self.client.get('/wnba/picks?date=1900-01-01')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('No stored WNBA picks were available for this date', html)
+        self.assertIn('Stored slate navigation', html)
+
+    def test_wnba_live_lens_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.wnba.live_lens.build_cards_page_context", return_value={"date": "1900-01-01", "games": [], "source_path": "missing_cards.csv"}):
+            from syndicate.features.wnba.live_lens import build_live_lens_page_context as build_wnba_live_lens_page_context
+
+            context = build_wnba_live_lens_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "WNBA live lens unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "WNBA live lens")
+
+    def test_wnba_archive_without_dates_uses_empty_state_not_sample_card(self) -> None:
+        with patch("syndicate.features.wnba.archive.available_dates", return_value=[]):
+            from syndicate.features.wnba.archive import build_archive_page_context as build_wnba_archive_page_context
+
+            context = build_wnba_archive_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "WNBA archive unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "WNBA daily archive")
+
+    def test_wnba_archive_page_uses_standalone_shell(self) -> None:
+        response = self.client.get('/wnba/archive?date=2026-05-22')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="archiveDateForm"', html)
+        self.assertIn('WNBA Daily Archive', html)
+        self.assertIn('/wnba/cards?date=2026-05-22', html)
+        self.assertIn('Source artifacts', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_wnba_archive_page_empty_state_renders_in_standalone_shell(self) -> None:
+        with patch('syndicate.features.wnba.archive.available_dates', return_value=[]):
+            response = self.client.get('/wnba/archive?date=1900-01-01')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('No stored WNBA archive dates were available', html)
+        self.assertIn('Stored archive navigation', html)
+
+    def test_wnba_props_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.wnba.props.load_json", return_value=None):
+            from syndicate.features.wnba.props import build_props_page_context as build_wnba_props_page_context
+
+            context = build_wnba_props_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "WNBA top props by game")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "WNBA props")
+
+    def test_wnba_props_page_uses_standalone_ladder_shell(self) -> None:
+        response = self.client.get('/wnba/props?date=2026-05-20')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="propLadderForm"', html)
+        self.assertIn('Player Prop Ladders', html)
+        self.assertIn('/wnba/cards?date=2026-05-20', html)
+        self.assertIn('/wnba/season/2026/betting-card?date=2026-05-20', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_wnba_props_page_empty_state_renders_in_standalone_shell(self) -> None:
+        response = self.client.get('/wnba/props?date=1900-01-01')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('No stored WNBA props were available for this date', html)
+        self.assertIn('id="propLadderGrid"', html)
+
+    def test_mlb_cards_empty_date_does_not_inject_fake_sample_games(self) -> None:
+        with patch("syndicate.features.mlb.cards.load_json_file", return_value=None):
+            from syndicate.features.mlb.cards import build_cards_page_context as build_mlb_cards_page_context
+
+            context = build_mlb_cards_page_context("1900-01-01")
+
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("scoreboard_items"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB cards unavailable")
+        self.assertEqual((context.get("source_meta_items") or [None, None, None])[2], "No data")
+
+    def test_mlb_game_detail_missing_artifact_does_not_inject_fake_matchup(self) -> None:
+        with patch("syndicate.features.mlb.game_detail.load_json_file", return_value=None):
+            from syndicate.features.mlb.game_detail import build_game_detail_page_context as build_mlb_game_detail_page_context
+
+            context = build_mlb_game_detail_page_context("1900-01-01", 999)
+
+        game = (context.get("games") or [{}])[0]
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB game unavailable")
+        self.assertEqual(game.get("status"), "MLB game unavailable")
+        self.assertEqual((game.get("away") or {}).get("abbr"), "AWY")
+        self.assertEqual((game.get("home") or {}).get("abbr"), "HOM")
+
+    def test_mlb_daily_archive_without_dates_uses_empty_state_not_sample_card(self) -> None:
+        with patch("syndicate.features.mlb.daily_archive.available_daily_summary_dates", return_value=[]):
+            from syndicate.features.mlb.daily_archive import build_daily_archive_page_context as build_mlb_daily_archive_page_context
+
+            context = build_mlb_daily_archive_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB daily archive unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB daily archive")
+
+    def test_mlb_live_lens_empty_date_does_not_inject_fake_sample_games(self) -> None:
+        with patch("syndicate.features.mlb.live_lens.load_json_file", return_value=None):
+            from syndicate.features.mlb.live_lens import build_live_lens_page_context as build_mlb_live_lens_page_context
+
+            context = build_mlb_live_lens_page_context("1900-01-01")
+
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("scoreboard_items"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB live lens unavailable")
+        self.assertEqual(context.get("dataRoot"), "data")
+        self.assertEqual(context.get("liveLensDir"), "data/live_lens")
+        self.assertEqual(
+            context.get("counts"),
+            {"archivedLiveProps": 0, "final": 0, "games": 0, "live": 0, "pregame": 0, "props": 0},
+        )
+        self.assertTrue(context.get("generatedAt"))
+
+    def test_mlb_live_lens_zero_game_report_does_not_fallback_to_cards(self) -> None:
+        with patch(
+            "syndicate.features.mlb.live_lens.load_json_file",
+            return_value={"generatedAt": "2026-05-20T14:58:42-05:00", "counts": {"games": 0, "live": 0, "final": 0, "props": 0}, "games": []},
+        ), patch(
+            "syndicate.features.mlb.live_lens.build_cards_page_context",
+            return_value={
+                "games": [{"gamePk": 1}],
+                "scoreboard_items": [{"target_id": "game-1"}],
+            },
+        ):
+            from syndicate.features.mlb.live_lens import build_live_lens_page_context as build_mlb_live_lens_page_context
+
+            context = build_mlb_live_lens_page_context("2026-05-20")
+
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("scoreboard_items"), [])
+        self.assertEqual(context.get("source_title"), "MLB live lens unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No live-lens games were available for this date")
+
+    def test_mlb_live_lens_game_rows_preserve_structured_status(self) -> None:
+        report = {
+            "generatedAt": "2026-05-09T16:25:51-05:00",
+            "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0},
+            "games": [
+                {
+                    "gamePk": 822820,
+                    "status": {"detailed": "In Progress"},
+                    "matchup": {
+                        "away": {"abbr": "LAA", "name": "Los Angeles Angels"},
+                        "home": {"abbr": "TOR", "name": "Toronto Blue Jays"},
+                        "liveText": "Bottom 7 | 0-1, 2 out | Vladimir Guerrero Jr. vs Mitch Farris",
+                        "score": {"away": 0, "home": 9},
+                    },
+                    "liveProps": [],
+                }
+            ],
+        }
+        with patch("syndicate.features.mlb.live_lens.load_json_file", return_value=report):
+            from syndicate.features.mlb.live_lens import build_live_lens_page_context as build_mlb_live_lens_page_context
+
+            context = build_mlb_live_lens_page_context("2026-05-09")
+
+        games = context.get("games") or []
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0].get("status"), {"abstract": "Live", "detailed": "In Progress"})
+
+    def test_mlb_betting_card_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.mlb.betting_card.load_json_file", return_value=None):
+            from syndicate.features.mlb.betting_card import build_betting_card_page_context as build_mlb_betting_card_page_context
+
+            context = build_mlb_betting_card_page_context(1900, "1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB betting card unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB betting card")
+
+    def test_mlb_top_props_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.mlb.top_props.load_json_file", return_value=None):
+            from syndicate.features.mlb.top_props import build_top_props_page_context as build_mlb_top_props_page_context
+
+            context = build_mlb_top_props_page_context("1900-01-01", group="pitcher")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB top props unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB top props")
+
+    def test_mlb_pitcher_ladders_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.mlb.ladders_common.load_json_file", return_value=None):
+            from syndicate.features.mlb.pitcher_ladders import build_pitcher_ladders_page_context
+
+            context = build_pitcher_ladders_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "Pitcher ladders unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "Pitcher ladders")
+
+    def test_mlb_hr_targets_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.mlb.hr_targets.load_json_file", return_value=None):
+            from syndicate.features.mlb.hr_targets import build_hr_targets_page_context as build_mlb_hr_targets_page_context
+
+            context = build_mlb_hr_targets_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB HR targets unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB HR targets")
+
+    def test_mlb_rfi_targets_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.mlb.rfi_targets.load_json_file", return_value=None):
+            from syndicate.features.mlb.rfi_targets import build_rfi_targets_page_context as build_mlb_rfi_targets_page_context
+
+            context = build_mlb_rfi_targets_page_context("1900-01-01")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB RFI targets unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB RFI targets")
+
+    def test_mlb_season_review_empty_date_does_not_inject_fake_sample_games(self) -> None:
+        with patch("syndicate.features.mlb.season.load_json_file", return_value=None):
+            from syndicate.features.mlb.season import build_season_page_context as build_mlb_season_page_context
+
+            context = build_mlb_season_page_context(1900, "1900-01-01")
+
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("scoreboard_items"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "MLB season review unavailable")
+
+    def test_nba_cards_empty_slate_does_not_inject_fake_sample_game(self) -> None:
+        with patch("syndicate.features.nba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recs.json")):
+            with patch("syndicate.features.nba.cards._local_live_state_payload", return_value={"games": []}):
+                with patch("syndicate.features.nba.cards._next_available_cards_date", return_value=None):
+                    context = build_nba_cards_page_context("2026-05-17")
+
+        self.assertEqual(context.get("date"), "2026-05-17")
+        self.assertEqual(context.get("requested_date"), "2026-05-17")
+        self.assertFalse(context.get("lookahead_applied"))
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("scoreboard_items"), [])
+        self.assertEqual(context.get("source_title"), "NBA cards unavailable")
+        self.assertEqual((context.get("header_stats") or [None, None])[1], {"label": "Recommendations", "value": "No data"})
+
+    def test_nba_cards_api_empty_slate_preserves_empty_state(self) -> None:
+        with patch("syndicate.features.nba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recs.json")):
+            with patch("syndicate.features.nba.cards._local_live_state_payload", return_value={"games": []}):
+                with patch("syndicate.features.nba.cards._next_available_cards_date", return_value=None):
+                    payload = build_nba_cards_api_payload("2026-05-17")
+
+        self.assertEqual(payload.get("games"), [])
+        self.assertEqual(payload.get("source_title"), "NBA cards unavailable")
+        self.assertEqual((payload.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        self.assertFalse(payload.get("using_sample_data"))
+
+    def test_nba_cards_live_state_fallback_uses_real_same_day_game(self) -> None:
+        live_state_payload = {
+            "games": [
+                {
+                    "away": "CLE",
+                    "home": "DET",
+                    "away_pts": 108,
+                    "home_pts": 75,
+                    "event_id": "401871339",
+                    "game_id": "CLE@DET",
+                    "status": "9:25 - 4th",
+                    "in_progress": True,
+                    "final": False,
+                }
+            ]
+        }
+
+        with patch("syndicate.features.nba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recs.json")):
+            with patch("syndicate.features.nba.cards._local_live_state_payload", return_value=live_state_payload):
+                with patch("syndicate.features.nba.cards._next_available_cards_date") as next_available_mock:
+                    context = build_nba_cards_page_context("2026-05-17")
+
+        self.assertEqual(context.get("date"), "2026-05-17")
+        self.assertEqual(context.get("requested_date"), "2026-05-17")
+        self.assertFalse(context.get("lookahead_applied"))
+        self.assertEqual([(game.get("away_tri"), game.get("home_tri")) for game in (context.get("games") or [])], [("CLE", "DET")])
+        self.assertEqual((context.get("scoreboard_items") or [{}])[0].get("label"), "CLE @ DET")
+        self.assertEqual(context.get("source_title"), "NBA live scoreboard fallback")
+        self.assertTrue(str(context.get("source_path") or "").endswith("live_state_2026-05-17.jsonl"))
+        next_available_mock.assert_not_called()
+
+    def test_nba_cards_live_state_fallback_prefers_local_snapshot_artifact(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            live_dir = root / "data" / "processed" / "live_snapshots"
+            live_dir.mkdir(parents=True, exist_ok=True)
+            (live_dir / "live_state_2026-05-17.jsonl").write_text(
+                json.dumps(
+                    {
+                        "ts": "2026-05-17T21:25:00Z",
+                        "payload": {
+                            "date": "2026-05-17",
+                            "games": [
+                                {
+                                    "away": "CLE",
+                                    "home": "DET",
+                                    "away_pts": 108,
+                                    "home_pts": 75,
+                                    "event_id": "401871339",
+                                    "game_id": "CLE@DET",
+                                    "status": "9:25 - 4th",
+                                    "in_progress": True,
+                                    "final": False,
+                                }
+                            ],
+                        },
+                    }
+                ) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                "syndicate.features.nba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recs.json")
+            ), patch(
+                "syndicate.features.nba.cards._next_available_cards_date"
+            ) as next_available_mock:
+                from syndicate.features.nba.cards import _local_live_state_payload
+
+                _local_live_state_payload.cache_clear()
+                context = build_nba_cards_page_context("2026-05-17")
+                _local_live_state_payload.cache_clear()
+
+        self.assertEqual([(game.get("away_tri"), game.get("home_tri")) for game in (context.get("games") or [])], [("CLE", "DET")])
+        self.assertEqual(context.get("source_title"), "NBA live scoreboard fallback")
+        self.assertTrue(str(context.get("source_path") or "").endswith("live_state_2026-05-17.jsonl"))
+        next_available_mock.assert_not_called()
+
+    def test_nba_cards_prefer_local_artifacts_over_source_payload(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "game_cards_2026-05-17.csv").write_text(
+                "game_id,visitor_team,home_team,away_tri,home_tri,commence_time,bookmaker,books_count,away_ml,home_ml,home_spread,total,prob_home_tip,early_threes_prob_ge_1\n"
+                "game-1,Cleveland Cavaliers,Detroit Pistons,CLE,DET,2026-05-17T19:00:00Z,Consensus,12,120,-140,-3.5,221.5,0.51,0.42\n",
+                encoding="utf-8",
+            )
+            (processed_dir / "recommendations_slate_2026-05-17.json").write_text(
+                json.dumps({"per_game": []}),
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+                context = build_nba_cards_page_context("2026-05-17")
+                payload = build_nba_cards_api_payload("2026-05-17")
+
+        self.assertEqual([(game.get("away_tri"), game.get("home_tri")) for game in (context.get("games") or [])], [("CLE", "DET")])
+        self.assertEqual(context.get("source_title"), "NBA processed game cards")
+        self.assertTrue(str(context.get("source_path") or "").endswith("game_cards_2026-05-17.csv"))
+        self.assertEqual([(game.get("away_tri"), game.get("home_tri")) for game in (payload.get("games") or [])], [("CLE", "DET")])
+        self.assertTrue(str(payload.get("source_path") or "").endswith("game_cards_2026-05-17.csv"))
+        self.assertFalse(bool(payload.get("using_sample_data")))
+
+
+class ArchiveRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        cls.client = app.test_client()
+
+    def test_ncaab_results_archive_route_and_api(self) -> None:
+        response = self.client.get("/ncaab/api/archive?date=2025-11-03")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((payload.get("rank_cards") or [{}])[0].get("title"), "2025-11-03")
+        self.assertEqual((payload.get("rank_cards") or [{}])[0].get("href"), "/ncaab/season/2025?date=2025-11-03")
+        self.assertEqual(len(payload.get("header_stats") or []), 4)
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertTrue(any(link.get("href") == "/ncaab/archive?date=2025-11-03" for link in (payload.get("module_links") or [])))
+
+        html = self.client.get("/ncaab/archive?date=2025-11-03").get_data(as_text=True)
+        self.assertIn("NCAAB Daily Archive", html)
+        self.assertIn("2025-11-03", html)
+        self.assertIn("/ncaab/season/2025?date=2025-11-03", html)
+
+        alias_payload = self.client.get("/ncaab/api/results?date=2025-11-03").get_json()
+        self.assertEqual(alias_payload.get("route_path"), "/ncaab/archive")
+        alias_html = self.client.get("/ncaab/results?date=2025-11-03").get_data(as_text=True)
+        self.assertIn("NCAAB Daily Archive", alias_html)
+
+    def test_mlb_daily_archive_route_and_api(self) -> None:
+        response = self.client.get("/mlb/api/archive?date=2026-05-18")
+        payload = response.get_json()
+        resolved_date = str(payload.get("date") or "")
+        resolved_season = resolved_date[:4]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((payload.get("rank_cards") or [{}])[0].get("title"), resolved_date)
+        self.assertEqual((payload.get("rank_cards") or [{}])[0].get("href"), f"/mlb/season/{resolved_season}?date={resolved_date}")
+        self.assertEqual(len(payload.get("header_stats") or []), 4)
+        self.assertTrue(payload.get("warning_panel"))
+
+        html = self.client.get("/mlb/archive?date=2026-05-18").get_data(as_text=True)
+        self.assertIn("MLB Daily Archive", html)
+        self.assertIn(resolved_date, html)
+        self.assertIn("Official picks", html)
+        self.assertIn(f"/mlb/season/{resolved_season}?date={resolved_date}", html)
+
+    def test_mlb_cards_api_without_date_uses_today(self) -> None:
+        today_date = date.today().isoformat()
+        response = self.client.get("/mlb/api/cards")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("date"), today_date)
+
+    def test_nba_cards_api_without_date_preserves_today_request(self) -> None:
+        today_date = date.today().isoformat()
+        response = self.client.get("/nba/api/cards")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("requested_date"), today_date)
+
+    def test_nhl_cards_bundle_without_date_preserves_today_request(self) -> None:
+        today_date = date.today().isoformat()
+        response = self.client.get("/nhl/api/cards/bundle")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("requested_date"), today_date)
+
+    def test_wnba_cards_api_without_date_uses_today(self) -> None:
+        today_date = date.today().isoformat()
+        response = self.client.get("/wnba/api/cards")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("date"), today_date)
+
+    def test_wnba_cards_default_route_uses_local_source_shell(self) -> None:
+        with patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA cards source shell should use local vendored parity assets"),
+        ):
+            response = self.client.get("/wnba/cards?date=2026-05-21")
+            body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("/wnba/cards-parity.js", body)
+        self.assertIn("WNBA Game Cards", body)
+        self.assertNotIn("/static/shared/game_board.js", body)
+
+    def test_wnba_cards_source_shell_uses_versioned_assets(self) -> None:
+        response = self.client.get("/wnba/cards?date=2026-05-21")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('/static/shared/standalone_shell.css?v=', body)
+        self.assertIn('/wnba/styles.css?v=', body)
+        self.assertIn('/wnba/cards-parity.css?v=', body)
+        self.assertIn('/wnba/cards-parity.js?v=', body)
+
+    def test_wnba_cards_source_alias_preserves_explicit_source_shell(self) -> None:
+        response = self.client.get("/wnba/cards/source?date=2026-05-21", follow_redirects=True)
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("/wnba/cards-parity.js", body)
+        self.assertIn("WNBA Game Cards", body)
+
+    def test_ncaab_cards_api_without_date_uses_today(self) -> None:
+        today_date = date.today().isoformat()
+        response = self.client.get("/ncaab/api/cards")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("date"), today_date)
+
+    def test_mlb_cards_api_empty_slate_preserves_empty_state(self) -> None:
+        with patch("syndicate.features.mlb.cards.load_json_file", return_value=None):
+            from syndicate.features.mlb.cards import build_cards_page_context as build_mlb_cards_page_context
+            from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+
+            context = build_mlb_cards_page_context("1900-01-01")
+            payload = build_game_board_api_payload(context)
+            payload.update(source_cards_api_payload(context))
+
+        self.assertEqual(payload.get("games"), [])
+        self.assertEqual(payload.get("source_title"), "MLB cards unavailable")
+        self.assertEqual((payload.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        self.assertFalse(payload.get("using_sample_data"))
+
+    def test_ncaab_season_api_exposes_archive_navigation_metadata(self) -> None:
+        response = self.client.get("/ncaab/api/season/2025?date=2025-11-03")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        module_links = payload.get("module_links") or []
+        self.assertTrue(any(link.get("href") == "/ncaab/archive?date=2025-11-03" for link in module_links))
+        self.assertTrue(any(link.get("href") == "/ncaab/season/2025/betting-card?date=2025-11-03" for link in module_links))
+        self.assertEqual((payload.get("teaser") or {}).get("href"), "/ncaab/cards?date=2025-11-03")
+        self.assertEqual(payload.get("control_action"), "/ncaab/season/2025")
+        self.assertEqual(payload.get("control_name"), "date")
+
+    def test_ncaab_season_context_uses_requested_season_copy(self) -> None:
+        context = build_season_page_context(2024, "2024-11-01")
+
+        self.assertEqual(context.get("route_path"), "/ncaab/season/2024")
+        self.assertEqual(context.get("intro_title"), "NCAAB 2024 Season Review")
+        self.assertEqual(context.get("source_title"), "NCAAB 2024 season review data")
+        self.assertIn("2024 navigation lands on a real historical page", context.get("intro_body") or "")
+
+    def test_ncaab_cards_empty_date_does_not_inject_fake_sample_game(self) -> None:
+        with patch("syndicate.features.ncaab.cards.mirrored_recommendations_payload", return_value={}), patch(
+            "syndicate.features.ncaab.cards.mirrored_available_dates", return_value=["2025-11-03"]
+        ):
+            context = build_ncaab_cards_page_context("2025-11-03")
+
+        self.assertEqual(context.get("games"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NCAAB cards unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+
+    def test_ncaab_game_detail_missing_card_does_not_inject_fake_matchup(self) -> None:
+        with patch(
+            "syndicate.features.ncaab.game_detail.build_cards_page_context",
+            return_value={
+                "date": "2025-11-03",
+                "prev_date": "2025-11-02",
+                "next_date": "2025-11-04",
+                "games": [],
+                "using_sample_data": False,
+                "source_path": "NCAAB /api/recommendations?date=2025-11-03",
+                "control_value": "2025-11-03",
+            },
+        ):
+            context = build_ncaab_game_detail_page_context("2025-11-03", "missing-game")
+
+        game = (context.get("games") or [{}])[0]
+        self.assertEqual(game.get("status"), "NCAAB game unavailable")
+        self.assertEqual(context.get("source_title"), "NCAAB game unavailable")
+        self.assertFalse(context.get("using_sample_data"))
+
+    def test_ncaab_season_review_empty_date_does_not_inject_fake_sample_game(self) -> None:
+        with patch("syndicate.features.ncaab.season.recommendations_payload", return_value={}), patch(
+            "syndicate.features.ncaab.season.results_by_date_payload", return_value={}
+        ), patch("syndicate.features.ncaab.season.season_dates", return_value=["2025-11-03"]), patch(
+            "syndicate.features.ncaab.season.default_season_date", return_value="2025-11-03"
+        ), patch("syndicate.features.ncaab.season.schedule_dates", return_value=[]), patch(
+            "syndicate.features.ncaab.season.results_dates", return_value=[]
+        ):
+            context = build_season_page_context(2025, "2025-11-03")
+
+        self.assertEqual(context.get("games"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No season-review rows were available for this date")
+
+    def test_ncaab_results_archive_empty_date_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.ncaab.results_archive.results_dates", return_value=[]), patch(
+            "syndicate.features.ncaab.results_archive.results_by_date_payload", return_value={}
+        ):
+            context = build_ncaab_results_archive_page_context("2025-11-03")
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NCAAB archive unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No settled NCAAB results dates were available")
+
+    def test_ncaab_season_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/ncaab/api/season/2025/betting-card?date=2025-11-03")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/ncaab/season/2025/betting-card")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/ncaab/archive?date=2025-11-03" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/ncaab/season/2025?date=2025-11-03" for link in (payload.get("module_links") or [])))
+
+    def test_nhl_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nhl/api/season/2026/betting-card?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/nhl/season/2026/betting-card")
+        self.assertEqual(payload.get("reset_href"), "/nhl/season/2026/betting-card")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/nhl/season/2026/betting-card?date=2026-05-16" for link in (payload.get("module_links") or [])))
+
+    def test_nhl_betting_card_page_uses_standalone_shell(self) -> None:
+        response = self.client.get('/nhl/season/2026/betting-card?date=2026-05-16')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="bettingCardDateForm"', html)
+        self.assertIn('NHL 2026 Betting Card', html)
+        self.assertIn('Source artifact', html)
+        self.assertIn('/nhl/picks?date=', html)
+        self.assertIn('/nhl/archive?date=', html)
+        self.assertNotIn('One app with seven feature modules.', html)
+
+    def test_wnba_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/wnba/api/season/2026/betting-card?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/wnba/season/2026/betting-card")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/wnba/season/2026/betting-card?date=2026-05-16" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/wnba/archive?date=2026-05-16" for link in (payload.get("module_links") or [])))
+
+    def test_wnba_live_lens_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/wnba/api/live-lens?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/wnba/live-lens")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/wnba/live-lens?date=2026-05-16" for link in (payload.get("module_links") or [])))
+
+    def test_nfl_archive_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nfl/api/archive?season=2025&week=21")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("route_path"), "/nfl/archive")
+        self.assertEqual(payload.get("reset_href"), "/nfl/archive?season=2025")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/nfl/archive?season=2025&week=21" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/nfl/season/2025/betting-card?week=21" for link in (payload.get("module_links") or [])))
+
+    def test_nfl_live_lens_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nfl/api/live-lens?season=2025&week=21")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("route_path"), "/nfl/live-lens")
+        self.assertEqual(payload.get("reset_href"), "/nfl/live-lens?season=2025")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/nfl/live-lens?season=2025&week=21" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/nfl/archive?season=2025&week=21" for link in (payload.get("module_links") or [])))
+
+    def test_ncaaf_archive_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/ncaaf/api/archive?week=1")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("route_path"), "/ncaaf/archive")
+        self.assertEqual(payload.get("reset_href"), "/ncaaf/archive")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/ncaaf/archive?week=1" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any("/ncaaf/season/" in str(link.get("href") or "") and "betting-card?week=1" in str(link.get("href") or "") for link in (payload.get("module_links") or [])))
+
+    def test_ncaaf_live_lens_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/ncaaf/api/live-lens?week=1")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("route_path"), "/ncaaf/live-lens")
+        self.assertEqual(payload.get("reset_href"), "/ncaaf/live-lens")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/ncaaf/live-lens?week=1" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/ncaaf/archive?week=1" for link in (payload.get("module_links") or [])))
+
+    def test_mlb_season_api_exposes_archive_navigation_metadata(self) -> None:
+        response = self.client.get("/mlb/api/season/2026/board?date=2026-05-18")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        module_links = payload.get("module_links") or []
+        self.assertTrue(any(link.get("href") == "/mlb/archive?date=2026-05-18" for link in module_links))
+        self.assertEqual((payload.get("teaser") or {}).get("href"), "/mlb/season/2026/betting-card?date=2026-05-18")
+        self.assertEqual(payload.get("route_path"), "/mlb/season/2026")
+        self.assertEqual(payload.get("control_name"), "date")
+
+    def test_mlb_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/mlb/api/season/2026/betting-card?date=2026-05-18")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/mlb/archive?date=2026-05-18" for link in (payload.get("module_links") or [])))
+
+    def test_mlb_top_props_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/mlb/api/top-props?date=2026-05-18")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/mlb/pitcher-top-props")
+        self.assertTrue(any(link.get("href") == "/mlb/top-props?date=2026-05-18" or link.get("href") == "/mlb/pitcher-top-props?date=2026-05-18" for link in (payload.get("module_links") or [])))
+
+    def test_mlb_group_top_props_apis_keep_rank_board_navigation_metadata(self) -> None:
+        pitcher = self.client.get("/mlb/api/pitcher-top-props?date=2026-05-18").get_json()
+        hitter = self.client.get("/mlb/api/hitter-top-props?date=2026-05-18").get_json()
+
+        self.assertEqual(pitcher.get("control_name"), "date")
+        self.assertEqual(hitter.get("control_name"), "date")
+        self.assertEqual(pitcher.get("artifactSource"), "daily_top_props")
+        self.assertEqual(hitter.get("artifactSource"), "daily_top_props")
+        self.assertTrue(any(link.get("href") == "/mlb/archive?date=2026-05-18" for link in (pitcher.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/mlb/archive?date=2026-05-18" for link in (hitter.get("module_links") or [])))
+
+    def test_mlb_rfi_targets_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/mlb/api/rfi-targets?date=2026-05-18")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/mlb/rfi-targets")
+        self.assertIn("signals", payload)
+        self.assertTrue(any(link.get("href") == "/mlb/rfi-targets?date=2026-05-18" for link in (payload.get("module_links") or [])))
+
+    def test_mlb_hr_targets_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/mlb/api/hr-targets?date=2026-05-18")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/mlb/hr-targets")
+        self.assertIn("targets", payload)
+        self.assertTrue(any(link.get("href") == "/mlb/hr-targets?date=2026-05-18" for link in (payload.get("module_links") or [])))
+
+    def test_mlb_ladder_apis_keep_rank_board_navigation_metadata(self) -> None:
+        pitcher = self.client.get("/mlb/api/pitcher-ladders?date=2026-05-18").get_json()
+        hitter = self.client.get("/mlb/api/hitter-ladders?date=2026-05-18").get_json()
+
+        self.assertEqual(pitcher.get("control_name"), "date")
+        self.assertEqual(hitter.get("control_name"), "date")
+        self.assertEqual(pitcher.get("route_path"), "/mlb/pitcher-ladders")
+        self.assertEqual(hitter.get("route_path"), "/mlb/hitter-ladders")
+        self.assertEqual(pitcher.get("artifactSource"), "daily_ladders")
+        self.assertEqual(hitter.get("artifactSource"), "daily_ladders")
+        self.assertTrue(any(link.get("href") == "/mlb/pitcher-ladders?date=2026-05-18" for link in (pitcher.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/mlb/hitter-ladders?date=2026-05-18" for link in (hitter.get("module_links") or [])))
+
+    def test_archive_launch_links_and_tracker_copy(self) -> None:
+        mlb_context = build_mlb_hub_context()
+        mlb_launch_date = str(mlb_context.get("launch_date") or "")
+        today_date = date.today().isoformat()
+        ncaab_launch_season = ncaab_season_for_date(today_date)
+        ncaab_season_launch_date = default_ncaab_season_date(ncaab_launch_season)
+        ncaaf_season = default_ncaaf_season()
+        mlb_hub = self.client.get("/mlb").get_data(as_text=True)
+        ncaab_hub = self.client.get("/ncaab").get_data(as_text=True)
+        ncaaf_hub = self.client.get("/ncaaf").get_data(as_text=True)
+        nfl_hub = self.client.get("/nfl").get_data(as_text=True)
+        wnba_hub = self.client.get("/wnba/hub").get_data(as_text=True)
+        nhl_hub = self.client.get("/nhl/hub").get_data(as_text=True)
+        nba_hub = self.client.get("/nba/hub").get_data(as_text=True)
+        home = self.client.get("/").get_data(as_text=True)
+
+        self.assertEqual(mlb_launch_date, today_date)
+        self.assertIn(f"/mlb/cards?date={today_date}", mlb_hub)
+        self.assertIn(f"/mlb/archive?date={today_date}", mlb_hub)
+        self.assertIn("daily archive", mlb_hub.lower())
+        self.assertIn("Open MLB hub", home)
+        self.assertIn("Phase-1 complete", home)
+        self.assertIn(f"/ncaab/cards?date={today_date}", ncaab_hub)
+        self.assertIn(f"/ncaab/archive?date={ncaab_season_launch_date}", ncaab_hub)
+        self.assertIn("daily archive", ncaab_hub.lower())
+        self.assertIn(f"/ncaab/season/{ncaab_launch_season}?date={ncaab_season_launch_date}", ncaab_hub)
+        self.assertIn("/ncaaf/cards?week=1", ncaaf_hub)
+        self.assertIn(f"/ncaaf/season/{ncaaf_season}/betting-card?week=1", ncaaf_hub)
+        self.assertRegex(ncaaf_hub, r"/ncaaf/live-lens\?week=\d+")
+        self.assertRegex(ncaaf_hub, r"/ncaaf/archive\?week=\d+")
+        self.assertRegex(nfl_hub, r"/nfl/cards\?season=\d{4}(?:&|&amp;)week=\d+")
+        self.assertRegex(nfl_hub, r"/nfl/picks\?season=\d{4}(?:&|&amp;)week=\d+")
+        self.assertRegex(nfl_hub, r"/nfl/season/\d{4}/betting-card\?week=\d+")
+        self.assertRegex(nfl_hub, r"/nfl/live-lens\?season=\d{4}(?:&|&amp;)week=\d+")
+        self.assertRegex(nfl_hub, r"/nfl/archive\?season=\d{4}(?:&|&amp;)week=\d+")
+        self.assertIn("Betting Card", nfl_hub)
+        self.assertIn(f"/wnba/cards?date={today_date}", wnba_hub)
+        self.assertRegex(wnba_hub, r"/wnba/cards\?date=\d{4}-\d{2}-\d{2}")
+        self.assertIn("Recent WNBA processed dates", wnba_hub)
+        self.assertRegex(wnba_hub, r"/wnba/season/\d{4}/betting-card\?date=\d{4}-\d{2}-\d{2}")
+        self.assertIn(f"/nba/cards?date={today_date}", nba_hub)
+        self.assertIn("Recent NBA processed dates", nba_hub)
+        self.assertRegex(nba_hub, r"/nba/season/\d{4}/betting-card\?profile=retuned(?:&|&amp;)date=\d{4}-\d{2}-\d{2}")
+        self.assertRegex(nba_hub, r"/nba/season/\d{4}/live-lens\?date=\d{4}-\d{2}-\d{2}(?:&|&amp;)profile=retuned")
+        self.assertIn(f"/nhl/cards?date={today_date}", nhl_hub)
+        self.assertRegex(nhl_hub, r"/nhl/reconciliation\?date=\d{4}-\d{2}-\d{2}")
+        self.assertRegex(nhl_hub, r"/nhl/props/reconciliation\?date=\d{4}-\d{2}-\d{2}")
+        self.assertRegex(nhl_hub, r"/nhl/props/lines\?date=\d{4}-\d{2}-\d{2}")
+        self.assertRegex(nhl_hub, r"/nhl/live-lens\?date=\d{4}-\d{2}-\d{2}")
+        self.assertIn("Recent NHL recommendation snapshots", nhl_hub)
+        self.assertRegex(nhl_hub, r"/nhl/season/\d{4}/betting-card\?date=\d{4}-\d{2}-\d{2}")
+        self.assertIn("Cross-sport daily board", home)
+        self.assertIn("Horizontal game and props rows with full compact-card scroll for the active slate.", home)
+        self.assertIn("Reference module", home)
+        self.assertIn("Artifact-backed cards + picks + recap + props lanes", home)
+        self.assertIn("Artifact-backed shared board + picks + props + live audit lanes", home)
+        self.assertIn("Open Live Lens", home)
+        self.assertIn("Open Prop Live Lens", home)
+
+    def test_nfl_hub_prefers_latest_mirrored_week_for_launch_links(self) -> None:
+        with patch(
+            "syndicate.blueprints.nfl.week_summaries",
+            return_value=[
+                {"season": 2025, "week": 17, "count": 12},
+                {"season": 2025, "week": 19, "count": 16},
+                {"season": 2025, "week": 21, "count": 14},
+            ],
+        ), patch(
+            "syndicate.blueprints.nfl.tracked_week",
+            return_value={"season": 2025, "week": 22},
+        ), patch(
+            "syndicate.blueprints.nfl.latest_season",
+            return_value=2025,
+        ), patch(
+            "syndicate.blueprints.nfl.default_week",
+            return_value=21,
+        ):
+            html = self.client.get("/nfl/hub").get_data(as_text=True)
+
+        self.assertIn("/nfl/cards?season=2025&amp;week=21", html)
+        self.assertIn("Source app currently points at 2025 Week 22", html)
+
+    def test_generic_sport_hub_uses_shared_visual_shell(self) -> None:
+        app = self.client.application
+        app.config["SYNDICATE_SPORTS"] = [
+            *app.config["SYNDICATE_SPORTS"],
+            {
+                "slug": "test-sport",
+                "name": "Test Sport",
+                "status": "Planned",
+                "phase": "Shared shell",
+                "summary": "Synthetic hub for visual shell parity coverage.",
+                "primary_href": "/test-sport/cards",
+                "primary_label": "Open Test Sport cards",
+                "surfaces": ["cards", "archive"],
+                "next_step": "Keep the fallback hub on the shared visual shell.",
+            },
+        ]
+
+        html = self.client.get("/test-sport").get_data(as_text=True)
+
+        self.assertIn(">Home<", html)
+        self.assertIn("Open Test Sport cards", html)
+        self.assertIn("Module status", html)
+        self.assertIn("Shared shell", html)
+        self.assertIn("cards", html)
+        self.assertIn("archive", html)
+
+    def test_ncaab_hub_uses_per_date_season_links(self) -> None:
+        with patch("syndicate.blueprints.ncaab.available_dates", return_value=["2024-11-05", "2025-11-03"]), patch(
+            "syndicate.blueprints.ncaab.latest_date", return_value="2025-11-03"
+        ), patch("syndicate.blueprints.ncaab.default_season_date", return_value="2025-11-03"), patch(
+            "syndicate.blueprints.ncaab.season_dates", return_value=["2025-11-03"]
+        ):
+            html = self.client.get("/ncaab/hub").get_data(as_text=True)
+
+        self.assertIn("/ncaab/season/2024?date=2024-11-05", html)
+        self.assertIn("/ncaab/season/2024/betting-card?date=2024-11-05", html)
+        self.assertIn("/ncaab/season/2025?date=2025-11-03", html)
+        self.assertIn("/ncaab/season/2025/betting-card?date=2025-11-03", html)
+
+    def test_ncaaf_hub_uses_per_week_season_links(self) -> None:
+        with patch(
+            "syndicate.blueprints.ncaaf.week_summaries",
+            return_value=[
+                {"week": 1, "season": 2024, "count": 10, "has_data": True},
+                {"week": 2, "season": 2025, "count": 12, "has_data": True},
+            ],
+        ), patch("syndicate.blueprints.ncaaf.default_season", return_value=2025), patch(
+            "syndicate.features.ncaaf.sources.default_season", return_value=2025
+        ):
+            html = self.client.get("/ncaaf/hub").get_data(as_text=True)
+
+        self.assertIn("/ncaaf/season/2024/betting-card?week=1", html)
+        self.assertIn("/ncaaf/season/2025/betting-card?week=2", html)
+
+    def test_mlb_hub_context_uses_launch_date_season(self) -> None:
+        context = build_mlb_hub_context()
+        launch_date = str(context.get("launch_date") or "")
+        launch_season = launch_date[:4]
+        route_groups = context.get("route_groups") or []
+        hrefs = [link.get("href") for group in route_groups for link in (group.get("links") or []) if isinstance(link, dict)]
+
+        self.assertTrue(any(href == f"/mlb/season/{launch_season}?date={launch_date}" for href in hrefs))
+        self.assertTrue(any(isinstance(href, str) and href.startswith(f"/mlb/season/{launch_season}/betting-card?date={launch_date}") for href in hrefs))
+        self.assertIn(f"/mlb/live-lens-accuracy?date={launch_date}", hrefs)
+
+    def test_mlb_live_lens_page_uses_standalone_daily_shell(self) -> None:
+        response = self.client.get("/mlb/live-lens?date=2026-05-16")
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<title>MLB Live Lens - 2026-05-16</title>', body)
+        self.assertNotIn('Live Lens Accuracy', body)
+        self.assertNotIn('Market Accuracy', body)
+
+    def test_ncaaf_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
+        ncaaf_season = default_ncaaf_season()
+        response = self.client.get("/ncaaf/api/picks?week=1")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("week"), 1)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/ncaaf/picks?week=1" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == f"/ncaaf/season/{ncaaf_season}/betting-card?week=1" for link in (payload.get("module_links") or [])))
+
+    def test_ncaaf_cards_context_uses_source_derived_season_label(self) -> None:
+        ncaaf_season = default_ncaaf_season()
+        context = build_ncaaf_cards_page_context(1)
+
+        self.assertEqual(context.get("date"), f"{ncaaf_season} Week 1")
+        self.assertEqual(context.get("requested_date"), f"{ncaaf_season} Week 1")
+
+    def test_ncaaf_cards_empty_week_does_not_inject_fake_sample_game(self) -> None:
+        with patch("syndicate.features.ncaaf.cards.load_json", return_value={}), patch(
+            "syndicate.features.ncaaf.cards.available_weeks", return_value=[1]
+        ):
+            context = build_ncaaf_cards_page_context(1)
+
+        self.assertEqual(context.get("games"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NCAAF cards unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this week")
+
+    def test_ncaaf_picks_context_uses_source_derived_season_token(self) -> None:
+        ncaaf_season = default_ncaaf_season()
+        context = build_ncaaf_picks_page_context(1)
+
+        self.assertEqual(context.get("season"), ncaaf_season)
+        self.assertEqual(context.get("date"), f"{ncaaf_season}-01-01")
+
+    def test_ncaaf_picks_empty_week_does_not_inject_fake_rank_card(self) -> None:
+        with patch("syndicate.features.ncaaf.picks.load_json", return_value={}), patch(
+            "syndicate.features.ncaaf.picks.available_weeks", return_value=[1]
+        ):
+            context = build_ncaaf_picks_page_context(1)
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No recommendations available.")
+
+    def test_ncaaf_game_detail_missing_card_does_not_inject_fake_matchup(self) -> None:
+        with patch(
+            "syndicate.features.ncaaf.game_detail.build_cards_page_context",
+            return_value={
+                "date": f"{default_ncaaf_season()} Week 1",
+                "prev_date": "1",
+                "next_date": "1",
+                "games": [],
+                "using_sample_data": False,
+                "source_path": "summary.json",
+                "control_value": "1",
+            },
+        ):
+            context = build_ncaaf_game_detail_page_context(1, "missing-game")
+
+        game = (context.get("games") or [{}])[0]
+        self.assertEqual(game.get("status"), "NCAAF game unavailable")
+        self.assertEqual(context.get("source_title"), "NCAAF game unavailable")
+        self.assertFalse(context.get("using_sample_data"))
+
+    def test_ncaaf_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/ncaaf/api/season/2025/betting-card?week=1")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("season"), 2025)
+        self.assertEqual(payload.get("week"), 1)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("route_path"), "/ncaaf/season/2025/betting-card")
+        self.assertTrue(any(link.get("href") == "/ncaaf/season/2025/betting-card?week=1" for link in (payload.get("module_links") or [])))
+
+    def test_nba_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nba/api/picks?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/nba/picks")
+        self.assertTrue(any(link.get("href") == "/nba/picks?date=2026-05-16" for link in (payload.get("module_links") or [])))
+
+    def test_nba_archive_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nba/api/archive?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/nba/archive")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/nba/archive?date=2026-05-16" for link in (payload.get("module_links") or [])))
+        self.assertTrue(isinstance(payload.get("available_dates"), list))
+
+    def test_nba_props_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nba/api/prop-ladders?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/nba/prop-ladders")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/nba/prop-ladders?date=2026-05-16" for link in (payload.get("module_links") or [])))
+        self.assertTrue(isinstance(payload.get("available_dates"), list))
+
+    def test_nba_prop_ladders_api_exposes_unfiltered_controls(self) -> None:
+        response = self.client.get("/nba/api/prop-ladders?date=2026-05-14")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([control.get("name") for control in (payload.get("extra_controls") or [])], ["team", "player", "sort"])
+        team_control = next(control for control in (payload.get("extra_controls") or []) if control.get("name") == "team")
+        sort_control = next(control for control in (payload.get("extra_controls") or []) if control.get("name") == "sort")
+        self.assertTrue(any(option.get("value") == "MEM" for option in (team_control.get("options") or [])))
+        self.assertTrue(any(option.get("value") == "team" for option in (sort_control.get("options") or [])))
+        first_card = (payload.get("rank_cards") or [{}])[0]
+        self.assertEqual(first_card.get("href"), "/nba/prop-ladders?date=2026-05-14&player=Adama+Bal")
+        self.assertEqual(first_card.get("href_label"), "Player focus")
+
+    def test_nba_prop_ladders_api_filters_cards_and_preserves_query_state(self) -> None:
+        response = self.client.get("/nba/api/prop-ladders?date=2026-05-14&team=MEM&player=Adama&sort=team")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(payload.get("using_sample_data"))
+        self.assertEqual(len(payload.get("rank_cards") or []), 1)
+        self.assertIn("Adama Bal", (payload.get("rank_cards") or [{}])[0].get("title", ""))
+        self.assertEqual(
+            payload.get("prev_href"),
+            "/nba/prop-ladders?date=2026-05-13&team=MEM&player=Adama&sort=team",
+        )
+        self.assertEqual(
+            payload.get("next_href"),
+            "/nba/prop-ladders?date=2026-05-15&team=MEM&player=Adama&sort=team",
+        )
+        self.assertEqual(
+            payload.get("hidden_fields"),
+            [],
+        )
+        self.assertEqual(payload.get("focus_panel", {}).get("eyebrow"), "Selected player")
+        self.assertEqual(payload.get("focus_panel", {}).get("title"), "Adama Bal")
+        self.assertEqual(
+            payload.get("focus_panel", {}).get("href"),
+            "/nba/prop-ladders?date=2026-05-14&team=MEM&sort=team",
+        )
+        self.assertEqual(payload.get("focus_panel", {}).get("summary_stats", [])[1].get("value"), "PRA 14.7")
+        self.assertEqual(payload.get("focus_panel", {}).get("table_groups", [])[0].get("heading"), "Model outputs")
+
+    def test_nba_prop_ladders_page_preserves_active_filters_in_date_form(self) -> None:
+        response = self.client.get("/nba/prop-ladders?date=2026-05-14&team=MEM&player=Adama&sort=team")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="team"', html)
+        self.assertIn('name="player"', html)
+        self.assertIn('name="sort"', html)
+        self.assertIn('<option value="MEM" selected>MEM</option>', html)
+        self.assertIn('name="player" value="Adama"', html)
+        self.assertIn('<option value="team" selected>Team</option>', html)
+        self.assertNotIn('type="hidden" name="team" value="MEM"', html)
+        self.assertNotIn('type="hidden" name="player" value="Adama"', html)
+        self.assertNotIn('type="hidden" name="sort" value="team"', html)
+        self.assertIn("Selected player", html)
+        self.assertIn("Adama Bal", html)
+        self.assertIn("PRA 14.7", html)
+        self.assertIn("Model outputs", html)
+        self.assertIn('/nba/prop-ladders?date=2026-05-14&amp;team=MEM&amp;sort=team', html)
+        self.assertIn('/nba/prop-ladders?date=2026-05-14&amp;team=MEM&amp;player=Adama+Bal&amp;sort=team', html)
+        self.assertIn('id="propLadderForm"', html)
+        self.assertIn('Player Prop Ladders', html)
+
+    def test_nba_prop_ladders_page_shows_unfiltered_controls(self) -> None:
+        response = self.client.get("/nba/prop-ladders?date=2026-05-14")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name="team"', html)
+        self.assertIn('name="player"', html)
+        self.assertIn('name="sort"', html)
+        self.assertIn('name="market"', html)
+        self.assertIn('<option value="MEM">MEM</option>', html)
+
+    def test_nba_prop_ladders_page_shows_empty_state_for_no_match_filters(self) -> None:
+        response = self.client.get("/nba/prop-ladders?date=2026-05-14&team=ZZZ")
+        payload = self.client.get("/nba/api/prop-ladders?date=2026-05-14&team=ZZZ").get_json()
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload.get("rank_cards"), [])
+        self.assertEqual(payload.get("empty_state", {}).get("title"), "No NBA props matched the current filters")
+        self.assertIn("No NBA props matched the current filters", html)
+
+    def test_nba_betting_card_day_api_forwards_include_prop_insights_flag(self) -> None:
+        with patch(
+            "syndicate.blueprints.nba.build_season_betting_card_day_payload",
+            return_value={"season": 2026, "date": "2026-05-14", "games": []},
+        ) as mocked_payload:
+            response = self.client.get(
+                "/nba/api/season/2026/betting-card/day/2026-05-14?profile=retuned&include_prop_insights=1"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"season": 2026, "date": "2026-05-14", "games": []})
+        mocked_payload.assert_called_once_with(
+            2026,
+            "2026-05-14",
+            "retuned",
+            include_prop_insights=True,
+        )
+
+    def test_nba_betting_card_page_uses_versioned_syndicate_assets(self) -> None:
+        html = self.client.get("/nba/season/2026/betting-card?profile=retuned&date=2026-05-14").get_data(as_text=True)
+
+        self.assertIn('/nba/assets/betting-card-v2.css?v=', html)
+        self.assertIn('/nba/assets/betting-card-v2.js?v=', html)
+        self.assertIn('/nba/cards?date=2026-05-14', html)
+        self.assertIn('/nba/season/2026/live-lens?date=2026-05-14&amp;profile=retuned', html)
+
+    def test_nba_betting_card_page_preserves_requested_profile_in_live_lens_nav(self) -> None:
+        html = self.client.get('/nba/season/2025/betting-card?profile=alt&date=2025-04-15').get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/live-lens?date=2025-04-15&amp;profile=alt', html)
+
+    def test_wnba_betting_card_page_uses_versioned_syndicate_assets(self) -> None:
+        html = self.client.get('/wnba/season/2026/betting-card?date=2026-05-14').get_data(as_text=True)
+
+        self.assertIn('/wnba/assets/betting-card-v2.css?v=', html)
+        self.assertIn('/wnba/cards?date=2026-05-14', html)
+        self.assertIn('/wnba/live-player-props-audit?date=2026-05-14', html)
+        self.assertIn('WNBA Betting Card', html)
+        self.assertIn('Stored slate navigation', html)
+
+    def test_wnba_betting_card_styles_asset_is_served_locally(self) -> None:
+        response = self.client.get('/wnba/assets/betting-card-v2.css')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('--cards-bg', response.get_data(as_text=True))
+
+    def test_wnba_season_betting_card_route_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_wnba_date_for_season(2025)
+        html = self.client.get('/wnba/season/2025/betting-card').get_data(as_text=True)
+
+        self.assertIn(f'/wnba/cards?date={season_date}', html)
+        self.assertIn(f'/wnba/live-player-props-audit?date={season_date}', html)
+
+    def test_nba_cards_source_page_uses_versioned_syndicate_assets(self) -> None:
+        context = build_nba_cards_page_context("2026-05-14")
+        resolved_date = str(context.get("date") or "")
+        html = self.client.get("/nba/cards?date=2026-05-14").get_data(as_text=True)
+
+        self.assertIn('/static/shared/standalone_shell.css?v=', html)
+        self.assertIn('/static/nba/cards_source.css?v=', html)
+        self.assertIn('/static/nba/cards_source.js?v=', html)
+        self.assertIn(f'/nba/season/{resolved_date[:4]}/betting-card?profile=retuned&amp;date={resolved_date}', html)
+        self.assertIn(f'/nba/prop-ladders?date={resolved_date}', html)
+        self.assertIn(f'/nba/season/{resolved_date[:4]}/live-lens?date={resolved_date}&amp;profile=retuned', html)
+
+    def test_nhl_cards_source_page_links_betting_recap_for_selected_date(self) -> None:
+        payload = build_nhl_source_bundle_payload("2026-05-14")
+        resolved_date = str(payload.get("date") or "")
+        html = self.client.get("/nhl/cards?date=2026-05-14").get_data(as_text=True)
+
+        self.assertIn(f'/nhl/reconciliation?date={resolved_date}', html)
+        self.assertIn("setDateScopedHref('bettingRecapLink', bettingRecapBasePath, d);", html)
+
+    def test_nhl_cards_source_page_uses_versioned_syndicate_assets(self) -> None:
+        html = self.client.get("/nhl/cards?date=2026-05-14").get_data(as_text=True)
+
+        self.assertIn('/static/shared/standalone_shell.css?v=', html)
+        self.assertIn('/static/nhl/cards_source_base.css?v=', html)
+        self.assertIn('/static/shared/polling.js?v=', html)
+
+    def test_nhl_cards_source_page_links_props_reconciliation_for_selected_date(self) -> None:
+        payload = build_nhl_source_bundle_payload("2026-05-14")
+        resolved_date = str(payload.get("date") or "")
+        html = self.client.get("/nhl/cards?date=2026-05-14").get_data(as_text=True)
+
+        self.assertIn(f'/nhl/props/reconciliation?date={resolved_date}', html)
+        self.assertIn("setDateScopedHref('propsReconciliationLink', propsReconciliationBasePath, d);", html)
+
+    def test_nhl_cards_source_page_links_props_lines_for_selected_date(self) -> None:
+        payload = build_nhl_source_bundle_payload("2026-05-14")
+        resolved_date = str(payload.get("date") or "")
+        html = self.client.get("/nhl/cards?date=2026-05-14").get_data(as_text=True)
+
+        self.assertIn(f'/nhl/props/lines?date={resolved_date}', html)
+        self.assertIn("setDateScopedHref('propsLinesLink', propsLinesBasePath, d);", html)
+
+    def test_nhl_cards_source_page_exposes_server_empty_state_hooks(self) -> None:
+        html = self.client.get("/nhl/cards?date=2026-05-14").get_data(as_text=True)
+
+        self.assertIn('id="emptyList"', html)
+        self.assertIn("emptyState && Array.isArray(emptyState.list_items)", html)
+        self.assertIn("renderEmptyHeaderMeta(b);", html)
+        self.assertIn("setEmpty(String(emptyState?.body || 'No predictions rows available for this date yet.'), emptyItems);", html)
+
+    def test_nba_cards_source_js_recomputes_betting_card_season_path_from_date(self) -> None:
+        content = Path("c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/static/nba/cards_source.js").read_text(encoding="utf-8")
+
+        self.assertIn("const seasonYear = Number(String(state.date || getLocalDateISO()).slice(0, 4))", content)
+        self.assertIn("seasonBettingCardLink.href = `/nba/season/${encodeURIComponent(seasonYear)}/betting-card?profile=retuned&date=${encodeURIComponent(state.date || getLocalDateISO())}`", content)
+        self.assertIn("propsLink.href = `/nba/prop-ladders?date=${encodeURIComponent(state.date || getLocalDateISO())}`", content)
+        self.assertIn("liveAuditLink.href = `/nba/season/${encodeURIComponent(seasonYear)}/live-lens?date=${encodeURIComponent(state.date || getLocalDateISO())}&profile=retuned`", content)
+
+    def test_nba_season_betting_card_route_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        html = self.client.get("/nba/season/2025/betting-card?profile=retuned").get_data(as_text=True)
+
+        self.assertIn(f"/nba/cards?date={season_date}", html)
+        self.assertIn(f"/nba/features?date={season_date}", html)
+        self.assertIn(f"/nba/season/2025/reconciliation?date={season_date}", html)
+        self.assertIn(f"/nba/season/2025/live-lens?date={season_date}", html)
+
+    def test_nba_features_route_preserves_requested_profile_in_nav(self) -> None:
+        html = self.client.get('/nba/features?date=2025-04-15&profile=alt').get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/betting-card?profile=alt&amp;date=2025-04-15', html)
+        self.assertIn('/nba/season/2025/reconciliation?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/features?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('>Data Features</a>', html)
+
+    def test_nba_season_live_lens_route_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        html = self.client.get("/nba/season/2025/live-lens").get_data(as_text=True)
+
+        self.assertIn(f'/nba/season/2025/betting-card?profile=retuned&amp;date={season_date}', html)
+        self.assertIn(f'/nba/season/2025/live-lens-accuracy?date={season_date}&amp;profile=retuned', html)
+        self.assertIn(f'/nba/season/2025/live-lens?date={season_date}', html)
+
+    def test_nba_season_live_lens_route_preserves_requested_profile_in_nav(self) -> None:
+        html = self.client.get("/nba/season/2025/live-lens?date=2025-04-15&profile=alt").get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/betting-card?profile=alt&amp;date=2025-04-15', html)
+        self.assertIn('/nba/season/2025/market-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('>Live Player Props Audit</a>', html)
+        self.assertIn('>Live Player Props Lens Accuracy</a>', html)
+
+    def test_nba_season_live_lens_accuracy_route_preserves_requested_profile_in_nav(self) -> None:
+        html = self.client.get('/nba/season/2025/live-lens-accuracy?date=2025-04-15&profile=alt').get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/betting-card?profile=alt&amp;date=2025-04-15', html)
+        self.assertIn('/nba/season/2025/market-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-daily-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-game-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('>Live Player Props Lens Accuracy</a>', html)
+        self.assertIn('>Live Player Props Audit</a>', html)
+
+    def test_nba_season_live_game_lens_accuracy_route_preserves_requested_profile_in_nav(self) -> None:
+        html = self.client.get('/nba/season/2025/live-game-lens-accuracy?date=2025-04-15&profile=alt').get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/betting-card?profile=alt&amp;date=2025-04-15', html)
+        self.assertIn('/nba/season/2025/market-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-daily-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-game-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('>Live Game Lens Accuracy</a>', html)
+        self.assertIn('>Live Player Props Lens Accuracy</a>', html)
+
+    def test_nba_season_live_lens_daily_accuracy_route_preserves_requested_profile_in_nav(self) -> None:
+        html = self.client.get('/nba/season/2025/live-lens-daily-accuracy?date=2025-04-15&profile=alt').get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/betting-card?profile=alt&amp;date=2025-04-15', html)
+        self.assertIn('/nba/season/2025/market-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-daily-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-game-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('>Live Lens Daily Accuracy</a>', html)
+        self.assertIn('>Live Game Lens Accuracy</a>', html)
+        self.assertIn('>Live Player Props Lens Accuracy</a>', html)
+
+    def test_nba_season_market_accuracy_route_preserves_requested_profile_in_nav(self) -> None:
+        html = self.client.get('/nba/season/2025/market-accuracy?date=2025-04-15&profile=alt').get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/betting-card?profile=alt&amp;date=2025-04-15', html)
+        self.assertIn('/nba/season/2025/market-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-daily-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-game-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('>Market Accuracy</a>', html)
+
+    def test_nba_season_reconciliation_route_preserves_requested_profile_in_nav(self) -> None:
+        html = self.client.get('/nba/season/2025/reconciliation?date=2025-04-15&profile=alt').get_data(as_text=True)
+
+        self.assertIn('/nba/season/2025/betting-card?profile=alt&amp;date=2025-04-15', html)
+        self.assertIn('/nba/season/2025/market-accuracy?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/live-lens?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('/nba/season/2025/reconciliation?date=2025-04-15&amp;profile=alt', html)
+        self.assertIn('>Betting Recap</a>', html)
+
+    def test_nba_betting_card_js_rewrites_source_routes_to_syndicate_paths(self) -> None:
+        content = source_betting_card_js()
+
+        self.assertIsInstance(content, str)
+        assert content is not None
+        self.assertIn("/nba/api/season/", content)
+        self.assertIn("/nba/cards?date=", content)
+        self.assertIn("/nba/season/${encodeURIComponent(state.season)}/live-lens?date=${encodeURIComponent(state.selectedDate)}&profile=${encodeURIComponent(state.profile)}", content)
+        self.assertIn("nextUrl.searchParams.set('profile', state.profile);", content)
+        self.assertIn("nextUrl.searchParams.set('date', state.selectedDate);", content)
+        self.assertNotIn("/live-player-props-audit?date=", content)
+        self.assertNotIn("href=\"/betting-card?date=", content)
+        self.assertNotIn("href=\"/api/season/", content)
+
+    def test_nba_betting_card_day_payload_rewrites_cards_url_to_syndicate_route(self) -> None:
+        build_season_betting_card_day_payload.cache_clear()
+        with patch(
+            "syndicate.features.nba.betting_card.load_json",
+            return_value={"season": 2026, "date": "2026-05-14", "cards_url": "/?date=2026-05-14", "games": []},
+        ):
+            payload = build_season_betting_card_day_payload(2026, "2026-05-14", "retuned")
+        build_season_betting_card_day_payload.cache_clear()
+
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((payload or {}).get("cards_url"), "/nba/cards?date=2026-05-14")
+
+    def test_nba_betting_card_manifest_payload_rewrites_route_fields_to_syndicate_paths(self) -> None:
+        build_season_betting_card_manifest_payload.cache_clear()
+        with patch(
+            "syndicate.features.nba.betting_card.load_json",
+            return_value={
+                "season": 2026,
+                "days": [{"date": "2026-05-14", "cards_url": "/?date=2026-05-14"}],
+                "meta": {"detail_url": "/api/season/2026/betting-card/day/2026-05-14?profile=retuned"},
+            },
+        ):
+            payload = build_season_betting_card_manifest_payload(2026, "retuned", "2026-05-14")
+        build_season_betting_card_manifest_payload.cache_clear()
+
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(((payload or {}).get("days") or [{}])[0].get("cards_url"), "/nba/cards?date=2026-05-14")
+        self.assertEqual(((payload or {}).get("meta") or {}).get("detail_url"), "/nba/api/season/2026/betting-card/day/2026-05-14?profile=retuned")
+
+    def test_nba_betting_card_manifest_payload_rewrites_non_selected_day_routes(self) -> None:
+        build_season_betting_card_manifest_payload.cache_clear()
+        with patch(
+            "syndicate.features.nba.betting_card.load_json",
+            return_value={
+                "season": 2026,
+                "days": [
+                    {"date": "2026-05-13", "cards_url": "/?date=2026-05-13", "audit_url": "/live-player-props-audit?date=2026-05-13"},
+                    {"date": "2026-05-14", "cards_url": "/?date=2026-05-14"},
+                ],
+            },
+        ):
+            payload = build_season_betting_card_manifest_payload(2026, "retuned", "2026-05-14")
+        build_season_betting_card_manifest_payload.cache_clear()
+
+        first_day = ((payload or {}).get("days") or [{}])[0]
+        self.assertEqual(first_day.get("cards_url"), "/nba/cards?date=2026-05-13")
+        self.assertEqual(first_day.get("audit_url"), "/nba/season/2026/live-lens?date=2026-05-13&profile=retuned")
+
+    def test_nba_betting_card_payloads_can_load_from_local_mirror_only(self) -> None:
+        build_season_betting_card_manifest_payload.cache_clear()
+        build_season_betting_card_day_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "season_betting_card_manifest_2026_retuned_2026-05-14.json").write_text(
+                json.dumps(
+                    {
+                        "season": 2026,
+                        "days": [{"date": "2026-05-14", "cards_url": "/?date=2026-05-14"}],
+                        "meta": {"detail_url": "/api/season/2026/betting-card/day/2026-05-14?profile=retuned"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (processed_dir / "season_betting_card_day_2026_retuned_2026-05-14.json").write_text(
+                json.dumps(
+                    {
+                        "season": 2026,
+                        "date": "2026-05-14",
+                        "cards_url": "/?date=2026-05-14",
+                        "audit_url": "/live-player-props-audit?date=2026-05-14",
+                        "games": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+                manifest_payload = build_season_betting_card_manifest_payload(2026, "retuned", "2026-05-14")
+                day_payload = build_season_betting_card_day_payload(2026, "2026-05-14", "retuned")
+
+        build_season_betting_card_manifest_payload.cache_clear()
+        build_season_betting_card_day_payload.cache_clear()
+
+        self.assertEqual(((manifest_payload or {}).get("days") or [{}])[0].get("cards_url"), "/nba/cards?date=2026-05-14")
+        self.assertEqual(((manifest_payload or {}).get("meta") or {}).get("detail_url"), "/nba/api/season/2026/betting-card/day/2026-05-14?profile=retuned")
+        self.assertEqual((day_payload or {}).get("cards_url"), "/nba/cards?date=2026-05-14")
+        self.assertEqual((day_payload or {}).get("audit_url"), "/nba/season/2026/live-lens?date=2026-05-14&profile=retuned")
+
+    def test_nba_betting_card_manifest_payload_falls_back_to_undated_local_manifest(self) -> None:
+        build_season_betting_card_manifest_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "season_betting_card_manifest_2026_retuned.json").write_text(
+                json.dumps(
+                    {
+                        "season": 2026,
+                        "days": [{"date": "2026-05-14", "cards_url": "/?date=2026-05-14"}],
+                        "meta": {"detail_url": "/api/season/2026/betting-card/day/2026-05-14?profile=retuned"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]):
+                payload = build_season_betting_card_manifest_payload(2026, "retuned", "2026-05-19")
+
+        build_season_betting_card_manifest_payload.cache_clear()
+
+        self.assertEqual(((payload or {}).get("days") or [{}])[0].get("cards_url"), "/nba/cards?date=2026-05-14")
+        self.assertEqual(((payload or {}).get("meta") or {}).get("detail_url"), "/nba/api/season/2026/betting-card/day/2026-05-14?profile=retuned")
+
+    def test_nba_betting_card_payloads_return_none_when_local_artifacts_are_missing(self) -> None:
+        build_season_betting_card_manifest_payload.cache_clear()
+        build_season_betting_card_day_payload.cache_clear()
+        with patch("syndicate.features.nba.betting_card.load_json", return_value=None):
+            manifest_payload = build_season_betting_card_manifest_payload(2026, "retuned", "2026-05-14")
+            day_payload = build_season_betting_card_day_payload(2026, "2026-05-14", "retuned")
+
+        build_season_betting_card_manifest_payload.cache_clear()
+        build_season_betting_card_day_payload.cache_clear()
+
+        self.assertIsNone(manifest_payload)
+        self.assertIsNone(day_payload)
+
+    def test_nba_season_betting_card_manifest_api_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        with patch(
+            "syndicate.blueprints.nba.build_season_betting_card_manifest_payload",
+            return_value={"season": 2025, "days": []},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2025/betting-card?profile=retuned")
+
+        self.assertEqual(response.status_code, 200)
+        mocked_payload.assert_called_once_with(2025, "retuned", season_date)
+
+    def test_nba_season_live_lens_api_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        with patch(
+            "syndicate.blueprints.nba.build_live_prop_audit_payload",
+            return_value={"ok": True, "meta": {"start": season_date, "end": season_date}},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2025/live-lens")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "meta": {"start": season_date, "end": season_date}})
+        mocked_payload.assert_called_once_with(f"date={season_date}")
+
+    def test_nba_live_prop_audit_prefers_local_mirror_artifacts(self) -> None:
+        build_live_prop_audit_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            projection_row = {
+                "market": "player_prop",
+                "game_id": "1234567890",
+                "player": "Jalen Brunson",
+                "stat": "pts",
+                "proj": 28.5,
+                "sim_mu": 27.9,
+                "sim_mu_adjusted": 28.1,
+                "elapsed": 18,
+                "line": 27.5,
+                "context": {"pregame_team_total_ratio": 1.01, "pregame_game_total_ratio": 1.02},
+            }
+            (processed_dir / "live_lens_projections_2026-05-18.jsonl").write_text(
+                json.dumps(projection_row) + "\n",
+                encoding="utf-8",
+            )
+            (processed_dir / "recon_props_2026-05-18.csv").write_text(
+                "game_id,player_name,pts,reb,ast\n1234567890,Jalen Brunson,30,4,7\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"SYNDICATE_NBA_ARTIFACT_ROOT": temp_dir}, clear=False):
+                payload = build_live_prop_audit_payload("date=2026-05-18&include_rows=1")
+
+        build_live_prop_audit_payload.cache_clear()
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((payload or {}).get("status"), "ok")
+        self.assertEqual((((payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((((payload or {}).get("overall") or {}).get("n")), 1)
+        self.assertEqual((((payload or {}).get("history") or {}).get("rows") or [{}])[0].get("actual"), 30.0)
+
+    def test_nba_live_game_accuracy_prefers_local_mirror_artifacts(self) -> None:
+        build_live_game_accuracy_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            signal_row = {
+                "market": "ats",
+                "klass": "BET",
+                "game_id": "1234567890",
+                "home": "NYK",
+                "away": "BOS",
+                "side": "NYK",
+                "live_line": -3.5,
+                "driver_tags": ["mgn:close"],
+                "received_at": "2026-05-18T01:00:00Z",
+            }
+            (processed_dir / "live_lens_signals_2026-05-18.jsonl").write_text(json.dumps(signal_row) + "\n", encoding="utf-8")
+            (processed_dir / "recon_games_2026-05-18.csv").write_text(
+                "game_id,home_tri,away_tri,home_pts,visitor_pts,total_actual\n1234567890,NYK,BOS,110,102,212\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"SYNDICATE_NBA_ARTIFACT_ROOT": temp_dir}, clear=False):
+                payload = build_live_game_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
+
+        build_live_game_accuracy_payload.cache_clear()
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((((payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((((payload or {}).get("overall") or {}).get("ats") or {}).get("n_settled"), 1)
+
+    def test_nba_live_prop_accuracy_prefers_local_mirror_artifacts(self) -> None:
+        build_live_prop_accuracy_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            signal_row = {
+                "market": "player_prop",
+                "klass": "BET",
+                "game_id": "1234567890",
+                "player": "Jalen Brunson",
+                "stat": "pts",
+                "side": "OVER",
+                "line": 27.5,
+                "driver_tags": ["sim:edge"],
+                "received_at": "2026-05-18T01:00:00Z",
+            }
+            (processed_dir / "live_lens_signals_2026-05-18.jsonl").write_text(json.dumps(signal_row) + "\n", encoding="utf-8")
+            (processed_dir / "recon_props_2026-05-18.csv").write_text(
+                "game_id,player_name,pts,reb,ast\n1234567890,Jalen Brunson,30,4,7\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"SYNDICATE_NBA_ARTIFACT_ROOT": temp_dir}, clear=False):
+                payload = build_live_prop_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
+
+        build_live_prop_accuracy_payload.cache_clear()
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((((payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((((payload or {}).get("overall") or {}).get("props") or {}).get("n_settled"), 1)
+
+    def test_nba_live_lens_builders_return_local_empty_payloads_without_source_fallback(self) -> None:
+        build_live_prop_audit_payload.cache_clear()
+        build_live_game_accuracy_payload.cache_clear()
+        build_live_prop_accuracy_payload.cache_clear()
+        from syndicate.features.nba.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload
+
+        build_live_lens_daily_accuracy_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            with patch.dict("os.environ", {"SYNDICATE_NBA_ARTIFACT_ROOT": temp_dir}, clear=False):
+                audit_payload = build_live_prop_audit_payload("date=2026-05-18&include_rows=1")
+                game_payload = build_live_game_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
+                prop_payload = build_live_prop_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
+                daily_payload = build_live_lens_daily_accuracy_payload("date=2026-05-18")
+
+        build_live_prop_audit_payload.cache_clear()
+        build_live_game_accuracy_payload.cache_clear()
+        build_live_prop_accuracy_payload.cache_clear()
+        build_live_lens_daily_accuracy_payload.cache_clear()
+
+        self.assertEqual((((audit_payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((audit_payload or {}).get("status"), "empty")
+        self.assertEqual((((game_payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((game_payload or {}).get("status"), "empty")
+        self.assertEqual((((prop_payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((prop_payload or {}).get("status"), "empty")
+        self.assertEqual(((daily_payload or {}).get("summary") or {}).get("available"), False)
+        self.assertEqual((((daily_payload or {}).get("window") or {}).get("since")), "2026-05-18")
+
+    def test_wnba_live_prop_audit_prefers_local_mirror_artifacts(self) -> None:
+        build_wnba_live_prop_audit_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            projection_row = {
+                "market": "player_prop",
+                "game_id": "1234567890",
+                "player": "A'ja Wilson",
+                "stat": "pts",
+                "proj": 25.5,
+                "sim_mu": 24.9,
+                "sim_mu_adjusted": 25.1,
+                "elapsed": 16,
+                "line": 24.5,
+                "context": {"pregame_team_total_ratio": 1.02, "pregame_game_total_ratio": 1.01},
+            }
+            (processed_dir / "live_lens_projections_2026-05-18.jsonl").write_text(
+                json.dumps(projection_row) + "\n",
+                encoding="utf-8",
+            )
+            (processed_dir / "recon_props_2026-05-18.csv").write_text(
+                "game_id,player_name,pts,reb,ast\n1234567890,A'ja Wilson,28,8,3\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"SYNDICATE_WNBA_SOURCE_ROOT": temp_dir}, clear=False):
+                payload = build_wnba_live_prop_audit_payload("date=2026-05-18&include_rows=1")
+
+        build_wnba_live_prop_audit_payload.cache_clear()
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((((payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((((payload or {}).get("overall") or {}).get("n")), 1)
+
+    def test_wnba_live_game_accuracy_prefers_local_mirror_artifacts(self) -> None:
+        build_wnba_live_game_accuracy_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            signal_row = {
+                "market": "ats",
+                "klass": "BET",
+                "game_id": "1234567890",
+                "home": "LVA",
+                "away": "SEA",
+                "side": "LVA",
+                "live_line": -4.5,
+                "driver_tags": ["mgn:close"],
+                "received_at": "2026-05-18T01:00:00Z",
+            }
+            (processed_dir / "live_lens_signals_2026-05-18.jsonl").write_text(json.dumps(signal_row) + "\n", encoding="utf-8")
+            (processed_dir / "recon_games_2026-05-18.csv").write_text(
+                "game_id,home_tri,away_tri,home_pts,visitor_pts,total_actual\n1234567890,LVA,SEA,95,88,183\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"SYNDICATE_WNBA_SOURCE_ROOT": temp_dir}, clear=False):
+                payload = build_wnba_live_game_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
+
+        build_wnba_live_game_accuracy_payload.cache_clear()
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((((payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((((payload or {}).get("overall") or {}).get("ats") or {}).get("n_settled"), 1)
+
+    def test_wnba_live_prop_accuracy_prefers_local_mirror_artifacts(self) -> None:
+        build_wnba_live_prop_accuracy_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            processed_dir = Path(temp_dir) / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            signal_row = {
+                "market": "player_prop",
+                "klass": "BET",
+                "game_id": "1234567890",
+                "player": "A'ja Wilson",
+                "stat": "pts",
+                "side": "OVER",
+                "line": 24.5,
+                "driver_tags": ["sim:edge"],
+                "received_at": "2026-05-18T01:00:00Z",
+            }
+            (processed_dir / "live_lens_signals_2026-05-18.jsonl").write_text(json.dumps(signal_row) + "\n", encoding="utf-8")
+            (processed_dir / "recon_props_2026-05-18.csv").write_text(
+                "game_id,player_name,pts,reb,ast\n1234567890,A'ja Wilson,28,8,3\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict("os.environ", {"SYNDICATE_WNBA_SOURCE_ROOT": temp_dir}, clear=False):
+                payload = build_wnba_live_prop_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
+
+        build_wnba_live_prop_accuracy_payload.cache_clear()
+        self.assertIsInstance(payload, dict)
+        self.assertEqual((((payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((((payload or {}).get("overall") or {}).get("props") or {}).get("n_settled"), 1)
+
+    def test_nba_season_live_lens_accuracy_api_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        with patch(
+            "syndicate.blueprints.nba.build_live_prop_accuracy_payload",
+            return_value={"ok": True, "status": "empty"},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2025/live-lens-accuracy")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "status": "empty"})
+        mocked_payload.assert_called_once_with(f"date={season_date}")
+
+    def test_nba_season_live_game_lens_accuracy_api_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        with patch(
+            "syndicate.blueprints.nba.build_live_game_accuracy_payload",
+            return_value={"ok": True, "status": "empty"},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2025/live-game-lens-accuracy")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "status": "empty"})
+        mocked_payload.assert_called_once_with(f"date={season_date}")
+
+    def test_nba_season_live_lens_daily_accuracy_api_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        with patch(
+            "syndicate.blueprints.nba.build_live_lens_daily_accuracy_payload",
+            return_value={"ok": True, "summary": {}, "days": [], "window": {"since": season_date, "until": season_date}},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2025/live-lens-daily-accuracy")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "summary": {}, "days": [], "window": {"since": season_date, "until": season_date}})
+        mocked_payload.assert_called_once_with(f"date={season_date}")
+
+    def test_nba_season_market_accuracy_api_without_date_uses_season_scoped_default(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        with patch(
+            "syndicate.blueprints.nba.build_market_accuracy_payload",
+            return_value={"ok": True, "summary": {}, "days": [], "window": {"since": season_date, "until": season_date}},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2025/market-accuracy")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "summary": {}, "days": [], "window": {"since": season_date, "until": season_date}})
+        mocked_payload.assert_called_once_with(f"date={season_date}")
+
+    def test_nba_season_market_accuracy_api_preserves_explicit_window_query(self) -> None:
+        with patch(
+            "syndicate.blueprints.nba.build_market_accuracy_payload",
+            return_value={"ok": True, "summary": {}, "days": [], "window": {"since": "2026-04-20", "until": "2026-05-19"}},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2026/market-accuracy?since=2026-04-20&until=2026-05-19")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "summary": {}, "days": [], "window": {"since": "2026-04-20", "until": "2026-05-19"}})
+        mocked_payload.assert_called_once_with("since=2026-04-20&until=2026-05-19")
+
+    def test_nba_season_betting_recap_api_without_date_uses_season_scoped_window(self) -> None:
+        season_date = default_nba_date_for_season(2025)
+        since_date = (date.fromisoformat(season_date) - timedelta(days=13)).isoformat()
+        with patch(
+            "syndicate.blueprints.nba.build_betting_recap_payload",
+            return_value={"version": "recaps-v1", "window": {"since": since_date, "until": season_date}, "items": []},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/season/2025/betting-recap")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"version": "recaps-v1", "window": {"since": since_date, "until": season_date}, "items": []})
+        mocked_payload.assert_called_once_with(f"since={since_date}&until={season_date}&days=14")
+
+    def test_nba_features_api_returns_payload(self) -> None:
+        with patch(
+            "syndicate.blueprints.nba.build_features_payload",
+            return_value={"generated_at": "2026-01-01T00:00:00Z", "catalog_path": "data/features_catalog.json", "datasets": [], "descriptions": {}},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/features")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"generated_at": "2026-01-01T00:00:00Z", "catalog_path": "data/features_catalog.json", "datasets": [], "descriptions": {}})
+        mocked_payload.assert_called_once_with()
+
+    def test_nba_market_accuracy_route_without_season_is_available(self) -> None:
+        html = self.client.get('/nba/market-accuracy?date=2025-04-15').get_data(as_text=True)
+
+        self.assertIn('/nba/market-accuracy?date=2025-04-15', html)
+        self.assertIn('>Market Accuracy</a>', html)
+
+    def test_nba_live_lens_accuracy_route_without_season_is_available(self) -> None:
+        html = self.client.get('/nba/live-lens-accuracy?date=2025-04-15').get_data(as_text=True)
+
+        self.assertIn('/nba/live-lens-accuracy?date=2025-04-15', html)
+        self.assertIn('>Live Lens Daily Accuracy</a>', html)
+
+    def test_mlb_market_accuracy_route_renders_native_template(self) -> None:
+        html = self.client.get('/mlb/market-accuracy?date=2026-05-19').get_data(as_text=True)
+
+        self.assertIn('MLB Betting - Market Accuracy', html)
+        self.assertIn('/mlb/api/market-accuracy', html)
+        self.assertIn('/mlb/live-lens?date=2026-05-19', html)
+        self.assertIn('/mlb/live-lens-accuracy?date=2026-05-19', html)
+        self.assertIn('Search picks, players, games', html)
+        self.assertIn('All results', html)
+        self.assertIn('Quick filters', html)
+        self.assertIn('Pitcher Props', html)
+        self.assertIn('Official summary', html)
+        self.assertIn('Window actions', html)
+        self.assertIn('Moneyline only', html)
+        self.assertIn('Active filter', html)
+        self.assertIn('Clear filter', html)
+
+    def test_mlb_season_live_lens_page_keeps_accuracy_links(self) -> None:
+        html = self.client.get('/mlb/season/2026/live-lens?date=2026-05-19').get_data(as_text=True)
+
+        self.assertIn('/mlb/market-accuracy?date=2026-05-19', html)
+        self.assertIn('>Market Accuracy</a>', html)
+        self.assertIn('/mlb/live-lens-accuracy?date=2026-05-19', html)
+
+    def test_nba_live_player_props_accuracy_route_without_season_is_available(self) -> None:
+        html = self.client.get('/nba/live-player-props-lens-accuracy?date=2025-04-15').get_data(as_text=True)
+
+        self.assertIn('/nba/live-player-props-lens-accuracy?date=2025-04-15', html)
+        self.assertIn('>Live Player Props Lens Accuracy</a>', html)
+
+    def test_wnba_live_accuracy_pages_render_native_templates(self) -> None:
+        cases = [
+            (
+                '/wnba/live-player-props-audit?date=2026-05-16',
+                'WNBA Betting - Live Player Props Audit',
+                '/wnba/api/live-player-props-audit',
+                '/wnba/market-accuracy?date=2026-05-16',
+            ),
+            (
+                '/wnba/live-player-props-lens-accuracy?date=2026-05-16',
+                'WNBA Betting - Live Player Props Lens Accuracy',
+                '/wnba/api/live-player-props-lens-accuracy',
+                '/wnba/live-player-props-audit?date=2026-05-16',
+            ),
+            (
+                '/wnba/live-game-lens-accuracy?date=2026-05-16',
+                'WNBA Betting - Live Game Lens Accuracy',
+                '/wnba/api/live-game-lens-accuracy',
+                '/wnba/live-lens-accuracy?date=2026-05-16',
+            ),
+            (
+                '/wnba/live-lens-accuracy?date=2026-05-16',
+                'WNBA Betting - Live Lens Daily Accuracy',
+                '/wnba/api/live-lens-accuracy',
+                '/wnba/market-accuracy?date=2026-05-16',
+            ),
+            (
+                '/wnba/market-accuracy?date=2026-05-16',
+                'WNBA Betting - Market Accuracy',
+                '/wnba/api/market-accuracy',
+                '/wnba/live-lens-accuracy?date=2026-05-16',
+            ),
+        ]
+
+        for route, title, api_path, nav_href in cases:
+            with self.subTest(route=route):
+                html = self.client.get(route).get_data(as_text=True)
+
+                self.assertIn(title, html)
+                self.assertIn(api_path, html)
+                self.assertIn(nav_href, html)
+                self.assertNotIn('source page unavailable', html)
+
+    def test_nhl_live_lens_accuracy_page_renders_native_template(self) -> None:
+        html = self.client.get('/nhl/live-lens-accuracy?date=2026-05-16').get_data(as_text=True)
+
+        self.assertIn('NHL Betting - Live Lens Daily Accuracy', html)
+        self.assertIn('/nhl/api/live-lens-accuracy', html)
+        self.assertIn('/nhl/live-lens?date=2026-05-16', html)
+        self.assertIn('/nhl/reconciliation?date=2026-05-16', html)
+        self.assertNotIn('source page unavailable', html)
+
+    def test_nhl_live_game_accuracy_page_renders_native_template(self) -> None:
+        html = self.client.get('/nhl/live-game-lens-accuracy?date=2026-05-16').get_data(as_text=True)
+
+        self.assertIn('NHL Betting - Live Game Lens Accuracy', html)
+        self.assertIn('/nhl/api/live-game-lens-accuracy', html)
+        self.assertIn('/nhl/live-lens-accuracy?date=2026-05-16', html)
+        self.assertIn('/nhl/reconciliation?date=2026-05-16', html)
+        self.assertNotIn('source page unavailable', html)
+
+    def test_nhl_market_accuracy_page_renders_native_template(self) -> None:
+        html = self.client.get('/nhl/market-accuracy?date=2026-05-16').get_data(as_text=True)
+
+        self.assertIn('NHL Betting - Market Accuracy', html)
+        self.assertIn('/nhl/api/market-accuracy', html)
+        self.assertIn('/nhl/live-lens-accuracy?date=2026-05-16', html)
+        self.assertIn('/nhl/reconciliation?date=2026-05-16', html)
+        self.assertNotIn('source page unavailable', html)
+
+    def test_nhl_reconciliation_page_renders_native_template(self) -> None:
+        html = self.client.get('/nhl/reconciliation?date=2026-05-16').get_data(as_text=True)
+
+        self.assertIn('Betting Recap | NHL Betting', html)
+        self.assertIn('/nhl/api/betting-recap', html)
+        self.assertIn('/nhl/market-accuracy?date=2026-05-16', html)
+        self.assertIn('/nhl/props/reconciliation?date=2026-05-16', html)
+        self.assertNotIn('source page unavailable', html)
+
+    def test_nhl_player_props_reconciliation_page_renders_native_template(self) -> None:
+        html = self.client.get('/nhl/props/reconciliation?date=2026-05-16').get_data(as_text=True)
+
+        self.assertIn('NHL Betting - Player Props Reconciliation', html)
+        self.assertIn('/nhl/api/player-props-reconciliation', html)
+        self.assertIn('/nhl/reconciliation?date=2026-05-16', html)
+        self.assertIn('/nhl/props/lines?date=2026-05-16', html)
+        self.assertNotIn('source page unavailable', html)
+
+    def test_nhl_props_lines_page_renders_native_template(self) -> None:
+        html = self.client.get('/nhl/props/lines?date=2026-05-16').get_data(as_text=True)
+
+        self.assertIn('NHL Betting - Props Lines', html)
+        self.assertIn('/nhl/api/props/lines.json', html)
+        self.assertIn('/nhl/props/reconciliation?date=2026-05-16', html)
+        self.assertNotIn('source page unavailable', html)
+
+    def test_nba_reconciliation_api_without_season_uses_requested_window(self) -> None:
+        with patch(
+            "syndicate.blueprints.nba.build_betting_recap_payload",
+            return_value={"version": "recaps-v1", "window": {"since": "2025-04-01", "until": "2025-04-14"}, "items": []},
+        ) as mocked_payload:
+            response = self.client.get("/nba/api/betting-recap?since=2025-04-01&until=2025-04-14")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"version": "recaps-v1", "window": {"since": "2025-04-01", "until": "2025-04-14"}, "items": []})
+        mocked_payload.assert_called_once_with("since=2025-04-01&until=2025-04-14")
+
+    def test_nhl_reconciliation_api_uses_requested_window(self) -> None:
+        with patch(
+            "syndicate.blueprints.nhl.build_betting_recap_payload",
+            return_value={"version": "recaps-v1", "window": {"since": "2026-03-01", "until": "2026-03-14"}, "items": []},
+        ) as mocked_payload:
+            response = self.client.get("/nhl/api/betting-recap?since=2026-03-01&until=2026-03-14")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"version": "recaps-v1", "window": {"since": "2026-03-01", "until": "2026-03-14"}, "items": []})
+        mocked_payload.assert_called_once_with("since=2026-03-01&until=2026-03-14")
+
+    def test_nhl_player_props_reconciliation_api_uses_query_string_payload_builder(self) -> None:
+        with patch(
+            "syndicate.blueprints.nhl.build_player_props_reconciliation_payload",
+            return_value={"ok": True, "version": "player-props-reconciliation-v1", "date": "2026-03-01", "data": []},
+        ) as mocked_payload:
+            response = self.client.get("/nhl/api/player-props-reconciliation?date=2026-03-01&market=GOALS")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "version": "player-props-reconciliation-v1", "date": "2026-03-01", "data": []})
+        mocked_payload.assert_called_once_with("date=2026-03-01&market=GOALS")
+
+    def test_nhl_props_lines_api_uses_query_string_payload_builder(self) -> None:
+        with patch(
+            "syndicate.blueprints.nhl.build_props_lines_payload",
+            return_value={"ok": True, "version": "props-lines-v1", "date": "2026-05-19", "data": [], "total_rows": 0},
+        ) as mocked_payload:
+            response = self.client.get("/nhl/api/props/lines.json?date=2026-05-19&market=GOALS")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "version": "props-lines-v1", "date": "2026-05-19", "data": [], "total_rows": 0})
+        mocked_payload.assert_called_once_with("date=2026-05-19&market=GOALS")
+
+    def test_nfl_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nfl/api/picks?week=21")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("week"), 21)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("season"), 2025)
+        self.assertEqual(payload.get("submit_label"), "Apply")
+        self.assertEqual(payload.get("reset_href"), "/nfl/picks?season=2025")
+        self.assertEqual(payload.get("hidden_fields"), [{"name": "season", "value": "2025"}])
+        self.assertTrue(any(link.get("href") == "/nfl/picks?season=2025&week=21" for link in (payload.get("module_links") or [])))
+
+    def test_nfl_picks_api_exposes_sort_control_and_preserves_sort_in_week_nav(self) -> None:
+        response = self.client.get("/nfl/api/picks?season=2025&week=21&sort=odds")
+        payload = response.get_json()
+        prev_week, next_week = neighboring_values(available_nfl_weeks(2025), 21, fallback=21)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((payload.get("extra_controls") or [{}])[0].get("name"), "sort")
+        self.assertEqual((payload.get("extra_controls") or [{}])[0].get("value"), "odds")
+        self.assertEqual(payload.get("prev_href"), f"/nfl/picks?season=2025&week={prev_week}&sort=odds")
+        self.assertEqual(payload.get("next_href"), f"/nfl/picks?season=2025&week={next_week}&sort=odds")
+        self.assertEqual(payload.get("summary_panel", {}).get("title"), "2025 Week 21 recommendation mix")
+        self.assertEqual((payload.get("summary_panel", {}).get("table_groups") or [{}])[0].get("heading"), "Confidence tiers")
+
+    def test_nfl_cards_api_preserves_explicit_season_navigation_metadata(self) -> None:
+        response = self.client.get("/nfl/api/cards?season=2025&week=21")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("date"), "2025 Week 21")
+        self.assertEqual(payload.get("control_action"), "/nfl/cards")
+        self.assertEqual(payload.get("hidden_fields"), [{"name": "season", "value": "2025"}])
+        self.assertTrue(any(link.get("href") == "/nfl/picks?season=2025&week=21" for link in (payload.get("module_links") or [])))
+
+    def test_nfl_cards_page_preserves_explicit_season_in_week_form(self) -> None:
+        html = self.client.get("/nfl/cards?season=2025&week=21").get_data(as_text=True)
+
+        self.assertIn('type="hidden" name="season" value="2025"', html)
+        self.assertIn('type="number" name="week" value="21"', html)
+
+    def test_nfl_cards_context_links_game_detail_with_explicit_season(self) -> None:
+        context = build_nfl_cards_page_context(21, season=2025)
+        games = context.get("games") or []
+
+        self.assertTrue(games)
+        self.assertTrue(all("?season=2025&week=21" in str(game.get("href") or "") for game in games[:3]))
+
+    def test_nfl_cards_empty_week_does_not_inject_fake_sample_game(self) -> None:
+        with patch("syndicate.features.nfl.cards._read_snapshot_rows", return_value=()), patch(
+            "syndicate.features.nfl.cards._available_card_weeks", return_value=[21]
+        ):
+            context = build_nfl_cards_page_context(21, season=2025)
+
+        self.assertEqual(context.get("games"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NFL cards unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this week")
+
+    def test_nfl_cards_api_resolves_unmirrored_week_to_last_available_snapshot(self) -> None:
+        response = self.client.get("/nfl/api/cards?season=2025&week=22")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload.get("date"), "2025 Week 21")
+        self.assertEqual(payload.get("requested_date"), "2025 Week 22")
+        self.assertEqual(payload.get("control_value"), "21")
+        self.assertTrue(str(payload.get("source_path") or "").endswith("upcoming_recs_2025_wk21.csv"))
+
+    def test_nfl_live_lens_api_resolves_unmirrored_week_to_last_available_snapshot(self) -> None:
+        response = self.client.get("/nfl/api/live-lens?season=2025&week=22")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload.get("week"), 21)
+        self.assertEqual(payload.get("control_value"), "21")
+        self.assertTrue(str(payload.get("source_path") or "").endswith("upcoming_recs_2025_wk21.csv"))
+
+    def test_nfl_game_detail_page_preserves_explicit_season_in_week_form(self) -> None:
+        context = build_nfl_cards_page_context(21, season=2025)
+        game_pk = str((context.get("games") or [{}])[0].get("gamePk") or "")
+        html = self.client.get(f"/nfl/game/{game_pk}?season=2025&week=21").get_data(as_text=True)
+
+        self.assertIn('type="hidden" name="season" value="2025"', html)
+        self.assertIn('type="number" name="week" value="21"', html)
+
+    def test_nfl_game_detail_missing_card_does_not_inject_fake_matchup(self) -> None:
+        with patch(
+            "syndicate.features.nfl.game_detail.build_cards_page_context",
+            return_value={
+                "date": "2025 Week 21",
+                "prev_date": "20",
+                "next_date": "22",
+                "games": [],
+                "using_sample_data": False,
+                "source_path": "NFL-Betting /api/cards?season=2025&week=21&sort=date",
+                "header_stats": [
+                    {"label": "Games", "value": "0"},
+                    {"label": "Season", "value": "2025"},
+                    {"label": "Week", "value": "21"},
+                ],
+            },
+        ):
+            context = build_nfl_game_detail_page_context(21, "missing-game", season=2025)
+
+        game = (context.get("games") or [{}])[0]
+        self.assertEqual(game.get("status"), "NFL game unavailable")
+        self.assertEqual(context.get("source_title"), "NFL game unavailable")
+        self.assertFalse(context.get("using_sample_data"))
+
+    def test_nfl_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nfl/api/season/2025/betting-card?week=21")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("season"), 2025)
+        self.assertEqual(payload.get("week"), 21)
+        self.assertEqual(payload.get("control_name"), "week")
+        self.assertEqual(payload.get("route_path"), "/nfl/season/2025/betting-card")
+        self.assertEqual(payload.get("submit_label"), "Apply")
+        self.assertEqual(payload.get("reset_href"), "/nfl/season/2025/betting-card")
+        self.assertEqual(payload.get("hidden_fields"), [{"name": "season", "value": "2025"}])
+        self.assertTrue(any(link.get("href") == "/nfl/season/2025/betting-card?week=21" for link in (payload.get("module_links") or [])))
+
+    def test_nfl_betting_card_api_preserves_sort_in_week_nav(self) -> None:
+        response = self.client.get("/nfl/api/season/2025/betting-card?week=21&sort=odds")
+        payload = response.get_json()
+        prev_week, next_week = neighboring_values(available_nfl_weeks(2025), 21, fallback=21)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload.get("prev_href"), f"/nfl/season/2025/betting-card?week={prev_week}&sort=odds")
+        self.assertEqual(payload.get("next_href"), f"/nfl/season/2025/betting-card?week={next_week}&sort=odds")
+
+    def test_nfl_picks_page_preserves_explicit_season_in_week_form(self) -> None:
+        html = self.client.get("/nfl/picks?season=2025&week=21").get_data(as_text=True)
+
+        self.assertIn('type="hidden" name="season" value="2025"', html)
+
+    def test_nfl_picks_page_shows_sort_control(self) -> None:
+        html = self.client.get("/nfl/picks?season=2025&week=21&sort=odds").get_data(as_text=True)
+
+        self.assertIn('name="sort"', html)
+        self.assertIn('<option value="odds" selected>Odds</option>', html)
+        self.assertIn('>Apply</button>', html)
+        self.assertIn('href="/nfl/picks?season=2025"', html)
+        self.assertIn('2025 Week 21 recommendation mix', html)
+        self.assertIn('Confidence tiers', html)
+
+    def test_nfl_picks_api_exposes_confidence_grouped_sections(self) -> None:
+        response = self.client.get("/nfl/api/picks?season=2025&week=19")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((payload.get("card_sections") or [{}])[0].get("title"), "High confidence")
+        self.assertEqual((payload.get("card_sections") or [{}, {}])[1].get("title"), "Medium confidence")
+
+    def test_nfl_picks_api_keeps_full_confidence_section_counts(self) -> None:
+        response = self.client.get("/nfl/api/picks?season=2025&week=17")
+        payload = response.get_json()
+        sections = payload.get("card_sections") or []
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((sections[0].get("meta") if sections else None), "13 recommendations")
+        self.assertEqual(len((sections[0].get("cards") if sections else []) or []), 13)
+        self.assertEqual((sections[-1].get("title") if sections else None), "Other")
+        self.assertEqual((sections[-1].get("meta") if sections else None), "14 recommendations")
+        self.assertEqual(len((sections[-1].get("cards") if sections else []) or []), 14)
+        self.assertEqual(len(payload.get("rank_cards") or []), payload.get("rows"))
+
+    def test_nfl_picks_header_card_count_matches_full_snapshot(self) -> None:
+        response = self.client.get("/nfl/api/picks?season=2025&week=17")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((payload.get("header_stats") or [{}])[0].get("value"), str(payload.get("rows")))
+
+    def test_nfl_picks_api_preserves_explicit_missing_week_as_empty_state(self) -> None:
+        response = self.client.get("/nfl/api/picks?season=2025&week=999")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload.get("week"), 999)
+        self.assertEqual(payload.get("rows"), 0)
+        self.assertEqual(payload.get("rank_cards"), [])
+        self.assertFalse(payload.get("have_data"))
+        self.assertEqual((payload.get("empty_state") or {}).get("title"), "No recommendations available.")
+
+    def test_nfl_picks_page_shows_empty_state_for_explicit_missing_week(self) -> None:
+        html = self.client.get("/nfl/picks?season=2025&week=999").get_data(as_text=True)
+
+        self.assertIn("No recommendations available.", html)
+        self.assertIn("2025 Week 999", html)
+        self.assertNotIn("Sample NFL Moneyline Edge", html)
+
+    def test_nfl_picks_context_without_rows_uses_empty_state_not_sample_card(self) -> None:
+        with patch("syndicate.features.nfl.picks.available_weeks", return_value=[21]), patch(
+            "syndicate.features.nfl.picks._read_rows", return_value=[]
+        ), patch("syndicate.features.nfl.picks.recommendation_path", return_value=Path("missing.csv")), patch(
+            "syndicate.features.nfl.picks.tracked_week", return_value={"season": 2025, "week": 21}
+        ):
+            context = build_nfl_picks_page_context(21, season=2025)
+
+        self.assertEqual(context.get("week"), 21)
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No recommendations available.")
+
+    def test_nfl_betting_card_api_preserves_explicit_missing_week_as_empty_state(self) -> None:
+        response = self.client.get("/nfl/api/season/2025/betting-card?week=999")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload.get("week"), 999)
+        self.assertEqual(payload.get("rows"), 0)
+        self.assertEqual(payload.get("rank_cards"), [])
+        self.assertFalse(payload.get("have_data"))
+        self.assertEqual((payload.get("empty_state") or {}).get("title"), "No recommendations available.")
+
+    def test_nfl_betting_card_page_shows_empty_state_for_explicit_missing_week(self) -> None:
+        html = self.client.get("/nfl/season/2025/betting-card?week=999").get_data(as_text=True)
+
+        self.assertIn("No recommendations available.", html)
+        self.assertIn("2025 Week 999", html)
+        self.assertNotIn("Sample NFL Moneyline Edge", html)
+
+    def test_nfl_picks_api_exposes_source_style_rows_and_groups(self) -> None:
+        response = self.client.get("/nfl/api/picks?season=2025&week=19")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload.get("rows"), len(payload.get("data") or []))
+        self.assertTrue(payload.get("have_data"))
+        self.assertEqual(len((payload.get("groups") or {}).get("High") or []), 8)
+        self.assertEqual(((payload.get("data") or [{}])[0]).get("confidence"), "High")
+
+    def test_nfl_picks_page_renders_confidence_grouped_sections(self) -> None:
+        html = self.client.get("/nfl/picks?season=2025&week=19").get_data(as_text=True)
+
+        self.assertIn("High confidence", html)
+        self.assertIn("Medium confidence", html)
+
+    def test_nfl_picks_page_renders_other_bucket_title(self) -> None:
+        html = self.client.get("/nfl/picks?season=2025&week=17").get_data(as_text=True)
+
+        self.assertIn(">Other<", html)
+        self.assertNotIn("Other confidence", html)
+
+    def test_nfl_betting_card_page_preserves_explicit_season_in_week_form(self) -> None:
+        html = self.client.get("/nfl/season/2025/betting-card?week=21").get_data(as_text=True)
+
+        self.assertIn('type="hidden" name="season" value="2025"', html)
+
+    def test_nhl_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nhl/api/picks?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertTrue(any(link.get("href") == "/nhl/picks?date=2026-05-16" for link in (payload.get("module_links") or [])))
+        self.assertTrue(isinstance(payload.get("available_dates"), list))
+
+    def test_nhl_live_lens_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nhl/api/live-lens?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/nhl/live-lens")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/nhl/live-lens?date=2026-05-16" for link in (payload.get("module_links") or [])))
+        self.assertTrue(isinstance(payload.get("available_dates"), list))
+
+    def test_nhl_live_lens_page_renders_rank_board_instead_of_redirecting(self) -> None:
+        response = self.client.get("/nhl/live-lens?date=2026-05-16")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.headers.get("Location"))
+        self.assertIn("NHL Live Lens", html)
+        self.assertIn('/nhl/live-lens?date=2026-05-16', html)
+
+    def test_nhl_game_route_redirects_to_cards_with_game_pk_and_date(self) -> None:
+        response = self.client.get("/nhl/game/824031?date=2026-05-16")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers.get("Location"), "/nhl/cards?date=2026-05-16&gamePk=824031")
+
+    def test_nhl_live_lens_accuracy_api_uses_query_string_payload_builder(self) -> None:
+        with patch(
+            "syndicate.blueprints.nhl.build_live_lens_daily_accuracy_payload",
+            return_value={"ok": True, "version": "live-lens-accuracy-v1", "window": {"since": "2026-05-10", "until": "2026-05-16"}},
+        ) as mocked_payload:
+            response = self.client.get("/nhl/api/live-lens-accuracy?date=2026-05-16")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {"ok": True, "version": "live-lens-accuracy-v1", "window": {"since": "2026-05-10", "until": "2026-05-16"}},
+        )
+        mocked_payload.assert_called_once_with("date=2026-05-16")
+
+    def test_nhl_live_game_accuracy_api_uses_query_string_payload_builder(self) -> None:
+        with patch(
+            "syndicate.blueprints.nhl.build_live_game_accuracy_payload",
+            return_value={"ok": True, "status": "ok", "meta": {"start": "2026-05-10", "end": "2026-05-16"}},
+        ) as mocked_payload:
+            response = self.client.get("/nhl/api/live-game-lens-accuracy?days=14&full_game_only=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {"ok": True, "status": "ok", "meta": {"start": "2026-05-10", "end": "2026-05-16"}},
+        )
+        mocked_payload.assert_called_once_with("days=14&full_game_only=1")
+
+    def test_nhl_live_lens_builders_return_local_empty_payloads_without_source_fallback(self) -> None:
+        from syndicate.features.nhl.live_game_accuracy import build_live_game_accuracy_payload as build_nhl_live_game_accuracy_payload
+        from syndicate.features.nhl.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload as build_nhl_live_lens_daily_accuracy_payload
+
+        build_nhl_live_game_accuracy_payload.cache_clear()
+        build_nhl_live_lens_daily_accuracy_payload.cache_clear()
+        with TemporaryDirectory() as temp_dir:
+            with patch.dict("os.environ", {"SYNDICATE_NHL_ARTIFACT_ROOT": temp_dir}, clear=False):
+                game_payload = build_nhl_live_game_accuracy_payload("since=2026-05-18&until=2026-05-18&include_rows=1")
+                daily_payload = build_nhl_live_lens_daily_accuracy_payload("date=2026-05-18")
+
+        build_nhl_live_game_accuracy_payload.cache_clear()
+        build_nhl_live_lens_daily_accuracy_payload.cache_clear()
+
+        self.assertEqual((((game_payload or {}).get("meta") or {}).get("source")), "local_mirror")
+        self.assertEqual((game_payload or {}).get("status"), "empty")
+        self.assertEqual(((daily_payload or {}).get("summary") or {}).get("available"), False)
+        self.assertEqual((((daily_payload or {}).get("window") or {}).get("since")), "2026-05-18")
+
+    def test_nhl_market_accuracy_api_uses_query_string_payload_builder(self) -> None:
+        with patch(
+            "syndicate.blueprints.nhl.build_market_accuracy_payload",
+            return_value={"ok": True, "version": "accuracy-market-v1", "window": {"since": "2026-05-10", "until": "2026-05-16"}},
+        ) as mocked_payload:
+            response = self.client.get("/nhl/api/market-accuracy?date=2026-05-16")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {"ok": True, "version": "accuracy-market-v1", "window": {"since": "2026-05-10", "until": "2026-05-16"}},
+        )
+        mocked_payload.assert_called_once_with("date=2026-05-16")
+
+    def test_nhl_archive_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/nhl/api/archive?date=2026-05-16")
+        payload = response.get_json()
+        resolved_date = str(payload.get("date") or "")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/nhl/archive")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == f"/nhl/archive?date={resolved_date}" for link in (payload.get("module_links") or [])))
+        self.assertTrue(isinstance(payload.get("available_dates"), list))
+
+    def test_wnba_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/wnba/api/picks?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertTrue(any(link.get("href") == "/wnba/picks?date=2026-05-16" for link in (payload.get("module_links") or [])))
+
+    def test_wnba_archive_api_exposes_rank_board_navigation_metadata(self) -> None:
+        response = self.client.get("/wnba/api/archive?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertEqual(payload.get("route_path"), "/wnba/archive")
+        self.assertTrue(payload.get("warning_panel"))
+        self.assertTrue(any(link.get("href") == "/wnba/archive?date=2026-05-16" for link in (payload.get("module_links") or [])))
+        self.assertTrue(isinstance(payload.get("available_dates"), list))
+
+    def test_wnba_cards_api_exposes_game_board_navigation_metadata(self) -> None:
+        response = self.client.get("/wnba/api/cards?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("board_contract", {}).get("schema"), "game_board_v1")
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertTrue(isinstance(payload.get("module_links"), list))
+
+    def test_wnba_game_detail_api_exists_and_exposes_game_board_metadata(self) -> None:
+        cards_payload = self.client.get("/wnba/api/cards?date=2026-05-16").get_json()
+        game_pk = str(((cards_payload.get("games") or [{}])[0]).get("gamePk") or "1")
+
+        response = self.client.get(f"/wnba/api/game/{game_pk}?date=2026-05-16")
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("board_contract", {}).get("module"), "game_detail")
+        self.assertEqual(payload.get("control_name"), "date")
+        self.assertTrue(any(link.get("href") == "/wnba/cards?date=2026-05-16" for link in (payload.get("module_links") or [])))
+
+
+if __name__ == "__main__":
+    unittest.main()

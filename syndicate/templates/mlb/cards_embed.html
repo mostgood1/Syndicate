@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MLB Compact Rail - {{ date }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename=cards_stylesheet) }}" />
+    <style>
+      {% set compact_home_cards = embed_mode == 'home-cards' %}
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        color: #edf4fb;
+      }
+
+      body.cards-body.cards-body--embed {
+        min-height: 100vh;
+        background: transparent;
+      }
+
+      .cards-shell.cards-shell--embed {
+        width: min(100%, 1480px);
+        margin: 0 auto;
+        padding: 0;
+      }
+
+      .cards-header.cards-header--embed {
+        display: grid;
+        gap: 0.7rem;
+        padding: 0 0 0.8rem;
+      }
+
+      .cards-header-meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        align-items: center;
+      }
+
+      .cards-embed-actions {
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+      }
+
+      .cards-shell--embed .cards-grid,
+      .cards-shell--embed .mlb-cards-grid,
+      .cards-shell--embed #cardsGrid {
+        padding-bottom: 0.5rem;
+      }
+
+      {% if compact_home_cards %}
+      body.cards-body.cards-body--embed {
+        min-height: 0;
+      }
+
+      .cards-header.cards-header--embed,
+      #cardsHrTargets {
+        display: none;
+      }
+
+      .cards-shell.cards-shell--embed {
+        padding-top: 0.25rem;
+      }
+      {% endif %}
+    </style>
+  </head>
+  <body class="cards-body cards-body--embed">
+    <div class="cards-shell cards-shell--embed">
+      <header class="cards-header cards-header--embed">
+        <div class="cards-title-row">
+          <h1>{{ cards_header_title or 'MLB Game Cards' }}</h1>
+          <div class="cards-header-meta" id="cardsHeaderMeta">Loading slate...</div>
+        </div>
+        <div class="cards-header-meta-row" id="cardsSourceMeta">
+          <span class="cards-source-meta-pill">Loading source...</span>
+        </div>
+        <div class="cards-embed-actions">
+          <a class="cards-nav-pill" href="/mlb/cards?date={{ date }}&client=source" target="_top">Open full cards</a>
+          <a class="cards-nav-pill" href="/mlb/live-lens?date={{ date }}" target="_top">Open live lens</a>
+          <a class="cards-nav-pill" href="/mlb/season/{{ season or date[:4]|int }}/betting-card?date={{ date }}" target="_top">Open betting card</a>
+        </div>
+      </header>
+
+      <section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+        <div class="cards-loading-strip">Loading scoreboard...</div>
+      </section>
+
+      {% if not compact_home_cards %}
+      <section class="cards-hr-targets" id="cardsHrTargets" aria-label="Home run targets">
+        <div class="cards-loading-state">Loading HR targets...</div>
+      </section>
+      {% endif %}
+
+      {% if not compact_home_cards %}
+      <main class="{{ cards_grid_class }}" id="cardsGrid" aria-label="{{ intro_title }} grid">
+        <div class="cards-loading-state">Loading cards...</div>
+      </main>
+      {% endif %}
+    </div>
+
+    <script>
+      window.MLBCardsBootstrap = {
+        date: {{ date|tojson }},
+        client: {{ (cards_client or 'source')|tojson }},
+        preserveClientParam: true,
+        embedMode: {{ embed_mode|tojson }},
+      };
+
+      (function () {
+        if (!window.ResizeObserver || window.parent === window) {
+          return;
+        }
+        const key = {{ embed_mode|tojson }};
+        const shell = document.querySelector('.cards-shell--embed');
+        const postHeight = function () {
+          const height = Math.max(
+            shell ? shell.scrollHeight : 0,
+            shell ? Math.ceil(shell.getBoundingClientRect().height) : 0
+          );
+          window.parent.postMessage({ type: 'syndicate:mlb-embed-height', key: key, height: height }, window.location.origin);
+        };
+        window.addEventListener('load', postHeight);
+        window.addEventListener('resize', postHeight);
+        const observer = new ResizeObserver(postHeight);
+        if (shell) {
+          observer.observe(shell);
+        } else {
+          if (document.body) {
+            observer.observe(document.body);
+          }
+          if (document.documentElement) {
+            observer.observe(document.documentElement);
+          }
+        }
+        setTimeout(postHeight, 0);
+      })();
+    </script>
+    {% if cards_script %}
+      <script src="{{ url_for('static', filename=cards_script) }}"></script>
+    {% endif %}
+  </body>
+</html>

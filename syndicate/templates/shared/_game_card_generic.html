@@ -1,0 +1,254 @@
+<article class="feature-game-card cards-game-card" id="game-{{ game.gamePk }}">
+  {% set live_state = game.shared_is_live if game.shared_is_live is defined else false %}
+  {% set period_rows = game.shared_period_rows if game.shared_period_rows is defined else [] %}
+  {% set probability_rows = game.shared_probability_rows if game.shared_probability_rows is defined else [] %}
+  {% set total_rows = game.shared_total_rows if game.shared_total_rows is defined else [] %}
+  {% set box_sections = game.shared_box_sections if game.shared_box_sections is defined else [] %}
+  {% set prop_rows = game.shared_prop_rows if game.shared_prop_rows is defined else [] %}
+  {% set top_play_rows = game.shared_top_play_rows if game.shared_top_play_rows is defined else [] %}
+  {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
+
+  <div class="cards-strip-head">
+    <div class="cards-head-left cards-head-matchup">
+      <div class="cards-head-team">
+        <div class="cards-strip-logo">{{ game.away.abbr }}</div>
+        <div>
+          <div class="cards-head-team-name">{{ game.away.name }}</div>
+          <div class="cards-mini-copy">{{ game.away.abbr }}</div>
+        </div>
+      </div>
+      <span class="cards-score-divider">@</span>
+      <div class="cards-head-team">
+        <div class="cards-strip-logo">{{ game.home.abbr }}</div>
+        <div>
+          <div class="cards-head-team-name">{{ game.home.name }}</div>
+          <div class="cards-mini-copy">{{ game.home.abbr }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="cards-status-cluster">
+      <div class="cards-game-time-row">
+        <span class="cards-game-time-label">{{ game.detail_label or 'Slate context' }}</span>
+        <span class="cards-game-time-value">{{ game.detail }}</span>
+      </div>
+      <span class="cards-status-badge">{{ game.status }}</span>
+      {% if game.href %}
+        <a class="cards-game-link" href="{{ game.href }}">{{ game.href_label or 'Open game detail' }}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cards-score-ribbon">
+    <div class="cards-score-meta">
+      <div class="cards-live-line">{{ game.summary }}</div>
+      {% if period_rows %}
+        <div class="cards-sim-line">{{ period_rows[0].subtitle }}</div>
+      {% endif %}
+      {% if game.shared_tab_game_title is defined %}
+        <div class="cards-mini-copy">{{ game.shared_tab_game_title }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cards-market-row">
+    {% for tile in game.market_tiles[:4] if game.market_tiles is defined and game.market_tiles %}
+      <div class="cards-market-tile">
+        <div class="cards-market-label">{{ tile.label }}</div>
+        <div class="cards-market-main">{{ tile.title }}</div>
+        <div class="cards-market-sub">{{ tile.sub }}</div>
+      </div>
+    {% else %}
+      {% for metric in metrics[:4] %}
+        <div class="cards-market-tile">
+          <div class="cards-market-label">{{ metric.label }}</div>
+          <div class="cards-market-main">{{ metric.value }}</div>
+          <div class="cards-market-sub">{{ game.away.abbr }} @ {{ game.home.abbr }}</div>
+        </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+
+  <div class="cards-tabs-rail">
+    <div class="cards-tabs">
+      <button class="cards-tab is-active" type="button" data-tab-target="game">Game</button>
+      <button class="cards-tab" type="button" data-tab-target="boxscore">Box Score</button>
+      <button class="cards-tab" type="button" data-tab-target="props">Props</button>
+    </div>
+    <div class="cards-mini-metrics cards-mini-metrics--rail">
+      {% for metric in metrics[:3] %}
+        <div class="cards-mini-metric">
+          <span>{{ metric.label }}</span>
+          <strong>{{ metric.value }}</strong>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <section class="cards-panel is-active" data-panel-id="game">
+    <div class="cards-overview-grid">
+      <div class="cards-panel-card cards-panel-card--overview-main">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>{{ game.shared_tab_game_title if game.shared_tab_game_title is defined else 'Game lens' }}</strong></div>
+          <span class="cards-overview-badge">{{ 'Live' if live_state else 'Pregame' }}</span>
+        </div>
+        <div class="cards-live-lens-grid">
+          {% for row in period_rows[:4] %}
+            <div class="cards-live-lens-card">
+              <div class="cards-box-head">
+                <div>
+                  <div class="cards-table-kicker">{{ row.label }}</div>
+                  <div class="cards-table-title"><strong>{{ row.main }}</strong></div>
+                </div>
+                <span class="cards-chip">{{ 'Live lens' if live_state else 'Period odds' }}</span>
+              </div>
+              <div class="cards-subcopy">{{ row.subtitle }}</div>
+              <div class="cards-summary-grid">
+                <div class="cards-data-pair"><span>Home win</span><strong>{{ row.home_win }}</strong></div>
+                <div class="cards-data-pair"><span>Market</span><strong>{{ row.market }}</strong></div>
+                <div class="cards-data-pair"><span>Best edge</span><strong>{{ row.best_edge }}</strong></div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="cards-panel-stack">
+        <div class="cards-panel-card">
+          <div class="cards-box-head">
+            <div>
+              <div class="cards-table-kicker">Period win probabilities</div>
+              <div class="cards-table-title"><strong>Win probs and totals by period</strong></div>
+            </div>
+            <span class="cards-chip">Bars</span>
+          </div>
+          <div class="cards-prob-grid">
+            {% for row in probability_rows %}
+              <div class="cards-prob-row">
+                <div class="cards-prob-label">{{ row.label }}</div>
+                <div class="cards-prob-bar" data-away-pct="{{ row.away_pct }}" data-home-pct="{{ row.home_pct }}">
+                  <span class="cards-prob-away"></span>
+                  <span class="cards-prob-home"></span>
+                </div>
+                <div class="cards-subcopy">{{ row.summary }}</div>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="cards-prob-grid">
+            {% for row in total_rows %}
+              <div class="cards-prob-row">
+                <div class="cards-prob-label">{{ row.label }}</div>
+                <div class="cards-run-dist-bar{% if not row.bins %} is-empty{% endif %}">
+                  {% for bin in row.bins %}
+                    <span class="cards-run-dist-bin" data-bin-width="{{ bin.width }}" title="{{ bin.total }}"></span>
+                  {% endfor %}
+                </div>
+                <div class="cards-subcopy">{{ row.summary }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="cards-panel-card">
+          <div class="cards-box-head">
+            <div>
+              <div class="cards-table-kicker">{{ 'Live prop lane' if live_state else 'Top plays' }}</div>
+              <div class="cards-table-title"><strong>{{ 'Live props' if live_state else 'Game and prop top plays' }}</strong></div>
+            </div>
+            <span class="cards-chip">{{ 'Live' if live_state else 'Pregame' }}</span>
+          </div>
+          {% if top_play_rows %}
+            <div class="cards-callout-list">
+              {% for row in top_play_rows[:5] %}
+                <div class="cards-callout">
+                  <strong>{{ row.name }}</strong>
+                  <span class="cards-callout-copy">{{ row.detail or row.heading }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="cards-empty-copy">No {{ 'live prop' if live_state else 'top play' }} lane is available for this game yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cards-panel" data-panel-id="boxscore">
+    <div class="cards-box-grid{% if box_sections|length < 2 %} cards-box-grid--stack{% endif %}">
+      {% for section in box_sections %}
+        <div class="cards-panel-card">
+          <div class="cards-box-head">
+            <div class="cards-table-title"><strong>{{ section.title }}</strong></div>
+            <span class="cards-chip">{{ 'Live' if live_state else 'Sim' }}</span>
+          </div>
+          <div class="cards-callout-copy">{{ section.body }}</div>
+          {% if section.rows %}
+            <div class="cards-table-wrap">
+              <div class="cards-table-list">
+                {% for row in section.rows %}
+                  <div class="cards-table-row">
+                    <div class="cards-table-row-main">
+                      <span class="cards-table-row-name">{{ row.name }}</span>
+                      {% if row.detail %}<span class="cards-table-copy">{{ row.detail }}</span>{% endif %}
+                    </div>
+                    <div class="cards-table-row-value">{{ row.value }}</div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% else %}
+            <div class="cards-empty-copy">No box rows are available for this game yet.</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="cards-panel" data-panel-id="props">
+    <div class="cards-box-grid{% if prop_rows|length < 4 %} cards-box-grid--stack{% endif %}">
+      <div class="cards-panel-card cards-panel-card--overview-main">
+        <div class="cards-box-head">
+          <div>
+            <div class="cards-table-kicker">{{ game.shared_tab_props_title if game.shared_tab_props_title is defined else 'Props' }}</div>
+            <div class="cards-table-title"><strong>{{ 'Live props lane' if live_state else 'Official and playable props' }}</strong></div>
+          </div>
+          <span class="cards-overview-badge">Props</span>
+        </div>
+        {% if prop_rows %}
+          <div class="cards-callout-list">
+            {% for row in prop_rows[:8] %}
+              <div class="cards-callout">
+                <strong>{{ row.name }}</strong>
+                <span class="cards-callout-copy">{{ row.detail or row.heading }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="cards-empty-copy">No playable props were linked for this game.</div>
+        {% endif %}
+      </div>
+      <div class="cards-panel-card">
+        <div class="cards-box-head">
+          <div class="cards-table-title"><strong>{{ 'Live props status' if live_state else 'Official props status' }}</strong></div>
+          <span class="cards-chip">{{ 'Live' if live_state else 'Pregame' }}</span>
+        </div>
+        {% if prop_rows %}
+          <div class="cards-table-wrap">
+            <div class="cards-table-list">
+              {% for row in prop_rows[:8] %}
+                <div class="cards-table-row">
+                  <div class="cards-table-row-main">
+                    <span class="cards-table-row-name">{{ row.heading }}</span>
+                    <span class="cards-table-copy">{{ row.name }}</span>
+                  </div>
+                  <div class="cards-table-row-value">{{ row.value }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% else %}
+          <div class="cards-empty-copy">This sport has not surfaced a dedicated prop lane for this matchup yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</article>

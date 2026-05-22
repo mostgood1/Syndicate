@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Features | NBA Betting</title>
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <style>
+    :root{--bg:#080d1a;--card:#0d1426;--card2:#121b31;--text:#f5f7ff;--muted:#c3cee4;--border:#243356;--link:#b8d1ff;--pill-bg:#101a2e;--pill-br:#2a3a63}
+    body.light{--bg:#ffffff;--card:#f8fafc;--card2:#f1f5fb;--text:#0a1020;--muted:#475569;--border:#cbd5e1;--link:#1e3a8a;--pill-bg:#eef3fb;--pill-br:#94a3b8}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--text)}
+    .container{max-width:1100px;margin:24px auto;padding:0 16px} a{color:var(--link)}
+    .nav{font-size:14px;margin-bottom:12px}.nav a{color:var(--link);text-decoration:none;margin-right:10px}.nav button{background:var(--pill-bg);color:var(--text);border:1px solid var(--pill-br);border-radius:6px;padding:6px 10px;cursor:pointer}
+    .controls{margin:12px 0}.controls input{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px;width:320px;max-width:100%}
+    .feature-grid{display:grid;grid-template-columns:1fr;gap:12px}.card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+    .ds-title{font-size:14px;font-weight:800;margin-bottom:6px}.ds-meta{font-size:12px;color:var(--muted);margin-bottom:10px}.feature{display:grid;gap:4px;padding:10px;border:1px solid var(--border);border-radius:10px;background:linear-gradient(180deg,var(--card),var(--card2))}.feature-name{font-weight:800}.feature-desc{font-size:12px;color:var(--text);opacity:.95;line-height:1.35}.muted-small{font-size:12px;color:var(--muted);opacity:.95}.summary{font-size:12px;color:var(--muted);margin-bottom:12px}.hidden{display:none}
+  </style>
+  <script>
+    (function(){try{const body=document.body;const saved=localStorage.getItem('theme');if(saved==='light') body.classList.add('light');window.addEventListener('DOMContentLoaded',()=>{const t=document.getElementById('themeToggle');if(t){t.addEventListener('click',()=>{body.classList.toggle('light');localStorage.setItem('theme', body.classList.contains('light')?'light':'dark');});}});}catch(_){}})();
+    function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    async function fetchJson(url){ const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error(`${r.status} ${r.statusText}`); return await r.json(); }
+    function getDesc(descMap, dsKey, col){ if(!descMap) return ''; const k1 = `${dsKey}.${col}`; return descMap[k1] || ''; }
+    function render(data, q){ const root=document.getElementById('root'); const meta=document.getElementById('meta'); const desc=data&&data.descriptions?data.descriptions:{}; const ds=Array.isArray(data&&data.datasets)?data.datasets:[]; const query=String(q||'').trim().toLowerCase(); meta.textContent=`Generated: ${esc(data.generated_at || '—')} • Catalog: ${esc(data.catalog_path || 'data/features_catalog.json')}`; const blocks=ds.map((d)=>{ const cols=Array.isArray(d.columns)?d.columns:[]; const rows=cols.map((c)=>{ const nm=String(c); const description=getDesc(desc,d.key,nm); const hay=`${d.key}.${nm} ${description}`.toLowerCase(); if(query && !hay.includes(query)) return ''; return `<div class="feature"><div class="feature-name">${esc(d.key)}.<span class="feature-name">${esc(nm)}</span></div>` + `<div class="feature-desc">${description ? esc(description) : '<span class="muted-small">No description yet. Add it to data/features_catalog.json</span>'}</div></div>`; }).filter(Boolean).join(''); const dsMeta=d.latest_date ? `Latest date: ${esc(d.latest_date)}${d.path ? ` • ${esc(d.path)}` : ''}` : (d.path ? esc(d.path) : ''); return `<div class="card"><div class="ds-title">${esc(d.key)}</div><div class="ds-meta">${dsMeta || 'No file found yet.'}</div>${rows || '<div class="muted-small">No matching columns.</div>'}</div>`; }).join(''); root.innerHTML = blocks || '<div class="card">No datasets found.</div>'; }
+    async function boot(){ const note=document.getElementById('note'); const input=document.getElementById('q'); try{ const data=await fetchJson('{{ api_path }}'); window.__featuresData=data; render(data,input.value); input.addEventListener('input',()=>render(window.__featuresData,input.value)); }catch(e){ note.textContent=`Failed to load features: ${String(e && e.message ? e.message : e)}`; note.classList.remove('hidden'); } }
+    window.addEventListener('DOMContentLoaded', boot);
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="{{ back_href }}">{{ back_label }}</a> |
+      {% if recap_href %}<a href="{{ recap_href }}">Betting Recap</a> |{% endif %}
+      <a href="{{ self_href }}" aria-current="page">Data Features</a> |
+      <button type="button" id="themeToggle">Toggle Theme</button>
+    </div>
+    <h1>Data Features</h1>
+    <div class="controls">
+      <label>Search <input id="q" type="text" placeholder="e.g. home_win_prob, edge, player_id" /></label>
+    </div>
+    <div id="note" class="card hidden"></div>
+    <div id="meta" class="summary"></div>
+    <div id="root" class="feature-grid"></div>
+  </div>
+</body>
+</html>

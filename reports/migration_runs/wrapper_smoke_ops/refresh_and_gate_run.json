@@ -1,0 +1,21 @@
+﻿{
+    "date":  "2026-05-19",
+    "runStamp":  "20260519_161247",
+    "baseUrl":  "",
+    "artifactsDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\wrapper_smoke_ops",
+    "refreshStatusDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\2026-05-19\\20260519_161247",
+    "jsonMode":  false,
+    "refreshOdds":  false,
+    "oddsPhase":  "all",
+    "oddsSports":  "all",
+    "oddsRegions":  "us",
+    "skipTests":  true,
+    "skipSmoke":  true,
+    "skipNFL":  true,
+    "skipNCAAF":  true,
+    "skipNCAAB":  true,
+    "skipMLB":  true,
+    "skipNBA":  true,
+    "skipNHL":  true,
+    "skipWNBA":  true
+}

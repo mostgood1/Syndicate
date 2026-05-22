@@ -1,0 +1,487 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Ops Odds Refresh{% endblock %}
+{% block page_title %}Ops Odds Refresh{% endblock %}
+
+{% block extra_head %}
+  <style>
+    .ops-board {
+      display: grid;
+      gap: 16px;
+    }
+
+    .ops-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+    }
+
+    .ops-card {
+      border: 1px solid var(--cards-line);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
+      box-shadow: var(--cards-shadow);
+      padding: 18px;
+    }
+
+    .ops-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .ops-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .ops-form-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ops-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .ops-field--full {
+      grid-column: 1 / -1;
+    }
+
+    .ops-field label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--cards-accent-strong);
+    }
+
+    .ops-field input,
+    .ops-field select {
+      min-height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--cards-line-strong);
+      border-radius: 12px;
+      background: rgba(7, 19, 29, 0.9);
+      color: var(--cards-text);
+    }
+
+    .ops-toggle-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ops-toggle {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--cards-line);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--cards-text-soft);
+    }
+
+    .ops-toggle input {
+      accent-color: var(--cards-accent);
+    }
+
+    .ops-meta-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .ops-meta-item {
+      border: 1px solid var(--cards-line);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .ops-meta-label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cards-accent-strong);
+    }
+
+    .ops-meta-value {
+      display: block;
+      margin-top: 6px;
+      color: var(--cards-text);
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .ops-section-title {
+      margin-bottom: 10px;
+    }
+
+    .ops-sport-list,
+    .ops-artifact-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .ops-history-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .ops-sport-item,
+    .ops-artifact-item {
+      border: 1px solid var(--cards-line);
+      border-radius: 16px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .ops-sport-top,
+    .ops-artifact-top {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .ops-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border: 1px solid var(--cards-line-strong);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--cards-text-soft);
+    }
+
+    .ops-badge--ok {
+      background: rgba(78, 205, 196, 0.14);
+      color: var(--cards-accent-strong);
+    }
+
+    .ops-badge--error {
+      background: rgba(255, 107, 107, 0.12);
+      color: #ff9a9a;
+    }
+
+    .ops-badge--running {
+      background: rgba(244, 191, 118, 0.14);
+      color: #f4bf76;
+    }
+
+    .ops-note,
+    .ops-path,
+    .ops-error {
+      color: var(--cards-text-soft);
+      font-size: 0.92rem;
+    }
+
+    .ops-error {
+      color: #ffb3b3;
+    }
+
+    .ops-code {
+      margin: 0;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid var(--cards-line);
+      background: rgba(5, 14, 23, 0.92);
+      color: var(--cards-text-soft);
+      overflow-x: auto;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    @media (max-width: 980px) {
+      .ops-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .ops-form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="ops-board">
+    <section class="ops-card">
+      <div class="section-label">Admin</div>
+      <h2 class="ops-section-title">Odds refresh control plane</h2>
+      <p class="lead">This page is a protected read-only view over the shared cross-sport odds refresh workflow. It renders the latest persisted refresh status and the current dry-run command plan from the same helpers used by the JSON ops endpoints.</p>
+      {% set runtime = (status_payload.get('refresh_status') or {}).get('runtime') or {} %}
+      {% if launch_notice.started %}
+        <p class="ops-note"><strong>Launch queued.</strong> PID {{ launch_notice.pid or 'unknown' }}{% if launch_notice.run_stamp %} · Run {{ launch_notice.run_stamp }}{% endif %}{% if launch_notice.dry_run %} · dry run{% endif %}</p>
+      {% endif %}
+      {% if launch_notice.canceled %}
+        <p class="ops-note"><strong>Cancel requested.</strong> The latest refresh manifest has been updated.</p>
+      {% endif %}
+      <div class="action-row action-row--compact">
+        <span class="ops-badge {% if runtime.get('state') == 'finished' %}ops-badge--ok{% elif runtime.get('state') == 'running' %}ops-badge--running{% else %}ops-badge--error{% endif %}">Run state: {{ runtime.get('state') or 'unknown' }}</span>
+        {% if runtime.get('pid') %}<span class="ops-note">PID {{ runtime.get('pid') }}</span>{% endif %}
+      </div>
+      <p class="ops-note">{{ runtime.get('detail') }}</p>
+      <div class="action-row action-row--compact">
+        <a class="cards-nav-pill" href="/api/ops/odds-refresh/status?admin_token={{ request.args.get('admin_token', '') }}">Status JSON</a>
+        <a class="cards-nav-pill" href="/api/ops/odds-refresh/plan?admin_token={{ request.args.get('admin_token', '') }}&sports={{ form_state.sports }}&phase={{ form_state.phase }}{% if form_state.date %}&date={{ form_state.date }}{% endif %}{% if form_state.skip_mirror %}&skip_mirror=1{% endif %}{% if form_state.mirror_only %}&mirror_only=1{% endif %}">Plan JSON</a>
+        <a class="cards-nav-pill" href="/api/ops/odds-refresh/run?admin_token={{ request.args.get('admin_token', '') }}">Run API</a>
+        <a class="cards-nav-pill" href="/api/ops/odds-refresh/logs?stream=stdout&raw=1&admin_token={{ request.args.get('admin_token', '') }}">Stdout log</a>
+        <a class="cards-nav-pill" href="/api/ops/odds-refresh/logs?stream=stderr&raw=1&admin_token={{ request.args.get('admin_token', '') }}">Stderr log</a>
+      </div>
+    </section>
+
+    <div class="ops-grid">
+      <section class="ops-card">
+        <div class="section-label">Dry Run Planner</div>
+        <h3 class="ops-section-title">Resolve current command plan</h3>
+        <form class="ops-form" method="get">
+          {% if request.args.get('admin_token') %}
+            <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token') }}" />
+          {% endif %}
+          <div class="ops-form-grid">
+            <div class="ops-field">
+              <label for="date">Date</label>
+              <input id="date" type="date" name="date" value="{{ form_state.date }}" />
+            </div>
+            <div class="ops-field">
+              <label for="phase">Phase</label>
+              <select id="phase" name="phase">
+                <option value="all"{% if form_state.phase == 'all' %} selected{% endif %}>all</option>
+                <option value="pregame"{% if form_state.phase == 'pregame' %} selected{% endif %}>pregame</option>
+                <option value="live"{% if form_state.phase == 'live' %} selected{% endif %}>live</option>
+              </select>
+            </div>
+            <div class="ops-field ops-field--full">
+              <label for="sports">Sports</label>
+              <input id="sports" type="text" name="sports" value="{{ form_state.sports }}" placeholder="all or mlb,nba,nhl" />
+            </div>
+            <div class="ops-field">
+              <label for="regions">Regions</label>
+              <input id="regions" type="text" name="regions" value="{{ form_state.regions }}" placeholder="us" />
+            </div>
+            <div class="ops-field">
+              <label for="bookmakers">Bookmakers</label>
+              <input id="bookmakers" type="text" name="bookmakers" value="{{ form_state.bookmakers }}" placeholder="Optional" />
+            </div>
+            <div class="ops-field">
+              <label for="markets">Markets</label>
+              <input id="markets" type="text" name="markets" value="{{ form_state.markets }}" placeholder="Optional" />
+            </div>
+            <div class="ops-field">
+              <label for="season">Season</label>
+              <input id="season" type="number" name="season" value="{{ form_state.season }}" placeholder="Optional" />
+            </div>
+            <div class="ops-field">
+              <label for="week">Week</label>
+              <input id="week" type="number" name="week" value="{{ form_state.week }}" placeholder="Optional" />
+            </div>
+          </div>
+          <div class="ops-toggle-row">
+            <label class="ops-toggle"><input type="checkbox" name="skip_mirror" value="1"{% if form_state.skip_mirror %} checked{% endif %} /> Skip mirror</label>
+            <label class="ops-toggle"><input type="checkbox" name="mirror_only" value="1"{% if form_state.mirror_only %} checked{% endif %} /> Mirror only</label>
+          </div>
+          <div class="action-row">
+            <button class="cards-submit-button" type="submit">Refresh Plan View</button>
+            <a class="cards-nav-pill" href="/ops/odds-refresh{% if request.args.get('admin_token') %}?admin_token={{ request.args.get('admin_token') }}{% endif %}">Reset</a>
+          </div>
+        </form>
+        <form class="ops-form" method="post" action="/ops/odds-refresh/run">
+          {% if request.args.get('admin_token') %}
+            <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token') }}" />
+          {% endif %}
+          <input type="hidden" name="date" value="{{ form_state.date }}" />
+          <input type="hidden" name="sports" value="{{ form_state.sports }}" />
+          <input type="hidden" name="phase" value="{{ form_state.phase }}" />
+          <input type="hidden" name="regions" value="{{ form_state.regions }}" />
+          <input type="hidden" name="bookmakers" value="{{ form_state.bookmakers }}" />
+          <input type="hidden" name="markets" value="{{ form_state.markets }}" />
+          <input type="hidden" name="season" value="{{ form_state.season }}" />
+          <input type="hidden" name="week" value="{{ form_state.week }}" />
+          {% if form_state.skip_mirror %}<input type="hidden" name="skip_mirror" value="1" />{% endif %}
+          {% if form_state.mirror_only %}<input type="hidden" name="mirror_only" value="1" />{% endif %}
+          <div class="action-row action-row--compact">
+            <button class="cards-submit-button" type="submit">Launch Refresh</button>
+            <button class="cards-nav-pill" type="submit" name="dry_run" value="1">Launch Dry Run</button>
+          </div>
+        </form>
+        <form class="ops-form" method="post" action="/ops/odds-refresh/cancel">
+          {% if request.args.get('admin_token') %}
+            <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token') }}" />
+          {% endif %}
+          <div class="action-row action-row--compact">
+            <button class="cards-nav-pill" type="submit">Cancel Latest Refresh</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="ops-stack">
+        <div class="ops-card">
+          <div class="section-label">Latest Status</div>
+          <h3 class="ops-section-title">Persisted refresh status</h3>
+          {% set refresh_status = status_payload.get('refresh_status', {}) %}
+          {% set refresh_manifest = refresh_status.get('manifest') or {} %}
+          {% set runtime = refresh_status.get('runtime') or {} %}
+          {% set daily_update = status_payload.get('daily_update') or {} %}
+          {% set daily_manifest = daily_update.get('manifest') or {} %}
+          <div class="ops-meta-grid">
+            <div class="ops-meta-item"><span class="ops-meta-label">Refresh date</span><span class="ops-meta-value">{{ refresh_manifest.get('date') or 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Run state</span><span class="ops-meta-value">{{ runtime.get('state') or 'unknown' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Refresh odds</span><span class="ops-meta-value">{{ 'on' if refresh_manifest.get('refreshOdds') else 'off' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Artifacts dir</span><span class="ops-meta-value">{{ refresh_manifest.get('artifactsDir') or 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Daily update manifest</span><span class="ops-meta-value">{{ daily_manifest.get('date') or 'Unavailable' }}</span></div>
+          </div>
+          <p class="ops-path">Manifest: {{ refresh_status.get('manifest_path') }}</p>
+          {% if runtime.get('stderr_preview') %}
+            <div class="ops-artifact-item">
+              <div class="ops-artifact-top">
+                <strong>stderr preview</strong>
+                <span class="ops-badge ops-badge--error">log</span>
+              </div>
+              <pre class="ops-code">{{ runtime.get('stderr_preview') }}</pre>
+            </div>
+          {% endif %}
+          {% set stdout_log_href = '/api/ops/odds-refresh/logs?stream=stdout&raw=1&admin_token=' ~ request.args.get('admin_token', '') %}
+          {% set stderr_log_href = '/api/ops/odds-refresh/logs?stream=stderr&raw=1&admin_token=' ~ request.args.get('admin_token', '') %}
+          <div class="action-row action-row--compact">
+            <a class="cards-nav-pill" href="{{ stdout_log_href }}">Open stdout</a>
+            <a class="cards-nav-pill" href="{{ stderr_log_href }}">Open stderr</a>
+          </div>
+          {% set artifacts = refresh_status.get('artifacts') or {} %}
+          {% if artifacts %}
+            <div class="ops-artifact-list">
+              {% for name, artifact in artifacts.items() %}
+                <div class="ops-artifact-item">
+                  <div class="ops-artifact-top">
+                    <strong>{{ name }}</strong>
+                    <span class="ops-badge {% if artifact.get('exists') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'present' if artifact.get('exists') else 'missing' }}</span>
+                  </div>
+                  <div class="ops-note">{{ artifact.get('path') }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% set mirror_manifests = refresh_status.get('mirror_manifests') or [] %}
+          {% if mirror_manifests %}
+            <div class="ops-history-list">
+              <div class="section-label">Mirror manifests</div>
+              {% for item in mirror_manifests %}
+                {% set mirror_manifest = item.get('manifest') or {} %}
+                {% set groups = item.get('artifact_groups') or {} %}
+                <div class="ops-artifact-item">
+                  <div class="ops-artifact-top">
+                    <strong>{{ item.get('sport', 'unknown')|upper }}</strong>
+                    <span class="ops-badge {% if item.get('exists') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'present' if item.get('exists') else 'missing' }}</span>
+                  </div>
+                  <div class="ops-note">Date: {{ item.get('date') or 'Unavailable' }}{% if item.get('copied_artifact_count') is not none %} · Copied {{ item.get('copied_artifact_count') }} artifacts{% endif %}</div>
+                  <div class="ops-path">{{ item.get('path') }}</div>
+                  {% if groups %}
+                    <div class="ops-meta-grid">
+                      {% for name, count in groups.items() %}
+                        <div class="ops-meta-item">
+                          <span class="ops-meta-label">{{ name|replace('_', ' ') }}</span>
+                          <span class="ops-meta-value">{{ count }}</span>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% elif mirror_manifest and mirror_manifest.get('sourceRepo') %}
+                    <div class="ops-note">Source repo: {{ mirror_manifest.get('sourceRepo') }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% set history = refresh_status.get('history') or [] %}
+          {% if history %}
+            <div class="ops-history-list">
+              <div class="section-label">Recent Runs</div>
+              {% for item in history %}
+                {% set item_runtime = item.get('runtime') or {} %}
+                <div class="ops-artifact-item">
+                  <div class="ops-artifact-top">
+                    <strong>{{ item.get('date') }} · {{ item.get('run_stamp') }}</strong>
+                    <span class="ops-badge {% if item_runtime.get('state') == 'finished' %}ops-badge--ok{% elif item_runtime.get('state') == 'running' %}ops-badge--running{% else %}ops-badge--error{% endif %}">{{ item_runtime.get('state') or 'unknown' }}</span>
+                  </div>
+                  <div class="ops-note">{{ item_runtime.get('detail') }}</div>
+                  <div class="ops-note">Sports: {{ item.get('sports') }} · Phase: {{ item.get('phase') }}{% if item.get('dry_run') %} · dry run{% endif %}</div>
+                  {% if item_runtime.get('finished_at') %}<div class="ops-path">Finished: {{ item_runtime.get('finished_at') }}</div>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="ops-card">
+          <div class="section-label">Plan Result</div>
+          <h3 class="ops-section-title">Dry-run execution plan</h3>
+          {% if plan_error %}
+            <p class="ops-error">{{ plan_error }}</p>
+          {% elif plan_payload %}
+            <div class="ops-meta-grid">
+              <div class="ops-meta-item"><span class="ops-meta-label">Date</span><span class="ops-meta-value">{{ plan_payload.get('date') }}</span></div>
+              <div class="ops-meta-item"><span class="ops-meta-label">Phase</span><span class="ops-meta-value">{{ plan_payload.get('phase') }}</span></div>
+              <div class="ops-meta-item"><span class="ops-meta-label">Sports</span><span class="ops-meta-value">{{ (plan_payload.get('sports') or [])|join(', ') }}</span></div>
+              <div class="ops-meta-item"><span class="ops-meta-label">Mirror mode</span><span class="ops-meta-value">{% if plan_payload.get('mirror_only') %}mirror-only{% elif plan_payload.get('skip_mirror') %}skip mirror{% else %}refresh + mirror{% endif %}</span></div>
+            </div>
+            <div class="ops-sport-list">
+              {% for sport in plan_payload.get('results') or [] %}
+                <div class="ops-sport-item">
+                  <div class="ops-sport-top">
+                    <strong>{{ sport.get('sport', 'unknown')|upper }}</strong>
+                    <span class="ops-badge {% if sport.get('ok') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'ok' if sport.get('ok') else 'error' }}</span>
+                  </div>
+                  <p class="ops-note">{{ sport.get('notes') }}</p>
+                  <p class="ops-path">Source repo: {{ sport.get('source_repo') }}</p>
+                  {% if sport.get('error') %}
+                    <p class="ops-error">{{ sport.get('error') }}</p>
+                  {% endif %}
+                  {% if sport.get('refresh_steps') %}
+                    <div class="ops-artifact-list">
+                      {% for step in sport.get('refresh_steps') %}
+                        <div class="ops-artifact-item">
+                          <div class="ops-artifact-top">
+                            <strong>{{ step.get('name') }}</strong>
+                            <span class="ops-badge {% if step.get('ok') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'ok' if step.get('ok') else 'error' }}</span>
+                          </div>
+                          <div class="ops-note">{{ step.get('description') }}</div>
+                          <pre class="ops-code">{{ step.get('command')|tojson(indent=2) }}</pre>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if sport.get('mirror') %}
+                    <div class="ops-artifact-item">
+                      <div class="ops-artifact-top">
+                        <strong>mirror</strong>
+                        <span class="ops-badge {% if sport.get('mirror', {}).get('ok') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'ok' if sport.get('mirror', {}).get('ok') else 'error' }}</span>
+                      </div>
+                      <pre class="ops-code">{{ sport.get('mirror', {}).get('command')|tojson(indent=2) }}</pre>
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="ops-note">No plan available.</p>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

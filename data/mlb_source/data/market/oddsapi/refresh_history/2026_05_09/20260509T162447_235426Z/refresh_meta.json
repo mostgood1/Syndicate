@@ -1,0 +1,54 @@
+{
+  "recordedAt": "2026-05-09T16:24:47-05:00",
+  "date": "2026-05-09",
+  "dataRoot": "data",
+  "marketDir": "data/market/oddsapi",
+  "archiveDir": "data/market/oddsapi/refresh_history/2026_05_09/20260509T162447_235426Z",
+  "result": {
+    "status": "ok",
+    "date": "2026-05-09",
+    "mode": "live",
+    "out_dir": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi",
+    "game_lines_path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi\\oddsapi_game_lines_2026_05_09.json",
+    "pitcher_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_09.json",
+    "hitter_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_09.json",
+    "counts": {
+      "game_lines": {
+        "events_matched": 14,
+        "games": 14,
+        "h2h_games": 13,
+        "totals_games": 14,
+        "spreads_games": 14
+      },
+      "pitcher_props": {
+        "players": 22,
+        "markets": {
+          "earned_runs": 19,
+          "hits_allowed": 22,
+          "outs": 20,
+          "strikeouts": 22,
+          "walks_allowed": 20
+        },
+        "events_matched": 14
+      },
+      "hitter_props": {
+        "players": 250,
+        "markets": {
+          "batter_hits": 239,
+          "batter_hits_runs_rbis": 229,
+          "batter_home_runs": 245,
+          "batter_rbis": 231,
+          "batter_runs_scored": 231,
+          "batter_strikeouts": 174,
+          "batter_total_bases": 239
+        },
+        "events_matched": 14
+      }
+    }
+  },
+  "files": {
+    "game_lines_path": "data/market/oddsapi/refresh_history/2026_05_09/20260509T162447_235426Z/oddsapi_game_lines_2026_05_09.json",
+    "pitcher_props_path": "data/market/oddsapi/refresh_history/2026_05_09/20260509T162447_235426Z/oddsapi_pitcher_props_2026_05_09.json",
+    "hitter_props_path": "data/market/oddsapi/refresh_history/2026_05_09/20260509T162447_235426Z/oddsapi_hitter_props_2026_05_09.json"
+  }
+}

@@ -1,0 +1,91 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | {{ intro_title }}{% endblock %}
+{% block page_title %}{{ intro_title }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/rank_board.css') }}" />
+{% endblock %}
+
+{% block content %}
+  {% with route_label=route_path, title=intro_title, status='Feature module', body=intro_body %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with source_title=source_title, source_date=source_date_display, source_path=source_path, stats=header_stats %}
+    {% include 'shared/_source_summary.html' %}
+  {% endwith %}
+
+  {% with action=route_path, prev_href=prev_href, next_href=next_href, reset_href=reset_href, control_label=control_label, control_type=control_type, control_name=control_name, control_value=control_value, submit_label=submit_label, links=module_links, hidden_fields=hidden_fields, extra_controls=extra_controls, show_home_link=false %}
+    {% include 'shared/_date_controls.html' %}
+  {% endwith %}
+
+  {% if warning_panel %}
+    {% with eyebrow=warning_panel.eyebrow, title=warning_panel.title, body=warning_panel.body, list_items=warning_panel.list_items %}
+      {% include 'shared/_content_panel.html' %}
+    {% endwith %}
+  {% endif %}
+
+  {% if summary_panel %}
+    {% with eyebrow=summary_panel.eyebrow, title=summary_panel.title, body=summary_panel.body, list_items=summary_panel.list_items, summary_stats=summary_panel.summary_stats, table_groups=summary_panel.table_groups %}
+      {% include 'shared/_content_panel.html' %}
+    {% endwith %}
+  {% endif %}
+
+  {% if focus_panel %}
+    {% with eyebrow=focus_panel.eyebrow, title=focus_panel.title, body=focus_panel.body, list_items=focus_panel.list_items, summary_stats=focus_panel.summary_stats, table_groups=focus_panel.table_groups %}
+      {% include 'shared/_content_panel.html' %}
+    {% endwith %}
+    {% if focus_panel.href %}
+      <div class="action-row">
+        <a class="cards-nav-pill" href="{{ focus_panel.href }}">{{ focus_panel.href_label or 'Open focus details' }}</a>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {% if card_sections %}
+    {% for section in card_sections %}
+      <section class="rank-section" aria-label="{{ section.title }}">
+        <div class="rank-section__header">
+          <h2>{{ section.title }}</h2>
+          {% if section.meta %}<div class="rank-section__meta">{{ section.meta }}</div>{% endif %}
+        </div>
+        <div class="hr-targets-grid">
+          {% for card in section.cards or [] %}
+            {% include 'shared/_rank_card.html' %}
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  {% else %}
+  <main class="hr-targets-grid" aria-label="{{ aria_label }}">
+    {% if rank_cards %}
+      {% for card in rank_cards %}
+        {% include 'shared/_rank_card.html' %}
+      {% endfor %}
+    {% elif empty_state %}
+      {% with eyebrow=empty_state.eyebrow, title=empty_state.title, body=empty_state.body, list_items=empty_state.list_items %}
+        {% include 'shared/_content_panel.html' %}
+      {% endwith %}
+    {% endif %}
+  </main>
+  {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  {% if route_path and 'live-lens' in route_path %}
+  <script>
+    (function () {
+      if (!window.SyndicatePolling) {
+        return;
+      }
+      window.SyndicatePolling.start({
+        intervalMs: window.SyndicatePolling.DEFAULT_INTERVAL_MS,
+        onTick: function () {
+          window.SyndicatePolling.reloadCurrentPage();
+        },
+      });
+    })();
+  </script>
+  {% endif %}
+{% endblock %}

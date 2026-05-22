@@ -1,0 +1,17 @@
+<section class="cards-control-card">
+  <div class="cards-title-row">
+    <div>
+      {% if route_label %}<div class="section-label">{{ route_label }}</div>{% endif %}
+      <h2>{{ title }}</h2>
+    </div>
+    {% if status %}<span class="status-pill">{{ status }}</span>{% endif %}
+  </div>
+  {% if body %}
+    <p class="lead">{{ body }}</p>
+  {% endif %}
+  {% if action_href and action_label %}
+    <div class="action-row">
+      <a class="cards-nav-pill" href="{{ action_href }}">{{ action_label }}</a>
+    </div>
+  {% endif %}
+</section>

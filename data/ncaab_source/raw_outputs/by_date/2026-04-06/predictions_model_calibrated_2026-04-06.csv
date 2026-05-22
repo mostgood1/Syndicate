@@ -1,0 +1,2 @@
+game_id,pred_total_model,pred_margin_model,pred_total_model_basis,pred_total_calibrated,pred_margin_calibrated
+401856600,68.82555235860642,-0.9899691099819424,model_v1,151.41621518893413,-0.9899691099819424

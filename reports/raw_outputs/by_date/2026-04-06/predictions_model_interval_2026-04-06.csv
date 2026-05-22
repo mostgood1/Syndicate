@@ -1,0 +1,2 @@
+game_id,pred_total_model,pred_margin_model,pred_total_model_basis,pred_total_calibrated,pred_margin_calibrated,pred_total_ci75_low,pred_total_ci75_high,pred_margin_ci75_low,pred_margin_ci75_high,pred_total_ci90_low,pred_total_ci90_high,pred_margin_ci90_low,pred_margin_ci90_high
+401856600,68.82555235860642,-0.9899691099819424,model_v1,151.41621518893413,-0.9899691099819424,137.61202718893412,165.22040318893414,-12.493459109981943,10.51352089001806,131.67796718893413,171.15446318893413,-17.438509109981943,15.45857089001806

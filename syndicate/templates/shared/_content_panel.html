@@ -1,0 +1,42 @@
+<div class="hub-content-panel mlb-surface-panel">
+  {% if eyebrow %}<div class="section-label">{{ eyebrow }}</div>{% endif %}
+  <h3>{{ title }}</h3>
+  <p>{{ body }}</p>
+  {% if summary_stats %}
+    <div class="feature-summary-strip">
+      {% for stat in summary_stats %}
+        <div class="feature-summary-pill">
+          <div class="feature-summary-pill__label">{{ stat.label }}</div>
+          <div class="feature-summary-pill__value">{{ stat.value }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if table_groups %}
+    <div class="feature-detail-grid">
+      {% for group in table_groups %}
+        <section class="feature-detail-card">
+          <div class="feature-detail-card__title">{{ group.heading }}</div>
+          <div class="feature-detail-list" role="list">
+            {% for row in group.rows %}
+              <div class="feature-detail-row" role="listitem">
+                <div class="feature-detail-row__main">
+                  <span class="feature-detail-row__name">{{ row.name }}</span>
+                  {% if row.detail %}<span class="feature-detail-row__detail">{{ row.detail }}</span>{% endif %}
+                </div>
+                <div class="feature-detail-row__value">{{ row.value }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% if list_items %}
+    <div class="feature-panel-list" role="list">
+      {% for list_item in list_items %}
+        <div class="feature-panel-list__item" role="listitem">{{ list_item }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

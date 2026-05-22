@@ -1,0 +1,152 @@
+{
+  "abs_margin_proxy_usage": {
+    "expected_used": 0,
+    "games": 1,
+    "spread_share": 1.0,
+    "spread_used": 1
+  },
+  "allow_market_guardrails": true,
+  "date": "2026-04-06",
+  "injuries_path": "data\\injuries_overrides.csv",
+  "mean_source": "auto",
+  "pace_sigma": 3.5,
+  "per_game_seed": "sha256_u32(f'{seed}:{game_id}')",
+  "rho": 0.25,
+  "rho_effective": 0.3514103432643683,
+  "samples": 2000,
+  "segment_weights_load_error": null,
+  "segment_weights_path_used": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\segment_weights.json",
+  "segments_grid_min_cfg": 5,
+  "segments_grid_min_env": null,
+  "segments_time_aware_env": null,
+  "sim_calibration": {
+    "delta_margin": 0.44711538461538464,
+    "delta_total": 4.071910937499999,
+    "end": "2026-04-05",
+    "margin_scale": 1.0,
+    "n_games": 104,
+    "n_games_rho": 104,
+    "post_total_1h_scale": 0.76,
+    "post_total_1h_shift": -0.75,
+    "post_total_scale": 1.155,
+    "post_total_shift": 4.5,
+    "rho": 0.3514103432643683,
+    "rho_method": "corr(actual_home - mu_home_cal, actual_away - mu_away_cal)",
+    "sigma_margin_mult": 1.1146390724383488,
+    "sigma_total_mult": 1.1537722023363082,
+    "spread_bins": [
+      {
+        "delta_margin_add": 0.24779211229946527,
+        "margin_scale_mult": 1.0,
+        "max": -15.0,
+        "min": -25.0,
+        "n_games": 61,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": 0.892983948635634,
+        "margin_scale_mult": 1.0,
+        "max": -10.0,
+        "min": -15.0,
+        "n_games": 123,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -1.8826435185185186,
+        "margin_scale_mult": 1.0,
+        "max": -7.0,
+        "min": -10.0,
+        "n_games": 175,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": 0.006292993630573246,
+        "margin_scale_mult": 1.0,
+        "max": -5.0,
+        "min": -7.0,
+        "n_games": 128,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -0.15578401898734173,
+        "margin_scale_mult": 1.0,
+        "max": -3.0,
+        "min": -5.0,
+        "n_games": 132,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -0.7472435312024353,
+        "margin_scale_mult": 1.0,
+        "max": -1.0,
+        "min": -3.0,
+        "n_games": 157,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -0.22660753176043555,
+        "margin_scale_mult": 1.0,
+        "max": 1.0,
+        "min": -1.0,
+        "n_games": 51,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -0.8740991379310344,
+        "margin_scale_mult": 1.0,
+        "max": 3.0,
+        "min": 1.0,
+        "n_games": 138,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -1.2029474789915966,
+        "margin_scale_mult": 1.0,
+        "max": 5.0,
+        "min": 3.0,
+        "n_games": 95,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -0.8099761586452764,
+        "margin_scale_mult": 1.0,
+        "max": 7.0,
+        "min": 5.0,
+        "n_games": 61,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": -1.5598581560283686,
+        "margin_scale_mult": 1.0,
+        "max": 10.0,
+        "min": 7.0,
+        "n_games": 64,
+        "sigma_margin_mult_mult": 1.0
+      },
+      {
+        "delta_margin_add": 0.9609127100371748,
+        "margin_scale_mult": 1.0,
+        "max": 15.0,
+        "min": 10.0,
+        "n_games": 38,
+        "sigma_margin_mult_mult": 1.0
+      }
+    ],
+    "start": "2026-03-17"
+  },
+  "sim_calibration_load_error": null,
+  "sim_calibration_path": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\segment_calibration_5min.json",
+  "sim_calibration_sha256": "5fb6148dccb163103725f4f35377fa44aabe6aff94a6275a3e9cab69f284dd95",
+  "sim_seed": 20260406,
+  "target_quantiles": {
+    "alpha": 1.0,
+    "apply_margin": false,
+    "apply_total": false,
+    "enabled": false,
+    "source": "auto"
+  },
+  "team_segment_weights_disabled_env": null,
+  "team_segment_weights_load_error": null,
+  "team_segment_weights_path_used": null,
+  "use_pace": true
+}

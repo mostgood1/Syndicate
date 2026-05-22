@@ -1,0 +1,57 @@
+Migration gate: FAIL
+
+Audit: FAIL
+  Allowed findings: 3
+  Actual findings: 4
+  Unexpected findings:
+    - source_shell_route syndicate/blueprints/mlb.py:242
+    - source_shell_route syndicate/blueprints/nhl.py:72
+    - source_shell_route syndicate/blueprints/wnba.py:107
+  Missing previously-allowed findings:
+    - source_shell_route syndicate/blueprints/mlb.py:241
+    - source_shell_route syndicate/blueprints/nhl.py:70
+
+audit: PASS
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe scripts/audit_migration.py --format json
+  Output: [
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/mlb.py",
+    "line": 242,
+    "summary": "Source shell route points at mlb/cards_source.js.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nba.py",
+    "line": 136,
+    "summary": "Source shell route points at nba/cards_source.html.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nhl.py",
+    ...
+
+tests: FAIL
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe -m unittest tests.test_archives
+  Output: FF......................................................F...........F.................................F.................................................
+======================================================================
+FAIL: test_archive_launch_links_and_tracker_copy (tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\tests\test_archives.py", line 991, in test_archive_launch_links_and_tracker_copy
+    s...
+
+browser_smoke: FAIL
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe scripts/browser_parity_smoke.py
+  Output: [FAIL] Syndicate home
+  URL: http://127.0.0.1:57102/
+  Board: timeout
+  Board excerpt: /mlb MLB Phase-1 complete Live today 2026-05-19 Reference module Games 15 Tracked dates 119 Focus Cards + betting Game board Live market view Live lanes on 2026-05-19 Active gam...
+  Failure: timeout
+[PASS] MLB source cards
+  URL: http://127.0.0.1:57102/mlb/cards?client=source
+  Board: populated
+  Header: 15 games on the slate | 15 with official plays
+  Board excerpt: ATL Atlanta Braves - @ MIA Miami Marlins - First pitch 3:10 PM Preview 3:10 PM Open game view Loading live box... Loading sim box... Probab...

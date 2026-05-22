@@ -1,0 +1,65 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | NFL{% endblock %}
+{% block page_title %}NFL Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/nfl', title='NFL now has cards, game drill-ins, picks, a live-lens monitor, an archive lane, and a betting-card lane in Syndicate', status='Active migration', body='Syndicate now exposes an NFL cards board lifted from the source app\'s `/api/cards` payload, plus per-game drill-ins on the same shared board contract, a read-only weekly live-lens monitor, a weekly daily-archive lane, the earlier weekly picks board, and a season betting-card companion backed by the same stored weekly snapshots.', action_href='/nfl/cards?season=' ~ season ~ '&week=' ~ launch_week, action_label='Open NFL cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Stored weekly snapshots', title='Available NFL recommendation weeks', body='The hub surfaces the weekly recommendation snapshot files already present in the source repo, so the first Syndicate NFL module is driven by real stored outputs.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  {% if current_week %}
+    {% with eyebrow='Tracked current week', title='Source app currently points at ' ~ current_week.season ~ ' Week ' ~ current_week.week, body='The latest tracked source week can be ahead of the stored snapshots; the first Syndicate module navigates the weeks that actually have persisted recommendation files.' %}
+      {% include 'shared/_content_panel.html' %}
+    {% endwith %}
+  {% endif %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="Available NFL weeks">
+    {% for week in available_weeks %}
+      <article class="sport-card">
+        <div class="section-label">{{ week.season }} Week {{ week.week }}</div>
+        <h3>{{ week.count }} recommendation rows</h3>
+        <p>Open the ranked NFL picks board for this stored weekly snapshot.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/nfl/picks?season={{ week.season }}&week={{ week.week }}">Launch week {{ week.week }} picks</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">{{ week.season }} Week {{ week.week }}</div>
+        <h3>Cards board</h3>
+        <p>Open the first shared NFL cards board for this week using the source app\'s `/api/cards` output.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/nfl/cards?season={{ week.season }}&week={{ week.week }}">Launch week {{ week.week }} cards</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">{{ week.season }} Week {{ week.week }}</div>
+        <h3>Live lens</h3>
+        <p>Open the read-only NFL live-lens monitor built from this stored weekly recommendation snapshot.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/nfl/live-lens?season={{ week.season }}&week={{ week.week }}">Launch week {{ week.week }} live lens</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">{{ week.season }} Week {{ week.week }}</div>
+        <h3>Daily archive</h3>
+        <p>Open the weekly daily-archive lane so historical NFL snapshots can relaunch the module family from stored artifacts.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/nfl/archive?season={{ week.season }}&week={{ week.week }}">Launch week {{ week.week }} archive</a>
+        </div>
+      </article>
+      <article class="sport-card">
+        <div class="section-label">{{ week.season }} Week {{ week.week }}</div>
+        <h3>Betting card</h3>
+        <p>Open the MLB-shaped NFL betting-card lane built from the same persisted weekly recommendation snapshot.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/nfl/season/{{ week.season }}/betting-card?week={{ week.week }}">Launch week {{ week.week }} betting card</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}

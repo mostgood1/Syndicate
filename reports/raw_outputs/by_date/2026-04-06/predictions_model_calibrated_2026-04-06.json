@@ -1,0 +1,19 @@
+{
+  "date": "2026-04-06",
+  "margin_calibration": {
+    "a": 0.0,
+    "b": 1.0,
+    "mode": ""
+  },
+  "pred_rows": 1,
+  "rows_used": 0,
+  "timestamp_utc": "2026-04-06T13:45:32.042386",
+  "total_calibration": {
+    "a": 0.0,
+    "b": 1.0,
+    "median_raw": 68.82555235860642,
+    "mode": "",
+    "scale_factor": 2.2
+  },
+  "window_days": 14
+}

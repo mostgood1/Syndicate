@@ -1,0 +1,24 @@
+{% if rows %}
+  <div class="cards-table-wrap">
+    <table class="cards-table">
+      <thead>
+        <tr>
+          {% for column in columns %}
+            <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            {% for column in columns %}
+              <td>{{ row.get(column, '') }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="cards-empty-copy">No rows available.</div>
+{% endif %}

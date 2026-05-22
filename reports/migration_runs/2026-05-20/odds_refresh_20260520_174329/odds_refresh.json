@@ -1,0 +1,65 @@
+{
+  "date": "2026-05-20",
+  "phase": "live",
+  "sports": [
+    "mlb"
+  ],
+  "skip_mirror": true,
+  "mirror_only": false,
+  "dry_run": true,
+  "results": [
+    {
+      "sport": "mlb",
+      "source_repo": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2",
+      "source_root_env_var": "SYNDICATE_SOURCE_ROOT_MLB",
+      "notes": "Uses the canonical current-day OddsAPI market refresh script that writes game lines plus hitter/pitcher props.",
+      "refresh_steps": [
+        {
+          "name": "mlb_oddsapi_markets",
+          "description": "Refresh MLB current-day game lines and props from OddsAPI.",
+          "cwd": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2",
+          "command": [
+            "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\.venv\\Scripts\\python.exe",
+            "-m",
+            "tools.oddsapi.fetch_daily_oddsapi_markets",
+            "--date",
+            "2026-05-20",
+            "--regions",
+            "us",
+            "--overwrite",
+            "on"
+          ],
+          "return_code": 0,
+          "started_at": "2026-05-20T17:43:30+00:00",
+          "finished_at": "2026-05-20T17:43:30+00:00",
+          "stdout": "",
+          "stderr": "",
+          "ok": true,
+          "dry_run": true
+        },
+        {
+          "name": "mlb_live_lens_report",
+          "description": "Rebuild the MLB live-lens report after live OddsAPI refresh so mirrored live artifacts stay current.",
+          "cwd": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2",
+          "command": [
+            "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\.venv\\Scripts\\python.exe",
+            "-c",
+            "import json; from tools.web.flask_frontend import _persist_live_lens_tick; print(json.dumps(_persist_live_lens_tick('2026-05-20', trigger='syndicate_refresh', refresh_markets=False)))"
+          ],
+          "return_code": 0,
+          "started_at": "2026-05-20T17:43:30+00:00",
+          "finished_at": "2026-05-20T17:43:30+00:00",
+          "stdout": "",
+          "stderr": "",
+          "ok": true,
+          "dry_run": true
+        }
+      ],
+      "mirror": null,
+      "ok": true
+    }
+  ],
+  "started_at": "2026-05-20T17:43:30+00:00",
+  "finished_at": "2026-05-20T17:43:30+00:00",
+  "ok": true
+}

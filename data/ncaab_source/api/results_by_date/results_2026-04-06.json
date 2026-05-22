@@ -1,0 +1,42 @@
+{
+  "count": 1,
+  "date": "2026-04-06",
+  "rows": [
+    {
+      "actual_ats": "Away Cover",
+      "actual_margin": 6.0,
+      "actual_ou": "Under",
+      "actual_total": 132.0,
+      "ats_correct": true,
+      "ats_result": "Away Cover",
+      "away_color": null,
+      "away_logo": null,
+      "away_score": 63.0,
+      "away_team": "UConn Huskies",
+      "away_text": null,
+      "date": "2026-04-06",
+      "game_id": 401856600,
+      "home_logo": null,
+      "home_score": 69.0,
+      "home_team": "Michigan Wolverines",
+      "home_text": null,
+      "market_total": 144.5,
+      "ou_correct": false,
+      "ou_result_full": "Under",
+      "pred_ats": "Away Cover",
+      "pred_margin": -13.0720005,
+      "pred_ou": "Over",
+      "pred_total": 156.76637,
+      "spread_home": -7.0
+    }
+  ],
+  "source": "local_raw_outputs",
+  "summary": {
+    "ats_accuracy": 100.0,
+    "ats_correct": 1,
+    "ats_total": 1,
+    "totals_accuracy": 0.0,
+    "totals_correct": 0,
+    "totals_total": 1
+  }
+}

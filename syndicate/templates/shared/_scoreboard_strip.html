@@ -1,0 +1,5 @@
+{% if games and games[0].card_variant == 'mlb_main' %}
+  {% include 'shared/_scoreboard_strip_mlb.html' %}
+{% else %}
+  {% include 'shared/_scoreboard_strip_generic.html' %}
+{% endif %}

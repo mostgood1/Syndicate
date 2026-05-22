@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NHL Betting - Props Lines</title>
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <style>
+    :root{--bg:#080d1a;--card:#0d1426;--card2:#121b31;--text:#f5f7ff;--muted:#c3cee4;--border:#243356;--link:#b8d1ff;--pill-bg:#101a2e;--pill-br:#2a3a63}
+    body.light{--bg:#ffffff;--card:#f8fafc;--card2:#f1f5fb;--text:#0a1020;--muted:#475569;--border:#cbd5e1;--link:#1e3a8a;--pill-bg:#eef3fb;--pill-br:#94a3b8}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--text)}
+    .container{max-width:1180px;margin:24px auto;padding:0 16px}.nav{font-size:14px;margin-bottom:12px}.nav a{color:var(--link);text-decoration:none;margin-right:10px}.nav button{background:var(--pill-bg);color:var(--text);border:1px solid var(--pill-br);border-radius:6px;padding:6px 10px;cursor:pointer}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}.controls input,.controls select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:13px}.controls button{background:var(--pill-bg);color:var(--text);border:1px solid var(--pill-br);border-radius:6px;padding:6px 10px;cursor:pointer}
+    .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+    .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.value{font-size:24px;font-weight:800}.muted{font-size:12px;color:var(--muted)}
+    .table-wrap{overflow-x:auto;margin-top:18px}.data-table{width:100%;border-collapse:collapse}.data-table th,.data-table td{padding:8px;text-align:left;border-top:1px solid var(--border)}.data-table thead th{border-top:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="{{ back_href }}">{{ back_label }}</a> |
+      {% if props_reconciliation_href %}<a href="{{ props_reconciliation_href }}">Props Reconciliation</a> |{% endif %}
+      {% if reconciliation_href %}<a href="{{ reconciliation_href }}">Betting Recap</a> |{% endif %}
+      <a href="{{ self_href }}" aria-current="page">Props Lines</a> |
+      <button type="button" id="themeToggle">Toggle Theme</button>
+    </div>
+
+    <h1>NHL Betting - Props Lines</h1>
+    <div class="controls">
+      <label>Date <input id="dateInput" type="date" value="{{ date }}" /></label>
+      <label>Market <select id="marketSelect"><option value="">All markets</option></select></label>
+      <label>Player <input id="playerInput" type="text" placeholder="Exact player name" /></label>
+      <button type="button" id="applyBtn">Apply</button>
+      <button type="button" id="resetBtn">Reset</button>
+    </div>
+
+    <div id="summaryRoot" class="summary-grid"></div>
+    <div class="table-wrap"><table class="data-table"><thead><tr><th>Player</th><th>Team</th><th>Market</th><th>Line</th><th>Over</th><th>Under</th><th>Book</th><th>Current</th></tr></thead><tbody id="rowsRoot"><tr><td colspan="8">Loading…</td></tr></tbody></table></div>
+  </div>
+
+  <script>
+    (function(){try{const body=document.body;const saved=localStorage.getItem('theme');if(saved==='light') body.classList.add('light');const t=document.getElementById('themeToggle');if(t){t.addEventListener('click',()=>{body.classList.toggle('light');localStorage.setItem('theme', body.classList.contains('light')?'light':'dark');});}}catch(_){}})();
+    function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+    function fmtNum(value, digits=1){const n=Number(value);return Number.isFinite(n)?n.toFixed(digits):'—';}
+    async function loadAll(){const date=String(document.getElementById('dateInput').value||'').trim();const market=String(document.getElementById('marketSelect').value||'').trim();const player=String(document.getElementById('playerInput').value||'').trim();const params=new URLSearchParams();if(date) params.set('date', date);if(market) params.set('market', market);if(player) params.set('player', player);const summaryRoot=document.getElementById('summaryRoot');const rowsRoot=document.getElementById('rowsRoot');summaryRoot.innerHTML='<div class="card">Loading…</div>';rowsRoot.innerHTML='<tr><td colspan="8">Loading…</td></tr>';try{const response=await fetch(`{{ api_path }}?${params.toString()}`, {cache:'no-store'});const payload=await response.json();const markets=Array.isArray(payload.markets)?payload.markets:[];const currentMarket=document.getElementById('marketSelect').value;document.getElementById('marketSelect').innerHTML='<option value="">All markets</option>'+markets.map((name)=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');document.getElementById('marketSelect').value=markets.includes(currentMarket)?currentMarket:'';summaryRoot.innerHTML=`<div class="card"><div class="label">Date</div><div class="value">${esc(payload.date||'—')}</div><div class="muted">Mirrored props lines snapshot</div></div><div class="card"><div class="label">Rows</div><div class="value">${esc(String(payload.total_rows||0))}</div><div class="muted">${esc(String((payload.markets||[]).length))} markets</div></div>`;const rows=Array.isArray(payload.data)?payload.data:[];rowsRoot.innerHTML=rows.length?rows.map((row)=>`<tr><td>${esc(row.player||'')}</td><td>${esc(row.team||'')}</td><td>${esc(row.market||'')}</td><td>${esc(fmtNum(row.line,1))}</td><td>${esc(fmtNum(row.over_price,0))}</td><td>${esc(fmtNum(row.under_price,0))}</td><td>${esc(row.book||'')}</td><td>${esc(String(row.is_current||''))}</td></tr>`).join(''):'<tr><td colspan="8">No props lines available.</td></tr>';const url=new URL(window.location.href);if(date) url.searchParams.set('date', date); else url.searchParams.delete('date');if(document.getElementById('marketSelect').value) url.searchParams.set('market', document.getElementById('marketSelect').value); else url.searchParams.delete('market');if(player) url.searchParams.set('player', player); else url.searchParams.delete('player');window.history.replaceState({},'',url.toString());}catch(error){summaryRoot.innerHTML=`<div class="card">Failed to load: ${esc(error&&error.message?error.message:error)}</div>`;rowsRoot.innerHTML='<tr><td colspan="8">Failed to load rows.</td></tr>';}}
+    window.addEventListener('DOMContentLoaded', ()=>{document.getElementById('applyBtn').addEventListener('click', loadAll);document.getElementById('resetBtn').addEventListener('click', ()=>{document.getElementById('marketSelect').value='';document.getElementById('playerInput').value='';loadAll();});loadAll();});
+  </script>
+</body>
+</html>

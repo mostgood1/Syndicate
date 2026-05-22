@@ -1,0 +1,62 @@
+{
+  "bad_jsonl_lines": 0,
+  "by_bucket": [
+    {
+      "bucket_remaining": "0-5",
+      "mae_blend": 1.2492732027932807,
+      "mae_model": 2.2535946721915914,
+      "mae_pace": 7.5978546610152335,
+      "n": 3
+    },
+    {
+      "bucket_remaining": "10-15",
+      "mae_blend": 7.965460579398581,
+      "mae_model": 8.751503249615581,
+      "mae_pace": 7.076546233925285,
+      "n": 1
+    },
+    {
+      "bucket_remaining": "20-25",
+      "mae_blend": 13.411422716511229,
+      "mae_model": 15.054383942200392,
+      "mae_pace": 12.5476974213933,
+      "n": 8
+    },
+    {
+      "bucket_remaining": "25-30",
+      "mae_blend": 13.166748060171704,
+      "mae_model": 17.68223186348971,
+      "mae_pace": 18.735654514177128,
+      "n": 20
+    },
+    {
+      "bucket_remaining": "30-35",
+      "mae_blend": 20.49425891109728,
+      "mae_model": 22.310227901516015,
+      "mae_pace": 23.47013912097014,
+      "n": 20
+    },
+    {
+      "bucket_remaining": "35-40",
+      "mae_blend": 25.062697416705113,
+      "mae_model": 25.062697416705113,
+      "mae_pace": 22.863702382918095,
+      "n": 13
+    }
+  ],
+  "date": "2026-04-06",
+  "games": 1,
+  "inputs": {
+    "results": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\daily_results\\results_2026-04-06.csv",
+    "segments": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\sim_segments_2min_2026-04-06.csv",
+    "snapshots": "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAB\\outputs\\live_snapshots\\live_2026-04-06.jsonl"
+  },
+  "overall": {
+    "mae_blend": 17.20061335019099,
+    "mae_model": 19.409409546478066,
+    "mae_pace": 19.563010665676888
+  },
+  "read_jsonl_lines": 487,
+  "rows": 65,
+  "status": "ok"
+}

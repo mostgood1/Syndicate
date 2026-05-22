@@ -1,0 +1,384 @@
+{
+  "generated_at": "2026-05-18T19:14:03.645129+00:00",
+  "reference_module": "mlb",
+  "reference_surfaces": [
+    "cards",
+    "game",
+    "live-lens",
+    "daily archive",
+    "season betting-card",
+    "hub"
+  ],
+  "modules": [
+    {
+      "slug": "mlb",
+      "name": "MLB",
+      "status": "Phase-1 complete",
+      "phase": "Reference module",
+      "summary": "Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked MLB views.",
+      "primary_href": "/mlb",
+      "primary_label": "Open MLB hub",
+      "surfaces": [
+        "cards",
+        "game",
+        "live-lens",
+        "daily archive",
+        "season betting-card",
+        "hub"
+      ],
+      "next_step": "Keep MLB stable as the reference module, and only extract shared board helpers where multiple migrated sports now prove the abstraction without weakening artifact-backed browser parity.",
+      "contract_alignment": {
+        "reference_module": true,
+        "mlb_shaped_primary": true,
+        "has_cards": true,
+        "has_game": true,
+        "has_live_lens": true,
+        "has_hub": true,
+        "archive_like_surfaces": [
+          "daily archive"
+        ],
+        "missing_reference_surfaces": [],
+        "parity_gap_count": 0
+      }
+    },
+    {
+      "slug": "nba",
+      "name": "NBA",
+      "status": "Active migration",
+      "phase": "Source-backed parity + archive",
+      "summary": "Source-backed cards, picks, live-lens, season betting-card flows, a real hub, and a stored-date daily archive now sit under the MLB-shaped public contract.",
+      "primary_href": "/nba/cards",
+      "primary_label": "Open NBA cards",
+      "surfaces": [
+        "cards",
+        "game",
+        "picks",
+        "props",
+        "live-lens",
+        "daily archive",
+        "season betting-card",
+        "hub"
+      ],
+      "next_step": "Keep reducing source-specific glue only where it does not weaken browser parity, and only add deeper historical surfaces where stored-date artifacts already exist.",
+      "contract_alignment": {
+        "reference_module": false,
+        "mlb_shaped_primary": true,
+        "has_cards": true,
+        "has_game": true,
+        "has_live_lens": true,
+        "has_hub": true,
+        "archive_like_surfaces": [
+          "daily archive"
+        ],
+        "missing_reference_surfaces": [],
+        "parity_gap_count": 0
+      }
+    },
+    {
+      "slug": "nhl",
+      "name": "NHL",
+      "status": "Active migration",
+      "phase": "Cards + live lens + picks + archive",
+      "summary": "NHL now has source-backed cards and game drill-in surfaces in Syndicate, plus ranked picks, a real live-lens board, and a stored-date archive lane projected from the same daily snapshot files.",
+      "primary_href": "/nhl/cards",
+      "primary_label": "Open NHL cards",
+      "surfaces": [
+        "cards",
+        "game",
+        "live-lens",
+        "picks",
+        "archive"
+      ],
+      "next_step": "Keep deepening NHL only with real stored-date consumers, using the new archive lane to prove historical workflows before inventing broader season shells.",
+      "contract_alignment": {
+        "reference_module": false,
+        "mlb_shaped_primary": true,
+        "has_cards": true,
+        "has_game": true,
+        "has_live_lens": true,
+        "has_hub": false,
+        "archive_like_surfaces": [
+          "archive"
+        ],
+        "missing_reference_surfaces": [
+          "daily archive",
+          "season betting-card",
+          "hub"
+        ],
+        "parity_gap_count": 3
+      }
+    },
+    {
+      "slug": "nfl",
+      "name": "NFL",
+      "status": "Near completion candidate",
+      "phase": "Cards + game + grouped picks + betting card",
+      "summary": "NFL now has source-backed cards and a game drill-in in Syndicate, alongside grouped weekly picks, source-style picks payload aliases, and a season betting-card companion built from the same stored snapshot lane.",
+      "primary_href": "/nfl/cards",
+      "primary_label": "Open NFL cards",
+      "surfaces": [
+        "cards",
+        "game",
+        "picks",
+        "season betting-card",
+        "hub"
+      ],
+      "next_step": "Keep NFL stable as the next module-family completion candidate, and only reopen the weekly snapshot family if a focused payload or view audit turns up a real artifact-backed gap before broader season or live shells.",
+      "contract_alignment": {
+        "reference_module": false,
+        "mlb_shaped_primary": true,
+        "has_cards": true,
+        "has_game": true,
+        "has_live_lens": false,
+        "has_hub": true,
+        "archive_like_surfaces": [],
+        "missing_reference_surfaces": [
+          "live-lens",
+          "daily archive"
+        ],
+        "parity_gap_count": 2
+      }
+    },
+    {
+      "slug": "wnba",
+      "name": "WNBA",
+      "status": "Active migration",
+      "phase": "Shared board + archive",
+      "summary": "WNBA now exposes shared cards, picks, props, game detail, MLB-style live-lens routes, and a stored-date archive lane in Syndicate.",
+      "primary_href": "/wnba/cards",
+      "primary_label": "Open WNBA cards",
+      "surfaces": [
+        "cards",
+        "game",
+        "picks",
+        "props",
+        "live-lens",
+        "archive"
+      ],
+      "next_step": "Keep replacing fallback-heavy slices with richer processed views and historical lanes where repeated stored dates already exist.",
+      "contract_alignment": {
+        "reference_module": false,
+        "mlb_shaped_primary": true,
+        "has_cards": true,
+        "has_game": true,
+        "has_live_lens": true,
+        "has_hub": false,
+        "archive_like_surfaces": [
+          "archive"
+        ],
+        "missing_reference_surfaces": [
+          "daily archive",
+          "season betting-card",
+          "hub"
+        ],
+        "parity_gap_count": 3
+      }
+    },
+    {
+      "slug": "ncaaf",
+      "name": "NCAAF",
+      "status": "Active migration",
+      "phase": "Historical cards + picks + betting card",
+      "summary": "NCAAF now has artifact-backed weekly cards, game drill-ins, picks, and a season betting-card companion in Syndicate, built from stored recommendation summaries while the live source feed is offseason-empty.",
+      "primary_href": "/ncaaf/cards",
+      "primary_label": "Open NCAAF cards",
+      "surfaces": [
+        "cards",
+        "game",
+        "picks",
+        "betting-card",
+        "hub"
+      ],
+      "next_step": "Decide when to replace the offseason artifact-backed board with the source app's live primary workflow once populated slate data is available again.",
+      "contract_alignment": {
+        "reference_module": false,
+        "mlb_shaped_primary": true,
+        "has_cards": true,
+        "has_game": true,
+        "has_live_lens": false,
+        "has_hub": true,
+        "archive_like_surfaces": [],
+        "missing_reference_surfaces": [
+          "live-lens",
+          "daily archive",
+          "season betting-card"
+        ],
+        "parity_gap_count": 3
+      }
+    },
+    {
+      "slug": "ncaab",
+      "name": "NCAAB",
+      "status": "Active migration",
+      "phase": "Cards + game + live lens + historical lane",
+      "summary": "NCAAB now has source-backed cards, a first game drill-in, a read-only live-lens board, a real-data season review, a historical betting-card companion, and a daily archive in Syndicate, lifted from the source app's recommendations, results, and live scoreboard workflows.",
+      "primary_href": "/ncaab/cards",
+      "primary_label": "Open NCAAB cards",
+      "surfaces": [
+        "cards",
+        "game",
+        "live-lens",
+        "daily archive",
+        "season review",
+        "season betting-card",
+        "hub"
+      ],
+      "next_step": "Keep tightening the NCAAB historical lane now that season review, a betting-card companion, and the daily archive all share the same settled-date workflow.",
+      "contract_alignment": {
+        "reference_module": false,
+        "mlb_shaped_primary": true,
+        "has_cards": true,
+        "has_game": true,
+        "has_live_lens": true,
+        "has_hub": true,
+        "archive_like_surfaces": [
+          "daily archive"
+        ],
+        "missing_reference_surfaces": [],
+        "parity_gap_count": 0
+      }
+    }
+  ],
+  "gap_summary": {
+    "aligned_modules": [
+      "nba",
+      "ncaab"
+    ],
+    "modules_needing_primary_alignment": [],
+    "modules_ranked_by_gap_count": [
+      {
+        "slug": "nba",
+        "name": "NBA",
+        "parity_gap_count": 0,
+        "missing_reference_surfaces": [],
+        "next_step": "Keep reducing source-specific glue only where it does not weaken browser parity, and only add deeper historical surfaces where stored-date artifacts already exist."
+      },
+      {
+        "slug": "ncaab",
+        "name": "NCAAB",
+        "parity_gap_count": 0,
+        "missing_reference_surfaces": [],
+        "next_step": "Keep tightening the NCAAB historical lane now that season review, a betting-card companion, and the daily archive all share the same settled-date workflow."
+      },
+      {
+        "slug": "nfl",
+        "name": "NFL",
+        "parity_gap_count": 2,
+        "missing_reference_surfaces": [
+          "live-lens",
+          "daily archive"
+        ],
+        "next_step": "Keep NFL stable as the next module-family completion candidate, and only reopen the weekly snapshot family if a focused payload or view audit turns up a real artifact-backed gap before broader season or live shells."
+      },
+      {
+        "slug": "ncaaf",
+        "name": "NCAAF",
+        "parity_gap_count": 3,
+        "missing_reference_surfaces": [
+          "live-lens",
+          "daily archive",
+          "season betting-card"
+        ],
+        "next_step": "Decide when to replace the offseason artifact-backed board with the source app's live primary workflow once populated slate data is available again."
+      },
+      {
+        "slug": "nhl",
+        "name": "NHL",
+        "parity_gap_count": 3,
+        "missing_reference_surfaces": [
+          "daily archive",
+          "season betting-card",
+          "hub"
+        ],
+        "next_step": "Keep deepening NHL only with real stored-date consumers, using the new archive lane to prove historical workflows before inventing broader season shells."
+      },
+      {
+        "slug": "wnba",
+        "name": "WNBA",
+        "parity_gap_count": 3,
+        "missing_reference_surfaces": [
+          "daily archive",
+          "season betting-card",
+          "hub"
+        ],
+        "next_step": "Keep replacing fallback-heavy slices with richer processed views and historical lanes where repeated stored dates already exist."
+      }
+    ],
+    "surface_gap_counts": [
+      {
+        "surface": "daily archive",
+        "module_count": 4,
+        "modules": [
+          "nhl",
+          "nfl",
+          "wnba",
+          "ncaaf"
+        ]
+      },
+      {
+        "surface": "season betting-card",
+        "module_count": 3,
+        "modules": [
+          "nhl",
+          "wnba",
+          "ncaaf"
+        ]
+      },
+      {
+        "surface": "hub",
+        "module_count": 2,
+        "modules": [
+          "nhl",
+          "wnba"
+        ]
+      },
+      {
+        "surface": "live-lens",
+        "module_count": 2,
+        "modules": [
+          "nfl",
+          "ncaaf"
+        ]
+      },
+      {
+        "surface": "cards",
+        "module_count": 0,
+        "modules": []
+      },
+      {
+        "surface": "game",
+        "module_count": 0,
+        "modules": []
+      }
+    ],
+    "highest_leverage_gaps": [
+      {
+        "surface": "daily archive",
+        "module_count": 4,
+        "modules": [
+          "nhl",
+          "nfl",
+          "wnba",
+          "ncaaf"
+        ]
+      },
+      {
+        "surface": "season betting-card",
+        "module_count": 3,
+        "modules": [
+          "nhl",
+          "wnba",
+          "ncaaf"
+        ]
+      },
+      {
+        "surface": "hub",
+        "module_count": 2,
+        "modules": [
+          "nhl",
+          "wnba"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-05-20",
+  "runStamp": "20260520_174329",
+  "generatedAt": "2026-05-20T17:43:29Z",
+  "artifactsDir": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329",
+  "refreshStatusDir": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\2026-05-20\\20260520_174329",
+  "latestManifestPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\latest\\refresh_status_latest.json",
+  "refreshOdds": true,
+  "oddsPhase": "live",
+  "oddsSports": "mlb",
+  "oddsRegions": "us",
+  "runSummaryPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\refresh_and_gate_run.json",
+  "oddsRefreshPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\odds_refresh.json",
+  "migrationGateReportPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\migration_gate_report.json",
+  "migrationGateConsolePath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\migration_gate_console.txt",
+  "dryRun": true,
+  "state": "running",
+  "pid": 49416
+}

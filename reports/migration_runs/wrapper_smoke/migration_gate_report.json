@@ -1,0 +1,62 @@
+{
+  "ok": false,
+  "generated_at": "2026-05-18T22:33:44.447581+00:00",
+  "audit": {
+    "ok": false,
+    "parse_error": null,
+    "allowed_count": 3,
+    "actual_count": 3,
+    "unexpected_findings": [
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/mlb.py",
+        "line": 241,
+        "summary": "Source shell route points at mlb/cards_source.js."
+      },
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/nba.py",
+        "line": 136,
+        "summary": "Source shell route points at nba/cards_source.html."
+      },
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/nhl.py",
+        "line": 70,
+        "summary": "Source shell route points at nhl/cards_source.html."
+      }
+    ],
+    "missing_allowed_findings": [
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/mlb.py",
+        "line": 236
+      },
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/nba.py",
+        "line": 131
+      },
+      {
+        "category": "source_shell_route",
+        "path": "syndicate/blueprints/nhl.py",
+        "line": 65
+      }
+    ]
+  },
+  "commands": [
+    {
+      "name": "audit",
+      "command": [
+        "C:\\Users\\mostg\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "scripts/audit_migration.py",
+        "--format",
+        "json"
+      ],
+      "ok": true,
+      "returncode": 0,
+      "stdout_excerpt": "[\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/mlb.py\",\n    \"line\": 241,\n    \"summary\": \"Source shell route points at mlb/cards_source.js.\",\n    \"detail\": \"Use these routes as the primary client-parity audit surface.\"\n  },\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/nba.py\",\n    \"line\": 136,\n    \"summary\": \"Source shell route points at nba/cards_source.html.\",\n    \"detail\": \"Use these routes as the primary client-parity audit surface.\"\n  },\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/nhl.py\",\n    ...",
+      "stderr_excerpt": ""
+    }
+  ]
+}

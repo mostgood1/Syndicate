@@ -1,0 +1,53 @@
+<section class="cards-scoreboard" id="cardsScoreboard" aria-label="Games">
+  <div class="cards-scoreboard-strip">
+    {% for game in games %}
+      {% set sim_panel = game.panels[4] if game.panels|length > 4 else None %}
+      {% set actual_box_panel = sim_panel.get('actual_box_panel') if sim_panel else None %}
+      {% set actual_box = actual_box_panel.get('actual_box') if actual_box_panel else None %}
+      {% set sim_box = sim_panel.get('sim_box') if sim_panel else None %}
+      {% set strip_totals = actual_box.get('totals') if actual_box and actual_box.get('totals') else sim_box.get('totals') if sim_box and sim_box.get('totals') else [] %}
+      <a class="cards-strip-card" href="#game-{{ game.gamePk }}" data-game-pk="{{ game.gamePk }}">
+        <div class="cards-strip-head">
+          <span class="cards-status-badge{% if actual_box_panel and actual_box_panel.get('badge_class') %} {{ actual_box_panel.get('badge_class') }}{% elif game.status_badge and 'Official' in game.status_badge %} is-final{% endif %}">{{ actual_box_panel.badge if actual_box_panel and actual_box_panel.get('badge') else game.status_badge or game.status }}</span>
+          {% if game.hero_note %}
+            <span data-role="strip-f1-signal" class="cards-chip {% if 'No official' in game.hero_note %}is-candidate{% else %}is-official{% endif %}">{{ game.hero_note }}</span>
+          {% endif %}
+          <span data-role="strip-detail">{{ game.detail }}</span>
+        </div>
+        <div class="cards-linescore is-compact">
+          <div class="cards-linescore-head">
+            <span class="cards-linescore-team-label">Team</span>
+            <span class="cards-linescore-stat-head">R</span>
+            <span class="cards-linescore-stat-head">H</span>
+            <span class="cards-linescore-stat-head">E</span>
+          </div>
+          <div class="cards-linescore-row">
+            <div class="cards-linescore-team">
+              <div class="cards-logo-fallback cards-strip-logo">{{ game.away.abbr }}</div>
+              <strong>{{ game.away.abbr }}</strong>
+            </div>
+            <span class="cards-linescore-stat">{{ strip_totals[0].totals.R if strip_totals|length > 0 else '-' }}</span>
+            <span class="cards-linescore-stat">{{ strip_totals[0].totals.H if strip_totals|length > 0 else '-' }}</span>
+            <span class="cards-linescore-stat">{{ strip_totals[0].totals.E if strip_totals|length > 0 else '-' }}</span>
+          </div>
+          <div class="cards-linescore-row">
+            <div class="cards-linescore-team">
+              <div class="cards-logo-fallback cards-strip-logo">{{ game.home.abbr }}</div>
+              <strong>{{ game.home.abbr }}</strong>
+            </div>
+            <span class="cards-linescore-stat">{{ strip_totals[1].totals.R if strip_totals|length > 1 else '-' }}</span>
+            <span class="cards-linescore-stat">{{ strip_totals[1].totals.H if strip_totals|length > 1 else '-' }}</span>
+            <span class="cards-linescore-stat">{{ strip_totals[1].totals.E if strip_totals|length > 1 else '-' }}</span>
+          </div>
+        </div>
+        {% if actual_box_panel and actual_box_panel.get('items') %}
+          <div class="cards-strip-live">{{ actual_box_panel.get('items')[0] }}</div>
+        {% endif %}
+        {% if sim_panel and sim_panel.get('items') and sim_panel.get('items')|length > 1 %}
+          <div class="cards-strip-lens">{{ sim_panel.get('items')[1] }}</div>
+        {% endif %}
+        <div class="cards-strip-meta">{{ game.summary }}</div>
+      </a>
+    {% endfor %}
+  </div>
+</section>

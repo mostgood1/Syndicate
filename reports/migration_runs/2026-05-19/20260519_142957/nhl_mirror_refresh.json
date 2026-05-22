@@ -1,0 +1,14 @@
+﻿{
+    "date":  "2026-05-19",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\NHL-Betting",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\nhl_source",
+    "copiedArtifacts":  [
+                            "predictions_2026-05-19.csv",
+                            "props_recommendations_2026-05-19.csv",
+                            "odds\\games\\date=2026-05-19\\scoreboard.csv",
+                            "odds\\team\\date=2026-05-19\\oddsapi.csv",
+                            "props\\player_props_lines\\date=2026-05-19\\oddsapi.csv",
+                            "props\\player_props_lines\\date=2026-05-19\\oddsapi.parquet"
+                        ]
+}
+

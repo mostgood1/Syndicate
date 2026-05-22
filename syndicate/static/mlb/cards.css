@@ -1,0 +1,975 @@
+.mlb-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+body.syndicate-mlb-cards-page {
+  background:
+    radial-gradient(circle at top left, rgba(78, 205, 196, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(255, 191, 105, 0.12), transparent 22%),
+    linear-gradient(180deg, #06111b 0%, #08131f 45%, #07101a 100%);
+  color: #edf4fb;
+}
+
+.syndicate-mlb-cards-shell {
+  width: min(1640px, calc(100vw - 16px));
+  max-width: none;
+  margin: 0 auto;
+  padding: 10px 0 24px;
+}
+
+body.syndicate-mlb-cards-page .cards-control-card,
+body.syndicate-mlb-cards-page .cards-scoreboard,
+body.syndicate-mlb-cards-page .cards-hr-targets,
+body.syndicate-mlb-cards-page .feature-game-card,
+body.syndicate-mlb-cards-page .feature-metric-item,
+body.syndicate-mlb-cards-page .mlb-surface-panel,
+body.syndicate-mlb-cards-page .cards-strip-card,
+body.syndicate-mlb-cards-page .cards-scoreboard-tile,
+body.syndicate-mlb-cards-page .cards-nav-pill,
+body.syndicate-mlb-cards-page .cards-date-form input[type="date"],
+body.syndicate-mlb-cards-page .cards-submit-button {
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+body.syndicate-mlb-cards-page .cards-control-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 18px;
+  background: rgba(7, 18, 29, 0.82);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.36);
+}
+
+body.syndicate-mlb-cards-page .cards-date-form,
+body.syndicate-mlb-cards-page .module-nav {
+  justify-content: center;
+}
+
+body.syndicate-mlb-cards-page .cards-date-form input[type="date"] {
+  min-height: 40px;
+  border-color: rgba(132, 166, 196, 0.3);
+  background: rgba(4, 12, 20, 0.8);
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .cards-date-form input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.88;
+}
+
+body.syndicate-mlb-cards-page .cards-submit-button {
+  min-height: 40px;
+  border-color: rgba(132, 166, 196, 0.3);
+  background: linear-gradient(135deg, #4ecdc4, #ffbf69);
+  color: #08131f;
+}
+
+body.syndicate-mlb-cards-page .cards-nav-pill {
+  min-height: 40px;
+  border-color: rgba(132, 166, 196, 0.3);
+  background: rgba(4, 12, 20, 0.72);
+  color: #bfd0df;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+body.syndicate-mlb-cards-page .cards-nav-pill:hover,
+body.syndicate-mlb-cards-page .cards-nav-pill:focus-visible {
+  border-color: rgba(154, 243, 222, 0.36);
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .cards-form-pill {
+  background: rgba(8, 18, 30, 0.82);
+}
+
+body.syndicate-mlb-cards-page .cards-scoreboard {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(320px, 1fr);
+  gap: 10px;
+  overflow-x: auto;
+  margin-top: 10px;
+  padding: 0 0 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.syndicate-mlb-cards-page .cards-scoreboard-strip {
+  display: contents;
+}
+
+body.syndicate-mlb-cards-page .cards-strip-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(13, 28, 42, 0.96), rgba(8, 17, 28, 0.92));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  color: #edf4fb;
+  text-decoration: none;
+}
+
+body.syndicate-mlb-cards-page .cards-strip-card:hover {
+  border-color: rgba(154, 243, 222, 0.36);
+  transform: translateY(-1px);
+}
+
+body.syndicate-mlb-cards-page .cards-scoreboard-tile {
+  gap: 6px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(13, 28, 42, 0.96), rgba(8, 17, 28, 0.92));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .cards-scoreboard-tile:hover {
+  border-color: rgba(154, 243, 222, 0.36);
+  transform: translateY(-1px);
+}
+
+body.syndicate-mlb-cards-page .cards-scoreboard-matchup {
+  color: #93a9bc;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.syndicate-mlb-cards-page .cards-scoreboard-status {
+  color: #bfd0df;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+body.syndicate-mlb-cards-page .cards-strip-meta {
+  color: #bfd0df;
+  font-size: 12px;
+}
+
+body.syndicate-mlb-cards-page .cards-strip-live {
+  color: #bfd0df;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(154, 243, 222, 0.16);
+  background: rgba(154, 243, 222, 0.06);
+}
+
+body.syndicate-mlb-cards-page .cards-strip-lens {
+  color: #edf4fb;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 196, 115, 0.18);
+  background: rgba(255, 196, 115, 0.08);
+}
+
+body.syndicate-mlb-cards-page .cards-strip-logo.cards-logo-fallback,
+body.syndicate-mlb-cards-page .cards-strip-logo {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  font-size: 9px;
+  border-radius: 999px;
+}
+
+body.syndicate-mlb-cards-page .feature-game-card {
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(10, 23, 37, 0.95), rgba(6, 16, 28, 0.92));
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.36);
+  color: #edf4fb;
+  padding: 18px;
+}
+
+body.syndicate-mlb-cards-page .feature-team-block__abbr {
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  font-size: 24px;
+  line-height: 1;
+}
+
+body.syndicate-mlb-cards-page .feature-team-block__name,
+body.syndicate-mlb-cards-page .feature-game-card__summary,
+body.syndicate-mlb-cards-page .feature-metric-label,
+body.syndicate-mlb-cards-page .mlb-surface-panel p,
+body.syndicate-mlb-cards-page .feature-panel-list {
+  color: #bfd0df;
+}
+
+body.syndicate-mlb-cards-page .feature-game-card__at,
+body.syndicate-mlb-cards-page .feature-game-card__status {
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .feature-game-card__badge {
+  color: #08131f;
+  background: linear-gradient(135deg, #9af3de, #ffbf69);
+}
+
+body.syndicate-mlb-cards-page .feature-game-card__hero-detail,
+body.syndicate-mlb-cards-page .feature-game-card__hero-note {
+  color: #93a9bc;
+}
+
+body.syndicate-mlb-cards-page .feature-metric-list {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+body.syndicate-mlb-cards-page .feature-metric-item {
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 14px;
+  background: rgba(8, 18, 30, 0.82);
+}
+
+body.syndicate-mlb-cards-page .feature-metric-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+body.syndicate-mlb-cards-page .feature-metric-value {
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .feature-game-card__body {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+body.syndicate-mlb-cards-page .feature-game-card__mlb-layout {
+  align-items: start;
+}
+
+body.syndicate-mlb-cards-page .mlb-surface-panel {
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 16px;
+  background: rgba(11, 23, 37, 0.9);
+}
+
+body.syndicate-mlb-cards-page .section-label {
+  color: #93a9bc;
+}
+
+body.syndicate-mlb-cards-page .mlb-surface-panel h3 {
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .feature-panel-list__item::before {
+  background: #4ecdc4;
+}
+
+body.syndicate-mlb-cards-page .feature-summary-pill,
+body.syndicate-mlb-cards-page .feature-detail-card {
+  border-color: rgba(132, 166, 196, 0.16);
+  background: rgba(8, 18, 30, 0.76);
+}
+
+body.syndicate-mlb-cards-page .feature-summary-pill__label,
+body.syndicate-mlb-cards-page .feature-detail-card__title,
+body.syndicate-mlb-cards-page .feature-detail-row__detail {
+  color: #93a9bc;
+}
+
+body.syndicate-mlb-cards-page .feature-summary-pill__value,
+body.syndicate-mlb-cards-page .feature-detail-row__name,
+body.syndicate-mlb-cards-page .feature-detail-row__value {
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .cards-loading-strip,
+body.syndicate-mlb-cards-page .cards-loading-state {
+  color: #bfd0df;
+}
+
+body.syndicate-mlb-cards-page .cards-game-card {
+  gap: 12px;
+  width: min(100%, 1540px);
+  padding: 13px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.96), rgba(7, 16, 26, 0.98));
+}
+
+body.syndicate-mlb-cards-page .cards-strip-head,
+body.syndicate-mlb-cards-page .cards-head-matchup,
+body.syndicate-mlb-cards-page .cards-head-team,
+body.syndicate-mlb-cards-page .cards-status-cluster,
+body.syndicate-mlb-cards-page .cards-score-meta,
+body.syndicate-mlb-cards-page .cards-box-head,
+body.syndicate-mlb-cards-page .cards-team-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+body.syndicate-mlb-cards-page .cards-strip-head {
+  justify-content: space-between;
+}
+
+body.syndicate-mlb-cards-page .cards-head-left {
+  justify-content: flex-start;
+}
+
+body.syndicate-mlb-cards-page .cards-logo-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #bfd0df;
+  background: rgba(8, 18, 30, 0.82);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+body.syndicate-mlb-cards-page .cards-team-code,
+body.syndicate-mlb-cards-page .cards-head-team-score,
+body.syndicate-mlb-cards-page .cards-game-time-value,
+body.syndicate-mlb-cards-page .cards-market-main {
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+}
+
+body.syndicate-mlb-cards-page .cards-team-code {
+  font-size: 19px;
+  line-height: 1;
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .cards-team-name,
+body.syndicate-mlb-cards-page .cards-market-sub,
+body.syndicate-mlb-cards-page .cards-mini-copy,
+body.syndicate-mlb-cards-page .cards-callout-copy,
+body.syndicate-mlb-cards-page .cards-live-line,
+body.syndicate-mlb-cards-page .cards-sim-line,
+body.syndicate-mlb-cards-page .cards-start-time,
+body.syndicate-mlb-cards-page .cards-empty-copy {
+  color: #bfd0df;
+}
+
+body.syndicate-mlb-cards-page .cards-head-team-score {
+  min-width: 22px;
+  text-align: right;
+  font-size: 22px;
+  line-height: 1;
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .cards-score-divider,
+body.syndicate-mlb-cards-page .cards-game-time-label,
+body.syndicate-mlb-cards-page .cards-market-label,
+body.syndicate-mlb-cards-page .cards-table-title,
+body.syndicate-mlb-cards-page .cards-lens-label,
+body.syndicate-mlb-cards-page .cards-box-total-label {
+  color: #93a9bc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.syndicate-mlb-cards-page .cards-status-badge,
+body.syndicate-mlb-cards-page .cards-chip,
+body.syndicate-mlb-cards-page .cards-overview-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+body.syndicate-mlb-cards-page .cards-status-badge,
+body.syndicate-mlb-cards-page .cards-overview-badge {
+  border: 1px solid rgba(154, 243, 222, 0.22);
+  color: #9af3de;
+  background: rgba(78, 205, 196, 0.08);
+}
+
+body.syndicate-mlb-cards-page .cards-status-badge.is-live,
+body.syndicate-mlb-cards-page .cards-overview-badge.is-live {
+  border-color: rgba(255, 191, 105, 0.28);
+  color: #ffbf69;
+  background: rgba(255, 191, 105, 0.1);
+}
+
+body.syndicate-mlb-cards-page .cards-status-badge.is-final,
+body.syndicate-mlb-cards-page .cards-chip,
+body.syndicate-mlb-cards-page .cards-overview-badge.is-final {
+  color: #08131f;
+  border-color: transparent;
+  background: linear-gradient(135deg, #9af3de, #ffbf69);
+}
+
+body.syndicate-mlb-cards-page .cards-chip.is-candidate {
+  color: #bfd0df;
+  border: 1px solid rgba(132, 166, 196, 0.24);
+  background: rgba(8, 18, 30, 0.9);
+}
+
+body.syndicate-mlb-cards-page .cards-game-link {
+  color: #9af3de;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+body.syndicate-mlb-cards-page .cards-score-ribbon {
+  padding: 7px 9px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 18px;
+  background: rgba(5, 14, 24, 0.65);
+}
+
+body.syndicate-mlb-cards-page .cards-market-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+body.syndicate-mlb-cards-page .cards-market-tile,
+body.syndicate-mlb-cards-page .cards-panel-card,
+body.syndicate-mlb-cards-page .cards-lens-shell {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px 11px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 18px;
+  background: rgba(5, 14, 24, 0.66);
+}
+
+body.syndicate-mlb-cards-page .cards-market-tile {
+  min-height: 74px;
+}
+
+body.syndicate-mlb-cards-page .cards-market-main,
+body.syndicate-mlb-cards-page .cards-box-total-value {
+  color: #edf4fb;
+  font-size: 14px;
+  line-height: 1.08;
+}
+
+body.syndicate-mlb-cards-page .cards-panel {
+  display: none;
+}
+
+body.syndicate-mlb-cards-page .cards-panel.is-active {
+  display: block;
+}
+
+body.syndicate-mlb-cards-page .cards-overview-grid,
+body.syndicate-mlb-cards-page .cards-box-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(330px, 0.95fr);
+  gap: 10px;
+  align-items: start;
+}
+
+body.syndicate-mlb-cards-page .cards-box-grid--props {
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+}
+
+body.syndicate-mlb-cards-page .cards-panel-card--overview-main,
+body.syndicate-mlb-cards-page .cards-panel-card--compact {
+  gap: 8px;
+}
+
+body.syndicate-mlb-cards-page .cards-overview-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.38fr);
+  gap: 8px;
+  align-items: start;
+}
+
+body.syndicate-mlb-cards-page .cards-tabs-rail {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+body.syndicate-mlb-cards-page .cards-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 3px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 999px;
+  background: rgba(5, 14, 24, 0.58);
+  width: fit-content;
+}
+
+body.syndicate-mlb-cards-page .cards-tab {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: #bfd0df;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.syndicate-mlb-cards-page .cards-tab.is-active {
+  color: #08131f;
+  background: linear-gradient(135deg, #9af3de, #ffbf69);
+}
+
+body.syndicate-mlb-cards-page .cards-mini-metrics--rail {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+body.syndicate-mlb-cards-page .cards-live-lens-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+body.syndicate-mlb-cards-page .cards-live-lens-card {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid rgba(132, 166, 196, 0.14);
+  border-radius: 14px;
+  background: rgba(10, 21, 34, 0.9);
+}
+
+body.syndicate-mlb-cards-page .cards-box-totals {
+  display: grid;
+  gap: 8px;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-groups,
+body.syndicate-mlb-cards-page .cards-prop-group,
+body.syndicate-mlb-cards-page .cards-prop-stack {
+  display: grid;
+  gap: 8px;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 6px;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-button {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-height: 54px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(132, 166, 196, 0.18);
+  border-radius: 14px;
+  color: #edf4fb;
+  background: rgba(10, 21, 34, 0.88);
+  font-size: 11.5px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-button.is-official {
+  border-color: rgba(154, 243, 222, 0.24);
+  background: linear-gradient(180deg, rgba(17, 38, 52, 0.94), rgba(10, 21, 34, 0.92));
+}
+
+body.syndicate-mlb-cards-page .cards-prop-button.is-candidate {
+  border-style: dashed;
+  border-color: rgba(132, 166, 196, 0.22);
+  background: rgba(8, 18, 30, 0.72);
+}
+
+body.syndicate-mlb-cards-page .cards-prop-button small {
+  display: block;
+  margin-top: 2px;
+  color: #93a9bc;
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-group.is-secondary {
+  padding-top: 4px;
+  border-top: 1px solid rgba(132, 166, 196, 0.12);
+}
+
+body.syndicate-mlb-cards-page .cards-section-label {
+  color: #93a9bc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.syndicate-mlb-cards-page .cards-linescore {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+}
+
+body.syndicate-mlb-cards-page .cards-linescore-head,
+body.syndicate-mlb-cards-page .cards-linescore-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px 48px 48px;
+  gap: 8px;
+  align-items: center;
+}
+
+body.syndicate-mlb-cards-page .cards-linescore-head {
+  color: #93a9bc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.syndicate-mlb-cards-page .cards-linescore-row {
+  padding: 8px 10px;
+  border: 1px solid rgba(132, 166, 196, 0.14);
+  border-radius: 12px;
+  background: rgba(8, 18, 30, 0.76);
+}
+
+body.syndicate-mlb-cards-page .cards-linescore-team,
+body.syndicate-mlb-cards-page .cards-linescore-stat {
+  color: #edf4fb;
+}
+
+body.syndicate-mlb-cards-page .cards-linescore-stat {
+  text-align: right;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+}
+
+body.syndicate-mlb-cards-page .cards-box-table-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body.syndicate-mlb-cards-page .cards-box-panel--nested {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+body.syndicate-mlb-cards-page .cards-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+body.syndicate-mlb-cards-page .cards-table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(132, 166, 196, 0.14);
+  border-radius: 14px;
+  background: rgba(8, 18, 30, 0.86);
+}
+
+body.syndicate-mlb-cards-page .cards-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+
+body.syndicate-mlb-cards-page .cards-table th,
+body.syndicate-mlb-cards-page .cards-table td {
+  padding: 6px 7px;
+  border-bottom: 1px solid rgba(132, 166, 196, 0.08);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+body.syndicate-mlb-cards-page .cards-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #93a9bc;
+  background: rgba(10, 21, 34, 0.98);
+}
+
+body.syndicate-mlb-cards-page .cards-table td:first-child,
+body.syndicate-mlb-cards-page .cards-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: rgba(10, 21, 34, 0.98);
+}
+
+body.syndicate-mlb-cards-page .cards-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+body.syndicate-mlb-cards-page .cards-table tr:last-child td {
+  border-bottom: 0;
+}
+
+body.syndicate-mlb-cards-page .cards-box-totals--summary {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+body.syndicate-mlb-cards-page .cards-box-total-pill {
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 12px;
+  background: rgba(8, 18, 30, 0.76);
+  padding: 10px 12px;
+}
+
+body.syndicate-mlb-cards-page .cards-callout-list {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  color: #bfd0df;
+}
+
+body.syndicate-mlb-cards-page .cards-live-lens-market,
+body.syndicate-mlb-cards-page .cards-live-lens-reason,
+body.syndicate-mlb-cards-page .cards-live-lens-reasons {
+  color: #9fb4c8;
+  font-size: 10.5px;
+  line-height: 1.22;
+}
+
+body.syndicate-mlb-cards-page .cards-live-lens-reasons {
+  display: grid;
+  gap: 4px;
+}
+
+body.syndicate-mlb-cards-page .cards-prob-groups {
+  display: grid;
+  gap: 14px;
+}
+
+body.syndicate-mlb-cards-page .cards-prob-group {
+  display: grid;
+  gap: 8px;
+}
+
+body.syndicate-mlb-cards-page .cards-prob-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+body.syndicate-mlb-cards-page .cards-prob-row {
+  display: grid;
+  gap: 6px;
+}
+
+body.syndicate-mlb-cards-page .cards-prob-bar {
+  display: grid;
+  grid-template-columns: minmax(10px, var(--away-pct, 50%)) minmax(10px, var(--home-pct, 50%));
+  gap: 2px;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.syndicate-mlb-cards-page .cards-prob-away {
+  background: linear-gradient(90deg, rgba(255, 107, 107, 0.88), rgba(255, 140, 140, 0.88));
+}
+
+body.syndicate-mlb-cards-page .cards-prob-home {
+  background: linear-gradient(90deg, rgba(78, 205, 196, 0.9), rgba(154, 243, 222, 0.92));
+}
+
+body.syndicate-mlb-cards-page .cards-run-dist-bar {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.syndicate-mlb-cards-page .cards-run-dist-bar.is-empty {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.syndicate-mlb-cards-page .cards-run-dist-bin {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: linear-gradient(90deg, rgba(255, 196, 87, 0.95), rgba(255, 140, 92, 0.95));
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-card {
+  display: grid;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(132, 166, 196, 0.12);
+  border-radius: 14px;
+  background: rgba(10, 21, 34, 0.9);
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-card .cards-data-pair {
+  min-height: 0;
+  padding: 6px 7px;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-card .cards-data-pair strong {
+  font-size: 13px;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-card .cards-data-pair.is-positive strong {
+  color: #7fdcc3;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-card .cards-data-pair.is-negative strong {
+  color: #ff9a90;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #9fb4c8;
+  font-size: 11px;
+  line-height: 1.3;
+  border-top: 1px solid rgba(132, 166, 196, 0.12);
+  padding-top: 7px;
+}
+
+body.syndicate-mlb-cards-page .cards-prop-overview-foot span:first-child {
+  flex: 1 1 220px;
+}
+
+body.syndicate-mlb-cards-page .cards-lens-badge {
+  color: #06111b;
+  background: linear-gradient(135deg, rgba(154, 243, 222, 0.95), rgba(78, 205, 196, 0.95));
+}
+
+body.syndicate-mlb-cards-page .cards-lens-badge.is-loss {
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.95), rgba(255, 160, 122, 0.95));
+}
+
+body.syndicate-mlb-cards-page .cards-lens-badge.is-push {
+  background: linear-gradient(135deg, rgba(255, 191, 105, 0.96), rgba(255, 214, 122, 0.96));
+  color: #06111b;
+}
+
+body.syndicate-mlb-cards-page .cards-lens-badge.is-live {
+  background: rgba(78, 205, 196, 0.14);
+  border: 1px solid rgba(154, 243, 222, 0.24);
+  color: #9af3de;
+}
+
+body.syndicate-mlb-cards-page .cards-callout-list [role="listitem"] {
+  position: relative;
+  padding-left: 14px;
+}
+
+body.syndicate-mlb-cards-page .cards-callout-list [role="listitem"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #4ecdc4;
+}
+
+body.syndicate-mlb-cards-page .feature-detail-grid--cards {
+  margin-top: 0;
+}
+
+@media (max-width: 1080px) {
+  body.syndicate-mlb-cards-page .cards-overview-grid,
+  body.syndicate-mlb-cards-page .cards-box-grid,
+  body.syndicate-mlb-cards-page .cards-box-grid--props,
+  body.syndicate-mlb-cards-page .cards-box-table-grid,
+  body.syndicate-mlb-cards-page .cards-overview-main-grid,
+  body.syndicate-mlb-cards-page .cards-tabs-rail {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  body.syndicate-mlb-cards-page .cards-strip-head,
+  body.syndicate-mlb-cards-page .cards-status-cluster,
+  body.syndicate-mlb-cards-page .cards-score-meta {
+    align-items: flex-start;
+  }
+
+  body.syndicate-mlb-cards-page .cards-live-lens-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .syndicate-mlb-cards-shell {
+    width: min(100vw - 12px, 1640px);
+  }
+
+  body.syndicate-mlb-cards-page .cards-scoreboard {
+    grid-auto-columns: minmax(260px, 1fr);
+  }
+}
+
+.cards-scoreboard-strip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cards-scoreboard-tile {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #e3eaf3;
+  background: #ffffff;
+  color: #16202a;
+  text-decoration: none;
+}
+
+.cards-scoreboard-matchup {
+  font-weight: 800;
+}
+
+.cards-scoreboard-status {
+  color: #4b5b70;
+  font-size: 13px;
+}

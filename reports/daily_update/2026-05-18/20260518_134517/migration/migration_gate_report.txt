@@ -1,0 +1,45 @@
+Migration gate: PASS
+
+Audit: PASS
+  Allowed findings: 3
+  Actual findings: 3
+
+audit: PASS
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe scripts/audit_migration.py --format json
+  Output: [
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/mlb.py",
+    "line": 236,
+    "summary": "Source shell route points at mlb/cards_source.js.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nba.py",
+    "line": 131,
+    "summary": "Source shell route points at nba/cards_source.html.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nhl.py",
+    ...
+
+tests: PASS
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe -m unittest tests.test_archives
+  Output: ..............................................................................................................................................
+----------------------------------------------------------------------
+Ran 142 tests in 202.854s
+OK
+
+browser_smoke: PASS
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe scripts/browser_parity_smoke.py --base-url http://127.0.0.1:5000
+  Output: [PASS] MLB source cards
+  URL: http://127.0.0.1:5000/mlb/cards?client=source
+  Board: populated
+  Header: 14 games on the slate | 1 with official plays
+  Board excerpt: BAL Baltimore Orioles - @ TB Tampa Bay Rays - First pitch 5:40 PM Preview 5:40 PM Open game view Loading live box... Loading sim box... Probables: Trevor Rogers vs Shane McClana...
+  #cardsHrTargets: Best 1+ HR looks HR Targets 28 targets across 14 games. daily_summary_2026_05_18_hr_targets.json Open board #1 93 KS Kyle Schwarber PHI vs CIN @ PHI 48.1% 1+ HR vs Nick Lodolo 9...
+[PASS] NBA source cards
+  URL: http://127.0.0.1...

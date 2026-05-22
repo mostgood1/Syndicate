@@ -1,0 +1,222 @@
+{
+  "selected_method_total": "lgbm_quantile_conformal_total_mid",
+  "selected_method_margin": "lgbm_quantile_conformal_margin_med",
+  "target_coverage": 0.8,
+  "window_days": 28,
+  "scores_total": [
+    {
+      "name": "residual_conformal",
+      "coverage": 0.7810588685015291,
+      "width": 80.72626981466999,
+      "crps": 17.996387653144954
+    },
+    {
+      "name": "normal_sigma",
+      "coverage": 0.7585053516819572,
+      "width": 78.08648733027923,
+      "crps": 19.354222955787737
+    },
+    {
+      "name": "lgbm_quantile_conformal_total_mid",
+      "coverage": 0.9250764525993884,
+      "width": 71.24661309772051,
+      "crps": 11.549015516814242
+    }
+  ],
+  "scores_margin": [
+    {
+      "name": "residual_conformal",
+      "coverage": 0.7861238532110092,
+      "width": 41.35493860583942,
+      "crps": 10.688531761974536
+    },
+    {
+      "name": "normal_sigma",
+      "coverage": 0.8040902140672783,
+      "width": 47.34504009501286,
+      "crps": 10.937323138847244
+    },
+    {
+      "name": "lgbm_quantile_conformal_margin_med",
+      "coverage": 0.9038608562691132,
+      "width": 66.51110836395844,
+      "crps": 10.605402941753967
+    }
+  ],
+  "crps_total": 11.549015516814242,
+  "crps_margin": 10.605402941753967,
+  "segment_rules": {
+    "total_thresholds": [
+      140.5,
+      143.0
+    ],
+    "margin_thresholds": [
+      7.5,
+      9.0
+    ],
+    "total_thresholds_meta": {
+      "mode": "adaptive",
+      "q33": 140.565,
+      "q66": 142.792,
+      "q33_rounded": 140.5,
+      "q66_rounded": 143.0,
+      "counts": {
+        "low": 3212,
+        "mid": 3935,
+        "high": 3260
+      }
+    },
+    "margin_thresholds_meta": {
+      "mode": "adaptive",
+      "q33": 7.716538368800155,
+      "q66": 9.129806698816369,
+      "q33_rounded": 7.5,
+      "q66_rounded": 9.0,
+      "counts": {
+        "small": 2656,
+        "med": 4198,
+        "large": 3553
+      }
+    }
+  },
+  "segment_scores_total": {
+    "low": [
+      {
+        "name": "residual_conformal",
+        "coverage": 0.6687422166874222,
+        "width": 80.72626981466999,
+        "crps": 23.993040902326406
+      },
+      {
+        "name": "normal_sigma",
+        "coverage": 0.49034869240348694,
+        "width": 78.08648733027923,
+        "crps": 31.92098703890566
+      },
+      {
+        "name": "lgbm_quantile_conformal_total_low",
+        "coverage": 0.9940846824408468,
+        "width": 34.77679004802923,
+        "crps": 5.117952917782411
+      }
+    ],
+    "mid": [
+      {
+        "name": "residual_conformal",
+        "coverage": 0.8977955911823647,
+        "width": 80.72626981466999,
+        "crps": 14.003197756672968
+      },
+      {
+        "name": "normal_sigma",
+        "coverage": 0.8885270541082164,
+        "width": 78.08648733027923,
+        "crps": 13.442075037564416
+      },
+      {
+        "name": "lgbm_quantile_conformal_total_mid",
+        "coverage": 0.9819639278557114,
+        "width": 50.05809654913162,
+        "crps": 7.742730805516025
+      }
+    ],
+    "high": [
+      {
+        "name": "residual_conformal",
+        "coverage": 0.7487730061349693,
+        "width": 80.72626981466999,
+        "crps": 16.8143241611562
+      },
+      {
+        "name": "normal_sigma",
+        "coverage": 0.8634969325153374,
+        "width": 78.08648733027923,
+        "crps": 13.73125770852529
+      },
+      {
+        "name": "lgbm_quantile_conformal_total_high",
+        "coverage": 0.9300613496932515,
+        "width": 34.80439122072515,
+        "crps": 5.475310691626774
+      }
+    ]
+  },
+  "segment_scores_margin": {
+    "small": [
+      {
+        "name": "residual_conformal",
+        "coverage": 0.7409638554216867,
+        "width": 41.35493860583942,
+        "crps": 12.050957909894406
+      },
+      {
+        "name": "normal_sigma",
+        "coverage": 0.7515060240963856,
+        "width": 47.34504009501286,
+        "crps": 11.551251843018472
+      },
+      {
+        "name": "lgbm_quantile_conformal_margin_small",
+        "coverage": 0.9100150602409639,
+        "width": 46.67573932452769,
+        "crps": 6.958403831236406
+      }
+    ],
+    "med": [
+      {
+        "name": "residual_conformal",
+        "coverage": 0.7786133960047004,
+        "width": 41.35493860583942,
+        "crps": 10.564868582704612
+      },
+      {
+        "name": "normal_sigma",
+        "coverage": 0.8058754406580494,
+        "width": 47.34504009501286,
+        "crps": 11.012277518427632
+      },
+      {
+        "name": "lgbm_quantile_conformal_margin_med",
+        "coverage": 0.9955346650998825,
+        "width": 55.996699776963645,
+        "crps": 8.089886711187836
+      }
+    ],
+    "large": [
+      {
+        "name": "residual_conformal",
+        "coverage": 0.8288770053475936,
+        "width": 41.35493860583942,
+        "crps": 9.899773832885455
+      },
+      {
+        "name": "normal_sigma",
+        "coverage": 0.8412609062763862,
+        "width": 47.34504009501286,
+        "crps": 10.42749576303866
+      },
+      {
+        "name": "lgbm_quantile_conformal_margin_large",
+        "coverage": 0.9802983394314664,
+        "width": 18.605215004542405,
+        "crps": 3.7808529945558664
+      }
+    ]
+  },
+  "selected_methods_by_segment_total": {
+    "overall": "lgbm_quantile_conformal_total_mid",
+    "low": "lgbm_quantile_conformal_total_low",
+    "mid": "lgbm_quantile_conformal_total_mid",
+    "high": "lgbm_quantile_conformal_total_high"
+  },
+  "selected_methods_by_segment_margin": {
+    "overall": "lgbm_quantile_conformal_margin_med",
+    "small": "lgbm_quantile_conformal_margin_small",
+    "med": "lgbm_quantile_conformal_margin_med",
+    "large": "lgbm_quantile_conformal_margin_large"
+  },
+  "median_width_total": 44.87759468138972,
+  "median_width_margin": 39.370387196933386,
+  "latest_date": "2025-11-30",
+  "timestamp": "2026-04-07T12:23:32.965350Z"
+}

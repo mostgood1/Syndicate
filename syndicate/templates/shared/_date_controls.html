@@ -1,0 +1,61 @@
+<section class="cards-control-card" aria-label="Slate controls">
+  {% set resolved_control_label = control_label or 'Date' %}
+  {% set resolved_control_type = control_type or 'date' %}
+  {% set resolved_control_name = control_name or 'date' %}
+  {% set resolved_control_value = control_value or date_value or date or '' %}
+  {% set use_plain_control_ids = plain_control_ids or false %}
+  {% set control_dom_suffix = '' if use_plain_control_ids else (route_path or action or 'controls')|replace('/', '-') %}
+  <form class="cards-date-form" method="get" action="{{ action }}">
+    {% if show_home_link is not defined or show_home_link %}
+    <a class="cards-nav-pill" href="/">Syndicate Home</a>
+    {% endif %}
+    <a class="cards-nav-pill" id="cardsPrevDateLink{{ control_dom_suffix }}" href="{{ prev_href }}" rel="prev">Prev</a>
+    <span class="cards-nav-pill cards-form-pill" aria-hidden="true">{{ resolved_control_label }}</span>
+    <input id="cardsDateInput{{ control_dom_suffix }}" type="{{ resolved_control_type }}" name="{{ resolved_control_name }}" value="{{ resolved_control_value }}" aria-label="Slate {{ resolved_control_label|lower }}" />
+    {% for extra_control in extra_controls or [] %}
+      <span class="cards-nav-pill cards-form-pill" aria-hidden="true">{{ extra_control.label }}</span>
+      {% if extra_control.type == 'select' %}
+        <select name="{{ extra_control.name }}" aria-label="{{ extra_control.label }}">
+          {% for option in extra_control.options or [] %}
+            <option value="{{ option.value }}"{% if option.value == extra_control.value %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <input type="{{ extra_control.type or 'text' }}" name="{{ extra_control.name }}" value="{{ extra_control.value or '' }}" aria-label="{{ extra_control.label }}" />
+      {% endif %}
+    {% endfor %}
+    {% for hidden_field in hidden_fields or [] %}
+      <input type="hidden" name="{{ hidden_field.name }}" value="{{ hidden_field.value }}" />
+    {% endfor %}
+    {% if cards_client %}
+      <input type="hidden" name="client" value="{{ cards_client }}" />
+    {% endif %}
+    <button class="cards-submit-button" type="submit">{{ submit_label or 'Load' }}</button>
+    {% if reset_href %}
+      <a class="cards-nav-pill" href="{{ reset_href }}">Reset</a>
+    {% endif %}
+    <a class="cards-nav-pill" id="cardsNextDateLink{{ control_dom_suffix }}" href="{{ next_href }}" rel="next">Next</a>
+    {% for link in cards_control_links or [] %}
+      <a class="cards-nav-pill{% if link.active %} is-active{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+    {% endfor %}
+  </form>
+  {% if links %}
+    {% with links=links %}
+      {% include 'shared/_module_nav.html' %}
+    {% endwith %}
+  {% endif %}
+  {% if source_meta_loading_text or source_meta_items is defined %}
+  <div class="cards-toolbar-rail">
+    <div class="cards-source-meta" id="cardsSourceMeta">
+      {% if source_meta_loading_text %}
+        {{ source_meta_loading_text }}
+      {% else %}
+        {% for item in source_meta_items or [] %}
+          <span>{{ item }}</span>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div class="cards-filters" id="cardsFilters"></div>
+  </div>
+  {% endif %}
+</section>

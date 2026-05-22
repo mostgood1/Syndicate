@@ -1,0 +1,16 @@
+type,confidence,ev_pct,odds,home_team,away_team,game_date,season,week
+MONEYLINE,High,160.0,160,New England Patriots,Los Angeles Chargers,2026-01-11,2025,19
+MONEYLINE,High,64.51612903225805,-155,Pittsburgh Steelers,Houston Texans,2026-01-12,2025,19
+TOTAL,High,28.239313103391595,-110,New England Patriots,Los Angeles Chargers,2026-01-11,2025,19
+MONEYLINE,High,17.391304347826075,-575,Carolina Panthers,Los Angeles Rams,2026-01-10,2025,19
+TOTAL,High,14.276396268618852,-110,Philadelphia Eagles,San Francisco 49ers,2026-01-11,2025,19
+TOTAL,High,14.191519616807202,-110,Carolina Panthers,Los Angeles Rams,2026-01-10,2025,19
+TOTAL,High,14.085511612978074,-110,Chicago Bears,Green Bay Packers,2026-01-10,2025,19
+SPREAD,High,13.964735199442767,-110,New England Patriots,Los Angeles Chargers,2026-01-11,2025,19
+SPREAD,Medium,10.517553222120634,-110,Chicago Bears,Green Bay Packers,2026-01-10,2025,19
+SPREAD,Medium,10.496561349703882,-110,Jacksonville Jaguars,Buffalo Bills,2026-01-11,2025,19
+TOTAL,Medium,10.066720419281994,-110,Jacksonville Jaguars,Buffalo Bills,2026-01-11,2025,19
+SPREAD,Low,7.119309003726948,-110,Carolina Panthers,Los Angeles Rams,2026-01-10,2025,19
+TOTAL,Low,5.689635565535134,-110,Pittsburgh Steelers,Houston Texans,2026-01-12,2025,19
+SPREAD,,-1.8440684602235302,-110,Pittsburgh Steelers,Houston Texans,2026-01-12,2025,19
+SPREAD,,-4.171486813503606,-110,Philadelphia Eagles,San Francisco 49ers,2026-01-11,2025,19

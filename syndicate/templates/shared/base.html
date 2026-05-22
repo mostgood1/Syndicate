@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Syndicate{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='shared/app.css') }}" />
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body class="syndicate-body{% if page_body_class %} {{ page_body_class }}{% endif %}">
+    <div class="cards-shell syndicate-shell{% if page_shell_class %} {{ page_shell_class }}{% endif %}">
+      {% if show_app_header is not defined or show_app_header %}
+        <header class="cards-header syndicate-header">
+          <div class="cards-title-row">
+            <div>
+              <div class="eyebrow">Syndicate</div>
+              <h1>{% block page_title %}Multi-Sport Betting Hub{% endblock %}</h1>
+            </div>
+            <nav class="syndicate-nav" aria-label="Sports">
+              <a class="cards-nav-pill" href="/">Home</a>
+              {% for sport in syndicate_sports %}
+                <a class="cards-nav-pill" href="/{{ sport.slug }}">{{ sport.name }}</a>
+              {% endfor %}
+              {% if request.args.get('admin_token') %}
+                <a class="cards-nav-pill" href="/ops/odds-refresh?admin_token={{ request.args.get('admin_token') }}">Ops</a>
+              {% endif %}
+            </nav>
+          </div>
+          <p class="cards-header-meta">One app with seven feature modules. Existing apps remain untouched while Syndicate is built in parallel.</p>
+        </header>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+    <script src="{{ url_for('static', filename='shared/polling.js') }}"></script>
+    {% block extra_scripts %}{% endblock %}
+  </body>
+</html>

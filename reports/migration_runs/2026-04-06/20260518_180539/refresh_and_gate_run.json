@@ -1,0 +1,15 @@
+﻿{
+    "date":  "2026-04-06",
+    "baseUrl":  "",
+    "artifactsDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-04-06\\20260518_180539",
+    "jsonMode":  false,
+    "skipTests":  true,
+    "skipSmoke":  false,
+    "skipNFL":  true,
+    "skipNCAAF":  true,
+    "skipNCAAB":  false,
+    "skipMLB":  true,
+    "skipNBA":  true,
+    "skipNHL":  true,
+    "skipWNBA":  true
+}

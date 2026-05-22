@@ -1,0 +1,10 @@
+{% if metrics %}
+  <div class="feature-metric-list">
+    {% for metric in metrics %}
+      <div class="feature-metric-item">
+        <div class="feature-metric-label">{{ metric.label }}</div>
+        <div class="feature-metric-value">{{ metric.value }}</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

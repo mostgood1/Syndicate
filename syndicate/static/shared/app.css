@@ -1,0 +1,511 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+:root {
+  --cards-bg: #08131f;
+  --cards-bg-alt: #0d1c2a;
+  --cards-surface: rgba(11, 23, 37, 0.9);
+  --cards-surface-strong: rgba(15, 30, 47, 0.96);
+  --cards-surface-soft: rgba(15, 30, 47, 0.72);
+  --cards-line: rgba(132, 166, 196, 0.16);
+  --cards-line-strong: rgba(132, 166, 196, 0.3);
+  --cards-text: #edf4fb;
+  --cards-text-soft: #bfd0df;
+  --cards-text-dim: #93a9bc;
+  --cards-accent: #4ecdc4;
+  --cards-accent-strong: #9af3de;
+  --cards-shadow: 0 20px 55px rgba(0, 0, 0, 0.36);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  line-height: 1.4;
+  background:
+    radial-gradient(circle at top left, rgba(78, 205, 196, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(255, 191, 105, 0.12), transparent 22%),
+    linear-gradient(180deg, #06111b 0%, #08131f 45%, #07101a 100%);
+  color: var(--cards-text);
+}
+
+.syndicate-shell {
+  width: min(1500px, calc(100vw - 20px));
+  margin: 0 auto;
+  padding: 18px 0 40px;
+}
+
+.syndicate-header {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--cards-line);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
+  box-shadow: var(--cards-shadow);
+}
+
+.eyebrow,
+.section-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cards-accent-strong);
+}
+
+.cards-title-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  letter-spacing: -0.03em;
+}
+
+h1 {
+  font-size: clamp(28px, 3.5vw, 36px);
+}
+
+h2 {
+  font-size: clamp(22px, 2.6vw, 28px);
+}
+
+h3 {
+  font-size: clamp(18px, 2vw, 22px);
+}
+
+.cards-header-meta,
+.cards-source-meta,
+.lead,
+.sport-card p {
+  color: var(--cards-text-soft);
+}
+
+.syndicate-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cards-nav-pill,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--cards-line-strong);
+  background: rgba(4, 12, 20, 0.72);
+  color: var(--cards-text-soft);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cards-nav-pill--active {
+  background: linear-gradient(135deg, var(--cards-accent), var(--cards-accent-strong));
+  border-color: rgba(154, 243, 222, 0.44);
+  color: #08211d;
+}
+
+.cards-control-card,
+.sport-card {
+  border: 1px solid var(--cards-line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
+  box-shadow: var(--cards-shadow);
+}
+
+.cards-control-card {
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.action-row--compact {
+  margin-top: 10px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.cards-date-form,
+.module-nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.module-nav {
+  margin-top: 14px;
+}
+
+.cards-form-pill {
+  background: rgba(14, 31, 44, 0.9);
+  color: var(--cards-text-soft);
+}
+
+.cards-submit-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 243, 222, 0.44);
+  background: linear-gradient(135deg, var(--cards-accent), var(--cards-accent-strong));
+  color: #08211d;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cards-date-form input[type="date"] {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--cards-line-strong);
+  border-radius: 12px;
+  background: rgba(7, 19, 29, 0.9);
+  color: var(--cards-text);
+}
+
+.cards-scoreboard,
+.cards-hr-targets {
+  border: 1px solid var(--cards-line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
+  box-shadow: var(--cards-shadow);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.cards-loading-strip,
+.cards-loading-state {
+  color: var(--cards-text-soft);
+  font-weight: 600;
+}
+
+.feature-game-card {
+  border: 1px solid var(--cards-line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(13, 27, 43, 0.94), rgba(7, 16, 26, 0.98));
+  box-shadow: var(--cards-shadow);
+  padding: 18px;
+}
+
+.feature-game-card__top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.feature-game-card__top--mlb {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(240px, 320px);
+  align-items: start;
+}
+
+.feature-game-card__hero {
+  display: grid;
+  gap: 14px;
+}
+
+.feature-team-block {
+  min-width: 0;
+}
+
+.feature-team-block--mlb {
+  display: grid;
+  gap: 4px;
+}
+
+.feature-team-block__abbr {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.feature-team-block__name,
+.feature-game-card__summary,
+.feature-metric-label,
+.hub-content-panel p,
+.mlb-surface-panel p {
+  color: var(--cards-text-soft);
+}
+
+.feature-game-card__at {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cards-text-dim);
+}
+
+.feature-game-card__meta {
+  margin-top: 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.feature-game-card__hero-meta {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.feature-game-card__hero-topline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.feature-game-card__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.feature-game-card__hero-detail,
+.feature-game-card__hero-note {
+  font-size: 12px;
+}
+
+.feature-game-card__status,
+.feature-metric-value {
+  font-weight: 700;
+}
+
+.feature-metric-list {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.feature-metric-item {
+  border: 1px solid var(--cards-line);
+  border-radius: 14px;
+  background: rgba(10, 24, 38, 0.78);
+  padding: 12px;
+}
+
+.feature-metric-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cards-text-dim);
+}
+
+.feature-game-card__body {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.feature-game-card__mlb-layout {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.9fr);
+  gap: 14px;
+}
+
+.feature-game-card__main-lane,
+.feature-game-card__side-lane {
+  display: grid;
+  gap: 14px;
+}
+
+.hub-content-panel,
+.mlb-surface-panel {
+  border: 1px solid var(--cards-line);
+  border-radius: 18px;
+  background: rgba(10, 24, 38, 0.78);
+  padding: 16px;
+}
+
+.hub-content-panel h3,
+.mlb-surface-panel h3 {
+  margin-bottom: 8px;
+}
+
+.feature-panel-list {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 6px;
+  color: var(--cards-text-soft);
+}
+
+.feature-panel-list__item {
+  position: relative;
+  padding-left: 16px;
+}
+
+.feature-panel-list__item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--cards-accent);
+}
+
+.feature-summary-strip {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.feature-summary-pill {
+  border: 1px solid var(--cards-line);
+  border-radius: 12px;
+  background: rgba(10, 24, 38, 0.72);
+  padding: 10px 12px;
+}
+
+.feature-summary-pill__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cards-text-dim);
+}
+
+.feature-summary-pill__value {
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.feature-detail-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.feature-detail-card {
+  border: 1px solid var(--cards-line);
+  border-radius: 14px;
+  background: rgba(10, 24, 38, 0.72);
+  padding: 12px;
+}
+
+.feature-detail-card__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cards-text-dim);
+}
+
+.feature-detail-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.feature-detail-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.feature-detail-row__main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.feature-detail-row__name,
+.feature-detail-row__value {
+  font-weight: 700;
+}
+
+.feature-detail-row__detail {
+  font-size: 12px;
+  color: var(--cards-text-dim);
+}
+
+.feature-detail-row__value {
+  text-align: right;
+}
+
+@media (max-width: 767px) {
+  .feature-game-card__top {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-game-card__top--mlb,
+  .feature-game-card__mlb-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-game-card__at {
+    display: none;
+  }
+}
+
+.cards-grid--sports {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.sport-card {
+  padding: 18px;
+}
+
+.sport-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 767px) {
+  h1 {
+    font-size: 24px;
+  }
+
+  .cards-nav-pill,
+  .status-pill {
+    min-height: 36px;
+    padding: 0 12px;
+  }
+
+  .cards-control-card,
+  .sport-card {
+    border-radius: 16px;
+  }
+}

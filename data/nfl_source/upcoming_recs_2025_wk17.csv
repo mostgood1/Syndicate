@@ -1,0 +1,33 @@
+type,confidence,ev_pct,odds,home_team,away_team,game_date,season,week
+SPREAD,High,37.19722530221946,-110,Kansas City Chiefs,Denver Broncos,2025-12-25,2025,17
+SPREAD,High,33.53877108868568,-110,New York Jets,New England Patriots,2025-12-28,2025,17
+SPREAD,High,30.67854357286639,-110,Atlanta Falcons,Los Angeles Rams,2025-12-29,2025,17
+SPREAD,High,29.51539731467403,-110,Indianapolis Colts,Jacksonville Jaguars,2025-12-28,2025,17
+SPREAD,High,28.9480057160607,-110,Carolina Panthers,Seattle Seahawks,2025-12-28,2025,17
+SPREAD,High,27.56002799092071,-110,Las Vegas Raiders,New York Giants,2025-12-28,2025,17
+SPREAD,High,25.817802255552312,-110,Los Angeles Chargers,Houston Texans,2025-12-27,2025,17
+SPREAD,High,25.010701527831593,-110,Tennessee Titans,New Orleans Saints,2025-12-28,2025,17
+SPREAD,High,20.999898523005722,-110,Washington Commanders,Dallas Cowboys,2025-12-25,2025,17
+SPREAD,High,19.59789122872039,-110,Miami Dolphins,Tampa Bay Buccaneers,2025-12-28,2025,17
+SPREAD,High,17.998683893700274,-110,Minnesota Vikings,Detroit Lions,2025-12-25,2025,17
+SPREAD,High,16.84626795523482,-110,Cleveland Browns,Pittsburgh Steelers,2025-12-28,2025,17
+SPREAD,High,14.713004214440872,-110,San Francisco 49ers,Chicago Bears,2025-12-28,2025,17
+TOTAL,Medium,11.374941172082087,-110,Cleveland Browns,Pittsburgh Steelers,2025-12-28,2025,17
+TOTAL,Medium,10.649988275116918,-110,Kansas City Chiefs,Denver Broncos,2025-12-25,2025,17
+TOTAL,Medium,8.996102095674818,-110,Los Angeles Chargers,Houston Texans,2025-12-27,2025,17
+SPREAD,Medium,8.424511506729171,-110,Cincinnati Bengals,Arizona Cardinals,2025-12-28,2025,17
+TOTAL,Low,6.708048006729195,-110,Tennessee Titans,New Orleans Saints,2025-12-28,2025,17
+TOTAL,,3.066448180579684,-110,San Francisco 49ers,Chicago Bears,2025-12-28,2025,17
+TOTAL,,2.594593565882181,-110,Cincinnati Bengals,Arizona Cardinals,2025-12-28,2025,17
+TOTAL,,2.033358046980538,-110,Buffalo Bills,Philadelphia Eagles,2025-12-28,2025,17
+SPREAD,,1.9054172274296122,-110,Buffalo Bills,Philadelphia Eagles,2025-12-28,2025,17
+TOTAL,,1.1075303689400573,-110,Washington Commanders,Dallas Cowboys,2025-12-25,2025,17
+TOTAL,,0.9818641718880361,-110,Atlanta Falcons,Los Angeles Rams,2025-12-29,2025,17
+TOTAL,,0.11711536596616945,-110,Carolina Panthers,Seattle Seahawks,2025-12-28,2025,17
+SPREAD,,0.10759434033957849,-110,Green Bay Packers,Baltimore Ravens,2025-12-27,2025,17
+TOTAL,,-0.0521363409351272,-110,New York Jets,New England Patriots,2025-12-28,2025,17
+TOTAL,,-0.25425858374359955,-110,Indianapolis Colts,Jacksonville Jaguars,2025-12-28,2025,17
+TOTAL,,-0.8101184091452107,-110,Miami Dolphins,Tampa Bay Buccaneers,2025-12-28,2025,17
+TOTAL,,-1.0332115490651106,-110,Minnesota Vikings,Detroit Lions,2025-12-25,2025,17
+TOTAL,,-3.7387304500897054,-110,Green Bay Packers,Baltimore Ravens,2025-12-27,2025,17
+TOTAL,,-3.9073115264294414,-110,Las Vegas Raiders,New York Giants,2025-12-28,2025,17

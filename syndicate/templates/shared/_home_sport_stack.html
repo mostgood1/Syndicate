@@ -1,0 +1,460 @@
+<section class="sport-stack" aria-label="Sport daily overview">
+  {% for sport in sports %}
+    {% if sport.slug == 'mlb' %}
+    <article class="sport-stack-card">
+      <div class="sport-stack-card__header">
+        <div class="sport-stack-card__identity">
+          <div class="section-label">/{{ sport.slug }}</div>
+          <h3>{{ sport.name }}</h3>
+          <div class="sport-stack-card__statusline">
+            {% if sport.status %}
+              <span class="status-pill">{{ sport.status }}</span>
+            {% endif %}
+            <span class="sport-board-chip">{{ sport.context_label }}</span>
+            {% if sport.phase %}
+              <span class="sport-board-chip">{{ sport.phase }}</span>
+            {% endif %}
+            {% if sport.active_today %}
+              <span class="sport-board-chip">Live slate</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="sport-rails">
+        <section class="sport-scroll-row sport-scroll-row--games sport-scroll-row--mlb-embed" aria-label="{{ sport.name }} compact game cards rail">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <h4 class="sport-scroll-row__headline">Compact game cards</h4>
+            </div>
+            <div class="sport-scroll-row__links" aria-label="{{ sport.name }} compact game card links">
+              <a class="cards-nav-pill" href="{{ sport.mlb_home.cards_href }}">Open full compact board</a>
+              <a class="cards-nav-pill" href="{{ sport.mlb_home.live_lens_href }}">Open live lens</a>
+              {% if sport.mlb_home.betting_href %}
+                <a class="cards-nav-pill" href="{{ sport.mlb_home.betting_href }}">Open betting card</a>
+              {% endif %}
+              <a class="cards-nav-pill" href="{{ sport.hub_href }}">Open MLB hub</a>
+            </div>
+          </div>
+
+          <div class="sport-embed-shell" data-home-preserve-key="home-cards" data-home-preserve-src="{{ sport.mlb_home.cards_embed_src }}">
+            <iframe
+              class="sport-embed-frame sport-embed-frame--mlb sport-embed-frame--mlb-compact-home"
+              src="{{ sport.mlb_home.cards_embed_src }}"
+              title="MLB compact cards"
+              loading="lazy"
+              referrerpolicy="same-origin"
+            ></iframe>
+          </div>
+        </section>
+
+        <section class="sport-scroll-row sport-scroll-row--props" aria-label="{{ sport.name }} HR targets rail">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <h4 class="sport-scroll-row__headline">HR targets</h4>
+            </div>
+            <div class="sport-scroll-row__links" aria-label="{{ sport.name }} HR target links">
+              <a class="cards-nav-pill" href="{{ sport.mlb_home.hr_targets_href }}">Open HR targets</a>
+            </div>
+          </div>
+
+          {% if sport.mlb_home.hr_targets_items %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} HR targets">
+              {% for item in sport.mlb_home.hr_targets_items %}
+                <article class="sport-compact-card">
+                  <div class="sport-compact-card__top">
+                    <div class="sport-compact-card__title">{{ item.name }}</div>
+                    <div class="sport-compact-card__value">{{ item.value }}</div>
+                  </div>
+                  <div class="sport-compact-card__meta">{{ item.matchup }}</div>
+                  <div class="sport-compact-card__summary">{{ item.detail }}</div>
+                  <div class="sport-compact-card__chip-row">
+                    <span class="sport-compact-card__chip">{{ item.heading }}</span>
+                    <span class="sport-compact-card__chip">Support {{ item.line }}</span>
+                  </div>
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">Open HR board</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No stored HR targets were available for this date.</p>
+          {% endif %}
+        </section>
+
+        <section class="sport-scroll-row sport-scroll-row--props" aria-label="{{ sport.name }} pregame props rail">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <h4 class="sport-scroll-row__headline">Pregame props</h4>
+            </div>
+            <div class="sport-scroll-row__links" aria-label="{{ sport.name }} pregame prop links">
+              <a class="cards-nav-pill" href="{{ sport.mlb_home.pregame_props_href }}">Pitcher top props</a>
+              <a class="cards-nav-pill" href="{{ sport.mlb_home.pregame_props_secondary_href }}">Hitter top props</a>
+            </div>
+          </div>
+
+          {% if sport.mlb_home.pregame_props_items %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} pregame props">
+              {% for item in sport.mlb_home.pregame_props_items %}
+                <article class="sport-compact-card">
+                  <div class="sport-compact-card__top">
+                    <div class="sport-compact-card__title">{{ item.name }}</div>
+                    <div class="sport-compact-card__value">{{ item.value }}</div>
+                  </div>
+                  <div class="sport-compact-card__meta">{{ item.matchup }}</div>
+                  <div class="sport-compact-card__summary">{{ item.detail }}</div>
+                  <div class="sport-compact-card__chip-row">
+                    {% if item.line %}
+                      <span class="sport-compact-card__chip">Line {{ item.line }}</span>
+                    {% endif %}
+                    <span class="sport-compact-card__chip">{{ item.heading }}</span>
+                  </div>
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No pregame prop rows were available for this slate.</p>
+          {% endif %}
+        </section>
+
+        <section class="sport-scroll-row sport-scroll-row--props" aria-label="{{ sport.name }} live props rail">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <h4 class="sport-scroll-row__headline">Live props</h4>
+            </div>
+            <div class="sport-scroll-row__links" aria-label="{{ sport.name }} live prop links">
+              <a class="cards-nav-pill" href="{{ sport.mlb_home.live_props_href }}">Open live props</a>
+              {% if sport.mlb_home.betting_href %}
+                <a class="cards-nav-pill" href="{{ sport.mlb_home.betting_href }}">Open betting card</a>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if sport.mlb_home.live_props_items %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} live props">
+              {% for item in sport.mlb_home.live_props_items %}
+                <article class="sport-compact-card">
+                  <div class="sport-compact-card__top">
+                    <div class="sport-compact-card__title">{{ item.name }}</div>
+                    <div class="sport-compact-card__value">{{ item.value }}</div>
+                  </div>
+                  <div class="sport-compact-card__meta">{{ item.matchup }}</div>
+                  <div class="sport-compact-card__summary">{{ item.detail }}</div>
+                  <div class="sport-compact-card__chip-row">
+                    {% if item.actual %}
+                      <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
+                    {% endif %}
+                    {% if item.projected %}
+                      <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
+                    {% endif %}
+                    {% if item.line %}
+                      <span class="sport-compact-card__chip">Line {{ item.line }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="sport-compact-card__signal-box sport-compact-card__signal-box--props">
+                    <span>{{ item.heading }}</span>
+                    <span>{{ item.matchup }}</span>
+                  </div>
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No live prop rows were available for this slate.</p>
+          {% endif %}
+        </section>
+      </div>
+    </article>
+    {% else %}
+    <article class="sport-stack-card">
+      <div class="sport-stack-card__header">
+        <div class="sport-stack-card__identity">
+          <div class="section-label">/{{ sport.slug }}</div>
+          <h3>{{ sport.name }}</h3>
+          <div class="sport-stack-card__statusline">
+            <span class="status-pill">{{ sport.status }}</span>
+            <span class="sport-board-chip">{{ sport.slate_label }}</span>
+            <span class="sport-board-chip">{{ sport.context_label }}</span>
+            {% if sport.phase %}
+              <span class="sport-board-chip">{{ sport.phase }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="sport-stack-card__stats" aria-label="{{ sport.name }} overview stats">
+          {% for stat in sport.overview_stats %}
+            <div class="sport-stack-stat">
+              <div class="sport-stack-stat__label">{{ stat.label }}</div>
+              <div class="sport-stack-stat__value">{{ stat.value }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="sport-rails">
+        {% if sport.slug == 'mlb' %}
+          <section class="sport-scroll-row sport-scroll-row--games sport-scroll-row--mlb-embed" aria-label="{{ sport.name }} compact board embed">
+            <div class="sport-scroll-row__header">
+              <div class="sport-scroll-row__title">
+                <div class="section-label">Exact compact rail</div>
+                <h4 class="sport-scroll-row__headline">Standalone MLB compact cards inside home</h4>
+                <div class="sport-scroll-row__tag">Source-preview parity</div>
+              </div>
+              <div class="sport-scroll-row__meta">
+                <span class="sport-board-chip">{{ sport.context_label }}</span>
+                <span class="sport-board-chip">Pregame + live ladders</span>
+              </div>
+            </div>
+
+            <p class="sport-scroll-row__kicker">Main Syndicate MLB pane now mounts the same compact rail client instead of a flattened home-card summary.</p>
+            <p class="sport-scroll-row__summary">This embed keeps the MLB scoreboard strip, HR target shelf, compact cards, and pitcher ladder details aligned with the standalone-style source client.</p>
+
+            <div class="sport-scroll-row__links" aria-label="{{ sport.name }} embedded board links">
+              <a class="cards-nav-pill" href="/mlb/cards?date={{ sport.context_label }}&client=source">Open full compact board</a>
+              <a class="cards-nav-pill" href="/mlb/live-lens?date={{ sport.context_label }}">Open live lens</a>
+              {% if sport.betting_href %}
+                <a class="cards-nav-pill" href="{{ sport.betting_href }}">Open betting card</a>
+              {% endif %}
+              <a class="cards-nav-pill" href="{{ sport.hub_href }}">Open MLB hub</a>
+            </div>
+
+            <div class="sport-embed-shell" data-home-preserve-key="mlb-home-embed" data-home-preserve-src="/mlb/cards?date={{ sport.context_label }}&client=source&embed=home">
+              <iframe
+                class="sport-embed-frame sport-embed-frame--mlb"
+                src="/mlb/cards?date={{ sport.context_label }}&client=source&embed=home"
+                title="MLB compact cards"
+                loading="lazy"
+                referrerpolicy="same-origin"
+              ></iframe>
+            </div>
+          </section>
+        {% else %}
+        <section class="sport-scroll-row sport-scroll-row--games" aria-label="{{ sport.name }} game board row">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <div class="section-label">{{ sport.game_bar.eyebrow }}</div>
+              <h4 class="sport-scroll-row__headline">{{ sport.game_bar.title }}</h4>
+              <div class="sport-scroll-row__tag">{{ sport.game_bar.status_label }}</div>
+            </div>
+            <div class="sport-scroll-row__meta">
+              <span class="sport-board-chip">{{ sport.context_label }}</span>
+              {% if sport.active_today %}
+                <span class="sport-board-chip">Active games</span>
+              {% else %}
+                <span class="sport-board-chip">Scheduled slate</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <p class="sport-scroll-row__kicker">{{ sport.game_bar.kicker }}</p>
+          <p class="sport-scroll-row__summary">{{ sport.game_bar.summary }}</p>
+
+          <div class="sport-scroll-row__links" aria-label="{{ sport.name }} game row links">
+            {% if sport.game_bar.primary_href %}
+              <a class="cards-nav-pill" href="{{ sport.game_bar.primary_href }}">{{ sport.game_bar.primary_label }}</a>
+            {% endif %}
+            {% if sport.game_bar.secondary_href and sport.game_bar.secondary_label %}
+              <a class="cards-nav-pill" href="{{ sport.game_bar.secondary_href }}">{{ sport.game_bar.secondary_label }}</a>
+            {% endif %}
+            <a class="cards-nav-pill" href="{{ sport.hub_href }}">Open {{ sport.name }} hub</a>
+          </div>
+
+          {% if sport.game_bar["items"] %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} compact game cards">
+              {% for item in sport.game_bar["items"] %}
+                <article class="sport-compact-card">
+                  <div class="sport-compact-card__scoreboard">
+                    <div class="sport-compact-card__statusline">
+                      <span class="sport-compact-card__badge">{{ item.status_badge }}</span>
+                      <span class="sport-compact-card__clock">{{ item.detail }}</span>
+                    </div>
+                    <div class="sport-compact-card__teams">
+                      <div class="sport-compact-card__team-row">
+                        <div class="sport-compact-card__team-name">
+                          {% if item.away_logo %}
+                            <img class="sport-compact-card__team-logo" src="{{ item.away_logo }}" alt="{{ item.away_label }} logo" loading="lazy">
+                          {% endif %}
+                          <span>{{ item.away_label }}</span>
+                        </div>
+                        <div class="sport-compact-card__team-score{% if not item.has_scores %} sport-compact-card__team-score--empty{% endif %}">{{ item.away_score or '-' }}</div>
+                      </div>
+                      <div class="sport-compact-card__team-row">
+                        <div class="sport-compact-card__team-name">
+                          {% if item.home_logo %}
+                            <img class="sport-compact-card__team-logo" src="{{ item.home_logo }}" alt="{{ item.home_label }} logo" loading="lazy">
+                          {% endif %}
+                          <span>{{ item.home_label }}</span>
+                        </div>
+                        <div class="sport-compact-card__team-score{% if not item.has_scores %} sport-compact-card__team-score--empty{% endif %}">{{ item.home_score or '-' }}</div>
+                      </div>
+                      {% if item.score_kind %}
+                        <div class="sport-compact-card__score-kind">{{ item.score_kind }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div class="sport-compact-card__top">
+                    <div class="sport-compact-card__title">{{ item.matchup }}</div>
+                    <div class="sport-compact-card__meta">Game card</div>
+                  </div>
+                  <div class="sport-compact-card__ribbon">
+                    <div class="sport-compact-card__ribbon-label">Board read</div>
+                    <div class="sport-compact-card__summary">{{ item.summary }}</div>
+                  </div>
+                  {% if item.market_chips %}
+                    <div class="sport-compact-card__chip-row">
+                      {% for chip in item.market_chips %}
+                        <span class="sport-compact-card__chip">{{ chip }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if item.signals %}
+                    <div class="sport-compact-card__signal-box">
+                      {% for signal in item.signals %}
+                        <span>{{ signal }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">{{ item.href_label }}</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if sport.game_bar.opportunity_tags %}
+            <div class="sport-board-rail" aria-label="{{ sport.name }} game opportunities">
+              {% for tag in sport.game_bar.opportunity_tags %}
+                <span class="sport-board-rail__chip">{{ tag }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </section>
+        {% endif %}
+
+        <section class="sport-scroll-row sport-scroll-row--props" aria-label="{{ sport.name }} props board row">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <div class="section-label">{{ sport.props_bar.eyebrow }}</div>
+              <h4 class="sport-scroll-row__headline">{{ sport.props_bar.title }}</h4>
+              <div class="sport-scroll-row__tag">{{ sport.props_bar.status_label }}</div>
+            </div>
+            <div class="sport-scroll-row__meta">
+              <span class="sport-board-chip">{{ sport.phase }}</span>
+              {% if sport.active_today %}
+                <span class="sport-board-chip">Active props lane</span>
+              {% else %}
+                <span class="sport-board-chip">Pregame props lane</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <p class="sport-scroll-row__kicker">{{ sport.props_bar.kicker }}</p>
+          <p class="sport-scroll-row__summary">{{ sport.props_bar.summary }}</p>
+
+          <div class="sport-scroll-row__links" aria-label="{{ sport.name }} props row links">
+            {% if sport.props_bar.primary_href %}
+              <a class="cards-nav-pill" href="{{ sport.props_bar.primary_href }}">{{ sport.props_bar.primary_label }}</a>
+            {% endif %}
+            {% if sport.props_bar.secondary_href and sport.props_bar.secondary_label %}
+              <a class="cards-nav-pill" href="{{ sport.props_bar.secondary_href }}">{{ sport.props_bar.secondary_label }}</a>
+            {% endif %}
+            {% for link in sport.props_bar.extra_links or [] %}
+              <a class="cards-nav-pill" href="{{ link.href }}">{{ link.label }}</a>
+            {% endfor %}
+            {% if sport.betting_href %}
+              <a class="cards-nav-pill" href="{{ sport.betting_href }}">Open Betting Card</a>
+            {% endif %}
+          </div>
+
+          {% if sport.slug == 'mlb' %}
+            <div class="sport-embed-shell" data-home-preserve-key="mlb-pitcher-props-embed" data-home-preserve-src="/mlb/pitcher-top-props?date={{ sport.context_label }}&embed=mlb-pitcher-props-embed">
+              <iframe
+                class="sport-embed-frame sport-embed-frame--mlb sport-embed-frame--mlb-props"
+                src="/mlb/pitcher-top-props?date={{ sport.context_label }}&embed=mlb-pitcher-props-embed"
+                title="MLB pitcher top props"
+                loading="lazy"
+                referrerpolicy="same-origin"
+              ></iframe>
+            </div>
+            <div class="sport-embed-shell" data-home-preserve-key="mlb-hitter-props-embed" data-home-preserve-src="/mlb/hitter-top-props?date={{ sport.context_label }}&embed=mlb-hitter-props-embed">
+              <iframe
+                class="sport-embed-frame sport-embed-frame--mlb sport-embed-frame--mlb-props"
+                src="/mlb/hitter-top-props?date={{ sport.context_label }}&embed=mlb-hitter-props-embed"
+                title="MLB hitter top props"
+                loading="lazy"
+                referrerpolicy="same-origin"
+              ></iframe>
+            </div>
+          {% else %}
+          {% if sport.props_bar["items"] %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} compact props">
+              {% for item in sport.props_bar["items"] %}
+                <article class="sport-compact-card">
+                  <div class="sport-compact-card__top">
+                    <div class="sport-compact-card__title">{{ item.name }}</div>
+                    <div class="sport-compact-card__value">{{ item.value }}</div>
+                  </div>
+                  <div class="sport-compact-card__meta">{{ item.matchup }}</div>
+                  <div class="sport-compact-card__summary">{{ item.detail }}</div>
+                  {% if item.actual or item.projected or item.line %}
+                    <div class="sport-compact-card__chip-row">
+                      {% if item.actual %}
+                        <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
+                      {% endif %}
+                      {% if item.projected %}
+                        <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
+                      {% endif %}
+                      {% if item.line %}
+                        <span class="sport-compact-card__chip">Line {{ item.line }}</span>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                  <div class="sport-compact-card__signal-box sport-compact-card__signal-box--props">
+                    <span>{{ item.heading }}</span>
+                    <span>{{ item.matchup }}</span>
+                  </div>
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% endif %}
+
+          {% if sport.props_bar.opportunity_tags %}
+            <div class="sport-board-rail" aria-label="{{ sport.name }} props opportunities">
+              {% for tag in sport.props_bar.opportunity_tags %}
+                <span class="sport-board-rail__chip">{{ tag }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </section>
+      </div>
+
+      {% if sport.feature_links %}
+        <div class="sport-stack-card__feature-nav" aria-label="{{ sport.name }} feature links">
+          {% for link in sport.feature_links %}
+            <a class="cards-nav-pill" href="{{ link.href }}">{{ link.label }}</a>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="sport-stack-card__footer">
+        {{ sport.phase }}
+        {% if sport.active_today %}
+          | Live day on the shared slate
+        {% else %}
+          | Stored slate fallback
+        {% endif %}
+      </div>
+    </article>
+    {% endif %}
+  {% endfor %}
+</section>

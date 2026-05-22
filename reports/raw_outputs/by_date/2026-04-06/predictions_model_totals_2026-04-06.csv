@@ -1,0 +1,2 @@
+game_id,date,pred_total_model,pred_total_q10,pred_total_q50,pred_total_q90,pred_total_basis
+401856600,2026-04-06,147.34388758331536,136.99823719755872,147.0322617821232,160.88582343854017,model_raw

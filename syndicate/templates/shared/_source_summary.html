@@ -1,0 +1,20 @@
+<section class="cards-control-card" aria-label="Data source summary">
+  <div class="cards-title-row">
+    <div>
+      <div class="section-label">Current data source</div>
+      <h2>{{ source_title }}</h2>
+    </div>
+    <span class="status-pill">{{ source_date }}</span>
+  </div>
+  <p class="lead">{{ source_path }}</p>
+  {% if stats %}
+    <div class="feature-metric-list">
+      {% for stat in stats %}
+        <div class="feature-metric-item">
+          <div class="feature-metric-label">{{ stat.label }}</div>
+          <div class="feature-metric-value">{{ stat.value }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>

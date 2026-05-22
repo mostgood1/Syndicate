@@ -1,0 +1,265 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | {{ intro_title }}{% endblock %}
+{% block page_title %}{{ intro_title }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/rank_board.css') }}" />
+  <style>
+    .ladder-page {
+      display: grid;
+      gap: 20px;
+    }
+
+    .ladder-shell {
+      display: grid;
+      gap: 20px;
+    }
+
+    .ladder-header,
+    .ladder-controls,
+    .ladder-summary,
+    .ladder-grid,
+    .ladder-note {
+      border: 1px solid rgba(128, 148, 168, 0.18);
+      border-radius: 24px;
+      background: rgba(15, 23, 42, 0.82);
+      box-shadow: 0 22px 52px rgba(15, 23, 42, 0.18);
+      padding: 20px;
+    }
+
+    .ladder-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .ladder-title-row,
+    .ladder-header-actions,
+    .ladder-summary,
+    .ladder-toolbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .ladder-kicker,
+    .ladder-section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #93c5fd;
+    }
+
+    .ladder-title-row h1,
+    .ladder-grid h2 {
+      margin: 0;
+    }
+
+    .ladder-header-meta,
+    .ladder-summary-text,
+    .ladder-empty-body {
+      color: #cbd5e1;
+      margin: 0;
+    }
+
+    .ladder-source-meta {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .ladder-source-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .ladder-source-file {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(30, 41, 59, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      color: #f8fafc;
+      font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+      font-size: 12px;
+    }
+
+    .ladder-source-path {
+      display: block;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(2, 6, 23, 0.38);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      color: #94a3b8;
+      font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .ladder-form {
+      display: grid;
+      gap: 14px;
+    }
+
+    .ladder-filter-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+
+    .ladder-filter-row label {
+      display: grid;
+      gap: 6px;
+      min-width: 180px;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+
+    .ladder-filter-row input {
+      min-height: 40px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.92);
+      color: #f8fafc;
+      padding: 0 12px;
+    }
+
+    .ladder-filter-row button {
+      min-height: 40px;
+      border: 0;
+      border-radius: 999px;
+      padding: 0 18px;
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .ladder-summary-card {
+      min-width: 140px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(30, 41, 59, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .ladder-summary-card strong {
+      display: block;
+      font-size: 24px;
+      margin-top: 6px;
+      color: #f8fafc;
+    }
+
+    .ladder-grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .ladder-empty {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .ladder-header {
+        grid-template-columns: minmax(0, 1fr);
+        display: grid;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="ladder-page">
+    <section class="ladder-shell">
+      <header class="ladder-header">
+        <div class="ladder-title-block">
+          <div class="ladder-kicker">Daily player prop distribution board</div>
+          <div class="ladder-title-row">
+            <h1>Player Prop Ladders</h1>
+            <span class="cards-nav-pill is-active">{{ date }}</span>
+            <span class="cards-nav-pill">WNBA</span>
+          </div>
+          <p class="ladder-header-meta">{{ intro_body }}</p>
+        </div>
+        <div class="ladder-header-actions">
+          <a class="cards-nav-pill" href="/wnba/cards?date={{ date }}">Daily cards</a>
+          <a class="cards-nav-pill" href="/wnba/season/{{ date[:4] }}/betting-card?date={{ date }}">Betting card</a>
+          <a class="cards-nav-pill is-active" href="/wnba/props?date={{ date }}">Prop ladders</a>
+        </div>
+      </header>
+
+      <section class="ladder-controls" aria-label="Player prop ladder controls">
+        <form class="ladder-form" id="propLadderForm" method="get" action="/wnba/props">
+          <div class="ladder-toolbar">
+            <a class="cards-nav-pill" id="propLadderPrevDateLink" href="{{ prev_href }}" rel="prev">Prev</a>
+            <a class="cards-nav-pill" id="propLadderNextDateLink" href="{{ next_href }}" rel="next">Next</a>
+            <a class="cards-nav-pill" href="{{ reset_href or route_path }}">Reset</a>
+          </div>
+          <div class="ladder-filter-row">
+            <label>
+              <span class="ladder-section-label">Date</span>
+              <input id="propLadderDateInput" type="date" name="date" value="{{ control_value or date }}" aria-label="Player prop ladder date" />
+            </label>
+            <button type="submit">Load</button>
+          </div>
+        </form>
+        <div class="ladder-source-meta">
+          <div class="ladder-source-row">
+            <span class="ladder-section-label">Source artifact</span>
+            <span>{{ source_title }}</span>
+            <span class="ladder-source-file">{{ source_path.rsplit('\\', 1)[-1].rsplit('/', 1)[-1] }}</span>
+          </div>
+          <span class="ladder-source-path">{{ source_path }}</span>
+        </div>
+      </section>
+
+      {% if warning_panel %}
+        <section class="ladder-note">
+          <div class="ladder-section-label">{{ warning_panel.eyebrow }}</div>
+          <h2>{{ warning_panel.title }}</h2>
+          <p class="ladder-summary-text">{{ warning_panel.body }}</p>
+        </section>
+      {% endif %}
+
+      <section class="ladder-summary" id="propLadderSummary" aria-live="polite">
+        {% for stat in header_stats or [] %}
+          <article class="ladder-summary-card">
+            <div class="ladder-section-label">{{ stat.label }}</div>
+            <strong>{{ stat.value }}</strong>
+          </article>
+        {% endfor %}
+      </section>
+
+      <main class="ladder-grid" id="propLadderGrid" aria-live="polite">
+        {% if rank_cards %}
+          {% for card in rank_cards %}
+            {% include 'shared/_rank_card.html' %}
+          {% endfor %}
+        {% elif empty_state %}
+          <section class="ladder-empty">
+            <div class="ladder-section-label">{{ empty_state.eyebrow }}</div>
+            <h2>{{ empty_state.title }}</h2>
+            <p class="ladder-empty-body">{{ empty_state.body }}</p>
+            <ul class="detail-list">
+              {% for item in empty_state.list_items or [] %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endif %}
+      </main>
+    </section>
+  </div>
+{% endblock %}

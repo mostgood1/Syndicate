@@ -1,0 +1,69 @@
+Migration gate: FAIL
+
+Audit: PASS
+  Allowed findings: 5
+  Actual findings: 5
+
+Runtime dependency: PASS
+  Allowed findings: 0
+  Actual findings: 0
+  Lowest ownership modules:
+    - ncaaf: score=88; tier=artifact_backed
+    - nfl: score=88; tier=artifact_backed
+    - nba: score=90; tier=artifact_backed
+
+audit: PASS
+  Command: C:\Users\mostg\OneDrive\Coding\MLB-BettingV2\.venv\Scripts\python.exe scripts/audit_migration.py --format json
+  Output: [
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/mlb.py",
+    "line": 272,
+    "summary": "Source shell route points at mlb/cards_source.js.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nba.py",
+    "line": 136,
+    "summary": "Source shell route points at nba/cards_source.html.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nhl.py",
+    ...
+
+module_tracker: PASS
+  Command: C:\Users\mostg\OneDrive\Coding\MLB-BettingV2\.venv\Scripts\python.exe scripts/module_tracker_snapshot.py --json
+  Output: {
+  "generated_at": "2026-05-22T17:23:35.098685+00:00",
+  "reference_module": "mlb",
+  "reference_surfaces": [
+    "cards",
+    "game",
+    "live-lens",
+    "daily archive",
+    "season betting-card",
+    "hub"
+  ],
+  "modules": [
+    {
+      "slug": "mlb",
+      "name": "MLB",
+      "status": "Phase-1 complete",
+      "phase": "Reference module",
+      "summary": "Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked ML...
+
+tests: FAIL
+  Command: C:\Users\mostg\OneDrive\Coding\MLB-BettingV2\.venv\Scripts\python.exe -m unittest tests.test_archives
+  Output: F................................................................................................................F..........F.F..F......F.......................................................F...............................................
+======================================================================
+FAIL: test_archive_launch_links_and_tracker_copy (tests.test_archives.ArchiveRouteTests.test_archive_launch_links_and_tracker_copy)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicat...
+
+browser_smoke: FAIL
+  Command: C:\Users\mostg\OneDrive\Coding\MLB-BettingV2\.venv\Scripts\python.exe scripts/browser_parity_smoke.py
+  Output: Playwright is not installed. Run `python -m pip install -r requirements-dev.txt` and `python -m playwright install chromium` first.

@@ -1,0 +1,14 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | {{ sport.name }}{% endblock %}
+{% block page_title %}{{ sport.name }} Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/' ~ sport.slug, title=sport.name ~ ' in Syndicate', status=sport.status, body=sport.summary, action_href=sport.primary_href, action_label=sport.primary_label %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with eyebrow='Module status', title=sport.phase, body=sport.next_step, list_items=sport.surfaces %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+{% endblock %}

@@ -1,0 +1,20 @@
+﻿{
+    "sport":  "ncaaf",
+    "date":  "2026-05-22",
+    "refreshedAtUtc":  "2026-05-22T17:23:03.4138421Z",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAFCompare",
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NCAAF",
+    "sourceDataRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\NCAAFCompare\\data",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source\\data",
+    "copiedArtifactCount":  3,
+    "artifactGroups":  {
+                           "recommendations":  2,
+                           "summaries":  1,
+                           "other":  0
+                       },
+    "copiedArtifacts":  [
+                            "recommendations_latest.json",
+                            "recommendations_2025.csv",
+                            "recommendations_summary"
+                        ]
+}

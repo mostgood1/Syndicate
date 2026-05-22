@@ -1,0 +1,33 @@
+{
+  "count": 1,
+  "date": "2026-04-06",
+  "games": {
+    "401856600": {
+      "away_score": 63.0,
+      "away_score_1h": 25.0,
+      "away_team": "UConn Huskies",
+      "away_team_short": "UConn",
+      "clock_seconds": 0,
+      "display_clock": "0:00",
+      "espn_event_id": "401856600",
+      "event_id": "401856600",
+      "game_id": "401856600",
+      "home_score": 69.0,
+      "home_score_1h": 27.0,
+      "home_team": "Michigan Wolverines",
+      "home_team_short": "Michigan",
+      "is_final": true,
+      "is_live": false,
+      "period": 2,
+      "remaining_1h_seconds": 1363,
+      "remaining_reg_seconds": null,
+      "state": "post",
+      "total_points": 132.0,
+      "total_points_1h": 52.0
+    }
+  },
+  "refresh": false,
+  "source": "local_raw_outputs",
+  "status": "ok",
+  "ttl": 0
+}

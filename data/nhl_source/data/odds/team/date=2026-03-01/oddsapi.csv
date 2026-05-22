@@ -1,0 +1,859 @@
+event_id,commence_time,home,away,bookmaker_key,bookmaker,book_last_update,market,outcome_name,outcome_price,outcome_point,date
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betrivers,BetRivers,,h2h,New York Rangers,108,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betrivers,BetRivers,,h2h,Pittsburgh Penguins,-132,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betrivers,BetRivers,,spreads,New York Rangers,-245,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betrivers,BetRivers,,spreads,Pittsburgh Penguins,188,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betrivers,BetRivers,,totals,Over,-103,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betrivers,BetRivers,,totals,Under,-125,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,draftkings,DraftKings,,h2h,New York Rangers,114,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,draftkings,DraftKings,,h2h,Pittsburgh Penguins,-135,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,draftkings,DraftKings,,spreads,New York Rangers,-238,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,draftkings,DraftKings,,spreads,Pittsburgh Penguins,195,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,draftkings,DraftKings,,totals,Over,-130,5.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,draftkings,DraftKings,,totals,Under,110,5.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanduel,FanDuel,,h2h,New York Rangers,108,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanduel,FanDuel,,h2h,Pittsburgh Penguins,-130,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanduel,FanDuel,,spreads,New York Rangers,-240,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanduel,FanDuel,,spreads,Pittsburgh Penguins,190,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanduel,FanDuel,,totals,Over,-130,5.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanduel,FanDuel,,totals,Under,106,5.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,williamhill_us,Caesars,,h2h,New York Rangers,115,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,williamhill_us,Caesars,,h2h,Pittsburgh Penguins,-135,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,williamhill_us,Caesars,,spreads,New York Rangers,-240,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,williamhill_us,Caesars,,spreads,Pittsburgh Penguins,196,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,williamhill_us,Caesars,,totals,Over,-110,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,williamhill_us,Caesars,,totals,Under,-110,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,mybookieag,MyBookie.ag,,h2h,New York Rangers,110,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,mybookieag,MyBookie.ag,,h2h,Pittsburgh Penguins,-134,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,mybookieag,MyBookie.ag,,spreads,New York Rangers,-248,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,mybookieag,MyBookie.ag,,spreads,Pittsburgh Penguins,196,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,mybookieag,MyBookie.ag,,totals,Over,-106,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,mybookieag,MyBookie.ag,,totals,Under,-115,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betmgm,BetMGM,,h2h,New York Rangers,110,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betmgm,BetMGM,,h2h,Pittsburgh Penguins,-135,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betmgm,BetMGM,,spreads,New York Rangers,-220,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betmgm,BetMGM,,spreads,Pittsburgh Penguins,180,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betmgm,BetMGM,,totals,Over,-110,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betmgm,BetMGM,,totals,Under,-110,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanatics,Fanatics,,h2h,New York Rangers,110,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanatics,Fanatics,,h2h,Pittsburgh Penguins,-130,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanatics,Fanatics,,spreads,New York Rangers,-240,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanatics,Fanatics,,spreads,Pittsburgh Penguins,190,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanatics,Fanatics,,totals,Over,-130,5.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,fanatics,Fanatics,,totals,Under,110,5.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,lowvig,LowVig.ag,,h2h,New York Rangers,117,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,lowvig,LowVig.ag,,h2h,Pittsburgh Penguins,-133,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,lowvig,LowVig.ag,,spreads,New York Rangers,-240,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,lowvig,LowVig.ag,,spreads,Pittsburgh Penguins,200,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,lowvig,LowVig.ag,,totals,Over,-108,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,lowvig,LowVig.ag,,totals,Under,-108,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betonlineag,BetOnline.ag,,h2h,New York Rangers,117,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betonlineag,BetOnline.ag,,h2h,Pittsburgh Penguins,-133,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betonlineag,BetOnline.ag,,spreads,New York Rangers,-240,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betonlineag,BetOnline.ag,,spreads,Pittsburgh Penguins,200,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betonlineag,BetOnline.ag,,totals,Over,-108,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betonlineag,BetOnline.ag,,totals,Under,-108,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,bovada,Bovada,,h2h,New York Rangers,117,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,bovada,Bovada,,h2h,Pittsburgh Penguins,-138,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,bovada,Bovada,,spreads,New York Rangers,-235,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,bovada,Bovada,,spreads,Pittsburgh Penguins,195,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,bovada,Bovada,,totals,Over,-105,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,bovada,Bovada,,totals,Under,-115,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betus,BetUS,,h2h,New York Rangers,115,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betus,BetUS,,h2h,Pittsburgh Penguins,-135,,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betus,BetUS,,spreads,New York Rangers,-240,1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betus,BetUS,,spreads,Pittsburgh Penguins,204,-1.5,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betus,BetUS,,totals,Over,-110,6.0,2026-03-01
+99a4d93070ba8f8325d58b71219e7703,2026-02-28T17:30:00Z,New York Rangers,Pittsburgh Penguins,betus,BetUS,,totals,Under,-110,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betrivers,BetRivers,,h2h,Boston Bruins,102,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betrivers,BetRivers,,h2h,Philadelphia Flyers,-124,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betrivers,BetRivers,,spreads,Boston Bruins,-265,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betrivers,BetRivers,,spreads,Philadelphia Flyers,195,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betrivers,BetRivers,,totals,Over,-117,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betrivers,BetRivers,,totals,Under,-109,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanduel,FanDuel,,h2h,Boston Bruins,100,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanduel,FanDuel,,h2h,Philadelphia Flyers,-120,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanduel,FanDuel,,spreads,Boston Bruins,-265,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanduel,FanDuel,,spreads,Philadelphia Flyers,210,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanduel,FanDuel,,totals,Over,-142,5.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanduel,FanDuel,,totals,Under,116,5.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,draftkings,DraftKings,,h2h,Boston Bruins,100,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,draftkings,DraftKings,,h2h,Philadelphia Flyers,-120,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,draftkings,DraftKings,,spreads,Boston Bruins,-265,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,draftkings,DraftKings,,spreads,Philadelphia Flyers,215,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,draftkings,DraftKings,,totals,Over,110,6.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,draftkings,DraftKings,,totals,Under,-130,6.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,williamhill_us,Caesars,,h2h,Boston Bruins,100,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,williamhill_us,Caesars,,h2h,Philadelphia Flyers,-120,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,williamhill_us,Caesars,,spreads,Boston Bruins,-260,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,williamhill_us,Caesars,,spreads,Philadelphia Flyers,210,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,williamhill_us,Caesars,,totals,Over,-115,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,williamhill_us,Caesars,,totals,Under,-105,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betmgm,BetMGM,,h2h,Boston Bruins,-102,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betmgm,BetMGM,,h2h,Philadelphia Flyers,-118,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betmgm,BetMGM,,spreads,Boston Bruins,-250,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betmgm,BetMGM,,spreads,Philadelphia Flyers,200,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betmgm,BetMGM,,totals,Over,-118,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betmgm,BetMGM,,totals,Under,-102,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanatics,Fanatics,,h2h,Boston Bruins,100,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanatics,Fanatics,,h2h,Philadelphia Flyers,-120,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanatics,Fanatics,,spreads,Boston Bruins,-260,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanatics,Fanatics,,spreads,Philadelphia Flyers,210,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanatics,Fanatics,,totals,Over,110,6.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,fanatics,Fanatics,,totals,Under,-130,6.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,lowvig,LowVig.ag,,h2h,Boston Bruins,101,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,lowvig,LowVig.ag,,h2h,Philadelphia Flyers,-115,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,lowvig,LowVig.ag,,spreads,Boston Bruins,-260,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,lowvig,LowVig.ag,,spreads,Philadelphia Flyers,215,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,lowvig,LowVig.ag,,totals,Over,-111,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,lowvig,LowVig.ag,,totals,Under,-105,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betonlineag,BetOnline.ag,,h2h,Boston Bruins,101,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betonlineag,BetOnline.ag,,h2h,Philadelphia Flyers,-115,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betonlineag,BetOnline.ag,,spreads,Boston Bruins,-260,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betonlineag,BetOnline.ag,,spreads,Philadelphia Flyers,215,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betonlineag,BetOnline.ag,,totals,Over,-111,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betonlineag,BetOnline.ag,,totals,Under,-105,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,bovada,Bovada,,h2h,Boston Bruins,102,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,bovada,Bovada,,h2h,Philadelphia Flyers,-122,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,bovada,Bovada,,spreads,Boston Bruins,-250,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,bovada,Bovada,,spreads,Philadelphia Flyers,210,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,bovada,Bovada,,totals,Over,-112,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,bovada,Bovada,,totals,Under,-108,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betus,BetUS,,h2h,Boston Bruins,-105,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betus,BetUS,,h2h,Philadelphia Flyers,-115,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betus,BetUS,,spreads,Boston Bruins,-260,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betus,BetUS,,spreads,Philadelphia Flyers,220,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betus,BetUS,,totals,Over,-115,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,betus,BetUS,,totals,Under,-105,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,mybookieag,MyBookie.ag,,h2h,Boston Bruins,-101,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,mybookieag,MyBookie.ag,,h2h,Philadelphia Flyers,-121,,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,mybookieag,MyBookie.ag,,spreads,Boston Bruins,-265,1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,mybookieag,MyBookie.ag,,spreads,Philadelphia Flyers,208,-1.5,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,mybookieag,MyBookie.ag,,totals,Over,-113,6.0,2026-03-01
+712cec8f13944914deaf4f2ac925a83a,2026-02-28T20:00:00Z,Philadelphia Flyers,Boston Bruins,mybookieag,MyBookie.ag,,totals,Under,-108,6.0,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betrivers,BetRivers,,h2h,Edmonton Oilers,-157,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betrivers,BetRivers,,h2h,San Jose Sharks,130,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betrivers,BetRivers,,spreads,Edmonton Oilers,155,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betrivers,BetRivers,,spreads,San Jose Sharks,-200,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betrivers,BetRivers,,totals,Over,-136,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betrivers,BetRivers,,totals,Under,108,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,draftkings,DraftKings,,h2h,Edmonton Oilers,-162,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,draftkings,DraftKings,,h2h,San Jose Sharks,136,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,draftkings,DraftKings,,spreads,Edmonton Oilers,160,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,draftkings,DraftKings,,spreads,San Jose Sharks,-192,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,draftkings,DraftKings,,totals,Over,-135,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,draftkings,DraftKings,,totals,Under,114,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanduel,FanDuel,,h2h,Edmonton Oilers,-156,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanduel,FanDuel,,h2h,San Jose Sharks,130,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanduel,FanDuel,,spreads,Edmonton Oilers,152,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanduel,FanDuel,,spreads,San Jose Sharks,-188,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanduel,FanDuel,,totals,Over,-140,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanduel,FanDuel,,totals,Under,114,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,williamhill_us,Caesars,,h2h,Edmonton Oilers,-160,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,williamhill_us,Caesars,,h2h,San Jose Sharks,135,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,williamhill_us,Caesars,,spreads,Edmonton Oilers,158,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,williamhill_us,Caesars,,spreads,San Jose Sharks,-190,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,williamhill_us,Caesars,,totals,Over,-135,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,williamhill_us,Caesars,,totals,Under,115,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betmgm,BetMGM,,h2h,Edmonton Oilers,-160,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betmgm,BetMGM,,h2h,San Jose Sharks,135,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betmgm,BetMGM,,spreads,Edmonton Oilers,140,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betmgm,BetMGM,,spreads,San Jose Sharks,-170,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betmgm,BetMGM,,totals,Over,110,7.0,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betmgm,BetMGM,,totals,Under,-135,7.0,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanatics,Fanatics,,h2h,Edmonton Oilers,-160,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanatics,Fanatics,,h2h,San Jose Sharks,130,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanatics,Fanatics,,spreads,Edmonton Oilers,160,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanatics,Fanatics,,spreads,San Jose Sharks,-190,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanatics,Fanatics,,totals,Over,-140,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,fanatics,Fanatics,,totals,Under,115,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,lowvig,LowVig.ag,,h2h,Edmonton Oilers,-155,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,lowvig,LowVig.ag,,h2h,San Jose Sharks,136,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,lowvig,LowVig.ag,,spreads,Edmonton Oilers,160,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,lowvig,LowVig.ag,,spreads,San Jose Sharks,-183,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,lowvig,LowVig.ag,,totals,Over,-135,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,lowvig,LowVig.ag,,totals,Under,117,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betonlineag,BetOnline.ag,,h2h,Edmonton Oilers,-155,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betonlineag,BetOnline.ag,,h2h,San Jose Sharks,136,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betonlineag,BetOnline.ag,,spreads,Edmonton Oilers,160,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betonlineag,BetOnline.ag,,spreads,San Jose Sharks,-183,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betonlineag,BetOnline.ag,,totals,Over,-135,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betonlineag,BetOnline.ag,,totals,Under,117,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,bovada,Bovada,,h2h,Edmonton Oilers,-160,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,bovada,Bovada,,h2h,San Jose Sharks,135,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,bovada,Bovada,,spreads,Edmonton Oilers,155,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,bovada,Bovada,,spreads,San Jose Sharks,-180,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,bovada,Bovada,,totals,Over,120,7.0,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,bovada,Bovada,,totals,Under,-140,7.0,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betus,BetUS,,h2h,Edmonton Oilers,-155,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betus,BetUS,,h2h,San Jose Sharks,134,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betus,BetUS,,spreads,Edmonton Oilers,160,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betus,BetUS,,spreads,San Jose Sharks,-185,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betus,BetUS,,totals,Over,-140,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,betus,BetUS,,totals,Under,120,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,mybookieag,MyBookie.ag,,h2h,Edmonton Oilers,-156,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,mybookieag,MyBookie.ag,,h2h,San Jose Sharks,127,,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,mybookieag,MyBookie.ag,,spreads,Edmonton Oilers,150,-1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,mybookieag,MyBookie.ag,,spreads,San Jose Sharks,-186,1.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,mybookieag,MyBookie.ag,,totals,Over,-131,6.5,2026-03-01
+f118a5fdc9405f475ab382818fe1e665,2026-02-28T21:00:00Z,San Jose Sharks,Edmonton Oilers,mybookieag,MyBookie.ag,,totals,Under,107,6.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betrivers,BetRivers,,h2h,New Jersey Devils,-113,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betrivers,BetRivers,,h2h,St Louis Blues,-108,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betrivers,BetRivers,,spreads,New Jersey Devils,215,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betrivers,BetRivers,,spreads,St Louis Blues,-286,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betrivers,BetRivers,,totals,Over,-115,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betrivers,BetRivers,,totals,Under,-110,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanduel,FanDuel,,h2h,New Jersey Devils,-118,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanduel,FanDuel,,h2h,St Louis Blues,-102,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanduel,FanDuel,,spreads,New Jersey Devils,210,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanduel,FanDuel,,spreads,St Louis Blues,-265,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanduel,FanDuel,,totals,Over,-118,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanduel,FanDuel,,totals,Under,-104,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,draftkings,DraftKings,,h2h,New Jersey Devils,-112,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,draftkings,DraftKings,,h2h,St Louis Blues,-108,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,draftkings,DraftKings,,spreads,New Jersey Devils,225,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,draftkings,DraftKings,,spreads,St Louis Blues,-278,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,draftkings,DraftKings,,totals,Over,-115,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,draftkings,DraftKings,,totals,Under,-105,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,williamhill_us,Caesars,,h2h,New Jersey Devils,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,williamhill_us,Caesars,,h2h,St Louis Blues,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,williamhill_us,Caesars,,spreads,New Jersey Devils,228,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,williamhill_us,Caesars,,spreads,St Louis Blues,-285,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,williamhill_us,Caesars,,totals,Over,-115,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,williamhill_us,Caesars,,totals,Under,-105,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betmgm,BetMGM,,h2h,New Jersey Devils,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betmgm,BetMGM,,h2h,St Louis Blues,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betmgm,BetMGM,,spreads,New Jersey Devils,-285,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betmgm,BetMGM,,spreads,St Louis Blues,210,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betmgm,BetMGM,,totals,Over,-118,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betmgm,BetMGM,,totals,Under,-102,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanatics,Fanatics,,h2h,New Jersey Devils,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanatics,Fanatics,,h2h,St Louis Blues,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanatics,Fanatics,,spreads,New Jersey Devils,230,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanatics,Fanatics,,spreads,St Louis Blues,-285,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanatics,Fanatics,,totals,Over,-120,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,fanatics,Fanatics,,totals,Under,100,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,lowvig,LowVig.ag,,h2h,New Jersey Devils,-108,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,lowvig,LowVig.ag,,h2h,St Louis Blues,-106,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,lowvig,LowVig.ag,,spreads,New Jersey Devils,230,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,lowvig,LowVig.ag,,spreads,St Louis Blues,-280,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,lowvig,LowVig.ag,,totals,Over,-118,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,lowvig,LowVig.ag,,totals,Under,102,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betonlineag,BetOnline.ag,,h2h,New Jersey Devils,-108,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betonlineag,BetOnline.ag,,h2h,St Louis Blues,-106,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betonlineag,BetOnline.ag,,spreads,New Jersey Devils,230,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betonlineag,BetOnline.ag,,spreads,St Louis Blues,-280,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betonlineag,BetOnline.ag,,totals,Over,-118,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betonlineag,BetOnline.ag,,totals,Under,102,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,bovada,Bovada,,h2h,New Jersey Devils,-112,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,bovada,Bovada,,h2h,St Louis Blues,-108,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,bovada,Bovada,,spreads,New Jersey Devils,230,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,bovada,Bovada,,spreads,St Louis Blues,-280,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,bovada,Bovada,,totals,Over,-117,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,bovada,Bovada,,totals,Under,-103,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betus,BetUS,,h2h,New Jersey Devils,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betus,BetUS,,h2h,St Louis Blues,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betus,BetUS,,spreads,New Jersey Devils,236,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betus,BetUS,,spreads,St Louis Blues,-280,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betus,BetUS,,totals,Over,-120,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,betus,BetUS,,totals,Under,100,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,mybookieag,MyBookie.ag,,h2h,New Jersey Devils,-111,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,mybookieag,MyBookie.ag,,h2h,St Louis Blues,-110,,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,mybookieag,MyBookie.ag,,spreads,New Jersey Devils,220,-1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,mybookieag,MyBookie.ag,,spreads,St Louis Blues,-280,1.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,mybookieag,MyBookie.ag,,totals,Over,-119,5.5,2026-03-01
+312fc18c9cd2ae15a2f3c97ef282aacd,2026-02-28T22:00:00Z,St Louis Blues,New Jersey Devils,mybookieag,MyBookie.ag,,totals,Under,-103,5.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betrivers,BetRivers,,h2h,Chicago Blackhawks,300,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betrivers,BetRivers,,h2h,Colorado Avalanche,-400,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betrivers,BetRivers,,spreads,Chicago Blackhawks,117,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betrivers,BetRivers,,spreads,Colorado Avalanche,-148,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betrivers,BetRivers,,totals,Over,-108,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betrivers,BetRivers,,totals,Under,-117,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanduel,FanDuel,,h2h,Chicago Blackhawks,260,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanduel,FanDuel,,h2h,Colorado Avalanche,-330,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanduel,FanDuel,,spreads,Chicago Blackhawks,104,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanduel,FanDuel,,spreads,Colorado Avalanche,-130,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanduel,FanDuel,,totals,Over,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanduel,FanDuel,,totals,Under,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,draftkings,DraftKings,,h2h,Chicago Blackhawks,275,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,draftkings,DraftKings,,h2h,Colorado Avalanche,-345,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,draftkings,DraftKings,,spreads,Chicago Blackhawks,105,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,draftkings,DraftKings,,spreads,Colorado Avalanche,-125,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,draftkings,DraftKings,,totals,Over,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,draftkings,DraftKings,,totals,Under,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,williamhill_us,Caesars,,h2h,Chicago Blackhawks,275,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,williamhill_us,Caesars,,h2h,Colorado Avalanche,-350,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,williamhill_us,Caesars,,spreads,Chicago Blackhawks,105,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,williamhill_us,Caesars,,spreads,Colorado Avalanche,-125,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,williamhill_us,Caesars,,totals,Over,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,williamhill_us,Caesars,,totals,Under,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betmgm,BetMGM,,h2h,Chicago Blackhawks,280,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betmgm,BetMGM,,h2h,Colorado Avalanche,-350,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betmgm,BetMGM,,spreads,Chicago Blackhawks,115,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betmgm,BetMGM,,spreads,Colorado Avalanche,-140,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betmgm,BetMGM,,totals,Over,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betmgm,BetMGM,,totals,Under,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanatics,Fanatics,,h2h,Chicago Blackhawks,260,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanatics,Fanatics,,h2h,Colorado Avalanche,-350,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanatics,Fanatics,,spreads,Chicago Blackhawks,105,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanatics,Fanatics,,spreads,Colorado Avalanche,-125,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanatics,Fanatics,,totals,Over,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,fanatics,Fanatics,,totals,Under,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,lowvig,LowVig.ag,,h2h,Chicago Blackhawks,278,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,lowvig,LowVig.ag,,h2h,Colorado Avalanche,-328,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,lowvig,LowVig.ag,,spreads,Chicago Blackhawks,108,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,lowvig,LowVig.ag,,spreads,Colorado Avalanche,-128,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,lowvig,LowVig.ag,,totals,Over,-108,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,lowvig,LowVig.ag,,totals,Under,-108,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betonlineag,BetOnline.ag,,h2h,Chicago Blackhawks,278,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betonlineag,BetOnline.ag,,h2h,Colorado Avalanche,-328,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betonlineag,BetOnline.ag,,spreads,Chicago Blackhawks,108,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betonlineag,BetOnline.ag,,spreads,Colorado Avalanche,-128,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betonlineag,BetOnline.ag,,totals,Over,-108,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betonlineag,BetOnline.ag,,totals,Under,-108,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,bovada,Bovada,,h2h,Chicago Blackhawks,275,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,bovada,Bovada,,h2h,Colorado Avalanche,-350,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,bovada,Bovada,,spreads,Chicago Blackhawks,107,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,bovada,Bovada,,spreads,Colorado Avalanche,-128,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,bovada,Bovada,,totals,Over,-112,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,bovada,Bovada,,totals,Under,-108,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betus,BetUS,,h2h,Chicago Blackhawks,275,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betus,BetUS,,h2h,Colorado Avalanche,-340,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betus,BetUS,,spreads,Chicago Blackhawks,110,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betus,BetUS,,spreads,Colorado Avalanche,-130,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betus,BetUS,,totals,Over,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,betus,BetUS,,totals,Under,-110,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,mybookieag,MyBookie.ag,,h2h,Chicago Blackhawks,270,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,mybookieag,MyBookie.ag,,h2h,Colorado Avalanche,-350,,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,mybookieag,MyBookie.ag,,spreads,Chicago Blackhawks,117,1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,mybookieag,MyBookie.ag,,spreads,Colorado Avalanche,-143,-1.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,mybookieag,MyBookie.ag,,totals,Over,-108,6.5,2026-03-01
+12a9916f4aec31d4f6800e146a666bc2,2026-02-28T23:00:00Z,Colorado Avalanche,Chicago Blackhawks,mybookieag,MyBookie.ag,,totals,Under,-113,6.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betrivers,BetRivers,,h2h,Columbus Blue Jackets,-136,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betrivers,BetRivers,,h2h,New York Islanders,112,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betrivers,BetRivers,,spreads,Columbus Blue Jackets,180,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betrivers,BetRivers,,spreads,New York Islanders,-240,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betrivers,BetRivers,,totals,Over,-113,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betrivers,BetRivers,,totals,Under,-113,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanduel,FanDuel,,h2h,Columbus Blue Jackets,-152,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanduel,FanDuel,,h2h,New York Islanders,126,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanduel,FanDuel,,spreads,Columbus Blue Jackets,164,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanduel,FanDuel,,spreads,New York Islanders,-205,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanduel,FanDuel,,totals,Over,104,6.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanduel,FanDuel,,totals,Under,-128,6.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,draftkings,DraftKings,,h2h,Columbus Blue Jackets,-142,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,draftkings,DraftKings,,h2h,New York Islanders,120,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,draftkings,DraftKings,,spreads,Columbus Blue Jackets,185,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,draftkings,DraftKings,,spreads,New York Islanders,-225,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,draftkings,DraftKings,,totals,Over,110,6.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,draftkings,DraftKings,,totals,Under,-130,6.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,williamhill_us,Caesars,,h2h,Columbus Blue Jackets,-140,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,williamhill_us,Caesars,,h2h,New York Islanders,118,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,williamhill_us,Caesars,,spreads,Columbus Blue Jackets,185,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,williamhill_us,Caesars,,spreads,New York Islanders,-225,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,williamhill_us,Caesars,,totals,Over,-115,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,williamhill_us,Caesars,,totals,Under,-105,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betmgm,BetMGM,,h2h,Columbus Blue Jackets,-140,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betmgm,BetMGM,,h2h,New York Islanders,115,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betmgm,BetMGM,,spreads,Columbus Blue Jackets,170,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betmgm,BetMGM,,spreads,New York Islanders,-210,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betmgm,BetMGM,,totals,Over,-115,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betmgm,BetMGM,,totals,Under,-105,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanatics,Fanatics,,h2h,Columbus Blue Jackets,-145,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanatics,Fanatics,,h2h,New York Islanders,120,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanatics,Fanatics,,spreads,Columbus Blue Jackets,175,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanatics,Fanatics,,spreads,New York Islanders,-210,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanatics,Fanatics,,totals,Over,110,6.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,fanatics,Fanatics,,totals,Under,-130,6.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betonlineag,BetOnline.ag,,h2h,Columbus Blue Jackets,-135,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betonlineag,BetOnline.ag,,h2h,New York Islanders,119,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betonlineag,BetOnline.ag,,spreads,Columbus Blue Jackets,186,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betonlineag,BetOnline.ag,,spreads,New York Islanders,-220,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betonlineag,BetOnline.ag,,totals,Over,-114,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betonlineag,BetOnline.ag,,totals,Under,-102,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,lowvig,LowVig.ag,,h2h,Columbus Blue Jackets,-135,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,lowvig,LowVig.ag,,h2h,New York Islanders,119,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,lowvig,LowVig.ag,,spreads,Columbus Blue Jackets,186,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,lowvig,LowVig.ag,,spreads,New York Islanders,-220,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,lowvig,LowVig.ag,,totals,Over,-114,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,lowvig,LowVig.ag,,totals,Under,-102,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,bovada,Bovada,,h2h,Columbus Blue Jackets,-140,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,bovada,Bovada,,h2h,New York Islanders,120,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,bovada,Bovada,,spreads,Columbus Blue Jackets,180,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,bovada,Bovada,,spreads,New York Islanders,-220,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,bovada,Bovada,,totals,Over,-112,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,bovada,Bovada,,totals,Under,-108,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betus,BetUS,,h2h,Columbus Blue Jackets,-140,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betus,BetUS,,h2h,New York Islanders,120,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betus,BetUS,,spreads,Columbus Blue Jackets,188,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betus,BetUS,,spreads,New York Islanders,-220,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betus,BetUS,,totals,Over,-115,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,betus,BetUS,,totals,Under,-105,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,mybookieag,MyBookie.ag,,h2h,Columbus Blue Jackets,-144,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,mybookieag,MyBookie.ag,,h2h,New York Islanders,117,,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,mybookieag,MyBookie.ag,,spreads,Columbus Blue Jackets,172,-1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,mybookieag,MyBookie.ag,,spreads,New York Islanders,-216,1.5,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,mybookieag,MyBookie.ag,,totals,Over,-115,6.0,2026-03-01
+3a99ae54dacb4545f5a53245f45bf5c1,2026-02-28T23:00:00Z,Columbus Blue Jackets,New York Islanders,mybookieag,MyBookie.ag,,totals,Under,-106,6.0,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betrivers,BetRivers,,h2h,Buffalo Sabres,195,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betrivers,BetRivers,,h2h,Tampa Bay Lightning,-245,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betrivers,BetRivers,,spreads,Buffalo Sabres,-136,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betrivers,BetRivers,,spreads,Tampa Bay Lightning,107,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betrivers,BetRivers,,totals,Over,-105,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betrivers,BetRivers,,totals,Under,-121,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanduel,FanDuel,,h2h,Buffalo Sabres,195,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanduel,FanDuel,,h2h,Tampa Bay Lightning,-240,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanduel,FanDuel,,spreads,Buffalo Sabres,-134,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanduel,FanDuel,,spreads,Tampa Bay Lightning,110,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanduel,FanDuel,,totals,Over,104,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanduel,FanDuel,,totals,Under,-128,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,draftkings,DraftKings,,h2h,Buffalo Sabres,195,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,draftkings,DraftKings,,h2h,Tampa Bay Lightning,-238,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,draftkings,DraftKings,,spreads,Buffalo Sabres,-130,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,draftkings,DraftKings,,spreads,Tampa Bay Lightning,110,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,draftkings,DraftKings,,totals,Over,100,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,draftkings,DraftKings,,totals,Under,-120,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,williamhill_us,Caesars,,h2h,Buffalo Sabres,196,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,williamhill_us,Caesars,,h2h,Tampa Bay Lightning,-240,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,williamhill_us,Caesars,,spreads,Buffalo Sabres,-130,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,williamhill_us,Caesars,,spreads,Tampa Bay Lightning,110,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,williamhill_us,Caesars,,totals,Over,100,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,williamhill_us,Caesars,,totals,Under,-120,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betmgm,BetMGM,,h2h,Buffalo Sabres,195,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betmgm,BetMGM,,h2h,Tampa Bay Lightning,-235,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betmgm,BetMGM,,spreads,Buffalo Sabres,-120,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betmgm,BetMGM,,spreads,Tampa Bay Lightning,100,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betmgm,BetMGM,,totals,Over,-125,6.0,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betmgm,BetMGM,,totals,Under,105,6.0,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanatics,Fanatics,,h2h,Buffalo Sabres,190,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanatics,Fanatics,,h2h,Tampa Bay Lightning,-240,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanatics,Fanatics,,spreads,Buffalo Sabres,-130,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanatics,Fanatics,,spreads,Tampa Bay Lightning,110,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanatics,Fanatics,,totals,Over,105,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,fanatics,Fanatics,,totals,Under,-125,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,bovada,Bovada,,h2h,Buffalo Sabres,195,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,bovada,Bovada,,h2h,Tampa Bay Lightning,-235,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,bovada,Bovada,,spreads,Buffalo Sabres,-128,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,bovada,Bovada,,spreads,Tampa Bay Lightning,107,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,bovada,Bovada,,totals,Over,100,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,bovada,Bovada,,totals,Under,-120,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,lowvig,LowVig.ag,,h2h,Buffalo Sabres,191,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,lowvig,LowVig.ag,,h2h,Tampa Bay Lightning,-220,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,lowvig,LowVig.ag,,spreads,Buffalo Sabres,-130,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,lowvig,LowVig.ag,,spreads,Tampa Bay Lightning,110,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,lowvig,LowVig.ag,,totals,Over,103,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,lowvig,LowVig.ag,,totals,Under,-119,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betonlineag,BetOnline.ag,,h2h,Buffalo Sabres,191,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betonlineag,BetOnline.ag,,h2h,Tampa Bay Lightning,-220,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betonlineag,BetOnline.ag,,spreads,Buffalo Sabres,-130,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betonlineag,BetOnline.ag,,spreads,Tampa Bay Lightning,110,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betonlineag,BetOnline.ag,,totals,Over,103,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betonlineag,BetOnline.ag,,totals,Under,-119,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betus,BetUS,,h2h,Buffalo Sabres,195,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betus,BetUS,,h2h,Tampa Bay Lightning,-230,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betus,BetUS,,spreads,Buffalo Sabres,-130,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betus,BetUS,,spreads,Tampa Bay Lightning,110,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betus,BetUS,,totals,Over,100,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,betus,BetUS,,totals,Under,-120,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,mybookieag,MyBookie.ag,,h2h,Buffalo Sabres,189,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,mybookieag,MyBookie.ag,,h2h,Tampa Bay Lightning,-238,,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,mybookieag,MyBookie.ag,,spreads,Buffalo Sabres,-130,1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,mybookieag,MyBookie.ag,,spreads,Tampa Bay Lightning,106,-1.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,mybookieag,MyBookie.ag,,totals,Over,100,6.5,2026-03-01
+22c7faf47e77ed1d3f3c410d9d4aa6a5,2026-03-01T00:00:00Z,Tampa Bay Lightning,Buffalo Sabres,mybookieag,MyBookie.ag,,totals,Under,-122,6.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betrivers,BetRivers,,h2h,Calgary Flames,132,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betrivers,BetRivers,,h2h,Los Angeles Kings,-162,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betrivers,BetRivers,,spreads,Calgary Flames,-200,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betrivers,BetRivers,,spreads,Los Angeles Kings,155,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betrivers,BetRivers,,totals,Over,-118,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betrivers,BetRivers,,totals,Under,-108,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanduel,FanDuel,,h2h,Calgary Flames,130,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanduel,FanDuel,,h2h,Los Angeles Kings,-156,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanduel,FanDuel,,spreads,Calgary Flames,-192,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanduel,FanDuel,,spreads,Los Angeles Kings,154,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanduel,FanDuel,,totals,Over,-118,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanduel,FanDuel,,totals,Under,-102,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,draftkings,DraftKings,,h2h,Calgary Flames,140,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,draftkings,DraftKings,,h2h,Los Angeles Kings,-166,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,draftkings,DraftKings,,spreads,Calgary Flames,-198,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,draftkings,DraftKings,,spreads,Los Angeles Kings,164,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,draftkings,DraftKings,,totals,Over,-118,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,draftkings,DraftKings,,totals,Under,-102,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,williamhill_us,Caesars,,h2h,Calgary Flames,135,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,williamhill_us,Caesars,,h2h,Los Angeles Kings,-160,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,williamhill_us,Caesars,,spreads,Calgary Flames,-205,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,williamhill_us,Caesars,,spreads,Los Angeles Kings,170,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,williamhill_us,Caesars,,totals,Over,-120,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,williamhill_us,Caesars,,totals,Under,100,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betmgm,BetMGM,,h2h,Calgary Flames,135,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betmgm,BetMGM,,h2h,Los Angeles Kings,-160,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betmgm,BetMGM,,spreads,Calgary Flames,-185,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betmgm,BetMGM,,spreads,Los Angeles Kings,150,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betmgm,BetMGM,,totals,Over,-118,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betmgm,BetMGM,,totals,Under,-102,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanatics,Fanatics,,h2h,Calgary Flames,130,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanatics,Fanatics,,h2h,Los Angeles Kings,-160,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanatics,Fanatics,,spreads,Calgary Flames,-190,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanatics,Fanatics,,spreads,Los Angeles Kings,160,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanatics,Fanatics,,totals,Over,-115,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,fanatics,Fanatics,,totals,Under,-105,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,lowvig,LowVig.ag,,h2h,Calgary Flames,135,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,lowvig,LowVig.ag,,h2h,Los Angeles Kings,-153,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,lowvig,LowVig.ag,,spreads,Calgary Flames,-200,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,lowvig,LowVig.ag,,spreads,Los Angeles Kings,174,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,lowvig,LowVig.ag,,totals,Over,-112,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,lowvig,LowVig.ag,,totals,Under,-104,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betonlineag,BetOnline.ag,,h2h,Calgary Flames,135,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betonlineag,BetOnline.ag,,h2h,Los Angeles Kings,-153,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betonlineag,BetOnline.ag,,spreads,Calgary Flames,-200,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betonlineag,BetOnline.ag,,spreads,Los Angeles Kings,174,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betonlineag,BetOnline.ag,,totals,Over,-112,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betonlineag,BetOnline.ag,,totals,Under,-104,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,bovada,Bovada,,h2h,Calgary Flames,135,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,bovada,Bovada,,h2h,Los Angeles Kings,-160,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,bovada,Bovada,,spreads,Calgary Flames,-198,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,bovada,Bovada,,spreads,Los Angeles Kings,168,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,bovada,Bovada,,totals,Over,-115,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,bovada,Bovada,,totals,Under,-105,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betus,BetUS,,h2h,Calgary Flames,134,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betus,BetUS,,h2h,Los Angeles Kings,-155,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betus,BetUS,,spreads,Calgary Flames,-200,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betus,BetUS,,spreads,Los Angeles Kings,172,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betus,BetUS,,totals,Over,-115,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,betus,BetUS,,totals,Under,-105,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,mybookieag,MyBookie.ag,,h2h,Calgary Flames,130,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,mybookieag,MyBookie.ag,,h2h,Los Angeles Kings,-159,,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,mybookieag,MyBookie.ag,,spreads,Calgary Flames,-198,1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,mybookieag,MyBookie.ag,,spreads,Los Angeles Kings,159,-1.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,mybookieag,MyBookie.ag,,totals,Over,-120,5.5,2026-03-01
+87a30c01bb93056280bef0727226d01c,2026-03-01T00:00:00Z,Los Angeles Kings,Calgary Flames,mybookieag,MyBookie.ag,,totals,Under,-102,5.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betrivers,BetRivers,,h2h,Carolina Hurricanes,-180,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betrivers,BetRivers,,h2h,Detroit Red Wings,148,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betrivers,BetRivers,,spreads,Carolina Hurricanes,138,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betrivers,BetRivers,,spreads,Detroit Red Wings,-177,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betrivers,BetRivers,,totals,Over,-122,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betrivers,BetRivers,,totals,Under,-105,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanduel,FanDuel,,h2h,Carolina Hurricanes,-184,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanduel,FanDuel,,h2h,Detroit Red Wings,152,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanduel,FanDuel,,spreads,Carolina Hurricanes,134,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanduel,FanDuel,,spreads,Detroit Red Wings,-164,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanduel,FanDuel,,totals,Over,110,6.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanduel,FanDuel,,totals,Under,-134,6.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,draftkings,DraftKings,,h2h,Carolina Hurricanes,-192,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,draftkings,DraftKings,,h2h,Detroit Red Wings,160,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,draftkings,DraftKings,,spreads,Carolina Hurricanes,130,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,draftkings,DraftKings,,spreads,Detroit Red Wings,-155,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,draftkings,DraftKings,,totals,Over,110,6.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,draftkings,DraftKings,,totals,Under,-130,6.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,williamhill_us,Caesars,,h2h,Carolina Hurricanes,-190,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,williamhill_us,Caesars,,h2h,Detroit Red Wings,158,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,williamhill_us,Caesars,,spreads,Carolina Hurricanes,126,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,williamhill_us,Caesars,,spreads,Detroit Red Wings,-150,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,williamhill_us,Caesars,,totals,Over,-110,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,williamhill_us,Caesars,,totals,Under,-110,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betmgm,BetMGM,,h2h,Carolina Hurricanes,-190,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betmgm,BetMGM,,h2h,Detroit Red Wings,155,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betmgm,BetMGM,,spreads,Carolina Hurricanes,125,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betmgm,BetMGM,,spreads,Detroit Red Wings,-155,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betmgm,BetMGM,,totals,Over,-118,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betmgm,BetMGM,,totals,Under,-102,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanatics,Fanatics,,h2h,Carolina Hurricanes,-190,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanatics,Fanatics,,h2h,Detroit Red Wings,160,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanatics,Fanatics,,spreads,Carolina Hurricanes,130,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanatics,Fanatics,,spreads,Detroit Red Wings,-160,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanatics,Fanatics,,totals,Over,110,6.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,fanatics,Fanatics,,totals,Under,-130,6.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betonlineag,BetOnline.ag,,h2h,Carolina Hurricanes,-185,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betonlineag,BetOnline.ag,,h2h,Detroit Red Wings,162,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betonlineag,BetOnline.ag,,spreads,Carolina Hurricanes,130,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betonlineag,BetOnline.ag,,spreads,Detroit Red Wings,-150,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betonlineag,BetOnline.ag,,totals,Over,-110,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betonlineag,BetOnline.ag,,totals,Under,-106,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,lowvig,LowVig.ag,,h2h,Carolina Hurricanes,-185,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,lowvig,LowVig.ag,,h2h,Detroit Red Wings,162,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,lowvig,LowVig.ag,,spreads,Carolina Hurricanes,130,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,lowvig,LowVig.ag,,spreads,Detroit Red Wings,-150,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,lowvig,LowVig.ag,,totals,Over,-110,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,lowvig,LowVig.ag,,totals,Under,-106,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,bovada,Bovada,,h2h,Carolina Hurricanes,-198,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,bovada,Bovada,,h2h,Detroit Red Wings,168,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,bovada,Bovada,,spreads,Carolina Hurricanes,130,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,bovada,Bovada,,spreads,Detroit Red Wings,-150,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,bovada,Bovada,,totals,Over,-112,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,bovada,Bovada,,totals,Under,-108,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betus,BetUS,,h2h,Carolina Hurricanes,-190,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betus,BetUS,,h2h,Detroit Red Wings,163,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betus,BetUS,,spreads,Carolina Hurricanes,130,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betus,BetUS,,spreads,Detroit Red Wings,-150,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betus,BetUS,,totals,Over,-110,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,betus,BetUS,,totals,Under,-110,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,mybookieag,MyBookie.ag,,h2h,Carolina Hurricanes,-189,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,mybookieag,MyBookie.ag,,h2h,Detroit Red Wings,152,,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,mybookieag,MyBookie.ag,,spreads,Carolina Hurricanes,135,-1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,mybookieag,MyBookie.ag,,spreads,Detroit Red Wings,-166,1.5,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,mybookieag,MyBookie.ag,,totals,Over,-122,6.0,2026-03-01
+4b0bd5e4779da438aee7ac81095b768d,2026-03-01T00:00:00Z,Carolina Hurricanes,Detroit Red Wings,mybookieag,MyBookie.ag,,totals,Under,100,6.0,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betrivers,BetRivers,,h2h,Montréal Canadiens,-165,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betrivers,BetRivers,,h2h,Washington Capitals,135,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betrivers,BetRivers,,spreads,Montréal Canadiens,150,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betrivers,BetRivers,,spreads,Washington Capitals,-195,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betrivers,BetRivers,,totals,Over,-113,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betrivers,BetRivers,,totals,Under,-113,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanduel,FanDuel,,h2h,Montréal Canadiens,-160,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanduel,FanDuel,,h2h,Washington Capitals,132,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanduel,FanDuel,,spreads,Montréal Canadiens,152,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanduel,FanDuel,,spreads,Washington Capitals,-192,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanduel,FanDuel,,totals,Over,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanduel,FanDuel,,totals,Under,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,draftkings,DraftKings,,h2h,Montréal Canadiens,-162,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,draftkings,DraftKings,,h2h,Washington Capitals,136,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,draftkings,DraftKings,,spreads,Montréal Canadiens,164,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,draftkings,DraftKings,,spreads,Washington Capitals,-198,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,draftkings,DraftKings,,totals,Over,-105,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,draftkings,DraftKings,,totals,Under,-115,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,williamhill_us,Caesars,,h2h,Montréal Canadiens,-160,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,williamhill_us,Caesars,,h2h,Washington Capitals,135,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,williamhill_us,Caesars,,spreads,Montréal Canadiens,162,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,williamhill_us,Caesars,,spreads,Washington Capitals,-195,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,williamhill_us,Caesars,,totals,Over,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,williamhill_us,Caesars,,totals,Under,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betmgm,BetMGM,,h2h,Montréal Canadiens,-160,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betmgm,BetMGM,,h2h,Washington Capitals,135,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betmgm,BetMGM,,spreads,Montréal Canadiens,145,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betmgm,BetMGM,,spreads,Washington Capitals,-175,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betmgm,BetMGM,,totals,Over,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betmgm,BetMGM,,totals,Under,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanatics,Fanatics,,h2h,Montréal Canadiens,-160,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanatics,Fanatics,,h2h,Washington Capitals,130,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanatics,Fanatics,,spreads,Montréal Canadiens,160,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanatics,Fanatics,,spreads,Washington Capitals,-190,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanatics,Fanatics,,totals,Over,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,fanatics,Fanatics,,totals,Under,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,bovada,Bovada,,h2h,Montréal Canadiens,-168,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,bovada,Bovada,,h2h,Washington Capitals,142,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,bovada,Bovada,,spreads,Montréal Canadiens,158,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,bovada,Bovada,,spreads,Washington Capitals,-183,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,bovada,Bovada,,totals,Over,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,bovada,Bovada,,totals,Under,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,lowvig,LowVig.ag,,h2h,Montréal Canadiens,-155,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,lowvig,LowVig.ag,,h2h,Washington Capitals,136,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,lowvig,LowVig.ag,,spreads,Montréal Canadiens,165,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,lowvig,LowVig.ag,,spreads,Washington Capitals,-190,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,lowvig,LowVig.ag,,totals,Over,-108,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,lowvig,LowVig.ag,,totals,Under,-108,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betonlineag,BetOnline.ag,,h2h,Montréal Canadiens,-155,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betonlineag,BetOnline.ag,,h2h,Washington Capitals,136,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betonlineag,BetOnline.ag,,spreads,Montréal Canadiens,165,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betonlineag,BetOnline.ag,,spreads,Washington Capitals,-190,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betonlineag,BetOnline.ag,,totals,Over,-108,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betonlineag,BetOnline.ag,,totals,Under,-108,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betus,BetUS,,h2h,Montréal Canadiens,-160,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betus,BetUS,,h2h,Washington Capitals,138,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betus,BetUS,,spreads,Montréal Canadiens,164,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betus,BetUS,,spreads,Washington Capitals,-190,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betus,BetUS,,totals,Over,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,betus,BetUS,,totals,Under,-110,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,mybookieag,MyBookie.ag,,h2h,Montréal Canadiens,-160,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,mybookieag,MyBookie.ag,,h2h,Washington Capitals,130,,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,mybookieag,MyBookie.ag,,spreads,Montréal Canadiens,156,-1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,mybookieag,MyBookie.ag,,spreads,Washington Capitals,-194,1.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,mybookieag,MyBookie.ag,,totals,Over,-111,6.5,2026-03-01
+8a1b1cf577524a5086f7627f30994089,2026-03-01T00:00:00Z,Montréal Canadiens,Washington Capitals,mybookieag,MyBookie.ag,,totals,Under,-111,6.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betrivers,BetRivers,,h2h,Ottawa Senators,-114,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betrivers,BetRivers,,h2h,Toronto Maple Leafs,-107,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betrivers,BetRivers,,spreads,Ottawa Senators,210,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betrivers,BetRivers,,spreads,Toronto Maple Leafs,-278,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betrivers,BetRivers,,totals,Over,-127,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betrivers,BetRivers,,totals,Under,100,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanduel,FanDuel,,h2h,Ottawa Senators,-122,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanduel,FanDuel,,h2h,Toronto Maple Leafs,102,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanduel,FanDuel,,spreads,Ottawa Senators,205,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanduel,FanDuel,,spreads,Toronto Maple Leafs,-265,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanduel,FanDuel,,totals,Over,106,6.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanduel,FanDuel,,totals,Under,-130,6.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,draftkings,DraftKings,,h2h,Ottawa Senators,-122,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,draftkings,DraftKings,,h2h,Toronto Maple Leafs,102,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,draftkings,DraftKings,,spreads,Ottawa Senators,210,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,draftkings,DraftKings,,spreads,Toronto Maple Leafs,-258,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,draftkings,DraftKings,,totals,Over,110,6.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,draftkings,DraftKings,,totals,Under,-130,6.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,williamhill_us,Caesars,,h2h,Ottawa Senators,-125,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,williamhill_us,Caesars,,h2h,Toronto Maple Leafs,105,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,williamhill_us,Caesars,,spreads,Ottawa Senators,215,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,williamhill_us,Caesars,,spreads,Toronto Maple Leafs,-267,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,williamhill_us,Caesars,,totals,Over,-120,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,williamhill_us,Caesars,,totals,Under,100,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betmgm,BetMGM,,h2h,Ottawa Senators,-125,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betmgm,BetMGM,,h2h,Toronto Maple Leafs,105,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betmgm,BetMGM,,spreads,Ottawa Senators,185,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betmgm,BetMGM,,spreads,Toronto Maple Leafs,-225,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betmgm,BetMGM,,totals,Over,-120,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betmgm,BetMGM,,totals,Under,100,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanatics,Fanatics,,h2h,Ottawa Senators,-125,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanatics,Fanatics,,h2h,Toronto Maple Leafs,105,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanatics,Fanatics,,spreads,Ottawa Senators,210,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanatics,Fanatics,,spreads,Toronto Maple Leafs,-260,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanatics,Fanatics,,totals,Over,105,6.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,fanatics,Fanatics,,totals,Under,-125,6.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,bovada,Bovada,,h2h,Ottawa Senators,-133,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,bovada,Bovada,,h2h,Toronto Maple Leafs,112,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,bovada,Bovada,,spreads,Ottawa Senators,200,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,bovada,Bovada,,spreads,Toronto Maple Leafs,-240,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,bovada,Bovada,,totals,Over,-120,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,bovada,Bovada,,totals,Under,100,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betonlineag,BetOnline.ag,,h2h,Ottawa Senators,-121,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betonlineag,BetOnline.ag,,h2h,Toronto Maple Leafs,107,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betonlineag,BetOnline.ag,,spreads,Ottawa Senators,219,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betonlineag,BetOnline.ag,,spreads,Toronto Maple Leafs,-265,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betonlineag,BetOnline.ag,,totals,Over,-120,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betonlineag,BetOnline.ag,,totals,Under,104,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,lowvig,LowVig.ag,,h2h,Ottawa Senators,-121,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,lowvig,LowVig.ag,,h2h,Toronto Maple Leafs,107,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,lowvig,LowVig.ag,,spreads,Ottawa Senators,219,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,lowvig,LowVig.ag,,spreads,Toronto Maple Leafs,-265,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,lowvig,LowVig.ag,,totals,Over,-120,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,lowvig,LowVig.ag,,totals,Under,104,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betus,BetUS,,h2h,Ottawa Senators,-120,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betus,BetUS,,h2h,Toronto Maple Leafs,100,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betus,BetUS,,spreads,Ottawa Senators,224,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betus,BetUS,,spreads,Toronto Maple Leafs,-265,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betus,BetUS,,totals,Over,-120,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,betus,BetUS,,totals,Under,100,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,mybookieag,MyBookie.ag,,h2h,Ottawa Senators,-117,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,mybookieag,MyBookie.ag,,h2h,Toronto Maple Leafs,-104,,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,mybookieag,MyBookie.ag,,spreads,Ottawa Senators,202,-1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,mybookieag,MyBookie.ag,,spreads,Toronto Maple Leafs,-255,1.5,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,mybookieag,MyBookie.ag,,totals,Over,-120,6.0,2026-03-01
+7098f95d654a8999a60ca7f859300f78,2026-03-01T00:00:00Z,Toronto Maple Leafs,Ottawa Senators,mybookieag,MyBookie.ag,,totals,Under,-102,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betrivers,BetRivers,,h2h,Dallas Stars,-165,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betrivers,BetRivers,,h2h,Nashville Predators,135,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betrivers,BetRivers,,spreads,Dallas Stars,150,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betrivers,BetRivers,,spreads,Nashville Predators,-195,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betrivers,BetRivers,,totals,Over,-112,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betrivers,BetRivers,,totals,Under,-114,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanduel,FanDuel,,h2h,Dallas Stars,-150,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanduel,FanDuel,,h2h,Nashville Predators,125,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanduel,FanDuel,,spreads,Dallas Stars,164,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanduel,FanDuel,,spreads,Nashville Predators,-205,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanduel,FanDuel,,totals,Over,-134,5.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanduel,FanDuel,,totals,Under,110,5.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,draftkings,DraftKings,,h2h,Dallas Stars,-155,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,draftkings,DraftKings,,h2h,Nashville Predators,130,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,draftkings,DraftKings,,spreads,Dallas Stars,164,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,draftkings,DraftKings,,spreads,Nashville Predators,-198,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,draftkings,DraftKings,,totals,Over,-135,5.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,draftkings,DraftKings,,totals,Under,114,5.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,williamhill_us,Caesars,,h2h,Dallas Stars,-155,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,williamhill_us,Caesars,,h2h,Nashville Predators,130,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,williamhill_us,Caesars,,spreads,Dallas Stars,162,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,williamhill_us,Caesars,,spreads,Nashville Predators,-195,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,williamhill_us,Caesars,,totals,Over,-110,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,williamhill_us,Caesars,,totals,Under,-110,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betmgm,BetMGM,,h2h,Dallas Stars,-150,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betmgm,BetMGM,,h2h,Nashville Predators,125,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betmgm,BetMGM,,spreads,Dallas Stars,155,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betmgm,BetMGM,,spreads,Nashville Predators,-190,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betmgm,BetMGM,,totals,Over,-110,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betmgm,BetMGM,,totals,Under,-110,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanatics,Fanatics,,h2h,Dallas Stars,-150,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanatics,Fanatics,,h2h,Nashville Predators,125,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanatics,Fanatics,,spreads,Dallas Stars,165,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanatics,Fanatics,,spreads,Nashville Predators,-200,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanatics,Fanatics,,totals,Over,-140,5.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,fanatics,Fanatics,,totals,Under,115,5.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,bovada,Bovada,,h2h,Dallas Stars,-155,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,bovada,Bovada,,h2h,Nashville Predators,133,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,bovada,Bovada,,spreads,Dallas Stars,165,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,bovada,Bovada,,spreads,Nashville Predators,-195,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,bovada,Bovada,,totals,Over,-112,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,bovada,Bovada,,totals,Under,-108,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betonlineag,BetOnline.ag,,h2h,Dallas Stars,-155,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betonlineag,BetOnline.ag,,h2h,Nashville Predators,136,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betonlineag,BetOnline.ag,,spreads,Dallas Stars,174,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betonlineag,BetOnline.ag,,spreads,Nashville Predators,-200,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betonlineag,BetOnline.ag,,totals,Over,-118,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betonlineag,BetOnline.ag,,totals,Under,102,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,lowvig,LowVig.ag,,h2h,Dallas Stars,-155,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,lowvig,LowVig.ag,,h2h,Nashville Predators,136,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,lowvig,LowVig.ag,,spreads,Dallas Stars,174,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,lowvig,LowVig.ag,,spreads,Nashville Predators,-200,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,lowvig,LowVig.ag,,totals,Over,-118,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,lowvig,LowVig.ag,,totals,Under,102,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betus,BetUS,,h2h,Dallas Stars,-155,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betus,BetUS,,h2h,Nashville Predators,134,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betus,BetUS,,spreads,Dallas Stars,172,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betus,BetUS,,spreads,Nashville Predators,-200,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betus,BetUS,,totals,Over,-120,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,betus,BetUS,,totals,Under,100,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,mybookieag,MyBookie.ag,,h2h,Dallas Stars,-158,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,mybookieag,MyBookie.ag,,h2h,Nashville Predators,129,,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,mybookieag,MyBookie.ag,,spreads,Dallas Stars,160,-1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,mybookieag,MyBookie.ag,,spreads,Nashville Predators,-199,1.5,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,mybookieag,MyBookie.ag,,totals,Over,-113,6.0,2026-03-01
+3e2e5681cc1a878f19cacd6f384a9278,2026-03-01T01:00:00Z,Dallas Stars,Nashville Predators,mybookieag,MyBookie.ag,,totals,Under,-108,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betrivers,BetRivers,,h2h,Seattle Kraken,-159,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betrivers,BetRivers,,h2h,Vancouver Canucks,132,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betrivers,BetRivers,,spreads,Seattle Kraken,150,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betrivers,BetRivers,,spreads,Vancouver Canucks,-195,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betrivers,BetRivers,,totals,Over,102,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betrivers,BetRivers,,totals,Under,-129,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanduel,FanDuel,,h2h,Seattle Kraken,-162,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanduel,FanDuel,,h2h,Vancouver Canucks,134,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanduel,FanDuel,,spreads,Seattle Kraken,152,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanduel,FanDuel,,spreads,Vancouver Canucks,-188,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanduel,FanDuel,,totals,Over,-128,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanduel,FanDuel,,totals,Under,104,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,draftkings,DraftKings,,h2h,Seattle Kraken,-166,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,draftkings,DraftKings,,h2h,Vancouver Canucks,140,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,draftkings,DraftKings,,spreads,Seattle Kraken,160,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,draftkings,DraftKings,,spreads,Vancouver Canucks,-192,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,draftkings,DraftKings,,totals,Over,-130,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,draftkings,DraftKings,,totals,Under,110,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,williamhill_us,Caesars,,h2h,Seattle Kraken,-160,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,williamhill_us,Caesars,,h2h,Vancouver Canucks,135,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,williamhill_us,Caesars,,spreads,Seattle Kraken,150,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,williamhill_us,Caesars,,spreads,Vancouver Canucks,-178,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,williamhill_us,Caesars,,totals,Over,-135,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,williamhill_us,Caesars,,totals,Under,115,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betmgm,BetMGM,,h2h,Seattle Kraken,-160,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betmgm,BetMGM,,h2h,Vancouver Canucks,135,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betmgm,BetMGM,,spreads,Seattle Kraken,150,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betmgm,BetMGM,,spreads,Vancouver Canucks,-185,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betmgm,BetMGM,,totals,Over,-105,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betmgm,BetMGM,,totals,Under,-115,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,bovada,Bovada,,h2h,Seattle Kraken,-155,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,bovada,Bovada,,h2h,Vancouver Canucks,133,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,bovada,Bovada,,spreads,Seattle Kraken,163,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,bovada,Bovada,,spreads,Vancouver Canucks,-190,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,bovada,Bovada,,totals,Over,-103,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,bovada,Bovada,,totals,Under,-117,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betonlineag,BetOnline.ag,,h2h,Seattle Kraken,-156,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betonlineag,BetOnline.ag,,h2h,Vancouver Canucks,137,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betonlineag,BetOnline.ag,,spreads,Seattle Kraken,161,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betonlineag,BetOnline.ag,,spreads,Vancouver Canucks,-185,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betonlineag,BetOnline.ag,,totals,Over,-101,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betonlineag,BetOnline.ag,,totals,Under,-115,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,lowvig,LowVig.ag,,h2h,Seattle Kraken,-156,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,lowvig,LowVig.ag,,h2h,Vancouver Canucks,137,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,lowvig,LowVig.ag,,spreads,Seattle Kraken,161,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,lowvig,LowVig.ag,,spreads,Vancouver Canucks,-185,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,lowvig,LowVig.ag,,totals,Over,-101,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,lowvig,LowVig.ag,,totals,Under,-115,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanatics,Fanatics,,h2h,Seattle Kraken,-160,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanatics,Fanatics,,h2h,Vancouver Canucks,130,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanatics,Fanatics,,spreads,Seattle Kraken,160,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanatics,Fanatics,,spreads,Vancouver Canucks,-190,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanatics,Fanatics,,totals,Over,-125,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,fanatics,Fanatics,,totals,Under,105,5.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betus,BetUS,,h2h,Seattle Kraken,-160,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betus,BetUS,,h2h,Vancouver Canucks,138,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betus,BetUS,,spreads,Seattle Kraken,160,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betus,BetUS,,spreads,Vancouver Canucks,-185,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betus,BetUS,,totals,Over,-105,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,betus,BetUS,,totals,Under,-115,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,mybookieag,MyBookie.ag,,h2h,Seattle Kraken,-165,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,mybookieag,MyBookie.ag,,h2h,Vancouver Canucks,134,,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,mybookieag,MyBookie.ag,,spreads,Seattle Kraken,153,-1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,mybookieag,MyBookie.ag,,spreads,Vancouver Canucks,-190,1.5,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,mybookieag,MyBookie.ag,,totals,Over,-103,6.0,2026-03-01
+015d8bf15ac1bd919c7cb78b955a8b6b,2026-03-01T03:00:00Z,Seattle Kraken,Vancouver Canucks,mybookieag,MyBookie.ag,,totals,Under,-119,6.0,2026-03-01

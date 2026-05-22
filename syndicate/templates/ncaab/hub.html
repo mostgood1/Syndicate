@@ -1,0 +1,66 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | NCAAB{% endblock %}
+{% block page_title %}NCAAB Hub{% endblock %}
+
+{% block content %}
+  {% with route_label='/ncaab', title='NCAAB now has source-backed cards, game, live-lens, season review, betting-card, and daily archive surfaces', status='Active migration', body='Syndicate now exposes NCAAB cards, a first game drill-in, a read-only live-lens board, a real-data season review, a compact historical betting-card lane, and a settled-date daily archive backed by the source app\'s recommendations, results, and live scoreboard workflows.', action_href='/ncaab/cards?date=' ~ launch_date, action_label='Open NCAAB cards' %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="NCAAB module launches">
+    <article class="sport-card">
+      <div class="section-label">Live Lens</div>
+      <h3>Current live board</h3>
+      <p>Open the source-backed NCAAB live-lens board for the selected date's live scoreboard feed.</p>
+      <div class="action-row">
+        <a class="cards-nav-pill" href="/ncaab/live-lens?date={{ today_date }}">Launch {{ today_date }} live lens</a>
+      </div>
+    </article>
+    <article class="sport-card">
+      <div class="section-label">Season {{ launch_season }}</div>
+      <h3>Season review</h3>
+      <p>Open the real-data NCAAB season review board built from Season {{ launch_season }} schedule dates, recommendations, and final results.</p>
+      <div class="action-row">
+        <a class="cards-nav-pill" href="/ncaab/season/{{ launch_season }}?date={{ season_launch_date }}">Launch season review</a>
+      </div>
+      <p class="muted">{{ season_dates_count }} tracked season dates</p>
+    </article>
+    <article class="sport-card">
+      <div class="section-label">Season {{ launch_season }}</div>
+      <h3>Historical betting card</h3>
+      <p>Open the compact ranked board that reuses the season-review merge for settled-date historical cards.</p>
+      <div class="action-row">
+        <a class="cards-nav-pill" href="/ncaab/season/{{ launch_season }}/betting-card?date={{ season_launch_date }}">Launch betting card</a>
+      </div>
+    </article>
+    <article class="sport-card">
+      <div class="section-label">Historical lane</div>
+      <h3>Daily archive</h3>
+      <p>Open the settled-date archive and drill into season review from real NCAAB daily finals dates.</p>
+      <div class="action-row">
+        <a class="cards-nav-pill" href="/ncaab/archive?date={{ season_launch_date }}">Launch daily archive</a>
+      </div>
+    </article>
+  </section>
+
+  {% with eyebrow='Source dates', title='Available NCAAB display dates', body='The first NCAAB Syndicate surface follows the display dates already exposed by the source app so navigation stays anchored to the real recommendations workflow.', summary_stats=summary_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  <section class="cards-grid cards-grid--sports" aria-label="Available NCAAB dates">
+    {% for item in available_date_cards | reverse %}
+      <article class="sport-card">
+        <div class="section-label">{{ item.date }}</div>
+        <h3>Stored NCAAB date</h3>
+        <p>Open the cards board, season review, betting card, or daily archive for this source-backed NCAAB date.</p>
+        <div class="action-row">
+          <a class="cards-nav-pill" href="/ncaab/cards?date={{ item.date }}">Cards</a>
+          <a class="cards-nav-pill" href="/ncaab/season/{{ item.season }}?date={{ item.date }}">Season review</a>
+          <a class="cards-nav-pill" href="/ncaab/season/{{ item.season }}/betting-card?date={{ item.date }}">Betting card</a>
+          <a class="cards-nav-pill" href="/ncaab/archive?date={{ item.date }}">Daily archive</a>
+        </div>
+      </article>
+    {% endfor %}
+  </section>
+{% endblock %}
