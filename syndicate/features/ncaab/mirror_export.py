@@ -562,13 +562,11 @@ def build_live_state_payload_from_raw(raw_root: Path, selected_date: str) -> dic
 
 
 def build_live_lines_payload_from_raw(raw_root: Path, selected_date: str) -> dict[str, Any] | None:
-    snapshot_lines_path = raw_root / "by_date" / selected_date / f"live_snapshot_lines_{selected_date}.csv"
     live_features_path = raw_root / "by_date" / selected_date / f"live_features_{selected_date}.csv"
     prediction_path = raw_root / "by_date" / selected_date / f"predictions_unified_enriched_{selected_date}.csv"
     if not prediction_path.exists():
         prediction_path = raw_root / "by_date" / selected_date / f"predictions_display_{selected_date}.csv"
 
-    line_rows = _read_csv_rows(snapshot_lines_path)
     live_rows = _read_csv_rows(live_features_path)
     prediction_rows = _read_csv_rows(prediction_path)
     prediction_by_game = {
@@ -578,19 +576,20 @@ def build_live_lines_payload_from_raw(raw_root: Path, selected_date: str) -> dic
     }
 
     latest_features = _latest_rows_by_key(live_rows, "game_id")
-    latest_snapshot = _latest_rows_by_key(line_rows, "event_id") if line_rows else {}
     lines: dict[str, dict[str, Any]] = {}
-    for event_id, line_row in latest_snapshot.items():
-        feature_row = latest_features.get(event_id, {})
+    for event_id, feature_row in latest_features.items():
         prediction = prediction_by_game.get(event_id, {})
-        total = _to_float(line_row.get("total"))
-        if total is None:
-            total = _to_float(feature_row.get("live_line_total"))
+        total = _to_float(feature_row.get("live_line_total"))
+        book = _clean_value(feature_row.get("live_line_book"))
+        provider_event_id = _clean_value(feature_row.get("live_line_provider_event_id"))
+        last_update = _clean_value(feature_row.get("live_line_last_update"))
+        if total is None and not book and not provider_event_id and not last_update:
+            continue
         lines[event_id] = {
             "event_id": event_id,
-            "book": _clean_value(line_row.get("book") or feature_row.get("live_line_book")),
-            "provider_event_id": _clean_value(line_row.get("provider_event_id") or feature_row.get("live_line_provider_event_id")),
-            "last_update": _clean_value(line_row.get("last_update") or feature_row.get("live_line_last_update")),
+            "book": book,
+            "provider_event_id": provider_event_id,
+            "last_update": last_update,
             "total": _clean_value(total),
             "spread_home": _clean_value(prediction.get("spread_home") or prediction.get("closing_spread_home")),
             "spread_away": _clean_value(-_to_float(prediction.get("spread_home") or prediction.get("closing_spread_home"))) if _to_float(prediction.get("spread_home") or prediction.get("closing_spread_home")) is not None else None,
@@ -598,9 +597,9 @@ def build_live_lines_payload_from_raw(raw_root: Path, selected_date: str) -> dic
 
     bookmakers = sorted(
         {
-            str((row.get("book") or row.get("live_line_book") or "")).strip().lower()
-            for row in [*line_rows, *live_rows]
-            if str((row.get("book") or row.get("live_line_book") or "")).strip()
+            str((row.get("live_line_book") or "")).strip().lower()
+            for row in live_rows
+            if str((row.get("live_line_book") or "")).strip()
         }
     )
     return {

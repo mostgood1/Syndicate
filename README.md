@@ -250,7 +250,7 @@ These scripts populate [data/nba_source](c:/Users/mostg/OneDrive/Coding/Syndicat
 
 NCAAB now supports two mirror modes. The default source-backed run still copies fresh artifacts from the sibling NCAAB repo when that checkout is available. The `-UseExistingRawOutputs` switch skips the sibling repo requirement and rebuilds `data/ncaab_source/api` directly from the already mirrored bundle under [data/ncaab_source/raw_outputs](c:/Users/mostg/OneDrive/Coding/Syndicate/data/ncaab_source/raw_outputs). That raw-only mode is the new hosted-friendly boundary for local API regeneration and Render-style rebuilds.
 
-The source-backed NCAAB raw mirror contract is now intentionally narrow. Syndicate only mirrors the files currently needed to regenerate the local API bundle: `live_lens_tuning.json` plus `games_<date>.csv`, `games_with_odds_<date>.csv`, `predictions_<date>.csv`, `predictions_display_<date>.csv`, `predictions_unified_enriched_<date>.csv`, `live_features_<date>.csv`, and `live_snapshot_lines_<date>.csv`.
+The source-backed NCAAB raw mirror contract is now intentionally narrow. Syndicate only mirrors the files currently needed to regenerate the local API bundle: `live_lens_tuning.json` plus `games_<date>.csv`, `games_with_odds_<date>.csv`, `predictions_<date>.csv`, `predictions_display_<date>.csv`, `predictions_unified_enriched_<date>.csv`, and `live_features_<date>.csv`.
 
 ## Next implementation steps
 

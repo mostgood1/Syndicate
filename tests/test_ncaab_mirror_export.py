@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -93,6 +94,28 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.assertEqual(line.get("book"), "DraftKings")
         self.assertEqual(line.get("total"), 132.5)
 
+    def test_build_live_lines_payload_from_raw_does_not_require_snapshot_lines_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            raw_root = Path(tmp_dir) / "raw_outputs"
+            date_root = raw_root / "by_date" / self.selected_date
+            date_root.mkdir(parents=True, exist_ok=True)
+            for name in [
+                f"live_features_{self.selected_date}.csv",
+                f"predictions_display_{self.selected_date}.csv",
+            ]:
+                shutil.copy2(self.raw_root / "by_date" / self.selected_date / name, date_root / name)
+
+            payload = build_live_lines_payload_from_raw(raw_root, self.selected_date)
+
+        self.assertIsNotNone(payload)
+        assert payload is not None
+        self.assertEqual(payload["date"], self.selected_date)
+        self.assertGreaterEqual(int(payload["count"]), 1)
+        lines = payload.get("lines") if isinstance(payload.get("lines"), dict) else {}
+        line = lines.get("401856600") if isinstance(lines.get("401856600"), dict) else {}
+        self.assertEqual(line.get("book"), "DraftKings")
+        self.assertEqual(line.get("total"), 132.5)
+
     def test_export_api_bundle_from_raw_writes_live_payloads(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             api_root = Path(tmp_dir) / "api"
@@ -114,3 +137,4 @@ class NcaabMirrorExportTests(unittest.TestCase):
 
         self.assertNotIn("--allow-source-app-fallback", content)
         self.assertNotIn("def _run_source_app_fallback", content)
+        self.assertNotIn("live_snapshot_lines_", content)
