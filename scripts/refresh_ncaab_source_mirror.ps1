@@ -1,7 +1,8 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
     [string]$SourceRepo = "..\NCAAB",
-    [switch]$UseExistingRawOutputs
+    [switch]$UseExistingRawOutputs,
+    [switch]$AllowSourceAppFallback
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,7 +41,10 @@ $exportArgs = @($exportScriptPath, $destApiRoot, $Date)
 if ($UseExistingRawOutputs) {
     $exportArgs += @('--raw-root', $rawOutputsRoot)
 } else {
-    $exportArgs += @('--source-root', $sourceRoot, '--allow-source-app-fallback')
+    $exportArgs += @('--source-root', $sourceRoot)
+    if ($AllowSourceAppFallback) {
+        $exportArgs += @('--allow-source-app-fallback')
+    }
 }
 & $sourcePython @exportArgs
 if ($LASTEXITCODE -ne 0) {
