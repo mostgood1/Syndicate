@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import importlib.util
 import json
 import shutil
 import sys
@@ -58,10 +59,41 @@ def _processed_source_directory(state: dict[str, object]) -> Path | None:
     return None
 
 
-def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path) -> dict[str, str]:
+def _load_source_app(source_root: Path):
+    app_path = source_root / "app.py"
+    spec = importlib.util.spec_from_file_location("syndicate_wnba_source_app", app_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load source app from {app_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    source_app = _load_source_app(source_root)
+    out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
+    query = (
+        f"/api/props/recommendations?date={date_str}&compact=1&portfolio_only=1"
+        "&use_snapshot=0&limit=25&per_game_limit=3&per_market=1&slate_per_market_limit=4"
+        "&markets=pts,reb,ast,threes,blk,stl,pra,pr,pa,ra,dd,td"
+    )
+    client = source_app.app.test_client()
+    response = client.get(query)
+    try:
+        payload = response.get_json() if response is not None else None
+    except Exception:
+        payload = None
+    if not isinstance(payload, dict):
+        payload = {"error": "no_json", "status": int(getattr(response, "status_code", 0) or 0)}
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return str(out_path)
+
+
+def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path) -> dict[str, object]:
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
-    copied: dict[str, str] = {}
+    copied: dict[str, object] = {}
     artifact_map = {
         "snapshot_alias_path": processed_root / Path(str(state.get("snapshot_alias_path") or "")).name,
         "predictions_path": processed_root / Path(str(state.get("predictions_path") or "")).name,
@@ -82,6 +114,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         )
         if smart_sim_files:
             copied["smart_sim_paths"] = smart_sim_files
+        top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if top_by_game_path:
+            copied["top_by_game_path"] = top_by_game_path
     return copied
 
 
@@ -122,7 +157,11 @@ def main() -> int:
     )
     artifact_root = str(args.artifact_root or "").strip()
     if artifact_root:
-        copied = _materialize_artifact_bundle(state=state, artifact_root=Path(artifact_root).resolve())
+        copied = _materialize_artifact_bundle(
+            state=state,
+            artifact_root=Path(artifact_root).resolve(),
+            source_root=source_root,
+        )
         if copied:
             state["artifact_bundle_root"] = str(Path(artifact_root).resolve())
             state["artifact_bundle_files"] = copied

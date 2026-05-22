@@ -89,6 +89,8 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 "smart_sim_2026-05-22_LAL_GSW.json",
             ]:
                 (tmp_root / name).write_text("id\n1\n", encoding="utf-8")
+            source_root = tmp_root / "source"
+            source_root.mkdir()
             artifact_root = tmp_root / "bundle"
             argv = [
                 "refresh_nba_oddsapi_props.py",
@@ -97,7 +99,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 "--regions",
                 "us",
                 "--source-root",
-                tmp_dir,
+                str(source_root),
                 "--artifact-root",
                 str(artifact_root),
                 "--log-file",
@@ -105,7 +107,22 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 "--do-edges",
                 "--do-export",
             ]
-            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch("sys.argv", argv):
+            class _FakeSourceApp:
+                class _Client:
+                    @staticmethod
+                    def get(_query):
+                        class _Response:
+                            @staticmethod
+                            def get_json():
+                                return {"data": [{"player": "Test NBA Player"}]}
+
+                            status_code = 200
+
+                        return _Response()
+
+                app = type("_App", (), {"test_client": staticmethod(lambda: _FakeSourceApp._Client())})()
+
+            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -116,3 +133,4 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_BOS_NYK.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_LAL_GSW.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
