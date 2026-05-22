@@ -141,6 +141,59 @@ class OpsRefreshApiTests(unittest.TestCase):
         payload = response.get_json()
         self.assertEqual(payload["status"]["refresh_status"]["runtime"]["state"], "running")
 
+    def test_status_reads_from_env_configured_reports_and_data_roots(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            reports_root = root / "persistent" / "reports"
+            data_root = root / "persistent" / "data"
+            refresh_latest = reports_root / "refresh_status" / "latest"
+            daily_latest = reports_root / "daily_update" / "latest"
+            artifacts_dir = reports_root / "migration_runs" / "2026-05-22" / "20260522_120000"
+            mirror_manifest_dir = data_root / "mlb_source" / "manifests"
+
+            refresh_latest.mkdir(parents=True, exist_ok=True)
+            daily_latest.mkdir(parents=True, exist_ok=True)
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            mirror_manifest_dir.mkdir(parents=True, exist_ok=True)
+
+            (artifacts_dir / "odds_refresh.json").write_text(
+                json.dumps({"ok": True, "dry_run": False, "sports": ["mlb"]}),
+                encoding="utf-8",
+            )
+            (artifacts_dir / "odds_refresh.stderr.txt").write_text("", encoding="utf-8")
+            (refresh_latest / "refresh_status_latest.json").write_text(
+                json.dumps({"date": "2026-05-22", "artifactsDir": str(artifacts_dir)}),
+                encoding="utf-8",
+            )
+            (daily_latest / "daily_update_latest.json").write_text(
+                json.dumps({"date": "2026-05-22"}),
+                encoding="utf-8",
+            )
+            (mirror_manifest_dir / "mirror_refresh_latest.json").write_text(
+                json.dumps({"sport": "mlb", "date": "2026-05-22", "copiedArtifactCount": 3}),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_REPORTS_ROOT": str(reports_root),
+                    "SYNDICATE_DATA_ROOT": str(data_root),
+                },
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/odds-refresh/status",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["status"]["reports_root"], str(reports_root))
+        self.assertEqual(payload["status"]["refresh_status"]["manifest"]["date"], "2026-05-22")
+        self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["sport"], "mlb")
+
     def test_plan_endpoint_returns_dry_run_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
             "syndicate.blueprints.ops.build_refresh_plan",

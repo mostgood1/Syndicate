@@ -23,6 +23,20 @@ def _today_date() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
 
+def _reports_root() -> Path:
+    override = str(os.environ.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_STATE_ROOT") or "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return REPORTS_ROOT
+
+
+def _data_root() -> Path:
+    override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return REPO_ROOT / "data"
+
+
 def _read_json_file(path: Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -39,7 +53,7 @@ def _read_text_file(path: Path) -> str | None:
 
 
 def _load_mirror_manifest_summaries() -> list[dict[str, Any]]:
-    data_root = REPO_ROOT / "data"
+    data_root = _data_root()
     if not data_root.exists():
         return []
     summaries: list[dict[str, Any]] = []
@@ -130,7 +144,7 @@ def _derive_refresh_runtime_state(
 
 
 def _load_recent_refresh_history(*, limit: int = 6) -> list[dict[str, Any]]:
-    refresh_root = REPORTS_ROOT / "refresh_status"
+    refresh_root = _reports_root() / "refresh_status"
     if not refresh_root.exists():
         return []
     history: list[dict[str, Any]] = []
@@ -168,7 +182,7 @@ def _load_recent_refresh_history(*, limit: int = 6) -> list[dict[str, Any]]:
 
 
 def _latest_refresh_manifest_context() -> dict[str, Any]:
-    refresh_manifest_path = REPORTS_ROOT / "refresh_status" / "latest" / "refresh_status_latest.json"
+    refresh_manifest_path = _reports_root() / "refresh_status" / "latest" / "refresh_status_latest.json"
     manifest = _read_json_file(refresh_manifest_path) or {}
     artifacts_dir_raw = str(manifest.get("artifactsDir") or "").strip()
     artifacts_dir = Path(artifacts_dir_raw) if artifacts_dir_raw else None
@@ -316,7 +330,8 @@ def build_refresh_plan(
 
 
 def load_latest_refresh_status() -> dict[str, Any]:
-    refresh_latest_dir = REPORTS_ROOT / "refresh_status" / "latest"
+    reports_root = _reports_root()
+    refresh_latest_dir = reports_root / "refresh_status" / "latest"
     refresh_manifest_path = refresh_latest_dir / "refresh_status_latest.json"
     refresh_manifest = _read_json_file(refresh_manifest_path)
 
@@ -340,12 +355,12 @@ def load_latest_refresh_status() -> dict[str, Any]:
             }
     runtime_state = _derive_refresh_runtime_state(refresh_manifest, refresh_artifacts)
 
-    daily_update_latest_dir = REPORTS_ROOT / "daily_update" / "latest"
+    daily_update_latest_dir = reports_root / "daily_update" / "latest"
     daily_update_manifest_path = daily_update_latest_dir / "daily_update_latest.json"
     daily_update_manifest = _read_json_file(daily_update_manifest_path)
 
     return {
-        "reports_root": str(REPORTS_ROOT),
+        "reports_root": str(reports_root),
         "refresh_status": {
             "manifest_path": str(refresh_manifest_path),
             "manifest_exists": refresh_manifest_path.exists(),
@@ -389,10 +404,11 @@ def launch_refresh_run(
 ) -> dict[str, Any]:
     selected_date = date or _today_date()
     run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    refresh_status_root = REPORTS_ROOT / "refresh_status"
+    reports_root = _reports_root()
+    refresh_status_root = reports_root / "refresh_status"
     refresh_status_run_dir = refresh_status_root / selected_date / run_stamp
     refresh_status_latest_dir = refresh_status_root / "latest"
-    artifacts_dir = REPORTS_ROOT / "migration_runs" / selected_date / f"odds_refresh_{run_stamp}"
+    artifacts_dir = reports_root / "migration_runs" / selected_date / f"odds_refresh_{run_stamp}"
 
     refresh_status_run_dir.mkdir(parents=True, exist_ok=True)
     refresh_status_latest_dir.mkdir(parents=True, exist_ok=True)
