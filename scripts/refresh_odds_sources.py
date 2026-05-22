@@ -299,8 +299,8 @@ REGISTRY: dict[str, SportSpec] = {
         source_repo_name="NBA-Betting",
         mirror_script_name="refresh_nba_source_mirror.ps1",
         step_builder=_build_nba_steps,
-        ingest_contract_kind="existing_mirror_artifacts",
-        ingest_contract_notes="Hosted-safe ingest can rebuild the mirror manifest from existing files under data/nba_source.",
+        ingest_contract_kind="artifact_bundle_or_existing_mirror",
+        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/nba_source or from a published NBA artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NBA.",
         notes="Runs the existing OddsAPI props refresh job with the same env-payload contract the source app and workflows already use.",
     ),
     "nhl": SportSpec(
@@ -458,6 +458,10 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         command.extend(["-Date", date])
     if sport == "mlb":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_MLB") or "").strip()
+        if artifact_root:
+            command.extend(["-SourceArtifactRoot", artifact_root])
+    if sport == "nba":
+        artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NBA") or "").strip()
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "nhl":

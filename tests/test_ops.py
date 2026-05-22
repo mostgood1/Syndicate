@@ -350,6 +350,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(result["sport"], "nba")
         self.assertEqual(result["generation_mode"], "none")
         self.assertEqual(result["ingestion_mode"], "mirror_script")
+        self.assertEqual(((result.get("ingestion") or {}).get("contract") or {}).get("kind"), "artifact_bundle_or_existing_mirror")
         self.assertEqual(result["refresh_steps"], [])
         mirror = result.get("mirror") or {}
         self.assertTrue(mirror.get("ok"))
@@ -357,6 +358,19 @@ class OpsRefreshApiTests(unittest.TestCase):
         command = mirror.get("command") or []
         self.assertIn("refresh_nba_source_mirror.ps1", " ".join(str(part) for part in command))
         self.assertIn("-UseExistingMirrorArtifacts", command)
+
+    def test_build_refresh_plan_uses_nba_artifact_root_when_configured(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        with patch.dict(os.environ, {"SYNDICATE_ARTIFACT_ROOT_NBA": "C:/published/nba-bundle"}, clear=False):
+            plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="nba", execution_mode="ingest")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        self.assertEqual(((result.get("ingestion") or {}).get("contract") or {}).get("kind"), "artifact_bundle_or_existing_mirror")
+        command = ((result.get("mirror") or {}).get("command") or [])
+        self.assertIn("-SourceArtifactRoot", command)
+        self.assertIn("C:/published/nba-bundle", command)
 
     def test_build_refresh_plan_uses_wnba_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
