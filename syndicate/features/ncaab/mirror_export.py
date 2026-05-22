@@ -653,14 +653,14 @@ def export_api_bundle_from_raw(api_root: Path, raw_root: Path, selected_date: st
     display_dates = sorted(
         {
             str(item).strip()
-            for item in existing_display_dates | _dates_from_recommendation_dir(api_root) | _dates_from_raw_dirs(raw_root, "predictions_unified_enriched") | _dates_from_raw_dirs(raw_root, "predictions_display")
+            for item in existing_display_dates | _dates_from_recommendation_dir(api_root) | _dates_from_raw_dirs(raw_root, "predictions_unified_enriched")
             if str(item).strip()
         }
     )
     schedule_dates = sorted(
         {
             str(item).strip()
-            for item in existing_schedule_dates | _dates_from_raw_dirs(raw_root, "games") | _dates_from_raw_dirs(raw_root, "games_with_odds")
+            for item in existing_schedule_dates | _dates_from_raw_dirs(raw_root, "games_with_odds")
             if str(item).strip()
         }
     )

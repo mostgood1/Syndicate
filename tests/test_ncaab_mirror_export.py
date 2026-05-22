@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import unittest
@@ -41,6 +42,32 @@ class NcaabMirrorExportTests(unittest.TestCase):
             self.assertTrue((api_root / "display_prediction_dates.json").exists())
             self.assertTrue((api_root / "dates.json").exists())
             self.assertTrue((api_root / "recommendations" / f"recommendations_{self.selected_date}.json").exists())
+
+    def test_export_api_bundle_from_raw_derives_schedule_dates_from_games_with_odds_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            raw_root = Path(tmp_dir) / "raw_outputs"
+            date_root = raw_root / "by_date" / self.selected_date
+            config_root = raw_root / "config"
+            api_root = Path(tmp_dir) / "api"
+            date_root.mkdir(parents=True, exist_ok=True)
+            config_root.mkdir(parents=True, exist_ok=True)
+            for name in [
+                "live_lens_tuning.json",
+            ]:
+                shutil.copy2(self.raw_root / "config" / name, config_root / name)
+            for name in [
+                f"games_with_odds_{self.selected_date}.csv",
+                f"predictions_{self.selected_date}.csv",
+                f"predictions_unified_enriched_{self.selected_date}.csv",
+                f"live_features_{self.selected_date}.csv",
+            ]:
+                shutil.copy2(self.raw_root / "by_date" / self.selected_date / name, date_root / name)
+
+            manifest = export_api_bundle_from_raw(api_root, raw_root, self.selected_date)
+            dates_payload = json.loads((api_root / "dates.json").read_text(encoding="utf-8"))
+
+        self.assertIn(self.selected_date, manifest["display_dates"])
+        self.assertIn(self.selected_date, dates_payload.get("dates") or [])
 
     def test_build_results_payload_from_raw_generates_settled_rows(self) -> None:
         payload = build_results_payload_from_raw(self.raw_root, self.selected_date)
@@ -139,3 +166,4 @@ class NcaabMirrorExportTests(unittest.TestCase):
         self.assertNotIn("def _run_source_app_fallback", content)
         self.assertNotIn("live_snapshot_lines_", content)
         self.assertNotIn("predictions_display_", content)
+        self.assertNotIn('f"games_{target_date}.csv"', content)
