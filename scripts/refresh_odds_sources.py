@@ -413,6 +413,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         command.extend(["-Date", date])
     if mirror_only and sport == "ncaab":
         command.append("-UseExistingRawOutputs")
+    if mirror_only and sport == "mlb":
+        command.append("-UseExistingMirrorArtifacts")
     if mirror_only and sport == "nba":
         command.append("-UseExistingMirrorArtifacts")
     if mirror_only and sport == "nhl":

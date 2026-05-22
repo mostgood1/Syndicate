@@ -228,9 +228,12 @@ To refresh Syndicate's local MLB validation mirror from the sibling MLB repo for
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\refresh_mlb_source_mirror.ps1 -Date 2026-05-15
+powershell -ExecutionPolicy Bypass -File .\scripts\refresh_mlb_source_mirror.ps1 -Date 2026-05-15 -UseExistingMirrorArtifacts
 ```
 
 The script copies the main live-lens report and JSONL, live prop registry files, daily snapshot and sim folders, archived market refresh history, and archived StatsAPI live feed files into [data/mlb_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source).
+
+MLB now supports the same two mirror modes as the in-season board modules. The default run still copies fresh artifacts from the sibling MLB repo when that checkout is available. The `-UseExistingMirrorArtifacts` switch skips the sibling repo requirement and rewrites the MLB mirror manifest from the already mirrored files under [data/mlb_source](c:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source). That gives the shared ingest path a hosted-safe local mirror mode for the reference module without changing the default source-backed refresh flow.
 
 Each run also writes [data/mlb_source/manifests/mirror_refresh_latest.json](c:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source/manifests/mirror_refresh_latest.json), and the migration gate now validates that manifest for the core mirrored MLB artifact families: daily summary, ladders, top props, ops, snapshots, sims, and season eval payloads.
 

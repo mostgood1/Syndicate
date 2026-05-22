@@ -4,6 +4,17 @@ import unittest
 from pathlib import Path
 
 
+class MlbMirrorScriptTests(unittest.TestCase):
+    def test_refresh_mlb_mirror_script_supports_existing_artifact_mode(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "refresh_mlb_source_mirror.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$UseExistingMirrorArtifacts", content)
+        self.assertIn("or use -UseExistingMirrorArtifacts", content)
+        self.assertIn("usedExistingMirrorArtifacts", content)
+
+
 class NbaMirrorScriptTests(unittest.TestCase):
     def test_refresh_nba_mirror_script_has_no_source_app_bootstrap(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]

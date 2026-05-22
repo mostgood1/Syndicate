@@ -1,26 +1,31 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\MLB-BettingV2"
+    [string]$SourceRepo = "..\MLB-BettingV2",
+    [switch]$UseExistingMirrorArtifacts
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_MLB'
-$sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
-if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
-    $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
-}
-if (-not (Test-Path $sourceRootCandidate)) {
-    throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar or pass -SourceRepo."
-}
-$sourceRoot = (Resolve-Path $sourceRootCandidate).Path
+$sourceRoot = $null
 $destDataRoot = Join-Path $repoRoot 'data\mlb_source\data'
 $dateSlug = $Date -replace '-', '_'
 $season = ($Date -split '-')[0]
 $seasonPayloadSlug = $dateSlug
 if ($seasonPayloadSlug.StartsWith("$season`_")) {
     $seasonPayloadSlug = $seasonPayloadSlug.Substring($season.Length + 1)
+}
+
+if (-not $UseExistingMirrorArtifacts) {
+    $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
+    if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
+        $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
+    }
+    if (-not (Test-Path $sourceRootCandidate)) {
+        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, or use -UseExistingMirrorArtifacts."
+    }
+    $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
 }
 
 function Copy-IfExists {
@@ -37,6 +42,15 @@ function Copy-IfExists {
     $parent = Split-Path -Parent $DestinationPath
     if ($parent) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    $resolvedSourcePath = (Resolve-Path $SourcePath).Path
+    $resolvedDestinationPath = $DestinationPath
+    if (Test-Path $DestinationPath) {
+        $resolvedDestinationPath = (Resolve-Path $DestinationPath).Path
+    }
+    if ($resolvedSourcePath -eq $resolvedDestinationPath) {
+        return $true
     }
 
     if ($Recurse) {
@@ -88,8 +102,8 @@ $filePairs = @(
 )
 
 foreach ($pair in $filePairs) {
-    $src = Join-Path $sourceRoot $pair[0]
     $dst = Join-Path $destDataRoot $pair[1]
+    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot $pair[0] }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add($pair[1]) | Out-Null
     }
@@ -103,14 +117,14 @@ $dirPairs = @(
 )
 
 foreach ($pair in $dirPairs) {
-    $src = Join-Path $sourceRoot $pair[0]
     $dst = Join-Path $destDataRoot $pair[1]
+    $src = if ($UseExistingMirrorArtifacts) { $dst } else { Join-Path $sourceRoot $pair[0] }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst -Recurse) {
         $copied.Add($pair[1]) | Out-Null
     }
 }
 
-$seasonEvalRoot = Join-Path $sourceRoot (Join-Path 'data\eval\seasons' $season)
+$seasonEvalRoot = if ($UseExistingMirrorArtifacts) { Join-Path $destDataRoot (Join-Path 'eval\seasons' $season) } else { Join-Path $sourceRoot (Join-Path 'data\eval\seasons' $season) }
 $seasonEvalManifest = Join-Path $seasonEvalRoot 'season_eval_manifest.json'
 if (Copy-IfExists -SourcePath $seasonEvalManifest -DestinationPath (Join-Path $destDataRoot (Join-Path 'eval\seasons' (Join-Path $season 'season_eval_manifest.json')))) {
     $copied.Add((Join-Path 'eval\seasons' (Join-Path $season 'season_eval_manifest.json'))) | Out-Null
@@ -154,7 +168,7 @@ if (Test-Path $seasonEvalRoot) {
     }
 }
 
-$liveLensRecapSource = Join-Path $sourceRoot (Join-Path 'data\live_lens\recaps' ("live_lens_daily_recap_{0}.json" -f $dateSlug))
+$liveLensRecapSource = if ($UseExistingMirrorArtifacts) { Join-Path $destDataRoot (Join-Path 'live_lens\recaps' ("live_lens_daily_recap_{0}.json" -f $dateSlug)) } else { Join-Path $sourceRoot (Join-Path 'data\live_lens\recaps' ("live_lens_daily_recap_{0}.json" -f $dateSlug)) }
 $liveLensRecapDest = Join-Path $destDataRoot (Join-Path 'live_lens\recaps' ("live_lens_daily_recap_{0}.json" -f $dateSlug))
 if (Copy-IfExists -SourcePath $liveLensRecapSource -DestinationPath $liveLensRecapDest) {
     $copied.Add((Join-Path 'live_lens\recaps' ("live_lens_daily_recap_{0}.json" -f $dateSlug))) | Out-Null
@@ -197,6 +211,7 @@ $manifest = [pscustomobject]@{
     sourceRepo = $sourceRoot
     sourceRootEnvVar = $sourceRootEnvVar
     destinationRoot = $destDataRoot
+    usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
     copiedArtifactCount = $copied.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copied)

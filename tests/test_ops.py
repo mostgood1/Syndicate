@@ -231,6 +231,26 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("refresh_ncaab_source_mirror.ps1", " ".join(str(part) for part in command))
         self.assertIn("-UseExistingRawOutputs", command)
 
+    def test_build_refresh_plan_uses_mlb_existing_mirror_command_in_mirror_only_mode(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="mlb", mirror_only=True)
+
+        self.assertTrue(plan["ok"])
+        self.assertEqual(plan["execution_mode"], "ingest")
+        self.assertEqual(plan["sports"], ["mlb"])
+        result = plan["results"][0]
+        self.assertEqual(result["sport"], "mlb")
+        self.assertEqual(result["generation_mode"], "none")
+        self.assertEqual(result["ingestion_mode"], "mirror_script")
+        self.assertEqual(result["refresh_steps"], [])
+        mirror = result.get("mirror") or {}
+        self.assertTrue(mirror.get("ok"))
+        self.assertTrue(mirror.get("dry_run"))
+        command = mirror.get("command") or []
+        self.assertIn("refresh_mlb_source_mirror.ps1", " ".join(str(part) for part in command))
+        self.assertIn("-UseExistingMirrorArtifacts", command)
+
     def test_build_refresh_plan_uses_nhl_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
 
