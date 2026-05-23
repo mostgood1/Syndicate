@@ -254,31 +254,26 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
 def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("nfl", "NFL-Betting")
     season, week = _infer_nfl_context(source_root, args.season, args.week)
-    python_exe = _venv_python(source_root)
-    out_path = source_root / "nfl_compare" / "data" / f"oddsapi_player_props_{season}_wk{week}.csv"
+    python_exe = _venv_python(REPO_ROOT)
+    artifact_root = _local_source_artifact_root("nfl")
     return [
         RefreshStep(
-            name="nfl_team_odds_snapshot",
+            name="nfl_oddsapi_refresh",
             phases=("pregame", "live"),
-            cwd=source_root / "nfl_compare",
-            command=(python_exe, "-m", "src.odds_api_client"),
-            description="Refresh NFL team odds snapshot from OddsAPI.",
-        ),
-        RefreshStep(
-            name="nfl_player_props_snapshot",
-            phases=("pregame", "live"),
-            cwd=source_root,
+            cwd=REPO_ROOT,
             command=(
                 python_exe,
-                "scripts/fetch_oddsapi_props.py",
+                "scripts/refresh_nfl_oddsapi.py",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
                 "--season",
                 str(season),
                 "--week",
                 str(week),
-                "--out",
-                str(out_path),
             ),
-            description="Refresh NFL player props snapshot from OddsAPI.",
+            description="Refresh NFL team odds and player props into a Syndicate-owned artifact bundle.",
         ),
     ]
 
@@ -523,6 +518,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "nfl":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NFL") or "").strip()
+        if (not artifact_root) and (not mirror_only):
+            artifact_root = str(_local_source_artifact_root("nfl"))
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "ncaaf":

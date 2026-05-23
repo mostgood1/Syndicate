@@ -550,6 +550,28 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("-SourceArtifactRoot", command)
         self.assertIn("C:/published/nfl-bundle", command)
 
+    def test_build_refresh_plan_uses_nfl_syndicate_runner_in_source_mode(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-10-01", sports="nfl", execution_mode="source")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        refresh_steps = result.get("refresh_steps") or []
+        self.assertEqual(len(refresh_steps), 1)
+        step = refresh_steps[0]
+        command = step.get("command") or []
+        self.assertIn("scripts/refresh_nfl_oddsapi.py", " ".join(str(part) for part in command))
+        self.assertNotIn("fetch_oddsapi_props.py --out", " ".join(str(part) for part in command))
+        self.assertNotIn("src.odds_api_client", " ".join(str(part) for part in command))
+        self.assertIn("--source-root", command)
+        self.assertIn("--artifact-root", command)
+        self.assertIn("data/nfl_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
+        mirror = result.get("mirror") or {}
+        mirror_command = mirror.get("command") or []
+        self.assertIn("-SourceArtifactRoot", mirror_command)
+        self.assertIn("data/nfl_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in mirror_command))
+
     def test_build_refresh_plan_uses_ncaaf_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
 
