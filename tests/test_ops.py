@@ -388,6 +388,7 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
+        self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
         step = refresh_steps[0]
@@ -578,6 +579,7 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
+        self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
         step = refresh_steps[0]

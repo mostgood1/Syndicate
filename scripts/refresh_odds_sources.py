@@ -407,7 +407,7 @@ def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: st
     source_dependency = "source_repo_artifacts"
     if execution_mode == "ingest" and _ingest_is_hosted_safe(spec):
         source_dependency = "local_artifacts"
-    elif execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "ncaaf"}:
+    elif execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf"}:
         source_dependency = "local_artifact_bundle"
     return {
         "kind": "mirror_script",
