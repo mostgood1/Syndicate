@@ -127,6 +127,33 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
     return str(out_path)
 
 
+def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    source_app = _load_source_app(source_root)
+    if hasattr(source_app, "_cron_auth_ok"):
+        try:
+            source_app._cron_auth_ok = lambda _request: True
+        except Exception:
+            pass
+    client = source_app.app.test_client()
+    response = client.get(f"/api/cron/reconcile-games?date={date_str}")
+    try:
+        payload = response.get_json() if response is not None else None
+    except Exception:
+        payload = None
+    if not isinstance(payload, dict):
+        return None
+    output_path = str(payload.get("output") or "").strip()
+    if not output_path:
+        return None
+    source = Path(output_path)
+    if not source.exists() or not source.is_file():
+        return None
+    destination = processed_root / source.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
+
+
 def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_root: Path, live_lens_root: Path) -> dict[str, str]:
     source_app = _load_source_app(source_root)
     client = source_app.app.test_client()
@@ -203,6 +230,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         )
         if smart_sim_files:
             copied["smart_sim_paths"] = smart_sim_files
+        recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recon_games_path:
+            copied["recon_games_path"] = recon_games_path
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path

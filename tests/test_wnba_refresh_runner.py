@@ -114,6 +114,10 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                         class _Response:
                             @staticmethod
                             def get_json():
+                                if "cron/reconcile-games" in query:
+                                    recon_source = tmp_root / "recon_games_2026-05-22.csv"
+                                    recon_source.write_text("game_id\n123\n", encoding="utf-8")
+                                    return {"output": str(recon_source), "rows": 1}
                                 return {"data": [{"player": "Test WNBA Player"}]}
 
                             @staticmethod
@@ -153,6 +157,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_ATL_DAL.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_IND_GSV.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "recon_games_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_projections_2026-05-22.jsonl").exists())
