@@ -44,12 +44,25 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
                 "--week",
                 "7",
             ]
-            with patch.object(module, "_load_source_module", return_value=source_module), patch("sys.argv", argv):
+            refresh_result = {
+                "status": "ok",
+                "week": 7,
+                "written_rows": 1,
+                "preserved_rows": 0,
+                "total_rows": 1,
+                "path": str(source_root / "data" / "college_football_betting_lines_2025.csv"),
+                "matched_games": 1,
+                "pred_games_in_week": 1,
+            }
+            with patch.object(module, "_run_refresh", return_value=refresh_result) as run_refresh, patch.object(module, "_materialize_artifact_bundle", return_value=[]), patch.dict("os.environ", {"ODDS_API_KEY": "test-key"}, clear=False), patch("sys.argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
-        self.assertEqual(source_module.calls, 1)
-        self.assertEqual(source_module.argv, ["fetch_2025_lines.py", "--week", "7"])
+        run_refresh.assert_called_once()
+        _, kwargs = run_refresh.call_args
+        self.assertEqual(kwargs["source_root"], source_root.resolve())
+        self.assertEqual(kwargs["week"], 7)
+        self.assertEqual(kwargs["api_key"], "test-key")
 
     def test_main_materializes_ncaaf_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
@@ -67,9 +80,6 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
             (source_data_root / "college_football_betting_lines_2025.csv").write_text("week,homeTeam\n7,Texas\n", encoding="utf-8")
             (summary_root / "reconciliation.csv").write_text("week,count\n7,3\n", encoding="utf-8")
 
-            class _FakeSourceModule:
-                def main(self) -> int:
-                    return 0
 
             argv = [
                 "refresh_ncaaf_oddsapi.py",
@@ -77,8 +87,10 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
                 str(source_root),
                 "--artifact-root",
                 str(artifact_root),
+                "--week",
+                "7",
             ]
-            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch("sys.argv", argv):
+            with patch.object(module, "_run_refresh", return_value={"status": "ok", "week": 7}), patch.dict("os.environ", {"ODDS_API_KEY": "test-key"}, clear=False), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
