@@ -127,6 +127,22 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
     return str(out_path)
 
 
+def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    source_app = _load_source_app(source_root)
+    out_path = processed_root / f"recommendations_slate_{date_str}.json"
+    client = source_app.app.test_client()
+    response = client.get(f"/recommendations?format=json&view=slate&date={date_str}")
+    try:
+        payload = response.get_json() if response is not None else None
+    except Exception:
+        payload = None
+    if not isinstance(payload, dict):
+        payload = {"error": "no_json", "status": int(getattr(response, "status_code", 0) or 0)}
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return str(out_path)
+
+
 def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     source_app = _load_source_app(source_root)
     if hasattr(source_app, "_cron_auth_ok"):
@@ -239,6 +255,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if recon_props_path:
             copied["recon_props_path"] = recon_props_path
+        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recommendations_slate_path:
+            copied["recommendations_slate_path"] = recommendations_slate_path
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
