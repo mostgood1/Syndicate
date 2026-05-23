@@ -379,7 +379,7 @@ REGISTRY: dict[str, SportSpec] = {
         step_builder=_build_ncaaf_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
         ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/ncaaf_source or from a published NCAAF artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NCAAF.",
-        notes="Uses the existing NCAAF lines fetcher through a Syndicate-owned runner that also materializes the recommendation artifact bundle contract.",
+        notes="Uses a Syndicate-owned NCAAF lines runner that reads and writes the local artifact bundle contract instead of calling the sibling fetch script directly.",
     ),
 }
 
@@ -389,6 +389,14 @@ def _ingest_is_hosted_safe(spec: SportSpec) -> bool:
 
 
 def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Path) -> dict[str, Any]:
+    if execution_mode == "source" and spec.slug == "ncaaf":
+        return {
+            "kind": "local_artifact_bundle",
+            "source_dependency": "local_artifact_bundle",
+            "hosted_safe": True,
+            "source_repo": str(source_root),
+            "steps": [],
+        }
     return {
         "kind": "source_repo" if execution_mode == "source" else "none",
         "source_dependency": "source_repo" if execution_mode == "source" else "none",
@@ -490,6 +498,10 @@ def _validate_source_root(spec: SportSpec) -> str | None:
     )
 
 
+def _step_requires_source_root(step: RefreshStep) -> bool:
+    return any(str(part) == "--source-root" for part in step.command)
+
+
 def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mirror_only: bool = False) -> RefreshStep:
     command = [_powershell(), "-ExecutionPolicy", "Bypass", "-File", str(REPO_ROOT / "scripts" / script_name)]
     if script_name not in {"refresh_nfl_source_mirror.ps1", "refresh_ncaaf_source_mirror.ps1"}:
@@ -585,7 +597,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
             "source_repo": str(source_root),
             "source_root_env_var": _source_root_env_var(spec.slug),
             "notes": spec.notes,
-            "generation_mode": "source_repo" if execution_mode == "source" else "none",
+            "generation_mode": "local_artifact_bundle" if execution_mode == "source" and spec.slug == "ncaaf" else "source_repo" if execution_mode == "source" else "none",
             "ingestion_mode": None if args.skip_mirror else "mirror_script",
             "generation": _generation_payload(spec, execution_mode=execution_mode, source_root=source_root),
             "ingestion": _ingestion_payload(spec, skip_mirror=bool(args.skip_mirror), execution_mode=execution_mode),
@@ -595,7 +607,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         }
 
         refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase)
-        if refresh_steps:
+        if refresh_steps and any(_step_requires_source_root(step) for step in refresh_steps):
             source_error = _validate_source_root(spec)
             if source_error is not None:
                 any_failure = True
