@@ -103,6 +103,23 @@ def _export_boxscores_artifact(*, source_root: Path, date_str: str, processed_ro
     return str(destination)
 
 
+def _export_recommendations_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    try:
+        cli_module = _load_source_cli(source_root)
+        cli_module.cli.main(["export-recommendations", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
+    except SystemExit:
+        pass
+    except Exception:
+        return None
+    source = source_root / "data" / "processed" / f"recommendations_{date_str}.csv"
+    if not source.exists() or not source.is_file():
+        return None
+    destination = processed_root / source.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
+
+
 def _load_source_app(source_root: Path):
     app_path = source_root / "app.py"
     return _load_module_from_path("syndicate_nba_source_app", app_path)
@@ -422,6 +439,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         boxscores_path = _export_boxscores_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if boxscores_path:
             copied["boxscores_path"] = boxscores_path
+        recommendations_path = _export_recommendations_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recommendations_path:
+            copied["recommendations_path"] = recommendations_path
         recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if recon_quarters_path:
             copied["recon_quarters_path"] = recon_quarters_path
