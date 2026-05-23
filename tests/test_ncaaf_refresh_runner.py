@@ -100,3 +100,31 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "college_football_betting_lines_2025.csv").exists())
             self.assertTrue((artifact_root / "college_football_schedule_2025_predicted_totals_enhanced.csv").exists())
             self.assertTrue((artifact_root / "recommendations_summary" / "reconciliation.csv").exists())
+
+    def test_main_uses_artifact_root_as_data_root_when_source_root_omitted(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            artifact_root = Path(tmp_dir) / "bundle"
+            summary_root = artifact_root / "recommendations_summary"
+            summary_root.mkdir(parents=True)
+
+            (artifact_root / "recommendations_latest.json").write_text("{}\n", encoding="utf-8")
+            (artifact_root / "recommendations_2025.csv").write_text("week\n7\n", encoding="utf-8")
+            (artifact_root / "college_football_betting_lines_2025.csv").write_text("week,homeTeam\n7,Texas\n", encoding="utf-8")
+            (artifact_root / "college_football_schedule_2025_predicted_totals_enhanced.csv").write_text("season,week,home_team,away_team,start_date\n2025,7,Texas,Oklahoma,2025-10-11T19:00:00Z\n", encoding="utf-8")
+            (summary_root / "reconciliation.csv").write_text("week,count\n7,3\n", encoding="utf-8")
+
+            argv = [
+                "refresh_ncaaf_oddsapi.py",
+                "--artifact-root",
+                str(artifact_root),
+                "--week",
+                "7",
+            ]
+            with patch.object(module, "_run_refresh", return_value={"status": "ok", "week": 7}) as run_refresh, patch.dict("os.environ", {"ODDS_API_KEY": "test-key"}, clear=False), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            _, kwargs = run_refresh.call_args
+            self.assertEqual(kwargs["source_root"], artifact_root.resolve())

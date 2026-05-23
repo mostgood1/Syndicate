@@ -119,6 +119,11 @@ def _copy_if_exists(source: Path, destination: Path) -> bool:
 def _copy_tree_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_dir():
         return False
+    try:
+        if source.resolve() == destination.resolve():
+            return True
+    except Exception:
+        pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         shutil.rmtree(destination)
@@ -128,9 +133,25 @@ def _copy_tree_if_exists(source: Path, destination: Path) -> bool:
 
 def _base_norm(name: str) -> str:
     try:
+        if source.resolve() == destination.resolve():
+            return True
+    except Exception:
+        pass
+    try:
         text = str(name or "")
     except Exception:
         return ""
+
+
+def _resolve_data_root(*, source_root: Path | None, artifact_root: Path) -> Path:
+    if source_root is not None:
+        return source_root.resolve()
+    if (artifact_root / PRED_FILES_GLOB.replace("*", "")).exists():
+        return artifact_root.resolve()
+    pattern_matches = list(artifact_root.glob(PRED_FILES_GLOB))
+    if pattern_matches:
+        return artifact_root.resolve()
+    raise FileNotFoundError("NCAAF runner needs --source-root or an --artifact-root containing the predicted schedule CSV.")
     text = text.strip().lower().replace("&", " and ")
     text = text.replace("ʻ", "'").replace("’", "'")
     text = re.sub(r"[^a-z0-9 '\-]", " ", text)
@@ -476,17 +497,18 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh NCAAF OddsAPI lines through a Syndicate-owned runner.")
-    parser.add_argument("--source-root", required=True)
+    parser.add_argument("--source-root", required=False)
     parser.add_argument("--artifact-root", required=False, default=str(REPO_ROOT / "data" / "ncaaf_source" / "source_artifacts"))
     parser.add_argument("--week", type=int, default=None)
     parser.add_argument("--api-key", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
-    source_root = Path(args.source_root).resolve()
     artifact_root = Path(args.artifact_root).resolve()
+    source_root = Path(args.source_root).resolve() if args.source_root else None
+    data_root = _resolve_data_root(source_root=source_root, artifact_root=artifact_root)
     api_key = args.api_key or os.environ.get("ODDS_API_KEY")
-    week = args.week if args.week is not None else _detect_upcoming_week(source_root)
+    week = args.week if args.week is not None else _detect_upcoming_week(data_root)
 
     if not api_key:
         print(json.dumps({"ok": False, "error": "Missing Odds API key (provide --api-key or set ODDS_API_KEY)."}))
@@ -496,7 +518,7 @@ def main() -> int:
         return 3
 
     try:
-        result = _run_refresh(source_root=source_root, week=week, api_key=api_key, debug=args.debug)
+        result = _run_refresh(source_root=data_root, week=week, api_key=api_key, debug=args.debug)
     except Exception as exc:
         print(json.dumps({"ok": False, "error": str(exc)}))
         return 1
@@ -506,7 +528,7 @@ def main() -> int:
     else:
         print(json.dumps(result, indent=2))
 
-    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root)
+    copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root)
     print(
         json.dumps(
             {
