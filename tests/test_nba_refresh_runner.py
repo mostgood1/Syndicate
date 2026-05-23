@@ -120,6 +120,12 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                                     return {"output": str(recon_source), "rows": 1}
                                 if "view=slate" in query:
                                     return {"games": [{"home_tri": "BOS", "away_tri": "NYK"}]}
+                                if "/api/season/" in query:
+                                    if "include_prop_insights=1" in query:
+                                        return {"date": "2026-05-22", "insights": [{"label": "Prop Insight"}]}
+                                    if "/day/" in query:
+                                        return {"date": "2026-05-22", "rows": [{"home_tri": "BOS", "away_tri": "NYK"}]}
+                                    return {"season": 2025, "days": [{"date": "2026-05-22"}]}
                                 if "/api/cards" in query:
                                     return {
                                         "games": [
@@ -215,6 +221,10 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "cards_props_snapshot_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "cards_sim_detail_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "season_betting_card_manifest_2025_retuned_2026-05-22.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "season_betting_card_manifest_2025_retuned.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "season_betting_card_day_2025_retuned_2026-05-22.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "season_betting_card_day_2025_retuned_2026-05-22_insights.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_projections_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_tuning_override.json").exists())

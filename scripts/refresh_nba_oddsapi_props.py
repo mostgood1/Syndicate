@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import importlib
 import importlib.util
 import json
@@ -66,6 +67,8 @@ def _load_module_from_path(module_name: str, module_path: Path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
 def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     try:
         cli_module = _load_source_cli(source_root)
@@ -103,6 +106,11 @@ def _export_boxscores_artifact(*, source_root: Path, date_str: str, processed_ro
 def _load_source_app(source_root: Path):
     app_path = source_root / "app.py"
     return _load_module_from_path("syndicate_nba_source_app", app_path)
+
+
+def _resolve_nba_season_year(date_str: str) -> int:
+    parsed = dt.datetime.strptime(date_str, "%Y-%m-%d")
+    return parsed.year if parsed.month >= 7 else parsed.year - 1
 
 
 def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
@@ -173,6 +181,45 @@ def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return str(out_path)
+
+
+def _export_season_betting_card_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
+    source_app = _load_source_app(source_root)
+    season = _resolve_nba_season_year(date_str)
+    profile = "retuned"
+    manifest_path = processed_root / f"season_betting_card_manifest_{season}_{profile}_{date_str}.json"
+    generic_manifest_path = processed_root / f"season_betting_card_manifest_{season}_{profile}.json"
+    day_path = processed_root / f"season_betting_card_day_{season}_{profile}_{date_str}.json"
+    day_insights_path = processed_root / f"season_betting_card_day_{season}_{profile}_{date_str}_insights.json"
+    client = source_app.app.test_client()
+
+    def _fetch_json(query: str) -> dict[str, object]:
+        response = client.get(query)
+        try:
+            payload = response.get_json() if response is not None else None
+        except Exception:
+            payload = None
+        if not isinstance(payload, dict):
+            payload = {"error": "no_json", "status": int(getattr(response, "status_code", 0) or 0)}
+        return payload
+
+    artifacts = {
+        manifest_path: _fetch_json(f"/api/season/{season}/betting-card?profile={profile}&date={date_str}"),
+        day_path: _fetch_json(f"/api/season/{season}/betting-card/day/{date_str}?profile={profile}"),
+        day_insights_path: _fetch_json(
+            f"/api/season/{season}/betting-card/day/{date_str}?profile={profile}&include_prop_insights=1"
+        ),
+    }
+    copied: dict[str, str] = {}
+    for out_path, payload in artifacts.items():
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    shutil.copy2(manifest_path, generic_manifest_path)
+    copied["season_betting_card_manifest_path"] = str(manifest_path)
+    copied["season_betting_card_manifest_generic_path"] = str(generic_manifest_path)
+    copied["season_betting_card_day_path"] = str(day_path)
+    copied["season_betting_card_day_insights_path"] = str(day_insights_path)
+    return copied
 
 
 def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
@@ -393,6 +440,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
+        copied.update(_export_season_betting_card_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
         copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
         copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     return copied
