@@ -89,39 +89,28 @@ def _infer_nfl_context(source_root: Path, season: int | None, week: int | None) 
 
 def _build_mlb_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("mlb", "MLB-BettingV2")
-    python_exe = _venv_python(source_root)
+    python_exe = _venv_python(REPO_ROOT)
+    artifact_root = _local_source_artifact_root("mlb")
     return [
         RefreshStep(
-            name="mlb_oddsapi_markets",
+            name="mlb_oddsapi_refresh",
             phases=("pregame", "live"),
-            cwd=source_root,
+            cwd=REPO_ROOT,
             command=(
                 python_exe,
-                "-m",
-                "tools.oddsapi.fetch_daily_oddsapi_markets",
+                "scripts/refresh_mlb_oddsapi.py",
                 "--date",
                 args.date,
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
                 "--regions",
                 args.regions,
                 "--overwrite",
                 "on",
             ),
-            description="Refresh MLB current-day game lines and props from OddsAPI.",
-        ),
-        RefreshStep(
-            name="mlb_live_lens_report",
-            phases=("live",),
-            cwd=source_root,
-            command=(
-                python_exe,
-                "-c",
-                (
-                    "import json; "
-                    "from tools.web.flask_frontend import _persist_live_lens_tick; "
-                    f"print(json.dumps(_persist_live_lens_tick({args.date!r}, trigger='syndicate_refresh', refresh_markets=False)))"
-                ),
-            ),
-            description="Rebuild the MLB live-lens report after live OddsAPI refresh so mirrored live artifacts stay current.",
+            description="Refresh MLB markets and live-lens artifacts into a Syndicate-owned bundle.",
         ),
     ]
 
@@ -339,7 +328,7 @@ REGISTRY: dict[str, SportSpec] = {
         step_builder=_build_mlb_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
         ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/mlb_source or from a published MLB artifact bundle root via SYNDICATE_ARTIFACT_ROOT_MLB.",
-        notes="Uses the canonical current-day OddsAPI market refresh script that writes game lines plus hitter/pitcher props.",
+        notes="Uses the source OddsAPI and live-lens helpers through a Syndicate-owned runner that materializes the MLB artifact bundle contract.",
     ),
     "nba": SportSpec(
         slug="nba",
@@ -418,7 +407,7 @@ def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: st
     source_dependency = "source_repo_artifacts"
     if execution_mode == "ingest" and _ingest_is_hosted_safe(spec):
         source_dependency = "local_artifacts"
-    elif execution_mode == "source" and spec.slug in {"nba", "wnba", "ncaaf"}:
+    elif execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "ncaaf"}:
         source_dependency = "local_artifact_bundle"
     return {
         "kind": "mirror_script",
@@ -510,6 +499,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
         command.extend(["-Date", date])
     if sport == "mlb":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_MLB") or "").strip()
+        if (not artifact_root) and (not mirror_only):
+            artifact_root = str(_local_source_artifact_root("mlb"))
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "nba":

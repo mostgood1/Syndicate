@@ -326,6 +326,27 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("-SourceArtifactRoot", command)
         self.assertIn("C:/published/mlb-bundle", command)
 
+    def test_build_refresh_plan_uses_mlb_syndicate_runner_in_source_mode(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="mlb", execution_mode="source")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        refresh_steps = result.get("refresh_steps") or []
+        self.assertEqual(len(refresh_steps), 1)
+        step = refresh_steps[0]
+        command = step.get("command") or []
+        self.assertIn("scripts/refresh_mlb_oddsapi.py", " ".join(str(part) for part in command))
+        self.assertNotIn("tools.oddsapi.fetch_daily_oddsapi_markets", " ".join(str(part) for part in command))
+        self.assertIn("--source-root", command)
+        self.assertIn("--artifact-root", command)
+        self.assertIn("data/mlb_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
+        mirror = result.get("mirror") or {}
+        mirror_command = mirror.get("command") or []
+        self.assertIn("-SourceArtifactRoot", mirror_command)
+        self.assertIn("data/mlb_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in mirror_command))
+
     def test_build_refresh_plan_uses_nhl_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
 
@@ -673,10 +694,10 @@ class OpsRefreshApiTests(unittest.TestCase):
                     "ingestion": {"kind": "mirror_script", "source_dependency": "local_artifacts", "hosted_safe": True, "contract": {"kind": "artifact_bundle_or_existing_mirror"}},
                     "refresh_steps": [
                         {
-                            "name": "mlb_oddsapi_markets",
+                            "name": "mlb_oddsapi_refresh",
                             "ok": True,
                             "description": "Refresh MLB markets",
-                            "command": ["python", "-m", "tools.oddsapi.fetch_daily_oddsapi_markets"],
+                            "command": ["python", "scripts/refresh_mlb_oddsapi.py"],
                         }
                     ],
                     "mirror": {
@@ -703,7 +724,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("Odds refresh control plane", html)
         self.assertIn("Persisted refresh status", html)
         self.assertIn("Dry-run execution plan", html)
-        self.assertIn("mlb_oddsapi_markets", html)
+        self.assertIn("mlb_oddsapi_refresh", html)
         self.assertIn("skip mirror", html.lower())
         self.assertIn("Launch Refresh", html)
         self.assertIn("Run state: finished", html)
