@@ -31,14 +31,18 @@ except ImportError:  # pragma: no cover - exercised in local CLI usage.
 
 WAIT_FOR_SETTLED_JS = """
 (spec) => {
+    const normalizeLoadingText = (value) => String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/…/g, '...');
   const settled = (selector, loadingText) => {
     if (!selector) return true;
     const element = document.querySelector(selector);
     if (!element) return false;
     if (!loadingText) return true;
     const currentText = (element.textContent || '').trim();
-        const normalizedCurrent = currentText.toLowerCase();
-        const normalizedLoading = String(loadingText || '').trim().toLowerCase();
+                const normalizedCurrent = normalizeLoadingText(currentText);
+                const normalizedLoading = normalizeLoadingText(loadingText);
     if (element.children && element.children.length > 1) return true;
         return !normalizedCurrent.startsWith(normalizedLoading);
   };

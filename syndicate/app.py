@@ -31,7 +31,7 @@ def create_app() -> Flask:
                 "phase": "Reference module",
                 "summary": "Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked MLB views.",
                 "primary_href": "/mlb",
-                "primary_label": "Open MLB cards",
+                "primary_label": "Open MLB hub",
                 "surfaces": ["cards", "game", "live-lens", "daily archive", "season betting-card", "hub"],
                 "next_step": "Keep MLB stable as the reference module, and only extract shared board helpers where multiple migrated sports now prove the abstraction without weakening artifact-backed browser parity.",
                 "runtime_contract": {
