@@ -308,17 +308,25 @@ def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("ncaaf", "NCAAFCompare")
-    python_exe = _venv_python(source_root)
-    command = [python_exe, "fetch_2025_lines.py"]
+    python_exe = _venv_python(REPO_ROOT)
+    artifact_root = _local_source_artifact_root("ncaaf")
+    command = [
+        python_exe,
+        "scripts/refresh_ncaaf_oddsapi.py",
+        "--source-root",
+        str(source_root),
+        "--artifact-root",
+        str(artifact_root),
+    ]
     if args.week is not None:
         command.extend(["--week", str(args.week)])
     return [
         RefreshStep(
             name="ncaaf_lines_snapshot",
             phases=("pregame", "live"),
-            cwd=source_root,
+            cwd=REPO_ROOT,
             command=tuple(command),
-            description="Refresh NCAAF lines snapshot using the existing 2025 lines fetcher.",
+            description="Refresh NCAAF lines and bundle source recommendation artifacts through a Syndicate-owned runner.",
         )
     ]
 
@@ -384,8 +392,8 @@ REGISTRY: dict[str, SportSpec] = {
         mirror_script_name="refresh_ncaaf_source_mirror.ps1",
         step_builder=_build_ncaaf_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
-        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/ncaaf_source/data or from a published NCAAF artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NCAAF.",
-        notes="Uses the existing NCAAF lines fetcher that merges provider lines into the source CSV used by the app.",
+        ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/ncaaf_source or from a published NCAAF artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NCAAF.",
+        notes="Uses the existing NCAAF lines fetcher through a Syndicate-owned runner that also materializes the recommendation artifact bundle contract.",
     ),
 }
 
@@ -410,7 +418,7 @@ def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: st
     source_dependency = "source_repo_artifacts"
     if execution_mode == "ingest" and _ingest_is_hosted_safe(spec):
         source_dependency = "local_artifacts"
-    elif execution_mode == "source" and spec.slug in {"nba", "wnba"}:
+    elif execution_mode == "source" and spec.slug in {"nba", "wnba", "ncaaf"}:
         source_dependency = "local_artifact_bundle"
     return {
         "kind": "mirror_script",
@@ -524,6 +532,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "ncaaf":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NCAAF") or "").strip()
+        if (not artifact_root) and (not mirror_only):
+            artifact_root = str(_local_source_artifact_root("ncaaf"))
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "wnba":
