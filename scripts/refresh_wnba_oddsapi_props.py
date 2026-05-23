@@ -233,6 +233,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if recon_games_path:
             copied["recon_games_path"] = recon_games_path
+        recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recon_quarters_path:
+            copied["recon_quarters_path"] = recon_quarters_path
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
@@ -246,6 +249,30 @@ def _load_source_module(source_root: Path):
     if str(src_root) not in sys.path:
         sys.path.insert(0, str(src_root))
     return importlib.import_module("nba_betting.refresh_oddsapi_props_job")
+
+
+def _load_source_cli(source_root: Path):
+    src_root = source_root / "src"
+    if str(src_root) not in sys.path:
+        sys.path.insert(0, str(src_root))
+    return importlib.import_module("nba_betting.cli")
+
+
+def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    try:
+        cli_module = _load_source_cli(source_root)
+        cli_module.cli.main(["reconcile-quarters", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
+    except SystemExit:
+        pass
+    except Exception:
+        return None
+    source = source_root / "data" / "processed" / f"recon_quarters_{date_str}.csv"
+    if not source.exists() or not source.is_file():
+        return None
+    destination = processed_root / source.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
 
 
 def main() -> int:
