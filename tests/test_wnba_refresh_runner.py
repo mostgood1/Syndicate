@@ -151,7 +151,12 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("game_id\nquarter-123\n", encoding="utf-8")
                 return str(out_path)
 
-            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch("sys.argv", argv):
+            def _fake_recon_props_artifact(*, source_root, date_str, processed_root):
+                out_path = processed_root / f"recon_props_{date_str}.csv"
+                out_path.write_text("player_id\n42\n", encoding="utf-8")
+                return str(out_path)
+
+            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch.object(module, "_export_recon_props_artifact", side_effect=_fake_recon_props_artifact), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -164,6 +169,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_IND_GSV.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "recon_games_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "recon_quarters_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "recon_props_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_projections_2026-05-22.jsonl").exists())

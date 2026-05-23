@@ -236,6 +236,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if recon_quarters_path:
             copied["recon_quarters_path"] = recon_quarters_path
+        recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if recon_props_path:
+            copied["recon_props_path"] = recon_props_path
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
@@ -267,6 +270,23 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
     except Exception:
         return None
     source = source_root / "data" / "processed" / f"recon_quarters_{date_str}.csv"
+    if not source.exists() or not source.is_file():
+        return None
+    destination = processed_root / source.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
+
+
+def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    try:
+        cli_module = _load_source_cli(source_root)
+        cli_module.cli.main(["fetch-prop-actuals", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
+    except SystemExit:
+        pass
+    except Exception:
+        return None
+    source = source_root / "data" / "processed" / f"recon_props_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
     destination = processed_root / source.name
