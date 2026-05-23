@@ -296,14 +296,11 @@ def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 
 def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _source_repo_root("ncaaf", "NCAAFCompare")
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("ncaaf")
     command = [
         python_exe,
         "scripts/refresh_ncaaf_oddsapi.py",
-        "--source-root",
-        str(source_root),
         "--artifact-root",
         str(artifact_root),
     ]

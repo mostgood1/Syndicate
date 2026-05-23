@@ -608,7 +608,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         command = step.get("command") or []
         self.assertIn("scripts/refresh_ncaaf_oddsapi.py", " ".join(str(part) for part in command))
         self.assertNotIn("fetch_2025_lines.py --week", " ".join(str(part) for part in command))
-        self.assertIn("--source-root", command)
+        self.assertNotIn("--source-root", command)
         self.assertIn("--artifact-root", command)
         self.assertIn("data/ncaaf_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
         mirror = result.get("mirror") or {}
