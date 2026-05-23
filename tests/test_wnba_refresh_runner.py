@@ -130,6 +130,20 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                                                     "home": [{"player": "Home WNBA Prop"}],
                                                     "away": [{"player": "Away WNBA Prop"}],
                                                 },
+                                                "sim": {
+                                                    "players": {
+                                                        "home": [{"player": "Home WNBA Sim"}],
+                                                        "away": [{"player": "Away WNBA Sim"}],
+                                                    },
+                                                    "missing_prop_players": {
+                                                        "home": [{"player": "Missing Home WNBA"}],
+                                                        "away": [{"player": "Missing Away WNBA"}],
+                                                    },
+                                                    "injuries": {
+                                                        "home": [{"player": "Injured Home WNBA"}],
+                                                        "away": [{"player": "Injured Away WNBA"}],
+                                                    },
+                                                },
                                             }
                                         ]
                                     }
@@ -187,6 +201,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "recon_props_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "recommendations_slate_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "cards_props_snapshot_2026-05-22.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "cards_sim_detail_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_projections_2026-05-22.jsonl").exists())

@@ -176,6 +176,61 @@ def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_
     return str(out_path)
 
 
+def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    source_app = _load_source_app(source_root)
+    out_path = processed_root / f"cards_sim_detail_{date_str}.json"
+    client = source_app.app.test_client()
+    response = client.get(f"/api/cards?date={date_str}&include_players=1&props_source=auto")
+    try:
+        payload = response.get_json() if response is not None else None
+    except Exception:
+        payload = None
+
+    games_out = []
+    if isinstance(payload, dict):
+        for game in payload.get("games") or []:
+            if not isinstance(game, dict):
+                continue
+            sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+            players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+            missing = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {}
+            injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {}
+            summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {
+                "home": len(players.get("home") or []),
+                "away": len(players.get("away") or []),
+                "missing_home": len(missing.get("home") or []),
+                "missing_away": len(missing.get("away") or []),
+                "injured_home": len(injuries.get("home") or []),
+                "injured_away": len(injuries.get("away") or []),
+            }
+            games_out.append(
+                {
+                    "home_tri": game.get("home_tri"),
+                    "away_tri": game.get("away_tri"),
+                    "sim": {
+                        "players_summary": dict(summary),
+                        "players": {
+                            "home": [row for row in (players.get("home") or []) if isinstance(row, dict)],
+                            "away": [row for row in (players.get("away") or []) if isinstance(row, dict)],
+                        },
+                        "missing_prop_players": {
+                            "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
+                            "away": [row for row in (missing.get("away") or []) if isinstance(row, dict)],
+                        },
+                        "injuries": {
+                            "home": [row for row in (injuries.get("home") or []) if isinstance(row, dict)],
+                            "away": [row for row in (injuries.get("away") or []) if isinstance(row, dict)],
+                        },
+                    },
+                }
+            )
+
+    out = {"date": date_str, "games": games_out}
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    return str(out_path)
+
+
 def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     source_app = _load_source_app(source_root)
     if hasattr(source_app, "_cron_auth_ok"):
@@ -294,6 +349,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if cards_props_snapshot_path:
             copied["cards_props_snapshot_path"] = cards_props_snapshot_path
+        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if cards_sim_detail_path:
+            copied["cards_sim_detail_path"] = cards_sim_detail_path
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path
