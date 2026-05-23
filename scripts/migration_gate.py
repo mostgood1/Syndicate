@@ -70,7 +70,7 @@ PROTECTED_RUNTIME_CONTRACTS = (
     {
         "slug": "nfl",
         "dependency_tier": "artifact_backed",
-        "ownership_goal": "artifact_backed",
+        "ownership_goal": "mirror_first",
         "ownership_score_min": 85,
         "fallback_surfaces": (),
         "parity_gap_count": 0,
@@ -86,7 +86,7 @@ PROTECTED_RUNTIME_CONTRACTS = (
     {
         "slug": "ncaaf",
         "dependency_tier": "artifact_backed",
-        "ownership_goal": "artifact_backed",
+        "ownership_goal": "mirror_first",
         "ownership_score_min": 85,
         "fallback_surfaces": (),
         "parity_gap_count": 0,

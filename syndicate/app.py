@@ -87,7 +87,7 @@ def create_app() -> Flask:
                 "next_step": "Keep NFL stable as the next module-family completion candidate, now that weekly snapshots back cards, live lens, archive, and betting-card lanes under the same artifact-backed contract.",
                 "runtime_contract": {
                     "dependency_tier": "artifact_backed",
-                    "ownership_goal": "artifact_backed",
+                    "ownership_goal": "mirror_first",
                     "source_of_truth": "Weekly stored snapshots mirrored into Syndicate",
                     "fallback_surfaces": [],
                 },
@@ -121,7 +121,7 @@ def create_app() -> Flask:
                 "next_step": "Keep NCAAF stable on the protected artifact-backed weekly contract until the live source workflow repopulates, then decide whether live-lens or archive wrappers need richer native views.",
                 "runtime_contract": {
                     "dependency_tier": "artifact_backed",
-                    "ownership_goal": "artifact_backed",
+                    "ownership_goal": "mirror_first",
                     "source_of_truth": "Syndicate-local weekly snapshots",
                     "fallback_surfaces": [],
                 },

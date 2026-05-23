@@ -20,8 +20,8 @@ class ModuleTrackerSnapshotTests(unittest.TestCase):
         self.assertEqual(modules["ncaab"]["runtime_contract"]["fallback_surfaces"], [])
         self.assertEqual(modules["nba"]["runtime_contract"]["ownership_score"], 90)
         self.assertEqual(modules["ncaab"]["runtime_contract"]["ownership_score"], 90)
-        self.assertEqual(modules["nfl"]["runtime_contract"]["ownership_score"], 88)
-        self.assertEqual(modules["ncaaf"]["runtime_contract"]["ownership_score"], 88)
+        self.assertEqual(modules["nfl"]["runtime_contract"]["ownership_score"], 90)
+        self.assertEqual(modules["ncaaf"]["runtime_contract"]["ownership_score"], 90)
         self.assertGreaterEqual(modules["ncaab"]["runtime_contract"]["ownership_score"], modules["nba"]["runtime_contract"]["ownership_score"])
 
     def test_gap_summary_ranks_low_ownership_modules(self) -> None:
@@ -29,17 +29,18 @@ class ModuleTrackerSnapshotTests(unittest.TestCase):
         lowest = snapshot["gap_summary"]["lowest_ownership_modules"]
 
         self.assertGreaterEqual(len(lowest), 1)
-        self.assertGreaterEqual(lowest[0]["ownership_score"], 88)
+        self.assertGreaterEqual(lowest[0]["ownership_score"], 90)
         self.assertEqual(lowest[0]["dependency_tier"], "artifact_backed")
-        self.assertEqual({item["slug"] for item in lowest[:2]}, {"nfl", "ncaaf"})
+        self.assertEqual({item["slug"] for item in lowest[:3]}, {"nba", "ncaab", "ncaaf"})
 
     def test_text_report_includes_ownership_section(self) -> None:
         snapshot = module_snapshot()
         report = render_text_report(snapshot)
 
         self.assertIn("Lowest ownership / source-independence modules:", report)
+        self.assertIn("nba", report)
+        self.assertIn("ncaab", report)
         self.assertIn("ncaaf", report)
-        self.assertIn("nfl", report)
 
     def test_text_report_suppresses_zero_gap_rankings(self) -> None:
         snapshot = module_snapshot()
