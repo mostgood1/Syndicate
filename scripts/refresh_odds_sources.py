@@ -229,21 +229,24 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     source_root = _source_repo_root("nhl", "NHL-Betting")
-    python_exe = _venv_python(source_root)
+    python_exe = _venv_python(REPO_ROOT)
+    artifact_root = _local_source_artifact_root("nhl")
     return [
         RefreshStep(
-            name="nhl_team_odds_collect",
+            name="nhl_oddsapi_refresh",
             phases=("pregame", "live"),
-            cwd=source_root,
-            command=(python_exe, "-m", "nhl_betting.cli", "team-odds-collect", "--date", args.date),
-            description="Refresh NHL team odds for the selected date.",
-        ),
-        RefreshStep(
-            name="nhl_props_collect",
-            phases=("pregame", "live"),
-            cwd=source_root,
-            command=(python_exe, "-m", "nhl_betting.cli", "props-collect", "--date", args.date, "--source", "oddsapi"),
-            description="Refresh NHL player props lines from OddsAPI.",
+            cwd=REPO_ROOT,
+            command=(
+                python_exe,
+                "scripts/refresh_nhl_oddsapi.py",
+                "--date",
+                args.date,
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+            ),
+            description="Refresh NHL team odds and player props lines into a Syndicate-owned artifact bundle.",
         ),
     ]
 
@@ -514,6 +517,8 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "nhl":
         artifact_root = str(os.environ.get("SYNDICATE_ARTIFACT_ROOT_NHL") or "").strip()
+        if (not artifact_root) and (not mirror_only):
+            artifact_root = str(_local_source_artifact_root("nhl"))
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
     if sport == "nfl":
