@@ -143,6 +143,39 @@ def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, 
     return str(out_path)
 
 
+def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    source_app = _load_source_app(source_root)
+    out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
+    client = source_app.app.test_client()
+    response = client.get(f"/api/cards?date={date_str}&props_source=source")
+    try:
+        payload = response.get_json() if response is not None else None
+    except Exception:
+        payload = None
+
+    games_out = []
+    if isinstance(payload, dict):
+        for game in payload.get("games") or []:
+            if not isinstance(game, dict):
+                continue
+            prop_recommendations = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
+            games_out.append(
+                {
+                    "home_tri": game.get("home_tri"),
+                    "away_tri": game.get("away_tri"),
+                    "prop_recommendations": {
+                        "home": [row for row in (prop_recommendations.get("home") or []) if isinstance(row, dict)],
+                        "away": [row for row in (prop_recommendations.get("away") or []) if isinstance(row, dict)],
+                    },
+                }
+            )
+
+    out = {"date": date_str, "games": games_out}
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+    return str(out_path)
+
+
 def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     source_app = _load_source_app(source_root)
     if hasattr(source_app, "_cron_auth_ok"):
@@ -258,6 +291,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if recommendations_slate_path:
             copied["recommendations_slate_path"] = recommendations_slate_path
+        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if cards_props_snapshot_path:
+            copied["cards_props_snapshot_path"] = cards_props_snapshot_path
         top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if top_by_game_path:
             copied["top_by_game_path"] = top_by_game_path

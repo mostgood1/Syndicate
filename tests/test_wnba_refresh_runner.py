@@ -120,6 +120,19 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                                     return {"output": str(recon_source), "rows": 1}
                                 if "view=slate" in query:
                                     return {"games": [{"home_tri": "ATL", "away_tri": "DAL"}]}
+                                if "/api/cards" in query:
+                                    return {
+                                        "games": [
+                                            {
+                                                "home_tri": "ATL",
+                                                "away_tri": "DAL",
+                                                "prop_recommendations": {
+                                                    "home": [{"player": "Home WNBA Prop"}],
+                                                    "away": [{"player": "Away WNBA Prop"}],
+                                                },
+                                            }
+                                        ]
+                                    }
                                 return {"data": [{"player": "Test WNBA Player"}]}
 
                             @staticmethod
@@ -173,6 +186,7 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / "recon_quarters_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "recon_props_2026-05-22.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "recommendations_slate_2026-05-22.json").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "cards_props_snapshot_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "props_recommendations_top_by_game_2026-05-22.json").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "live_lens_projections_2026-05-22.jsonl").exists())
