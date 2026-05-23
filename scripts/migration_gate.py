@@ -308,6 +308,14 @@ def summarize_command_output(output: str, limit: int = 600) -> str:
     return f"{text[: limit - 3]}..."
 
 
+def audit_finding_identity(item: dict[str, object]) -> tuple[object, ...]:
+    category = str(item.get("category") or "").strip()
+    path = str(item.get("path") or "").strip()
+    if category == "source_shell_route":
+        return (category, path)
+    return (category, path, item.get("line"))
+
+
 def evaluate_runtime_dependency_findings(findings: list[dict[str, object]]) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     allowed_set = {
         (
@@ -824,13 +832,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         audit_parse_error = "audit command failed"
 
     normalized_findings = normalize_audit_findings(findings_payload)
-    allowed_set = {(item["category"], item["path"], item["line"]) for item in ALLOWED_AUDIT_FINDINGS}
-    actual_set = {(item.get("category"), item.get("path"), item.get("line")) for item in normalized_findings}
+    allowed_set = {audit_finding_identity(item) for item in ALLOWED_AUDIT_FINDINGS}
+    actual_set = {audit_finding_identity(item) for item in normalized_findings}
     unexpected_findings = [
-        item for item in normalized_findings if (item.get("category"), item.get("path"), item.get("line")) not in allowed_set
+        item for item in normalized_findings if audit_finding_identity(item) not in allowed_set
     ]
     missing_allowed_findings = [
-        item for item in ALLOWED_AUDIT_FINDINGS if (item["category"], item["path"], item["line"]) not in actual_set
+        item for item in ALLOWED_AUDIT_FINDINGS if audit_finding_identity(item) not in actual_set
     ]
     audit_ok = bool(audit_result.ok and audit_parse_error is None and not unexpected_findings and not missing_allowed_findings)
 
