@@ -26,6 +26,10 @@ ROOT_FILES = (
     "college_football_betting_lines_2025.csv",
 )
 
+ROOT_FILE_GLOBS = (
+    PRED_FILES_GLOB,
+)
+
 DIRECTORIES = (
     "recommendations_summary",
 )
@@ -454,6 +458,12 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
         destination = artifact_root / name
         if _copy_if_exists(source, destination):
             copied.setdefault("files", []).append(str(destination))
+
+    for pattern in ROOT_FILE_GLOBS:
+        for source in sorted(source_data_root.glob(pattern)):
+            destination = artifact_root / source.name
+            if _copy_if_exists(source, destination):
+                copied.setdefault("files", []).append(str(destination))
 
     for name in DIRECTORIES:
         source = source_data_root / name

@@ -82,6 +82,8 @@ class NcaafMirrorScriptTests(unittest.TestCase):
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
         self.assertIn("usedArtifactBundle", content)
+        self.assertIn("college_football_betting_lines_2025.csv", content)
+        self.assertIn("college_football_schedule_2025_predicted_totals_enhanced*.csv", content)
 
 
 class WnbaMirrorScriptTests(unittest.TestCase):

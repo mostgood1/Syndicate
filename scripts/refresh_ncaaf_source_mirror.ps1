@@ -96,7 +96,12 @@ $copied = New-Object System.Collections.Generic.List[string]
 
 $fileNames = @(
     'recommendations_latest.json',
-    'recommendations_2025.csv'
+    'recommendations_2025.csv',
+    'college_football_betting_lines_2025.csv'
+)
+
+$filePatterns = @(
+    'college_football_schedule_2025_predicted_totals_enhanced*.csv'
 )
 
 foreach ($name in $fileNames) {
@@ -104,6 +109,16 @@ foreach ($name in $fileNames) {
     $dst = Join-Path $destRoot $name
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add($name) | Out-Null
+    }
+}
+
+foreach ($pattern in $filePatterns) {
+    Get-ChildItem -Path (Join-Path $sourceDataRoot $pattern) -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $src = $_.FullName
+        $dst = Join-Path $destRoot $_.Name
+        if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
+            $copied.Add($_.Name) | Out-Null
+        }
     }
 }
 

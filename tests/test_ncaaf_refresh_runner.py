@@ -78,6 +78,7 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
             (source_data_root / "recommendations_latest.json").write_text("{}\n", encoding="utf-8")
             (source_data_root / "recommendations_2025.csv").write_text("week\n7\n", encoding="utf-8")
             (source_data_root / "college_football_betting_lines_2025.csv").write_text("week,homeTeam\n7,Texas\n", encoding="utf-8")
+            (source_data_root / "college_football_schedule_2025_predicted_totals_enhanced.csv").write_text("season,week,home_team,away_team,start_date\n2025,7,Texas,Oklahoma,2025-10-11T19:00:00Z\n", encoding="utf-8")
             (summary_root / "reconciliation.csv").write_text("week,count\n7,3\n", encoding="utf-8")
 
 
@@ -97,4 +98,5 @@ class NcaafRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "recommendations_latest.json").exists())
             self.assertTrue((artifact_root / "recommendations_2025.csv").exists())
             self.assertTrue((artifact_root / "college_football_betting_lines_2025.csv").exists())
+            self.assertTrue((artifact_root / "college_football_schedule_2025_predicted_totals_enhanced.csv").exists())
             self.assertTrue((artifact_root / "recommendations_summary" / "reconciliation.csv").exists())
