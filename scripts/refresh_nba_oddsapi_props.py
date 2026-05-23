@@ -66,6 +66,21 @@ def _load_module_from_path(module_name: str, module_path: Path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    try:
+        cli_module = _load_source_cli(source_root)
+        cli_module.cli.main(["export-game-cards", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
+    except SystemExit:
+        pass
+    except Exception:
+        return None
+    source = source_root / "data" / "processed" / f"game_cards_{date_str}.csv"
+    if not source.exists() or not source.is_file():
+        return None
+    destination = processed_root / source.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
 
 
 def _load_source_app(source_root: Path):
@@ -337,6 +352,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if recon_games_path:
             copied["recon_games_path"] = recon_games_path
+        game_cards_path = _export_game_cards_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+        if game_cards_path:
+            copied["game_cards_path"] = game_cards_path
         recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
         if recon_quarters_path:
             copied["recon_quarters_path"] = recon_quarters_path
