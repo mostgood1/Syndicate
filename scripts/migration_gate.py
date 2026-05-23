@@ -20,27 +20,22 @@ ALLOWED_AUDIT_FINDINGS = (
     {
         "category": "source_shell_route",
         "path": "syndicate/blueprints/mlb.py",
-        "line": 272,
+        "line": 291,
     },
     {
         "category": "source_shell_route",
         "path": "syndicate/blueprints/nba.py",
-        "line": 136,
+        "line": 140,
     },
     {
         "category": "source_shell_route",
         "path": "syndicate/blueprints/nhl.py",
-        "line": 215,
+        "line": 234,
     },
     {
         "category": "source_shell_route",
         "path": "syndicate/blueprints/wnba.py",
-        "line": 209,
-    },
-    {
-        "category": "source_shell_route",
-        "path": "syndicate/blueprints/wnba.py",
-        "line": 213,
+        "line": 243,
     },
 )
 
