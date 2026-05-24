@@ -455,7 +455,7 @@
                     <span class="ops-badge {% if sport.get('ok') %}ops-badge--ok{% else %}ops-badge--error{% endif %}">{{ 'ok' if sport.get('ok') else 'error' }}</span>
                   </div>
                   <p class="ops-note">{{ sport.get('notes') }}</p>
-                  <p class="ops-path">Source repo: {{ sport.get('source_repo') }}</p>
+                  <p class="ops-path">{{ 'Source repo' if sport.get('generation', {}).get('source_dependency') == 'source_repo' else 'Source context' }}: {{ sport.get('source_repo') }}</p>
                   {% if sport.get('error') %}
                     <p class="ops-error">{{ sport.get('error') }}</p>
                   {% endif %}

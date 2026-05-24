@@ -756,6 +756,56 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("Mirror manifests", html)
         self.assertIn("Copied 14 artifacts", html)
         self.assertIn("Contract: artifact_bundle_or_existing_mirror", html)
+        self.assertIn("Source repo: C:/repos/MLB-BettingV2", html)
+
+    def test_ops_page_labels_bundle_local_generation_as_source_context(self) -> None:
+        fake_status = {"refresh_status": {"mirror_manifests": [], "runtime": {"state": "idle", "detail": "No active refresh run."}}, "daily_update": {"manifest": None}}
+        fake_plan = {
+            "ok": True,
+            "date": "2026-10-01",
+            "phase": "all",
+            "sports": ["ncaaf"],
+            "skip_mirror": False,
+            "mirror_only": False,
+            "results": [
+                {
+                    "sport": "ncaaf",
+                    "ok": True,
+                    "notes": "NCAAF local artifact bundle refresh",
+                    "source_repo": "C:/repos/NCAAFCompare",
+                    "generation": {"kind": "local_artifact_bundle", "source_dependency": "local_artifact_bundle", "hosted_safe": True},
+                    "ingestion": {"kind": "mirror_script", "source_dependency": "local_artifact_bundle", "hosted_safe": False, "contract": {"kind": "artifact_bundle_or_existing_mirror"}},
+                    "refresh_steps": [
+                        {
+                            "name": "ncaaf_lines_snapshot",
+                            "ok": True,
+                            "description": "Refresh NCAAF lines",
+                            "command": ["python", "scripts/refresh_ncaaf_oddsapi.py", "--artifact-root", "data/ncaaf_source/source_artifacts"],
+                        }
+                    ],
+                    "mirror": {
+                        "ok": True,
+                        "command": ["powershell.exe", "-File", "refresh_ncaaf_source_mirror.ps1", "-SourceArtifactRoot", "data/ncaaf_source/source_artifacts"],
+                    },
+                }
+            ],
+        }
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.blueprints.ops.load_latest_refresh_status",
+            return_value=fake_status,
+        ), patch(
+            "syndicate.blueprints.ops.build_refresh_plan",
+            return_value=fake_plan,
+        ):
+            response = self.client.get(
+                "/ops/odds-refresh?sports=ncaaf",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Source context: C:/repos/NCAAFCompare", html)
+        self.assertNotIn("Source repo: C:/repos/NCAAFCompare", html)
 
     def test_run_endpoint_returns_launch_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
