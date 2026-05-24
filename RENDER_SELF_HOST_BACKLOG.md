@@ -10,7 +10,7 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 
 - [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) still resolves sibling repo roots and executes source-owned generation commands by default, even though all per-sport ingestion contracts can now target neutral artifact bundles.
 - Deployment proof is still incomplete: the Render blueprint and docs need manual `SYNDICATE_ARTIFACT_ROOT_*` wiring per environment before hosted refreshes can actually ingest published bundles.
-- The normal mirror bootstrap blockers are closed, but multiple sports still depend on source-owned generation jobs, and NCAAB still depends on source-owned odds-history generation when fresh raw outputs must be republished.
+- The normal mirror bootstrap blockers are closed, but multiple sports still depend on source-owned generation jobs.
 
 ## Backlog status table
 
@@ -19,9 +19,9 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 | Area | Scope | Status | What is done | What is left |
 | --- | --- | --- | --- | --- |
 | Milestone 0 | Keep current hosted mode stable | In progress | Read-only Render mode is stable and the docs distinguish read-only hosting from self-refresh hosting. | Keep the status/planning surfaces accurate while the self-host cuts continue. |
-| Workstream 1A | NCAAB exporter replacement | Completed | Normal NCAAB mirror refresh rebuilds the API bundle from mirrored raw outputs and no longer boots the source app. | Fresh raw-output generation is still source-owned through NCAAB odds-history generation. |
+| Workstream 1A | NCAAB exporter replacement | Completed | Normal NCAAB mirror refresh rebuilds the API bundle from mirrored raw outputs, and the fresh odds snapshot is now generated locally through Syndicate without the source CLI. | Keep the local raw-output lane stable and only reopen it if a broader NCAAB prediction-generation cut becomes necessary. |
 | Workstream 1B | NBA live-state bootstrap removal | Completed | The normal NBA mirror path no longer boots the source Flask app or uses the old `/api/live_state` fallback. | NBA generation is still source-owned through the props refresh job. |
-| Milestone 1 | Remove source-app bootstrapping blockers | In progress | The normal mirror bootstrap blockers are closed for NCAAB and NBA. | The remaining blocker is generation ownership, not mirror bootstrap removal. |
+| Milestone 1 | Remove source-app bootstrapping blockers | Completed | The normal mirror bootstrap blockers are closed for NCAAB and NBA, and NCAAB no longer depends on the source CLI for fresh odds snapshots. | No further normal-path source-app bootstrap blockers remain; keep the completed seams stable. |
 | Milestone 2 | Split refresh generation from artifact ingestion | In progress | Every current sport now has a hosted-safe ingest contract, and the planner/mirror layer understands neutral artifact bundles or existing mirrors. | Replace the remaining source-owned generation jobs and finish real hosted publication/wiring of those bundles. |
 | Milestone 3 | Move runtime and state out of the web process | In progress | The worker contract and the shared refresh-state store exist, including Key Value-backed status/log storage. | Prove the hosted worker/state wiring end to end and keep the ops surfaces reading only from durable state. |
 | Milestone 4 | Expand the Render deployment model | In progress | The blueprint and docs now describe a web service, worker, and shared state backend. | Finish the self-refresh deployment proof, environment wiring, and hosted smoke checklist. |
@@ -36,7 +36,7 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 | NHL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through source CLI collection commands | Covered by Milestone 2 and the sport backlog after blockers | Replace the NHL odds and props CLI generation seam with Syndicate-owned jobs or a shared package. |
 | NFL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned weekly generation through the source odds and props refreshers | Covered by Milestone 2 and the sport backlog after blockers | Replace the NFL team-odds and props generation seam with Syndicate-owned code or a shared package. |
 | WNBA | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through the source props refresh job | Covered by Milestone 2 and the sport backlog after blockers | Replace the WNBA props refresh job with a Syndicate-owned generator or a neutral publisher. |
-| NCAAB | Hosted-safe via `existing_raw_outputs` | Partially owned: mirror/export is local, fresh odds-history generation is still source-owned | Covered by Workstream 1A, Milestone 2, and the recommended next-slice guidance | Replace NCAAB odds-history generation so fresh raw outputs can be produced without the source CLI. |
+| NCAAB | Hosted-safe via `existing_raw_outputs` | Local raw-output generation and local mirror/export are now owned in Syndicate | Covered by Workstream 1A and Milestone 2 | Keep the owned raw-output lane stable and only reopen this sport if broader NCAAB generation must move into Syndicate. |
 | NCAAF | Hosted-safe via `artifact_bundle_or_existing_mirror` | Bundle-local generation in Syndicate | Covered by Milestone 2 and the sport backlog after blockers | Keep the owned bundle path stable and only reopen it if the live workflow or publication path needs more owned generation. |
 
 ## Delivery strategy
@@ -75,6 +75,7 @@ Current status:
 - Completed. The normal NCAAB mirror path is now artifact-only by default.
 - [scripts/export_ncaab_source_mirror.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/export_ncaab_source_mirror.py) rebuilds the local API bundle from mirrored raw outputs.
 - [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) keeps source-backed raw-output sync only behind the explicit manual switch `-RefreshRawOutputsFromSource`.
+- [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py) now fetches The Odds API data directly inside Syndicate, so the normal source-mode refresh path no longer imports `ncaab_model` from a sibling checkout.
 
 Owning files:
 - [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1)
@@ -85,10 +86,11 @@ Owning files:
 Outcome:
 - Normal NCAAB mirror refresh no longer boots the source app.
 - NCAAB API exports are rebuilt from mirrored artifacts only.
+- Fresh NCAAB odds snapshots can now be regenerated locally through Syndicate without the source CLI.
 - Focused regression coverage exists for the artifact-only export path and the explicit manual source-sync path.
 
 Next NCAAB gap:
-- Fresh raw-output generation is still source-owned through `ncaab_model.cli fetch-odds-history --mode current`; replacing that generation step is now separate from the completed API export cutover.
+- The remaining NCAAB work is no longer about the normal odds-refresh path. Only the explicit compatibility switch `-RefreshRawOutputsFromSource` still reaches into a sibling checkout.
 
 ### Workstream 1B: NBA live-state bootstrap removal
 
@@ -236,6 +238,6 @@ Treat Render self-hosting as done only when all of the following are true:
 
 ## Recommended next implementation slice
 
-Start with the first source-owned generation job you want Syndicate to own directly.
+Start with the next source-owned generation job you want Syndicate to own directly.
 
-The highest-leverage next code change is replacing one source-owned generation command with a Syndicate-owned job or a published artifact producer, with NCAAB odds-history generation and the NBA props refresh job as the clearest near-term candidates.
+The highest-leverage next code change is replacing one of the remaining source-owned generation commands with a Syndicate-owned job or a published artifact producer, with the NBA props refresh job as the clearest near-term candidate and MLB or NHL close behind.

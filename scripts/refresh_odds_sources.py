@@ -268,7 +268,6 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 
 def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _source_repo_root("ncaab", "NCAAB")
     python_exe = _venv_python(REPO_ROOT)
     raw_outputs_root = REPO_ROOT / "data" / "ncaab_source" / "raw_outputs" / "by_date" / args.date
     return [
@@ -283,8 +282,6 @@ def _build_ncaab_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 args.date,
                 "--region",
                 args.regions,
-                "--source-root",
-                str(source_root),
                 "--out-dir",
                 str(raw_outputs_root),
                 "--mode",
@@ -389,6 +386,14 @@ def _ingest_is_hosted_safe(spec: SportSpec) -> bool:
 
 
 def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Path) -> dict[str, Any]:
+    if execution_mode == "source" and spec.slug == "ncaab":
+        return {
+            "kind": "local_raw_outputs",
+            "source_dependency": "local_raw_outputs",
+            "hosted_safe": True,
+            "source_repo": str(source_root),
+            "steps": [],
+        }
     if execution_mode == "source" and spec.slug == "ncaaf":
         return {
             "kind": "local_artifact_bundle",
@@ -411,6 +416,8 @@ def _ingestion_payload(spec: SportSpec, *, skip_mirror: bool, execution_mode: st
         return None
     source_dependency = "source_repo_artifacts"
     if execution_mode == "ingest" and _ingest_is_hosted_safe(spec):
+        source_dependency = "local_artifacts"
+    elif execution_mode == "source" and spec.slug == "ncaab":
         source_dependency = "local_artifacts"
     elif execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf"}:
         source_dependency = "local_artifact_bundle"
@@ -542,8 +549,6 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
             artifact_root = str(_local_source_artifact_root("wnba"))
         if artifact_root:
             command.extend(["-SourceArtifactRoot", artifact_root])
-    if sport == "ncaab" and not mirror_only:
-        command.append("-RefreshRawOutputsFromSource")
     if mirror_only and sport == "ncaab":
         command.append("-UseExistingRawOutputs")
     if mirror_only and sport == "mlb":
@@ -592,12 +597,17 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     for sport in selected:
         spec = REGISTRY[sport]
         source_root = _source_repo_root(spec.slug, spec.source_repo_name)
+        generation_mode = "source_repo"
+        if execution_mode == "source" and spec.slug == "ncaaf":
+            generation_mode = "local_artifact_bundle"
+        elif execution_mode == "source" and spec.slug == "ncaab":
+            generation_mode = "local_raw_outputs"
         sport_result: dict[str, Any] = {
             "sport": sport,
             "source_repo": str(source_root),
             "source_root_env_var": _source_root_env_var(spec.slug),
             "notes": spec.notes,
-            "generation_mode": "local_artifact_bundle" if execution_mode == "source" and spec.slug == "ncaaf" else "source_repo" if execution_mode == "source" else "none",
+            "generation_mode": generation_mode if execution_mode == "source" else "none",
             "ingestion_mode": None if args.skip_mirror else "mirror_script",
             "generation": _generation_payload(spec, execution_mode=execution_mode, source_root=source_root),
             "ingestion": _ingestion_payload(spec, skip_mirror=bool(args.skip_mirror), execution_mode=execution_mode),

@@ -62,7 +62,7 @@ Current hosted boundary:
 - The web app itself is deployable on Render now.
 - The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
 - The per-sport ingest boundary is now hosted-safe across MLB, NBA, NHL, NFL, WNBA, NCAAF, and NCAAB: each module can import from a neutral artifact bundle or an already mirrored local bundle instead of requiring a sibling source checkout during ingest.
-- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for most sports. The remaining blockers are the source-owned refresh jobs themselves, including NCAAB odds-history generation and the broader per-sport refresh commands that still live outside Syndicate.
+- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for most sports. The remaining blockers are the broader per-sport refresh commands that still live outside Syndicate, especially NBA, MLB, NHL, NFL, and WNBA generation.
 
 Render setup:
 
@@ -195,12 +195,12 @@ The central tool is intentionally an orchestrator, not a new fetcher. It reuses 
 - NHL: `nhl_betting.cli team-odds-collect` plus `props-collect`
 - NFL: `nfl_compare/src/odds_api_client.py` plus `scripts/fetch_oddsapi_props.py`
 - WNBA: `wnba_betting.refresh_oddsapi_props_job`
-- NCAAB: `scripts/refresh_ncaab_odds_history.py --mode current --source-root <NCAAB> --out-dir data/ncaab_source/raw_outputs/by_date/<date>`
+- NCAAB: `scripts/refresh_ncaab_odds_history.py --mode current --out-dir data/ncaab_source/raw_outputs/by_date/<date>`
 - NCAAF: `scripts/refresh_ncaaf_oddsapi.py --artifact-root data/ncaaf_source/source_artifacts [--week <week>]`
 
-That keeps Syndicate aligned with the existing source models for pregame and live odds, while the mirror scripts now also copy the refreshed odds artifacts that those source refreshes produce.
+That keeps Syndicate aligned with the existing source models for pregame and live odds, while the mirror scripts now also copy the refreshed odds artifacts that those refreshes produce.
 
-For NCAAB specifically, `--mirror-only` now takes the hosted-friendly path through [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) with `-UseExistingRawOutputs`, so the shared planner can rebuild the local API bundle from already mirrored raw outputs without requiring a sibling `NCAAB` checkout for that step.
+For NCAAB specifically, source mode now writes the raw odds snapshot locally through [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py), and `--mirror-only` still takes the hosted-friendly path through [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) with `-UseExistingRawOutputs`. That means both fresh raw-output generation and API export can now run without requiring a sibling `NCAAB` checkout on the normal path.
 
 Use `--dry-run` when you want the tool to resolve source roots, working directories, and commands without executing any refreshes. This is the safest way to validate a new schedule, a narrowed sport list, or a deployment environment before turning the job loose.
 
