@@ -412,6 +412,10 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
+        self.assertEqual(result["generation_mode"], "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle")
+        self.assertTrue((result.get("generation") or {}).get("hosted_safe"))
         self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
@@ -419,13 +423,32 @@ class OpsRefreshApiTests(unittest.TestCase):
         command = step.get("command") or []
         self.assertIn("scripts/refresh_nhl_oddsapi.py", " ".join(str(part) for part in command))
         self.assertNotIn("nhl_betting.cli", " ".join(str(part) for part in command))
-        self.assertIn("--source-root", command)
+        self.assertNotIn("--source-root", command)
         self.assertIn("--artifact-root", command)
         self.assertIn("data/nhl_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
         mirror = result.get("mirror") or {}
         mirror_command = mirror.get("command") or []
         self.assertIn("-SourceArtifactRoot", mirror_command)
         self.assertIn("data/nhl_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in mirror_command))
+
+    def test_build_refresh_plan_allows_nhl_source_mode_without_source_repo_path(self) -> None:
+        from syndicate.features.shared import ops_refresh
+
+        module = ops_refresh._refresh_script_module()
+        missing_root = Path("C:/definitely_missing_nhl_repo")
+        with patch.object(module, "_source_repo_root", return_value=missing_root), patch("syndicate.features.shared.ops_refresh._refresh_script_module", return_value=module):
+            plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="nhl", execution_mode="source")
+
+        self.assertTrue(plan["ok"])
+        result = plan["results"][0]
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["generation_mode"], "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "local_artifact_bundle")
+        self.assertEqual(result["source_repo"], str(missing_root))
+        refresh_steps = result.get("refresh_steps") or []
+        self.assertEqual(len(refresh_steps), 1)
+        command = refresh_steps[0].get("command") or []
+        self.assertNotIn("--source-root", command)
 
     def test_build_refresh_plan_uses_nba_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh

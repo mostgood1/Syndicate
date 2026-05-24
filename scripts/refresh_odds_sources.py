@@ -217,7 +217,6 @@ def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 
 def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _source_repo_root("nhl", "NHL-Betting")
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("nhl")
     return [
@@ -230,8 +229,6 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 "scripts/refresh_nhl_oddsapi.py",
                 "--date",
                 args.date,
-                "--source-root",
-                str(source_root),
                 "--artifact-root",
                 str(artifact_root),
             ),
@@ -386,6 +383,14 @@ def _ingest_is_hosted_safe(spec: SportSpec) -> bool:
 
 
 def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Path) -> dict[str, Any]:
+    if execution_mode == "source" and spec.slug == "nhl":
+        return {
+            "kind": "local_artifact_bundle",
+            "source_dependency": "local_artifact_bundle",
+            "hosted_safe": True,
+            "source_repo": str(source_root),
+            "steps": [],
+        }
     if execution_mode == "source" and spec.slug == "ncaab":
         return {
             "kind": "local_raw_outputs",
@@ -598,7 +603,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         spec = REGISTRY[sport]
         source_root = _source_repo_root(spec.slug, spec.source_repo_name)
         generation_mode = "source_repo"
-        if execution_mode == "source" and spec.slug == "ncaaf":
+        if execution_mode == "source" and spec.slug in {"ncaaf", "nhl"}:
             generation_mode = "local_artifact_bundle"
         elif execution_mode == "source" and spec.slug == "ncaab":
             generation_mode = "local_raw_outputs"

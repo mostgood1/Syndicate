@@ -22,7 +22,7 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 | Workstream 1A | NCAAB exporter replacement | Completed | Normal NCAAB mirror refresh rebuilds the API bundle from mirrored raw outputs, and the fresh odds snapshot is now generated locally through Syndicate without the source CLI. | Keep the local raw-output lane stable and only reopen it if a broader NCAAB prediction-generation cut becomes necessary. |
 | Workstream 1B | NBA live-state bootstrap removal | Completed | The normal NBA mirror path no longer boots the source Flask app or uses the old `/api/live_state` fallback. | NBA generation is still source-owned through the props refresh job. |
 | Milestone 1 | Remove source-app bootstrapping blockers | Completed | The normal mirror bootstrap blockers are closed for NCAAB and NBA, and NCAAB no longer depends on the source CLI for fresh odds snapshots. | No further normal-path source-app bootstrap blockers remain; keep the completed seams stable. |
-| Milestone 2 | Split refresh generation from artifact ingestion | In progress | Every current sport now has a hosted-safe ingest contract, and the planner/mirror layer understands neutral artifact bundles or existing mirrors. | Replace the remaining source-owned generation jobs and finish real hosted publication/wiring of those bundles. |
+| Milestone 2 | Split refresh generation from artifact ingestion | In progress | Every current sport now has a hosted-safe ingest contract, and NCAAB, NCAAF, and NHL now have normal-path Syndicate-owned generation for their current odds artifact lanes. | Replace the remaining source-owned generation jobs and finish real hosted publication/wiring of those bundles. |
 | Milestone 3 | Move runtime and state out of the web process | In progress | The worker contract and the shared refresh-state store exist, including Key Value-backed status/log storage. | Prove the hosted worker/state wiring end to end and keep the ops surfaces reading only from durable state. |
 | Milestone 4 | Expand the Render deployment model | In progress | The blueprint and docs now describe a web service, worker, and shared state backend. | Finish the self-refresh deployment proof, environment wiring, and hosted smoke checklist. |
 | Acceptance checklist | Final self-host exit criteria | In progress | Normal mirror bootstrap removal, worker/state abstraction, and hosted-safe ingest contracts are largely in place. | Remove normal sibling-repo refresh dependencies, keep refreshes out of the web process, and finish the full hosted architecture proof. |
@@ -33,7 +33,7 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 | --- | --- | --- | --- | --- |
 | MLB | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through Syndicate wrapper | Covered by Milestone 2 and the sport backlog after blockers | Replace the MLB OddsAPI/live-lens generation seam with fully owned generation or a neutral publisher. |
 | NBA | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through the source props refresh job | Covered by Workstream 1B, Milestone 2, and the recommended next-slice guidance | Replace the NBA props refresh job with a Syndicate-owned generator or a neutral publisher. |
-| NHL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through source CLI collection commands | Covered by Milestone 2 and the sport backlog after blockers | Replace the NHL odds and props CLI generation seam with Syndicate-owned jobs or a shared package. |
+| NHL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Bundle-local generation in Syndicate for scoreboard, team odds, and props lines | Covered by Milestone 2 and the sport backlog after blockers | Keep the owned NHL odds bundle path stable; only the optional processed/live-lens backfill still benefits from a sibling source checkout. |
 | NFL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned weekly generation through the source odds and props refreshers | Covered by Milestone 2 and the sport backlog after blockers | Replace the NFL team-odds and props generation seam with Syndicate-owned code or a shared package. |
 | WNBA | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through the source props refresh job | Covered by Milestone 2 and the sport backlog after blockers | Replace the WNBA props refresh job with a Syndicate-owned generator or a neutral publisher. |
 | NCAAB | Hosted-safe via `existing_raw_outputs` | Local raw-output generation and local mirror/export are now owned in Syndicate | Covered by Workstream 1A and Milestone 2 | Keep the owned raw-output lane stable and only reopen this sport if broader NCAAB generation must move into Syndicate. |
@@ -141,7 +141,8 @@ Current status:
 - The planner now exposes a hosted-safe ingest contract for every current sport module.
 - MLB, NBA, NHL, NFL, WNBA, and NCAAF mirror scripts all support `artifact_bundle_or_existing_mirror` via `SYNDICATE_ARTIFACT_ROOT_*` or `-UseExistingMirrorArtifacts`.
 - NCAAB already supports the hosted-safe raw-output bundle path via `existing_raw_outputs`.
-- The remaining gap in this milestone is not neutral ingest shape; it is generation ownership and actual hosted publication/wiring of those artifact bundles.
+- NHL source mode now generates scoreboard, team-odds, and player-props artifacts locally through Syndicate, while source-root use is optional for compatibility-only processed/live-lens backfill.
+- The remaining gap in this milestone is not neutral ingest shape; it is generation ownership for MLB, NBA, NFL, and WNBA plus actual hosted publication/wiring of those artifact bundles.
 
 Exit criteria:
 - Refresh planning can target hosted-safe generation or hosted-safe ingestion without assuming sibling repos.
@@ -213,16 +214,13 @@ After Milestones 1 through 3 are complete, use this order for per-sport hosted o
 1. MLB
 Reason: live-lens and current-day board ownership are central to the reference module.
 
-2. NHL
-Reason: CLI-owned refresh steps are relatively well-bounded and should migrate cleanly into Syndicate-owned jobs.
-
-3. NFL
+2. NFL
 Reason: weekly artifact boundaries are already clearer than the daily source-app-export cases.
 
-4. WNBA
+3. WNBA
 Reason: similar shape to NBA, but simpler once the shared props-refresh pattern is established.
 
-5. NCAAF
+4. NCAAF
 Reason: smallest structurally, but lower product urgency than the active in-season modules.
 
 ## Acceptance checklist
@@ -240,4 +238,4 @@ Treat Render self-hosting as done only when all of the following are true:
 
 Start with the next source-owned generation job you want Syndicate to own directly.
 
-The highest-leverage next code change is replacing one of the remaining source-owned generation commands with a Syndicate-owned job or a published artifact producer, with the NBA props refresh job as the clearest near-term candidate and MLB or NHL close behind.
+The highest-leverage next code change is replacing one of the remaining source-owned generation commands with a Syndicate-owned job or a published artifact producer, with the NBA props refresh job as the clearest near-term candidate and MLB or NFL close behind.
