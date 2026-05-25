@@ -17,24 +17,21 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
-    def test_main_calls_source_refresh_function_directly(self) -> None:
+    def test_main_calls_syndicate_cli_refresh_path(self) -> None:
         module = self._load_module()
 
-        class _FakeSourceModule:
-            def __init__(self) -> None:
-                self.calls = []
+        calls = []
 
-            def run_refresh_oddsapi_props_job(self, **kwargs):
-                self.calls.append(kwargs)
-                return {
-                    "snapshot_rows": 12,
-                    "snapshot_alias_rows": 12,
-                    "edges_rows": 5,
-                    "recs_rows": 3,
-                    "error": None,
-                }
+        def _fake_refresh(**kwargs):
+            calls.append(kwargs)
+            return {
+                "snapshot_rows": 12,
+                "snapshot_alias_rows": 12,
+                "edges_rows": 5,
+                "recs_rows": 3,
+                "error": None,
+            }
 
-        fake_source = _FakeSourceModule()
         with tempfile.TemporaryDirectory() as tmp_dir:
             argv = [
                 "refresh_nba_oddsapi_props.py",
@@ -49,14 +46,324 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 "--do-edges",
                 "--do-export",
             ]
-            with patch.object(module, "_load_source_module", return_value=fake_source), patch("sys.argv", argv):
+            with patch.object(module, "_run_refresh_via_cli", side_effect=_fake_refresh), patch("sys.argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
-        self.assertEqual(len(fake_source.calls), 1)
-        self.assertEqual(fake_source.calls[0]["date_str"], "2026-05-22")
-        self.assertTrue(fake_source.calls[0]["do_edges"])
-        self.assertTrue(fake_source.calls[0]["do_export"])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["date_str"], "2026-05-22")
+        self.assertTrue(calls[0]["do_edges"])
+        self.assertTrue(calls[0]["do_export"])
+
+    def test_run_refresh_via_cli_uses_local_snapshot_fetcher(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            (source_root / "data" / "raw").mkdir(parents=True, exist_ok=True)
+            commands = []
+
+            def _fake_run(args, log_file, **kwargs):
+                commands.append((list(args), kwargs.get("cwd")))
+                out_idx = args.index("--out") + 1
+                out_path = Path(args[out_idx])
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                return 0
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="fanduel,draftkings",
+                    markets="player_points,player_rebounds",
+                    do_edges=False,
+                    do_export=False,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(Path(commands[0][0][1]).name, "fetch_basketball_oddsapi_props_local.py")
+        self.assertIn("--league", commands[0][0])
+        self.assertIn("nba", commands[0][0])
+        self.assertEqual(commands[0][1], module.REPO_ROOT)
+        self.assertEqual(int(state["rc_snapshot"]), 0)
+        self.assertEqual(int(state["snapshot_rows"]), 1)
+
+    def test_run_refresh_via_cli_uses_inprocess_predict_props(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            predict_calls = []
+            run_calls = []
+
+            def _fake_run(args, log_file, **kwargs):
+                run_calls.append(list(args))
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                elif "props-edges" in args:
+                    edges_path = processed_root / "props_edges_2026-05-22.csv"
+                    edges_path.parent.mkdir(parents=True, exist_ok=True)
+                    edges_path.write_text("market\nPTS\n", encoding="utf-8")
+                return 0
+
+            def _fake_predict_export(**kwargs):
+                predict_calls.append(dict(kwargs))
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=True,
+                    do_export=False,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertEqual(len(run_calls), 1)
+        self.assertEqual(Path(run_calls[0][1]).name, "fetch_basketball_oddsapi_props_local.py")
+        self.assertEqual(len(predict_calls), 1)
+        self.assertEqual(predict_calls[0]["date_str"], "2026-05-22")
+        self.assertTrue(predict_calls[0]["use_smart_sim"])
+        self.assertEqual(int(state["predictions_rows"]), 1)
+
+    def test_run_refresh_via_cli_uses_inprocess_props_edges(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            predict_calls = []
+            edges_calls = []
+
+            def _fake_run(args, log_file, **kwargs):
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                return 0
+
+            def _fake_predict_export(**kwargs):
+                predict_calls.append(dict(kwargs))
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_edges_export(**kwargs):
+                edges_calls.append(dict(kwargs))
+                out_path = kwargs["out_path"]
+                out_path.write_text("market\nPTS\n", encoding="utf-8")
+                return 1, out_path
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=True,
+                    do_export=True,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertEqual(len(predict_calls), 1)
+        self.assertEqual(len(edges_calls), 1)
+        self.assertEqual(edges_calls[0]["bookmakers"], "")
+        self.assertEqual(int(state["rc_edges"]), 0)
+        self.assertEqual(int(state["edges_rows"]), 1)
+
+    def test_run_refresh_via_cli_uses_inprocess_export_props_recommendations(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            predict_calls = []
+            edges_calls = []
+            export_calls = []
+
+            def _fake_run(args, log_file, **kwargs):
+                if "--out" in args:
+                    out_idx = args.index("--out") + 1
+                    out_path = Path(args[out_idx])
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text("snapshot_ts,event_id\n2026-05-22T12:00:00Z,evt-1\n", encoding="utf-8")
+                elif "props-edges" in args:
+                    (processed_root / "props_edges_2026-05-22.csv").write_text("market\nPTS\n", encoding="utf-8")
+                return 0
+
+            def _fake_predict_export(**kwargs):
+                predict_calls.append(dict(kwargs))
+                out_path = kwargs["out_path"]
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_edges_export(**kwargs):
+                edges_calls.append(dict(kwargs))
+                out_path = kwargs["out_path"]
+                out_path.write_text("market\nPTS\n", encoding="utf-8")
+                return 1, out_path
+
+            def _fake_export(*, processed_root, date_str, max_plus_odds=125.0):
+                export_calls.append({"processed_root": processed_root, "date_str": date_str, "max_plus_odds": max_plus_odds})
+                out_path = processed_root / f"props_recommendations_{date_str}.csv"
+                out_path.write_text("player\nA\n", encoding="utf-8")
+                return 1, out_path
+
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "export_props_recommendations_local", side_effect=_fake_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)):
+                state = module._run_refresh_via_cli(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    regions="us",
+                    bookmakers="",
+                    markets="",
+                    do_edges=True,
+                    do_export=True,
+                    do_push=False,
+                    log_file=tmp_root / "refresh.log",
+                )
+
+        self.assertEqual(len(predict_calls), 1)
+        self.assertEqual(len(edges_calls), 1)
+        self.assertEqual(len(export_calls), 1)
+        self.assertEqual(int(state["rc_export"]), 0)
+        self.assertEqual(int(state["recs_rows"]), 1)
+
+    def test_cli_backed_exports_prefer_existing_processed_files(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_source.mkdir(parents=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            date_str = "2026-05-22"
+
+            expected = {
+                f"recon_quarters_{date_str}.csv": module._export_recon_quarters_artifact,
+                f"recon_props_{date_str}.csv": module._export_recon_props_artifact,
+                f"game_cards_{date_str}.csv": module._export_game_cards_artifact,
+                f"boxscores_{date_str}.csv": module._export_boxscores_artifact,
+                f"recommendations_{date_str}.csv": module._export_recommendations_artifact,
+            }
+            for name in expected:
+                (processed_source / name).write_text("id\n1\n", encoding="utf-8")
+
+            with patch.object(module, "_load_source_cli", side_effect=AssertionError("source CLI should not load")):
+                for name, exporter in expected.items():
+                    out = exporter(source_root=source_root, date_str=date_str, processed_root=processed_root)
+                    self.assertEqual(out, str(processed_root / name))
+                    self.assertTrue((processed_root / name).exists())
+
+    def test_app_backed_exports_prefer_existing_processed_files(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_source.mkdir(parents=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            live_lens_root = tmp_root / "bundle" / "data" / "live_lens"
+            date_str = "2026-05-22"
+
+            expected = {
+                f"recon_games_{date_str}.csv": module._export_recon_games_artifact,
+                f"recommendations_slate_{date_str}.json": module._export_recommendations_slate_snapshot,
+                f"cards_props_snapshot_{date_str}.json": module._export_cards_props_snapshot,
+                f"cards_sim_detail_{date_str}.json": module._export_cards_sim_detail_snapshot,
+                f"props_recommendations_top_by_game_{date_str}.json": module._export_top_by_game_snapshot,
+            }
+            for name in expected:
+                (processed_source / name).write_text('{"ok": true}\n', encoding="utf-8")
+            (processed_source / f"live_lens_signals_{date_str}.jsonl").write_text('{"kind":"signal"}\n', encoding="utf-8")
+            (processed_source / f"live_lens_projections_{date_str}.jsonl").write_text('{"kind":"projection"}\n', encoding="utf-8")
+            (processed_source / "live_lens_tuning_override.json").write_text('{"alpha":1.25}\n', encoding="utf-8")
+
+            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+                for name, exporter in expected.items():
+                    out = exporter(source_root=source_root, date_str=date_str, processed_root=processed_root)
+                    self.assertEqual(out, str(processed_root / name))
+                    self.assertTrue((processed_root / name).exists())
+                copied = module._export_live_lens_artifacts(
+                    source_root=source_root,
+                    date_str=date_str,
+                    processed_root=processed_root,
+                    live_lens_root=live_lens_root,
+                )
+                self.assertEqual(copied["live_lens_signals_path"], str(processed_root / f"live_lens_signals_{date_str}.jsonl"))
+                self.assertEqual(copied["live_lens_projections_path"], str(processed_root / f"live_lens_projections_{date_str}.jsonl"))
+                self.assertEqual(copied["live_lens_tuning_override_path"], str(processed_root / "live_lens_tuning_override.json"))
+                self.assertEqual(copied["live_lens_tuning_override_live_lens_path"], str(live_lens_root / "live_lens_tuning_override.json"))
+
+    def test_optional_tool_and_season_exports_prefer_existing_processed_files(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_source.mkdir(parents=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            date_str = "2026-05-22"
+            season = module._resolve_nba_season_year(date_str)
+
+            (processed_source / f"recon_players_{date_str}.csv").write_text("player\nA\n", encoding="utf-8")
+            (processed_source / f"live_player_lens_tuning_{date_str}.csv").write_text("player\nA\n", encoding="utf-8")
+            (processed_source / f"season_betting_card_manifest_{season}_retuned_{date_str}.json").write_text('{"ok": true}\n', encoding="utf-8")
+            (processed_source / f"season_betting_card_day_{season}_retuned_{date_str}.json").write_text('{"ok": true}\n', encoding="utf-8")
+            (processed_source / f"season_betting_card_day_{season}_retuned_{date_str}_insights.json").write_text('{"ok": true}\n', encoding="utf-8")
+
+            with patch.object(module, "_load_module_from_path", side_effect=AssertionError("tool module should not load")):
+                copied = module._build_optional_player_recon_artifacts(
+                    source_root=source_root,
+                    date_str=date_str,
+                    processed_root=processed_root,
+                )
+                self.assertEqual(copied["recon_players_path"], str(processed_root / f"recon_players_{date_str}.csv"))
+                self.assertEqual(copied["live_player_lens_tuning_path"], str(processed_root / f"live_player_lens_tuning_{date_str}.csv"))
+
+            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+                copied = module._export_season_betting_card_artifacts(
+                    source_root=source_root,
+                    date_str=date_str,
+                    processed_root=processed_root,
+                )
+                self.assertEqual(copied["season_betting_card_manifest_path"], str(processed_root / f"season_betting_card_manifest_{season}_retuned_{date_str}.json"))
+                self.assertEqual(copied["season_betting_card_manifest_generic_path"], str(processed_root / f"season_betting_card_manifest_{season}_retuned.json"))
 
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
@@ -206,7 +513,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("market\nATS\n", encoding="utf-8")
                 return str(out_path)
 
-            with patch.object(module, "_load_source_module", return_value=_FakeSourceModule()), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_export_boxscores_artifact", side_effect=_fake_boxscores_artifact), patch.object(module, "_export_recommendations_artifact", side_effect=_fake_recommendations_artifact), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch.object(module, "_export_recon_props_artifact", side_effect=_fake_recon_props_artifact), patch("sys.argv", argv):
+            with patch.object(module, "_run_refresh_via_cli", return_value=_FakeSourceModule().run_refresh_oddsapi_props_job(log_file=tmp_root / "refresh.log")), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_export_boxscores_artifact", side_effect=_fake_boxscores_artifact), patch.object(module, "_export_recommendations_artifact", side_effect=_fake_recommendations_artifact), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch.object(module, "_export_recon_props_artifact", side_effect=_fake_recon_props_artifact), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -239,3 +546,119 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_projections_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_tuning_override.json").exists())
+
+    def test_main_prefers_existing_refresh_outputs_before_source_job(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            artifact_root = tmp_root / "bundle"
+            date_str = "2026-05-22"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            required_files = {
+                raw_root / f"odds_nba_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"oddsapi_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"props_predictions_{date_str}.csv": "player\nA\n",
+                processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
+                processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",
+                processed_root / f"game_cards_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"boxscores_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recommendations_{date_str}.csv": "market\nATS\n",
+                processed_root / f"recon_quarters_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recon_props_{date_str}.csv": "player_id\n1\n",
+                processed_root / f"recon_games_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recommendations_slate_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"cards_props_snapshot_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"cards_sim_detail_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"props_recommendations_top_by_game_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"live_lens_signals_{date_str}.jsonl": '{"kind":"signal"}\n',
+                processed_root / f"live_lens_projections_{date_str}.jsonl": '{"kind":"projection"}\n',
+                processed_root / "live_lens_tuning_override.json": '{"alpha":1.25}\n',
+                processed_root / f"recon_players_{date_str}.csv": "player\nA\n",
+                processed_root / f"live_player_lens_tuning_{date_str}.csv": "player\nA\n",
+            }
+            for path, content in required_files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+
+            season = module._resolve_nba_season_year(date_str)
+            for name in (
+                f"season_betting_card_manifest_{season}_retuned_{date_str}.json",
+                f"season_betting_card_day_{season}_retuned_{date_str}.json",
+                f"season_betting_card_day_{season}_retuned_{date_str}_insights.json",
+            ):
+                (processed_root / name).write_text('{"ok": true}\n', encoding="utf-8")
+            (processed_root / "smart_sim_2026-05-22_BOS_NYK.json").write_text('{"ok": true}\n', encoding="utf-8")
+
+            argv = [
+                "refresh_nba_oddsapi_props.py",
+                "--date",
+                date_str,
+                "--regions",
+                "us",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+                "--log-file",
+                str(tmp_root / "refresh.log"),
+                "--do-edges",
+                "--do-export",
+            ]
+            with patch.object(module, "_run_refresh_via_cli", side_effect=AssertionError("cli refresh path should not load")), patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")), patch.object(module, "_load_source_cli", side_effect=AssertionError("source cli should not load")), patch.object(module, "_load_module_from_path", side_effect=AssertionError("source tools should not load")), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            self.assertTrue((artifact_root / "data" / "raw" / f"odds_nba_player_props_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"props_predictions_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"props_edges_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"props_recommendations_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"game_cards_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_BOS_NYK.json").exists())
+
+    def test_main_prefers_existing_artifact_bundle_before_source_job(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "missing-source"
+            artifact_root = tmp_root / "bundle"
+            raw_root = artifact_root / "data" / "raw"
+            processed_root = artifact_root / "data" / "processed"
+            date_str = "2026-05-22"
+
+            required_files = {
+                raw_root / f"odds_nba_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"oddsapi_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"props_predictions_{date_str}.csv": "player\nA\n",
+                processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
+                processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",
+            }
+            for path, content in required_files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+
+            argv = [
+                "refresh_nba_oddsapi_props.py",
+                "--date",
+                date_str,
+                "--regions",
+                "us",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+                "--log-file",
+                str(tmp_root / "refresh.log"),
+                "--do-edges",
+                "--do-export",
+            ]
+            with patch.object(module, "_run_refresh_via_cli", side_effect=AssertionError("cli refresh path should not load")), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)

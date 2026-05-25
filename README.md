@@ -62,7 +62,7 @@ Current hosted boundary:
 - The web app itself is deployable on Render now.
 - The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
 - The per-sport ingest boundary is now hosted-safe across MLB, NBA, NHL, NFL, WNBA, NCAAF, and NCAAB: each module can import from a neutral artifact bundle or an already mirrored local bundle instead of requiring a sibling source checkout during ingest.
-- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for several sports. The remaining blockers are the broader per-sport refresh commands that still live outside Syndicate, especially NBA and WNBA.
+- Syndicate is still not fully self-refreshing on Render because some artifact generation remains source-owned for sports outside the active NBA/WNBA props lane. NBA and WNBA props refresh now run through Syndicate-owned runners and local SmartSim/prediction helpers; the remaining hosted blockers are the broader non-props generation commands for other sports and the wider deployment wiring.
 
 Render setup:
 
@@ -191,10 +191,10 @@ python .\scripts\refresh_odds_sources.py --date 2026-05-18 --phase pregame --spo
 The central tool is intentionally an orchestrator, not a new fetcher. It reuses the existing source repo entrypoints that already own each sport's odds and live-props logic:
 
 - MLB: local `scripts/fetch_mlb_oddsapi_local.py` plus local live-lens bootstrap handling in `scripts/refresh_mlb_oddsapi.py`
-- NBA: `nba_betting.refresh_oddsapi_props_job` when the day's snapshot/predictions/edges/recommendations are missing; otherwise `scripts/refresh_nba_oddsapi_props.py` now reuses the existing outputs directly before materializing the Syndicate bundle
+- NBA: Syndicate-local `scripts/refresh_nba_oddsapi_props.py`, which reuses existing source outputs or an existing Syndicate artifact bundle first, regenerates the raw OddsAPI props snapshot locally, runs both the no-SmartSim and SmartSim-enabled prediction paths through Syndicate-owned helpers, uses a fully local SmartSim compatibility bridge, and writes the daily `props_predictions_<date>.csv`, `props_edges_<date>.csv`, `props_recommendations_<date>.csv`, and supporting SmartSim artifacts without importing `nba_betting` runtime modules.
 - NHL: `scripts/refresh_nhl_oddsapi.py --artifact-root data/nhl_source/source_artifacts`
 - NFL: Syndicate-local `scripts/fetch_nfl_team_odds_local.py` plus `scripts/fetch_nfl_oddsapi_props_local.py`
-- WNBA: `wnba_betting.refresh_oddsapi_props_job` when the day's snapshot/predictions/edges/recommendations are missing; otherwise `scripts/refresh_wnba_oddsapi_props.py` now reuses the existing outputs directly before materializing the Syndicate bundle
+- WNBA: Syndicate-local `scripts/refresh_wnba_oddsapi_props.py`, which reuses existing source outputs or an existing Syndicate artifact bundle first, regenerates the raw OddsAPI props snapshot locally, runs both the no-SmartSim and SmartSim-enabled prediction paths through Syndicate-owned helpers, uses the same fully local SmartSim compatibility bridge, and writes the daily `props_predictions_<date>.csv`, `props_edges_<date>.csv`, `props_recommendations_<date>.csv`, and supporting SmartSim artifacts without importing source runtime modules.
 - NCAAB: `scripts/refresh_ncaab_odds_history.py --mode current --out-dir data/ncaab_source/raw_outputs/by_date/<date>`
 - NCAAF: `scripts/refresh_ncaaf_oddsapi.py --artifact-root data/ncaaf_source/source_artifacts [--week <week>]`
 
@@ -259,6 +259,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Dat
 ```
 
 This wrapper is the temporary bridge until Syndicate owns all generation locally. It runs the existing source daily-update entrypoint for each enabled sport with source-side git push explicitly disabled, then runs [scripts/refresh_and_gate.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_and_gate.ps1), and only after that succeeds stages, commits, and pushes each dirty source repo plus Syndicate itself.
+
+The runner also enforces the current temporary runtime policy for the heaviest simulation steps so source refreshes stay consistent and fast enough to use operationally: MLB runs `ui-daily` at `1000` sims with `4` workers, NBA and WNBA set `DAILY_SMARTSIM_NSIMS=1000` plus `DAILY_SMARTSIM_WORKERS=4`, NHL runs `-SimSamples 1000` with `-PropsBoxscoreNSims 1000`, and NFL sets `DAILY_UPDATE_SCENARIO_N_SIMS=1000`. NCAAF and NCAAB currently run their native daily-update defaults because this wrapper does not yet have a verified low-risk sim/worker control surface for them. That policy is emitted into the run manifest so dry runs and completed runs both show the exact values used.
 
 The unified runner writes [reports/daily_update/<date>/<stamp>/unified_daily_update_run.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update) plus a rolling latest copy at [reports/daily_update/latest/unified_daily_update_latest.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest). Those manifests record the exact source commands invoked and the final per-repo push results.
 

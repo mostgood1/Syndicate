@@ -328,7 +328,7 @@ REGISTRY: dict[str, SportSpec] = {
         step_builder=_build_nba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
         ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/nba_source or from a published NBA artifact bundle root via SYNDICATE_ARTIFACT_ROOT_NBA.",
-        notes="Runs the existing OddsAPI props refresh job with the same env-payload contract the source app and workflows already use.",
+        notes="Uses the Syndicate NBA props runner, which reuses local source outputs or an existing artifact bundle, regenerates the raw OddsAPI snapshot locally, runs both prediction branches through Syndicate-owned helpers, uses a fully local SmartSim compatibility bridge, and writes props_predictions_<date>.csv, props_edges_<date>.csv, props_recommendations_<date>.csv, and supporting SmartSim artifacts without importing source runtime modules.",
     ),
     "nhl": SportSpec(
         slug="nhl",
@@ -355,7 +355,7 @@ REGISTRY: dict[str, SportSpec] = {
         step_builder=_build_wnba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
         ingest_contract_notes="Hosted-safe ingest can rebuild from existing files under data/wnba_source or from a published WNBA artifact bundle root via SYNDICATE_ARTIFACT_ROOT_WNBA.",
-        notes="Reuses the WNBA repo's existing OddsAPI props job rather than duplicating the shared NBA logic.",
+        notes="Uses the Syndicate WNBA props runner, which reuses local source outputs or an existing artifact bundle, regenerates the raw OddsAPI snapshot locally, runs both prediction branches through Syndicate-owned helpers, uses the same fully local SmartSim compatibility bridge, and writes props_predictions_<date>.csv, props_edges_<date>.csv, props_recommendations_<date>.csv, and supporting SmartSim artifacts without importing source runtime modules.",
     ),
     "ncaab": SportSpec(
         slug="ncaab",
@@ -383,6 +383,14 @@ def _ingest_is_hosted_safe(spec: SportSpec) -> bool:
 
 
 def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Path) -> dict[str, Any]:
+    if execution_mode == "source" and spec.slug in {"nba", "wnba"}:
+        return {
+            "kind": "source_cli_with_local_bundle_reuse",
+            "source_dependency": "local_artifact_bundle_or_source_cli",
+            "hosted_safe": False,
+            "source_repo": str(source_root),
+            "steps": [],
+        }
     if execution_mode == "source" and spec.slug == "nhl":
         return {
             "kind": "local_artifact_bundle",
@@ -605,6 +613,8 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         generation_mode = "source_repo"
         if execution_mode == "source" and spec.slug in {"ncaaf", "nhl"}:
             generation_mode = "local_artifact_bundle"
+        elif execution_mode == "source" and spec.slug in {"nba", "wnba"}:
+            generation_mode = "source_cli_with_local_bundle_reuse"
         elif execution_mode == "source" and spec.slug == "ncaab":
             generation_mode = "local_raw_outputs"
         sport_result: dict[str, Any] = {

@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import importlib
 import importlib.util
 import json
+import os
+import shlex
 import shutil
+import subprocess
 import sys
+import threading
+import time
+import traceback
 from pathlib import Path
+
+from syndicate.features.shared.basketball_props_edges import export_props_edges_local
+from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
+from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -93,6 +104,501 @@ def _count_csv_rows_quick(path: Path | None) -> int:
         return 0
 
 
+def _append_log(log_file: Path, line: str) -> None:
+    try:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        with log_file.open("a", encoding="utf-8", errors="ignore") as out:
+            out.write(f"[{dt.datetime.utcnow().isoformat(timespec='seconds')}] {line.rstrip()}\n")
+    except Exception:
+        pass
+
+
+def _materialize_processed_snapshot_alias(*, processed_root: Path, date_str: str, snapshot_path: Path, log_file: Path | None = None) -> tuple[Path, int, str | None]:
+    alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
+    try:
+        if not snapshot_path.exists() or not snapshot_path.is_file() or snapshot_path.stat().st_size <= 0:
+            return alias_path, 0, None
+        alias_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(snapshot_path, alias_path)
+        rows = int(_count_csv_rows_quick(alias_path))
+        if log_file is not None:
+            _append_log(log_file, f"Materialized processed OddsAPI props snapshot alias: {alias_path} (rows={rows})")
+        return alias_path, rows, None
+    except Exception as exc:
+        if log_file is not None:
+            _append_log(log_file, f"Failed to materialize processed OddsAPI props snapshot alias: {exc}")
+        return alias_path, 0, str(exc)
+
+
+def _source_python(source_root: Path) -> str:
+    candidates = [
+        source_root / ".venv" / "Scripts" / "python.exe",
+        source_root / ".venv" / "bin" / "python",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    if sys.executable and Path(sys.executable).exists():
+        return sys.executable
+    return "python"
+
+
+def _local_python() -> str:
+    if sys.executable and Path(sys.executable).exists():
+        return sys.executable
+    return "python"
+
+
+def _local_worker_env() -> dict[str, str]:
+    env = dict(os.environ)
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    return env
+
+
+def _owned_snapshot_cli_args(*, date_str: str, out_path: Path, regions: str, bookmakers: str, markets: str) -> list[str]:
+    args = [
+        _local_python(),
+        str(REPO_ROOT / "scripts" / "fetch_basketball_oddsapi_props_local.py"),
+        "--league",
+        "wnba",
+        "--date",
+        date_str,
+        "--out",
+        str(out_path),
+        "--regions",
+        str(regions or "us").strip() or "us",
+    ]
+    if bookmakers:
+        args.extend(["--bookmakers", bookmakers])
+    if markets:
+        args.extend(["--markets", markets])
+    return args
+
+
+def _source_worker_env(source_root: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    src_dir = str(source_root / "src")
+    existing = str(env.get("PYTHONPATH") or "").strip()
+    env["PYTHONPATH"] = src_dir if not existing else f"{src_dir}{os.pathsep}{existing}"
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    env.setdefault("OMP_NUM_THREADS", "1")
+    env.setdefault("OMP_THREAD_LIMIT", "1")
+    env.setdefault("OPENBLAS_NUM_THREADS", "1")
+    env.setdefault("MKL_NUM_THREADS", "1")
+    env.setdefault("NUMEXPR_NUM_THREADS", "1")
+    return env
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(float(str(os.environ.get(name, str(default))).strip()))
+    except Exception:
+        return int(default)
+
+
+def _env_timeout_s(name: str, default_s: float) -> float | None:
+    try:
+        raw = str(os.environ.get(name, str(default_s))).strip()
+        value = float(raw)
+    except Exception:
+        value = float(default_s)
+    return None if value <= 0 else float(value)
+
+
+def _run_to_file(
+    args: list[str],
+    log_file: Path,
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    timeout_s: float | None,
+    heartbeat_cb: callable | None,
+    heartbeat_every_s: float = 15.0,
+) -> int:
+    cmd_text = " ".join(shlex.quote(str(a)) for a in args)
+    _append_log(log_file, f"$ {cmd_text}")
+    start = time.time()
+    last_heartbeat = start
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    with log_file.open("a", encoding="utf-8", errors="ignore") as out:
+        proc = subprocess.Popen(
+            [str(a) for a in args],
+            cwd=str(cwd),
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=out,
+            stderr=subprocess.STDOUT,
+        )
+        while True:
+            try:
+                return int(proc.wait(timeout=1.0))
+            except subprocess.TimeoutExpired:
+                now = time.time()
+                if heartbeat_cb and (now - last_heartbeat) >= max(1.0, float(heartbeat_every_s)):
+                    try:
+                        heartbeat_cb()
+                    except Exception:
+                        pass
+                    last_heartbeat = now
+                if timeout_s is not None and (now - start) >= float(timeout_s):
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                    try:
+                        proc.wait(timeout=5.0)
+                    except Exception:
+                        pass
+                    _append_log(log_file, f"Command timed out after {int(timeout_s)}s")
+                    return 124
+
+
+def _season_year_for_date(date_str: str) -> int:
+    parsed = dt.datetime.strptime(date_str, "%Y-%m-%d")
+    return parsed.year if parsed.month >= 7 else (parsed.year - 1)
+
+
+def _season_str_from_year(season_year: int) -> str:
+    return f"{season_year}-{(season_year + 1) % 100:02d}"
+
+
+def _active_player_logs_paths(source_root: Path) -> list[Path]:
+    return [
+        source_root / "data" / "processed" / "player_logs.parquet",
+        source_root / "data" / "processed" / "player_logs.csv",
+    ]
+
+
+def _file_is_fresh(path: Path, *, max_age_minutes: int) -> bool:
+    try:
+        if max_age_minutes <= 0:
+            return path.exists() and path.stat().st_size > 0
+        if not path.exists() or path.stat().st_size <= 0:
+            return False
+        age_s = max(0.0, time.time() - float(path.stat().st_mtime))
+        return age_s <= (float(max_age_minutes) * 60.0)
+    except Exception:
+        return False
+
+
+def _player_logs_ready(source_root: Path, *, max_age_minutes: int) -> bool:
+    return any(_file_is_fresh(path, max_age_minutes=max_age_minutes) for path in _active_player_logs_paths(source_root))
+
+
+def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, log_file: Path, heartbeat_cb: callable) -> tuple[bool, str | None]:
+    raw_max_age = (
+        os.environ.get("REFRESH_PLAYER_LOGS_MAX_AGE_HOURS")
+        or os.environ.get("DAILY_PLAYER_LOGS_MAX_AGE_HOURS")
+        or "12"
+    ).strip()
+    try:
+        max_age_minutes = int(max(0.0, float(raw_max_age) * 60.0))
+    except Exception:
+        max_age_minutes = 12 * 60
+
+    if _player_logs_ready(source_root, max_age_minutes=max_age_minutes):
+        return True, None
+    if any(path.exists() and path.stat().st_size > 0 for path in _active_player_logs_paths(source_root)):
+        return True, None
+
+    allow_fetch_on_miss = (os.environ.get("REFRESH_PLAYER_LOGS_FETCH_ON_MISS") or "0").strip().lower() in {"1", "true", "yes"}
+    if not allow_fetch_on_miss:
+        return False, "player_logs not found; run fetch-player-logs"
+    _append_log(log_file, "player_logs missing and source fetch fallback is disabled in Syndicate-only mode")
+    return False, "player_logs missing and no local fetch fallback is available"
+
+
+def _predict_props_cli_args(*, source_root: Path, date_str: str, out_path: Path) -> list[str]:
+    smart_sim_n_sims = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150))
+    smart_sim_workers = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1))
+    calib_window = max(1, _env_int("REFRESH_PREDICT_PROPS_CALIB_WINDOW", 7))
+    player_calib_window = max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_CALIB_WINDOW", 30))
+    player_min_pairs = max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_MIN_PAIRS", 6))
+    player_shrink_k = max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_SHRINK_K", 8))
+    args = [
+        "predict-props",
+        "--date",
+        date_str,
+        "--out",
+        str(out_path),
+        "--slate-only",
+        "--calibrate",
+        "--calib-window",
+        str(calib_window),
+        "--use-pure-onnx",
+    ]
+    if _env_bool("REFRESH_PREDICT_PROPS_CALIBRATE_PLAYER", True):
+        args.extend([
+            "--calibrate-player",
+            "--player-calib-window",
+            str(player_calib_window),
+            "--player-min-pairs",
+            str(player_min_pairs),
+            "--player-shrink-k",
+            str(player_shrink_k),
+        ])
+    else:
+        args.append("--no-calibrate-player")
+    if _env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True):
+        args.extend([
+            "--use-smart-sim",
+            "--smart-sim-n-sims",
+            str(smart_sim_n_sims),
+            "--smart-sim-workers",
+            str(smart_sim_workers),
+        ])
+        args.append("--smart-sim-pbp" if _env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True) else "--no-smart-sim-pbp")
+    else:
+        args.append("--no-use-smart-sim")
+    return args
+
+
+def _run_source_cli_command(
+    source_root: Path,
+    args: list[str],
+    log_file: Path,
+    *,
+    heartbeat_cb: callable | None,
+    heartbeat_every_s: float = 15.0,
+) -> int:
+    cmd_text = " ".join(shlex.quote(str(a)) for a in args)
+    _append_log(log_file, f"$ source-cli {cmd_text}")
+
+    cli_module = _load_source_cli(source_root)
+    stop_event = threading.Event()
+    heartbeat_thread = None
+    if heartbeat_cb is not None:
+        def _heartbeat_loop() -> None:
+            while not stop_event.wait(max(1.0, float(heartbeat_every_s))):
+                try:
+                    heartbeat_cb()
+                except Exception:
+                    pass
+
+        heartbeat_thread = threading.Thread(target=_heartbeat_loop, daemon=True)
+        heartbeat_thread.start()
+
+    previous_cwd = Path.cwd()
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with log_file.open("a", encoding="utf-8", errors="ignore") as out:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                os.chdir(source_root)
+                try:
+                    cli_module.cli.main(args, standalone_mode=False)  # type: ignore[attr-defined]
+                    return 0
+                except SystemExit as exc:
+                    code = exc.code
+                    if code is None:
+                        return 0
+                    if isinstance(code, int):
+                        return int(code)
+                    return 1
+                except Exception:
+                    traceback.print_exc(file=out)
+                    return 1
+    finally:
+        try:
+            os.chdir(previous_cwd)
+        except Exception:
+            pass
+        stop_event.set()
+        if heartbeat_thread is not None:
+            heartbeat_thread.join(timeout=1.0)
+
+
+def _run_refresh_via_cli(
+    *,
+    source_root: Path,
+    date_str: str,
+    regions: str,
+    bookmakers: str,
+    markets: str,
+    do_edges: bool,
+    do_export: bool,
+    do_push: bool,
+    log_file: Path,
+    started_at: str | None = None,
+) -> dict[str, object]:
+    raw_root = source_root / "data" / "raw"
+    processed_root = source_root / "data" / "processed"
+    raw_fp = raw_root / f"odds_wnba_player_props_{date_str}.csv"
+    pred_fp = processed_root / f"props_predictions_{date_str}.csv"
+    edges_fp = processed_root / f"props_edges_{date_str}.csv"
+    rec_fp = processed_root / f"props_recommendations_{date_str}.csv"
+    started_iso = started_at or dt.datetime.utcnow().isoformat()
+    state: dict[str, object] = {
+        "date": str(date_str),
+        "started_at": started_iso,
+        "ended_at": None,
+        "phase": "snapshot",
+        "phase_started_at": started_iso,
+        "heartbeat_at": dt.datetime.utcnow().isoformat(),
+        "rc_snapshot": -1,
+        "rc_edges": (-2 if do_edges else None),
+        "rc_export": (-2 if do_export else None),
+        "snapshot_rows": 0,
+        "predictions_rows": 0,
+        "edges_rows": 0,
+        "recs_rows": 0,
+        "snapshot_path": str(raw_fp),
+        "predictions_path": str(pred_fp),
+        "edges_path": str(edges_fp),
+        "recs_path": str(rec_fp),
+        "snapshot_alias_path": str(processed_root / f"oddsapi_player_props_{date_str}.csv"),
+        "snapshot_alias_rows": 0,
+        "duration_s": None,
+        "error": None,
+    }
+    started_ts = time.time()
+
+    def _touch_progress() -> None:
+        state["heartbeat_at"] = dt.datetime.utcnow().isoformat()
+
+    py = _source_python(source_root)
+    env = _source_worker_env(source_root)
+    rc_snapshot = _run_to_file(
+        _owned_snapshot_cli_args(
+            date_str=date_str,
+            out_path=raw_fp,
+            regions=regions,
+            bookmakers=bookmakers,
+            markets=markets,
+        ),
+        log_file,
+        cwd=REPO_ROOT,
+        env=_local_worker_env(),
+        timeout_s=15 * 60,
+        heartbeat_cb=_touch_progress,
+    )
+    state["rc_snapshot"] = int(rc_snapshot)
+    state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
+    alias_path, alias_rows, alias_error = _materialize_processed_snapshot_alias(
+        processed_root=processed_root,
+        date_str=date_str,
+        snapshot_path=raw_fp,
+        log_file=log_file,
+    )
+    state["snapshot_alias_path"] = str(alias_path)
+    state["snapshot_alias_rows"] = int(alias_rows)
+    if alias_error and int(state["snapshot_rows"] or 0) > 0:
+        state["error"] = f"snapshot alias write failed: {alias_error}"
+
+    pred_ready = False
+    if not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
+        state["phase"] = "predictions"
+        state["phase_started_at"] = dt.datetime.utcnow().isoformat()
+        player_logs_ok, player_logs_error = _ensure_player_logs_for_props_refresh(
+            source_root=source_root,
+            date_str=date_str,
+            log_file=log_file,
+            heartbeat_cb=_touch_progress,
+        )
+        if not player_logs_ok:
+            state["error"] = player_logs_error or f"player_logs missing before predict-props for {date_str}"
+        else:
+            try:
+                _touch_progress()
+                _, _ = export_props_predictions_local(
+                    source_root=source_root,
+                    date_str=date_str,
+                    out_path=pred_fp,
+                    calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_CALIB_WINDOW", 7)),
+                    calibrate_player=_env_bool("REFRESH_PREDICT_PROPS_CALIBRATE_PLAYER", True),
+                    player_calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_CALIB_WINDOW", 30)),
+                    player_min_pairs=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_MIN_PAIRS", 6)),
+                    player_shrink_k=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_SHRINK_K", 8)),
+                    use_smart_sim=_env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True),
+                    smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150)),
+                    smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
+                    smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
+                    log_file=log_file,
+                    heartbeat_cb=_touch_progress,
+                    heartbeat_every_s=5.0,
+                )
+                _touch_progress()
+                rc_pred = 0
+            except Exception:
+                rc_pred = 1
+            state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
+            if int(rc_pred) != 0:
+                state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
+            elif int(state["predictions_rows"] or 0) <= 0:
+                state["error"] = f"predict-props completed without writing rows to {pred_fp.name}"
+            else:
+                pred_ready = True
+    elif int(state["snapshot_rows"] or 0) <= 0:
+        state["rc_edges"] = None if do_edges else state.get("rc_edges")
+        state["rc_export"] = None if do_export else state.get("rc_export")
+
+    if pred_ready and do_edges:
+        state["phase"] = "edges"
+        state["phase_started_at"] = dt.datetime.utcnow().isoformat()
+        state["rc_edges"] = -1
+        try:
+            _touch_progress()
+            _, _ = export_props_edges_local(
+                source_root=source_root,
+                date_str=date_str,
+                raw_path=raw_fp,
+                predictions_path=pred_fp,
+                out_path=edges_fp,
+                bookmakers=bookmakers,
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+                heartbeat_every_s=5.0,
+            )
+            _touch_progress()
+            rc_edges = 0
+        except Exception:
+            rc_edges = 1
+        state["rc_edges"] = int(rc_edges)
+        state["edges_rows"] = int(_count_csv_rows_quick(edges_fp))
+        if int(rc_edges) != 0:
+            state["error"] = f"props-edges failed with exit code {int(rc_edges)}"
+        elif int(state["snapshot_rows"] or 0) > 0 and int(state["edges_rows"] or 0) <= 0:
+            state["error"] = "props-edges produced zero rows after a non-empty snapshot"
+
+    if pred_ready and do_export and not state.get("error"):
+        state["phase"] = "export"
+        state["phase_started_at"] = dt.datetime.utcnow().isoformat()
+        state["rc_export"] = -1
+        try:
+            _touch_progress()
+            _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)
+            _touch_progress()
+            rc_export = 0
+        except Exception:
+            _append_log(log_file, traceback.format_exc())
+            rc_export = 1
+        state["rc_export"] = int(rc_export)
+        state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
+        if int(rc_export) != 0:
+            state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
+
+    state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
+    state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
+    state["edges_rows"] = int(_count_csv_rows_quick(edges_fp))
+    state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
+    state["snapshot_alias_rows"] = int(_count_csv_rows_quick(Path(str(state.get("snapshot_alias_path") or ""))))
+    state["phase"] = "done"
+    ended = dt.datetime.utcnow().isoformat()
+    state["phase_started_at"] = ended
+    state["heartbeat_at"] = ended
+    state["ended_at"] = ended
+    state["duration_s"] = float(max(0.0, time.time() - started_ts))
+    if do_push:
+        _append_log(log_file, "do_push requested but push is not implemented in the Syndicate-owned runner")
+    return state
+
+
 def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None) -> dict[str, object] | None:
     raw_root = source_root / "data" / "raw"
     processed_root = source_root / "data" / "processed"
@@ -137,6 +643,54 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         "duration_s": 0.0,
         "error": None,
         "reused_existing_outputs": True,
+    }
+
+
+def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None) -> dict[str, object] | None:
+    raw_root = artifact_root / "data" / "raw"
+    processed_root = artifact_root / "data" / "processed"
+    snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
+    snapshot_alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
+    predictions_path = processed_root / f"props_predictions_{date_str}.csv"
+    edges_path = processed_root / f"props_edges_{date_str}.csv"
+    recs_path = processed_root / f"props_recommendations_{date_str}.csv"
+
+    required_paths = [snapshot_path, snapshot_alias_path]
+    if do_edges or do_export:
+        required_paths.append(predictions_path)
+    if do_edges:
+        required_paths.append(edges_path)
+    if do_export:
+        required_paths.append(recs_path)
+    if any(not path.exists() or not path.is_file() for path in required_paths):
+        return None
+
+    started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
+    ended = str(dt.datetime.utcnow().isoformat())
+    return {
+        "date": str(date_str),
+        "started_at": started,
+        "ended_at": ended,
+        "phase": "done",
+        "phase_started_at": ended,
+        "heartbeat_at": ended,
+        "rc_snapshot": 0,
+        "rc_edges": (0 if do_edges else None),
+        "rc_export": (0 if do_export else None),
+        "snapshot_rows": int(_count_csv_rows_quick(snapshot_path)),
+        "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
+        "edges_rows": int(_count_csv_rows_quick(edges_path)),
+        "recs_rows": int(_count_csv_rows_quick(recs_path)),
+        "snapshot_path": str(snapshot_path),
+        "predictions_path": str(predictions_path),
+        "edges_path": str(edges_path),
+        "recs_path": str(recs_path),
+        "snapshot_alias_path": str(snapshot_alias_path),
+        "snapshot_alias_rows": int(_count_csv_rows_quick(snapshot_alias_path)),
+        "duration_s": 0.0,
+        "error": None,
+        "reused_existing_artifact_bundle": True,
+        "artifact_bundle_root": str(artifact_root),
     }
 
 
@@ -524,18 +1078,8 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
     return copied
 
 
-def _load_source_module(source_root: Path):
-    src_root = source_root / "src"
-    if str(src_root) not in sys.path:
-        sys.path.insert(0, str(src_root))
-    return importlib.import_module("nba_betting.refresh_oddsapi_props_job")
-
-
 def _load_source_cli(source_root: Path):
-    src_root = source_root / "src"
-    if str(src_root) not in sys.path:
-        sys.path.insert(0, str(src_root))
-    return importlib.import_module("nba_betting.cli")
+    raise RuntimeError("source CLI fallback removed; use local artifacts or local Syndicate builders")
 
 
 def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
@@ -546,13 +1090,6 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
     )
     if existing:
         return existing
-    try:
-        cli_module = _load_source_cli(source_root)
-        cli_module.cli.main(["reconcile-quarters", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
-    except SystemExit:
-        pass
-    except Exception:
-        return None
     source = source_root / "data" / "processed" / f"recon_quarters_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
@@ -570,13 +1107,6 @@ def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_
     )
     if existing:
         return existing
-    try:
-        cli_module = _load_source_cli(source_root)
-        cli_module.cli.main(["fetch-prop-actuals", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
-    except SystemExit:
-        pass
-    except Exception:
-        return None
     source = source_root / "data" / "processed" / f"recon_props_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
@@ -594,13 +1124,6 @@ def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_r
     )
     if existing:
         return existing
-    try:
-        cli_module = _load_source_cli(source_root)
-        cli_module.cli.main(["export-game-cards", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
-    except SystemExit:
-        pass
-    except Exception:
-        return None
     source = source_root / "data" / "processed" / f"game_cards_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
@@ -618,13 +1141,6 @@ def _export_boxscores_artifact(*, source_root: Path, date_str: str, processed_ro
     )
     if existing:
         return existing
-    try:
-        cli_module = _load_source_cli(source_root)
-        cli_module.cli.main(["fetch-boxscores", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
-    except SystemExit:
-        pass
-    except Exception:
-        return None
     source = source_root / "data" / "processed" / f"boxscores_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
@@ -642,13 +1158,6 @@ def _export_recommendations_artifact(*, source_root: Path, date_str: str, proces
     )
     if existing:
         return existing
-    try:
-        cli_module = _load_source_cli(source_root)
-        cli_module.cli.main(["export-recommendations", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
-    except SystemExit:
-        pass
-    except Exception:
-        return None
     source = source_root / "data" / "processed" / f"recommendations_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
@@ -674,6 +1183,7 @@ def main() -> int:
     args = parser.parse_args()
 
     source_root = Path(args.source_root).resolve()
+    artifact_root = str(args.artifact_root or "").strip()
     state = _existing_refresh_state(
         source_root=source_root,
         date_str=args.date,
@@ -681,9 +1191,17 @@ def main() -> int:
         do_export=bool(args.do_export),
         started_at=args.started_at or None,
     )
+    if state is None and artifact_root:
+        state = _existing_artifact_bundle_state(
+            artifact_root=Path(artifact_root).resolve(),
+            date_str=args.date,
+            do_edges=bool(args.do_edges),
+            do_export=bool(args.do_export),
+            started_at=args.started_at or None,
+        )
     if state is None:
-        source_module = _load_source_module(source_root)
-        state = source_module.run_refresh_oddsapi_props_job(
+        state = _run_refresh_via_cli(
+            source_root=source_root,
             date_str=args.date,
             regions=args.regions,
             bookmakers=args.bookmakers,
@@ -694,8 +1212,7 @@ def main() -> int:
             log_file=Path(args.log_file).resolve(),
             started_at=args.started_at or None,
         )
-    artifact_root = str(args.artifact_root or "").strip()
-    if artifact_root:
+    if artifact_root and not state.get("reused_existing_artifact_bundle"):
         copied = _materialize_artifact_bundle(
             state=state,
             artifact_root=Path(artifact_root).resolve(),

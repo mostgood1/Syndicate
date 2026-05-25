@@ -238,7 +238,10 @@ def cards():
     selected_date = _selected_date()
     client = (request.args.get("client") or "").strip().lower()
     if client == "board":
-        context = build_cards_page_context(selected_date)
+        context = build_cards_page_context(
+            selected_date,
+            allow_stored_date_fallback="date" not in request.args,
+        )
         return render_template("shared/game_cards_board.html", **context)
     return render_template("wnba/cards_source.html", date=selected_date, asset_version=_cards_source_asset_version())
 
