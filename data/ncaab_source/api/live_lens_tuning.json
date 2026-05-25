@@ -1,14 +1,5 @@
 {
-  "early_over_period_max": 1.0,
-  "early_over_remaining_min": 20.0,
-  "early_over_strength_penalty": 0.0,
-  "late_over_margin_abs_min": 0.0,
-  "late_over_period_min": 2.0,
-  "late_over_remaining_hi": 10.0,
-  "late_over_remaining_lo": 5.0,
-  "late_over_strength_penalty": 0.0,
-  "market_blend_max_w": 0.55,
-  "market_blend_start_min": null,
+  "generated_at": "2026-04-07T12:18:30.427252Z",
   "meta": {
     "days": 21,
     "files": 104,
@@ -19,14 +10,6 @@
     "samples": 1351,
     "source": "cache_espn_pbp"
   },
-  "pace_hi": 3.25,
-  "pace_lo": 2.75,
-  "pbp_n_scale": 70.0,
-  "pps_hi": 1.18,
-  "pps_lo": 0.95,
-  "shot_proxy_ft_weight": 0.44,
-  "source": "outputs/live_lens_tuning.json",
-  "status": "ok",
   "tuning": {
     "driver_tag_strength_penalties": {
       "pace_hi": 2.0
