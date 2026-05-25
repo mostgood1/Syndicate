@@ -21,6 +21,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$cpuCount = [Environment]::ProcessorCount
+
+function Get-ReasonableWorkerCount {
+    param(
+        [int]$Requested,
+        [int]$CpuCount = $cpuCount
+    )
+
+    $safeCpu = [Math]::Max(1, [int]$CpuCount)
+    $safeRequested = [Math]::Max(1, [int]$Requested)
+    return [Math]::Min($safeRequested, [Math]::Max(1, $safeCpu - 1))
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $season = ($Date -split '-')[0]
 $runStamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
@@ -29,11 +42,38 @@ $latestDir = Join-Path $repoRoot 'reports\daily_update\latest'
 New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 New-Item -ItemType Directory -Path $latestDir -Force | Out-Null
 
+$runtimePolicy = [ordered]@{
+    MLB = [ordered]@{
+        sims = 1000
+        workers = 4
+    }
+    NBA = [ordered]@{
+        smartsimNSims = 1000
+        smartsimWorkers = 4
+    }
+    WNBA = [ordered]@{
+        smartsimNSims = 1000
+        smartsimWorkers = 4
+    }
+    NHL = [ordered]@{
+        gameSimSamples = 1000
+        propsBoxscoreNSims = 1000
+    }
+    NFL = [ordered]@{
+        scenarioNSims = 1000
+    }
+}
+
+$runtimePolicy.MLB.workers = Get-ReasonableWorkerCount -Requested $runtimePolicy.MLB.workers
+$runtimePolicy.NBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.NBA.smartsimWorkers
+$runtimePolicy.WNBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.WNBA.smartsimWorkers
+
 function Invoke-Step {
     param(
         [string]$Name,
         [string[]]$Command,
-        [string]$WorkingDirectory
+        [string]$WorkingDirectory,
+        [hashtable]$EnvironmentOverrides
     )
 
     Write-Host "==> $Name" -ForegroundColor Cyan
@@ -41,19 +81,36 @@ function Invoke-Step {
         Write-Host "    cwd: $WorkingDirectory" -ForegroundColor DarkGray
     }
     Write-Host ("    " + ($Command -join ' ')) -ForegroundColor DarkGray
+    if ($EnvironmentOverrides -and $EnvironmentOverrides.Count -gt 0) {
+        $envSummary = @($EnvironmentOverrides.GetEnumerator() | Sort-Object Name | ForEach-Object { "{0}={1}" -f $_.Key, $_.Value }) -join '; '
+        Write-Host "    env: $envSummary" -ForegroundColor DarkGray
+    }
 
     if ($DryRun) {
         return
     }
 
     Push-Location $WorkingDirectory
+    $previousEnv = @{}
     try {
+        if ($EnvironmentOverrides) {
+            foreach ($entry in $EnvironmentOverrides.GetEnumerator()) {
+                $previousEnv[$entry.Key] = [Environment]::GetEnvironmentVariable($entry.Key, 'Process')
+                [Environment]::SetEnvironmentVariable($entry.Key, [string]$entry.Value, 'Process')
+            }
+        }
         & $Command[0] $Command[1..($Command.Length - 1)]
         if ($LASTEXITCODE -ne 0) {
             throw "$Name failed with exit code $LASTEXITCODE"
         }
     }
     finally {
+        if ($EnvironmentOverrides) {
+            foreach ($entry in $EnvironmentOverrides.GetEnumerator()) {
+                $priorValue = $previousEnv[$entry.Key]
+                [Environment]::SetEnvironmentVariable($entry.Key, $priorValue, 'Process')
+            }
+        }
         Pop-Location
     }
 }
@@ -174,8 +231,8 @@ if (-not $SkipMLB) {
             '--date', $Date,
             '--season', $season,
             '--workflow', 'ui-daily',
-            '--sims', '100',
-            '--workers', '1',
+            '--sims', ([string]$runtimePolicy.MLB.sims),
+            '--workers', ([string]$runtimePolicy.MLB.workers),
             '--pbp', 'off',
             '--use-roster-artifacts', 'on',
             '--write-roster-artifacts', 'on',
@@ -186,6 +243,7 @@ if (-not $SkipMLB) {
             '--git-push', 'off'
         )
         WorkingDirectory = $mlbRoot
+        EnvironmentOverrides = @{}
     }
     $publishRepos += [pscustomobject]@{ Name = 'MLB-BettingV2'; RepoPath = $mlbRoot; CommitMessage = "$CommitMessagePrefix $Date (MLB source daily update)" }
 }
@@ -195,6 +253,10 @@ if (-not $SkipNBA) {
         Name = 'NBA source daily update'
         Command = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', '.\scripts\daily_update.ps1', '-Date', $Date, '-GitPush:$false')
         WorkingDirectory = $nbaRoot
+        EnvironmentOverrides = @{
+            DAILY_SMARTSIM_NSIMS = [string]$runtimePolicy.NBA.smartsimNSims
+            DAILY_SMARTSIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
+        }
     }
     $publishRepos += [pscustomobject]@{ Name = 'NBA-Betting'; RepoPath = $nbaRoot; CommitMessage = "$CommitMessagePrefix $Date (NBA source daily update)" }
 }
@@ -204,6 +266,10 @@ if (-not $SkipWNBA) {
         Name = 'WNBA source daily update'
         Command = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', '.\scripts\daily_update.ps1', '-Date', $Date, '-GitPush:$false')
         WorkingDirectory = $wnbaRoot
+        EnvironmentOverrides = @{
+            DAILY_SMARTSIM_NSIMS = [string]$runtimePolicy.WNBA.smartsimNSims
+            DAILY_SMARTSIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
+        }
     }
     $publishRepos += [pscustomobject]@{ Name = 'WNBA-Betting'; RepoPath = $wnbaRoot; CommitMessage = "$CommitMessagePrefix $Date (WNBA source daily update)" }
 }
@@ -211,8 +277,15 @@ if (-not $SkipNHL) {
     $nhlRoot = Join-Path $repoRoot '..\NHL-Betting'
     $sourceSteps += [pscustomobject]@{
         Name = 'NHL source daily update'
-        Command = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', '.\scripts\daily_update.ps1', '-BaseDate', $Date, '-NoGitPush')
+        Command = @(
+            'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', '.\scripts\daily_update.ps1',
+            '-BaseDate', $Date,
+            '-SimSamples', ([string]$runtimePolicy.NHL.gameSimSamples),
+            '-PropsBoxscoreNSims', ([string]$runtimePolicy.NHL.propsBoxscoreNSims),
+            '-NoGitPush'
+        )
         WorkingDirectory = $nhlRoot
+        EnvironmentOverrides = @{}
     }
     $publishRepos += [pscustomobject]@{ Name = 'NHL-Betting'; RepoPath = $nhlRoot; CommitMessage = "$CommitMessagePrefix $Date (NHL source daily update)" }
 }
@@ -222,6 +295,9 @@ if (-not $SkipNFL) {
         Name = 'NFL source daily update'
         Command = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', '.\daily_update.ps1', '-GitPush:$false')
         WorkingDirectory = $nflRoot
+        EnvironmentOverrides = @{
+            DAILY_UPDATE_SCENARIO_N_SIMS = [string]$runtimePolicy.NFL.scenarioNSims
+        }
     }
     $publishRepos += [pscustomobject]@{ Name = 'NFL-Betting'; RepoPath = $nflRoot; CommitMessage = "$CommitMessagePrefix $Date (NFL source daily update)" }
 }
@@ -231,6 +307,7 @@ if (-not $SkipNCAAF) {
         Name = 'NCAAF source daily update'
         Command = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', '.\Run-DailyUpdate.ps1', '-DisableGitPush')
         WorkingDirectory = $ncaafRoot
+        EnvironmentOverrides = @{}
     }
     $publishRepos += [pscustomobject]@{ Name = 'NCAAFCompare'; RepoPath = $ncaafRoot; CommitMessage = "$CommitMessagePrefix $Date (NCAAF source daily update)" }
 }
@@ -240,6 +317,7 @@ if (-not $SkipNCAAB) {
         Name = 'NCAAB source daily update'
         Command = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', '.\scripts\daily_update.ps1', '-Today', $Date, '-SkipGitPush')
         WorkingDirectory = $ncaabRoot
+        EnvironmentOverrides = @{}
     }
     $publishRepos += [pscustomobject]@{ Name = 'NCAAB'; RepoPath = $ncaabRoot; CommitMessage = "$CommitMessagePrefix $Date (NCAAB source daily update)" }
 }
@@ -251,7 +329,8 @@ $runManifest = [ordered]@{
     generatedAt = (Get-Date).ToString('o')
     runDir = $runDir
     latestDir = $latestDir
-    sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ name = $_.Name; workingDirectory = $_.WorkingDirectory; command = $_.Command } })
+    runtimePolicy = $runtimePolicy
+    sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ name = $_.Name; workingDirectory = $_.WorkingDirectory; environmentOverrides = $_.EnvironmentOverrides; command = $_.Command } })
     skipGitPush = [bool]$SkipGitPush
     gitRemote = $GitRemote
     commitMessagePrefix = $CommitMessagePrefix
@@ -278,7 +357,7 @@ try {
 
     if (-not $SkipSourceUpdates) {
         foreach ($step in $sourceSteps) {
-            Invoke-Step -Name $step.Name -Command $step.Command -WorkingDirectory $step.WorkingDirectory
+            Invoke-Step -Name $step.Name -Command $step.Command -WorkingDirectory $step.WorkingDirectory -EnvironmentOverrides $step.EnvironmentOverrides
         }
     }
 

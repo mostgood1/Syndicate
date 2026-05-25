@@ -478,6 +478,11 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
+        self.assertEqual(result["generation_mode"], "source_cli_with_local_bundle_reuse")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "source_cli_with_local_bundle_reuse")
+        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle_or_source_cli")
+        self.assertFalse((result.get("generation") or {}).get("hosted_safe"))
+        self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
         step = refresh_steps[0]
@@ -536,6 +541,11 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
+        self.assertEqual(result["generation_mode"], "source_cli_with_local_bundle_reuse")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "source_cli_with_local_bundle_reuse")
+        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle_or_source_cli")
+        self.assertFalse((result.get("generation") or {}).get("hosted_safe"))
+        self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
         step = refresh_steps[0]

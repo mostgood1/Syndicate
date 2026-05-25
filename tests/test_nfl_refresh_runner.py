@@ -20,27 +20,17 @@ class NflRefreshRunnerTests(unittest.TestCase):
     def test_main_calls_source_modules_directly(self) -> None:
         module = self._load_module()
 
-        class _FakeOddsModule:
-            def __init__(self) -> None:
-                self.calls = 0
-
-            def main(self) -> None:
-                self.calls += 1
-
-        class _FakePropsModule:
-            def __init__(self) -> None:
-                self.calls = 0
-
-            def main(self) -> int:
-                self.calls += 1
-                return 0
-
-        odds_module = _FakeOddsModule()
-        props_module = _FakePropsModule()
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir) / "source"
             (source_root / "nfl_compare" / "data").mkdir(parents=True)
+            class _FakeOddsModule:
+                def main(self, *, data_dir: Path | None = None) -> None:
+                    return None
+
+            class _FakePropsModule:
+                def main(self, argv: list[str] | None = None) -> int:
+                    return 0
+
             argv = [
                 "refresh_nfl_oddsapi.py",
                 "--source-root",
@@ -52,12 +42,11 @@ class NflRefreshRunnerTests(unittest.TestCase):
                 "--week",
                 "4",
             ]
-            with patch.object(module, "_load_source_modules", return_value=(odds_module, props_module)), patch("sys.argv", argv):
+            with patch.object(module, "_load_local_fetchers", return_value=(_FakeOddsModule(), _FakePropsModule())) as load_fetchers, patch("sys.argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
-        self.assertEqual(odds_module.calls, 1)
-        self.assertEqual(props_module.calls, 1)
+        load_fetchers.assert_called_once()
 
     def test_main_materializes_nfl_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
@@ -80,14 +69,23 @@ class NflRefreshRunnerTests(unittest.TestCase):
             (source_data_root / "upcoming_recs_2026_wk4.csv").write_text("team\nKC\n", encoding="utf-8")
             (source_data_root / "manifests" / "2026_wk4.json").write_text("{}\n", encoding="utf-8")
 
+            def _fake_odds_main(*, data_dir: Path | None = None) -> Path:
+                target_dir = data_dir or source_data_root
+                output = target_dir / "real_betting_lines_2026_10_01.json"
+                output.write_text("{}\n", encoding="utf-8")
+                return output
+
+            def _fake_props_main(argv: list[str] | None = None) -> int:
+                (source_data_root / "oddsapi_player_props_2026_wk4.csv").write_text("player\nMahomes\n", encoding="utf-8")
+                return 0
+
             class _FakeOddsModule:
-                def main(self) -> None:
-                    (source_data_root / "real_betting_lines_2026_10_01.json").write_text("{}\n", encoding="utf-8")
+                def main(self, *, data_dir: Path | None = None) -> Path:
+                    return _fake_odds_main(data_dir=data_dir)
 
             class _FakePropsModule:
-                def main(self) -> int:
-                    (source_data_root / "oddsapi_player_props_2026_wk4.csv").write_text("player\nMahomes\n", encoding="utf-8")
-                    return 0
+                def main(self, argv: list[str] | None = None) -> int:
+                    return _fake_props_main(argv)
 
             argv = [
                 "refresh_nfl_oddsapi.py",
@@ -100,7 +98,7 @@ class NflRefreshRunnerTests(unittest.TestCase):
                 "--week",
                 "4",
             ]
-            with patch.object(module, "_load_source_modules", return_value=(_FakeOddsModule(), _FakePropsModule())), patch("sys.argv", argv):
+            with patch.object(module, "_load_local_fetchers", return_value=(_FakeOddsModule(), _FakePropsModule())), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)

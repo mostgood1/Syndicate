@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import importlib.util
 import json
 import os
 import shutil
@@ -32,6 +31,12 @@ DIRECTORIES = (
 )
 
 
+def _load_local_fetchers():
+    odds_module = importlib.import_module("scripts.fetch_nfl_team_odds_local")
+    props_module = importlib.import_module("scripts.fetch_nfl_oddsapi_props_local")
+    return odds_module, props_module
+
+
 def _copy_if_exists(*, source: Path, destination: Path, recurse: bool = False) -> bool:
     if not source.exists():
         return False
@@ -48,28 +53,6 @@ def _copy_if_exists(*, source: Path, destination: Path, recurse: bool = False) -
     else:
         shutil.copy2(source, destination)
     return True
-
-
-def _load_module_from_path(module_name: str, module_path: Path):
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load module from {module_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def _load_source_modules(source_root: Path):
-    nfl_compare_root = (source_root / "nfl_compare").resolve()
-    if str(nfl_compare_root) not in sys.path:
-        sys.path.insert(0, str(nfl_compare_root))
-    if str(source_root.resolve()) not in sys.path:
-        sys.path.insert(0, str(source_root.resolve()))
-    importlib.invalidate_caches()
-    odds_module = importlib.import_module("src.odds_api_client")
-    props_module = _load_module_from_path("syndicate_nfl_fetch_oddsapi_props", source_root / "scripts" / "fetch_oddsapi_props.py")
-    return odds_module, props_module
-
 
 @contextmanager
 def _pushd(path: Path):
@@ -129,20 +112,17 @@ def main() -> int:
     props_out = source_data_root / f"oddsapi_player_props_{int(args.season)}_wk{int(args.week)}.csv"
 
     try:
-        odds_module, props_module = _load_source_modules(source_root)
-        with _pushd(source_root / "nfl_compare"):
-            odds_module.main()
+        odds_module, props_module = _load_local_fetchers()
+        odds_module.main(data_dir=source_data_root)
         with _pushd(source_root):
-            with _argv([
-                "fetch_oddsapi_props.py",
+            props_rc = props_module.main([
                 "--season",
                 str(int(args.season)),
                 "--week",
                 str(int(args.week)),
                 "--out",
                 str(props_out),
-            ]):
-                props_rc = props_module.main()
+            ])
         if int(props_rc or 0) != 0:
             print(json.dumps({"ok": False, "error": f"fetch_oddsapi_props exited with {props_rc}"}, indent=2))
             return int(props_rc or 1)
