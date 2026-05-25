@@ -14,6 +14,8 @@
   "migrationGateReportPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\migration_gate_report.json",
   "migrationGateConsolePath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\migration_gate_console.txt",
   "dryRun": true,
-  "state": "running",
-  "pid": 49416
+  "state": "failed",
+  "pid": 49416,
+  "canceledAt": "2026-05-22T20:34:30Z",
+  "finishedAt": "2026-05-22T20:34:30Z"
 }
