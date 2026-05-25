@@ -1,0 +1,188 @@
+﻿{
+    "date":  "2026-05-24",
+    "generatedAt":  "2026-05-24T19:27:52.7090868-05:00",
+    "runDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-24\\20260524_192752",
+    "latestDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
+    "runtimePolicy":  {
+                          "MLB":  {
+                                      "sims":  1000,
+                                      "workers":  4
+                                  },
+                          "NBA":  {
+                                      "smartsimNSims":  1000,
+                                      "smartsimWorkers":  4
+                                  },
+                          "WNBA":  {
+                                       "smartsimNSims":  1000,
+                                       "smartsimWorkers":  4
+                                   },
+                          "NHL":  {
+                                      "gameSimSamples":  1000,
+                                      "propsBoxscoreNSims":  1000
+                                  },
+                          "NFL":  {
+                                      "scenarioNSims":  1000
+                                  }
+                      },
+    "sourceSteps":  [
+                        {
+                            "name":  "MLB source daily update",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\MLB-BettingV2",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "command":  [
+                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\MLB-BettingV2\\.venv_x64\\Scripts\\python.exe",
+                                            "tools\\daily_update.py",
+                                            "--date",
+                                            "2026-05-24",
+                                            "--season",
+                                            "2026",
+                                            "--workflow",
+                                            "ui-daily",
+                                            "--sims",
+                                            "1000",
+                                            "--workers",
+                                            "4",
+                                            "--pbp",
+                                            "off",
+                                            "--use-roster-artifacts",
+                                            "on",
+                                            "--write-roster-artifacts",
+                                            "on",
+                                            "--refresh-prior-feed-live",
+                                            "off",
+                                            "--settle-prior-card",
+                                            "off",
+                                            "--build-next-day",
+                                            "off",
+                                            "--refresh-season-manifests",
+                                            "off",
+                                            "--git-push",
+                                            "off"
+                                        ]
+                        },
+                        {
+                            "name":  "NBA source daily update",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\NBA-Betting",
+                            "environmentOverrides":  {
+                                                         "DAILY_SMARTSIM_NSIMS":  "1000",
+                                                         "DAILY_SMARTSIM_WORKERS":  "4"
+                                                     },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            ".\\scripts\\daily_update.ps1",
+                                            "-Date",
+                                            "2026-05-24",
+                                            "-GitPush:$false"
+                                        ]
+                        },
+                        {
+                            "name":  "WNBA source daily update",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\WNBA-Betting",
+                            "environmentOverrides":  {
+                                                         "DAILY_SMARTSIM_NSIMS":  "1000",
+                                                         "DAILY_SMARTSIM_WORKERS":  "4"
+                                                     },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            ".\\scripts\\daily_update.ps1",
+                                            "-Date",
+                                            "2026-05-24",
+                                            "-GitPush:$false"
+                                        ]
+                        },
+                        {
+                            "name":  "NHL source daily update",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\NHL-Betting",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            ".\\scripts\\daily_update.ps1",
+                                            "-BaseDate",
+                                            "2026-05-24",
+                                            "-SimSamples",
+                                            "1000",
+                                            "-PropsBoxscoreNSims",
+                                            "1000",
+                                            "-NoGitPush"
+                                        ]
+                        },
+                        {
+                            "name":  "NFL source daily update",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\NFL-Betting",
+                            "environmentOverrides":  {
+                                                         "DAILY_UPDATE_SCENARIO_N_SIMS":  "1000"
+                                                     },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            ".\\daily_update.ps1",
+                                            "-GitPush:$false"
+                                        ]
+                        },
+                        {
+                            "name":  "NCAAF source daily update",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\NCAAFCompare",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            ".\\Run-DailyUpdate.ps1",
+                                            "-DisableGitPush"
+                                        ]
+                        },
+                        {
+                            "name":  "NCAAB source daily update",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\..\\NCAAB",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "command":  [
+                                            "powershell.exe",
+                                            "-ExecutionPolicy",
+                                            "Bypass",
+                                            "-File",
+                                            ".\\scripts\\daily_update.ps1",
+                                            "-Today",
+                                            "2026-05-24",
+                                            "-SkipGitPush"
+                                        ]
+                        }
+                    ],
+    "skipGitPush":  true,
+    "gitRemote":  "origin",
+    "commitMessagePrefix":  "daily update",
+    "skipped":  {
+                    "sourceUpdates":  false,
+                    "refreshGate":  true,
+                    "mlb":  false,
+                    "nba":  false,
+                    "nhl":  false,
+                    "wnba":  false,
+                    "nfl":  false,
+                    "ncaaf":  false,
+                    "ncaab":  false
+                },
+    "dryRun":  true,
+    "pushResults":  [
+
+                    ]
+}

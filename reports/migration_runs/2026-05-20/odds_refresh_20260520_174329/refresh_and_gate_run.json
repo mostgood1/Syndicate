@@ -11,7 +11,7 @@
   "skipMirror": true,
   "mirrorOnly": false,
   "dryRun": true,
-  "state": "running",
+  "state": "failed",
   "generatedAt": "2026-05-20T17:43:29Z",
   "command": [
     "C:\\Users\\mostg\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
@@ -30,5 +30,7 @@
   ],
   "oddsRefreshPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\odds_refresh.json",
   "oddsRefreshStderrPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-20\\odds_refresh_20260520_174329\\odds_refresh.stderr.txt",
-  "pid": 49416
+  "pid": 49416,
+  "canceledAt": "2026-05-22T20:34:30Z",
+  "finishedAt": "2026-05-22T20:34:30Z"
 }

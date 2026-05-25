@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "nfl",
-    "date":  "2026-05-24",
-    "refreshedAtUtc":  "2026-05-24T21:22:06.6623838Z",
+    "date":  "2026-05-25",
+    "refreshedAtUtc":  "2026-05-25T18:14:33.5111667Z",
     "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\NFL-Betting",
     "sourceArtifactRoot":  null,
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NFL",
@@ -184,3 +184,4 @@
                             "manifests"
                         ]
 }
+

@@ -1,0 +1,21 @@
+﻿{
+    "date":  "2026-05-25",
+    "runStamp":  "20260525_131418",
+    "baseUrl":  "",
+    "artifactsDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\migration_runs\\2026-05-25\\20260525_131418",
+    "refreshStatusDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\2026-05-25\\20260525_131418",
+    "jsonMode":  false,
+    "refreshOdds":  false,
+    "oddsPhase":  "all",
+    "oddsSports":  "all",
+    "oddsRegions":  "us",
+    "skipTests":  false,
+    "skipSmoke":  false,
+    "skipNFL":  false,
+    "skipNCAAF":  false,
+    "skipNCAAB":  false,
+    "skipMLB":  false,
+    "skipNBA":  false,
+    "skipNHL":  false,
+    "skipWNBA":  false
+}
