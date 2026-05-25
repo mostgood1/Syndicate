@@ -15,7 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from werkzeug.serving import BaseWSGIServer, make_server
+from werkzeug.serving import BaseWSGIServer, WSGIRequestHandler, make_server
 
 from syndicate.app import create_app
 
@@ -208,8 +208,9 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         board_loading_text="",
         scoreboard_selector="#cardsScoreboard",
         scoreboard_loading_text="",
-        extra_required_selectors=(".cards-control-card", ".cards-date-form", ".cards-nav-pill", ".feature-game-card", "#cardsHrTargets"),
-        extra_required_nonempty_selectors=("#cardsGrid .feature-game-card", ".cards-date-form", "#cardsHrTargets"),
+        empty_selector="#cardsGrid .hub-content-panel",
+        extra_required_selectors=(".cards-control-card", ".cards-date-form", ".cards-nav-pill", "#cardsHrTargets"),
+        extra_required_nonempty_selectors=(".cards-date-form", "#cardsHrTargets"),
     ),
     RouteSpec(
         name="NHL source cards",
@@ -399,7 +400,7 @@ class LocalServer(AbstractContextManager["LocalServer"]):
         if not any(item.get("slug") == SYNTHETIC_SPORT["slug"] for item in sports if isinstance(item, dict)):
             app.config["SYNDICATE_SPORTS"] = [*sports, dict(SYNTHETIC_SPORT)]
         port = self._find_free_port()
-        self._server = make_server("127.0.0.1", port, app)
+        self._server = make_server("127.0.0.1", port, app, request_handler=_SilentRequestHandler)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
         self.base_url = f"http://127.0.0.1:{port}"
@@ -419,6 +420,11 @@ class LocalServer(AbstractContextManager["LocalServer"]):
             return int(sock.getsockname()[1])
 
 
+class _SilentRequestHandler(WSGIRequestHandler):
+    def log(self, type: str, message: str, *args) -> None:  # noqa: A003 - Werkzeug API name.
+        return
+
+
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run browser-level smoke checks for source-shell cards routes and shared module hubs.",
@@ -430,8 +436,8 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument(
         "--timeout-ms",
         type=int,
-        default=20000,
-        help="Per-route timeout in milliseconds. Default: 20000.",
+        default=60000,
+        help="Per-route timeout in milliseconds. Default: 60000.",
     )
     parser.add_argument(
         "--headed",

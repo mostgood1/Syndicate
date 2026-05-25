@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import importlib
 import importlib.util
 import json
@@ -48,6 +49,97 @@ def _copy_matching_files(*, source_directory: Path, pattern: str, destination_di
     return copied
 
 
+def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path, file_name: str) -> str | None:
+    source = source_root / "data" / "processed" / file_name
+    if not source.exists() or not source.is_file():
+        return None
+    destination = processed_root / file_name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
+
+
+def _copy_existing_live_lens_artifact(*, source_root: Path, file_name: str, destinations: tuple[tuple[Path, str | None], ...]) -> dict[str, str]:
+    candidates = (
+        source_root / "data" / "processed" / file_name,
+        source_root / "data" / "live_lens" / file_name,
+    )
+    source = next((path for path in candidates if path.exists() and path.is_file()), None)
+    if source is None:
+        return {}
+    copied: dict[str, str] = {}
+    raw = source.read_bytes()
+    for out_path, copied_key in destinations:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(raw)
+        if copied_key:
+            copied[copied_key] = str(out_path)
+    return copied
+
+
+def _count_csv_rows_quick(path: Path | None) -> int:
+    try:
+        if path is None or not path.exists() or not path.is_file():
+            return 0
+        newline_count = 0
+        with path.open("rb") as handle:
+            while True:
+                chunk = handle.read(1024 * 1024)
+                if not chunk:
+                    break
+                newline_count += chunk.count(b"\n")
+        return max(0, int(newline_count - 1))
+    except Exception:
+        return 0
+
+
+def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None) -> dict[str, object] | None:
+    raw_root = source_root / "data" / "raw"
+    processed_root = source_root / "data" / "processed"
+    snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
+    snapshot_alias_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
+    predictions_path = processed_root / f"props_predictions_{date_str}.csv"
+    edges_path = processed_root / f"props_edges_{date_str}.csv"
+    recs_path = processed_root / f"props_recommendations_{date_str}.csv"
+
+    required_paths = [snapshot_path, snapshot_alias_path]
+    if do_edges or do_export:
+        required_paths.append(predictions_path)
+    if do_edges:
+        required_paths.append(edges_path)
+    if do_export:
+        required_paths.append(recs_path)
+    if any(not path.exists() or not path.is_file() for path in required_paths):
+        return None
+
+    started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
+    ended = str(dt.datetime.utcnow().isoformat())
+    return {
+        "date": str(date_str),
+        "started_at": started,
+        "ended_at": ended,
+        "phase": "done",
+        "phase_started_at": ended,
+        "heartbeat_at": ended,
+        "rc_snapshot": 0,
+        "rc_edges": (0 if do_edges else None),
+        "rc_export": (0 if do_export else None),
+        "snapshot_rows": int(_count_csv_rows_quick(snapshot_path)),
+        "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
+        "edges_rows": int(_count_csv_rows_quick(edges_path)),
+        "recs_rows": int(_count_csv_rows_quick(recs_path)),
+        "snapshot_path": str(snapshot_path),
+        "predictions_path": str(predictions_path),
+        "edges_path": str(edges_path),
+        "recs_path": str(recs_path),
+        "snapshot_alias_path": str(snapshot_alias_path),
+        "snapshot_alias_rows": int(_count_csv_rows_quick(snapshot_alias_path)),
+        "duration_s": 0.0,
+        "error": None,
+        "reused_existing_outputs": True,
+    }
+
+
 def _processed_source_directory(state: dict[str, object]) -> Path | None:
     for key in ("snapshot_alias_path", "predictions_path", "edges_path", "recs_path"):
         source_text = str(state.get(key) or "").strip()
@@ -75,6 +167,21 @@ def _load_source_app(source_root: Path):
 
 def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
     copied: dict[str, str] = {}
+    existing_specs = (
+        (f"recon_players_{date_str}.csv", "recon_players_path"),
+        (f"live_player_lens_tuning_{date_str}.csv", "live_player_lens_tuning_path"),
+    )
+    for file_name, copied_key in existing_specs:
+        existing = _copy_existing_processed_artifact(
+            source_root=source_root,
+            processed_root=processed_root,
+            file_name=file_name,
+        )
+        if existing:
+            copied[copied_key] = existing
+    if len(copied) == len(existing_specs):
+        return copied
+
     tool_specs = (
         (
             source_root / "tools" / "build_recon_players.py",
@@ -107,6 +214,13 @@ def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, 
 
 
 def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"props_recommendations_top_by_game_{date_str}.json",
+    )
+    if existing:
+        return existing
     source_app = _load_source_app(source_root)
     out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
     query = (
@@ -128,6 +242,13 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
 
 
 def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"recommendations_slate_{date_str}.json",
+    )
+    if existing:
+        return existing
     source_app = _load_source_app(source_root)
     out_path = processed_root / f"recommendations_slate_{date_str}.json"
     client = source_app.app.test_client()
@@ -144,6 +265,13 @@ def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, 
 
 
 def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"cards_props_snapshot_{date_str}.json",
+    )
+    if existing:
+        return existing
     source_app = _load_source_app(source_root)
     out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
     client = source_app.app.test_client()
@@ -177,6 +305,13 @@ def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_
 
 
 def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"cards_sim_detail_{date_str}.json",
+    )
+    if existing:
+        return existing
     source_app = _load_source_app(source_root)
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     client = source_app.app.test_client()
@@ -232,6 +367,13 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
 
 
 def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"recon_games_{date_str}.csv",
+    )
+    if existing:
+        return existing
     source_app = _load_source_app(source_root)
     if hasattr(source_app, "_cron_auth_ok"):
         try:
@@ -259,10 +401,9 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
 
 
 def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_root: Path, live_lens_root: Path) -> dict[str, str]:
-    source_app = _load_source_app(source_root)
-    client = source_app.app.test_client()
     exports = (
         (
+            f"live_lens_signals_{date_str}.jsonl",
             f"/api/download_live_lens_signals?date={date_str}",
             (
                 (processed_root / f"live_lens_signals_{date_str}.jsonl", "live_lens_signals_path"),
@@ -270,6 +411,7 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
             ),
         ),
         (
+            f"live_lens_projections_{date_str}.jsonl",
             f"/api/download_live_lens_projections?date={date_str}",
             (
                 (processed_root / f"live_lens_projections_{date_str}.jsonl", "live_lens_projections_path"),
@@ -277,6 +419,7 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
             ),
         ),
         (
+            "live_lens_tuning_override.json",
             "/api/download_live_lens_tuning",
             (
                 (processed_root / "live_lens_tuning_override.json", "live_lens_tuning_override_path"),
@@ -285,7 +428,19 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         ),
     )
     copied: dict[str, str] = {}
-    for query, destinations in exports:
+    missing_exports: list[tuple[str, str, tuple[tuple[Path, str | None], ...]]] = []
+    for file_name, query, destinations in exports:
+        existing = _copy_existing_live_lens_artifact(source_root=source_root, file_name=file_name, destinations=destinations)
+        if existing:
+            copied.update(existing)
+            continue
+        missing_exports.append((file_name, query, destinations))
+    if not missing_exports:
+        return copied
+
+    source_app = _load_source_app(source_root)
+    client = source_app.app.test_client()
+    for _file_name, query, destinations in missing_exports:
         try:
             response = client.get(query)
             status_code = int(getattr(response, "status_code", 0) or 0)
@@ -384,6 +539,13 @@ def _load_source_cli(source_root: Path):
 
 
 def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"recon_quarters_{date_str}.csv",
+    )
+    if existing:
+        return existing
     try:
         cli_module = _load_source_cli(source_root)
         cli_module.cli.main(["reconcile-quarters", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
@@ -401,6 +563,13 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
 
 
 def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"recon_props_{date_str}.csv",
+    )
+    if existing:
+        return existing
     try:
         cli_module = _load_source_cli(source_root)
         cli_module.cli.main(["fetch-prop-actuals", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
@@ -418,6 +587,13 @@ def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_
 
 
 def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"game_cards_{date_str}.csv",
+    )
+    if existing:
+        return existing
     try:
         cli_module = _load_source_cli(source_root)
         cli_module.cli.main(["export-game-cards", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
@@ -435,6 +611,13 @@ def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_r
 
 
 def _export_boxscores_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"boxscores_{date_str}.csv",
+    )
+    if existing:
+        return existing
     try:
         cli_module = _load_source_cli(source_root)
         cli_module.cli.main(["fetch-boxscores", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
@@ -452,6 +635,13 @@ def _export_boxscores_artifact(*, source_root: Path, date_str: str, processed_ro
 
 
 def _export_recommendations_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+    existing = _copy_existing_processed_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        file_name=f"recommendations_{date_str}.csv",
+    )
+    if existing:
+        return existing
     try:
         cli_module = _load_source_cli(source_root)
         cli_module.cli.main(["export-recommendations", "--date", date_str], standalone_mode=False)  # type: ignore[attr-defined]
@@ -484,18 +674,26 @@ def main() -> int:
     args = parser.parse_args()
 
     source_root = Path(args.source_root).resolve()
-    source_module = _load_source_module(source_root)
-    state = source_module.run_refresh_oddsapi_props_job(
+    state = _existing_refresh_state(
+        source_root=source_root,
         date_str=args.date,
-        regions=args.regions,
-        bookmakers=args.bookmakers,
-        markets=args.markets,
         do_edges=bool(args.do_edges),
         do_export=bool(args.do_export),
-        do_push=bool(args.do_push),
-        log_file=Path(args.log_file).resolve(),
         started_at=args.started_at or None,
     )
+    if state is None:
+        source_module = _load_source_module(source_root)
+        state = source_module.run_refresh_oddsapi_props_job(
+            date_str=args.date,
+            regions=args.regions,
+            bookmakers=args.bookmakers,
+            markets=args.markets,
+            do_edges=bool(args.do_edges),
+            do_export=bool(args.do_export),
+            do_push=bool(args.do_push),
+            log_file=Path(args.log_file).resolve(),
+            started_at=args.started_at or None,
+        )
     artifact_root = str(args.artifact_root or "").strip()
     if artifact_root:
         copied = _materialize_artifact_bundle(

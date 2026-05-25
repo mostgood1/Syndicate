@@ -31,11 +31,11 @@ Today Syndicate is not yet safe to run on Render as a self-refreshing system bec
 
 | Sport | Normal ingest status | Generation status | Backlog coverage | Next migration gap |
 | --- | --- | --- | --- | --- |
-| MLB | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through Syndicate wrapper | Covered by Milestone 2 and the sport backlog after blockers | Replace the MLB OddsAPI/live-lens generation seam with fully owned generation or a neutral publisher. |
-| NBA | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through the source props refresh job | Covered by Workstream 1B, Milestone 2, and the recommended next-slice guidance | Replace the NBA props refresh job with a Syndicate-owned generator or a neutral publisher. |
+| MLB | Hosted-safe via `artifact_bundle_or_existing_mirror` | Bundle-local generation in Syndicate for OddsAPI fetch, live-lens bootstrap, bundle materialization, snapshot/archive/meta handling, and existing-artifact reuse | Covered by Milestone 2 and the sport backlog after blockers | Keep the owned MLB bundle path stable; only copied daily/live/eval artifacts still come from the mirrored source data root. |
+| NBA | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through the source props refresh job, but the Syndicate runner now skips that job when the day's snapshot/predictions/edges/recommendations already exist and reuses those outputs directly | Covered by Workstream 1B, Milestone 2, and the recommended next-slice guidance | Replace the remaining NBA props refresh job path with a Syndicate-owned generator or a neutral publisher. |
 | NHL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Bundle-local generation in Syndicate for scoreboard, team odds, and props lines | Covered by Milestone 2 and the sport backlog after blockers | Keep the owned NHL odds bundle path stable; only the optional processed/live-lens backfill still benefits from a sibling source checkout. |
-| NFL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned weekly generation through the source odds and props refreshers | Covered by Milestone 2 and the sport backlog after blockers | Replace the NFL team-odds and props generation seam with Syndicate-owned code or a shared package. |
-| WNBA | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through the source props refresh job | Covered by Milestone 2 and the sport backlog after blockers | Replace the WNBA props refresh job with a Syndicate-owned generator or a neutral publisher. |
+| NFL | Hosted-safe via `artifact_bundle_or_existing_mirror` | Bundle-local generation in Syndicate for team odds and player props lines | Covered by Milestone 2 and the sport backlog after blockers | Keep the owned NFL bundle path stable; only the copied weekly artifacts still come from the mirrored source data root. |
+| WNBA | Hosted-safe via `artifact_bundle_or_existing_mirror` | Source-owned generation through the source props refresh job, but the Syndicate runner now skips that job when the day's snapshot/predictions/edges/recommendations already exist and reuses those outputs directly | Covered by Milestone 2 and the sport backlog after blockers | Replace the remaining WNBA props refresh job path with a Syndicate-owned generator or a neutral publisher. |
 | NCAAB | Hosted-safe via `existing_raw_outputs` | Local raw-output generation and local mirror/export are now owned in Syndicate | Covered by Workstream 1A and Milestone 2 | Keep the owned raw-output lane stable and only reopen this sport if broader NCAAB generation must move into Syndicate. |
 | NCAAF | Hosted-safe via `artifact_bundle_or_existing_mirror` | Bundle-local generation in Syndicate | Covered by Milestone 2 and the sport backlog after blockers | Keep the owned bundle path stable and only reopen it if the live workflow or publication path needs more owned generation. |
 
@@ -215,7 +215,7 @@ After Milestones 1 through 3 are complete, use this order for per-sport hosted o
 Reason: live-lens and current-day board ownership are central to the reference module.
 
 2. NFL
-Reason: weekly artifact boundaries are already clearer than the daily source-app-export cases.
+Reason: weekly artifact boundaries are clear, and the player-props leg is now local to Syndicate; the remaining gap is the team-odds fetcher.
 
 3. WNBA
 Reason: similar shape to NBA, but simpler once the shared props-refresh pattern is established.

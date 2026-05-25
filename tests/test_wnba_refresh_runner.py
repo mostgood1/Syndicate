@@ -58,6 +58,97 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertTrue(fake_source.calls[0]["do_edges"])
         self.assertTrue(fake_source.calls[0]["do_export"])
 
+    def test_cli_backed_exports_prefer_existing_processed_files(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_source.mkdir(parents=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            date_str = "2026-05-22"
+
+            expected = {
+                f"recon_quarters_{date_str}.csv": module._export_recon_quarters_artifact,
+                f"recon_props_{date_str}.csv": module._export_recon_props_artifact,
+                f"game_cards_{date_str}.csv": module._export_game_cards_artifact,
+                f"boxscores_{date_str}.csv": module._export_boxscores_artifact,
+                f"recommendations_{date_str}.csv": module._export_recommendations_artifact,
+            }
+            for name in expected:
+                (processed_source / name).write_text("id\n1\n", encoding="utf-8")
+
+            with patch.object(module, "_load_source_cli", side_effect=AssertionError("source CLI should not load")):
+                for name, exporter in expected.items():
+                    out = exporter(source_root=source_root, date_str=date_str, processed_root=processed_root)
+                    self.assertEqual(out, str(processed_root / name))
+                    self.assertTrue((processed_root / name).exists())
+
+    def test_app_backed_exports_prefer_existing_processed_files(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_source.mkdir(parents=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            live_lens_root = tmp_root / "bundle" / "data" / "live_lens"
+            date_str = "2026-05-22"
+
+            expected = {
+                f"recon_games_{date_str}.csv": module._export_recon_games_artifact,
+                f"recommendations_slate_{date_str}.json": module._export_recommendations_slate_snapshot,
+                f"cards_props_snapshot_{date_str}.json": module._export_cards_props_snapshot,
+                f"cards_sim_detail_{date_str}.json": module._export_cards_sim_detail_snapshot,
+                f"props_recommendations_top_by_game_{date_str}.json": module._export_top_by_game_snapshot,
+            }
+            for name in expected:
+                (processed_source / name).write_text('{"ok": true}\n', encoding="utf-8")
+            (processed_source / f"live_lens_signals_{date_str}.jsonl").write_text('{"kind":"signal"}\n', encoding="utf-8")
+            (processed_source / f"live_lens_projections_{date_str}.jsonl").write_text('{"kind":"projection"}\n', encoding="utf-8")
+            (processed_source / "live_lens_tuning_override.json").write_text('{"alpha":1.25}\n', encoding="utf-8")
+
+            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+                for name, exporter in expected.items():
+                    out = exporter(source_root=source_root, date_str=date_str, processed_root=processed_root)
+                    self.assertEqual(out, str(processed_root / name))
+                    self.assertTrue((processed_root / name).exists())
+                copied = module._export_live_lens_artifacts(
+                    source_root=source_root,
+                    date_str=date_str,
+                    processed_root=processed_root,
+                    live_lens_root=live_lens_root,
+                )
+                self.assertEqual(copied["live_lens_signals_path"], str(processed_root / f"live_lens_signals_{date_str}.jsonl"))
+                self.assertEqual(copied["live_lens_projections_path"], str(processed_root / f"live_lens_projections_{date_str}.jsonl"))
+                self.assertEqual(copied["live_lens_tuning_override_path"], str(processed_root / "live_lens_tuning_override.json"))
+                self.assertEqual(copied["live_lens_tuning_override_live_lens_path"], str(live_lens_root / "live_lens_tuning_override.json"))
+
+    def test_optional_tool_exports_prefer_existing_processed_files(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_source.mkdir(parents=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            date_str = "2026-05-22"
+
+            (processed_source / f"recon_players_{date_str}.csv").write_text("player\nA\n", encoding="utf-8")
+            (processed_source / f"live_player_lens_tuning_{date_str}.csv").write_text("player\nA\n", encoding="utf-8")
+
+            with patch.object(module, "_load_module_from_path", side_effect=AssertionError("tool module should not load")):
+                copied = module._build_optional_player_recon_artifacts(
+                    source_root=source_root,
+                    date_str=date_str,
+                    processed_root=processed_root,
+                )
+                self.assertEqual(copied["recon_players_path"], str(processed_root / f"recon_players_{date_str}.csv"))
+                self.assertEqual(copied["live_player_lens_tuning_path"], str(processed_root / f"live_player_lens_tuning_{date_str}.csv"))
+
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 
@@ -229,3 +320,69 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_signals_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_projections_2026-05-22.jsonl").exists())
             self.assertTrue((artifact_root / "data" / "live_lens" / "live_lens_tuning_override.json").exists())
+
+    def test_main_prefers_existing_refresh_outputs_before_source_job(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            raw_root = source_root / "data" / "raw"
+            processed_root = source_root / "data" / "processed"
+            artifact_root = tmp_root / "bundle"
+            date_str = "2026-05-22"
+            raw_root.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            required_files = {
+                raw_root / f"odds_wnba_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"oddsapi_player_props_{date_str}.csv": "id\n1\n",
+                processed_root / f"props_predictions_{date_str}.csv": "player\nA\n",
+                processed_root / f"props_edges_{date_str}.csv": "player\nA\n",
+                processed_root / f"props_recommendations_{date_str}.csv": "player\nA\n",
+                processed_root / f"game_cards_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"boxscores_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recommendations_{date_str}.csv": "market\nATS\n",
+                processed_root / f"recon_quarters_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recon_props_{date_str}.csv": "player_id\n1\n",
+                processed_root / f"recon_games_{date_str}.csv": "game_id\n1\n",
+                processed_root / f"recommendations_slate_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"cards_props_snapshot_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"cards_sim_detail_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"props_recommendations_top_by_game_{date_str}.json": '{"ok": true}\n',
+                processed_root / f"live_lens_signals_{date_str}.jsonl": '{"kind":"signal"}\n',
+                processed_root / f"live_lens_projections_{date_str}.jsonl": '{"kind":"projection"}\n',
+                processed_root / "live_lens_tuning_override.json": '{"alpha":1.25}\n',
+                processed_root / f"recon_players_{date_str}.csv": "player\nA\n",
+                processed_root / f"live_player_lens_tuning_{date_str}.csv": "player\nA\n",
+            }
+            for path, content in required_files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+            (processed_root / "smart_sim_2026-05-22_ATL_DAL.json").write_text('{"ok": true}\n', encoding="utf-8")
+
+            argv = [
+                "refresh_wnba_oddsapi_props.py",
+                "--date",
+                date_str,
+                "--regions",
+                "us",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+                "--log-file",
+                str(tmp_root / "refresh.log"),
+                "--do-edges",
+                "--do-export",
+            ]
+            with patch.object(module, "_load_source_module", side_effect=AssertionError("source job should not load")), patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")), patch.object(module, "_load_source_cli", side_effect=AssertionError("source cli should not load")), patch.object(module, "_load_module_from_path", side_effect=AssertionError("source tools should not load")), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            self.assertTrue((artifact_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"props_predictions_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"props_edges_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"props_recommendations_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / f"game_cards_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_ATL_DAL.json").exists())

@@ -62,7 +62,7 @@ Current hosted boundary:
 - The web app itself is deployable on Render now.
 - The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
 - The per-sport ingest boundary is now hosted-safe across MLB, NBA, NHL, NFL, WNBA, NCAAF, and NCAAB: each module can import from a neutral artifact bundle or an already mirrored local bundle instead of requiring a sibling source checkout during ingest.
-- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for several sports. The remaining blockers are the broader per-sport refresh commands that still live outside Syndicate, especially NBA, MLB, NFL, and WNBA generation.
+- Syndicate is still not fully self-refreshing on Render because artifact generation remains source-owned for several sports. The remaining blockers are the broader per-sport refresh commands that still live outside Syndicate, especially NBA and WNBA.
 
 Render setup:
 
@@ -190,11 +190,11 @@ python .\scripts\refresh_odds_sources.py --date 2026-05-18 --phase pregame --spo
 
 The central tool is intentionally an orchestrator, not a new fetcher. It reuses the existing source repo entrypoints that already own each sport's odds and live-props logic:
 
-- MLB: `tools.oddsapi.fetch_daily_oddsapi_markets`
-- NBA: `nba_betting.refresh_oddsapi_props_job`
+- MLB: local `scripts/fetch_mlb_oddsapi_local.py` plus local live-lens bootstrap handling in `scripts/refresh_mlb_oddsapi.py`
+- NBA: `nba_betting.refresh_oddsapi_props_job` when the day's snapshot/predictions/edges/recommendations are missing; otherwise `scripts/refresh_nba_oddsapi_props.py` now reuses the existing outputs directly before materializing the Syndicate bundle
 - NHL: `scripts/refresh_nhl_oddsapi.py --artifact-root data/nhl_source/source_artifacts`
-- NFL: `nfl_compare/src/odds_api_client.py` plus `scripts/fetch_oddsapi_props.py`
-- WNBA: `wnba_betting.refresh_oddsapi_props_job`
+- NFL: Syndicate-local `scripts/fetch_nfl_team_odds_local.py` plus `scripts/fetch_nfl_oddsapi_props_local.py`
+- WNBA: `wnba_betting.refresh_oddsapi_props_job` when the day's snapshot/predictions/edges/recommendations are missing; otherwise `scripts/refresh_wnba_oddsapi_props.py` now reuses the existing outputs directly before materializing the Syndicate bundle
 - NCAAB: `scripts/refresh_ncaab_odds_history.py --mode current --out-dir data/ncaab_source/raw_outputs/by_date/<date>`
 - NCAAF: `scripts/refresh_ncaaf_oddsapi.py --artifact-root data/ncaaf_source/source_artifacts [--week <week>]`
 
@@ -246,6 +246,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\daily_update.ps1 -Date 2026-0
 ```
 
 This daily update writes a timestamped run under [reports/daily_update](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update), keeps a rolling latest manifest under [reports/daily_update/latest](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest), emits `module_tracker_snapshot.json`, and now publishes `module_tracker_gap_report.txt` so each run shows the highest-leverage MLB parity gaps and a ranked module backlog alongside migration health.
+
+## Unified Daily Runner
+
+To run the temporary all-sports source-update workflow from Syndicate in one command, then mirror, gate, and only push after the gate succeeds:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Date 2026-05-24
+powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Date 2026-05-24 -SkipGitPush
+powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Date 2026-05-24 -BaseUrl http://127.0.0.1:5000 -SkipSmoke
+```
+
+This wrapper is the temporary bridge until Syndicate owns all generation locally. It runs the existing source daily-update entrypoint for each enabled sport with source-side git push explicitly disabled, then runs [scripts/refresh_and_gate.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_and_gate.ps1), and only after that succeeds stages, commits, and pushes each dirty source repo plus Syndicate itself.
+
+The unified runner writes [reports/daily_update/<date>/<stamp>/unified_daily_update_run.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update) plus a rolling latest copy at [reports/daily_update/latest/unified_daily_update_latest.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest). Those manifests record the exact source commands invoked and the final per-repo push results.
+
+Use `-SkipGitPush` when you want the full source-refresh plus mirror-plus-gate validation without committing anything, and use the existing per-sport `-SkipMLB`, `-SkipNBA`, `-SkipNHL`, `-SkipWNBA`, `-SkipNFL`, `-SkipNCAAF`, and `-SkipNCAAB` switches to narrow the run. The script refuses to push if `-SkipRefreshGate` is set, because the intended contract is gate-first, publish-second.
 
 ## Browser parity smoke
 
