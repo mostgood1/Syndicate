@@ -57,9 +57,7 @@ def _copy_tree_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_dir():
         return False
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        shutil.rmtree(destination)
-    shutil.copytree(source, destination)
+    shutil.copytree(source, destination, dirs_exist_ok=True)
     return True
 
 

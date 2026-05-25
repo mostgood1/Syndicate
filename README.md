@@ -38,12 +38,12 @@ Syndicate is the new unified multi-sport app that will eventually replace the se
 - The shared shell follows the MLB-first migration plan.
 - Module status currently breaks down as follows:
   - MLB: phase-1 complete reference module with cards, game detail, live-lens, a daily archive, season betting-card surfaces, and shared rank-board API parity across the main ranked MLB views.
-  - NBA: active source-backed migration with cards, game detail, picks, live-lens, season betting-card surfaces, and a stored-date archive under MLB-shaped routes.
-  - NHL: active source-backed migration with cards, a game drill-in, ranked picks, a live-lens board, and a stored-date archive lane projected from daily snapshots.
-  - WNBA: active shared-board migration with cards, game detail, picks, props, live lens, and a stored-date archive lane.
-  - NFL: near-complete module-family candidate with cards, a game drill-in, grouped weekly picks, a season betting-card companion, and source-style picks API aliases built from stored weekly recommendation snapshots.
-  - NCAAF: active artifact-backed migration with weekly cards, a game drill-in, picks, and a season betting-card companion.
-  - NCAAB: active source-backed migration with cards, a game drill-in, a live-lens board, a season review page, a historical betting-card companion, and a results archive.
+  - NBA: active artifact-backed migration with cards, game detail, picks, props, live-lens, accuracy and recap lanes, season betting-card surfaces, and a stored-date archive under MLB-shaped routes.
+  - NHL: active artifact-backed migration with cards, a game drill-in, ranked picks, native live-lens and accuracy lanes, props reconciliation and props-lines surfaces, and a stored-date archive built from mirrored daily artifacts.
+  - WNBA: active artifact-backed migration with cards, game detail, picks, props, live-lens, native local audit and accuracy payloads, and a stored-date archive lane.
+  - NFL: near-complete module-family candidate with cards, a game drill-in, grouped weekly picks, a read-only live-lens monitor, a weekly archive lane, and a season betting-card companion built from stored weekly recommendation snapshots.
+  - NCAAF: active artifact-backed migration with weekly cards, a game drill-in, picks, a read-only live-lens monitor, a weekly archive lane, and a season betting-card companion.
+  - NCAAB: active mirror-first migration with cards, a game drill-in, a live-lens board, a season review page, a historical betting-card companion, and a results archive backed by mirrored local artifacts.
 - The home screen should be treated as the migration tracker for module maturity, not just a launcher.
 
 ## Local run
@@ -249,7 +249,7 @@ This daily update writes a timestamped run under [reports/daily_update](c:/Users
 
 ## Unified Daily Runner
 
-To run the temporary all-sports source-update workflow from Syndicate in one command, then mirror, gate, and only push after the gate succeeds:
+To run the temporary all-sports daily workflow from Syndicate in one command, then mirror, gate, and only push after the gate succeeds:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1
@@ -258,9 +258,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Dat
 powershell -ExecutionPolicy Bypass -File .\scripts\unified_daily_update.ps1 -Date 2026-05-24 -BaseUrl http://127.0.0.1:5000 -SkipSmoke
 ```
 
-This wrapper is the temporary bridge until Syndicate owns all generation locally. It runs the existing source daily-update entrypoint for each enabled sport with source-side git push explicitly disabled, then runs [scripts/refresh_and_gate.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_and_gate.ps1), and only after that succeeds stages, commits, and pushes each dirty source repo plus Syndicate itself.
+This wrapper is the temporary bridge until Syndicate owns all generation locally. MLB now runs through the Syndicate-owned [scripts/refresh_mlb_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_oddsapi.py) path inside the Syndicate repo, while the other enabled sports still run their existing source daily-update entrypoints with source-side git push explicitly disabled. After those generation steps complete, the wrapper runs [scripts/refresh_and_gate.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_and_gate.ps1), and only after that succeeds stages, commits, and pushes each remaining dirty source repo plus Syndicate itself.
 
-The runner also enforces the current temporary runtime policy for the heaviest simulation steps so source refreshes stay consistent and fast enough to use operationally: MLB runs `ui-daily` at `1000` sims with `4` workers, NBA and WNBA set `DAILY_SMARTSIM_NSIMS=1000` plus `DAILY_SMARTSIM_WORKERS=4`, NHL runs `-SimSamples 1000` with `-PropsBoxscoreNSims 1000`, and NFL sets `DAILY_UPDATE_SCENARIO_N_SIMS=1000`. NCAAF and NCAAB currently run their native daily-update defaults because this wrapper does not yet have a verified low-risk sim/worker control surface for them. That policy is emitted into the run manifest so dry runs and completed runs both show the exact values used.
+The runner also enforces the current temporary runtime policy for the heaviest simulation steps so refreshes stay consistent and fast enough to use operationally: NBA and WNBA set `DAILY_SMARTSIM_NSIMS=1000` plus `DAILY_SMARTSIM_WORKERS=4`, NHL runs `-SimSamples 1000` with `-PropsBoxscoreNSims 1000`, and NFL sets `DAILY_UPDATE_SCENARIO_N_SIMS=1000`. MLB now uses the local Syndicate refresh/materialization path rooted at `data/mlb_source` and publishes the current artifact bundle to `data/mlb_source/source_artifacts`. NCAAF and NCAAB currently run their native daily-update defaults because this wrapper does not yet have a verified low-risk sim/worker control surface for them. That policy is emitted into the run manifest so dry runs and completed runs both show the exact values used.
 
 The unified runner writes [reports/daily_update/<date>/<stamp>/unified_daily_update_run.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update) plus a rolling latest copy at [reports/daily_update/latest/unified_daily_update_latest.json](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest). Those manifests record the exact source commands invoked and the final per-repo push results.
 
@@ -343,10 +343,10 @@ The source-backed NCAAB raw mirror contract is now intentionally narrow. Syndica
 ## Next implementation steps
 
 1. Keep NFL stable as the next module-family completion candidate, and only reopen its weekly snapshot family if a focused payload or view audit exposes a real artifact-backed gap.
-2. Keep tightening NBA, NHL, and WNBA around the MLB public contract while preserving source parity where those sports have denser source-specific pages.
-3. Keep tightening NCAAB's historical lane now that season review, a historical betting-card board, and the results archive are in place, and keep hardening shared helpers only where real consumers already exist.
-4. Keep MLB stable as the reference feature module, and only extract helpers after multiple real consumers prove the contract.
-5. Leave NCAAF stable as an artifact-backed weekly module until the live source workflow is populated again.
+2. Keep NBA and WNBA moving from protected artifact-backed runtime ownership into deeper fully local generator ownership, now that their active props refresh path is already Syndicate-owned.
+3. Keep NHL, NFL, NCAAF, and NCAAB stable on their protected artifact-backed contracts while the hosted worker/state and bundle-publication seams are proven end to end.
+4. Keep MLB stable as the reference feature module and the first fully local runtime contract, and only extract helpers after multiple real consumers prove the contract.
+5. Use the module tracker and migration gate as the source of truth for sport maturity; update docs whenever the tracker contract changes.
 
 ## How We Call A Module Done
 
@@ -357,4 +357,4 @@ For the current migration phase, a module is only considered complete when:
 3. The active surfaces are covered by the focused regression suite.
 4. The home tracker and docs describe the same visible surfaces the module actually ships.
 
-MLB now meets the current phase-1 complete standard. NFL is now the nearest near-complete module-family candidate, and the current weekly snapshot family is coherent through cards, drill-ins, grouped picks, betting-card navigation, explicit missing-week empty states, and source-style picks payload aliases.
+MLB now meets the current phase-1 complete standard and is the first fully local runtime contract in Syndicate. NFL remains the nearest near-complete module-family candidate, and the current weekly snapshot family is coherent through cards, drill-ins, grouped picks, live-lens and archive lanes, betting-card navigation, explicit missing-week empty states, and source-style picks payload aliases.

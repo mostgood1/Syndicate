@@ -72,7 +72,12 @@ function Invoke-Step {
 
 $refreshSteps = @()
 if (-not $SkipMLB) {
-    $refreshSteps += ,@('MLB mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_mlb_source_mirror.ps1'), '-Date', $Date))
+    $mlbMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_mlb_source_mirror.ps1'), '-Date', $Date)
+    $localMlbArtifactRoot = Join-Path $repoRoot 'data\mlb_source\source_artifacts'
+    if (Test-Path $localMlbArtifactRoot) {
+        $mlbMirrorCommand += @('-SourceArtifactRoot', $localMlbArtifactRoot)
+    }
+    $refreshSteps += ,@('MLB mirror refresh', $mlbMirrorCommand)
 }
 if (-not $SkipNBA) {
     $refreshSteps += ,@('NBA mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nba_source_mirror.ps1'), '-Date', $Date))

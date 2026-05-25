@@ -15,11 +15,11 @@
 
 1. Shared Syndicate shell is in place.
 2. MLB is the phase-1 complete reference module with cards, live-lens, a daily archive, season betting-card surfaces, and aligned shared rank-board API transport across its main ranked modules.
-3. NBA is an active source-backed migration with cards, picks, live-lens, season betting-card routes, and a stored-date archive under the MLB-shaped public contract.
-4. WNBA is an active shared-board migration with a stored-date archive lane.
-5. NHL is an active source-backed migration with cards, a game drill-in, ranked picks, a live-lens board, and a stored-date archive lane.
-6. NFL currently sits in a frontend-parity lane: cards, a game drill-in, grouped weekly picks, a season betting-card companion, explicit missing-week empty states, and source-style picks API aliases are the visible target, while deeper sim-engine overhaul stays deferred.
-7. NCAAF is in the same frontend-parity lane with artifact-backed weekly cards, a game drill-in, picks, and a season betting-card companion, while NCAAB remains the next full-completion target with source-backed cards, a first game drill-in, a read-only live-lens board, a season review page, a historical betting-card companion, and a results archive.
+3. NBA is now an active artifact-backed migration with cards, picks, props, live-lens, accuracy and recap lanes, season betting-card routes, and a stored-date archive under the MLB-shaped public contract.
+4. WNBA is now an active artifact-backed migration with cards, picks, props, live-lens, local audit and accuracy payloads, and a stored-date archive lane.
+5. NHL is now an active artifact-backed migration with cards, a game drill-in, ranked picks, live-lens and accuracy pages, props reconciliation and props-lines surfaces, and a stored-date archive lane.
+6. NFL is now a near-completion artifact-backed weekly module with cards, a game drill-in, grouped weekly picks, a read-only live-lens monitor, a weekly archive lane, and a season betting-card companion.
+7. NCAAF is now an artifact-backed weekly module with cards, a game drill-in, picks, a read-only live-lens monitor, a weekly archive lane, and a season betting-card companion, while NCAAB has moved into a mirror-first college basketball lane with cards, a first game drill-in, a read-only live-lens board, a season review page, a historical betting-card companion, and a results archive.
 
 ## Current layered scorecard
 
@@ -33,22 +33,22 @@ Current readout:
 
 | Sport | Frontend parity | Artifact maturity | Sim/analytics substrate | Primary posture |
 | --- | --- | --- | --- | --- |
-| MLB | Strong | Strong but partial | Moderate | mirror-first reference contract |
-| NBA | Strong | Moderate | Moderate-to-weak | mirror-backed with source parity glue |
-| WNBA | Good | Moderate | Weak-to-moderate | mirror-backed with source API proxy |
-| NHL | Good | Moderate | Moderate | mirror-first processed artifacts plus source live contract reuse |
-| NFL | Good for weekly module | Moderate but narrow | Weak | narrow mirror-backed weekly contract |
-| NCAAF | Honest weekly artifact surface | Moderate but narrow | Weak | summary-first weekly mirror contract |
-| NCAAB | Good surface coverage | Weak-to-moderate | Weak | mixed mirror plus subprocess source-app API calls |
+| MLB | Strong | Owned local | Strong | fully local reference contract |
+| NBA | Strong | Strong | Moderate | protected artifact-backed mirror-first contract |
+| WNBA | Strong | Strong | Moderate | protected artifact-backed mirror-first contract |
+| NHL | Strong | Strong | Moderate | protected artifact-backed mirror-first contract |
+| NFL | Strong for weekly module | Strong | Moderate-to-weak | protected artifact-backed weekly contract |
+| NCAAF | Strong for weekly module | Strong | Moderate-to-weak | protected artifact-backed weekly contract |
+| NCAAB | Strong | Strong | Moderate | protected artifact-backed mirror-first college basketball contract |
 
-The key planning rule is that a module can be visually coherent before it is operationally independent. For sequencing, full operational completion now means: in-season sports first, then NCAAB, then NFL and NCAAF backend depth.
+The key planning rule is that visible parity and runtime independence should now be tracked separately. The major remaining gap is no longer route coverage for most sports; it is deeper owned generation and hosted publication/runtime proof for the artifact-backed contracts.
 
 ## Priority sequence
 
-1. Finish the active in-season sports to full completion across frontend parity, artifact maturity, and sim or analytics ownership.
-2. Move next to NCAAB and remove its remaining source-app dependency so its mature model, live-lens, and sim stack are fully owned under Syndicate contracts.
-3. Hold NFL and NCAAF deeper backend work until last, except for mirroring MLB's frontend representation as completely and honestly as possible.
-4. Treat NFL and NCAAF sim-engine work as likely overhaul projects rather than normal follow-on migration tasks.
+1. Keep MLB stable as the fully local reference contract and avoid regressing its owned refresh/runtime path.
+2. Finish the remaining deeper generator seams for NBA and WNBA, where runtime fallback is already gone but lower-level event or position helpers still trail full local ownership.
+3. Keep NHL, NFL, NCAAF, and NCAAB stable on their protected artifact-backed contracts while proving the hosted worker, state, and bundle publication architecture.
+4. Treat NFL and NCAAF deeper sim-engine work as likely overhaul projects rather than normal follow-on migration tasks.
 
 ## Phase-1 completion rubric
 

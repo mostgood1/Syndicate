@@ -43,10 +43,6 @@ New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 New-Item -ItemType Directory -Path $latestDir -Force | Out-Null
 
 $runtimePolicy = [ordered]@{
-    MLB = [ordered]@{
-        sims = 1000
-        workers = 4
-    }
     NBA = [ordered]@{
         smartsimNSims = 1000
         smartsimWorkers = 4
@@ -64,7 +60,6 @@ $runtimePolicy = [ordered]@{
     }
 }
 
-$runtimePolicy.MLB.workers = Get-ReasonableWorkerCount -Requested $runtimePolicy.MLB.workers
 $runtimePolicy.NBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.NBA.smartsimWorkers
 $runtimePolicy.WNBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.WNBA.smartsimWorkers
 
@@ -115,17 +110,38 @@ function Invoke-Step {
     }
 }
 
+function Test-PythonExecutable {
+    param([string]$Executable)
+
+    if ([string]::IsNullOrWhiteSpace($Executable)) {
+        return $false
+    }
+
+    try {
+        & $Executable '-c' 'import sys' *> $null
+        return ($LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
+}
+
 function Resolve-Python {
     param([string]$RepoPath)
 
     $candidatePaths = @(
         (Join-Path $RepoPath '.venv_x64\Scripts\python.exe'),
-        (Join-Path $RepoPath '.venv\Scripts\python.exe')
+        (Join-Path $RepoPath '.venv\Scripts\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe')
     )
     foreach ($candidate in $candidatePaths) {
-        if (Test-Path $candidate) {
+        if ((Test-Path $candidate) -and (Test-PythonExecutable -Executable $candidate)) {
             return $candidate
         }
+    }
+    if (Test-PythonExecutable -Executable 'python') {
+        return 'python'
     }
     return 'python'
 }
@@ -222,30 +238,19 @@ $sourceSteps = @()
 $publishRepos = @()
 
 if (-not $SkipMLB) {
-    $mlbRoot = Join-Path $repoRoot '..\MLB-BettingV2'
     $sourceSteps += [pscustomobject]@{
-        Name = 'MLB source daily update'
+        Name = 'MLB Syndicate daily refresh'
         Command = @(
-            (Resolve-Python $mlbRoot),
-            'tools\daily_update.py',
+            (Resolve-Python $repoRoot),
+            'scripts\refresh_mlb_oddsapi.py',
             '--date', $Date,
-            '--season', $season,
-            '--workflow', 'ui-daily',
-            '--sims', ([string]$runtimePolicy.MLB.sims),
-            '--workers', ([string]$runtimePolicy.MLB.workers),
-            '--pbp', 'off',
-            '--use-roster-artifacts', 'on',
-            '--write-roster-artifacts', 'on',
-            '--refresh-prior-feed-live', 'off',
-            '--settle-prior-card', 'off',
-            '--build-next-day', 'off',
-            '--refresh-season-manifests', 'off',
-            '--git-push', 'off'
+            '--source-root', 'data\mlb_source',
+            '--artifact-root', 'data\mlb_source\source_artifacts',
+            '--overwrite', 'on'
         )
-        WorkingDirectory = $mlbRoot
+        WorkingDirectory = $repoRoot
         EnvironmentOverrides = @{}
     }
-    $publishRepos += [pscustomobject]@{ Name = 'MLB-BettingV2'; RepoPath = $mlbRoot; CommitMessage = "$CommitMessagePrefix $Date (MLB source daily update)" }
 }
 if (-not $SkipNBA) {
     $nbaRoot = Join-Path $repoRoot '..\NBA-Betting'
