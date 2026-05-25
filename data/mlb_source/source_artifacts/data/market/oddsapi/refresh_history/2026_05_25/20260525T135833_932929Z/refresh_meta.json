@@ -1,0 +1,51 @@
+{
+  "recordedAt": "2026-05-25T13:58:33-05:00",
+  "date": "2026-05-25",
+  "archiveDir": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_05_25\\20260525T135833_932929Z",
+  "result": {
+    "status": "ok",
+    "date": "2026-05-25",
+    "mode": "live",
+    "out_dir": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi",
+    "game_lines_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_game_lines_2026_05_25.json",
+    "pitcher_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_25.json",
+    "hitter_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_25.json",
+    "counts": {
+      "game_lines": {
+        "events_matched": 11,
+        "games": 11,
+        "h2h_games": 11,
+        "totals_games": 11,
+        "spreads_games": 11
+      },
+      "pitcher_props": {
+        "players": 21,
+        "markets": {
+          "earned_runs": 14,
+          "hits_allowed": 20,
+          "outs": 20,
+          "strikeouts": 21,
+          "walks_allowed": 17
+        },
+        "events_matched": 11
+      },
+      "hitter_props": {
+        "players": 203,
+        "markets": {
+          "batter_hits": 199,
+          "batter_hits_runs_rbis": 202,
+          "batter_home_runs": 196,
+          "batter_rbis": 198,
+          "batter_runs_scored": 198,
+          "batter_total_bases": 197
+        },
+        "events_matched": 11
+      }
+    }
+  },
+  "files": {
+    "game_lines_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_05_25\\20260525T135833_932929Z\\oddsapi_game_lines_2026_05_25.json",
+    "pitcher_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_05_25\\20260525T135833_932929Z\\oddsapi_pitcher_props_2026_05_25.json",
+    "hitter_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_05_25\\20260525T135833_932929Z\\oddsapi_hitter_props_2026_05_25.json"
+  }
+}
