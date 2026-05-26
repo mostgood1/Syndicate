@@ -168,6 +168,26 @@ def _count_csv_rows_quick(path: Path | None) -> int:
         return 0
 
 
+def _path_has_meaningful_content(path: Path | None) -> bool:
+    try:
+        if path is None or not path.exists() or not path.is_file() or path.stat().st_size <= 0:
+            return False
+        if path.suffix.lower() == ".csv":
+            return _count_csv_rows_quick(path) > 0
+        text = path.read_text(encoding="utf-8", errors="ignore").strip()
+        if not text:
+            return False
+        if path.suffix.lower() == ".json":
+            payload = json.loads(text)
+            if isinstance(payload, dict):
+                return bool(payload)
+            if isinstance(payload, list):
+                return len(payload) > 0
+        return True
+    except Exception:
+        return False
+
+
 def _append_log(log_file: Path, line: str) -> None:
     try:
         log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -271,6 +291,254 @@ def _source_worker_env(source_root: Path) -> dict[str, str]:
     env.setdefault("MKL_NUM_THREADS", "1")
     env.setdefault("NUMEXPR_NUM_THREADS", "1")
     return env
+
+
+def _run_source_processed_export(
+    *,
+    source_root: Path,
+    package_name: str,
+    command_name: str,
+    date_str: str,
+    expected_file_name: str,
+    log_file: Path,
+    heartbeat_cb: callable | None,
+) -> tuple[str | None, int]:
+    existing_path = source_root / "data" / "processed" / expected_file_name
+    if _path_has_meaningful_content(existing_path):
+        return str(existing_path), 0
+
+    rc = _run_to_file(
+        [
+            _source_python(source_root),
+            "-m",
+            f"{package_name}.cli",
+            command_name,
+            "--date",
+            date_str,
+        ],
+        log_file,
+        cwd=source_root,
+        env=_source_worker_env(source_root),
+        timeout_s=15 * 60,
+        heartbeat_cb=heartbeat_cb,
+        heartbeat_every_s=5.0,
+    )
+
+    if _path_has_meaningful_content(existing_path):
+        return str(existing_path), int(rc)
+
+    _append_log(log_file, f"{command_name} did not create expected artifact: {existing_path}")
+    return None, int(rc)
+
+
+def _seed_game_odds_from_raw_history(*, source_root: Path, date_str: str, log_file: Path) -> bool:
+    processed_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
+    if _path_has_meaningful_content(processed_path):
+        return True
+
+    raw_candidates = (
+        source_root / "data" / "raw" / "games_nba_api.csv",
+        source_root / "data" / "raw" / "games_nba_api.parquet",
+    )
+    raw_frame = None
+    for candidate in raw_candidates:
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        try:
+            if candidate.suffix.lower() == ".parquet":
+                import pandas as pd
+
+                raw_frame = pd.read_parquet(candidate)
+            else:
+                import pandas as pd
+
+                raw_frame = pd.read_csv(candidate)
+            break
+        except Exception as exc:
+            _append_log(log_file, f"Failed to read raw games history {candidate}: {exc}")
+    if raw_frame is None or raw_frame.empty:
+        return False
+
+    import pandas as pd
+
+    date_col = next((col for col in ("date", "game_date", "date_utc", "date_est") if col in raw_frame.columns), None)
+    home_col = next((col for col in ("home_team", "home") if col in raw_frame.columns), None)
+    away_col = next((col for col in ("visitor_team", "away_team", "away") if col in raw_frame.columns), None)
+    if not date_col or not home_col or not away_col:
+        return False
+
+    day_frame = raw_frame.copy()
+    day_frame[date_col] = pd.to_datetime(day_frame[date_col], errors="coerce").dt.strftime("%Y-%m-%d")
+    day_frame = day_frame[day_frame[date_col] == date_str].copy()
+    if day_frame.empty:
+        return False
+
+    out = day_frame[[date_col, home_col, away_col]].rename(
+        columns={date_col: "date", home_col: "home_team", away_col: "visitor_team"}
+    )
+    out = out.dropna(subset=["home_team", "visitor_team"]).drop_duplicates().reset_index(drop=True)
+    if out.empty:
+        return False
+
+    processed_path.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(processed_path, index=False)
+    _append_log(log_file, f"Seeded fallback game odds slate from raw history: {processed_path} (rows={len(out)})")
+    return True
+
+
+def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log_file: Path) -> bool:
+    processed_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
+    if _path_has_meaningful_content(processed_path):
+        return True
+
+    snapshot_candidates = (
+        source_root / "data" / "processed" / f"oddsapi_player_props_{date_str}.csv",
+        source_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv",
+    )
+    import pandas as pd
+
+    for candidate in snapshot_candidates:
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        try:
+            frame = pd.read_csv(candidate)
+        except Exception as exc:
+            _append_log(log_file, f"Failed to read props snapshot {candidate}: {exc}")
+            continue
+        if frame.empty or not {"home_team", "away_team"}.issubset(frame.columns):
+            continue
+        out = frame[["home_team", "away_team"]].dropna().drop_duplicates().copy()
+        out = out.rename(columns={"away_team": "visitor_team"})
+        out.insert(0, "date", date_str)
+        if "commence_time" in frame.columns:
+            times = frame[["home_team", "away_team", "commence_time"]].dropna(subset=["home_team", "away_team"]).copy()
+            times = times.rename(columns={"away_team": "visitor_team"})
+            times = times.drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
+            out = out.merge(times, on=["home_team", "visitor_team"], how="left")
+        processed_path.parent.mkdir(parents=True, exist_ok=True)
+        out.to_csv(processed_path, index=False)
+        _append_log(log_file, f"Seeded fallback game odds slate from props snapshot: {processed_path} (rows={len(out)})")
+        return True
+    return False
+
+
+def _run_source_subprocess_cli_command(
+    *,
+    source_root: Path,
+    package_name: str,
+    command_parts: list[str],
+    log_file: Path,
+    heartbeat_cb: callable | None,
+    timeout_s: float,
+) -> int:
+    return _run_to_file(
+        [
+            _source_python(source_root),
+            "-m",
+            f"{package_name}.cli",
+            *command_parts,
+        ],
+        log_file,
+        cwd=source_root,
+        env=_source_worker_env(source_root),
+        timeout_s=timeout_s,
+        heartbeat_cb=heartbeat_cb,
+        heartbeat_every_s=5.0,
+    )
+
+
+def _ensure_source_game_inputs(
+    *,
+    source_root: Path,
+    package_name: str,
+    date_str: str,
+    log_file: Path,
+    heartbeat_cb: callable | None,
+) -> dict[str, int]:
+    processed_root = source_root / "data" / "processed"
+    raw_root = source_root / "data" / "raw"
+    raw_candidates = (
+        raw_root / "games_nba_api.csv",
+        raw_root / "games_nba_api.parquet",
+    )
+    feature_candidates = (
+        processed_root / "features.csv",
+        processed_root / "features.parquet",
+    )
+
+    rc_schedule = _run_source_subprocess_cli_command(
+        source_root=source_root,
+        package_name=package_name,
+        command_parts=["fetch-schedule"],
+        log_file=log_file,
+        heartbeat_cb=heartbeat_cb,
+        timeout_s=10 * 60,
+    )
+
+    rc_fetch = 0
+    if not any(path.exists() and path.is_file() and path.stat().st_size > 0 for path in raw_candidates):
+        rc_fetch = _run_source_subprocess_cli_command(
+            source_root=source_root,
+            package_name=package_name,
+            command_parts=["fetch", "--years", "10", "--no-periods"],
+            log_file=log_file,
+            heartbeat_cb=heartbeat_cb,
+            timeout_s=45 * 60,
+        )
+
+    rc_build_features = 0
+    if not any(path.exists() and path.is_file() and path.stat().st_size > 0 for path in feature_candidates):
+        rc_build_features = _run_source_subprocess_cli_command(
+            source_root=source_root,
+            package_name=package_name,
+            command_parts=["build-features"],
+            log_file=log_file,
+            heartbeat_cb=heartbeat_cb,
+            timeout_s=20 * 60,
+        )
+
+    _seed_game_odds_from_props_snapshot(source_root=source_root, date_str=date_str, log_file=log_file)
+    _seed_game_odds_from_raw_history(source_root=source_root, date_str=date_str, log_file=log_file)
+
+    rc_predict_date = _run_source_predict_date(
+        source_root=source_root,
+        package_name=package_name,
+        date_str=date_str,
+        log_file=log_file,
+        heartbeat_cb=heartbeat_cb,
+    )
+    return {
+        "schedule": int(rc_schedule),
+        "fetch": int(rc_fetch),
+        "build_features": int(rc_build_features),
+        "predict_date": int(rc_predict_date),
+    }
+
+
+def _run_source_predict_date(
+    *,
+    source_root: Path,
+    package_name: str,
+    date_str: str,
+    log_file: Path,
+    heartbeat_cb: callable | None,
+) -> int:
+    return _run_to_file(
+        [
+            _source_python(source_root),
+            "-m",
+            f"{package_name}.cli",
+            "predict-date",
+            "--date",
+            date_str,
+        ],
+        log_file,
+        cwd=source_root,
+        env=_source_worker_env(source_root),
+        timeout_s=20 * 60,
+        heartbeat_cb=heartbeat_cb,
+        heartbeat_every_s=5.0,
+    )
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -655,10 +923,24 @@ def _run_refresh_via_cli(
             except Exception:
                 rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
+            existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
+            existing_recs_rows = int(_count_csv_rows_quick(rec_fp))
+            existing_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
+            have_downstream_artifacts = (
+                (not do_edges or existing_edges_rows > 0)
+                and (not do_export or existing_recs_rows > 0)
+                and (not do_export or existing_game_cards_rows > 0)
+            )
             if int(rc_pred) != 0:
-                state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
+                if have_downstream_artifacts:
+                    _append_log(log_file, f"predict-props returned exit code {int(rc_pred)} but downstream artifacts already exist for {date_str}; continuing")
+                else:
+                    state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
             elif int(state["predictions_rows"] or 0) <= 0:
-                state["error"] = f"predict-props completed without writing rows to {pred_fp.name}"
+                if have_downstream_artifacts:
+                    _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} but downstream artifacts already exist for {date_str}; continuing")
+                else:
+                    state["error"] = f"predict-props completed without writing rows to {pred_fp.name}"
             else:
                 pred_ready = True
     elif int(state["snapshot_rows"] or 0) <= 0:
@@ -701,14 +983,44 @@ def _run_refresh_via_cli(
             _touch_progress()
             _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)
             _touch_progress()
-            rc_export = 0
+            game_input_rcs = _ensure_source_game_inputs(
+                source_root=source_root,
+                package_name="wnba_betting",
+                date_str=date_str,
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+            )
+            _, rc_recommendations = _run_source_processed_export(
+                source_root=source_root,
+                package_name="wnba_betting",
+                command_name="export-recommendations",
+                date_str=date_str,
+                expected_file_name=f"recommendations_{date_str}.csv",
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+            )
+            _, rc_game_cards = _run_source_processed_export(
+                source_root=source_root,
+                package_name="wnba_betting",
+                command_name="export-game-cards",
+                date_str=date_str,
+                expected_file_name=f"game_cards_{date_str}.csv",
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+            )
+            rc_export = 0 if all(int(value) == 0 for value in game_input_rcs.values()) and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
         except Exception:
             _append_log(log_file, traceback.format_exc())
             rc_export = 1
         state["rc_export"] = int(rc_export)
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
-        if int(rc_export) != 0:
+        source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
+        if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0 and source_game_cards_rows > 0:
+            state["rc_export"] = 0
+        elif int(rc_export) != 0:
             state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
+        elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
+            state["error"] = f"export-game-cards completed without writing rows to game_cards_{date_str}.csv"
 
     state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
     state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))

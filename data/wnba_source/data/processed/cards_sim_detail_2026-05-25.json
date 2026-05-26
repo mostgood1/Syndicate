@@ -1,4 +1,258 @@
 {
   "date": "2026-05-25",
-  "games": []
+  "games": [
+    {
+      "home_tri": "NYL",
+      "away_tri": "POR",
+      "sim": {
+        "players_summary": {
+          "away": 0,
+          "home": 0,
+          "injured_away": 0,
+          "injured_home": 0,
+          "missing_away": 0,
+          "missing_home": 0
+        },
+        "players": {
+          "home": [],
+          "away": []
+        },
+        "missing_prop_players": {
+          "home": [],
+          "away": []
+        },
+        "injuries": {
+          "home": [],
+          "away": []
+        }
+      }
+    },
+    {
+      "home_tri": "GSV",
+      "away_tri": "CON",
+      "sim": {
+        "players_summary": {
+          "away": 0,
+          "home": 0,
+          "injured_away": 0,
+          "injured_home": 0,
+          "missing_away": 0,
+          "missing_home": 4
+        },
+        "players": {
+          "home": [],
+          "away": []
+        },
+        "missing_prop_players": {
+          "home": [
+            {
+              "player_name": "Gabby Williams",
+              "prop_line_options": {
+                "reb": [
+                  {
+                    "best_price": 118.0,
+                    "book_count": 1,
+                    "books": [
+                      {
+                        "book": "fanduel",
+                        "book_title": "FanDuel",
+                        "implied_move": null,
+                        "last_update": null,
+                        "line_move": null,
+                        "open_line": null,
+                        "open_price": null,
+                        "price": 118.0,
+                        "snapshot_ts": "2026-05-26T03:41:37.137705+00:00"
+                      }
+                    ],
+                    "edge": 0.010436164060744768,
+                    "ev": 0.022750837652423583,
+                    "ev_pct": 2.2750837652423583,
+                    "line": 2.5,
+                    "recommendation_book": "fanduel",
+                    "recommendation_ev_pct": 2.2750837652423583,
+                    "recommendation_price": 118.0,
+                    "recommendation_rank": 1,
+                    "recommended": true,
+                    "recommended_primary": true,
+                    "side": "UNDER",
+                    "sources": [
+                      "edges",
+                      "recommendations"
+                    ]
+                  }
+                ]
+              },
+              "prop_lines": {
+                "reb": 2.5
+              }
+            },
+            {
+              "player_name": "Janelle Salaun",
+              "prop_line_options": {
+                "pts": [
+                  {
+                    "best_price": 122.0,
+                    "book_count": 1,
+                    "books": [
+                      {
+                        "book": "fanduel",
+                        "book_title": "FanDuel",
+                        "implied_move": null,
+                        "last_update": "2026-05-26T03:49:23Z",
+                        "line_move": null,
+                        "open_line": null,
+                        "open_price": null,
+                        "price": 122.0,
+                        "snapshot_ts": "2026-05-26T03:55:23.792785+00:00"
+                      }
+                    ],
+                    "edge": null,
+                    "ev": null,
+                    "ev_pct": null,
+                    "line": 9.5,
+                    "side": "OVER",
+                    "sources": [
+                      "snapshot"
+                    ]
+                  },
+                  {
+                    "best_price": -160.0,
+                    "book_count": 1,
+                    "books": [
+                      {
+                        "book": "fanduel",
+                        "book_title": "FanDuel",
+                        "implied_move": null,
+                        "last_update": "2026-05-26T03:49:23Z",
+                        "line_move": null,
+                        "open_line": null,
+                        "open_price": null,
+                        "price": -160.0,
+                        "snapshot_ts": "2026-05-26T03:55:23.792785+00:00"
+                      }
+                    ],
+                    "edge": null,
+                    "ev": null,
+                    "ev_pct": null,
+                    "line": 9.5,
+                    "side": "UNDER",
+                    "sources": [
+                      "snapshot"
+                    ]
+                  }
+                ],
+                "threes": [
+                  {
+                    "best_price": 154.0,
+                    "book_count": 1,
+                    "books": [
+                      {
+                        "book": "fanduel",
+                        "book_title": "FanDuel",
+                        "implied_move": null,
+                        "last_update": null,
+                        "line_move": null,
+                        "open_line": null,
+                        "open_price": null,
+                        "price": 154.0,
+                        "snapshot_ts": "2026-05-26T03:41:37.137705+00:00"
+                      }
+                    ],
+                    "edge": 0.1352431595752685,
+                    "ev": 0.343517625321182,
+                    "ev_pct": 34.3517625321182,
+                    "line": 1.5,
+                    "side": "OVER",
+                    "sources": [
+                      "edges"
+                    ]
+                  }
+                ]
+              },
+              "prop_lines": {
+                "pts": 9.5,
+                "threes": 1.5
+              }
+            },
+            {
+              "player_name": "Tiffany Hayes",
+              "prop_line_options": {
+                "pts": [
+                  {
+                    "best_price": 102.0,
+                    "book_count": 1,
+                    "books": [
+                      {
+                        "book": "fanduel",
+                        "book_title": "FanDuel",
+                        "implied_move": null,
+                        "last_update": null,
+                        "line_move": null,
+                        "open_line": null,
+                        "open_price": null,
+                        "price": 102.0,
+                        "snapshot_ts": "2026-05-26T03:41:37.137705+00:00"
+                      }
+                    ],
+                    "edge": 0.1051475921740232,
+                    "ev": 0.2123981361915269,
+                    "ev_pct": 21.239813619152688,
+                    "line": 9.5,
+                    "side": "OVER",
+                    "sources": [
+                      "edges"
+                    ]
+                  }
+                ]
+              },
+              "prop_lines": {
+                "pts": 9.5
+              }
+            },
+            {
+              "player_name": "Veronica Burton",
+              "prop_line_options": {
+                "ast": [
+                  {
+                    "best_price": 130.0,
+                    "book_count": 1,
+                    "books": [
+                      {
+                        "book": "fanduel",
+                        "book_title": "FanDuel",
+                        "implied_move": null,
+                        "last_update": null,
+                        "line_move": null,
+                        "open_line": null,
+                        "open_price": null,
+                        "price": 130.0,
+                        "snapshot_ts": "2026-05-26T03:41:37.137705+00:00"
+                      }
+                    ],
+                    "edge": 0.0563452552543848,
+                    "ev": 0.1295940870850852,
+                    "ev_pct": 12.959408708508521,
+                    "line": 7.5,
+                    "side": "UNDER",
+                    "sources": [
+                      "edges"
+                    ]
+                  }
+                ]
+              },
+              "prop_lines": {
+                "ast": 7.5
+              }
+            }
+          ],
+          "away": []
+        },
+        "injuries": {
+          "home": [],
+          "away": []
+        }
+      }
+    }
+  ]
 }

@@ -1,4 +1,149 @@
 {
   "date": "2026-05-25",
-  "games": []
+  "games": [
+    {
+      "home_tri": "NYL",
+      "away_tri": "POR",
+      "prop_recommendations": {
+        "home": [],
+        "away": []
+      }
+    },
+    {
+      "home_tri": "GSV",
+      "away_tri": "CON",
+      "prop_recommendations": {
+        "home": [
+          {
+            "basketball_priority_score": 0.0,
+            "basketball_reasons": [],
+            "best": {
+              "basketball_reasons": [],
+              "book": "fanduel",
+              "edge": 0.010436164060744768,
+              "ev": 0.022750837652423583,
+              "ev_pct": 2.2750837652423583,
+              "line": 2.5,
+              "market": "reb",
+              "market_reasons": [
+                "Projected value is +2.3% per unit risked.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at +118.",
+                "Model probability clears the market by 1.0 points."
+              ],
+              "model_prob": 0.4691517603910201,
+              "model_reasons": [
+                "Win probability grades at 46.9%."
+              ],
+              "opponent": "CON",
+              "p_win": 0.4691517603910201,
+              "player": "Gabby Williams",
+              "player_name": "Gabby Williams",
+              "price": 118.0,
+              "prob_calib": 0.4691517603910201,
+              "probability": 0.4691517603910201,
+              "reasons": [
+                "Win probability grades at 46.9%.",
+                "Projected value is +2.3% per unit risked.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at +118.",
+                "Model probability clears the market by 1.0 points."
+              ],
+              "side": "under",
+              "sim_mu": 2.287083969465649,
+              "team": "GSV"
+            },
+            "card_bucket": "official",
+            "card_rank": 1,
+            "date": "2026-05-25",
+            "display_pick": "Gabby Williams Under 2.5 REB",
+            "edge": 0.010436164060744768,
+            "ev": 0.022750837652423583,
+            "ev_pct": 2.28,
+            "game_key": "2026-05-25:CON@GSV",
+            "implied_prob": 0.4587,
+            "line": 2.5,
+            "locked_policy_score": 12.087,
+            "locked_policy_sim_score": 0.0,
+            "locked_policy_trend_score": 0.0,
+            "locked_policy_value_score": 44.5,
+            "market": "reb",
+            "market_reasons": [
+              "Projected value is +2.3% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +118.",
+              "Model probability clears the market by 1.0 points."
+            ],
+            "matchup": "GSV",
+            "model_baseline": 2.287083969465649,
+            "model_prob": 0.4691517603910201,
+            "model_reasons": [
+              "Win probability grades at 46.9%."
+            ],
+            "opponent": "CON",
+            "p_win": 0.4692,
+            "picks": [
+              {
+                "book": "fanduel",
+                "edge": 0.010436164060744768,
+                "ev": 0.022750837652423583,
+                "ev_pct": 2.2750837652423583,
+                "line": 2.5,
+                "market": "reb",
+                "player": "Gabby Williams",
+                "player_name": "Gabby Williams",
+                "price": 118.0,
+                "side": "under",
+                "team": "GSV"
+              }
+            ],
+            "player": "Gabby Williams",
+            "price": 118.0,
+            "prob": 0.4691517603910201,
+            "prob_calib": 0.4691517603910201,
+            "prob_edge": 0.0104,
+            "probability": 0.4691517603910201,
+            "reasons": [
+              "Win probability grades at 46.9%.",
+              "Projected value is +2.3% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +118.",
+              "Model probability clears the market by 1.0 points."
+            ],
+            "recommendation_priority_score": 8.9,
+            "selection": "UNDER",
+            "side": "UNDER",
+            "sim_mu": 2.287083969465649,
+            "sim_reasons": [
+              "Win probability grades at 46.9%."
+            ],
+            "sim_support_score": 0.0,
+            "source": "props_recommendations",
+            "team": "GSV",
+            "team_side": "home",
+            "top_play_baseline": 2.287083969465649,
+            "top_play_consensus": 0.0,
+            "top_play_line_adv": 1.0,
+            "top_play_reasons": [
+              "Win probability grades at 46.9%.",
+              "Projected value is +2.3% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +118.",
+              "Model probability clears the market by 1.0 points."
+            ],
+            "value_reasons": [
+              "Projected value is +2.3% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +118.",
+              "Model probability clears the market by 1.0 points."
+            ],
+            "value_support_score": 44.5,
+            "why_explain": "model 2.3 vs line 2.5 (-0.2)",
+            "win_prob": 0.4691517603910201
+          }
+        ],
+        "away": []
+      }
+    }
+  ]
 }

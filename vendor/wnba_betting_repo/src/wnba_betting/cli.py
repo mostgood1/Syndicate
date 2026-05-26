@@ -12701,6 +12701,9 @@ def _predict_from_matchups(inp: pd.DataFrame) -> pd.DataFrame:
     enriched = features_df.tail(len(feat_rows))
     
     # Get feature matrix
+    missing_feat_cols = [col for col in feat_cols if col not in enriched.columns]
+    for col in missing_feat_cols:
+        enriched[col] = 0.0
     X = enriched[feat_cols].fillna(0)
 
     # Load models - Use NPU-accelerated predictions for ALL models (game + periods)
