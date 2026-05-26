@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ page_title or ('MLB Live Lens - ' ~ date) }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v='20260421-back-to-top-v1') }}" />
+    {% if season %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='cards.css', v='20260421-back-to-top-v2') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='season.css', v='20260328-season-mobile-v8') }}" />
+    {% endif %}
+  </head>
+  <body{% if season %} class="cards-body season-body"{% endif %}>
+    {% if season %}
+    <div class="season-shell">
+      <header class="season-header">
+        <div class="season-title-block">
+          <div class="season-kicker">Intraday recommendation monitor</div>
+          <div class="season-title-row">
+            <h1>{{ page_heading or ('MLB Live Lens - ' ~ date) }}</h1>
+            <span class="cards-nav-pill is-active">{{ season }}</span>
+          </div>
+          <p id="liveLensMeta" class="season-header-meta">Loading live lens…</p>
+        </div>
+        <div class="season-header-actions">
+          <a class="cards-nav-pill" href="{{ back_href or ('/?date=' ~ date) }}">{{ back_label or 'Back to cards' }}</a>
+          <a class="cards-nav-pill" href="/season/{{ season }}?date={{ date }}">Season review</a>
+          <a class="cards-nav-pill" href="/season/{{ season }}/betting-card?date={{ date }}">Betting card</a>
+          <a class="cards-nav-pill" href="/pitcher-top-props?date={{ date }}">Pitcher top props</a>
+          <a class="cards-nav-pill" href="/hitter-top-props?date={{ date }}">Hitter top props</a>
+          <form class="date-form" method="get" action="{{ form_action or '/live-lens' }}">
+            <label>
+              Date
+              <input type="date" name="date" value="{{ date }}" />
+            </label>
+            <button type="submit">Load</button>
+          </form>
+        </div>
+      </header>
+
+      <section id="liveLensMonths" class="season-months" aria-label="Live lens month filters"></section>
+
+      <main class="season-layout">
+        <aside class="season-day-rail">
+          <div class="season-rail-head">
+            <div>
+              <div class="season-kicker">Live-lens days</div>
+              <div class="season-rail-title">Browse the slate</div>
+            </div>
+          </div>
+          <div class="season-day-list" id="liveLensDays">
+            <div class="cards-loading-state">Loading season days...</div>
+          </div>
+        </aside>
+
+        <section class="season-main">
+          <section class="panel">
+            <div class="panel-title">Overview</div>
+            <pre id="liveLensOverview" class="pre"></pre>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">Games</div>
+            <div id="liveLensGames"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    {% else %}
+    <div class="container">
+      <header class="header">
+        <div class="breadcrumbs">
+          <a href="{{ back_href or ('/?date=' ~ date) }}">← {{ back_label or 'Back to cards' }}</a>
+        </div>
+        <h1>{{ page_heading or ('MLB Live Lens - ' ~ date) }}</h1>
+        <form class="date-form" method="get" action="{{ form_action or '/live-lens' }}">
+          <label>
+            Date
+            <input type="date" name="date" value="{{ date }}" />
+          </label>
+          <button type="submit">Load</button>
+        </form>
+        <div id="liveLensMeta" class="status-line">Loading live lens…</div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-title">Overview</div>
+        <pre id="liveLensOverview" class="pre"></pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Games</div>
+        <div id="liveLensGames"></div>
+      </section>
+    </div>
+    {% endif %}
+
+    <script>
+      window.MLBLiveLensBootstrap = {
+        date: {{ date|tojson }},
+        season: {{ season|tojson }},
+        apiPath: {{ api_path|tojson }}
+      };
+    </script>
+    <script src="{{ url_for('static', filename='live_lens.js', v='20260403-live-lens-copy-v1') }}"></script>
+    <script src="{{ url_for('static', filename='back_to_top.js', v='20260421-back-to-top-v1') }}"></script>
+  </body>
+</html>

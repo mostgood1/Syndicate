@@ -1,0 +1,1622 @@
+{
+  "144": {
+    "team_id": 144,
+    "team_name": "Atlanta Braves",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 190,
+    "derived": {
+      "avg_sp_pitches": 83.82105263157895,
+      "avg_sp_ip": 4.9431578947368475,
+      "avg_bullpen_pitchers": 3.363157894736842,
+      "avg_pinch_hitters": 2.278947368421053,
+      "closer_save_opp_rate": 0.3157894736842105
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 84,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778704,
+        "is_home": true,
+        "sp_pitches": 19.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 10,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778706,
+        "is_home": true,
+        "sp_pitches": 44.0,
+        "sp_ip": 1.2,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778973,
+        "is_home": false,
+        "sp_pitches": 48.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 8,
+        "pinch_hitters": 10,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.998845",
+    "source": "statsapi_feed_live_raw"
+  },
+  "141": {
+    "team_id": 141,
+    "team_name": "Toronto Blue Jays",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 204,
+    "derived": {
+      "avg_sp_pitches": 81.30392156862744,
+      "avg_sp_ip": 4.820098039215692,
+      "avg_bullpen_pitchers": 3.7549019607843137,
+      "avg_pinch_hitters": 2.5588235294117645,
+      "closer_save_opp_rate": 0.37745098039215685
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 81,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778704,
+        "is_home": false,
+        "sp_pitches": 19.0,
+        "sp_ip": 1.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 10,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778957,
+        "is_home": true,
+        "sp_pitches": 47.0,
+        "sp_ip": 3.2,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779112,
+        "is_home": false,
+        "sp_pitches": 49.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 11,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "120": {
+    "team_id": 120,
+    "team_name": "Washington Nationals",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 191,
+    "derived": {
+      "avg_sp_pitches": 83.79581151832461,
+      "avg_sp_ip": 4.821465968586393,
+      "avg_bullpen_pitchers": 3.6910994764397906,
+      "avg_pinch_hitters": 1.7539267015706805,
+      "closer_save_opp_rate": 0.33507853403141363
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 84,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.29232111692844676
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778730,
+        "is_home": true,
+        "sp_pitches": 49.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 4,
+        "pinch_hitters": 5,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-01",
+        "game_pk": 779079,
+        "is_home": false,
+        "sp_pitches": 39.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 7,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778732,
+        "is_home": false,
+        "sp_pitches": 57.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 8,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "146": {
+    "team_id": 146,
+    "team_name": "Miami Marlins",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 187,
+    "derived": {
+      "avg_sp_pitches": 78.65775401069519,
+      "avg_sp_ip": 4.656684491978613,
+      "avg_bullpen_pitchers": 3.4171122994652405,
+      "avg_pinch_hitters": 2.358288770053476,
+      "closer_save_opp_rate": 0.3582887700534759
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 79,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778730,
+        "is_home": false,
+        "sp_pitches": 32.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779078,
+        "is_home": true,
+        "sp_pitches": 24.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778895,
+        "is_home": false,
+        "sp_pitches": 26.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "112": {
+    "team_id": 112,
+    "team_name": "Chicago Cubs",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 190,
+    "derived": {
+      "avg_sp_pitches": 77.22105263157894,
+      "avg_sp_ip": 4.833157894736848,
+      "avg_bullpen_pitchers": 3.431578947368421,
+      "avg_pinch_hitters": 1.7,
+      "closer_save_opp_rate": 0.3526315789473684
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 77,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.2833333333333333
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778756,
+        "is_home": true,
+        "sp_pitches": 46.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-01",
+        "game_pk": 778936,
+        "is_home": false,
+        "sp_pitches": 51.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778749,
+        "is_home": true,
+        "sp_pitches": 52.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "114": {
+    "team_id": 114,
+    "team_name": "Cleveland Guardians",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 196,
+    "derived": {
+      "avg_sp_pitches": 87.26020408163265,
+      "avg_sp_ip": 5.07397959183674,
+      "avg_bullpen_pitchers": 3.5051020408163267,
+      "avg_pinch_hitters": 2.36734693877551,
+      "closer_save_opp_rate": 0.4030612244897959
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 87,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778756,
+        "is_home": false,
+        "sp_pitches": 52.0,
+        "sp_ip": 1.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778833,
+        "is_home": true,
+        "sp_pitches": 50.0,
+        "sp_ip": 1.2,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 10,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779012,
+        "is_home": false,
+        "sp_pitches": 53.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 8,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "111": {
+    "team_id": 111,
+    "team_name": "Boston Red Sox",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 195,
+    "derived": {
+      "avg_sp_pitches": 82.31282051282051,
+      "avg_sp_ip": 4.8841025641025695,
+      "avg_bullpen_pitchers": 3.5743589743589745,
+      "avg_pinch_hitters": 2.112820512820513,
+      "closer_save_opp_rate": 0.39487179487179486
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 82,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778774,
+        "is_home": true,
+        "sp_pitches": 40.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778769,
+        "is_home": true,
+        "sp_pitches": 25.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779128,
+        "is_home": false,
+        "sp_pitches": 31.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 4,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "142": {
+    "team_id": 142,
+    "team_name": "Minnesota Twins",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 190,
+    "derived": {
+      "avg_sp_pitches": 79.88421052631578,
+      "avg_sp_ip": 4.707894736842109,
+      "avg_bullpen_pitchers": 3.5473684210526315,
+      "avg_pinch_hitters": 2.4842105263157896,
+      "closer_save_opp_rate": 0.3368421052631579
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 80,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778774,
+        "is_home": false,
+        "sp_pitches": 48.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 4,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778881,
+        "is_home": true,
+        "sp_pitches": 51.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-04",
+        "game_pk": 778708,
+        "is_home": false,
+        "sp_pitches": 59.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "109": {
+    "team_id": 109,
+    "team_name": "Arizona Diamondbacks",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 191,
+    "derived": {
+      "avg_sp_pitches": 82.48167539267016,
+      "avg_sp_ip": 4.944502617801051,
+      "avg_bullpen_pitchers": 3.4293193717277486,
+      "avg_pinch_hitters": 2.345549738219895,
+      "closer_save_opp_rate": 0.4293193717277487
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 82,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778801,
+        "is_home": true,
+        "sp_pitches": 28.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778935,
+        "is_home": false,
+        "sp_pitches": 31.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778802,
+        "is_home": true,
+        "sp_pitches": 47.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "115": {
+    "team_id": 115,
+    "team_name": "Colorado Rockies",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 190,
+    "derived": {
+      "avg_sp_pitches": 78.27368421052631,
+      "avg_sp_ip": 4.451578947368426,
+      "avg_bullpen_pitchers": 3.4263157894736844,
+      "avg_pinch_hitters": 2.1315789473684212,
+      "closer_save_opp_rate": 0.30526315789473685
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 78,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778801,
+        "is_home": false,
+        "sp_pitches": 50.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778799,
+        "is_home": true,
+        "sp_pitches": 48.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 10,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779156,
+        "is_home": false,
+        "sp_pitches": 57.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "113": {
+    "team_id": 113,
+    "team_name": "Cincinnati Reds",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 193,
+    "derived": {
+      "avg_sp_pitches": 82.21761658031087,
+      "avg_sp_ip": 4.916580310880836,
+      "avg_bullpen_pitchers": 3.5906735751295336,
+      "avg_pinch_hitters": 2.3471502590673574,
+      "closer_save_opp_rate": 0.38341968911917096
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 82,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778831,
+        "is_home": true,
+        "sp_pitches": 42.0,
+        "sp_ip": 1.2,
+        "bullpen_pitchers": 8,
+        "pinch_hitters": 10,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778749,
+        "is_home": false,
+        "sp_pitches": 37.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 10,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778829,
+        "is_home": true,
+        "sp_pitches": 50.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "135": {
+    "team_id": 135,
+    "team_name": "San Diego Padres",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 191,
+    "derived": {
+      "avg_sp_pitches": 80.27748691099477,
+      "avg_sp_ip": 4.653403141361263,
+      "avg_bullpen_pitchers": 3.7905759162303663,
+      "avg_pinch_hitters": 2.654450261780105,
+      "closer_save_opp_rate": 0.39267015706806285
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 80,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778831,
+        "is_home": false,
+        "sp_pitches": 43.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 11,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779013,
+        "is_home": true,
+        "sp_pitches": 45.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 10,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-04",
+        "game_pk": 778750,
+        "is_home": false,
+        "sp_pitches": 58.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "119": {
+    "team_id": 119,
+    "team_name": "Los Angeles Dodgers",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 195,
+    "derived": {
+      "avg_sp_pitches": 78.07179487179488,
+      "avg_sp_ip": 4.749743589743594,
+      "avg_bullpen_pitchers": 3.707692307692308,
+      "avg_pinch_hitters": 2.164102564102564,
+      "closer_save_opp_rate": 0.4256410256410256
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 78,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778858,
+        "is_home": true,
+        "sp_pitches": 47.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778860,
+        "is_home": true,
+        "sp_pitches": 22.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 9,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779146,
+        "is_home": false,
+        "sp_pitches": 45.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "137": {
+    "team_id": 137,
+    "team_name": "San Francisco Giants",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 187,
+    "derived": {
+      "avg_sp_pitches": 83.31016042780749,
+      "avg_sp_ip": 4.890374331550807,
+      "avg_bullpen_pitchers": 3.304812834224599,
+      "avg_pinch_hitters": 2.1176470588235294,
+      "closer_save_opp_rate": 0.37967914438502676
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 83,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778858,
+        "is_home": false,
+        "sp_pitches": 20.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 8,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778986,
+        "is_home": true,
+        "sp_pitches": 36.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-04",
+        "game_pk": 779011,
+        "is_home": false,
+        "sp_pitches": 47.0,
+        "sp_ip": 3.1,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "118": {
+    "team_id": 118,
+    "team_name": "Kansas City Royals",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 190,
+    "derived": {
+      "avg_sp_pitches": 83.20526315789473,
+      "avg_sp_ip": 5.002105263157903,
+      "avg_bullpen_pitchers": 3.536842105263158,
+      "avg_pinch_hitters": 2.610526315789474,
+      "closer_save_opp_rate": 0.39473684210526316
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 83,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778936,
+        "is_home": true,
+        "sp_pitches": 48.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779013,
+        "is_home": false,
+        "sp_pitches": 41.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778940,
+        "is_home": true,
+        "sp_pitches": 36.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "139": {
+    "team_id": 139,
+    "team_name": "Tampa Bay Rays",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 185,
+    "derived": {
+      "avg_sp_pitches": 79.91351351351351,
+      "avg_sp_ip": 4.8935135135135175,
+      "avg_bullpen_pitchers": 3.502702702702703,
+      "avg_pinch_hitters": 2.0054054054054054,
+      "closer_save_opp_rate": 0.3621621621621622
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 80,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.3342342342342342
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778970,
+        "is_home": true,
+        "sp_pitches": 35.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 8,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778881,
+        "is_home": false,
+        "sp_pitches": 50.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 8,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778973,
+        "is_home": true,
+        "sp_pitches": 29.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "121": {
+    "team_id": 121,
+    "team_name": "New York Mets",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 188,
+    "derived": {
+      "avg_sp_pitches": 79.87765957446808,
+      "avg_sp_ip": 4.581914893617026,
+      "avg_bullpen_pitchers": 3.5585106382978724,
+      "avg_pinch_hitters": 2.154255319148936,
+      "closer_save_opp_rate": 0.3723404255319149
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 80,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 778970,
+        "is_home": false,
+        "sp_pitches": 19.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778769,
+        "is_home": false,
+        "sp_pitches": 32.0,
+        "sp_ip": 1.1,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778895,
+        "is_home": true,
+        "sp_pitches": 31.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "136": {
+    "team_id": 136,
+    "team_name": "Seattle Mariners",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 198,
+    "derived": {
+      "avg_sp_pitches": 82.74242424242425,
+      "avg_sp_ip": 5.037373737373741,
+      "avg_bullpen_pitchers": 3.6818181818181817,
+      "avg_pinch_hitters": 2.207070707070707,
+      "closer_save_opp_rate": 0.3939393939393939
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 83,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779018,
+        "is_home": true,
+        "sp_pitches": 31.0,
+        "sp_ip": 1.2,
+        "bullpen_pitchers": 10,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778799,
+        "is_home": false,
+        "sp_pitches": 42.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779012,
+        "is_home": true,
+        "sp_pitches": 42.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "145": {
+    "team_id": 145,
+    "team_name": "Chicago White Sox",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 189,
+    "derived": {
+      "avg_sp_pitches": 74.17460317460318,
+      "avg_sp_ip": 4.295767195767201,
+      "avg_bullpen_pitchers": 3.5502645502645502,
+      "avg_pinch_hitters": 2.5502645502645502,
+      "closer_save_opp_rate": 0.291005291005291
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 75,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779018,
+        "is_home": false,
+        "sp_pitches": 26.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778860,
+        "is_home": false,
+        "sp_pitches": 32.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778859,
+        "is_home": true,
+        "sp_pitches": 54.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "147": {
+    "team_id": 147,
+    "team_name": "New York Yankees",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 196,
+    "derived": {
+      "avg_sp_pitches": 84.58163265306122,
+      "avg_sp_ip": 4.97193877551021,
+      "avg_bullpen_pitchers": 3.5051020408163267,
+      "avg_pinch_hitters": 2.4183673469387754,
+      "closer_save_opp_rate": 0.3979591836734694
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 85,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779051,
+        "is_home": true,
+        "sp_pitches": 54.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778706,
+        "is_home": false,
+        "sp_pitches": 43.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779050,
+        "is_home": true,
+        "sp_pitches": 49.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 8,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "117": {
+    "team_id": 117,
+    "team_name": "Houston Astros",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 186,
+    "derived": {
+      "avg_sp_pitches": 82.60215053763442,
+      "avg_sp_ip": 4.915591397849468,
+      "avg_bullpen_pitchers": 3.4516129032258065,
+      "avg_pinch_hitters": 2.381720430107527,
+      "closer_save_opp_rate": 0.3548387096774194
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 83,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779051,
+        "is_home": false,
+        "sp_pitches": 29.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778732,
+        "is_home": true,
+        "sp_pitches": 40.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779076,
+        "is_home": false,
+        "sp_pitches": 45.0,
+        "sp_ip": 1.2,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "138": {
+    "team_id": 138,
+    "team_name": "St. Louis Cardinals",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 192,
+    "derived": {
+      "avg_sp_pitches": 81.14583333333333,
+      "avg_sp_ip": 5.014062500000004,
+      "avg_bullpen_pitchers": 3.171875,
+      "avg_pinch_hitters": 2.1354166666666665,
+      "closer_save_opp_rate": 0.375
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 81,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779079,
+        "is_home": true,
+        "sp_pitches": 47.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 10,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779078,
+        "is_home": false,
+        "sp_pitches": 55.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-04",
+        "game_pk": 778733,
+        "is_home": false,
+        "sp_pitches": 37.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 4,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "158": {
+    "team_id": 158,
+    "team_name": "Milwaukee Brewers",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 198,
+    "derived": {
+      "avg_sp_pitches": 77.01010101010101,
+      "avg_sp_ip": 4.458080808080813,
+      "avg_bullpen_pitchers": 3.6161616161616164,
+      "avg_pinch_hitters": 2.2777777777777777,
+      "closer_save_opp_rate": 0.3686868686868687
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 77,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779099,
+        "is_home": true,
+        "sp_pitches": 12.0,
+        "sp_ip": 1.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778833,
+        "is_home": false,
+        "sp_pitches": 35.0,
+        "sp_ip": 0.1,
+        "bullpen_pitchers": 9,
+        "pinch_hitters": 10,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778829,
+        "is_home": false,
+        "sp_pitches": 22.0,
+        "sp_ip": 1.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 8,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "140": {
+    "team_id": 140,
+    "team_name": "Texas Rangers",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 187,
+    "derived": {
+      "avg_sp_pitches": 80.02139037433155,
+      "avg_sp_ip": 4.8855614973262105,
+      "avg_bullpen_pitchers": 3.4224598930481283,
+      "avg_pinch_hitters": 2.4705882352941178,
+      "closer_save_opp_rate": 0.39037433155080214
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 80,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779099,
+        "is_home": false,
+        "sp_pitches": 38.0,
+        "sp_ip": 1.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778935,
+        "is_home": true,
+        "sp_pitches": 40.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778940,
+        "is_home": false,
+        "sp_pitches": 19.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "116": {
+    "team_id": 116,
+    "team_name": "Detroit Tigers",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 198,
+    "derived": {
+      "avg_sp_pitches": 78.52525252525253,
+      "avg_sp_ip": 4.69444444444445,
+      "avg_bullpen_pitchers": 3.3484848484848486,
+      "avg_pinch_hitters": 2.6262626262626263,
+      "closer_save_opp_rate": 0.35353535353535354
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 79,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779111,
+        "is_home": true,
+        "sp_pitches": 35.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 10,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779036,
+        "is_home": false,
+        "sp_pitches": 29.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779112,
+        "is_home": true,
+        "sp_pitches": 37.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 11,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "143": {
+    "team_id": 143,
+    "team_name": "Philadelphia Phillies",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 193,
+    "derived": {
+      "avg_sp_pitches": 85.43523316062176,
+      "avg_sp_ip": 5.308290155440418,
+      "avg_bullpen_pitchers": 3.435233160621762,
+      "avg_pinch_hitters": 2.0466321243523318,
+      "closer_save_opp_rate": 0.41450777202072536
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 85,
+      "starter_min_innings": 5,
+      "pinch_hit_aggressiveness": 0.34110535405872194
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779111,
+        "is_home": false,
+        "sp_pitches": 20.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 4,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778912,
+        "is_home": true,
+        "sp_pitches": 50.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778957,
+        "is_home": false,
+        "sp_pitches": 29.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 8,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "110": {
+    "team_id": 110,
+    "team_name": "Baltimore Orioles",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 192,
+    "derived": {
+      "avg_sp_pitches": 80.24479166666667,
+      "avg_sp_ip": 4.702604166666671,
+      "avg_bullpen_pitchers": 3.5416666666666665,
+      "avg_pinch_hitters": 2.1145833333333335,
+      "closer_save_opp_rate": 0.359375
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 80,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779129,
+        "is_home": true,
+        "sp_pitches": 43.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 8,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778912,
+        "is_home": false,
+        "sp_pitches": 38.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779128,
+        "is_home": true,
+        "sp_pitches": 22.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "134": {
+    "team_id": 134,
+    "team_name": "Pittsburgh Pirates",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 186,
+    "derived": {
+      "avg_sp_pitches": 79.23118279569893,
+      "avg_sp_ip": 4.748924731182801,
+      "avg_bullpen_pitchers": 3.4516129032258065,
+      "avg_pinch_hitters": 2.096774193548387,
+      "closer_save_opp_rate": 0.3655913978494624
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 79,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.3494623655913978
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779129,
+        "is_home": false,
+        "sp_pitches": 54.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779036,
+        "is_home": true,
+        "sp_pitches": 44.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 9,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779050,
+        "is_home": false,
+        "sp_pitches": 49.0,
+        "sp_ip": 2.2,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "108": {
+    "team_id": 108,
+    "team_name": "Los Angeles Angels",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 188,
+    "derived": {
+      "avg_sp_pitches": 82.85106382978724,
+      "avg_sp_ip": 4.8042553191489406,
+      "avg_bullpen_pitchers": 3.5319148936170213,
+      "avg_pinch_hitters": 2.1702127659574466,
+      "closer_save_opp_rate": 0.3617021276595745
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 83,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779157,
+        "is_home": true,
+        "sp_pitches": 40.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 4,
+        "pinch_hitters": 10,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 778986,
+        "is_home": false,
+        "sp_pitches": 43.0,
+        "sp_ip": 1.1,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 779156,
+        "is_home": true,
+        "sp_pitches": 47.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 7,
+        "pinch_hitters": 8,
+        "closer_save_opp": 0
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  },
+  "133": {
+    "team_id": 133,
+    "team_name": "Athletics",
+    "season": 2025,
+    "start_date": "2025-03-01",
+    "end_date": "2025-11-30",
+    "games": 187,
+    "derived": {
+      "avg_sp_pitches": 82.16577540106952,
+      "avg_sp_ip": 4.6663101604278125,
+      "avg_bullpen_pitchers": 3.3475935828877006,
+      "avg_pinch_hitters": 2.406417112299465,
+      "closer_save_opp_rate": 0.3048128342245989
+    },
+    "recommended_manager_overrides": {
+      "pull_starter_pitch_count": 82,
+      "starter_min_innings": 4,
+      "pinch_hit_aggressiveness": 0.35
+    },
+    "sample": [
+      {
+        "date": "2025-03-01",
+        "game_pk": 779157,
+        "is_home": false,
+        "sp_pitches": 45.0,
+        "sp_ip": 2.1,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-02",
+        "game_pk": 779146,
+        "is_home": true,
+        "sp_pitches": 41.0,
+        "sp_ip": 3.0,
+        "bullpen_pitchers": 5,
+        "pinch_hitters": 9,
+        "closer_save_opp": 0
+      },
+      {
+        "date": "2025-03-03",
+        "game_pk": 778859,
+        "is_home": false,
+        "sp_pitches": 43.0,
+        "sp_ip": 2.0,
+        "bullpen_pitchers": 6,
+        "pinch_hitters": 9,
+        "closer_save_opp": 1
+      }
+    ],
+    "generated_at": "2026-02-09T16:46:25.999844",
+    "source": "statsapi_feed_live_raw"
+  }
+}

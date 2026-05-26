@@ -56,22 +56,32 @@ def recommendation_path(date_str: str) -> Path:
 
 def slate_summaries() -> list[dict[str, Any]]:
     seen: dict[str, dict[str, Any]] = {}
-    processed = default_nhl_source_root() / "data" / "processed"
-    if not processed.exists():
-        return []
-    for path in sorted(processed.glob("predictions_*.csv")):
-        if path.stem.startswith("predictions_sim_"):
-            continue
-        date_str = path.stem.replace("predictions_", "", 1)
-        seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Predictions snapshot"})
-    for path in sorted(processed.glob("recommendations_sim_*.csv")):
-        date_str = path.stem.replace("recommendations_sim_", "", 1)
-        seen[date_str] = {"date": date_str, "path": str(path), "kind": "Sim snapshot"}
-    for path in sorted(processed.glob("recommendations_*.csv")):
-        if path.stem.startswith("recommendations_sim_"):
-            continue
-        date_str = path.stem.replace("recommendations_", "", 1)
-        seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Direct snapshot"})
+    root = default_nhl_source_root()
+    processed = root / "data" / "processed"
+    if processed.exists():
+        for path in sorted(processed.glob("predictions_*.csv")):
+            if path.stem.startswith("predictions_sim_"):
+                continue
+            date_str = path.stem.replace("predictions_", "", 1)
+            seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Predictions snapshot"})
+        for path in sorted(processed.glob("recommendations_sim_*.csv")):
+            date_str = path.stem.replace("recommendations_sim_", "", 1)
+            seen[date_str] = {"date": date_str, "path": str(path), "kind": "Sim snapshot"}
+        for path in sorted(processed.glob("recommendations_*.csv")):
+            if path.stem.startswith("recommendations_sim_"):
+                continue
+            date_str = path.stem.replace("recommendations_", "", 1)
+            seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Direct snapshot"})
+
+    scoreboard_root = root / "data" / "odds" / "games"
+    if scoreboard_root.exists():
+        for path in sorted(scoreboard_root.glob("date=*/scoreboard.csv")):
+            parent_name = path.parent.name
+            if not parent_name.startswith("date="):
+                continue
+            date_str = parent_name.replace("date=", "", 1)
+            seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Archived scoreboard"})
+
     return sorted(seen.values(), key=lambda item: item["date"])
 
 

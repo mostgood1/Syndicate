@@ -1,0 +1,83 @@
+﻿{
+    "date":  "2026-05-25",
+    "generatedAt":  "2026-05-25T14:24:07.9374511-05:00",
+    "runDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_142407",
+    "latestDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
+    "runtimePolicy":  {
+                          "NBA":  {
+                                      "smartsimNSims":  1000,
+                                      "smartsimWorkers":  4
+                                  },
+                          "WNBA":  {
+                                       "smartsimNSims":  1000,
+                                       "smartsimWorkers":  4
+                                   },
+                          "NHL":  {
+                                      "gameSimSamples":  1000,
+                                      "propsBoxscoreNSims":  1000
+                                  },
+                          "NFL":  {
+                                      "scenarioNSims":  1000
+                                  }
+                      },
+    "sourceSteps":  [
+                        {
+                            "name":  "NBA Syndicate props refresh",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000"
+                                                     },
+                            "command":  [
+                                            "C:\\Users\\mostg\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+                                            "scripts\\refresh_nba_oddsapi_props.py",
+                                            "--date",
+                                            "2026-05-25",
+                                            "--artifact-root",
+                                            "data\\nba_source",
+                                            "--log-file",
+                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_142407\\nba_props_refresh.log",
+                                            "--do-edges",
+                                            "--do-export"
+                                        ]
+                        },
+                        {
+                            "name":  "WNBA Syndicate props refresh",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000"
+                                                     },
+                            "command":  [
+                                            "C:\\Users\\mostg\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+                                            "scripts\\refresh_wnba_oddsapi_props.py",
+                                            "--date",
+                                            "2026-05-25",
+                                            "--artifact-root",
+                                            "data\\wnba_source",
+                                            "--log-file",
+                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_142407\\wnba_props_refresh.log",
+                                            "--do-edges",
+                                            "--do-export"
+                                        ]
+                        }
+                    ],
+    "skipGitPush":  true,
+    "gitRemote":  "origin",
+    "commitMessagePrefix":  "daily update",
+    "skipped":  {
+                    "sourceUpdates":  false,
+                    "refreshGate":  false,
+                    "mlb":  true,
+                    "nba":  false,
+                    "nhl":  true,
+                    "wnba":  false,
+                    "nfl":  true,
+                    "ncaaf":  true,
+                    "ncaab":  true
+                },
+    "dryRun":  true,
+    "pushResults":  [
+
+                    ]
+}

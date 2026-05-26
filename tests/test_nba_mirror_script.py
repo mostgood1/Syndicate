@@ -13,6 +13,7 @@ class MlbMirrorScriptTests(unittest.TestCase):
         self.assertIn("[switch]$UseExistingMirrorArtifacts", content)
         self.assertIn("[string]$SourceArtifactRoot", content)
         self.assertIn("SYNDICATE_ARTIFACT_ROOT_MLB", content)
+        self.assertIn("data\\mlb_source", content)
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
         self.assertIn("usedArtifactBundle", content)

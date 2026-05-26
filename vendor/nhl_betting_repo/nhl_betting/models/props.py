@@ -1,0 +1,331 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, Optional, List, Set
+import functools
+
+import numpy as np
+import pandas as pd
+from scipy.stats import poisson
+
+
+def is_integer_line(line: float, *, tol: float = 1e-9) -> bool:
+    try:
+        x = float(line)
+    except Exception:
+        return False
+    if not np.isfinite(x):
+        return False
+    return abs(x - round(x)) <= tol
+
+
+def poisson_over_under_push_probs(lam: float, line: float) -> tuple[float, float, float]:
+    """Return (p_over_win, p_under_win, p_push) for a Poisson rate and a betting line.
+
+    Semantics:
+    - Over wins if X > line for integer lines, else X > floor(line).
+      (Equivalently: for x.5 lines, Over wins if X >= ceil(line).)
+    - Under wins if X < line for integer lines, else X <= floor(line).
+    - Push exists only when line is integer: X == line.
+    """
+    try:
+        mu = float(lam)
+        ln = float(line)
+    except Exception:
+        return (float("nan"), float("nan"), float("nan"))
+    if not np.isfinite(mu) or mu < 0 or not np.isfinite(ln):
+        return (float("nan"), float("nan"), float("nan"))
+
+    threshold = int(np.floor(ln + 1e-9))
+    p_over = float(poisson.sf(threshold, mu=mu))
+
+    if is_integer_line(ln):
+        k = int(round(ln))
+        p_push = float(poisson.pmf(k, mu=mu))
+        p_under = float(poisson.cdf(k - 1, mu=mu))
+    else:
+        p_push = 0.0
+        p_under = float(max(0.0, 1.0 - p_over))
+
+    # Clamp for numeric stability
+    def _clamp01(x: float) -> float:
+        if not np.isfinite(x):
+            return float("nan")
+        if x < 0.0:
+            return 0.0
+        if x > 1.0:
+            return 1.0
+        return float(x)
+
+    p_over = _clamp01(p_over)
+    p_under = _clamp01(p_under)
+    p_push = _clamp01(p_push)
+
+    return (p_over, p_under, p_push)
+
+
+def ev_two_way_decimal(*, prob_win: float, dec_odds: float, prob_push: float = 0.0) -> float:
+    """Expected profit for a $1 stake using decimal odds.
+
+    - Win profit: (dec_odds - 1)
+    - Loss profit: -1
+    - Push profit: 0
+    """
+    try:
+        p = float(prob_win)
+        d = float(dec_odds)
+        pp = float(prob_push)
+    except Exception:
+        return float("nan")
+    if not (np.isfinite(p) and np.isfinite(d) and np.isfinite(pp)):
+        return float("nan")
+    if d <= 0:
+        return float("nan")
+    # EV = p_win*(d-1) - p_lose, where p_lose = 1 - p_win - p_push
+    return (p * (d - 1.0)) - (1.0 - p - pp)
+
+
+@dataclass
+class PropsConfig:
+    window: int = 10
+    # Emphasize recent form: exponential decay with alpha (0=no weighting, 1=only last game)
+    recency_alpha: float = 0.3
+def _normalize_name(s: str) -> str:
+    import unicodedata, re
+    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode()
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+@functools.lru_cache(maxsize=50000)
+def _unwrap_dictish_name(val: str) -> str:
+    """If the name is serialized like "{'default': 'N. Schmaltz'}", extract the default/name.
+
+    Returns the original string if parsing fails.
+    """
+    try:
+        s = str(val or "").strip()
+        if s.startswith("{") and s.endswith("}"):
+            import ast
+            d = ast.literal_eval(s)
+            if isinstance(d, dict):
+                v = d.get("default") or d.get("name") or d.get("fullName")
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+    except Exception:
+        pass
+    return str(val or "")
+
+
+def _name_variants(full_name: str) -> Set[str]:
+    """Generate reasonable variants for matching player names in historical data.
+
+    Examples:
+    - "Tyler Bertuzzi" -> {"Tyler Bertuzzi", "T Bertuzzi", "T. Bertuzzi"}
+    - Handles extra spaces and diacritics.
+    """
+    full = _normalize_name(full_name)
+    parts = full.split(" ")
+    out: Set[str] = {full}
+    if len(parts) >= 2:
+        first = parts[0]
+        last = parts[-1]
+        if first:
+            ini = first[0]
+            out.add(f"{ini} {last}")
+            out.add(f"{ini}. {last}")
+    return { _normalize_name(x) for x in out }
+
+
+def _select_player_rows(df: pd.DataFrame, player: str, role: str, metric_cols: List[str]) -> pd.DataFrame:
+    """Return per-player rows for a given role with guaranteed metric columns present.
+
+    This helper is defensive: if expected metric columns are missing from the source
+    data, it will create them as NaN so downstream dropna/sort logic is safe.
+    """
+    expected = ["date", "player", "role", *metric_cols]
+    if df is None or df.empty:
+        # Ensure the returned frame has the expected schema
+        return pd.DataFrame(columns=expected)
+    try:
+        candidates = _name_variants(player)
+        pdf = df[df.get("role", "").astype(str).str.lower() == str(role).lower()].copy()
+        # Normalize player names in the view for matching
+        if "player" in pdf.columns:
+            # If a normalized column already exists, reuse it to avoid repeated parsing
+            if "_p_norm" in pdf.columns:
+                pdf = pdf[pdf["_p_norm"].isin(candidates)]
+            else:
+                # Unwrap dict-like serialized names, then normalize (cached)
+                pdf["_p_norm"] = pdf["player"].astype(str).map(_unwrap_dictish_name).map(_normalize_name)
+                pdf = pdf[pdf["_p_norm"].isin(candidates)]
+        else:
+            # No player column; return empty schema
+            return pd.DataFrame(columns=expected)
+        # If 'date' is missing but 'date_key' exists (common in calibration), copy it
+        if "date" not in pdf.columns and "date_key" in pdf.columns:
+            pdf["date"] = pdf["date_key"]
+        # Materialize any missing metric columns as NaN
+        for col in metric_cols:
+            if col not in pdf.columns:
+                pdf[col] = np.nan
+        # Build final view with the expected schema order (missing added above)
+        keep = [c for c in expected if c in pdf.columns]
+        if len(keep) < len(expected):
+            # If any core columns like date/player/role were still missing, add them
+            for core in ["date", "player", "role"]:
+                if core not in pdf.columns:
+                    pdf[core] = "" if core != "date" else None
+            keep = expected
+        return pdf[keep]
+    except Exception:
+        return pd.DataFrame(columns=expected)
+
+
+
+class SkaterShotsModel:
+    def __init__(self, cfg: PropsConfig | None = None):
+        self.cfg = cfg or PropsConfig()
+
+    def player_lambda(self, df: pd.DataFrame, player: str, team: Optional[str] = None) -> float:
+        pdf = _select_player_rows(df, player, role="skater", metric_cols=["shots"]).copy()
+        # Coerce metric and drop missing
+        pdf["shots"] = pd.to_numeric(pdf.get("shots"), errors="coerce")
+        pdf = pdf.dropna(subset=["shots"]).copy()
+        # History is already chronological; take last N and apply recency weighting
+        pdf = pdf.tail(self.cfg.window)
+        if pdf.empty:
+            return 2.0
+        vals = pdf["shots"].astype(float).values
+        if len(vals) == 1 or self.cfg.recency_alpha <= 0:
+            return float(vals.mean())
+        # Newest at end: build exponentially increasing weights
+        n = len(vals)
+        al = min(max(self.cfg.recency_alpha, 0.0), 0.99)
+        # weights: w_t = (1-alpha)^(n-1-t)
+        idx = np.arange(n)
+        w = (1.0 - al) ** (n - 1 - idx)
+        w = w / w.sum()
+        return float(np.dot(vals, w))
+
+    def prob_over(self, lam: float, line: float, max_x: int = 15) -> float:
+        # Use stable survival function to avoid factorial overflow
+        threshold = int(np.floor(line + 1e-9))
+        return float(poisson.sf(threshold, mu=lam))
+
+
+class GoalieSavesModel:
+    def __init__(self, cfg: PropsConfig | None = None):
+        self.cfg = cfg or PropsConfig()
+
+    def player_lambda(self, df: pd.DataFrame, player: str) -> float:
+        pdf = _select_player_rows(df, player, role="goalie", metric_cols=["saves"]).copy()
+        pdf["saves"] = pd.to_numeric(pdf.get("saves"), errors="coerce")
+        pdf = pdf.dropna(subset=["saves"]).copy()
+        pdf = pdf.tail(self.cfg.window)
+        if pdf.empty:
+            return 25.0
+        vals = pdf["saves"].astype(float).values
+        if len(vals) == 1 or self.cfg.recency_alpha <= 0:
+            return float(vals.mean())
+        n = len(vals); al = min(max(self.cfg.recency_alpha, 0.0), 0.99)
+        w = (1.0 - al) ** (n - 1 - np.arange(n)); w = w / w.sum()
+        return float(np.dot(vals, w))
+
+    def prob_over(self, lam: float, line: float, max_x: int = 60) -> float:
+        threshold = int(np.floor(line + 1e-9))
+        return float(poisson.sf(threshold, mu=lam))
+
+
+class SkaterGoalsModel:
+    def __init__(self, cfg: PropsConfig | None = None):
+        self.cfg = cfg or PropsConfig()
+
+    def player_lambda(self, df: pd.DataFrame, player: str) -> float:
+        pdf = _select_player_rows(df, player, role="skater", metric_cols=["goals"]).copy()
+        pdf["goals"] = pd.to_numeric(pdf.get("goals"), errors="coerce")
+        pdf = pdf.dropna(subset=["goals"]).copy()
+        pdf = pdf.tail(self.cfg.window)
+        if pdf.empty:
+            return 0.3
+        vals = pdf["goals"].astype(float).values
+        if len(vals) == 1 or self.cfg.recency_alpha <= 0:
+            return float(vals.mean())
+        n = len(vals); al = min(max(self.cfg.recency_alpha, 0.0), 0.99)
+        w = (1.0 - al) ** (n - 1 - np.arange(n)); w = w / w.sum()
+        return float(np.dot(vals, w))
+
+    def prob_over(self, lam: float, line: float, max_x: int = 5) -> float:
+        threshold = int(np.floor(line + 1e-9))
+        return float(poisson.sf(threshold, mu=lam))
+
+
+class SkaterAssistsModel:
+    def __init__(self, cfg: PropsConfig | None = None):
+        self.cfg = cfg or PropsConfig()
+
+    def player_lambda(self, df: pd.DataFrame, player: str) -> float:
+        pdf = _select_player_rows(df, player, role="skater", metric_cols=["assists"]).copy()
+        pdf["assists"] = pd.to_numeric(pdf.get("assists"), errors="coerce")
+        pdf = pdf.dropna(subset=["assists"]).copy()
+        pdf = pdf.tail(self.cfg.window)
+        if pdf.empty:
+            return 0.4
+        vals = pdf["assists"].astype(float).values
+        if len(vals) == 1 or self.cfg.recency_alpha <= 0:
+            return float(vals.mean())
+        n = len(vals); al = min(max(self.cfg.recency_alpha, 0.0), 0.99)
+        w = (1.0 - al) ** (n - 1 - np.arange(n)); w = w / w.sum()
+        return float(np.dot(vals, w))
+
+    def prob_over(self, lam: float, line: float, max_x: int = 5) -> float:
+        threshold = int(np.floor(line + 1e-9))
+        return float(poisson.sf(threshold, mu=lam))
+
+
+class SkaterPointsModel:
+    def __init__(self, cfg: PropsConfig | None = None):
+        self.cfg = cfg or PropsConfig()
+
+    def player_lambda(self, df: pd.DataFrame, player: str) -> float:
+        # Points = goals + assists
+        pdf = _select_player_rows(df, player, role="skater", metric_cols=["goals","assists"]).copy()
+        pdf["goals"] = pd.to_numeric(pdf.get("goals"), errors="coerce")
+        pdf["assists"] = pd.to_numeric(pdf.get("assists"), errors="coerce")
+        pdf = pdf.dropna(subset=["goals", "assists"]).copy()
+        pdf = pdf.tail(self.cfg.window)
+        if pdf.empty:
+            return 0.7
+        pts = (pdf["goals"].astype(float) + pdf["assists"].astype(float)).values
+        if len(pts) == 1 or self.cfg.recency_alpha <= 0:
+            return float(np.mean(pts))
+        n = len(pts); al = min(max(self.cfg.recency_alpha, 0.0), 0.99)
+        w = (1.0 - al) ** (n - 1 - np.arange(n)); w = w / w.sum()
+        return float(np.dot(pts, w))
+
+    def prob_over(self, lam: float, line: float, max_x: int = 8) -> float:
+        threshold = int(np.floor(line + 1e-9))
+        return float(poisson.sf(threshold, mu=lam))
+
+
+class SkaterBlocksModel:
+    def __init__(self, cfg: PropsConfig | None = None):
+        self.cfg = cfg or PropsConfig()
+
+    def player_lambda(self, df: pd.DataFrame, player: str) -> float:
+        pdf = _select_player_rows(df, player, role="skater", metric_cols=["blocked"]).copy()
+        pdf["blocked"] = pd.to_numeric(pdf.get("blocked"), errors="coerce")
+        pdf = pdf.dropna(subset=["blocked"]).copy()
+        pdf = pdf.tail(self.cfg.window)
+        if pdf.empty:
+            return 1.5
+        vals = pdf["blocked"].astype(float).values
+        if len(vals) == 1 or self.cfg.recency_alpha <= 0:
+            return float(vals.mean())
+        n = len(vals); al = min(max(self.cfg.recency_alpha, 0.0), 0.99)
+        w = (1.0 - al) ** (n - 1 - np.arange(n)); w = w / w.sum()
+        return float(np.dot(vals, w))
+
+    def prob_over(self, lam: float, line: float, max_x: int = 15) -> float:
+        threshold = int(np.floor(line + 1e-9))
+        return float(poisson.sf(threshold, mu=lam))

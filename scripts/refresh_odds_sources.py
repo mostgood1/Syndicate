@@ -51,9 +51,30 @@ def _source_repo_root(slug: str, source_repo_name: str) -> Path:
     return (WORKSPACE_ROOT / source_repo_name).resolve()
 
 
+def _looks_usable_python(path_text: str | None) -> bool:
+    candidate = str(path_text or "").strip()
+    if not candidate:
+        return False
+    lowered = candidate.lower()
+    if "windowsapps" in lowered:
+        return False
+    return Path(candidate).exists()
+
+
 def _venv_python(source_root: Path) -> str:
+    override = str(os.environ.get("SYNDICATE_PYTHON_EXE") or "").strip()
+    if _looks_usable_python(override):
+        return override
+    if _looks_usable_python(sys.executable):
+        return str(sys.executable)
+    for candidate in (
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311" / "python.exe",
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311-arm64" / "python.exe",
+    ):
+        if candidate.exists():
+            return str(candidate)
     candidate = source_root / ".venv" / "Scripts" / "python.exe"
-    if candidate.exists():
+    if _looks_usable_python(str(candidate)):
         return str(candidate)
     return sys.executable or "python"
 
@@ -72,10 +93,12 @@ def _json_payload(data: dict[str, Any]) -> str:
     return json.dumps(data, separators=(",", ":"))
 
 
-def _infer_nfl_context(source_root: Path, season: int | None, week: int | None) -> tuple[int, int]:
+def _infer_nfl_context(source_root: Path | None, artifact_root: Path, season: int | None, week: int | None) -> tuple[int, int]:
     if season is not None and week is not None:
         return int(season), int(week)
-    current_week_path = source_root / "nfl_compare" / "data" / "current_week.json"
+    current_week_path = artifact_root / "current_week.json"
+    if (not current_week_path.exists()) and source_root is not None:
+        current_week_path = source_root / "nfl_compare" / "data" / "current_week.json"
     payload: dict[str, Any] = {}
     if current_week_path.exists():
         try:
@@ -88,7 +111,7 @@ def _infer_nfl_context(source_root: Path, season: int | None, week: int | None) 
 
 
 def _build_mlb_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _source_repo_root("mlb", "MLB-BettingV2")
+    source_root = REPO_ROOT / "data" / "mlb_source"
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("mlb")
     return [
@@ -116,10 +139,7 @@ def _build_mlb_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 
 def _build_nba_payload(args: argparse.Namespace, *, env_key: str) -> dict[str, str]:
-    log_dir = _source_repo_root(
-        "nba" if env_key == "NBA_BETTING_ODDSAPI_PROPS_JOB" else "wnba",
-        "NBA-Betting" if env_key == "NBA_BETTING_ODDSAPI_PROPS_JOB" else "WNBA-Betting",
-    ) / "logs"
+    log_dir = _local_source_bundle_root("nba" if env_key == "NBA_BETTING_ODDSAPI_PROPS_JOB" else "wnba") / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / f"syndicate_refresh_oddsapi_props_{args.date}.log"
     payload = {
@@ -140,8 +160,16 @@ def _local_source_artifact_root(slug: str) -> Path:
     return REPO_ROOT / "data" / f"{slug}_source" / "source_artifacts"
 
 
+def _local_source_bundle_root(slug: str) -> Path:
+    return REPO_ROOT / "data" / f"{slug}_source"
+
+
+def _local_mlb_bundle_root() -> Path:
+    return REPO_ROOT / "data" / "mlb_source"
+
+
 def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _source_repo_root("nba", "NBA-Betting")
+    source_root = _local_source_bundle_root("nba")
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")["NBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
@@ -179,7 +207,7 @@ def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 
 def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _source_repo_root("wnba", "WNBA-Betting")
+    source_root = _local_source_bundle_root("wnba")
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="WNBA_BETTING_ODDSAPI_PROPS_JOB")["WNBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
@@ -238,10 +266,10 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
 
 def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _source_repo_root("nfl", "NFL-Betting")
-    season, week = _infer_nfl_context(source_root, args.season, args.week)
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("nfl")
+    source_root = _source_repo_root("nfl", "NFL-Betting")
+    season, week = _infer_nfl_context(source_root, artifact_root, args.season, args.week)
     return [
         RefreshStep(
             name="nfl_oddsapi_refresh",
@@ -250,8 +278,6 @@ def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
             command=(
                 python_exe,
                 "scripts/refresh_nfl_oddsapi.py",
-                "--source-root",
-                str(source_root),
                 "--artifact-root",
                 str(artifact_root),
                 "--season",
@@ -314,7 +340,7 @@ def _build_ncaaf_steps(args: argparse.Namespace) -> list[RefreshStep]:
 REGISTRY: dict[str, SportSpec] = {
     "mlb": SportSpec(
         slug="mlb",
-        source_repo_name="MLB-BettingV2",
+        source_repo_name="mlb_source",
         mirror_script_name="refresh_mlb_source_mirror.ps1",
         step_builder=_build_mlb_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
@@ -323,7 +349,7 @@ REGISTRY: dict[str, SportSpec] = {
     ),
     "nba": SportSpec(
         slug="nba",
-        source_repo_name="NBA-Betting",
+        source_repo_name="nba_source",
         mirror_script_name="refresh_nba_source_mirror.ps1",
         step_builder=_build_nba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
@@ -332,7 +358,7 @@ REGISTRY: dict[str, SportSpec] = {
     ),
     "nhl": SportSpec(
         slug="nhl",
-        source_repo_name="NHL-Betting",
+        source_repo_name="nhl_source",
         mirror_script_name="refresh_nhl_source_mirror.ps1",
         step_builder=_build_nhl_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
@@ -350,7 +376,7 @@ REGISTRY: dict[str, SportSpec] = {
     ),
     "wnba": SportSpec(
         slug="wnba",
-        source_repo_name="WNBA-Betting",
+        source_repo_name="wnba_source",
         mirror_script_name="refresh_wnba_source_mirror.ps1",
         step_builder=_build_wnba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
@@ -383,11 +409,19 @@ def _ingest_is_hosted_safe(spec: SportSpec) -> bool:
 
 
 def _generation_payload(spec: SportSpec, *, execution_mode: str, source_root: Path) -> dict[str, Any]:
+    if execution_mode == "source" and spec.slug == "mlb":
+        return {
+            "kind": "local_artifact_bundle",
+            "source_dependency": "local_artifact_bundle",
+            "hosted_safe": True,
+            "source_repo": str(source_root),
+            "steps": [],
+        }
     if execution_mode == "source" and spec.slug in {"nba", "wnba"}:
         return {
-            "kind": "source_cli_with_local_bundle_reuse",
-            "source_dependency": "local_artifact_bundle_or_source_cli",
-            "hosted_safe": False,
+            "kind": "local_artifact_bundle",
+            "source_dependency": "local_artifact_bundle",
+            "hosted_safe": True,
             "source_repo": str(source_root),
             "steps": [],
         }
@@ -508,6 +542,16 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
 
 
 def _validate_source_root(spec: SportSpec) -> str | None:
+    if spec.slug == "mlb":
+        source_root = _local_mlb_bundle_root()
+        if source_root.exists():
+            return None
+        return f"Local MLB bundle root not found: {source_root}."
+    if spec.slug in {"nba", "wnba"}:
+        source_root = _local_source_bundle_root(spec.slug)
+        if source_root.exists():
+            return None
+        return f"Local {spec.slug.upper()} bundle root not found: {source_root}."
     source_root = _source_repo_root(spec.slug, spec.source_repo_name)
     if source_root.exists():
         return None
@@ -609,12 +653,17 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     any_failure = False
     for sport in selected:
         spec = REGISTRY[sport]
-        source_root = _source_repo_root(spec.slug, spec.source_repo_name)
+        if spec.slug == "mlb":
+            source_root = _local_mlb_bundle_root()
+        elif spec.slug in {"nba", "wnba"}:
+            source_root = _local_source_bundle_root(spec.slug)
+        else:
+            source_root = _source_repo_root(spec.slug, spec.source_repo_name)
         generation_mode = "source_repo"
-        if execution_mode == "source" and spec.slug in {"ncaaf", "nhl"}:
+        if execution_mode == "source" and spec.slug == "mlb":
             generation_mode = "local_artifact_bundle"
-        elif execution_mode == "source" and spec.slug in {"nba", "wnba"}:
-            generation_mode = "source_cli_with_local_bundle_reuse"
+        if execution_mode == "source" and spec.slug in {"ncaaf", "nhl", "nba", "wnba"}:
+            generation_mode = "local_artifact_bundle"
         elif execution_mode == "source" and spec.slug == "ncaab":
             generation_mode = "local_raw_outputs"
         sport_result: dict[str, Any] = {

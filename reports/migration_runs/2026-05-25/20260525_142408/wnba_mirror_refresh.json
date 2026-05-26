@@ -1,0 +1,23 @@
+﻿{
+    "sport":  "wnba",
+    "date":  "2026-05-25",
+    "refreshedAtUtc":  "2026-05-25T19:24:09.2953501Z",
+    "sourceRepo":  null,
+    "sourceArtifactRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\wnba_source",
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_WNBA",
+    "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_WNBA",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\data\\processed",
+    "usedExistingMirrorArtifacts":  false,
+    "usedArtifactBundle":  true,
+    "copiedArtifactCount":  1,
+    "artifactGroups":  {
+                           "processed":  1,
+                           "live_lens":  0,
+                           "raw":  0,
+                           "other":  0
+                       },
+    "copiedArtifacts":  [
+                            "live_lens_tuning_override.json"
+                        ]
+}
+

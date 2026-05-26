@@ -3091,7 +3091,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "ml",
@@ -3104,7 +3104,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "pitcher_props",
@@ -3115,7 +3115,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_hits",
@@ -3126,7 +3126,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3137,7 +3137,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3148,7 +3148,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3159,7 +3159,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3170,7 +3170,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3181,7 +3181,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3192,7 +3192,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3203,7 +3203,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3214,7 +3214,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_runs",
@@ -3225,7 +3225,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3236,7 +3236,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3247,7 +3247,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3258,7 +3258,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3269,7 +3269,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3280,7 +3280,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3291,7 +3291,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3302,7 +3302,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3313,7 +3313,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3326,7 +3326,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "ml",
@@ -3337,7 +3337,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "pitcher_props",
@@ -3348,7 +3348,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_hits",
@@ -3359,7 +3359,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3370,7 +3370,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3381,7 +3381,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3392,7 +3392,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3403,7 +3403,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3414,7 +3414,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3425,7 +3425,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3436,7 +3436,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_total_bases",
@@ -3447,7 +3447,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_runs",
@@ -3458,7 +3458,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3469,7 +3469,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3480,7 +3480,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3491,7 +3491,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3502,7 +3502,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3513,7 +3513,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3524,7 +3524,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3535,7 +3535,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -3546,7 +3546,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823384,
             "market": "hitter_rbis",
@@ -6301,7 +6301,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "pitcher_props",
@@ -6314,7 +6314,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "pitcher_props",
@@ -6325,7 +6325,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6336,7 +6336,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6347,7 +6347,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6358,7 +6358,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6369,7 +6369,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6380,7 +6380,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6391,7 +6391,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6402,7 +6402,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6413,7 +6413,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6424,7 +6424,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_runs",
@@ -6435,7 +6435,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6446,7 +6446,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6457,7 +6457,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6468,7 +6468,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6479,7 +6479,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6490,7 +6490,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6501,7 +6501,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6514,7 +6514,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "pitcher_props",
@@ -6525,7 +6525,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "pitcher_props",
@@ -6536,7 +6536,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6547,7 +6547,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6558,7 +6558,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6569,7 +6569,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6580,7 +6580,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6591,7 +6591,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6602,7 +6602,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6613,7 +6613,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6624,7 +6624,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_total_bases",
@@ -6635,7 +6635,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_runs",
@@ -6646,7 +6646,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6657,7 +6657,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6668,7 +6668,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6679,7 +6679,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6690,7 +6690,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6701,7 +6701,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -6712,7 +6712,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822739,
             "market": "hitter_rbis",
@@ -8539,7 +8539,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_hits",
@@ -8550,7 +8550,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_runs",
@@ -8563,7 +8563,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "pitcher_props",
@@ -8574,7 +8574,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_hits",
@@ -8585,7 +8585,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_hits",
@@ -8596,7 +8596,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8607,7 +8607,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8618,7 +8618,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8629,7 +8629,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8640,7 +8640,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8651,7 +8651,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_rbis",
@@ -8662,7 +8662,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_rbis",
@@ -8673,7 +8673,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_rbis",
@@ -8686,7 +8686,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_hits",
@@ -8697,7 +8697,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_runs",
@@ -8708,7 +8708,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "pitcher_props",
@@ -8719,7 +8719,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_hits",
@@ -8730,7 +8730,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_hits",
@@ -8741,7 +8741,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8752,7 +8752,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8763,7 +8763,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8774,7 +8774,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8785,7 +8785,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_total_bases",
@@ -8796,7 +8796,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_rbis",
@@ -8807,7 +8807,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_rbis",
@@ -8818,7 +8818,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824280,
             "market": "hitter_rbis",
@@ -10963,7 +10963,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -10976,7 +10976,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "pitcher_props",
@@ -10987,7 +10987,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "pitcher_props",
@@ -10998,7 +10998,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_hits",
@@ -11009,7 +11009,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_hits",
@@ -11020,7 +11020,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11031,7 +11031,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11042,7 +11042,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11053,7 +11053,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11064,7 +11064,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11075,7 +11075,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11086,7 +11086,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11097,7 +11097,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11108,7 +11108,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11119,7 +11119,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11130,7 +11130,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11143,7 +11143,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11154,7 +11154,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "pitcher_props",
@@ -11165,7 +11165,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "pitcher_props",
@@ -11176,7 +11176,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_hits",
@@ -11187,7 +11187,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_hits",
@@ -11198,7 +11198,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11209,7 +11209,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11220,7 +11220,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11231,7 +11231,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11242,7 +11242,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11253,7 +11253,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_total_bases",
@@ -11264,7 +11264,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11275,7 +11275,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11286,7 +11286,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11297,7 +11297,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -11308,7 +11308,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 822983,
             "market": "hitter_rbis",
@@ -13427,7 +13427,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13438,7 +13438,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13451,7 +13451,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "pitcher_props",
@@ -13462,7 +13462,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_hits",
@@ -13473,7 +13473,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_hits",
@@ -13484,7 +13484,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13495,7 +13495,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13506,7 +13506,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13517,7 +13517,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13528,7 +13528,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13539,7 +13539,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -13550,7 +13550,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -13561,7 +13561,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -13572,7 +13572,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -13585,7 +13585,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13596,7 +13596,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13607,7 +13607,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "pitcher_props",
@@ -13618,7 +13618,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_hits",
@@ -13629,7 +13629,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_hits",
@@ -13640,7 +13640,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13651,7 +13651,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13662,7 +13662,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13673,7 +13673,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13684,7 +13684,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_total_bases",
@@ -13695,7 +13695,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -13706,7 +13706,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -13717,7 +13717,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -13728,7 +13728,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823707,
             "market": "hitter_rbis",
@@ -14735,7 +14735,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_total_bases",
@@ -14748,7 +14748,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_hits",
@@ -14759,7 +14759,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_hits",
@@ -14770,7 +14770,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_total_bases",
@@ -14781,7 +14781,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_rbis",
@@ -14792,7 +14792,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_rbis",
@@ -14805,7 +14805,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_total_bases",
@@ -14816,7 +14816,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_hits",
@@ -14827,7 +14827,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_hits",
@@ -14838,7 +14838,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_total_bases",
@@ -14849,7 +14849,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_rbis",
@@ -14860,7 +14860,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824439,
             "market": "hitter_rbis",
@@ -15910,7 +15910,7 @@
         "unresolved_rows": [],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_hits",
@@ -15921,7 +15921,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_hits",
@@ -15932,7 +15932,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -15943,7 +15943,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -15954,7 +15954,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -15965,7 +15965,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -15976,7 +15976,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_rbis",
@@ -15989,7 +15989,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_hits",
@@ -16000,7 +16000,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_hits",
@@ -16011,7 +16011,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -16022,7 +16022,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -16033,7 +16033,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -16044,7 +16044,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_total_bases",
@@ -16055,7 +16055,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823629,
             "market": "hitter_rbis",
@@ -16963,7 +16963,7 @@
         "unresolved_rows": [],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -16974,7 +16974,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -16985,7 +16985,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -16996,7 +16996,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -17007,7 +17007,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_rbis",
@@ -17018,7 +17018,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_rbis",
@@ -17031,7 +17031,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -17042,7 +17042,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -17053,7 +17053,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -17064,7 +17064,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_total_bases",
@@ -17075,7 +17075,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_rbis",
@@ -17086,7 +17086,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824925,
             "market": "hitter_rbis",
@@ -18286,7 +18286,7 @@
         "unresolved_rows": [],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "pitcher_props",
@@ -18297,7 +18297,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_hits",
@@ -18308,7 +18308,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_total_bases",
@@ -18319,7 +18319,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_total_bases",
@@ -18330,7 +18330,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_total_bases",
@@ -18341,7 +18341,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_rbis",
@@ -18352,7 +18352,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_rbis",
@@ -18363,7 +18363,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_rbis",
@@ -18376,7 +18376,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "pitcher_props",
@@ -18387,7 +18387,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_hits",
@@ -18398,7 +18398,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_total_bases",
@@ -18409,7 +18409,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_total_bases",
@@ -18420,7 +18420,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_total_bases",
@@ -18431,7 +18431,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_rbis",
@@ -18442,7 +18442,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_rbis",
@@ -18453,7 +18453,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824601,
             "market": "hitter_rbis",
@@ -20680,7 +20680,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20693,7 +20693,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "pitcher_props",
@@ -20704,7 +20704,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_hits",
@@ -20715,7 +20715,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20726,7 +20726,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20737,7 +20737,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20748,7 +20748,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20759,7 +20759,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20770,7 +20770,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_runs",
@@ -20781,7 +20781,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20792,7 +20792,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20803,7 +20803,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20814,7 +20814,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20825,7 +20825,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20836,7 +20836,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20849,7 +20849,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20860,7 +20860,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "pitcher_props",
@@ -20871,7 +20871,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_hits",
@@ -20882,7 +20882,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20893,7 +20893,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20904,7 +20904,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20915,7 +20915,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20926,7 +20926,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_total_bases",
@@ -20937,7 +20937,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_runs",
@@ -20948,7 +20948,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20959,7 +20959,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20970,7 +20970,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20981,7 +20981,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -20992,7 +20992,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -21003,7 +21003,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824194,
             "market": "hitter_rbis",
@@ -21964,7 +21964,7 @@
         "unresolved_rows": [],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "pitcher_props",
@@ -21975,7 +21975,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "pitcher_props",
@@ -21986,7 +21986,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_hits",
@@ -21997,7 +21997,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_total_bases",
@@ -22008,7 +22008,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_total_bases",
@@ -22019,7 +22019,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_rbis",
@@ -22030,7 +22030,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_rbis",
@@ -22043,7 +22043,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "pitcher_props",
@@ -22054,7 +22054,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "pitcher_props",
@@ -22065,7 +22065,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_hits",
@@ -22076,7 +22076,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_total_bases",
@@ -22087,7 +22087,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_total_bases",
@@ -22098,7 +22098,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_rbis",
@@ -22109,7 +22109,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823061,
             "market": "hitter_rbis",
@@ -24045,7 +24045,7 @@
         "unresolved_rows": [],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "pitcher_props",
@@ -24056,7 +24056,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "pitcher_props",
@@ -24067,7 +24067,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "pitcher_props",
@@ -24078,7 +24078,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24089,7 +24089,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24100,7 +24100,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24111,7 +24111,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24122,7 +24122,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24133,7 +24133,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24144,7 +24144,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24155,7 +24155,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24166,7 +24166,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24177,7 +24177,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_rbis",
@@ -24188,7 +24188,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_rbis",
@@ -24201,7 +24201,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "pitcher_props",
@@ -24212,7 +24212,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "pitcher_props",
@@ -24223,7 +24223,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "pitcher_props",
@@ -24234,7 +24234,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24245,7 +24245,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24256,7 +24256,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24267,7 +24267,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24278,7 +24278,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24289,7 +24289,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24300,7 +24300,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24311,7 +24311,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24322,7 +24322,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_total_bases",
@@ -24333,7 +24333,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_rbis",
@@ -24344,7 +24344,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824360,
             "market": "hitter_rbis",
@@ -27187,7 +27187,7 @@
         "all_settled_rows": [],
         "unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27198,7 +27198,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27209,7 +27209,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27220,7 +27220,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27233,7 +27233,7 @@
         ],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "pitcher_props",
@@ -27244,7 +27244,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27255,7 +27255,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27266,7 +27266,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27277,7 +27277,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27288,7 +27288,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27299,7 +27299,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27310,7 +27310,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27321,7 +27321,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27332,7 +27332,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27343,7 +27343,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27354,7 +27354,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -27365,7 +27365,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -27376,7 +27376,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -27387,7 +27387,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -27400,7 +27400,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27411,7 +27411,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27422,7 +27422,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27433,7 +27433,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27444,7 +27444,7 @@
             "recommendation_tier": "official"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "pitcher_props",
@@ -27455,7 +27455,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27466,7 +27466,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_hits",
@@ -27477,7 +27477,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27488,7 +27488,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27499,7 +27499,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27510,7 +27510,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27521,7 +27521,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27532,7 +27532,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27543,7 +27543,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27554,7 +27554,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_total_bases",
@@ -27565,7 +27565,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -27576,7 +27576,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -27587,7 +27587,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -27598,7 +27598,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 824037,
             "market": "hitter_rbis",
@@ -29095,7 +29095,7 @@
         "unresolved_rows": [],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_hits",
@@ -29106,7 +29106,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_hits",
@@ -29117,7 +29117,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_hits",
@@ -29128,7 +29128,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_total_bases",
@@ -29139,7 +29139,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_total_bases",
@@ -29150,7 +29150,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_total_bases",
@@ -29161,7 +29161,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_runs",
@@ -29172,7 +29172,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_rbis",
@@ -29183,7 +29183,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_rbis",
@@ -29196,7 +29196,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_hits",
@@ -29207,7 +29207,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_hits",
@@ -29218,7 +29218,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_hits",
@@ -29229,7 +29229,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_total_bases",
@@ -29240,7 +29240,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_total_bases",
@@ -29251,7 +29251,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_total_bases",
@@ -29262,7 +29262,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_runs",
@@ -29273,7 +29273,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_rbis",
@@ -29284,7 +29284,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 823140,
             "market": "hitter_rbis",
@@ -31640,7 +31640,7 @@
         "unresolved_rows": [],
         "playable_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31651,7 +31651,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31662,7 +31662,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31673,7 +31673,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31684,7 +31684,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31695,7 +31695,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31706,7 +31706,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31717,7 +31717,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31728,7 +31728,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31739,7 +31739,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31750,7 +31750,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31761,7 +31761,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31772,7 +31772,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31783,7 +31783,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31794,7 +31794,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31807,7 +31807,7 @@
         ],
         "all_unresolved_rows": [
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31818,7 +31818,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31829,7 +31829,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31840,7 +31840,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31851,7 +31851,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31862,7 +31862,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31873,7 +31873,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31884,7 +31884,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31895,7 +31895,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_total_bases",
@@ -31906,7 +31906,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31917,7 +31917,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31928,7 +31928,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31939,7 +31939,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31950,7 +31950,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",
@@ -31961,7 +31961,7 @@
             "recommendation_tier": "candidate"
           },
           {
-            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
+            "path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\daily\\daily_summary_2026_05_15_locked_policy.json",
             "date": "2026-05-15",
             "game_pk": 825009,
             "market": "hitter_rbis",

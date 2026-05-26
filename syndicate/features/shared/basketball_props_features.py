@@ -32,6 +32,92 @@ TEAM_COLS = ["TEAM_ABBREVIATION", "team", "slugTeam"]
 MATCHUP_COL = "MATCHUP"
 
 
+def _boxscore_paths(processed_root: Path) -> list[Path]:
+    paths: list[Path] = []
+    for candidate in (
+        processed_root / "boxscores_history.parquet",
+        processed_root / "boxscores_history.csv",
+    ):
+        if candidate.exists() and candidate.stat().st_size > 0:
+            paths.append(candidate)
+    for pattern in ("boxscores_*.parquet", "boxscores_*.csv"):
+        for candidate in sorted(processed_root.glob(pattern)):
+            if candidate.exists() and candidate.stat().st_size > 0:
+                paths.append(candidate)
+    return paths
+
+
+def _read_boxscore_frame(path: Path):
+    import pandas as pd
+
+    suffix = path.suffix.lower()
+    if suffix == ".parquet":
+        return pd.read_parquet(path)
+    return pd.read_csv(path)
+
+
+def _load_boxscores_as_player_logs(processed_root: Path):
+    import pandas as pd
+
+    frames = []
+    for path in _boxscore_paths(processed_root):
+        try:
+            frame = _read_boxscore_frame(path)
+        except Exception:
+            continue
+        if frame is None or frame.empty:
+            continue
+        frames.append(frame)
+
+    if not frames:
+        return pd.DataFrame()
+
+    df = pd.concat(frames, ignore_index=True)
+    if df.empty:
+        return df
+
+    if "date" in df.columns and "GAME_DATE" not in df.columns:
+        df["GAME_DATE"] = pd.to_datetime(df["date"], errors="coerce")
+    elif "GAME_DATE" in df.columns:
+        df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"], errors="coerce")
+    else:
+        df["GAME_DATE"] = pd.NaT
+
+    if "TEAM_ABBREVIATION" in df.columns:
+        df["TEAM_ABBREVIATION"] = df["TEAM_ABBREVIATION"].astype(str).str.strip().str.upper()
+    if "PLAYER_NAME" in df.columns:
+        df["PLAYER_NAME"] = df["PLAYER_NAME"].astype(str).str.strip()
+
+    keep = [
+        "GAME_DATE",
+        "TEAM_ABBREVIATION",
+        "PLAYER_ID",
+        "PLAYER_NAME",
+        "MATCHUP",
+        "MIN",
+        "PTS",
+        "REB",
+        "AST",
+        "STL",
+        "BLK",
+        "TOV",
+        "FG3M",
+        "FG3A",
+        "FGA",
+        "FGM",
+        "FTA",
+        "FTM",
+        "PF",
+        "PLUS_MINUS",
+        "OREB",
+        "DREB",
+    ]
+    out = df[[column for column in keep if column in df.columns]].copy()
+    if "MATCHUP" not in out.columns:
+        out["MATCHUP"] = None
+    return out
+
+
 def _find_col(df, candidates) -> str | None:
     cols = {column.lower(): column for column in df.columns}
     for candidate in candidates:
@@ -111,6 +197,9 @@ def load_player_logs_local(*, processed_root: Path):
             )
     if csv_path.exists():
         return pd.read_csv(csv_path)
+    fallback = _load_boxscores_as_player_logs(processed_root)
+    if isinstance(fallback, pd.DataFrame) and not fallback.empty:
+        return fallback
     raise FileNotFoundError("player_logs not found; run fetch-player-logs")
 
 

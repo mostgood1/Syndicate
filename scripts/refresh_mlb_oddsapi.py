@@ -14,11 +14,17 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 FILE_TEMPLATES = (
+    ("data/daily/lineups_last_known_by_team.json", "data/daily/lineups_last_known_by_team.json"),
     ("data/daily/daily_summary_{date_slug}.json", "data/daily/daily_summary_{date_slug}.json"),
     ("data/daily/daily_summary_{date_slug}_profile_bundle.json", "data/daily/daily_summary_{date_slug}_profile_bundle.json"),
     ("data/daily/daily_summary_{date_slug}_locked_policy.json", "data/daily/daily_summary_{date_slug}_locked_policy.json"),
     ("data/daily/daily_summary_{date_slug}_hr_targets.json", "data/daily/daily_summary_{date_slug}_hr_targets.json"),
     ("data/daily/daily_summary_{date_slug}_rfi_targets.json", "data/daily/daily_summary_{date_slug}_rfi_targets.json"),
+    ("data/manager/manager_tendencies.json", "data/manager/manager_tendencies.json"),
+    ("data/manager/probable_pitcher_overrides.json", "data/manager/probable_pitcher_overrides.json"),
+    ("data/park/park_factors.json", "data/park/park_factors.json"),
+    ("data/umpire/umpire_factors.json", "data/umpire/umpire_factors.json"),
+    ("data/umpire/umpire_factors_report_2025-07-01_2025-09-30.json", "data/umpire/umpire_factors_report_2025-07-01_2025-09-30.json"),
     ("data/daily/ladders/daily_ladders_{date_slug}.json", "data/daily/ladders/daily_ladders_{date_slug}.json"),
     ("data/daily/top_props/daily_top_props_{date_slug}.json", "data/daily/top_props/daily_top_props_{date_slug}.json"),
     ("data/daily/ops/daily_ops_{date_slug}.json", "data/daily/ops/daily_ops_{date_slug}.json"),
@@ -33,9 +39,20 @@ FILE_TEMPLATES = (
 )
 
 DIRECTORY_TEMPLATES = (
+    ("data/cache", "data/cache"),
+    ("data/daily_hitter_props", "data/daily_hitter_props"),
+    ("data/daily_pitcher_props", "data/daily_pitcher_props"),
     ("data/daily/snapshots/{date_str}", "data/daily/snapshots/{date_str}"),
     ("data/daily/sims/{date_str}", "data/daily/sims/{date_str}"),
+    ("data/manager", "data/manager"),
+    ("data/park", "data/park"),
     ("data/market/oddsapi/refresh_history/{date_slug}", "data/market/oddsapi/refresh_history/{date_slug}"),
+    ("data/raw/statcast/pitches", "data/raw/statcast/pitches"),
+    ("data/raw/statsapi/feed_live", "data/raw/statsapi/feed_live"),
+    ("data/roster_registry", "data/roster_registry"),
+    ("data/runtime", "data/runtime"),
+    ("data/statcast", "data/statcast"),
+    ("data/umpire", "data/umpire"),
     ("data/raw/statsapi/feed_live/{season}/{date_str}", "data/raw/statsapi/feed_live/{season}/{date_str}"),
 )
 
@@ -56,6 +73,11 @@ def _copy_if_exists(source: Path, destination: Path) -> bool:
 def _copy_tree_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_dir():
         return False
+    try:
+        if source.resolve() == destination.resolve():
+            return True
+    except Exception:
+        pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, destination, dirs_exist_ok=True)
     return True

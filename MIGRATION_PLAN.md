@@ -79,7 +79,7 @@ Phase-1 complete does not mean the source app is fully retired. It means the cur
 4. Deepen NHL artifact coverage and document the minimum sim and evaluation families required for full cards, props, archive, and live-lens parity.
 5. Define a cross-sport mirrored artifact manifest schema that records raw inputs, processed board artifacts, sim outputs, live-support artifacts, evaluation bundles, and fallback state per run.
 6. Add migration-gate checks that fail when source-app fallback is exercised for surfaces that are supposed to be mirror-backed, so progress is measured by shrinking dependency, not just by page availability.
-7. Add an ownership or source-independence score to the module tracker so the app distinguishes surface parity from runtime dependency on sibling repos.
+7. Add an ownership or source-independence score to the module tracker so the app distinguishes surface parity from runtime dependency on external source repos.
 8. Remove NCAAB source-app dependency from normal operation by expanding mirror coverage until the active cards, game, live-lens, and results families no longer need subprocess API fallback.
 9. Bring NFL to full MLB-style frontend representation without committing yet to a deeper sim-engine overhaul.
 10. Bring NCAAF to full MLB-style frontend representation without committing yet to a deeper sim-engine overhaul.

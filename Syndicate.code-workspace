@@ -1,24 +1,8 @@
 {
 	"folders": [
 		{
-			"name": "MLB-BettingV2",
-			"path": "../MLB-BettingV2"
-		},
-		{
-			"name": "NBA-Betting",
-			"path": "../NBA-Betting"
-		},
-		{
-			"name": "NHL-Betting",
-			"path": "../NHL-Betting"
-		},
-		{
 			"name": "NFL-Betting",
 			"path": "../NFL-Betting"
-		},
-		{
-			"name": "WNBA-Betting",
-			"path": "../WNBA-Betting"
 		},
 		{
 			"name": "NCAAFCompare",

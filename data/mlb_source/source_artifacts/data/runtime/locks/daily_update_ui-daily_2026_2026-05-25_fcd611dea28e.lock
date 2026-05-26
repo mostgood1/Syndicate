@@ -1,0 +1,27 @@
+{
+  "workflow": "ui-daily",
+  "season": 2026,
+  "date": "2026-05-25",
+  "out_ROOT_DIR": "C:/Users/mostg/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily",
+  "pid": 124532,
+  "created_at": "2026-05-25T19:31:42.810256",
+  "command": [
+    "tools\\daily_update.py",
+    "--workflow",
+    "ui-daily",
+    "--date",
+    "2026-05-25",
+    "--season",
+    "2026",
+    "--sims",
+    "1000",
+    "--workers",
+    "4",
+    "--git-push",
+    "off",
+    "--validate-render-frontend",
+    "off",
+    "--build-next-day",
+    "on"
+  ]
+}

@@ -1,0 +1,57 @@
+﻿Migration gate: PASS
+
+Audit: PASS
+  Allowed findings: 4
+  Actual findings: 4
+
+Runtime dependency: PASS
+  Allowed findings: 0
+  Actual findings: 0
+  Lowest ownership modules:
+    - nba: score=90; tier=artifact_backed
+    - ncaab: score=90; tier=artifact_backed
+    - ncaaf: score=90; tier=artifact_backed
+
+audit: PASS
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe scripts/audit_migration.py --format json
+  Output: [
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/mlb.py",
+    "line": 291,
+    "summary": "Source shell route points at mlb/cards_source.js.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nba.py",
+    "line": 140,
+    "summary": "Source shell route points at nba/cards_source.html.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nhl.py",
+    ...
+
+module_tracker: PASS
+  Command: C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe scripts/module_tracker_snapshot.py --json
+  Output: {
+  "generated_at": "2026-05-26T00:42:29.151965+00:00",
+  "reference_module": "mlb",
+  "reference_surfaces": [
+    "cards",
+    "game",
+    "live-lens",
+    "daily archive",
+    "season betting-card",
+    "hub"
+  ],
+  "modules": [
+    {
+      "slug": "mlb",
+      "name": "MLB",
+      "status": "Phase-1 complete",
+      "phase": "Reference module",
+      "summary": "Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked ML...
+

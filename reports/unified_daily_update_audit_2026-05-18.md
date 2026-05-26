@@ -43,10 +43,10 @@ What it does not do now:
 
 | Sport | Source repo daily-update entrypoint | Primary source artifacts generated | Current Syndicate ingestion model | Audit status |
 | --- | --- | --- | --- | --- |
-| MLB | `MLB-BettingV2/tools/daily_update.py` | `data/daily/daily_summary_<date>.json`, `_profile_bundle`, `_locked_policy`, `_hr_targets`, daily snapshots, daily sims, live lens report, raw StatsAPI feed, `data/eval/seasons/.../season_betting_day_*` | Local mirror first under `data/mlb_source`, fallback to sibling repo per-file | Partial mirror, strong source contract |
-| NBA | `NBA-Betting/scripts/daily_update.ps1` | `data/processed/game_cards_<date>.csv`, `recommendations_slate_<date>.json`, `cards_sim_detail_<date>.json`, `cards_props_snapshot_<date>.json`, `props_recommendations_top_by_game_<date>.json` | Local mirror first under `data/nba_source`, some source-app subprocess/API usage for parity lanes | Mirror-backed but not source-update-backed |
-| WNBA | `WNBA-Betting/scripts/daily_update.ps1` | `data/processed/game_cards_<date>.csv`, `recommendations_slate_<date>.json`, `cards_sim_detail_<date>.json`, `cards_props_snapshot_<date>.json`, `props_recommendations_top_by_game_<date>.json` | Local mirror first under `data/wnba_source` | Mirror-backed but not source-update-backed |
-| NHL | `NHL-Betting/scripts/daily_update.ps1` | `data/processed/predictions_<date>.csv`, `predictions_sim_<date>.csv`, `recommendations_<date>.csv`, `recommendations_sim_<date>.csv`, `props_boxscores_sim_<date>.csv`, `props_recommendations_<date>.csv`, scoreboard snapshot | Local mirror first under `data/nhl_source` | Mirror-backed but not source-update-backed |
+| MLB | `Syndicate/tools/daily_update.py` | `data/daily/daily_summary_<date>.json`, `_profile_bundle`, `_locked_policy`, `_hr_targets`, daily snapshots, daily sims, live lens report, raw StatsAPI feed, `data/eval/seasons/.../season_betting_day_*` | Local mirror first under `data/mlb_source`, fallback to sibling repo per-file | Partial mirror, strong source contract |
+| NBA | `Syndicate/scripts/daily_update.ps1` | `data/processed/game_cards_<date>.csv`, `recommendations_slate_<date>.json`, `cards_sim_detail_<date>.json`, `cards_props_snapshot_<date>.json`, `props_recommendations_top_by_game_<date>.json` | Local mirror first under `data/nba_source`, some source-app subprocess/API usage for parity lanes | Mirror-backed but not source-update-backed |
+| WNBA | `Syndicate/scripts/daily_update.ps1` | `data/processed/game_cards_<date>.csv`, `recommendations_slate_<date>.json`, `cards_sim_detail_<date>.json`, `cards_props_snapshot_<date>.json`, `props_recommendations_top_by_game_<date>.json` | Local mirror first under `data/wnba_source` | Mirror-backed but not source-update-backed |
+| NHL | `Syndicate/scripts/daily_update.ps1` | `data/processed/predictions_<date>.csv`, `predictions_sim_<date>.csv`, `recommendations_<date>.csv`, `recommendations_sim_<date>.csv`, `props_boxscores_sim_<date>.csv`, `props_recommendations_<date>.csv`, scoreboard snapshot | Local mirror first under `data/nhl_source` | Mirror-backed but not source-update-backed |
 | NFL | `NFL-Betting/daily_update.ps1` | `nfl_compare/data/current_week.json`, `upcoming_recs_<season>_wk<week>.csv`, `upcoming_recs_<season>_wk<week>_publish.csv`, props/scenario/backtest/manifests | Local mirror first under `data/nfl_source`, fallback to sibling repo data root | Mirror-backed for core weekly files |
 | NCAAF | `NCAAFCompare/Run-DailyUpdate.ps1` | `data/recommendations_summary/index.json`, `week_<n>.json`, refreshed schedule/prediction/recommendation outputs via weekly pipeline | Local mirror first under `data/ncaaf_source`, fallback to sibling repo | Mirror-backed for recommendation summaries |
 | NCAAB | `NCAAB/scripts/daily_update.ps1` and `scripts/auto_daily_update.ps1` | Source app outputs and uploaded Render artifacts; route-backed date/results payloads | Source app subprocess/API calls from Syndicate, not file mirroring | No stable local artifact contract in Syndicate |
@@ -57,7 +57,7 @@ What it does not do now:
 
 Source entrypoint:
 
-- `MLB-BettingV2/tools/daily_update.py`
+- `Syndicate/tools/daily_update.py`
 
 Confirmed source artifact families:
 
@@ -82,7 +82,7 @@ Important current mismatch:
 
 Source entrypoint:
 
-- `NBA-Betting/scripts/daily_update.ps1`
+- `Syndicate/scripts/daily_update.ps1`
 
 Confirmed artifacts Syndicate mirrors:
 
@@ -101,7 +101,7 @@ Current state:
 
 Source entrypoint:
 
-- `WNBA-Betting/scripts/daily_update.ps1`
+- `Syndicate/scripts/daily_update.ps1`
 
 Confirmed artifacts Syndicate mirrors:
 
@@ -120,7 +120,7 @@ Current state:
 
 Source entrypoint:
 
-- `NHL-Betting/scripts/daily_update.ps1`
+- `Syndicate/scripts/daily_update.ps1`
 
 Confirmed artifacts Syndicate mirrors:
 

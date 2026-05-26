@@ -1,0 +1,43 @@
+[2026-05-25T22:12:01] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py", line 7, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+[2026-05-25T22:13:53] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-25.csv with 2021 rows.
+[2026-05-25T22:13:59] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\processed\oddsapi_player_props_2026-05-25.csv (rows=2021)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_edges.py", line 586, in export_props_edges_local
+    edges = _filter_player_prop_bookmakers_df(edges, bookmakers)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_edges.py", line 525, in _filter_player_prop_bookmakers_df
+    columns = getattr(edges, "columns", []) or []
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\indexes\base.py", line 2975, in __bool__
+    raise ValueError(
+ValueError: The truth value of a Index is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
+[2026-05-25T22:15:23] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-25.csv with 2013 rows.
+[2026-05-25T22:15:25] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\processed\oddsapi_player_props_2026-05-25.csv (rows=2013)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_edges.py", line 586, in export_props_edges_local
+    edges = _filter_player_prop_bookmakers_df(edges, bookmakers)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_edges.py", line 525, in _filter_player_prop_bookmakers_df
+    columns = getattr(edges, "columns", []) or []
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\pandas\core\indexes\base.py", line 2975, in __bool__
+    raise ValueError(
+ValueError: The truth value of a Index is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
+[2026-05-25T22:16:15] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-25.csv with 2013 rows.
+[2026-05-25T22:16:18] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\processed\oddsapi_player_props_2026-05-25.csv (rows=2013)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions

@@ -1,0 +1,45 @@
+﻿{
+    "sport":  "mlb",
+    "date":  "2026-05-25",
+    "refreshedAtUtc":  "2026-05-25T19:06:57.8461902Z",
+    "sourceRepo":  null,
+    "sourceArtifactRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts",
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_MLB",
+    "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_MLB",
+    "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data",
+    "usedExistingMirrorArtifacts":  false,
+    "usedArtifactBundle":  true,
+    "copiedArtifactCount":  21,
+    "artifactGroups":  {
+                           "daily":  10,
+                           "eval":  3,
+                           "live_lens":  5,
+                           "market":  1,
+                           "raw":  0,
+                           "other":  2
+                       },
+    "copiedArtifacts":  [
+                            "daily\\daily_summary_2026_05_25.json",
+                            "daily\\daily_summary_2026_05_25_profile_bundle.json",
+                            "daily\\daily_summary_2026_05_25_locked_policy.json",
+                            "daily\\daily_summary_2026_05_25_hr_targets.json",
+                            "daily\\daily_summary_2026_05_25_rfi_targets.json",
+                            "daily\\ladders\\daily_ladders_2026_05_25.json",
+                            "daily\\top_props\\daily_top_props_2026_05_25.json",
+                            "daily\\ops\\daily_ops_2026_05_25.json",
+                            "live_lens\\live_lens_2026_05_25.jsonl",
+                            "live_lens\\live_lens_report_2026_05_25.json",
+                            "live_lens\\prop_registry\\live_prop_registry_2026_05_25.json",
+                            "live_lens\\prop_registry\\live_prop_registry_2026_05_25.jsonl",
+                            "live_lens\\prop_registry\\live_prop_observations_2026_05_25.jsonl",
+                            "tuning\\live_prop_ranking\\default.json",
+                            "..\\sim_engine\\live_prop_ranking.py",
+                            "daily\\snapshots\\2026-05-25",
+                            "daily\\sims\\2026-05-25",
+                            "market\\oddsapi\\refresh_history\\2026_05_25",
+                            "eval\\seasons\\2026\\season_eval_manifest.json",
+                            "eval\\seasons\\2026\\season_betting_cards_retuned_manifest.json",
+                            "eval\\seasons\\2026\\season_betting_cards_retuned_hrr_manifest.json"
+                        ]
+}
+

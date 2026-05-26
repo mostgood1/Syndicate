@@ -473,15 +473,8 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "mlb_source"
-            sibling_root = root / "MLB-BettingV2"
-            sibling_daily = sibling_root / "data" / "daily" / "daily_summary_2026_05_17.json"
-            sibling_feed = sibling_root / "data" / "raw" / "statsapi" / "feed_live" / "2026" / "2026-05-17" / "123.json"
-            sibling_daily.parent.mkdir(parents=True, exist_ok=True)
-            sibling_feed.parent.mkdir(parents=True, exist_ok=True)
-            sibling_daily.write_text("{}", encoding="utf-8")
-            sibling_feed.write_text("{}", encoding="utf-8")
             expected_daily = local_root / "data" / "daily" / "daily_summary_2026_05_17.json"
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root]):
                 actual_daily = mlb_daily_artifact_path("2026-05-17")
                 actual_dates = mlb_available_daily_summary_dates()
                 actual_feed = mlb_raw_feed_live_path("2026-05-17", 123)
@@ -502,16 +495,16 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "wnba_source"
-            sibling_root = root / "WNBA-Betting"
-            sibling_processed = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            sibling_snapshot = sibling_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
-            sibling_processed.parent.mkdir(parents=True, exist_ok=True)
-            sibling_snapshot.parent.mkdir(parents=True, exist_ok=True)
-            sibling_processed.write_text("x", encoding="utf-8")
-            sibling_snapshot.write_text("x", encoding="utf-8")
+            external_root = root / "wnba_source_bundle"
+            external_processed = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            external_snapshot = external_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
+            external_processed.parent.mkdir(parents=True, exist_ok=True)
+            external_snapshot.parent.mkdir(parents=True, exist_ok=True)
+            external_processed.write_text("x", encoding="utf-8")
+            external_snapshot.write_text("x", encoding="utf-8")
             expected_processed = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
             expected_snapshot = local_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, external_root]):
                 actual_processed = wnba_processed_path("game_cards_2026-05-17.csv")
                 actual_snapshot = wnba_live_snapshot_path("live_state_2026-05-17.json")
                 actual_dates = wnba_available_dates()
@@ -598,12 +591,12 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nba_source"
-            sibling_root = root / "NBA-Betting"
-            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            sibling_file.parent.mkdir(parents=True, exist_ok=True)
-            sibling_file.write_text("x", encoding="utf-8")
+            external_root = root / "nba_source_bundle"
+            external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            external_file.parent.mkdir(parents=True, exist_ok=True)
+            external_file.write_text("x", encoding="utf-8")
             expected = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
                 actual_path = nba_processed_path("game_cards_2026-05-17.csv")
                 actual_dates = nba_available_dates()
             if Path(actual_path) != expected:
@@ -621,16 +614,16 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nhl_source"
-            sibling_root = root / "NHL-Betting"
-            sibling_processed = sibling_root / "data" / "processed" / "recommendations_2026-05-17.csv"
-            sibling_scoreboard = sibling_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
-            sibling_processed.parent.mkdir(parents=True, exist_ok=True)
-            sibling_scoreboard.parent.mkdir(parents=True, exist_ok=True)
-            sibling_processed.write_text("x", encoding="utf-8")
-            sibling_scoreboard.write_text("x", encoding="utf-8")
+            external_root = root / "nhl_source_bundle"
+            external_processed = external_root / "data" / "processed" / "recommendations_2026-05-17.csv"
+            external_scoreboard = external_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
+            external_processed.parent.mkdir(parents=True, exist_ok=True)
+            external_scoreboard.parent.mkdir(parents=True, exist_ok=True)
+            external_processed.write_text("x", encoding="utf-8")
+            external_scoreboard.write_text("x", encoding="utf-8")
             expected_processed = local_root / "data" / "processed" / "recommendations_2026-05-17.csv"
             expected_scoreboard = local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
-            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root, external_root]):
                 actual_processed = nhl_processed_path("recommendations_2026-05-17.csv")
                 actual_scoreboard = nhl_scoreboard_snapshot_path("2026-05-17")
                 actual_slates = nhl_slate_summaries()

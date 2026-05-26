@@ -522,7 +522,8 @@ def _resolve_player_prop_bookmakers(raw: str | None = None) -> tuple[str, ...]:
 def _filter_player_prop_bookmakers_df(edges, raw: str | None = None):
     if edges is None:
         return edges
-    columns = getattr(edges, "columns", []) or []
+    columns_attr = getattr(edges, "columns", None)
+    columns = list(columns_attr) if columns_attr is not None else []
     if getattr(edges, "empty", False) or "bookmaker" not in columns:
         return edges
 

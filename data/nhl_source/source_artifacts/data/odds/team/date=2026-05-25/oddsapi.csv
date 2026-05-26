@@ -1,0 +1,75 @@
+event_id,commence_time,home,away,bookmaker_key,bookmaker,book_last_update,market,outcome_name,outcome_price,outcome_point,date
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,h2h,Carolina Hurricanes,-152,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,h2h,Montréal Canadiens,125,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,spreads,Carolina Hurricanes,160,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,spreads,Montréal Canadiens,-205,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,totals,Over,-132,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,totals,Under,105,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Over,-110,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Under,-110,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Over,-102,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Under,-118,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Over,-103,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Under,-118,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Over,100,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Under,-120,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,h2h,Carolina Hurricanes,-130,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,h2h,Montréal Canadiens,102,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,spreads,Carolina Hurricanes,188,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,spreads,Montréal Canadiens,-255,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,totals,Over,104,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,totals,Under,-135,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,h2h,Carolina Hurricanes,-145,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,h2h,Montréal Canadiens,110,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,spreads,Carolina Hurricanes,185,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,spreads,Montréal Canadiens,-260,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,totals,Over,105,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,totals,Under,-140,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,h2h,Carolina Hurricanes,-154,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,h2h,Montréal Canadiens,120,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,spreads,Carolina Hurricanes,150,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,spreads,Montréal Canadiens,-195,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,totals,Over,120,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,totals,Under,-154,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,h2h,Carolina Hurricanes,-154,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,h2h,Montréal Canadiens,136,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,spreads,Carolina Hurricanes,157,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,spreads,Montréal Canadiens,-180,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,totals,Over,-122,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,totals,Under,106,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,h2h,Carolina Hurricanes,-160,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,h2h,Montréal Canadiens,125,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,spreads,Carolina Hurricanes,165,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,spreads,Montréal Canadiens,-210,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Over,-125,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Under,-105,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,h2h,Carolina Hurricanes,-154,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,h2h,Montréal Canadiens,136,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,spreads,Carolina Hurricanes,157,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,spreads,Montréal Canadiens,-180,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,totals,Over,-122,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,totals,Under,106,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,h2h,Carolina Hurricanes,-140,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,h2h,Montréal Canadiens,110,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,spreads,Carolina Hurricanes,175,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,spreads,Montréal Canadiens,-235,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Over,120,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Under,-160,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,h2h,Carolina Hurricanes,-155,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,h2h,Montréal Canadiens,134,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,spreads,Carolina Hurricanes,164,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,spreads,Montréal Canadiens,-190,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,totals,Over,100,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,totals,Under,-120,6.0,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,h2h,Carolina Hurricanes,-133,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,h2h,Montréal Canadiens,105,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,spreads,Carolina Hurricanes,190,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,spreads,Montréal Canadiens,-286,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Over,105,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Under,-143,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,h2h,Carolina Hurricanes,-155,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,h2h,Montréal Canadiens,120,,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,spreads,Carolina Hurricanes,170,-1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,spreads,Montréal Canadiens,-225,1.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Over,115,5.5,2026-05-25
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Under,-150,5.5,2026-05-25

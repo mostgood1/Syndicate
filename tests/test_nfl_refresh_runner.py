@@ -48,6 +48,37 @@ class NflRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         load_fetchers.assert_called_once()
 
+    def test_main_runs_from_local_artifact_root_without_source_repo(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            artifact_root = Path(tmp_dir) / "bundle"
+            artifact_root.mkdir(parents=True)
+            (artifact_root / "current_week.json").write_text('{"season": 2026, "week": 4}\n', encoding="utf-8")
+
+            class _FakeOddsModule:
+                def main(self, *, data_dir: Path | None = None) -> None:
+                    assert data_dir == artifact_root
+                    (artifact_root / "real_betting_lines_2026_10_01.json").write_text("{}\n", encoding="utf-8")
+
+            class _FakePropsModule:
+                def main(self, argv: list[str] | None = None) -> int:
+                    (artifact_root / "oddsapi_player_props_2026_wk4.csv").write_text("player\nMahomes\n", encoding="utf-8")
+                    return 0
+
+            argv = [
+                "refresh_nfl_oddsapi.py",
+                "--artifact-root",
+                str(artifact_root),
+            ]
+            with patch.object(module, "_load_local_fetchers", return_value=(_FakeOddsModule(), _FakePropsModule())), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            self.assertTrue((artifact_root / "current_week.json").exists())
+            self.assertTrue((artifact_root / "real_betting_lines_2026_10_01.json").exists())
+            self.assertTrue((artifact_root / "oddsapi_player_props_2026_wk4.csv").exists())
+
     def test_main_materializes_nfl_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 

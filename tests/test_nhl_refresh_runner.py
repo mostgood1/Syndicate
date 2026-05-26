@@ -35,7 +35,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(Path(tmp_dir) / "bundle"),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation", return_value=None), patch("sys.argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
@@ -79,7 +79,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(artifact_root),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation", return_value=None), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -94,6 +94,48 @@ class NhlRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "odds" / "team" / "date=2026-05-22" / "oddsapi.parquet").exists())
             self.assertTrue((artifact_root / "data" / "props" / "player_props_lines" / "date=2026-05-22" / "oddsapi.csv").exists())
             self.assertTrue((artifact_root / "data" / "props" / "player_props_lines" / "date=2026-05-22" / "oddsapi.parquet").exists())
+
+    def test_main_generates_source_backed_nhl_sim_files_into_bundle(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            artifact_root = tmp_root / "bundle"
+
+            def _fake_collect_owned_nhl_artifacts(*, artifact_root, date_str, team_markets, props_source):
+                (artifact_root / "data" / "odds" / "games" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
+                (artifact_root / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv").write_text("game_id\n1\n", encoding="utf-8")
+                (artifact_root / "data" / "odds" / "team" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
+                (artifact_root / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.csv").write_text("game_id\nteam-1\n", encoding="utf-8")
+                (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
+                (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").write_text("player\nProp Skater\n", encoding="utf-8")
+
+            def _fake_run_source_generation(*, source_root, artifact_root, date_str):
+                processed_root = artifact_root / "data" / "processed"
+                processed_root.mkdir(parents=True, exist_ok=True)
+                (processed_root / f"props_boxscores_sim_{date_str}.csv").write_text("player\nSkater\n", encoding="utf-8")
+                (processed_root / f"props_boxscores_sim_hist_{date_str}.csv").write_text("player\nSkater\n", encoding="utf-8")
+                (processed_root / f"predictions_sim_{date_str}.csv").write_text("game_id\n1\n", encoding="utf-8")
+                (processed_root / f"recommendations_sim_{date_str}.csv").write_text("game_id\n1\n", encoding="utf-8")
+
+            argv = [
+                "refresh_nhl_oddsapi.py",
+                "--date",
+                "2026-05-22",
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+            ]
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation", side_effect=_fake_run_source_generation), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            self.assertTrue((artifact_root / "data" / "processed" / "props_boxscores_sim_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "props_boxscores_sim_hist_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "predictions_sim_2026-05-22.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "recommendations_sim_2026-05-22.csv").exists())
 
     def test_main_uses_local_artifact_root_when_source_root_omitted(self) -> None:
         module = self._load_module()

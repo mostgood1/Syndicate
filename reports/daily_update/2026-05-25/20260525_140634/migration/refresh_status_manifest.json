@@ -1,0 +1,20 @@
+﻿{
+    "date":  "2026-05-25",
+    "runStamp":  "20260525_140657",
+    "generatedAt":  "2026-05-25T14:08:18.5979241-05:00",
+    "artifactsDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_140634\\migration",
+    "refreshStatusDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\2026-05-25\\20260525_140657",
+    "latestManifestPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\latest\\refresh_status_latest.json",
+    "refreshOdds":  false,
+    "oddsPhase":  "all",
+    "oddsSports":  "all",
+    "oddsRegions":  "us",
+    "baseUrl":  "",
+    "jsonMode":  false,
+    "skipTests":  false,
+    "skipSmoke":  false,
+    "runSummaryPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_140634\\migration\\refresh_and_gate_run.json",
+    "oddsRefreshPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_140634\\migration\\odds_refresh.json",
+    "migrationGateReportPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_140634\\migration\\migration_gate_report.json",
+    "migrationGateConsolePath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-25\\20260525_140634\\migration\\migration_gate_console.txt"
+}

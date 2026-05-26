@@ -277,12 +277,12 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "mlb_source"
-            sibling_root = root / "MLB-BettingV2"
-            sibling_file = sibling_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            external_root = root / "mlb_source_bundle"
+            sibling_file = external_root / "data" / "daily" / "daily_summary_2026_05_17.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
 
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(
                     daily_artifact_path("2026-05-17"),
                     local_root / "data" / "daily" / "daily_summary_2026_05_17.json",
@@ -292,24 +292,24 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "mlb_source"
-            sibling_root = root / "MLB-BettingV2"
-            sibling_file = sibling_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            external_root = root / "mlb_source_bundle"
+            sibling_file = external_root / "data" / "daily" / "daily_summary_2026_05_17.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
 
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(available_daily_summary_dates(), [])
 
     def test_mlb_raw_feed_live_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "mlb_source"
-            sibling_root = root / "MLB-BettingV2"
-            sibling_file = sibling_root / "data" / "raw" / "statsapi" / "feed_live" / "2026" / "2026-05-17" / "123.json"
+            external_root = root / "mlb_source_bundle"
+            sibling_file = external_root / "data" / "raw" / "statsapi" / "feed_live" / "2026" / "2026-05-17" / "123.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
 
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertIsNone(raw_feed_live_path("2026-05-17", 123))
 
     def test_mlb_hr_targets_context_backfills_from_daily_summary_when_artifact_is_sparse(self) -> None:
@@ -631,26 +631,26 @@ class DateArchiveHelperTests(unittest.TestCase):
             root = Path(temp_dir)
             local_root = root / "data" / "nba_source"
             local_file = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            sibling_root = root.parent / "NBA-Betting"
-            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            external_root = root.parent / "nba_source_bundle"
+            external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
             local_file.parent.mkdir(parents=True, exist_ok=True)
-            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            external_file.parent.mkdir(parents=True, exist_ok=True)
             local_file.write_text("local", encoding="utf-8")
-            sibling_file.write_text("sibling", encoding="utf-8")
+            external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(nba_processed_path("game_cards_2026-05-17.csv"), local_file)
 
     def test_nba_processed_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nba_source"
-            sibling_root = root.parent / "NBA-Betting"
-            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            sibling_file.parent.mkdir(parents=True, exist_ok=True)
-            sibling_file.write_text("sibling", encoding="utf-8")
+            external_root = root.parent / "nba_source_bundle"
+            external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            external_file.parent.mkdir(parents=True, exist_ok=True)
+            external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(
                     nba_processed_path("game_cards_2026-05-17.csv"),
                     local_root / "data" / "processed" / "game_cards_2026-05-17.csv",
@@ -660,12 +660,12 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nba_source"
-            sibling_root = root.parent / "NBA-Betting"
-            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            sibling_file.parent.mkdir(parents=True, exist_ok=True)
-            sibling_file.write_text("sibling", encoding="utf-8")
+            external_root = root.parent / "nba_source_bundle"
+            external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            external_file.parent.mkdir(parents=True, exist_ok=True)
+            external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
                 from syndicate.features.nba.sources import available_dates as nba_available_dates
 
                 self.assertEqual(nba_available_dates(), [])
@@ -694,7 +694,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nhl_source"
-            sibling_root = root / "NHL-Betting"
+            sibling_root = root / "nhl_source_bundle"
             local_file = local_root / "data" / "processed" / "recommendations_2026-05-17.csv"
             sibling_file = sibling_root / "data" / "processed" / "recommendations_2026-05-17.csv"
             local_file.parent.mkdir(parents=True, exist_ok=True)
@@ -709,7 +709,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nhl_source"
-            sibling_root = root / "NHL-Betting"
+            sibling_root = root / "nhl_source_bundle"
             sibling_file = sibling_root / "data" / "processed" / "recommendations_2026-05-17.csv"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("sibling", encoding="utf-8")
@@ -724,7 +724,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nhl_source"
-            sibling_root = root / "NHL-Betting"
+            sibling_root = root / "nhl_source_bundle"
             local_file = local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
             sibling_file = sibling_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
             local_file.parent.mkdir(parents=True, exist_ok=True)
@@ -739,7 +739,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nhl_source"
-            sibling_root = root / "NHL-Betting"
+            sibling_root = root / "nhl_source_bundle"
             sibling_file = sibling_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("sibling", encoding="utf-8")
@@ -754,7 +754,7 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nhl_source"
-            sibling_root = root / "NHL-Betting"
+            sibling_root = root / "nhl_source_bundle"
             sibling_file = sibling_root / "data" / "processed" / "recommendations_2026-05-17.csv"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("col\nvalue\n", encoding="utf-8")
@@ -763,6 +763,22 @@ class DateArchiveHelperTests(unittest.TestCase):
                 from syndicate.features.nhl.sources import slate_summaries as nhl_slate_summaries
 
                 self.assertEqual(nhl_slate_summaries(), [])
+
+    def test_nhl_slate_summaries_include_local_scoreboard_only_dates(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "nhl_source"
+            scoreboard_file = local_root / "data" / "odds" / "games" / "date=2026-05-17" / "scoreboard.csv"
+            scoreboard_file.parent.mkdir(parents=True, exist_ok=True)
+            scoreboard_file.write_text("gamePk,away,home\n1,Away,Home\n", encoding="utf-8")
+
+            with patch("syndicate.features.nhl.sources._source_roots", return_value=[local_root]):
+                from syndicate.features.nhl.sources import slate_summaries as nhl_slate_summaries
+
+                self.assertEqual(
+                    nhl_slate_summaries(),
+                    [{"date": "2026-05-17", "path": str(scoreboard_file), "kind": "Archived scoreboard"}],
+                )
 
     def test_ncaaf_data_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -1350,40 +1366,40 @@ class HomeBoardTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "wnba_source"
-            sibling_root = root / "WNBA-Betting"
+            external_root = root / "wnba_source_bundle"
             local_file = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
             local_file.parent.mkdir(parents=True, exist_ok=True)
-            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            external_file.parent.mkdir(parents=True, exist_ok=True)
             local_file.write_text("local", encoding="utf-8")
-            sibling_file.write_text("sibling", encoding="utf-8")
+            external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(wnba_processed_path("game_cards_2026-05-17.csv"), local_file)
 
     def test_wnba_live_snapshot_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "wnba_source"
-            sibling_root = root / "WNBA-Betting"
+            external_root = root / "wnba_source_bundle"
             local_file = local_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
-            sibling_file = sibling_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
-            sibling_file.parent.mkdir(parents=True, exist_ok=True)
-            sibling_file.write_text("sibling", encoding="utf-8")
+            external_file = external_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
+            external_file.parent.mkdir(parents=True, exist_ok=True)
+            external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(wnba_live_snapshot_path("live_state_2026-05-17.json"), local_file)
 
     def test_wnba_available_dates_do_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "wnba_source"
-            sibling_root = root / "WNBA-Betting"
-            sibling_file = sibling_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            sibling_file.parent.mkdir(parents=True, exist_ok=True)
-            sibling_file.write_text("sibling", encoding="utf-8")
+            external_root = root / "wnba_source_bundle"
+            external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            external_file.parent.mkdir(parents=True, exist_ok=True)
+            external_file.write_text("external", encoding="utf-8")
 
-            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, sibling_root]):
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(wnba_available_dates(), [])
 
     def test_wnba_cards_empty_slate_does_not_inject_fake_sample_game(self) -> None:

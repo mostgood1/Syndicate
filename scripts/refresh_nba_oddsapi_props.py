@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import csv
 import datetime as dt
 import importlib
 import importlib.util
@@ -16,12 +17,14 @@ import time
 import traceback
 from pathlib import Path
 
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from syndicate.features.shared.basketball_props_edges import export_props_edges_local
 from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
-
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _json_ready(value):
@@ -88,6 +91,67 @@ def _copy_existing_live_lens_artifact(*, source_root: Path, file_name: str, dest
     return copied
 
 
+def _boxscores_history_sources(*, source_root: Path, processed_root: Path) -> list[Path]:
+    candidates: list[Path] = []
+    seen: set[str] = set()
+    for root in (source_root / "data" / "processed", processed_root):
+        if not root.exists() or not root.is_dir():
+            continue
+        for path in sorted(root.glob("boxscores_*.csv")):
+            try:
+                key = str(path.resolve())
+            except Exception:
+                key = str(path)
+            if key in seen or not path.is_file():
+                continue
+            seen.add(key)
+            candidates.append(path)
+    return candidates
+
+
+def _refresh_boxscores_history_artifact(*, source_root: Path, processed_root: Path) -> str | None:
+    sources = _boxscores_history_sources(source_root=source_root, processed_root=processed_root)
+    if not sources:
+        existing = source_root / "data" / "processed" / "boxscores_history.csv"
+        if not existing.exists() or not existing.is_file():
+            return None
+        destination = processed_root / existing.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(existing, destination)
+        return str(destination)
+
+    rows: list[dict[str, str]] = []
+    header_order: list[str] = []
+    seen_rows: set[tuple[str, ...]] = set()
+    for source in sources:
+        with source.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames:
+                continue
+            for field in reader.fieldnames:
+                if field not in header_order:
+                    header_order.append(field)
+            for row in reader:
+                normalized = {field: str((row or {}).get(field, "") or "") for field in header_order}
+                row_key = tuple(normalized.get(field, "") for field in header_order)
+                if row_key in seen_rows:
+                    continue
+                seen_rows.add(row_key)
+                rows.append(normalized)
+
+    if not header_order:
+        return None
+
+    destination = processed_root / "boxscores_history.csv"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=header_order)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in header_order})
+    return str(destination)
+
+
 def _count_csv_rows_quick(path: Path | None) -> int:
     try:
         if path is None or not path.exists() or not path.is_file():
@@ -131,12 +195,23 @@ def _materialize_processed_snapshot_alias(*, processed_root: Path, date_str: str
 
 
 def _source_python(source_root: Path) -> str:
+    override = str(os.environ.get("SYNDICATE_PYTHON_EXE") or "").strip()
+    if override and Path(override).exists() and "windowsapps" not in override.lower():
+        return override
+    if sys.executable and Path(sys.executable).exists() and "windowsapps" not in str(sys.executable).lower():
+        return sys.executable
+    for installed in (
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311" / "python.exe",
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311-arm64" / "python.exe",
+    ):
+        if installed.exists():
+            return str(installed)
     candidates = [
         source_root / ".venv" / "Scripts" / "python.exe",
         source_root / ".venv" / "bin" / "python",
     ]
     for candidate in candidates:
-        if candidate.exists():
+        if candidate.exists() and "windowsapps" not in str(candidate).lower():
             return str(candidate)
     if sys.executable and Path(sys.executable).exists():
         return sys.executable
@@ -144,8 +219,17 @@ def _source_python(source_root: Path) -> str:
 
 
 def _local_python() -> str:
-    if sys.executable and Path(sys.executable).exists():
+    override = str(os.environ.get("SYNDICATE_PYTHON_EXE") or "").strip()
+    if override and Path(override).exists() and "windowsapps" not in override.lower():
+        return override
+    if sys.executable and Path(sys.executable).exists() and "windowsapps" not in str(sys.executable).lower():
         return sys.executable
+    for installed in (
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311" / "python.exe",
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311-arm64" / "python.exe",
+    ):
+        if installed.exists():
+            return str(installed)
     return "python"
 
 
@@ -276,6 +360,17 @@ def _active_player_logs_paths(source_root: Path) -> list[Path]:
     ]
 
 
+def _active_player_logs_fallback_paths(source_root: Path) -> list[Path]:
+    processed_root = source_root / "data" / "processed"
+    paths = [
+        processed_root / "boxscores_history.parquet",
+        processed_root / "boxscores_history.csv",
+    ]
+    for pattern in ("boxscores_*.parquet", "boxscores_*.csv"):
+        paths.extend(sorted(processed_root.glob(pattern)))
+    return [path for path in paths if path.exists() and path.stat().st_size > 0]
+
+
 def _file_is_fresh(path: Path, *, max_age_minutes: int) -> bool:
     try:
         if max_age_minutes <= 0:
@@ -289,7 +384,31 @@ def _file_is_fresh(path: Path, *, max_age_minutes: int) -> bool:
 
 
 def _player_logs_ready(source_root: Path, *, max_age_minutes: int) -> bool:
-    return any(_file_is_fresh(path, max_age_minutes=max_age_minutes) for path in _active_player_logs_paths(source_root))
+    paths = _active_player_logs_paths(source_root) + _active_player_logs_fallback_paths(source_root)
+    return any(_file_is_fresh(path, max_age_minutes=max_age_minutes) for path in paths)
+
+
+def _bootstrap_local_boxscores_history_for_props(*, source_root: Path, date_str: str, log_file: Path) -> tuple[bool, str | None]:
+    processed_root = source_root / "data" / "processed"
+    try:
+        from syndicate.features.shared.basketball_boxscores_history import bootstrap_boxscores_history_local
+
+        result = bootstrap_boxscores_history_local(
+            processed_root=processed_root,
+            date_str=date_str,
+            league_code="nba",
+            lookback_days=max(7, _env_int("REFRESH_PLAYER_LOGS_BOOTSTRAP_LOOKBACK_DAYS", 35)),
+        )
+    except Exception as exc:
+        _append_log(log_file, f"local boxscores bootstrap failed: {exc}")
+        return False, f"local boxscores bootstrap failed: {exc}"
+
+    if int(result.get("history_rows") or 0) > 0 and str(result.get("wrote") or "").strip():
+        _append_log(log_file, f"bootstrapped local boxscores history via ESPN: {result.get('wrote')}")
+        return True, None
+    reason = str(result.get("error") or "local boxscores bootstrap wrote no history rows").strip()
+    _append_log(log_file, f"local boxscores bootstrap unavailable: {reason}")
+    return False, reason
 
 
 def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, log_file: Path, heartbeat_cb: callable) -> tuple[bool, str | None]:
@@ -305,12 +424,20 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
 
     if _player_logs_ready(source_root, max_age_minutes=max_age_minutes):
         return True, None
-    if any(path.exists() and path.stat().st_size > 0 for path in _active_player_logs_paths(source_root)):
+    if any(path.exists() and path.stat().st_size > 0 for path in (_active_player_logs_paths(source_root) + _active_player_logs_fallback_paths(source_root))):
+        return True, None
+
+    bootstrapped_ok, bootstrap_error = _bootstrap_local_boxscores_history_for_props(
+        source_root=source_root,
+        date_str=date_str,
+        log_file=log_file,
+    )
+    if bootstrapped_ok:
         return True, None
 
     allow_fetch_on_miss = (os.environ.get("REFRESH_PLAYER_LOGS_FETCH_ON_MISS") or "0").strip().lower() in {"1", "true", "yes"}
     if not allow_fetch_on_miss:
-        return False, "player_logs not found; run fetch-player-logs"
+        return False, bootstrap_error or "player_logs not found and no local boxscores fallback is available; run fetch-player-logs"
     _append_log(log_file, "player_logs missing and source fetch fallback is disabled in Syndicate-only mode")
     return False, "player_logs missing and no local fetch fallback is available"
 
@@ -715,6 +842,45 @@ def _load_module_from_path(module_name: str, module_path: Path):
     return module
 
 
+def _target_refresh_dates(*, date_str: str, days_ahead: int) -> list[str]:
+    parsed = dt.datetime.strptime(date_str, "%Y-%m-%d").date()
+    return [(parsed + dt.timedelta(days=offset)).isoformat() for offset in range(0, max(0, int(days_ahead)) + 1)]
+
+
+def _run_playoff_transition_if_needed(*, source_root: Path, date_str: str) -> dict[str, object]:
+    module_path = source_root / "src" / "nba_betting" / "playoff_transition.py"
+    if not module_path.exists() or not module_path.is_file():
+        return {"status": "unavailable"}
+    src_root = source_root / "src"
+    try:
+        src_root_text = str(src_root)
+        inserted = False
+        if src_root_text not in sys.path:
+            sys.path.insert(0, src_root_text)
+            inserted = True
+        importlib.invalidate_caches()
+        module = importlib.import_module("nba_betting.playoff_transition")
+        runner = getattr(module, "run_playoff_transition", None)
+        if runner is None:
+            return {"status": "unavailable"}
+        summary = runner(target_date=dt.datetime.strptime(date_str, "%Y-%m-%d").date())
+        return {"status": "ok", "summary": _json_ready(summary)}
+    except Exception as exc:
+        if isinstance(exc, ModuleNotFoundError):
+            return {"status": "unavailable", "reason": f"missing dependency: {getattr(exc, 'name', 'unknown')}"}
+        message = str(exc)
+        lowered = message.lower()
+        if "regular season has not completed" in lowered or "regular-season" in lowered:
+            return {"status": "skipped", "reason": message}
+        return {"status": "error", "error": message}
+    finally:
+        try:
+            if inserted:
+                sys.path.remove(src_root_text)
+        except Exception:
+            pass
+
+
 def _export_game_cards_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
@@ -768,6 +934,8 @@ def _export_recommendations_artifact(*, source_root: Path, date_str: str, proces
 
 def _load_source_app(source_root: Path):
     app_path = source_root / "app.py"
+    if not app_path.exists() or not app_path.is_file():
+        return None
     return _load_module_from_path("syndicate_nba_source_app", app_path)
 
 
@@ -833,6 +1001,8 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
     if existing:
         return existing
     source_app = _load_source_app(source_root)
+    if source_app is None:
+        return None
     out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
     query = (
         f"/api/props/recommendations?date={date_str}&compact=1&portfolio_only=1"
@@ -861,6 +1031,8 @@ def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, 
     if existing:
         return existing
     source_app = _load_source_app(source_root)
+    if source_app is None:
+        return None
     out_path = processed_root / f"recommendations_slate_{date_str}.json"
     client = source_app.app.test_client()
     response = client.get(f"/recommendations?format=json&view=slate&date={date_str}")
@@ -905,6 +1077,8 @@ def _export_season_betting_card_artifacts(*, source_root: Path, date_str: str, p
         return copied
 
     source_app = _load_source_app(source_root)
+    if source_app is None:
+        return copied
     client = source_app.app.test_client()
 
     def _fetch_json(query: str) -> dict[str, object]:
@@ -944,6 +1118,8 @@ def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_
     if existing:
         return existing
     source_app = _load_source_app(source_root)
+    if source_app is None:
+        return None
     out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
     client = source_app.app.test_client()
     response = client.get(f"/api/cards?date={date_str}&props_source=source")
@@ -984,6 +1160,8 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
     if existing:
         return existing
     source_app = _load_source_app(source_root)
+    if source_app is None:
+        return None
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     client = source_app.app.test_client()
     response = client.get(f"/api/cards?date={date_str}&include_players=1&props_source=auto")
@@ -1046,6 +1224,8 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
     if existing:
         return existing
     source_app = _load_source_app(source_root)
+    if source_app is None:
+        return None
     if hasattr(source_app, "_cron_auth_ok"):
         try:
             source_app._cron_auth_ok = lambda _request: True
@@ -1110,6 +1290,8 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
         return copied
 
     source_app = _load_source_app(source_root)
+    if source_app is None:
+        return copied
     client = source_app.app.test_client()
     for _file_name, query, destinations in missing_exports:
         try:
@@ -1193,6 +1375,16 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         copied.update(_export_season_betting_card_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
         copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
         copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+    boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
+    if boxscores_history_path:
+        copied["boxscores_history_path"] = boxscores_history_path
+    for transition_path in sorted((source_root / "data" / "processed").glob(f"playoff_transition_*_{date_text}.json")):
+        if not transition_path.is_file():
+            continue
+        destination = processed_root / transition_path.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(transition_path, destination)
+        copied.setdefault("playoff_transition_paths", []).append(str(destination))
     return copied
 
 
@@ -1240,54 +1432,78 @@ def main() -> int:
     parser.add_argument("--regions", default="us")
     parser.add_argument("--bookmakers", default="")
     parser.add_argument("--markets", default="")
-    parser.add_argument("--source-root", required=True)
+    parser.add_argument("--source-root")
     parser.add_argument("--log-file", required=True)
     parser.add_argument("--artifact-root")
     parser.add_argument("--do-edges", action="store_true")
     parser.add_argument("--do-export", action="store_true")
     parser.add_argument("--do-push", action="store_true")
+    parser.add_argument("--force-refresh", action="store_true")
+    parser.add_argument("--days-ahead", type=int, default=0)
     parser.add_argument("--started-at")
     args = parser.parse_args()
 
-    source_root = Path(args.source_root).resolve()
+    source_root_arg = str(args.source_root or "").strip()
+    source_root = Path(source_root_arg).resolve() if source_root_arg else None
     artifact_root = str(args.artifact_root or "").strip()
-    state = _existing_refresh_state(
-        source_root=source_root,
-        date_str=args.date,
-        do_edges=bool(args.do_edges),
-        do_export=bool(args.do_export),
-        started_at=args.started_at or None,
-    )
-    if state is None and artifact_root:
-        state = _existing_artifact_bundle_state(
-            artifact_root=Path(artifact_root).resolve(),
-            date_str=args.date,
-            do_edges=bool(args.do_edges),
-            do_export=bool(args.do_export),
-            started_at=args.started_at or None,
-        )
-    if state is None:
-        state = _run_refresh_via_cli(
-            source_root=source_root,
-            date_str=args.date,
-            regions=args.regions,
-            bookmakers=args.bookmakers,
-            markets=args.markets,
-            do_edges=bool(args.do_edges),
-            do_export=bool(args.do_export),
-            do_push=bool(args.do_push),
-            log_file=Path(args.log_file).resolve(),
-            started_at=args.started_at or None,
-        )
-    if artifact_root and not state.get("reused_existing_artifact_bundle"):
-        copied = _materialize_artifact_bundle(
-            state=state,
-            artifact_root=Path(artifact_root).resolve(),
-            source_root=source_root,
-        )
-        if copied:
-            state["artifact_bundle_root"] = str(Path(artifact_root).resolve())
-            state["artifact_bundle_files"] = copied
+    target_dates = _target_refresh_dates(date_str=args.date, days_ahead=int(args.days_ahead or 0))
+    states: list[dict[str, object]] = []
+    artifact_root_path = Path(artifact_root).resolve() if artifact_root else None
+    for index, target_date in enumerate(target_dates):
+        state = None
+        started_at = args.started_at if index == 0 else None
+        if source_root is not None and not bool(args.force_refresh):
+            state = _existing_refresh_state(
+                source_root=source_root,
+                date_str=target_date,
+                do_edges=bool(args.do_edges),
+                do_export=bool(args.do_export),
+                started_at=started_at,
+            )
+        if state is None and artifact_root and not bool(args.force_refresh):
+            state = _existing_artifact_bundle_state(
+                artifact_root=artifact_root_path,
+                date_str=target_date,
+                do_edges=bool(args.do_edges),
+                do_export=bool(args.do_export),
+                started_at=started_at,
+            )
+        if state is None:
+            if source_root is None:
+                state = {
+                    "date": str(target_date),
+                    "error": "source-root is required when no reusable artifact bundle is available",
+                    "artifact_bundle_root": str(artifact_root_path) if artifact_root_path else None,
+                }
+                states.append(state)
+                continue
+            state = _run_refresh_via_cli(
+                source_root=source_root,
+                date_str=target_date,
+                regions=args.regions,
+                bookmakers=args.bookmakers,
+                markets=args.markets,
+                do_edges=bool(args.do_edges),
+                do_export=bool(args.do_export),
+                do_push=bool(args.do_push),
+                log_file=Path(args.log_file).resolve(),
+                started_at=started_at,
+            )
+        if source_root is not None:
+            state["playoff_transition"] = _run_playoff_transition_if_needed(source_root=source_root, date_str=target_date)
+        if artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle"):
+            copied = _materialize_artifact_bundle(
+                state=state,
+                artifact_root=artifact_root_path,
+                source_root=source_root,
+            )
+            if copied:
+                state["artifact_bundle_root"] = str(artifact_root_path)
+                state["artifact_bundle_files"] = copied
+        states.append(state)
+    state = states[0] if states else {"date": str(args.date), "error": "no refresh states generated"}
+    if len(states) > 1:
+        state["lookahead_runs"] = states[1:]
     print(json.dumps(_json_ready(state), indent=2, sort_keys=True))
 
     snapshot_rows = int(state.get("snapshot_rows") or 0)
@@ -1296,6 +1512,9 @@ def main() -> int:
     recs_rows = int(state.get("recs_rows") or 0)
     if state.get("error"):
         return 1
+    for extra_state in states[1:]:
+        if extra_state.get("error"):
+            return 1
     if snapshot_rows > 0 and alias_rows <= 0:
         return 1
     if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:

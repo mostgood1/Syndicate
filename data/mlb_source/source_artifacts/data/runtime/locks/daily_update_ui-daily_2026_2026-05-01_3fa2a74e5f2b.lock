@@ -1,0 +1,29 @@
+{
+  "workflow": "ui-daily",
+  "season": 2026,
+  "date": "2026-05-01",
+  "out_ROOT_DIR": "data/daily",
+  "pid": 30420,
+  "created_at": "2026-05-01T15:49:39.078085",
+  "command": [
+    "tools/daily_update.py",
+    "--date",
+    "2026-05-01",
+    "--season",
+    "2026",
+    "--workflow",
+    "ui-daily",
+    "--sims",
+    "1000",
+    "--workers",
+    "4",
+    "--pbp",
+    "off",
+    "--use-roster-artifacts",
+    "on",
+    "--write-roster-artifacts",
+    "on",
+    "--git-push",
+    "off"
+  ]
+}

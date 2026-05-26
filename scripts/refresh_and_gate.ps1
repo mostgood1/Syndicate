@@ -21,7 +21,13 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$python = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'py' }
+$python = 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe'
+if (-not (Test-Path $python)) {
+    $python = Join-Path $repoRoot '.venv\Scripts\python.exe'
+}
+if (-not (Test-Path $python)) {
+    $python = if (Get-Command py -ErrorAction SilentlyContinue) { 'py' } else { 'python' }
+}
 $runStamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
 $runArtifactsDir = if ($ArtifactsDir) {
     if ([System.IO.Path]::IsPathRooted($ArtifactsDir)) { $ArtifactsDir } else { Join-Path $repoRoot $ArtifactsDir }
@@ -36,6 +42,17 @@ $refreshStatusLatestDir = Join-Path $refreshStatusRoot 'latest'
 New-Item -ItemType Directory -Path $runArtifactsDir -Force | Out-Null
 New-Item -ItemType Directory -Path $refreshStatusRunDir -Force | Out-Null
 New-Item -ItemType Directory -Path $refreshStatusLatestDir -Force | Out-Null
+
+$preferLocalMirrorArtifacts = $false
+if ($RefreshOdds) {
+    $preferLocalMirrorArtifacts = $true
+}
+else {
+    $useLocalMirrorArtifacts = [Environment]::GetEnvironmentVariable('SYNDICATE_USE_LOCAL_ARTIFACT_MIRRORS', 'Process')
+    if (-not [string]::IsNullOrWhiteSpace($useLocalMirrorArtifacts) -and $useLocalMirrorArtifacts -match '^(1|true|yes)$') {
+        $preferLocalMirrorArtifacts = $true
+    }
+}
 
 function Write-JsonArtifact {
     param(
@@ -74,28 +91,56 @@ $refreshSteps = @()
 if (-not $SkipMLB) {
     $mlbMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_mlb_source_mirror.ps1'), '-Date', $Date)
     $localMlbArtifactRoot = Join-Path $repoRoot 'data\mlb_source\source_artifacts'
-    if (Test-Path $localMlbArtifactRoot) {
+    if ($preferLocalMirrorArtifacts -and (Test-Path $localMlbArtifactRoot)) {
         $mlbMirrorCommand += @('-SourceArtifactRoot', $localMlbArtifactRoot)
+    }
+    else {
+        $mlbMirrorCommand += @('-SourceRepo', '..\MLB-BettingV2')
     }
     $refreshSteps += ,@('MLB mirror refresh', $mlbMirrorCommand)
 }
 if (-not $SkipNBA) {
-    $refreshSteps += ,@('NBA mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nba_source_mirror.ps1'), '-Date', $Date))
+    $nbaMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nba_source_mirror.ps1'), '-Date', $Date)
+    $localNbaArtifactRoot = Join-Path $repoRoot 'data\nba_source'
+    if ($preferLocalMirrorArtifacts -and (Test-Path $localNbaArtifactRoot)) {
+        $nbaMirrorCommand += @('-SourceArtifactRoot', $localNbaArtifactRoot)
+    }
+    $refreshSteps += ,@('NBA mirror refresh', $nbaMirrorCommand)
 }
 if (-not $SkipNHL) {
-    $refreshSteps += ,@('NHL mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nhl_source_mirror.ps1'), '-Date', $Date))
+    $nhlMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nhl_source_mirror.ps1'), '-Date', $Date)
+    $localNhlArtifactRoot = Join-Path $repoRoot 'data\nhl_source\source_artifacts'
+    if ($preferLocalMirrorArtifacts -and (Test-Path $localNhlArtifactRoot)) {
+        $nhlMirrorCommand += @('-SourceArtifactRoot', $localNhlArtifactRoot)
+    }
+    $refreshSteps += ,@('NHL mirror refresh', $nhlMirrorCommand)
 }
 if (-not $SkipWNBA) {
-    $refreshSteps += ,@('WNBA mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_wnba_source_mirror.ps1'), '-Date', $Date))
+    $wnbaMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_wnba_source_mirror.ps1'), '-Date', $Date)
+    $localWnbaArtifactRoot = Join-Path $repoRoot 'data\wnba_source'
+    if ($preferLocalMirrorArtifacts -and (Test-Path $localWnbaArtifactRoot)) {
+        $wnbaMirrorCommand += @('-SourceArtifactRoot', $localWnbaArtifactRoot)
+    }
+    $refreshSteps += ,@('WNBA mirror refresh', $wnbaMirrorCommand)
 }
 if (-not $SkipNFL) {
-    $refreshSteps += ,@('NFL mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nfl_source_mirror.ps1')))
+    $nflMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nfl_source_mirror.ps1'))
+    $localNflArtifactRoot = Join-Path $repoRoot 'data\nfl_source\source_artifacts'
+    if ($preferLocalMirrorArtifacts -and (Test-Path $localNflArtifactRoot)) {
+        $nflMirrorCommand += @('-SourceArtifactRoot', $localNflArtifactRoot)
+    }
+    $refreshSteps += ,@('NFL mirror refresh', $nflMirrorCommand)
 }
 if (-not $SkipNCAAF) {
-    $refreshSteps += ,@('NCAAF mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaaf_source_mirror.ps1')))
+    $ncaafMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaaf_source_mirror.ps1'))
+    $localNcaafArtifactRoot = Join-Path $repoRoot 'data\ncaaf_source\source_artifacts'
+    if ($preferLocalMirrorArtifacts -and (Test-Path $localNcaafArtifactRoot)) {
+        $ncaafMirrorCommand += @('-SourceArtifactRoot', $localNcaafArtifactRoot)
+    }
+    $refreshSteps += ,@('NCAAF mirror refresh', $ncaafMirrorCommand)
 }
 if (-not $SkipNCAAB) {
-    $refreshSteps += ,@('NCAAB mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaab_source_mirror.ps1'), '-Date', $Date, '-RefreshRawOutputsFromSource'))
+    $refreshSteps += ,@('NCAAB mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaab_source_mirror.ps1'), '-Date', $Date))
 }
 
 Push-Location $repoRoot
@@ -166,6 +211,7 @@ try {
         refreshStatusDir = $refreshStatusRunDir
         latestManifestPath = (Join-Path $refreshStatusLatestDir 'refresh_status_latest.json')
         refreshOdds = [bool]$RefreshOdds
+        preferLocalMirrorArtifacts = [bool]$preferLocalMirrorArtifacts
         oddsPhase = $OddsPhase
         oddsSports = $OddsSports
         oddsRegions = $OddsRegions

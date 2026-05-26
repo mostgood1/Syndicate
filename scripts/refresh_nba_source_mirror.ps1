@@ -161,6 +161,64 @@ function Copy-LatestDatedArtifact {
     return $true
 }
 
+function Copy-MatchingDatedArtifacts {
+    param(
+        [string]$SourceDirectory,
+        [string]$DestinationDirectory,
+        [string]$Prefix,
+        [string]$Suffix,
+        [datetime]$TargetDate,
+        [string]$ManifestPrefix = ''
+    )
+
+    if (-not (Test-Path $SourceDirectory)) {
+        return 0
+    }
+
+    $escapedPrefix = [regex]::Escape($Prefix)
+    $escapedSuffix = [regex]::Escape($Suffix)
+    $pattern = '^{0}(?<date>\d{{4}}-\d{{2}}-\d{{2}}){1}$' -f $escapedPrefix, $escapedSuffix
+    $copiedCount = 0
+
+    foreach ($candidate in Get-ChildItem -Path $SourceDirectory -File | Sort-Object Name) {
+        $match = [regex]::Match($candidate.Name, $pattern)
+        if (-not $match.Success) {
+            continue
+        }
+
+        try {
+            $candidateDate = [datetime]::ParseExact($match.Groups['date'].Value, 'yyyy-MM-dd', $null)
+        }
+        catch {
+            continue
+        }
+
+        if ($candidateDate -gt $TargetDate) {
+            continue
+        }
+
+        $destinationPath = Join-Path $DestinationDirectory $candidate.Name
+        if (-not (Copy-IfExists -SourcePath $candidate.FullName -DestinationPath $destinationPath)) {
+            continue
+        }
+
+        if ([string]::IsNullOrWhiteSpace($ManifestPrefix)) {
+            if (-not $copied.Contains($candidate.Name)) {
+                $copied.Add($candidate.Name) | Out-Null
+            }
+        }
+        else {
+            $manifestName = Join-Path $ManifestPrefix $candidate.Name
+            if (-not $copied.Contains($manifestName)) {
+                $copied.Add($manifestName) | Out-Null
+            }
+        }
+        $copiedCount += 1
+    }
+
+    return $copiedCount
+}
+
 $copied = New-Object System.Collections.Generic.List[string]
 
 $datedProcessedArtifacts = @(
@@ -190,8 +248,12 @@ foreach ($artifact in $datedProcessedArtifacts) {
     Copy-LatestDatedArtifact -SourceDirectory $sourceDirectory -DestinationDirectory $destDataRoot -Prefix $artifact.Prefix -Suffix $artifact.Suffix -TargetDate $targetDate | Out-Null
 }
 
+$boxscoresSourceDirectory = if ($UseExistingMirrorArtifacts) { $destDataRoot } elseif ($artifactRoot) { Join-Path $artifactRoot 'data\processed' } else { Join-Path $sourceRoot 'data\processed' }
+Copy-MatchingDatedArtifacts -SourceDirectory $boxscoresSourceDirectory -DestinationDirectory $destDataRoot -Prefix 'boxscores_' -Suffix '.csv' -TargetDate $targetDate | Out-Null
+
 $processedStaticFiles = @(
     'live_lens_tuning_override.json',
+    'boxscores_history.csv',
     ("season_betting_card_manifest_{0}_retuned.json" -f $targetSeason)
 )
 

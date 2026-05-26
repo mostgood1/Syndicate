@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NHL Betting – Live Lens Accuracy</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script>
+    try {
+      if (localStorage.getItem('theme') === 'light') {
+        document.documentElement.classList.add('light');
+      }
+    } catch (e) {}
+  </script>
+  <style>
+    header .header-inner { flex-wrap: wrap; }
+    .topbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; width:100%; }
+    .spacer { flex:1; }
+    .muted { color:var(--cards-text-dim); font-size:12px; }
+
+    .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+    .controls label { color:var(--cards-text-dim); font-size:12px; font-weight:800; letter-spacing:0.3px; text-transform:uppercase; display:block; margin-bottom:4px; }
+    .controls .field { display:grid; gap:4px; }
+    .controls input {
+      min-height:40px;
+      padding:0 14px;
+      border:1px solid var(--cards-line-strong);
+      border-radius:999px;
+      color:var(--cards-text);
+      background:rgba(4, 12, 20, 0.72);
+      font-weight:700;
+      font-size:12px;
+    }
+    .controls input:focus-visible {
+      outline:none;
+      border-color:rgba(154, 243, 222, 0.36);
+      box-shadow:0 0 0 3px rgba(78, 205, 196, 0.12);
+    }
+    html.light .controls input { background:rgba(255, 255, 255, 0.92); }
+
+    .grid-4 { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+    .tile {
+      border:1px solid var(--cards-line);
+      border-radius:14px;
+      padding:10px;
+      display:grid;
+      gap:6px;
+      background:linear-gradient(180deg, rgba(16, 34, 52, 0.94), rgba(9, 20, 31, 0.98));
+      box-shadow:var(--cards-shadow);
+    }
+    html.light .tile { background:linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 252, 0.98)); }
+    .tile .k { color:var(--cards-text-dim); font-size:11px; font-weight:800; letter-spacing:0.3px; text-transform:uppercase; }
+    .tile .v { font-variant-numeric: tabular-nums; font-size:14px; color:var(--cards-text); font-weight:900; }
+    .explain { color:var(--cards-text-soft); font-size:13px; line-height:1.5; }
+    .explain strong { color:var(--cards-text); }
+
+    table { width:100%; border-collapse: collapse; color:var(--cards-text-soft); }
+    th, td { border:1px solid var(--cards-line); padding:6px 8px; font-size:12px; font-variant-numeric: tabular-nums; }
+    th {
+      color:var(--cards-text-soft);
+      background:rgba(5, 14, 24, 0.78);
+      text-align:left;
+    }
+    td { background:rgba(8, 18, 30, 0.54); }
+    tr:nth-child(even) td { background:rgba(8, 18, 30, 0.72); }
+    html.light th { background:rgba(240, 245, 250, 0.98); }
+    html.light td { background:rgba(255, 255, 255, 0.9); }
+    html.light tr:nth-child(even) td { background:rgba(247, 250, 252, 0.98); }
+
+    .section-title { color:var(--cards-text-dim); font-size:11px; font-weight:800; letter-spacing:0.3px; text-transform:uppercase; }
+
+    .m0 { margin:0; }
+    .mt10 { margin-top:10px; }
+    .p-main { padding:18px 16px; }
+    .mb16 { margin-bottom:16px; }
+    .xscroll { overflow-x:auto; border-radius:14px; }
+
+    @media (max-width: 900px) {
+      .grid-4 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .grid-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container header-inner">
+      <div class="topbar">
+        <h1 class="m0">Live Lens Accuracy</h1>
+        <a id="cardsLink" class="btn" href="/?date={{ date | urlencode }}">Back to Cards</a>
+        <a id="skaterLaddersLink" class="btn" href="/skater-ladders?date={{ date | urlencode }}">Skater Ladders</a>
+        <a id="goalieLaddersLink" class="btn" href="/goalie-ladders?date={{ date | urlencode }}">Goalie Ladders</a>
+        <div class="spacer"></div>
+        <div class="muted">commit {{ commit }}</div>
+      </div>
+      <div class="controls mt10">
+        <div class="field">
+          <label for="date">Date</label>
+          <input id="date" type="date" value="{{ date }}" />
+        </div>
+        <div class="field">
+          <label for="start">Start</label>
+          <input id="start" type="date" value="{{ start }}" />
+        </div>
+        <div class="field">
+          <label for="end">End</label>
+          <input id="end" type="date" value="{{ end }}" />
+        </div>
+        <button id="run" class="btn" type="button">Load</button>
+        <div class="muted" id="status">Loading…</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="container p-main">
+      <div class="card mb16">
+        <div class="section-title">Selected Day Summary</div>
+        <div class="muted mt10" id="selectionScope"></div>
+        <div class="grid-4 mt10" id="summaryTiles"></div>
+      </div>
+
+      <div class="card mb16">
+        <div class="section-title">Daily Recap (All Settled Days)</div>
+        <div class="muted mt10" id="historyScope"></div>
+        <div class="xscroll">
+          <table id="byDate"></table>
+        </div>
+        <div class="section-title mt10">Breakout By Bet Type</div>
+        <div class="muted mt10">Each settled day split by Total, Period Total, and ML so you can see what actually drove the day.</div>
+        <div class="xscroll">
+          <table id="byDateBetType"></table>
+        </div>
+      </div>
+
+      <div class="card mb16">
+        <div class="section-title">Cumulative By Bet Type (Market)</div>
+        <div class="xscroll">
+          <table id="byMarket"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Cumulative By Elapsed Bucket</div>
+        <div class="xscroll">
+          <table id="byElapsed"></table>
+        </div>
+      </div>
+
+      <div class="card mt10">
+        <div class="section-title">Cumulative Driver Tags</div>
+        <div class="muted mt10" id="tagCoverage"></div>
+        <div class="xscroll">
+          <table id="byDriverTag"></table>
+        </div>
+      </div>
+
+      <div class="card mt10">
+        <div class="section-title">Cumulative Tag Types</div>
+        <div class="xscroll">
+          <table id="byTagType"></table>
+        </div>
+      </div>
+
+      <div class="card mt10">
+        <div class="section-title">How To Read This</div>
+        <p class="explain mt10 m0"><strong>Elapsed bucket</strong> tells you when the bet fired on the full NHL game clock. This recap now groups bets into <strong>1-minute windows</strong> across all <strong>65 minutes</strong> of regulation plus overtime. For example, <strong>20:00-21:00</strong> means the signal fired during that one-minute stretch. The underlying ledger also keeps <strong>15-second bins</strong> for deeper tuning.</p>
+        <p class="explain mt10 m0"><strong>Driver tags</strong> are the machine-readable reasons the signal liked a bet at that moment. Examples: <strong>pace:up</strong> means the game is running faster than expected, <strong>goalie:weak</strong> means the save environment looks softer than baseline, and <strong>manpower:pp_home</strong> means the home team is on a power play.</p>
+        <p class="explain mt10 m0"><strong>Tag types</strong> are the families before the colon. So <strong>pace</strong> groups pace-related tags, <strong>goalie</strong> groups goalie-strength tags, and <strong>gate</strong> groups rule or threshold tags that let a bet through.</p>
+        <div class="section-title mt10">Tag Type Guide</div>
+        <div class="xscroll mt10">
+          <table id="tagTypeGuide"></table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function fmt(x, nd=3) {
+      if (x === null || x === undefined || Number.isNaN(Number(x))) return '—';
+      return Number(x).toFixed(nd);
+    }
+
+    function pct(x, nd=1) {
+      if (x === null || x === undefined || Number.isNaN(Number(x))) return '—';
+      return (100 * Number(x)).toFixed(nd) + '%';
+    }
+
+    function setStatus(s) { $('status').textContent = s || ''; }
+
+    function setDateScopedHref(elementId, base, d) {
+      const node = $(elementId);
+      if (!node) return;
+      if (!d) {
+        node.setAttribute('href', base);
+        return;
+      }
+      const u = new URL(base, window.location.origin);
+      u.searchParams.set('date', d);
+      node.setAttribute('href', u.pathname + u.search);
+    }
+
+    function syncNavLinks() {
+      const d = $('date').value || '';
+      setDateScopedHref('cardsLink', '/', d);
+      setDateScopedHref('skaterLaddersLink', '/skater-ladders', d);
+      setDateScopedHref('goalieLaddersLink', '/goalie-ladders', d);
+    }
+
+    const TAG_TYPE_DESCRIPTIONS = {
+      'market': 'Which market family the bet belongs to, like moneyline, total, or period total.',
+      'pace': 'How fast or slow the game is playing relative to expectation.',
+      'goalie': 'Whether the goalie environment looks softer or stronger than normal.',
+      'manpower': 'Special-teams state, usually a power play for one side.',
+      'empty_net': 'One team has pulled its goalie, which changes scoring pressure.',
+      'late': 'Late-game score-state logic, such as tied or one-goal situations.',
+      'pressure': 'Which side has more urgency to attack based on the score and game state.',
+      'gate': 'Rule-based filters or minimum-edge checks that had to be satisfied.',
+      'edge': 'A coarse bucket for how large the model edge was when the bet fired.',
+      'score': 'Current score-state context, like home leading or tied.',
+      'guard': 'Safety checks that block obviously bad or stale situations.',
+      'period_total': 'Period-total-specific logic and context.',
+      'period_ml': 'Period moneyline-specific logic and context.',
+      'P1': 'First-period-specific context.',
+      'P2': 'Second-period-specific context.',
+      'P3': 'Third-period-specific context.',
+      '(none)': 'No driver tags were attached to the settled bet.'
+    };
+
+    const BET_TYPE_LABELS = {
+      'TOTAL': 'Total',
+      'PERIOD_TOTAL': 'Period Total',
+      'ML': 'ML',
+      'PERIOD_ML': 'Period ML'
+    };
+
+    function describeDriverTag(tag) {
+      const s = String(tag || '').trim();
+      if (!s || s === '(none)') return 'No driver tags were recorded for this bet.';
+      if (s === 'pace:up') return 'The game was playing faster than expected, which usually supports more scoring.';
+      if (s === 'pace:down') return 'The game was playing slower than expected, which usually supports fewer goals.';
+      if (s === 'goalie:weak') return 'The goalie environment looked weaker than baseline, which can help offense.';
+      if (s === 'goalie:strong') return 'The goalie environment looked stronger than baseline, which can suppress offense.';
+      if (s === 'manpower:pp_home') return 'The home team was on a power play when the signal fired.';
+      if (s === 'manpower:pp_away') return 'The away team was on a power play when the signal fired.';
+      if (s === 'empty_net:home') return 'The home team had pulled its goalie, increasing late-game volatility.';
+      if (s === 'empty_net:away') return 'The away team had pulled its goalie, increasing late-game volatility.';
+      if (s === 'late:one_goal') return 'Late-game state with only a one-goal margin.';
+      if (s === 'late:empty_net') return 'Late-game empty-net conditions were part of the signal.';
+      if (s === 'late:multi_goal') return 'Late-game state with a multi-goal margin.';
+      if (s === 'late:tied') return 'Late-game tied score state.';
+      if (s === 'pressure:home') return 'The home side had more reason to press for offense.';
+      if (s === 'pressure:away') return 'The away side had more reason to press for offense.';
+      if (s === 'pressure:even') return 'Neither side had a clear pressure advantage.';
+      if (s === 'market:TOTAL' || s === 'market:total_blend') return 'This signal came from the totals logic or a totals-specific blend.';
+      if (s.startsWith('gate:')) return 'A threshold or safety rule that the bet had to clear before being shown.';
+      if (s.startsWith('edge:')) return 'A bucket describing how large the model edge was.';
+      if (s.startsWith('score:')) return 'Current score-state context used by the live model.';
+      if (s === 'goals_ahead') return 'Goals were running ahead of the target pace for this market.';
+      if (s === 'goals_behind') return 'Goals were running behind the target pace for this market.';
+      if (s === 'goals_on_track') return 'Scoring was roughly on the pace implied by the market.';
+      if (s === 'pressure_high') return 'The game state suggested higher urgency and offensive push.';
+      if (s === 'pressure_low') return 'The game state suggested lower urgency and a calmer pace.';
+      if (s === 'total_already_reached' || s === 'guard:total_already_reached') return 'The posted total had effectively already been hit, so the signal was constrained by that state.';
+      if (/^P[123]$/.test(s)) return `This tag marks that the signal was tied to ${s.replace('P', 'period ')}.`;
+      if (s === 'period_total') return 'This signal came from period-total logic rather than full-game logic.';
+      if (s === 'period_ml') return 'This signal came from period moneyline logic rather than full-game logic.';
+      const tagType = s.includes(':') ? s.split(':', 1)[0] : s;
+      return TAG_TYPE_DESCRIPTIONS[tagType] || 'A model context tag used to explain why this live signal was triggered.';
+    }
+
+    function describeTagType(tagType) {
+      const s = String(tagType || '').trim() || '(none)';
+      return TAG_TYPE_DESCRIPTIONS[s] || 'A family of related driver tags.';
+    }
+
+    function formatElapsedBucket(bucket) {
+      const s = String(bucket ?? '').trim();
+      if (!s || s === '(none)' || s === '(missing)') return '(missing)';
+      if (/^\d{2}:\d{2}-\d{2}:\d{2}$/.test(s)) return s;
+      if (s === '0-4') return '0-4 min (opening stretch)';
+      if (s === '4-8') return '4-8 min';
+      if (s === '8-12') return '8-12 min';
+      if (s === '12-20') return '12-20 min';
+      if (s === '>=20') return '20+ min (later game)';
+      return s;
+    }
+
+    function rangeText(start, end) {
+      if (start && end) return start === end ? start : `${start}..${end}`;
+      if (start) return `from ${start}`;
+      if (end) return `through ${end}`;
+      return 'all settled days';
+    }
+
+    function formatBetType(value) {
+      const key = String(value ?? '').trim().toUpperCase();
+      if (!key || key === '(NONE)') return '(none)';
+      return BET_TYPE_LABELS[key] || key.replaceAll('_', ' ');
+    }
+
+    function renderTiles(sum) {
+      const el = $('summaryTiles');
+      el.innerHTML = '';
+      if (!sum) return;
+
+      const tiles = [
+        { k: 'Bets', v: String(sum.bets ?? '—') },
+        { k: 'Units', v: fmt(sum.units, 3) },
+        { k: 'ROI', v: pct(sum.roi, 1) },
+        { k: 'Win Rate', v: (sum.win_rate === null || sum.win_rate === undefined) ? '—' : pct(sum.win_rate, 1) },
+      ];
+
+      for (const t of tiles) {
+        const d = document.createElement('div');
+        d.className = 'tile';
+        d.innerHTML = `<div class="k">${t.k}</div><div class="v">${t.v}</div>`;
+        el.appendChild(d);
+      }
+    }
+
+    function renderTable(tableEl, rows, keyLabel, keyFormatter=null) {
+      tableEl.innerHTML = '';
+      const head = document.createElement('tr');
+      for (const h of [keyLabel, 'bets', 'wins', 'losses', 'pushes', 'units', 'roi', 'win_rate']) {
+        const th = document.createElement('th');
+        th.textContent = h;
+        head.appendChild(th);
+      }
+      tableEl.appendChild(head);
+
+      for (const r of (rows || [])) {
+        const tr = document.createElement('tr');
+        const rawKey = (r.key === null || r.key === undefined) ? '(none)' : String(r.key);
+        const cols = [
+          keyFormatter ? keyFormatter(rawKey, r) : rawKey,
+          String(r.bets ?? ''),
+          String(r.wins ?? ''),
+          String(r.losses ?? ''),
+          String(r.pushes ?? ''),
+          fmt(r.units, 3),
+          pct(r.roi, 1),
+          (r.win_rate === null || r.win_rate === undefined) ? '—' : pct(r.win_rate, 1),
+        ];
+        for (const c of cols) {
+          const td = document.createElement('td');
+          td.textContent = c;
+          tr.appendChild(td);
+        }
+        tableEl.appendChild(tr);
+      }
+    }
+
+    function renderGlossaryTable(tableEl, rows) {
+      tableEl.innerHTML = '';
+      const head = document.createElement('tr');
+      for (const h of ['tag_type', 'plain_english']) {
+        const th = document.createElement('th');
+        th.textContent = h;
+        head.appendChild(th);
+      }
+      tableEl.appendChild(head);
+
+      for (const row of (rows || [])) {
+        const tr = document.createElement('tr');
+        for (const val of [String(row.tag_type || '(none)'), String(row.description || '')]) {
+          const td = document.createElement('td');
+          td.textContent = val;
+          tr.appendChild(td);
+        }
+        tableEl.appendChild(tr);
+      }
+    }
+
+    function renderDateBetTypeTable(tableEl, rows) {
+      tableEl.innerHTML = '';
+      const head = document.createElement('tr');
+      for (const h of ['date', 'bet_type', 'bets', 'wins', 'losses', 'pushes', 'units', 'roi', 'win_rate']) {
+        const th = document.createElement('th');
+        th.textContent = h;
+        head.appendChild(th);
+      }
+      tableEl.appendChild(head);
+
+      for (const r of (rows || [])) {
+        const tr = document.createElement('tr');
+        const cols = [
+          String(r.date ?? '(none)'),
+          formatBetType(r.market),
+          String(r.bets ?? ''),
+          String(r.wins ?? ''),
+          String(r.losses ?? ''),
+          String(r.pushes ?? ''),
+          fmt(r.units, 3),
+          pct(r.roi, 1),
+          (r.win_rate === null || r.win_rate === undefined) ? '—' : pct(r.win_rate, 1),
+        ];
+        for (const c of cols) {
+          const td = document.createElement('td');
+          td.textContent = c;
+          tr.appendChild(td);
+        }
+        tableEl.appendChild(tr);
+      }
+    }
+
+    function renderTagTypeGuide(allDays) {
+      const seen = new Set();
+      const rows = [];
+      for (const row of (allDays?.by_tag_type || [])) {
+        const tagType = String(row?.key ?? '').trim() || '(none)';
+        if (seen.has(tagType)) continue;
+        seen.add(tagType);
+        rows.push({ tag_type: tagType, description: describeTagType(tagType) });
+      }
+      if (!rows.length) {
+        rows.push({ tag_type: '(none)', description: describeTagType('(none)') });
+      }
+      renderGlossaryTable($('tagTypeGuide'), rows);
+    }
+
+    function renderScopeNotes(obj, allDays) {
+      const selectedRange = rangeText(obj.start, obj.end);
+      const requested = obj.requested_date ? `requested ${obj.requested_date}` : selectedRange;
+      const note = obj.note ? ` ${obj.note}` : '';
+      $('selectionScope').textContent = `Tiles summarize the selected settled slice: ${requested}.${note}`;
+
+      const historyRange = rangeText(allDays?.start, allDays?.end);
+      const historyRows = Number(allDays?.rows ?? 0);
+      $('historyScope').textContent = `This table is the daily recap across every settled day currently in the ledger: ${historyRange} (${historyRows} settled bets).`;
+    }
+
+    async function load() {
+      const date = $('date').value || '';
+      const start = $('start').value || '';
+      const end = $('end').value || '';
+
+      syncNavLinks();
+
+      const params = new URLSearchParams();
+      if (date) params.set('date', date);
+      if (start) params.set('start', start);
+      if (end) params.set('end', end);
+
+      setStatus('Loading…');
+      try {
+        const r = await fetch('/api/live-lens-accuracy/data?' + params.toString(), { headers: { 'accept': 'application/json' } });
+        const obj = await r.json();
+        if (!obj.ok) {
+          setStatus('Error: ' + (obj.error || 'unknown'));
+          return;
+        }
+        const allDays = obj.all_days || {};
+        renderTiles(obj.summary);
+        renderScopeNotes(obj, allDays);
+        renderTable($('byDate'), allDays.by_date || obj.by_date, 'date');
+        renderDateBetTypeTable($('byDateBetType'), allDays.by_date_market || obj.by_date_market || []);
+        renderTable($('byMarket'), allDays.by_market || obj.by_market, 'bet_type', formatBetType);
+        renderTable($('byElapsed'), allDays.by_elapsed_bucket || obj.by_elapsed_bucket, 'elapsed_bucket', formatElapsedBucket);
+        renderTable($('byDriverTag'), allDays.by_driver_tag_all || obj.by_driver_tag_all || obj.by_driver_tag, 'driver_tag', (key) => `${key} — ${describeDriverTag(key)}`);
+        renderTable($('byTagType'), allDays.by_tag_type || obj.by_tag_type, 'tag_type', (key) => `${key} — ${describeTagType(key)}`);
+        renderTagTypeGuide(allDays);
+
+        try {
+          const tc = allDays.tag_coverage || obj.tag_coverage;
+          if (tc) {
+            const n = Number(tc.bets_settled ?? 0);
+            const miss = Number(tc.bets_missing_tags ?? 0);
+            const distinct = Number(tc.distinct_tags ?? 0);
+            const rate = tc.missing_rate;
+            $('tagCoverage').textContent = `tagged: ${Math.max(0, n - miss)}/${n} • missing: ${miss}` +
+              (rate === null || rate === undefined ? '' : ` (${pct(rate, 1)})`) +
+              ` • distinct: ${distinct}`;
+          } else {
+            $('tagCoverage').textContent = '';
+          }
+        } catch (e) {
+          $('tagCoverage').textContent = '';
+        }
+        const range = obj.start && obj.end ? `${obj.start}..${obj.end}` : '(latest)';
+        const note = obj.note ? ` · ${obj.note}` : '';
+        const allRange = (allDays.start && allDays.end) ? ` · recap ${rangeText(allDays.start, allDays.end)}` : '';
+        setStatus(`OK – selected ${range}${allRange}${note}`);
+      } catch (e) {
+        setStatus('Error: ' + String(e));
+      }
+    }
+
+    $('date').addEventListener('change', syncNavLinks);
+    $('run').addEventListener('click', load);
+    syncNavLinks();
+    load();
+  </script>
+</body>
+</html>

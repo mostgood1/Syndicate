@@ -1,6 +1,6 @@
 # Render Self-Host Refactor Plan
 
-This document answers the stricter question behind Render readiness: what still has to change before Syndicate can refresh itself on Render without sibling source repos.
+This document answers the stricter question behind Render readiness: what still has to change before Syndicate can refresh itself on Render without external source repos.
 
 For the execution-ordered version of this plan, use [RENDER_SELF_HOST_BACKLOG.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_BACKLOG.md). This file remains the architectural overview; the backlog file is the implementation tracker.
 
@@ -12,11 +12,11 @@ Syndicate is not yet a self-refreshing hosted system. The remaining gap is not t
 
 Today that path still depends on three assumptions:
 
-1. [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) resolves sibling repo roots by default and runs source-owned commands inside those repos.
-2. The generation layer is still source-owned even though the per-sport mirror scripts under [scripts](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts) can now import from neutral artifact bundles instead of only from sibling repo layouts.
+1. [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) now resolves local bundle roots for the MLB, NHL, NFL, and NCAAF lanes and runs source-owned commands only where a sport still needs them.
+2. The generation layer is still partially source-owned even though the per-sport mirror scripts under [scripts](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts) can now import from neutral artifact bundles instead of relying on repo layouts.
 3. [syndicate/features/shared/ops_refresh.py](c:/Users/mostg/OneDrive/Coding/Syndicate/syndicate/features/shared/ops_refresh.py) launches background refresh jobs with `subprocess.Popen` and persists run state under repo-local `reports/`, which implies writable durable storage and a process model friendlier than a standard Render web dyno.
 
-Render can host the web app now. Render cannot yet replace the whole local multi-repo refresh workflow.
+Render can host the web app now. Render cannot yet replace the whole local refresh workflow.
 
 ## Dependency map by sport
 
@@ -27,7 +27,7 @@ Current source refresh owner:
 - `tools.web.flask_frontend._persist_live_lens_tick`
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_mlb_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_source_mirror.ps1) copies processed daily artifacts, live-lens files, market refresh history, raw feed snapshots, and season eval outputs out of `MLB-BettingV2`.
+- [scripts/refresh_mlb_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_mlb_source_mirror.ps1) copies processed daily artifacts, live-lens files, market refresh history, raw feed snapshots, and season eval outputs out of the repo-owned MLB bundle.
 
 Required Render-safe refactor:
 - Move the canonical MLB OddsAPI refresh and live-lens rebuild into a Syndicate-owned package, or publish the canonical MLB artifacts to a neutral storage location that Syndicate can ingest.
@@ -38,7 +38,7 @@ Current source refresh owner:
 - `nba_betting.refresh_oddsapi_props_job`
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) copies processed and raw artifacts out of `NBA-Betting`.
+- [scripts/refresh_nba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nba_source_mirror.ps1) copies processed and raw artifacts out of the owned NBA bundle root.
 
 Required Render-safe refactor:
 - The source-app bootstrap fallback used to emit live-state snapshots has already been removed from the mirror layer.
@@ -50,7 +50,7 @@ Current source refresh owner:
 - `wnba_betting.refresh_oddsapi_props_job`
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_wnba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_wnba_source_mirror.ps1) copies processed, raw, and live-lens artifacts out of `WNBA-Betting`.
+- [scripts/refresh_wnba_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_wnba_source_mirror.ps1) copies processed, raw, and live-lens artifacts out of the owned WNBA bundle root.
 
 Required Render-safe refactor:
 - Same pattern as NBA, but the mirror layer is simpler because it is currently copy-only.
@@ -59,40 +59,36 @@ Required Render-safe refactor:
 ### NHL
 
 Current source refresh owner:
-- `nhl_betting.cli team-odds-collect`
-- `nhl_betting.cli props-collect --source oddsapi`
+- Syndicate-owned [scripts/refresh_nhl_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_oddsapi.py) for scoreboard, team odds, and player-props lines
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_nhl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_source_mirror.ps1) copies processed board files, live-lens files, game odds, team odds, and props files out of `NHL-Betting`.
+- [scripts/refresh_nhl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nhl_source_mirror.ps1) ingests the local or published artifact bundle and can still backfill extra processed/live-lens files when a source repo is available.
 
 Required Render-safe refactor:
-- Move the source CLI collection commands into Syndicate-owned code or into a separately deployable shared package.
-- Keep the mirror contract, but make its source something Render can reach without a sibling repo checkout.
+- Keep the owned odds-snapshot lane stable.
+- Replace the remaining processed board and live-lens generation dependencies so the local bundle no longer needs optional source-root backfill.
 
 ### NFL
 
 Current source refresh owner:
-- `nfl_compare/src/odds_api_client.py`
-- `scripts/fetch_oddsapi_props.py`
+- Syndicate-owned [scripts/refresh_nfl_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nfl_oddsapi.py) plus local helper modules for team odds and player props
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_nfl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nfl_source_mirror.ps1) copies weekly recommendations, real betting lines, props snapshots, calibration files, and manifests out of `NFL-Betting`.
+- [scripts/refresh_nfl_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_nfl_source_mirror.ps1) ingests weekly recommendations, real betting lines, props snapshots, calibration files, and manifests from the local or published artifact bundle.
 
 Required Render-safe refactor:
-- Extract the team-odds and player-props refreshers into Syndicate-owned code or a shared package.
-- Preserve the weekly artifact contract now used by the mirror layer.
+- Keep the owned weekly artifact contract stable and verify any remaining deeper NFL generation/runtime seams separately from this odds-refresh boundary.
 
 ### NCAAF
 
 Current source refresh owner:
-- `fetch_2025_lines.py`
+- Syndicate-owned [scripts/refresh_ncaaf_oddsapi.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaaf_oddsapi.py)
 
 Current Syndicate mirror behavior:
-- [scripts/refresh_ncaaf_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaaf_source_mirror.ps1) copies weekly recommendation summaries and a small recommendation bundle out of `NCAAFCompare`.
+- [scripts/refresh_ncaaf_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaaf_source_mirror.ps1) ingests weekly recommendation summaries and the small recommendation bundle from the local or published artifact bundle.
 
 Required Render-safe refactor:
-- Replace the direct dependency on the standalone source fetch script with a Syndicate-owned line refresh job.
-- This is structurally the smallest sports-specific migration.
+- Keep the owned line-refresh bundle stable and maintain the local predicted-schedule/recommendation contract.
 
 ### NCAAB
 
@@ -121,7 +117,7 @@ Render-safe shape:
 - Syndicate consumes canonical artifacts from object storage or another external publisher.
 
 What must change:
-- Stop defaulting to sibling repo roots as the primary runtime model.
+- Stop defaulting to external source repo roots as the primary runtime model.
 - Replace per-sport `source_repo_name` plus `cwd=source_root` execution with either local Syndicate jobs or remote artifact pull steps.
 
 ### 2. Replace repo-local status storage with durable hosted storage
@@ -154,7 +150,7 @@ Render-safe shape:
 - or the scripts disappear because Syndicate writes directly into its own canonical data roots
 
 What must change:
-- replace `SourceRepo` defaults like `..\NBA-Betting` and `..\NHL-Betting`
+- replace `SourceRepo` defaults like the legacy compatibility roots used by the remaining source-bound lanes
 - define a stable ingest contract per sport that no longer assumes source repo layout details
 
 Current implementation progress:
@@ -186,7 +182,7 @@ What must change:
 
 Syndicate is self-host ready when all of the following are true:
 
-1. No normal refresh path requires a sibling checkout such as `..\NBA-Betting` or `..\NCAAB`.
+1. No normal refresh path requires an external checkout.
 2. No normal refresh path boots a source Flask app to export artifacts.
 3. The web service can restart without losing the latest refresh status and manifests.
 4. Refresh jobs can run outside the web process and publish status that the web app can read.

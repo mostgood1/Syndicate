@@ -8,10 +8,10 @@
     "status": "ok",
     "date": "2026-05-09",
     "mode": "live",
-    "out_dir": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi",
-    "game_lines_path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi\\oddsapi_game_lines_2026_05_09.json",
-    "pitcher_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_09.json",
-    "hitter_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_09.json",
+    "out_dir": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\market\\oddsapi",
+    "game_lines_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\market\\oddsapi\\oddsapi_game_lines_2026_05_09.json",
+    "pitcher_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_09.json",
+    "hitter_props_path": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_09.json",
     "counts": {
       "game_lines": {
         "events_matched": 14,

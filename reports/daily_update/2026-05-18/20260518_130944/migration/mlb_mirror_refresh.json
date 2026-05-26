@@ -1,6 +1,6 @@
-﻿{
+{
     "date":  "2026-05-18",
-    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
     "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data",
     "copiedArtifacts":  [
                             "daily\\snapshots\\2026-05-18",

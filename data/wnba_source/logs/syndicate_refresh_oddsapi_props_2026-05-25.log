@@ -1,0 +1,24 @@
+[2026-05-25T22:12:02] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-05-25.csv' --regions us
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py", line 7, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+[2026-05-25T22:14:43] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-05-25.csv' --regions us
+C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-05-25.csv with 363 rows.
+[2026-05-25T22:14:46] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\oddsapi_player_props_2026-05-25.csv (rows=363)
+[2026-05-25T22:14:47] local boxscores bootstrap failed: Cannot compare tz-naive and tz-aware timestamps
+[2026-05-25T22:15:29] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-05-25.csv' --regions us
+C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-05-25.csv with 363 rows.
+[2026-05-25T22:15:33] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\oddsapi_player_props_2026-05-25.csv (rows=363)
+[2026-05-25T22:15:34] local boxscores bootstrap failed: Cannot compare tz-naive and tz-aware timestamps
+[2026-05-25T22:16:22] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-05-25.csv' --regions us
+C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-05-25.csv with 363 rows.
+[2026-05-25T22:16:26] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\oddsapi_player_props_2026-05-25.csv (rows=363)
+[2026-05-25T22:17:33] bootstrapped local boxscores history via ESPN: C:\Users\mostg\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\boxscores_history.csv
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions

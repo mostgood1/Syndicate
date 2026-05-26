@@ -1,6 +1,6 @@
 # Render Self-Host Backlog
 
-This backlog translates [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) into an execution sequence. The goal is not to make Syndicate merely deployable on Render. The goal is to make it self-refreshing and operationally complete on Render without sibling source repos.
+This backlog translates [RENDER_SELF_HOST_REFACTOR_PLAN.md](c:/Users/mostg/OneDrive/Coding/Syndicate/RENDER_SELF_HOST_REFACTOR_PLAN.md) into an execution sequence. The goal is not to make Syndicate merely deployable on Render. The goal is to make it self-refreshing and operationally complete on Render without external source repos.
 
 ## Current hosted boundary
 
@@ -8,7 +8,7 @@ Today Syndicate is safe to run on Render as a read-only web app backed by mirror
 
 Today Syndicate is not yet safe to run on Render as a self-refreshing system because:
 
-- [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) still resolves sibling repo roots and executes source-owned generation commands by default, even though all per-sport ingestion contracts can now target neutral artifact bundles.
+- [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) now uses local bundle roots for the normal MLB, NHL, NFL, and NCAAF odds-refresh lanes, but several sports still keep deeper source-owned generation seams behind their current artifact bundles.
 - Deployment proof is still incomplete: the Render blueprint and docs need manual `SYNDICATE_ARTIFACT_ROOT_*` wiring per environment before hosted refreshes can actually ingest published bundles.
 - The normal mirror bootstrap blockers are closed, but multiple sports still depend on source-owned generation jobs.
 
@@ -75,7 +75,7 @@ Current status:
 - Completed. The normal NCAAB mirror path is now artifact-only by default.
 - [scripts/export_ncaab_source_mirror.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/export_ncaab_source_mirror.py) rebuilds the local API bundle from mirrored raw outputs.
 - [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1) keeps source-backed raw-output sync only behind the explicit manual switch `-RefreshRawOutputsFromSource`.
-- [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py) now fetches The Odds API data directly inside Syndicate, so the normal source-mode refresh path no longer imports `ncaab_model` from a sibling checkout.
+- [scripts/refresh_ncaab_odds_history.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_odds_history.py) now fetches The Odds API data directly inside Syndicate, so the normal source-mode refresh path no longer imports `ncaab_model` from an external checkout.
 
 Owning files:
 - [scripts/refresh_ncaab_source_mirror.ps1](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_ncaab_source_mirror.ps1)
@@ -90,7 +90,7 @@ Outcome:
 - Focused regression coverage exists for the artifact-only export path and the explicit manual source-sync path.
 
 Next NCAAB gap:
-- The remaining NCAAB work is no longer about the normal odds-refresh path. Only the explicit compatibility switch `-RefreshRawOutputsFromSource` still reaches into a sibling checkout.
+- The remaining NCAAB work is no longer about the normal odds-refresh path. Only the explicit compatibility switch `-RefreshRawOutputsFromSource` still reaches into an external checkout.
 
 ### Workstream 1B: NBA live-state bootstrap removal
 
@@ -129,7 +129,7 @@ Tasks:
 - Split the current planner in [scripts/refresh_odds_sources.py](c:/Users/mostg/OneDrive/Coding/Syndicate/scripts/refresh_odds_sources.py) into two explicit layers:
   - generation jobs
   - ingestion jobs
-- Define one neutral ingest contract per sport. Each ingest contract should assume a stable artifact payload, not a sibling repo layout.
+- Define one neutral ingest contract per sport. Each ingest contract should assume a stable artifact payload, not a repo layout tied to an external source checkout.
 - Change the mirror scripts so `SourceRepo` is no longer the primary runtime assumption.
 - Introduce one hosted-safe source of truth per sport:
   - Syndicate-owned job output, or
@@ -142,10 +142,10 @@ Current status:
 - MLB, NBA, NHL, NFL, WNBA, and NCAAF mirror scripts all support `artifact_bundle_or_existing_mirror` via `SYNDICATE_ARTIFACT_ROOT_*` or `-UseExistingMirrorArtifacts`.
 - NCAAB already supports the hosted-safe raw-output bundle path via `existing_raw_outputs`.
 - NHL source mode now generates scoreboard, team-odds, and player-props artifacts locally through Syndicate, while source-root use is optional for compatibility-only processed/live-lens backfill.
-- The remaining gap in this milestone is not neutral ingest shape; it is generation ownership for MLB, NBA, NFL, and WNBA plus actual hosted publication/wiring of those artifact bundles.
+- The remaining gap in this milestone is not neutral ingest shape; it is generation ownership for MLB, NBA, WNBA, and deeper NHL processed/live-lens artifacts plus actual hosted publication/wiring of those bundles.
 
 Exit criteria:
-- Refresh planning can target hosted-safe generation or hosted-safe ingestion without assuming sibling repos.
+- Refresh planning can target hosted-safe generation or hosted-safe ingestion without assuming external source repos.
 - Mirror/import jobs operate on neutral artifact contracts instead of source repo directories.
 
 ## Milestone 3: Move runtime and state out of the web process

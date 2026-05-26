@@ -23,9 +23,7 @@ class MigrationGateRuntimeDependencyTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "repo"
             file_path = repo_root / "syndicate" / "features" / "nba" / "sources.py"
-            sibling_root = repo_root.parent / "NBA-Betting"
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            sibling_root.mkdir(parents=True, exist_ok=True)
 
             with patch.dict(os.environ, {}, clear=False):
                 roots = preferred_source_roots(

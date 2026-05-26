@@ -1,6 +1,6 @@
-﻿{
+{
     "date":  "2026-05-18",
-    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\NHL-Betting",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
     "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\nhl_source",
     "copiedArtifacts":  [
                             "predictions_2026-05-18.csv",

@@ -1,0 +1,1003 @@
+from __future__ import annotations
+
+import pandas as pd
+import requests
+from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo  # Python 3.9+
+except Exception:  # pragma: no cover
+    ZoneInfo = None  # type: ignore
+from typing import Any
+
+from .teams import normalize_team
+
+
+_BOVADA_REGIONS = ["A", "B", "C"]  # A: Americas, others as fallback
+_BOVADA_BASES = [
+    # Regular season categories
+    "https://www.bovada.lv/services/sports/event/v2/events/{region}/description/basketball/nba",
+    "https://www.bovada.lv/services/sports/event/v2/events/{region}/description/basketball/usa/nba",
+    # Preseason categories (correct slug is 'nba-pre-season')
+    "https://www.bovada.lv/services/sports/event/v2/events/{region}/description/basketball/nba-pre-season",
+    "https://www.bovada.lv/services/sports/event/v2/events/{region}/description/basketball/usa/nba-pre-season",
+    # Some deployments have used 'nba-preseason' historically; keep as fallback
+    "https://www.bovada.lv/services/sports/event/v2/events/{region}/description/basketball/nba-preseason",
+]
+_BOVADA_PARAMS = [
+    "",
+    "?lang=en",
+    "?lang=en&preMatchOnly=true&marketFilterId=def",
+    "?lang=en&marketFilterId=all",
+]
+ENDPOINTS = [
+    base.format(region=r) + q
+    for r in _BOVADA_REGIONS
+    for base in _BOVADA_BASES
+    for q in _BOVADA_PARAMS
+]
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://www.bovada.lv",
+    # Use preseason referer which is valid for both preseason and regular pages
+    "Referer": "https://www.bovada.lv/sports/basketball/nba-pre-season",
+    "Connection": "keep-alive",
+}
+
+
+def _safe_get(d: dict, *keys: str, default=None):
+    cur: Any = d
+    for k in keys:
+        if not isinstance(cur, dict):
+            return default
+        cur = cur.get(k, default)
+        if cur is default:
+            return default
+    return cur
+
+
+def _extract_markets(ev: dict, *, home_norm: str | None = None, away_norm: str | None = None) -> dict:
+    """Extract Moneyline, Spread, and Total from Bovada event JSON for full-game markets.
+
+    Strategy:
+    - Prefer markets in display group "Game Lines" or period indicating a full game.
+    - First pass: keyword-based detection (broad synonyms) for ML/ATS/TOTAL.
+    - Second pass: heuristic fallback by inspecting outcomes shape (e.g., two team outcomes w/o handicap -> ML).
+    - Filters out quarters/halves and alternate-line/team totals to avoid bad values.
+
+    Returns dict with keys: home_ml, away_ml, home_spread, away_spread, total, and price fields.
+    """
+    out = {
+        "home_ml": None, "away_ml": None,
+        "home_spread": None, "away_spread": None,
+        "home_spread_price": None, "away_spread_price": None,
+        "total": None, "total_over_price": None, "total_under_price": None,
+    }
+    
+    def _to_american(val) -> int | None:
+        try:
+            s = str(val)
+            if s.startswith("+"):
+                s = s[1:]
+            return int(s)
+        except Exception:
+            return None
+    
+    def _is_full_game(period_desc: str, dg_desc: str) -> bool:
+        # Treat 'Game Lines' and 'Main' display groups as full-game
+        if ("game lines" in dg_desc) or ("main" in dg_desc):
+            return True
+        pd = period_desc
+        # Consider generic or preseason descriptors as full game
+        return any(k in pd for k in ["game", "match", "full", "regular time", "regulation", "regular", "pre", "pre-season", "preseason"]) or (pd.strip() == "")
+    
+    def _looks_team_total(mtype: str, dg_desc: str) -> bool:
+        mt = mtype
+        return ("team" in mt) or ("team" in dg_desc)
+
+    dgs = ev.get("displayGroups", []) or []
+    # Candidates collected across markets, then reduced to best pick
+    def _dg_priority(desc: str) -> int:
+        d = desc.lower()
+        if ("game lines" in d) or ("game" in d and "lines" in d) or ("main" in d):
+            return 0
+        return 1
+    ml_cands: list[dict] = []  # each: {"home": int, "away": int, "prio": int}
+    spread_cands: dict[float, dict] = {}  # abs(handicap) -> {"home_h": float, "away_h": float, "home_price": int, "away_price": int, "prio": int}
+    total_cands: dict[float, dict] = {}   # total -> {"over_price": int, "under_price": int, "prio": int}
+    # Flatten markets
+    for dg in dgs:
+        dg_desc = str(dg.get("description") or dg.get("name") or "").lower()
+        # Prefer "game lines"/full game groups; still allow others if period filter passes
+        for m in dg.get("markets", []) or []:
+            mtype = (m.get("description") or m.get("marketType") or "").lower()
+            # Skip obvious non-full-game markets
+            period = m.get("period") or {}
+            period_desc = str(period.get("description") or period.get("abbreviation") or "").lower()
+            if any(k in period_desc for k in ["quarter", "1st quarter", "2nd quarter", "3rd quarter", "4th quarter", "half", "1st half", "2nd half"]):
+                continue
+            if "alternate" in mtype:
+                # Avoid alternate lines to keep a single canonical line
+                continue
+            # If display group doesn't look like full game, require period_desc that looks like game/match
+            if (("game lines" not in dg_desc) and ("main" not in dg_desc)) and not any(k in period_desc for k in ["game", "match", "full", "regular time", "regulation", "regular", "pre", "pre-season", "preseason"]):
+                # Allow totals/spreads named as game types as a fallback
+                if not any(k in mtype for k in [
+                    "moneyline", "money line", "match odds", "match result", "to win",
+                    "head to head", "h2h", "winner", "game winner", "match winner",
+                    "spread", "point spread", "handicap", "line", "against the spread", "ats",
+                    "total", "totals", "total points", "over/under", "o/u", "game total", "points total"
+                ]):
+                    continue
+            # Moneyline (keep names tight to avoid picking race/winner props)
+            is_ml = any(k in mtype for k in [
+                "moneyline", "money line", "match odds", "match result", "to win",
+                "head to head", "h2h"
+            ]) and not any(k in mtype for k in ["race", "first to", "margin", "exact", "by "])
+            if is_ml:
+                temp = {"home": None, "away": None}
+                for oc in m.get("outcomes", []) or []:
+                    typ = (oc.get("type") or "").lower()
+                    desc = str(oc.get("description") or oc.get("name") or oc.get("competitor") or "").strip().lower()
+                    price = _to_american(_safe_get(oc, "price", "american"))
+                    if price is None:
+                        continue
+                    if typ in ("home", "h") or (typ == "" and home_norm and (home_norm in desc)):
+                        temp["home"] = price
+                    elif typ in ("away", "a") or (typ == "" and away_norm and (away_norm in desc)):
+                        temp["away"] = price
+                if temp["home"] is not None and temp["away"] is not None:
+                    temp["prio"] = _dg_priority(dg_desc)
+                    ml_cands.append(temp)
+            # Point spread
+            elif any(k in mtype for k in ["spread", "point spread", "handicap", "against the spread", "ats"]) and ("player" not in mtype):
+                if _looks_team_total(mtype, dg_desc):
+                    # safeguard: don't confuse team totals w/ spreads
+                    pass
+                # Home/Away outcomes with handicap
+                for oc in m.get("outcomes", []) or []:
+                    typ = (oc.get("type") or "").lower()
+                    desc = str(oc.get("description") or oc.get("name") or oc.get("competitor") or "").strip().lower()
+                    price_obj = oc.get("price") or {}
+                    handicap = _safe_get(oc, "price", "handicap") or oc.get("handicap")
+                    try:
+                        hval = float(handicap) if handicap is not None else None
+                    except Exception:
+                        hval = None
+                    if hval is None:
+                        continue
+                    # capture juice for EV
+                    spr_price = None
+                    try:
+                        s = price_obj.get("american")
+                        spr_price = _to_american(s) if s is not None else None
+                    except Exception:
+                        spr_price = None
+                    key = round(abs(hval), 1)
+                    rec = spread_cands.setdefault(key, {"home_h": None, "away_h": None, "home_price": None, "away_price": None, "prio": _dg_priority(dg_desc)})
+                    if typ in ("home", "h") or (typ == "" and home_norm and (home_norm in desc)):
+                        rec["home_h"] = hval
+                        if spr_price is not None:
+                            rec["home_price"] = spr_price
+                    elif typ in ("away", "a") or (typ == "" and away_norm and (away_norm in desc)):
+                        rec["away_h"] = hval
+                        if spr_price is not None:
+                            rec["away_price"] = spr_price
+            # Game Total (exclude team totals and player/prop totals)
+            elif any(k in mtype for k in ["total", "totals", "total points", "over/under", "o/u", "game total", "points total"]) and not any(k in mtype for k in ["team", "player", "race", "alt"]):
+                # Total outcomes with over/under; handicap is the total line
+                for oc in m.get("outcomes", []) or []:
+                    price_obj = oc.get("price") or {}
+                    typ = (oc.get("type") or oc.get("description") or "").lower()
+                    handicap = _safe_get(oc, "price", "handicap") or oc.get("handicap")
+                    try:
+                        hval = float(handicap) if handicap is not None else None
+                    except Exception:
+                        hval = None
+                    if hval is None:
+                        continue
+                    # Only set total when period indicates a game/match or in a group named game lines
+                    if (("game lines" not in dg_desc) and ("main" not in dg_desc)) and not any(k in period_desc for k in ["game", "match", "full", "regular", "pre", "pre-season", "preseason"]):
+                        continue
+                    # Exclude team totals by display group name
+                    if "team" in dg_desc:
+                        continue
+                    # Sanity: ignore implausible NBA full-game totals (likely half/quarter/team totals slipped through)
+                    if hval < 150 or hval > 330:
+                        continue
+                    rec = total_cands.setdefault(round(hval,1), {"over_price": None, "under_price": None, "prio": _dg_priority(dg_desc)})
+                    # capture over/under prices
+                    try:
+                        s = price_obj.get("american")
+                        if s is not None:
+                            pr = _to_american(s)
+                            if "over" in typ:
+                                rec["over_price"] = pr
+                            elif "under" in typ:
+                                rec["under_price"] = pr
+                    except Exception:
+                        pass
+            # Heuristic fallbacks when keywords are missing
+            else:
+                if not _is_full_game(period_desc, dg_desc):
+                    continue
+                outs = list(m.get("outcomes", []) or [])
+                if not outs:
+                    continue
+                # Detect TOTAL: outcomes mention over/under and handicap in plausible range
+                types_str = " ".join([(o.get("type") or o.get("description") or "").lower() for o in outs])
+                if any(k in types_str for k in ["over", "under"]) and not _looks_team_total(mtype, dg_desc):
+                    for oc in outs:
+                        price_obj = oc.get("price") or {}
+                        handicap = _safe_get(oc, "price", "handicap") or oc.get("handicap")
+                        try:
+                            hval = float(handicap) if handicap is not None else None
+                        except Exception:
+                            hval = None
+                        if hval is None or hval < 150 or hval > 330:
+                            continue
+                        rec = total_cands.setdefault(round(hval,1), {"over_price": None, "under_price": None, "prio": _dg_priority(dg_desc)})
+                        pr = _to_american(price_obj.get("american"))
+                        t = (oc.get("type") or oc.get("description") or "").lower()
+                        if pr is not None:
+                            if "over" in t:
+                                rec["over_price"] = pr
+                            elif "under" in t:
+                                rec["under_price"] = pr
+                # Detect SPREAD: outcomes for both teams with handicap within range
+                if out["home_spread"] is None or out["away_spread"] is None:
+                    for oc in outs:
+                        price_obj = oc.get("price") or {}
+                        handicap = _safe_get(oc, "price", "handicap") or oc.get("handicap")
+                        try:
+                            hval = float(handicap) if handicap is not None else None
+                        except Exception:
+                            hval = None
+                        if hval is None or abs(hval) > 50:
+                            continue
+                        typ = (oc.get("type") or "").lower()
+                        desc = str(oc.get("description") or oc.get("name") or oc.get("competitor") or "").strip().lower()
+                        pr = _to_american((price_obj or {}).get("american"))
+                        key = round(abs(hval), 1)
+                        rec = spread_cands.setdefault(key, {"home_h": None, "away_h": None, "home_price": None, "away_price": None})
+                        if (typ in ("home", "h")) or (home_norm and home_norm in desc):
+                            rec["home_h"] = hval
+                            if pr is not None:
+                                rec["home_price"] = pr
+                        elif (typ in ("away", "a")) or (away_norm and away_norm in desc):
+                            rec["away_h"] = hval
+                            if pr is not None:
+                                rec["away_price"] = pr
+                # Detect ML: two team outcomes without handicap values
+                if out["home_ml"] is None or out["away_ml"] is None:
+                    # Ensure most outcomes have no handicap
+                    no_hcap = [o for o in outs if _safe_get(o, "price", "handicap") is None and o.get("handicap") is None]
+                    if len(no_hcap) >= 2:
+                        temp = {"home": None, "away": None}
+                        for oc in no_hcap:
+                            typ = (oc.get("type") or "").lower()
+                            desc = str(oc.get("description") or oc.get("name") or oc.get("competitor") or "").strip().lower()
+                            pr = _to_american(_safe_get(oc, "price", "american"))
+                            if pr is None:
+                                continue
+                            if (typ in ("home", "h")) or (home_norm and home_norm in desc):
+                                temp["home"] = pr
+                            elif (typ in ("away", "a")) or (away_norm and away_norm in desc):
+                                temp["away"] = pr
+                        if temp["home"] is not None and temp["away"] is not None:
+                            ml_cands.append(temp)
+    # Choose best ML candidate (first good one)
+    if ml_cands:
+        # Prefer display groups that look like main/game lines first
+        ml_cands.sort(key=lambda d: (d.get("prio", 1), ))
+        out["home_ml"] = ml_cands[0].get("home")
+        out["away_ml"] = ml_cands[0].get("away")
+    # Choose best spread candidate: smallest abs handicap then juice closeness to -110
+    if spread_cands:
+        def spread_score(k: float, rec: dict) -> tuple:
+            hp = rec.get("home_price"); ap = rec.get("away_price")
+            # distance from -110 on each side (use 200 if missing)
+            d = (abs((abs(hp) if hp is not None else 200) - 110) + abs((abs(ap) if ap is not None else 200) - 110))
+            return (rec.get("prio", 1), d, abs(k - (sum(spread_cands.keys())/max(len(spread_cands),1))))
+        best_key = sorted(((k, v) for k, v in spread_cands.items() if v.get("home_h") is not None and v.get("away_h") is not None), key=lambda kv: spread_score(kv[0], kv[1]))
+        if best_key:
+            k, rec = best_key[0]
+            out["home_spread"] = rec.get("home_h")
+            out["away_spread"] = rec.get("away_h")
+            out["home_spread_price"] = rec.get("home_price")
+            out["away_spread_price"] = rec.get("away_price")
+    # Choose best total candidate: prefer both prices but accept with one; prefer prices near -110
+    if total_cands:
+        def total_score(line: float, rec: dict) -> tuple:
+            op = rec.get("over_price"); up = rec.get("under_price")
+            d = (abs((abs(op) if op is not None else 110) - 110) + abs((abs(up) if up is not None else 110) - 110))
+            # prefer mid-range totals as tiebreaker (e.g., 210-240 typical)
+            bias = abs(line - 225.0)
+            return (rec.get("prio", 1), d, bias)
+        # Accept lines even if one price missing; pick best by prio then juice closeness
+        ln, rc = sorted(total_cands.items(), key=lambda it: total_score(it[0], it[1]))[0]
+        out["total"] = ln
+        op = rc.get("over_price"); up = rc.get("under_price")
+        out["total_over_price"] = op if op is not None else -110
+        out["total_under_price"] = up if up is not None else -110
+    return out
+
+
+def _period_key(period_desc: str) -> str | None:
+    pd = (period_desc or "").strip().lower()
+    if not pd:
+        return None
+    # Normalize common Bovada descriptors
+    if any(k in pd for k in ["1st half", "first half", "1h", "h1", "1sthalf"]):
+        return "h1"
+    if any(k in pd for k in ["2nd half", "second half", "2h", "h2", "2ndhalf"]):
+        return "h2"
+    if any(k in pd for k in ["1st quarter", "first quarter", "q1", "1q", "quarter 1"]):
+        return "q1"
+    if any(k in pd for k in ["2nd quarter", "second quarter", "q2", "2q", "quarter 2"]):
+        return "q2"
+    if any(k in pd for k in ["3rd quarter", "third quarter", "q3", "3q", "quarter 3"]):
+        return "q3"
+    if any(k in pd for k in ["4th quarter", "fourth quarter", "q4", "4q", "quarter 4"]):
+        return "q4"
+    return None
+
+
+def _extract_period_markets(ev: dict, *, home_norm: str | None = None, away_norm: str | None = None) -> dict:
+    """Extract half/quarter spread + total lines from Bovada event JSON.
+
+    Returns dict with keys like q1_total, q1_spread, h1_total, h1_spread (and optional price fields).
+    Spread is the HOME handicap (negative if home favored).
+    """
+    out: dict[str, Any] = {}
+
+    def _to_american(val) -> int | None:
+        try:
+            s = str(val)
+            if s.startswith("+"):
+                s = s[1:]
+            return int(s)
+        except Exception:
+            return None
+
+    def _dg_priority(desc: str) -> int:
+        d = (desc or "").lower()
+        if any(k in d for k in ["quarter", "half", "period", "game lines", "main"]):
+            return 0
+        return 1
+
+    # Track best picks by period for totals/spreads
+    best_total: dict[str, dict[str, Any]] = {}
+    best_spread: dict[str, dict[str, Any]] = {}
+
+    dgs = ev.get("displayGroups", []) or []
+    for dg in dgs:
+        dg_desc = str(dg.get("description") or dg.get("name") or "")
+        prio = _dg_priority(dg_desc)
+        for m in dg.get("markets", []) or []:
+            mtype = (m.get("description") or m.get("marketType") or "").lower()
+            if "alternate" in mtype:
+                continue
+            period = m.get("period") or {}
+            period_desc = str(period.get("description") or period.get("abbreviation") or "")
+            pkey = _period_key(period_desc)
+            if not pkey:
+                continue
+
+            outs = list(m.get("outcomes", []) or [])
+            if not outs:
+                continue
+
+            # TOTALS
+            if any(k in mtype for k in ["total", "totals", "total points", "over/under", "o/u"]) and not any(k in mtype for k in ["team", "player"]):
+                # Identify line from any outcome handicap
+                line = None
+                over_price = None
+                under_price = None
+                for oc in outs:
+                    price_obj = oc.get("price") or {}
+                    typ = (oc.get("type") or oc.get("description") or "").lower()
+                    handicap = _safe_get(oc, "price", "handicap") or oc.get("handicap")
+                    try:
+                        hval = float(handicap) if handicap is not None else None
+                    except Exception:
+                        hval = None
+                    if hval is not None:
+                        line = hval
+                    pr = _to_american(price_obj.get("american"))
+                    if pr is not None:
+                        if "over" in typ:
+                            over_price = pr
+                        elif "under" in typ:
+                            under_price = pr
+                # Sanity ranges (avoid accidentally grabbing full-game totals)
+                if line is None:
+                    continue
+                if pkey.startswith("q") and not (20 <= float(line) <= 120):
+                    continue
+                if pkey.startswith("h") and not (60 <= float(line) <= 200):
+                    continue
+                cur = best_total.get(pkey)
+                if cur is None or prio < int(cur.get("prio", 99)):
+                    best_total[pkey] = {"line": float(line), "over_price": over_price, "under_price": under_price, "prio": prio}
+
+            # SPREADS
+            elif any(k in mtype for k in ["spread", "point spread", "handicap", "ats"]) and ("player" not in mtype):
+                home_h = None
+                away_h = None
+                home_price = None
+                away_price = None
+                for oc in outs:
+                    typ = (oc.get("type") or "").lower()
+                    desc = str(oc.get("description") or oc.get("name") or oc.get("competitor") or "").strip().lower()
+                    price_obj = oc.get("price") or {}
+                    handicap = _safe_get(oc, "price", "handicap") or oc.get("handicap")
+                    try:
+                        hval = float(handicap) if handicap is not None else None
+                    except Exception:
+                        hval = None
+                    if hval is None:
+                        continue
+                    pr = _to_american(price_obj.get("american"))
+                    if typ in ("home", "h") or (typ == "" and home_norm and (home_norm in desc)):
+                        home_h = hval
+                        if pr is not None:
+                            home_price = pr
+                    elif typ in ("away", "a") or (typ == "" and away_norm and (away_norm in desc)):
+                        away_h = hval
+                        if pr is not None:
+                            away_price = pr
+                if home_h is None and away_h is not None:
+                    home_h = -float(away_h)
+                if away_h is None and home_h is not None:
+                    away_h = -float(home_h)
+                if home_h is None:
+                    continue
+                # Sanity: periods shouldn't have crazy ATS numbers
+                if abs(float(home_h)) > 30:
+                    continue
+                cur = best_spread.get(pkey)
+                if cur is None or prio < int(cur.get("prio", 99)):
+                    best_spread[pkey] = {"home_h": float(home_h), "away_h": float(away_h) if away_h is not None else None, "home_price": home_price, "away_price": away_price, "prio": prio}
+
+    # Materialize to flat dict
+    for pkey, rec in best_total.items():
+        out[f"{pkey}_total"] = rec.get("line")
+        if rec.get("over_price") is not None:
+            out[f"{pkey}_total_over_price"] = rec.get("over_price")
+        if rec.get("under_price") is not None:
+            out[f"{pkey}_total_under_price"] = rec.get("under_price")
+    for pkey, rec in best_spread.items():
+        out[f"{pkey}_spread"] = rec.get("home_h")
+        if rec.get("home_price") is not None:
+            out[f"{pkey}_home_spread_price"] = rec.get("home_price")
+        if rec.get("away_price") is not None:
+            out[f"{pkey}_away_spread_price"] = rec.get("away_price")
+    return out
+
+
+def fetch_bovada_period_lines_current(date: datetime | str, verbose: bool = False) -> pd.DataFrame:
+    """Fetch current Bovada half/quarter lines for the given ET calendar date.
+
+    Returns a wide DataFrame with columns:
+      date, home_team, visitor_team, h1_total,h2_total,q1_total..q4_total,h1_spread,h2_spread,q1_spread..q4_spread
+    Price columns may also be included when available.
+    """
+    if ZoneInfo is not None:
+        try:
+            et = ZoneInfo("US/Eastern")
+        except Exception:
+            et = None
+    else:
+        et = None
+
+    target_et = pd.to_datetime(str(date)).date()
+    rows: list[dict] = []
+    payloads = []
+    for url in ENDPOINTS:
+        try:
+            r = requests.get(url, timeout=30, headers=HEADERS)
+            if r.ok:
+                payloads.append(r.json())
+        except Exception as e:
+            if verbose:
+                print(f"[bovada] {url} failed: {e}")
+            continue
+
+    for p in payloads:
+        try:
+            for events in _walk_event_lists(p):
+                for ev in (events or []):
+                    try:
+                        dt = _to_dt_utc(ev.get("startTime"))
+                        if dt is not None:
+                            try:
+                                ct = dt.tz_convert(et).date() if et is not None else dt.date()
+                            except Exception:
+                                ct = dt.date()
+                        else:
+                            ct = None
+                    except Exception:
+                        ct = None
+                    if ct != target_et:
+                        continue
+
+                    comps = ev.get("competitors", []) or []
+                    home_name = None
+                    away_name = None
+                    for c in comps:
+                        nm = c.get("name") or c.get("team") or c.get("abbreviation")
+                        is_home = bool(c.get("home") is True or str(c.get("position")).upper() == "H")
+                        if is_home:
+                            home_name = nm
+                        else:
+                            away_name = away_name or nm
+                    if not home_name or not away_name:
+                        title = ev.get("description") or ev.get("name") or ""
+                        if " @ " in title:
+                            a, h = title.split(" @ ", 1)
+                            away_name = away_name or a
+                            home_name = home_name or h
+
+                    home = normalize_team(str(home_name or "").strip())
+                    away = normalize_team(str(away_name or "").strip())
+                    home_l = home.lower()
+                    away_l = away.lower()
+                    mk = _extract_period_markets(ev, home_norm=home_l, away_norm=away_l)
+                    if not mk:
+                        continue
+
+                    row = {
+                        "date": str(target_et),
+                        "home_team": home,
+                        "visitor_team": away,
+                    }
+                    row.update(mk)
+                    rows.append(row)
+        except Exception:
+            continue
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    # Keep one row per matchup (best-effort dedupe)
+    df = df.drop_duplicates(subset=["date", "home_team", "visitor_team"], keep="first")
+    return df
+
+
+def _to_dt_utc(val) -> pd.Timestamp | None:
+    try:
+        # Bovada often uses epoch millis; handle both ms and ISO strings
+        if isinstance(val, (int, float)) or (isinstance(val, str) and val.isdigit()):
+            return pd.to_datetime(int(val), unit="ms", utc=True)
+        return pd.to_datetime(val, utc=True)
+    except Exception:
+        return None
+
+
+def _walk_event_lists(payload: Any):
+    """Yield lists of events found anywhere under the payload.
+
+    Bovada responses can be arrays of category dicts; each may contain an 'events' array directly
+    or nested under additional arrays. This walker finds any dict with an 'events' key.
+    """
+    try:
+        if isinstance(payload, dict):
+            if isinstance(payload.get("events"), list):
+                yield payload.get("events")
+            # Recurse into values
+            for v in payload.values():
+                yield from _walk_event_lists(v)
+        elif isinstance(payload, list):
+            for item in payload:
+                yield from _walk_event_lists(item)
+    except Exception:
+        return
+
+
+def fetch_bovada_odds_current(date: datetime | str, verbose: bool = False) -> pd.DataFrame:
+    """Fetch current game odds from Bovada for events on the given calendar date (UTC date match).
+
+    Returns a normalized DataFrame with columns:
+      - date, commence_time, home_team, away_team, home_ml, away_ml, home_spread, away_spread, total, bookmaker
+    """
+    # Match by US/Eastern calendar day to align with slate dates; fallback to UTC if tzdata missing
+    if ZoneInfo is not None:
+        try:
+            et = ZoneInfo("US/Eastern")
+        except Exception:
+            et = None
+    else:
+        et = None
+    # Important: interpret the requested date as the ET calendar day provided by the caller,
+    # not as UTC midnight converted to ET (which can underflow to the prior day).
+    # Accept a string YYYY-MM-DD and use as-is (no tz involved)
+    target_et = pd.to_datetime(str(date)).date()
+    rows: list[dict] = []
+    payloads = []
+    for url in ENDPOINTS:
+        try:
+            r = requests.get(url, timeout=30, headers=HEADERS)
+            if r.ok:
+                payloads.append(r.json())
+        except Exception as e:
+            if verbose:
+                print(f"[bovada] {url} failed: {e}")
+            continue
+    # Traverse payloads to locate events lists regardless of depth
+    for p in payloads:
+        try:
+            for events in _walk_event_lists(p):
+                for ev in (events or []):
+                    try:
+                        dt = _to_dt_utc(ev.get("startTime"))
+                        if dt is not None:
+                            try:
+                                ct = dt.tz_convert(et).date() if et is not None else dt.date()
+                            except Exception:
+                                ct = dt.date()
+                        else:
+                            ct = None
+                    except Exception:
+                        ct = None
+                    if ct != target_et:
+                        continue
+                    comps = ev.get("competitors", []) or []
+                    home_name = None; away_name = None
+                    for c in comps:
+                        nm = c.get("name") or c.get("team") or c.get("abbreviation")
+                        # Bovada sometimes uses "home": True or a "position": "H"/"A"
+                        is_home = bool(c.get("home") is True or str(c.get("position")).upper() == "H")
+                        if is_home:
+                            home_name = nm
+                        else:
+                            away_name = away_name or nm
+                    if not home_name or not away_name:
+                        # fallback from titles
+                        title = ev.get("description") or ev.get("name") or ""
+                        if " @ " in title:
+                            a, h = title.split(" @ ", 1)
+                            away_name = away_name or a
+                            home_name = home_name or h
+                    home = normalize_team(str(home_name or "").strip())
+                    away = normalize_team(str(away_name or "").strip())
+                    # Normalize to lowercase for internal name matching
+                    home_l = home.lower()
+                    away_l = away.lower()
+                    mk = _extract_markets(ev, home_norm=home_l, away_norm=away_l)
+                    rows.append({
+                        "date": str(target_et),
+                        "commence_time": dt.isoformat() if dt is not None else ev.get("startTime"),
+                        "home_team": home,
+                        "visitor_team": away,
+                        "home_ml": mk.get("home_ml"),
+                        "away_ml": mk.get("away_ml"),
+                        "home_spread": mk.get("home_spread"),
+                        "away_spread": mk.get("away_spread"),
+                        "home_spread_price": mk.get("home_spread_price"),
+                        "away_spread_price": mk.get("away_spread_price"),
+                        "total": mk.get("total"),
+                        "total_over_price": mk.get("total_over_price"),
+                        "total_under_price": mk.get("total_under_price"),
+                        "bookmaker": "bovada",
+                    })
+        except Exception:
+            continue
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    # Sanity filters
+    def _clamp_ml(x):
+        try:
+            xi = int(x)
+            return xi if -20000 <= xi <= 20000 else None
+        except Exception:
+            return None
+    df["home_ml"] = df["home_ml"].apply(_clamp_ml)
+    df["away_ml"] = df["away_ml"].apply(_clamp_ml)
+    def _ok_spread(x):
+        try:
+            xv = float(x)
+            return xv if -50 <= xv <= 50 else None
+        except Exception:
+            return None
+    for c in ["home_spread","away_spread"]:
+        df[c] = df[c].apply(_ok_spread)
+    def _ok_total(x):
+        try:
+            xv = float(x)
+            return xv if 150 <= xv <= 330 else None
+        except Exception:
+            return None
+    df["total"] = df["total"].apply(_ok_total)
+    # De-duplicate: choose one row per game with the most complete data
+    keep_cols = [
+        "date","commence_time","home_team","visitor_team",
+        "home_ml","away_ml","home_spread","away_spread",
+        "home_spread_price","away_spread_price",
+        "total","total_over_price","total_under_price","bookmaker"
+    ]
+    df = df[keep_cols]
+    def pick_best(group: pd.DataFrame) -> pd.Series:
+        # Score completeness: count non-nulls in core fields; prefer rows with total present
+        core = ["home_ml","away_ml","home_spread","away_spread","total"]
+        g = group.copy()
+        g["_score"] = g[core].notna().sum(axis=1) + g["total"].notna().astype(int)
+        # Prefer realistic totals closer to median of group to avoid outliers if multiple totals present
+        if g["total"].notna().any():
+            med = g["total"].median(skipna=True)
+            g["_score"] += (g["total"].notna()).astype(int)
+            # small penalty for totals far from median
+            try:
+                g["_score"] -= (abs(g["total"] - med) / 10.0).fillna(0)
+            except Exception:
+                pass
+        # Highest score wins; tie-breaker earliest commence_time
+        g = g.sort_values(["_score","commence_time"], ascending=[False, True])
+        best = g.iloc[0].drop(labels=["_score"]) if "_score" in g.columns else g.iloc[0]
+        # Fill missing odds from others in the group if possible
+        for col in ["home_ml","away_ml","home_spread","away_spread","total",
+                    "home_spread_price","away_spread_price","total_over_price","total_under_price"]:
+            if pd.isna(best[col]):
+                vals = g[col].dropna()
+                if not vals.empty:
+                    best[col] = vals.iloc[0]
+        return best
+    # Avoid pandas FutureWarning by explicitly excluding grouping columns from the object
+    # passed to apply; then restore the keys with reset_index.
+    group_keys = ["date","home_team","visitor_team"]
+    value_cols = [c for c in keep_cols if c not in group_keys]
+    df = (
+        df.groupby(group_keys, sort=False)[value_cols]
+          .apply(pick_best)
+          .reset_index()
+    )
+    # The groupby-apply can produce a multi-index in older pandas; ensure clean DataFrame
+    if not isinstance(df, pd.DataFrame):
+        df = pd.DataFrame(df)
+    # Ensure bookmaker is set
+    if "bookmaker" not in df.columns:
+        df["bookmaker"] = "bovada"
+    return df.reset_index(drop=True)
+
+
+def fetch_bovada_player_props_current(date: datetime | str, verbose: bool = False) -> pd.DataFrame:
+    """Fetch current player props from Bovada for events on the given calendar date (US/Eastern).
+
+    Returns normalized columns compatible with props_edges:
+      - bookmaker, bookmaker_title, market, outcome_name (Over/Under), player_name, point, price, commence_time
+    """
+    # Timezone handling similar to game odds
+    if ZoneInfo is not None:
+        try:
+            et = ZoneInfo("US/Eastern")
+        except Exception:
+            et = None
+    else:
+        et = None
+    target_et = pd.to_datetime(str(date)).date()
+    payloads = []
+    for url in ENDPOINTS:
+        try:
+            r = requests.get(url, timeout=30, headers=HEADERS)
+            if r.ok:
+                payloads.append(r.json())
+        except Exception as e:
+            if verbose:
+                print(f"[bovada-props] {url} failed: {e}")
+            continue
+
+    def _market_to_key(desc: str) -> str | None:
+        d = (desc or "").lower()
+        # Match common Bovada labels
+        if "points + rebounds + assists" in d or "+ rebounds + assists" in d or "points rebounds assists" in d or "pra" in d:
+            return "player_points_rebounds_assists"
+        if "3-point" in d or "3pt" in d or "three point" in d or "3-point field goals" in d:
+            return "player_threes"
+        if "rebounds" in d:
+            return "player_rebounds"
+        if "assists" in d:
+            return "player_assists"
+        if "points" in d:
+            return "player_points"
+        return None
+
+    def _parse_player_from_market(desc: str) -> str:
+        """Extract a player name from Bovada market descriptions.
+
+        Handles formats like:
+        - "LeBron James - Total Points"
+        - "Points Milestones - Devin Booker (PHX)"
+        - "Assists - Chris Paul"
+        """
+        s = str(desc or "").strip()
+        low = s.lower()
+        # Try pattern where name is after hyphen and before optional team parentheses
+        import re
+        m = re.search(r"-\s*([A-Za-z][A-Za-z .\-']+?)(?:\s*\([A-Z]{2,3}\))?$", s)
+        if m:
+            return m.group(1).strip()
+        # Try pattern where name is before hyphen
+        if " - " in s:
+            left = s.split(" - ", 1)[0].strip()
+            # If left part looks like a person (two tokens), use it
+            parts = [p for p in left.replace("-", " ").split() if p]
+            if len(parts) >= 2 and all(any(c.isalpha() for c in p) for p in parts[:2]):
+                return left
+        # Fallback: strip common stat keywords from either end
+        repl = [" total", " points", " rebounds", " assists", " 3-point", " threes", " pra", " milestones"]
+        t = s
+        for token in repl:
+            if t.lower().endswith(token):
+                t = t[: -len(token)].strip()
+        return t
+
+    rows: list[dict] = []
+    for p in payloads:
+        try:
+            for events in _walk_event_lists(p):
+                for ev in (events or []):
+                    try:
+                        dt = _to_dt_utc(ev.get("startTime"))
+                        if dt is not None:
+                            try:
+                                ct = dt.tz_convert(et).date() if et is not None else dt.date()
+                            except Exception:
+                                ct = dt.date()
+                        else:
+                            ct = None
+                        if ct != target_et:
+                            continue
+                        dgs = ev.get("displayGroups", []) or []
+                        for dg in dgs:
+                            for m in dg.get("markets", []) or []:
+                                mdesc = m.get("description") or m.get("marketType") or ""
+                                # Player-specific markets often include the player's name in market description
+                                player_name = _parse_player_from_market(mdesc)
+                                key = _market_to_key(mdesc)
+                                if key is None:
+                                    # Some payloads put player in outcomes description like "Over/Under - LeBron James"
+                                    # Try outcomes to detect market type
+                                    od = " ".join([(o.get("description") or o.get("name") or "") for o in (m.get("outcomes") or [])]).lower()
+                                    key = _market_to_key(od)
+                                if key is None or not player_name or player_name.lower() in ("over", "under"):
+                                    continue
+                                outcomes = m.get("outcomes", []) or []
+                                # Case 1: Standard Over/Under with handicap
+                                std_found = False
+                                for oc in outcomes:
+                                    typ = (oc.get("type") or oc.get("description") or "").lower()
+                                    if ("over" in typ) or ("under" in typ):
+                                        price_obj = oc.get("price") or {}
+                                        point = price_obj.get("handicap") or oc.get("handicap")
+                                        try:
+                                            line = float(point)
+                                        except Exception:
+                                            line = None
+                                        american = price_obj.get("american")
+                                        try:
+                                            price = int(str(american).lstrip("+")) if american is not None else None
+                                        except Exception:
+                                            price = None
+                                        if line is None or price is None:
+                                            continue
+                                        outcome = "Over" if "over" in typ else "Under"
+                                        rows.append({
+                                            "bookmaker": "bovada",
+                                            "bookmaker_title": "Bovada",
+                                            "market": key,
+                                            "outcome_name": outcome,
+                                            "player_name": player_name,
+                                            "point": line,
+                                            "price": price,
+                                            "commence_time": dt.isoformat() if dt is not None else None,
+                                        })
+                                        std_found = True
+                                if std_found:
+                                    continue
+                                # Case 2: Milestones like "To Score 10+ Points" -> treat as Over at N-0.5
+                                import re
+                                for oc in outcomes:
+                                    desc = (oc.get("description") or oc.get("name") or "").lower()
+                                    # Extract threshold like 10+ or 1+
+                                    mplus = re.search(r"(\d+)(?:\+)", desc)
+                                    if not mplus:
+                                        continue
+                                    try:
+                                        thr = float(mplus.group(1))
+                                    except Exception:
+                                        continue
+                                    # Map to stat-specific baseline (no change; Over at thr-0.5)
+                                    line = thr - 0.5
+                                    price_obj = oc.get("price") or {}
+                                    american = price_obj.get("american")
+                                    try:
+                                        price = int(str(american).lstrip("+")) if american is not None else None
+                                    except Exception:
+                                        price = None
+                                    if price is None:
+                                        continue
+                                    rows.append({
+                                        "bookmaker": "bovada",
+                                        "bookmaker_title": "Bovada",
+                                        "market": key,
+                                        "outcome_name": "Over",
+                                        "player_name": player_name,
+                                        "point": line,
+                                        "price": price,
+                                        "commence_time": dt.isoformat() if dt is not None else None,
+                                    })
+                    except Exception as e:
+                        if verbose:
+                            print(f"[bovada-props] event parse error: {e}")
+                        continue
+        except Exception:
+            continue
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        # Drop exact duplicates that Bovada sometimes repeats across display groups
+        keep = [
+            "bookmaker", "bookmaker_title", "market", "outcome_name",
+            "player_name", "point", "price", "commence_time"
+        ]
+        existing = [c for c in keep if c in df.columns]
+        if existing:
+            df = df.drop_duplicates(subset=existing, keep="first").reset_index(drop=True)
+    return df
+
+
+def probe_bovada(date: datetime | str, verbose: bool = False) -> dict:
+    """Probe Bovada endpoints and report counts for the given date (US/Eastern match).
+
+    Returns a dict with target_date and a list of results per URL including HTTP status and event counts.
+    """
+    # Compute target ET date similar to fetch function
+    if ZoneInfo is not None:
+        try:
+            et = ZoneInfo("US/Eastern")
+        except Exception:
+            et = None
+    else:
+        et = None
+    # Interpret requested date as the ET calendar day (no UTC shift)
+    target_et = pd.to_datetime(str(date)).date()
+    out = {"target_date": str(target_et), "results": []}
+    for url in ENDPOINTS:
+        ent = {"url": url, "status": None, "events_total": 0, "events_on_date": 0, "error": None}
+        try:
+            r = requests.get(url, timeout=30, headers=HEADERS)
+            ent["status"] = r.status_code
+            if r.ok:
+                payload = r.json()
+                total = 0
+                on_date = 0
+                first_ts = None
+                for events in _walk_event_lists(payload):
+                    lst = list(events or [])
+                    total += len(lst)
+                    for ev in lst:
+                        try:
+                            dt = _to_dt_utc(ev.get("startTime"))
+                            if dt is None:
+                                continue
+                            if first_ts is None:
+                                first_ts = dt.isoformat()
+                            try:
+                                ct = dt.tz_convert(et).date() if et is not None else dt.date()
+                            except Exception:
+                                ct = dt.date()
+                            if ct == target_et:
+                                on_date += 1
+                        except Exception:
+                            pass
+                ent["events_total"] = total
+                ent["events_on_date"] = on_date
+                ent["first_event_ts_utc"] = first_ts
+            else:
+                ent["error"] = f"http {r.status_code}"
+        except Exception as e:
+            ent["error"] = str(e)
+        out["results"].append(ent)
+    return out

@@ -1,8 +1,8 @@
-﻿{
+{
     "sport":  "nhl",
     "date":  "2026-05-21",
     "refreshedAtUtc":  "2026-05-21T22:27:02.6309044Z",
-    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\NHL-Betting",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NHL",
     "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\nhl_source",
     "copiedArtifactCount":  12,

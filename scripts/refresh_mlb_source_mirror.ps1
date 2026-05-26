@@ -1,6 +1,6 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\MLB-BettingV2",
+    [string]$SourceRepo = "",
     [string]$SourceArtifactRoot = "",
     [switch]$UseExistingMirrorArtifacts
 )
@@ -12,6 +12,8 @@ $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_MLB'
 $sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_MLB'
 $sourceRoot = $null
 $artifactRoot = $null
+$localSourceRoot = Join-Path $repoRoot 'data\mlb_source'
+$localArtifactRoot = Join-Path $localSourceRoot 'source_artifacts'
 $destDataRoot = Join-Path $repoRoot 'data\mlb_source\data'
 $dateSlug = $Date -replace '-', '_'
 $season = ($Date -split '-')[0]
@@ -25,6 +27,9 @@ if (-not $UseExistingMirrorArtifacts) {
     if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
         $artifactRootCandidate = [Environment]::GetEnvironmentVariable($sourceArtifactRootEnvVar)
     }
+    if ([string]::IsNullOrWhiteSpace($artifactRootCandidate) -and (Test-Path $localArtifactRoot)) {
+        $artifactRootCandidate = $localArtifactRoot
+    }
     if (-not [string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
         if (-not (Test-Path $artifactRootCandidate)) {
             throw "Artifact root path not found: $artifactRootCandidate. Set $sourceArtifactRootEnvVar or pass -SourceArtifactRoot with a published MLB artifact bundle path."
@@ -36,10 +41,15 @@ if (-not $UseExistingMirrorArtifacts) {
 if ((-not $UseExistingMirrorArtifacts) -and (-not $artifactRoot)) {
     $sourceRootCandidate = [Environment]::GetEnvironmentVariable($sourceRootEnvVar)
     if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
+        if (Test-Path $localSourceRoot) {
+            $sourceRootCandidate = $localSourceRoot
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($sourceRootCandidate)) {
         $sourceRootCandidate = Join-Path $repoRoot $SourceRepo
     }
     if (-not (Test-Path $sourceRootCandidate)) {
-        throw "Source repo path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, set $sourceArtifactRootEnvVar / -SourceArtifactRoot, or use -UseExistingMirrorArtifacts."
+        throw "Source path not found: $sourceRootCandidate. Set $sourceRootEnvVar, pass -SourceRepo, set $sourceArtifactRootEnvVar / -SourceArtifactRoot, or use -UseExistingMirrorArtifacts."
     }
     $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
 }
@@ -99,11 +109,17 @@ function Write-JsonFile {
 $copied = New-Object System.Collections.Generic.List[string]
 
 $filePairs = @(
+    @("data\daily\lineups_last_known_by_team.json", "daily\lineups_last_known_by_team.json"),
     @("data\daily\daily_summary_$dateSlug.json", "daily\daily_summary_$dateSlug.json"),
     @("data\daily\daily_summary_${dateSlug}_profile_bundle.json", "daily\daily_summary_${dateSlug}_profile_bundle.json"),
     @("data\daily\daily_summary_${dateSlug}_locked_policy.json", "daily\daily_summary_${dateSlug}_locked_policy.json"),
     @("data\daily\daily_summary_${dateSlug}_hr_targets.json", "daily\daily_summary_${dateSlug}_hr_targets.json"),
     @("data\daily\daily_summary_${dateSlug}_rfi_targets.json", "daily\daily_summary_${dateSlug}_rfi_targets.json"),
+    @("data\manager\manager_tendencies.json", "manager\manager_tendencies.json"),
+    @("data\manager\probable_pitcher_overrides.json", "manager\probable_pitcher_overrides.json"),
+    @("data\park\park_factors.json", "park\park_factors.json"),
+    @("data\umpire\umpire_factors.json", "umpire\umpire_factors.json"),
+    @("data\umpire\umpire_factors_report_2025-07-01_2025-09-30.json", "umpire\umpire_factors_report_2025-07-01_2025-09-30.json"),
     @("data\daily\ladders\daily_ladders_$dateSlug.json", "daily\ladders\daily_ladders_$dateSlug.json"),
     @("data\daily\top_props\daily_top_props_$dateSlug.json", "daily\top_props\daily_top_props_$dateSlug.json"),
     @("data\daily\ops\daily_ops_$dateSlug.json", "daily\ops\daily_ops_$dateSlug.json"),
@@ -126,9 +142,20 @@ foreach ($pair in $filePairs) {
 }
 
 $dirPairs = @(
+    @("data\cache", "cache"),
+    @("data\daily_hitter_props", "daily_hitter_props"),
+    @("data\daily_pitcher_props", "daily_pitcher_props"),
     @("data\daily\snapshots\$Date", "daily\snapshots\$Date"),
     @("data\daily\sims\$Date", "daily\sims\$Date"),
+    @("data\manager", "manager"),
+    @("data\park", "park"),
     @("data\market\oddsapi\refresh_history\$dateSlug", "market\oddsapi\refresh_history\$dateSlug"),
+    @("data\raw\statcast\pitches", "raw\statcast\pitches"),
+    @("data\raw\statsapi\feed_live", "raw\statsapi\feed_live"),
+    @("data\roster_registry", "roster_registry"),
+    @("data\runtime", "runtime"),
+    @("data\statcast", "statcast"),
+    @("data\umpire", "umpire"),
     @("data\raw\statsapi\feed_live\$season\$Date", "raw\statsapi\feed_live\$season\$Date")
 )
 

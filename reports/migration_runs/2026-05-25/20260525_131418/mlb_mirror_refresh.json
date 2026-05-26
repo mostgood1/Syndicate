@@ -1,8 +1,8 @@
-﻿{
+{
     "sport":  "mlb",
     "date":  "2026-05-25",
     "refreshedAtUtc":  "2026-05-25T18:14:19.5708930Z",
-    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2",
+    "sourceRepo":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
     "sourceArtifactRoot":  null,
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_MLB",
     "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_MLB",

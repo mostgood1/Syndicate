@@ -353,10 +353,19 @@ class OpsRefreshApiTests(unittest.TestCase):
     def test_build_refresh_plan_uses_mlb_syndicate_runner_in_source_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
 
-        plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="mlb", execution_mode="source")
+        module = ops_refresh._refresh_script_module()
+        with patch.object(module, "_source_repo_root", side_effect=AssertionError("MLB should not resolve a sibling source repo")), patch(
+            "syndicate.features.shared.ops_refresh._refresh_script_module", return_value=module
+        ):
+            plan = ops_refresh.build_refresh_plan(date="2026-05-22", sports="mlb", execution_mode="source")
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
+        self.assertEqual(result["generation_mode"], "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle")
+        self.assertTrue((result.get("generation") or {}).get("hosted_safe"))
+        self.assertIn("data/mlb_source", (result.get("source_repo") or "").replace("\\", "/"))
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
         step = refresh_steps[0]
@@ -366,10 +375,12 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("--source-root", command)
         self.assertIn("--artifact-root", command)
         self.assertIn("data/mlb_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
+        self.assertNotIn("source checkout", " ".join(str(part) for part in command).lower())
         mirror = result.get("mirror") or {}
         mirror_command = mirror.get("command") or []
         self.assertIn("-SourceArtifactRoot", mirror_command)
         self.assertIn("data/mlb_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in mirror_command))
+        self.assertNotIn("source checkout", " ".join(str(part) for part in mirror_command).lower())
 
     def test_build_refresh_plan_uses_nhl_existing_mirror_command_in_mirror_only_mode(self) -> None:
         from syndicate.features.shared import ops_refresh
@@ -644,7 +655,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("scripts/refresh_nfl_oddsapi.py", " ".join(str(part) for part in command))
         self.assertNotIn("fetch_oddsapi_props.py --out", " ".join(str(part) for part in command))
         self.assertNotIn("src.odds_api_client", " ".join(str(part) for part in command))
-        self.assertIn("--source-root", command)
+        self.assertNotIn("--source-root", command)
         self.assertIn("--artifact-root", command)
         self.assertIn("data/nfl_source/source_artifacts", " ".join(str(part).replace("\\", "/") for part in command))
         mirror = result.get("mirror") or {}
@@ -742,7 +753,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         fake_status = {
             "refresh_status": {
                 "manifest_path": "reports/refresh_status/latest/refresh_status_latest.json",
-                "manifest": {"date": "2026-05-19", "refreshOdds": True, "artifactsDir": "reports/x"},
+                    "manifest": {"date": "2026-05-22", "refreshOdds": True, "artifactsDir": "reports/x"},
                 "artifacts": {"odds_refresh": {"path": "reports/x/odds_refresh.json", "exists": True}},
                 "mirror_manifests": [
                     {
@@ -752,7 +763,7 @@ class OpsRefreshApiTests(unittest.TestCase):
                         "date": "2026-05-19",
                         "copied_artifact_count": 14,
                         "artifact_groups": {"daily": 10, "eval": 4},
-                        "manifest": {"sourceRepo": "C:/repos/MLB-BettingV2"},
+                            "manifest": {"sourceRepo": "C:/repos/mlb_source_bundle"},
                     }
                 ],
                 "runtime": {"state": "finished", "detail": "Latest refresh run completed successfully.", "pid": 4321},
@@ -771,7 +782,7 @@ class OpsRefreshApiTests(unittest.TestCase):
                     "sport": "mlb",
                     "ok": True,
                     "notes": "MLB live refresh",
-                    "source_repo": "C:/repos/MLB-BettingV2",
+                        "source_repo": "C:/repos/mlb_source_bundle",
                     "generation": {"kind": "source_repo", "source_dependency": "source_repo", "hosted_safe": False},
                     "ingestion": {"kind": "mirror_script", "source_dependency": "local_artifacts", "hosted_safe": True, "contract": {"kind": "artifact_bundle_or_existing_mirror"}},
                     "refresh_steps": [
@@ -813,7 +824,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("Mirror manifests", html)
         self.assertIn("Copied 14 artifacts", html)
         self.assertIn("Contract: artifact_bundle_or_existing_mirror", html)
-        self.assertIn("Source repo: C:/repos/MLB-BettingV2", html)
+        self.assertIn("Source repo: C:/repos/mlb_source_bundle", html)
 
     def test_ops_page_labels_bundle_local_generation_as_source_context(self) -> None:
         fake_status = {"refresh_status": {"mirror_manifests": [], "runtime": {"state": "idle", "detail": "No active refresh run."}}, "daily_update": {"manifest": None}}

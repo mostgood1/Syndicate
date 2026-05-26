@@ -82,6 +82,54 @@ function Write-JsonFile {
     $Value | ConvertTo-Json -Depth 6 | Set-Content -Path $Path -Encoding utf8
 }
 
+function Copy-MatchingDatedArtifacts {
+    param(
+        [string]$SourceDirectory,
+        [string]$DestinationDirectory,
+        [string]$Prefix,
+        [string]$Suffix,
+        [datetime]$TargetDate
+    )
+
+    if (-not (Test-Path $SourceDirectory)) {
+        return 0
+    }
+
+    $escapedPrefix = [regex]::Escape($Prefix)
+    $escapedSuffix = [regex]::Escape($Suffix)
+    $pattern = '^{0}(?<date>\d{{4}}-\d{{2}}-\d{{2}}){1}$' -f $escapedPrefix, $escapedSuffix
+    $copiedCount = 0
+
+    foreach ($candidate in Get-ChildItem -Path $SourceDirectory -File | Sort-Object Name) {
+        $match = [regex]::Match($candidate.Name, $pattern)
+        if (-not $match.Success) {
+            continue
+        }
+
+        try {
+            $candidateDate = [datetime]::ParseExact($match.Groups['date'].Value, 'yyyy-MM-dd', $null)
+        }
+        catch {
+            continue
+        }
+
+        if ($candidateDate -gt [datetime]::ParseExact($Date, 'yyyy-MM-dd', $null)) {
+            continue
+        }
+
+        $destinationPath = Join-Path $DestinationDirectory $candidate.Name
+        if (-not (Copy-IfExists -SourcePath $candidate.FullName -DestinationPath $destinationPath)) {
+            continue
+        }
+        if (-not $copied.Contains($candidate.Name)) {
+            $copied.Add($candidate.Name) | Out-Null
+        }
+        $copiedCount += 1
+    }
+
+    return $copiedCount
+}
+
 $copied = New-Object System.Collections.Generic.List[string]
 
 $files = @(
@@ -101,6 +149,7 @@ $files = @(
     "recon_players_$Date.csv",
     "live_player_lens_tuning_$Date.csv",
     "boxscores_$Date.csv",
+    "boxscores_history.csv",
     "live_lens_projections_$Date.jsonl",
     "live_lens_signals_$Date.jsonl",
     "live_lens_tuning_override.json"
@@ -113,6 +162,9 @@ foreach ($name in $files) {
         $copied.Add($name) | Out-Null
     }
 }
+
+$boxscoresSourceRoot = if ($UseExistingMirrorArtifacts) { $destDataRoot } elseif ($artifactRoot) { Join-Path $artifactRoot 'data\processed' } else { Join-Path $sourceRoot 'data\processed' }
+Copy-MatchingDatedArtifacts -SourceDirectory $boxscoresSourceRoot -DestinationDirectory $destDataRoot -Prefix 'boxscores_' -Suffix '.csv' -TargetDate ([datetime]::ParseExact($Date, 'yyyy-MM-dd', $null)) | Out-Null
 
 $smartSimSourceRoot = if ($UseExistingMirrorArtifacts) { $destDataRoot } elseif ($artifactRoot) { Join-Path $artifactRoot 'data\processed' } else { Join-Path $sourceRoot 'data\processed' }
 if (Test-Path $smartSimSourceRoot) {

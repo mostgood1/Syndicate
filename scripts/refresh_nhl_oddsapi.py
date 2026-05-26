@@ -5,8 +5,10 @@ import json
 import os
 import shutil
 import sys
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
+from datetime import datetime, timedelta
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +39,11 @@ LIVE_LENS_FILES = (
 def _copy_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_file():
         return False
+    try:
+        if source.resolve() == destination.resolve():
+            return True
+    except Exception:
+        pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
     return True
@@ -64,6 +71,83 @@ def _collect_owned_nhl_artifacts(*, artifact_root: Path, date_str: str, team_mar
         parquet_path = str(Path(props_output).with_suffix(".parquet"))
         copied["props_line_paths"] = [path for path in [csv_path, parquet_path] if Path(path).exists()]
     return copied
+
+
+def _source_python_executable(source_root: Path) -> str:
+    override = str(os.environ.get("SYNDICATE_PYTHON_EXE") or "").strip()
+    if override and Path(override).exists() and "windowsapps" not in override.lower():
+        return override
+    if sys.executable and Path(sys.executable).exists() and "windowsapps" not in str(sys.executable).lower():
+        return sys.executable
+    for installed in (
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311" / "python.exe",
+        Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311-arm64" / "python.exe",
+    ):
+        if installed.exists():
+            return str(installed)
+    candidate = source_root / ".venv" / "Scripts" / "python.exe"
+    if candidate.exists() and "windowsapps" not in str(candidate).lower():
+        return str(candidate)
+    return sys.executable
+
+
+def _default_source_root() -> Path | None:
+    candidate = REPO_ROOT / "vendor" / "nhl_betting_repo"
+    cli_path = candidate / "nhl_betting" / "cli.py"
+    if cli_path.exists() and cli_path.is_file():
+        return candidate
+    return None
+
+
+def _run_source_cli(*, source_root: Path, artifact_root: Path, command_args: list[str]) -> None:
+    env = os.environ.copy()
+    data_dir = artifact_root / "data"
+    env["NHL_DATA_DIR"] = str(data_dir)
+    env["DATA_DIR"] = str(data_dir)
+    print(json.dumps({"phase": "source_cli", "command": command_args}))
+    completed = subprocess.run(
+        [_source_python_executable(source_root), "-m", "nhl_betting.cli", *command_args],
+        cwd=str(source_root),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"Source NHL CLI failed for {' '.join(command_args)} with exit code {completed.returncode}: {completed.stderr.strip() or completed.stdout.strip()}"
+        )
+
+
+def _run_source_generation(*, source_root: Path, artifact_root: Path, date_str: str, props_boxscore_n_sims: int) -> None:
+    _run_source_generation_multi(source_root=source_root, artifact_root=artifact_root, date_str=date_str, props_boxscore_n_sims=props_boxscore_n_sims, days_ahead=0)
+
+
+def _date_window(*, date_str: str, days_ahead: int) -> list[str]:
+    parsed = datetime.strptime(date_str, "%Y-%m-%d").date()
+    return [(parsed + timedelta(days=offset)).isoformat() for offset in range(0, max(0, int(days_ahead)) + 1)]
+
+
+def _run_source_generation_multi(*, source_root: Path, artifact_root: Path, date_str: str, props_boxscore_n_sims: int, days_ahead: int) -> None:
+    target_dates = _date_window(date_str=date_str, days_ahead=days_ahead)
+    for index, target_date in enumerate(target_dates):
+        pregame_batches = [
+            ["roster-update", "--date", target_date],
+            ["lineup-update", "--date", target_date, "--prefer-source", "none"],
+            ["team-odds-collect", "--date", target_date],
+            ["props-collect", "--date", target_date],
+        ]
+        if index == 0:
+            pregame_batches.insert(2, ["shifts-update", "--date", target_date])
+            pregame_batches.insert(3, ["injury-update", "--date", target_date])
+        for command_args in pregame_batches:
+            _run_source_cli(source_root=source_root, artifact_root=artifact_root, command_args=command_args)
+        if index == 0:
+            for command_args in (
+                ["props-simulate-boxscores", "--date", target_date, "--n-sims", str(int(props_boxscore_n_sims))],
+                ["props-recommendations-boxscores", "--date", target_date],
+                ["game-recommendations-sim", "--date", target_date],
+            ):
+                _run_source_cli(source_root=source_root, artifact_root=artifact_root, command_args=command_args)
 
 
 @contextmanager
@@ -97,40 +181,56 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
     if props_paths:
         copied["props_line_paths"] = props_paths
 
-    if source_root is None:
-        return copied
+    source_roots = [artifact_root]
+    if source_root is not None:
+        source_roots.append(source_root)
 
     for template in PROCESSED_FILES:
         filename = template.format(date=date_str)
-        source = source_root / "data" / "processed" / filename
         destination = processed_root / filename
-        if _copy_if_exists(source, destination):
-            copied.setdefault("processed_files", []).append(str(destination))
+        for candidate_root in source_roots:
+            source = candidate_root / "data" / "processed" / filename
+            if _copy_if_exists(source, destination):
+                copied.setdefault("processed_files", []).append(str(destination))
+                break
 
     for template in LIVE_LENS_FILES:
         filename = template.format(date=date_str)
         processed_destination = processed_root / filename
         live_lens_destination = live_lens_root / filename
-        sources = [
-            source_root / "data" / "processed" / filename,
-            source_root / "data" / "processed" / "live_lens" / filename,
-            source_root / "data" / "live_lens" / filename,
-        ]
-        if _copy_first_existing(sources=sources, destination=processed_destination):
-            copied.setdefault("live_lens_processed_files", []).append(str(processed_destination))
-        if _copy_first_existing(sources=sources, destination=live_lens_destination):
-            copied.setdefault("live_lens_files", []).append(str(live_lens_destination))
+        for candidate_root in source_roots:
+            sources = [
+                candidate_root / "data" / "processed" / filename,
+                candidate_root / "data" / "processed" / "live_lens" / filename,
+                candidate_root / "data" / "live_lens" / filename,
+            ]
+            if _copy_first_existing(sources=sources, destination=processed_destination):
+                copied.setdefault("live_lens_processed_files", []).append(str(processed_destination))
+                break
+        for candidate_root in source_roots:
+            sources = [
+                candidate_root / "data" / "processed" / filename,
+                candidate_root / "data" / "processed" / "live_lens" / filename,
+                candidate_root / "data" / "live_lens" / filename,
+            ]
+            if _copy_first_existing(sources=sources, destination=live_lens_destination):
+                copied.setdefault("live_lens_files", []).append(str(live_lens_destination))
+                break
 
     for name in ("oddsapi.csv", "oddsapi.parquet"):
-        team_source = source_root / "data" / "odds" / "team" / f"date={date_str}" / name
         team_destination = odds_team_root / name
-        if _copy_if_exists(team_source, team_destination):
-            copied["team_odds_paths"] = [str(path) for path in (odds_team_root / "oddsapi.csv", odds_team_root / "oddsapi.parquet") if path.exists()]
+        for candidate_root in source_roots:
+            team_source = candidate_root / "data" / "odds" / "team" / f"date={date_str}" / name
+            if _copy_if_exists(team_source, team_destination):
+                copied["team_odds_paths"] = [str(path) for path in (odds_team_root / "oddsapi.csv", odds_team_root / "oddsapi.parquet") if path.exists()]
+                break
 
-        props_source = source_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / name
         props_destination = props_root / name
-        if _copy_if_exists(props_source, props_destination):
-            copied["props_line_paths"] = [str(path) for path in (props_root / "oddsapi.csv", props_root / "oddsapi.parquet") if path.exists()]
+        for candidate_root in source_roots:
+            props_source = candidate_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / name
+            if _copy_if_exists(props_source, props_destination):
+                copied["props_line_paths"] = [str(path) for path in (props_root / "oddsapi.csv", props_root / "oddsapi.parquet") if path.exists()]
+                break
 
     return copied
 
@@ -142,23 +242,44 @@ def main() -> int:
     parser.add_argument("--artifact-root", required=False, default=str(REPO_ROOT / "data" / "nhl_source" / "source_artifacts"))
     parser.add_argument("--team-markets", default="h2h,spreads,totals")
     parser.add_argument("--props-source", default="oddsapi")
+    parser.add_argument("--props-boxscore-n-sims", type=int, default=1000)
+    parser.add_argument("--days-ahead", type=int, default=0)
     args = parser.parse_args()
 
-    source_root = Path(args.source_root).resolve() if args.source_root else None
+    default_source_root = _default_source_root()
+    source_root = Path(args.source_root).resolve() if args.source_root else default_source_root
     artifact_root = Path(args.artifact_root).resolve()
 
     try:
-        _collect_owned_nhl_artifacts(
-            artifact_root=artifact_root,
-            date_str=args.date,
-            team_markets=str(args.team_markets or "h2h,spreads,totals"),
-            props_source=str(args.props_source or "oddsapi"),
-        )
+        copied_by_date: dict[str, dict[str, object]] = {}
+        for target_date in _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0)):
+            copied_by_date[target_date] = _collect_owned_nhl_artifacts(
+                artifact_root=artifact_root,
+                date_str=target_date,
+                team_markets=str(args.team_markets or "h2h,spreads,totals"),
+                props_source=str(args.props_source or "oddsapi"),
+            )
+        if source_root is not None:
+            _run_source_generation_multi(
+                source_root=source_root,
+                artifact_root=artifact_root,
+                date_str=args.date,
+                props_boxscore_n_sims=int(args.props_boxscore_n_sims),
+                days_ahead=int(args.days_ahead or 0),
+            )
     except Exception as exc:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
 
     copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
+    lookahead_runs = []
+    for target_date in _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))[1:]:
+        lookahead_runs.append(
+            {
+                "date": target_date,
+                "artifact_bundle_files": _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=target_date),
+            }
+        )
     print(
         json.dumps(
             {
@@ -166,6 +287,7 @@ def main() -> int:
                 "date": args.date,
                 "artifact_bundle_root": str(artifact_root),
                 "artifact_bundle_files": copied,
+                "lookahead_runs": lookahead_runs,
             },
             indent=2,
         )

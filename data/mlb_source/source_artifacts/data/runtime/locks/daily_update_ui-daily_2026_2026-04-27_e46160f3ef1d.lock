@@ -1,0 +1,23 @@
+{
+  "workflow": "ui-daily",
+  "season": 2026,
+  "date": "2026-04-27",
+  "out_ROOT_DIR": "data/daily_pitcher_props",
+  "pid": 1748,
+  "created_at": "2026-04-27T13:10:04.779745",
+  "command": [
+    "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\tools\\daily_update.py",
+    "--date",
+    "2026-04-27",
+    "--season",
+    "2026",
+    "--seed",
+    "1337",
+    "--seed-source",
+    "default_fixed",
+    "--out",
+    "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily_pitcher_props",
+    "--lineups-last-known",
+    "C:\\Users\\mostg\\OneDrive\\Coding\\MLB-BettingV2\\data\\daily\\lineups_last_known_by_team.json"
+  ]
+}

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+from syndicate.features.shared import basketball_props_features
 
 
 class NbaRefreshRunnerTests(unittest.TestCase):
@@ -92,6 +95,62 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(commands[0][1], module.REPO_ROOT)
         self.assertEqual(int(state["rc_snapshot"]), 0)
         self.assertEqual(int(state["snapshot_rows"]), 1)
+
+    def test_player_logs_preflight_accepts_local_boxscores(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (processed_root / "boxscores_2026-05-22.csv").write_text(
+                "date,TEAM_ABBREVIATION,PLAYER_ID,PLAYER_NAME,MIN,PTS,REB,AST,FG3M\n"
+                "2026-05-21,BOS,1,Test Player,30,20,5,6,3\n",
+                encoding="utf-8",
+            )
+
+            ready, reason = module._ensure_player_logs_for_props_refresh(
+                source_root=source_root,
+                date_str="2026-05-22",
+                log_file=Path(tmp_dir) / "refresh.log",
+                heartbeat_cb=lambda *_args, **_kwargs: None,
+            )
+
+        self.assertTrue(ready)
+        self.assertIsNone(reason)
+
+    def test_player_logs_preflight_bootstraps_local_history_when_missing(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            (source_root / "data" / "processed").mkdir(parents=True, exist_ok=True)
+
+            with patch.object(module, "_bootstrap_local_boxscores_history_for_props", return_value=(True, None)):
+                ready, reason = module._ensure_player_logs_for_props_refresh(
+                    source_root=source_root,
+                    date_str="2026-05-22",
+                    log_file=Path(tmp_dir) / "refresh.log",
+                    heartbeat_cb=lambda *_args, **_kwargs: None,
+                )
+
+        self.assertTrue(ready)
+        self.assertIsNone(reason)
+
+    def test_load_player_logs_local_falls_back_to_boxscores_files(self) -> None:
+        class _FakeDataFrame:
+            def __init__(self):
+                self.empty = False
+
+        fake_logs = _FakeDataFrame()
+        fake_pd = types.SimpleNamespace(DataFrame=_FakeDataFrame)
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict("sys.modules", {"pandas": fake_pd}):
+            processed_root = Path(tmp_dir)
+            with patch.object(basketball_props_features, "_load_boxscores_as_player_logs", return_value=fake_logs):
+                logs = basketball_props_features.load_player_logs_local(processed_root=processed_root)
+
+        self.assertIs(logs, fake_logs)
 
     def test_run_refresh_via_cli_uses_inprocess_predict_props(self) -> None:
         module = self._load_module()
@@ -585,6 +644,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             for path, content in required_files.items():
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
+            (processed_root / "boxscores_2026-05-21.csv").write_text("game_id,player_id\nold-game,11\n", encoding="utf-8")
 
             season = module._resolve_nba_season_year(date_str)
             for name in (
@@ -619,7 +679,11 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_root / "data" / "processed" / f"props_edges_{date_str}.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / f"props_recommendations_{date_str}.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / f"game_cards_{date_str}.csv").exists())
+            self.assertTrue((artifact_root / "data" / "processed" / "boxscores_history.csv").exists())
             self.assertTrue((artifact_root / "data" / "processed" / "smart_sim_2026-05-22_BOS_NYK.json").exists())
+            history_text = (artifact_root / "data" / "processed" / "boxscores_history.csv").read_text(encoding="utf-8")
+            self.assertIn("old-game", history_text)
+            self.assertIn("game_id", history_text)
 
     def test_main_prefers_existing_artifact_bundle_before_source_job(self) -> None:
         module = self._load_module()
@@ -649,8 +713,6 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 date_str,
                 "--regions",
                 "us",
-                "--source-root",
-                str(source_root),
                 "--artifact-root",
                 str(artifact_root),
                 "--log-file",

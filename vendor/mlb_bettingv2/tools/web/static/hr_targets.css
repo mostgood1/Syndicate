@@ -1,0 +1,178 @@
+.hr-targets-body {
+  background:
+    radial-gradient(circle at top, rgba(255, 180, 122, 0.14), transparent 26%),
+    linear-gradient(180deg, #101824 0%, #142130 100%);
+  color: #edf4fb;
+}
+
+.hr-targets-shell {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+.hr-targets-header,
+.hr-targets-controls,
+.hr-target-game-head,
+.hr-target-card-head,
+.hr-targets-summary-grid,
+.hr-target-metrics,
+.hr-target-rank-block,
+.hr-target-player-block,
+.hr-targets-header-actions,
+.hr-target-game-meta {
+  display: flex;
+  gap: 12px;
+}
+
+.hr-targets-header,
+.hr-targets-controls,
+.hr-target-game-head,
+.hr-target-card-head {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.hr-targets-header {
+  margin-bottom: 20px;
+}
+
+.hr-targets-kicker,
+.hr-targets-summary-label,
+.hr-target-metric-label {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+  color: #f1bf86;
+}
+
+.hr-targets-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.hr-targets-title-row h1,
+.hr-target-game-head h2 {
+  margin: 0;
+}
+
+.hr-targets-header-meta,
+.hr-targets-source-meta,
+.hr-targets-empty-state {
+  color: #a8b7ca;
+}
+
+.hr-targets-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.hr-targets-summary {
+  margin-bottom: 20px;
+}
+
+.hr-targets-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.hr-targets-summary-card,
+.hr-target-game-card {
+  background: rgba(10, 19, 31, 0.88);
+  border: 1px solid rgba(241, 191, 134, 0.16);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+.hr-targets-summary-card {
+  padding: 16px;
+}
+
+.hr-targets-summary-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 22px;
+}
+
+.hr-targets-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.hr-target-game-card {
+  padding: 18px;
+}
+
+.hr-target-game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.hr-target-card-badges,
+.hr-target-result-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.hr-target-result-row {
+  justify-content: flex-start;
+}
+
+.hr-target-result-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f4f7fb;
+  font-size: 12px;
+}
+
+.hr-target-result-badge.is-win {
+  border-color: rgba(118, 224, 172, 0.34);
+  background: rgba(118, 224, 172, 0.1);
+}
+
+.hr-target-result-badge.is-loss {
+  border-color: rgba(255, 132, 132, 0.34);
+  background: rgba(122, 22, 22, 0.26);
+}
+
+.hr-target-result-badge.is-push,
+.hr-target-result-badge.is-pending,
+.hr-target-result-badge.is-unavailable,
+.hr-target-result-badge.is-actual {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hr-target-page-chip {
+  min-height: 0;
+}
+
+.hr-targets-empty-state {
+  padding: 24px;
+}
+
+@media (max-width: 860px) {
+  .hr-targets-header,
+  .hr-targets-controls,
+  .hr-target-game-head,
+  .hr-target-card-head {
+    flex-direction: column;
+  }
+
+  .hr-target-game-grid {
+    grid-template-columns: 1fr;
+  }
+}
