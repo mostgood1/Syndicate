@@ -1,0 +1,20 @@
+[2026-05-26T03:23:13] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m wnba_betting.cli export-game-cards --date 2026-05-25
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py", line 28, in <module>
+    from .league_status import build_league_status
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\league_status.py", line 8, in <module>
+    from .odds_api import player_props_raw_path
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\odds_api.py", line 15, in <module>
+    from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
+ModuleNotFoundError: No module named 'tenacity'
+[2026-05-26T03:23:14] export-game-cards did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\game_cards_2026-05-25.csv
+[2026-05-26T03:24:03] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m wnba_betting.cli export-game-cards --date 2026-05-25
+------------------------------ Export Game Cards ------------------------------
+{
+    'rows': 0,
+    'output': 
+'C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\vendor\\wnba_betting_repo\\data
+\\processed\\game_cards_2026-05-25.csv'
+}

@@ -1,0 +1,18 @@
+[2026-05-26T03:23:11] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-game-cards --date 2026-05-25
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 26, in <module>
+    from .rosters import fetch_rosters
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\rosters.py", line 8, in <module>
+    from nba_api.stats.endpoints import commonteamroster
+ModuleNotFoundError: No module named 'nba_api'
+[2026-05-26T03:23:12] export-game-cards did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_cards_2026-05-25.csv
+[2026-05-26T03:24:00] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-game-cards --date 2026-05-25
+------------------------------ Export Game Cards ------------------------------
+{
+    'rows': 0,
+    'output': 
+'C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\vendor\\nba_betting_repo\\data\
+\processed\\game_cards_2026-05-25.csv'
+}

@@ -1913,7 +1913,7 @@ def api_home():
         {
             "ok": True,
             "sports": payload["sports"],
-            "dashboard": payload["dashboard"],
+            "dashboard": payload.get("dashboard"),
             "html": payload["html"],
             "polled_at": payload["polled_at"],
         }

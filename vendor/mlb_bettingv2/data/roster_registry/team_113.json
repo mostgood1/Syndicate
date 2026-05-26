@@ -630,6 +630,632 @@
     },
     "2026-05-26": {
       "40Man": {
+        "added": [],
+        "players": [
+          {
+            "full_name": "Andrew Abbott",
+            "player_id": 671096,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Blake Dunn",
+            "player_id": 694362,
+            "position": "RF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Brady Singer",
+            "player_id": 663903,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Brandon Williamson",
+            "player_id": 682227,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Brock Burke",
+            "player_id": 656271,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Caleb Ferguson",
+            "player_id": 657571,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Chase Burns",
+            "player_id": 695505,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Chase Petty",
+            "player_id": 695534,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Chris Paddack",
+            "player_id": 663978,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Connor Phillips",
+            "player_id": 683175,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Dane Myers",
+            "player_id": 667472,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Edwin Arroyo",
+            "player_id": 695490,
+            "position": "SS",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Elly De La Cruz",
+            "player_id": 682829,
+            "position": "SS",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Emilio Pagán",
+            "player_id": 641941,
+            "position": "P",
+            "status": {
+              "code": "D15",
+              "description": "Injured 15-Day"
+            }
+          },
+          {
+            "full_name": "Eugenio Suárez",
+            "player_id": 553993,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Graham Ashcraft",
+            "player_id": 668933,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Héctor Rodríguez",
+            "player_id": 699302,
+            "position": "LF",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Hunter Greene",
+            "player_id": 668881,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "JJ Bleday",
+            "player_id": 668709,
+            "position": "LF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Jose Franco",
+            "player_id": 683742,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Jose Trevino",
+            "player_id": 624431,
+            "position": "C",
+            "status": {
+              "code": "D10",
+              "description": "Injured 10-Day"
+            }
+          },
+          {
+            "full_name": "Julian Aguiar",
+            "player_id": 687924,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Ke'Bryan Hayes",
+            "player_id": 663647,
+            "position": "3B",
+            "status": {
+              "code": "D10",
+              "description": "Injured 10-Day"
+            }
+          },
+          {
+            "full_name": "Kyle Nicolas",
+            "player_id": 693312,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Leo Balcazar",
+            "player_id": 699114,
+            "position": "SS",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Luis Mey",
+            "player_id": 682825,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Matt McLain",
+            "player_id": 680574,
+            "position": "2B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Nathaniel Lowe",
+            "player_id": 663993,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Nick Lodolo",
+            "player_id": 666157,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Noelvi Marte",
+            "player_id": 682622,
+            "position": "RF",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "P.J. Higgins",
+            "player_id": 664731,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Pierce Johnson",
+            "player_id": 572955,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Rhett Lowder",
+            "player_id": 695076,
+            "position": "P",
+            "status": {
+              "code": "D15",
+              "description": "Injured 15-Day"
+            }
+          },
+          {
+            "full_name": "Sal Stewart",
+            "player_id": 701398,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Sam Moll",
+            "player_id": 594580,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Spencer Steer",
+            "player_id": 668715,
+            "position": "LF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "TJ Friedl",
+            "player_id": 670770,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tejay Antone",
+            "player_id": 622088,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tony Santillan",
+            "player_id": 663574,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tyler Stephenson",
+            "player_id": 663886,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Will Benson",
+            "player_id": 666181,
+            "position": "RF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Zach Maxwell",
+            "player_id": 687209,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          }
+        ],
+        "removed": []
+      },
+      "active": {
+        "added": [],
+        "players": [
+          {
+            "full_name": "Andrew Abbott",
+            "player_id": 671096,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Blake Dunn",
+            "player_id": 694362,
+            "position": "RF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Brady Singer",
+            "player_id": 663903,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Brock Burke",
+            "player_id": 656271,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Caleb Ferguson",
+            "player_id": 657571,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Chase Burns",
+            "player_id": 695505,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Chris Paddack",
+            "player_id": 663978,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Dane Myers",
+            "player_id": 667472,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Elly De La Cruz",
+            "player_id": 682829,
+            "position": "SS",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Eugenio Suárez",
+            "player_id": 553993,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Graham Ashcraft",
+            "player_id": 668933,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "JJ Bleday",
+            "player_id": 668709,
+            "position": "LF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Matt McLain",
+            "player_id": 680574,
+            "position": "2B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Nathaniel Lowe",
+            "player_id": 663993,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Nick Lodolo",
+            "player_id": 666157,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "P.J. Higgins",
+            "player_id": 664731,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Pierce Johnson",
+            "player_id": 572955,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Sal Stewart",
+            "player_id": 701398,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Sam Moll",
+            "player_id": 594580,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Spencer Steer",
+            "player_id": 668715,
+            "position": "LF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "TJ Friedl",
+            "player_id": 670770,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tejay Antone",
+            "player_id": 622088,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tony Santillan",
+            "player_id": 663574,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tyler Stephenson",
+            "player_id": 663886,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Will Benson",
+            "player_id": 666181,
+            "position": "RF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Zach Maxwell",
+            "player_id": 687209,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          }
+        ],
+        "removed": []
+      }
+    },
+    "2026-05-27": {
+      "40Man": {
         "added": [
           553993,
           572955,
@@ -1327,5 +1953,5 @@
   },
   "team_abbr": "CIN",
   "team_id": 113,
-  "updated_at": "2026-05-25T19:32:03.344286"
+  "updated_at": "2026-05-26T11:39:16.380015"
 }

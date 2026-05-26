@@ -1,0 +1,106 @@
+[2026-05-26T16:12:00] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-26 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-26.csv' --regions us
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-26.csv with 2085 rows.
+[2026-05-26T16:12:01] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-26.csv (rows=2085)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 429, in export_props_predictions_local
+    finalize_props_predictions_local(
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 357, in finalize_props_predictions_local
+    raise RuntimeError(f"predict-props produced no rows for {date_str}")
+RuntimeError: predict-props produced no rows for 2026-05-26
+[2026-05-26T16:12:09] predict-props returned exit code 1 but downstream artifacts already exist for 2026-05-26; continuing
+[2026-05-26T16:12:09] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli fetch-schedule
+------------------------------- Fetch Schedule --------------------------------
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-26T16:12:11] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli predict-date --date 2026-05-26
+------------------------------- Predict (Date) --------------------------------
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-26.
+Updating Elo ---------------------------------------- 100% 0:00:00
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 15310, in <module>
+    cli()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 13079, in predict_date_cmd
+    res = _predict_from_matchups(slate)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 12300, in _predict_from_matchups
+    from .features_enhanced import build_features_enhanced
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\features_enhanced.py", line 14, in <module>
+    from .scrapers import BasketballReferenceScraper, NBAInjuryDatabase
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrapers\__init__.py", line 4, in <module>
+    from .injuries import ESPNInjuryScraper, NBAInjuryDatabase
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrapers\injuries.py", line 18, in <module>
+    from pypdf import PdfReader
+ModuleNotFoundError: No module named 'pypdf'
+[2026-05-26T16:12:14] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-05-26T16:12:14] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli daily-update --date 2026-05-26 --no-npu --no-git-push
+---------------------------- Enhanced Daily Update ----------------------------
+[NPU] Running enhanced daily update for 2026-05-26
+[INFO] NPU Acceleration: Disabled
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 15310, in <module>
+    cli()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 12448, in daily_update_cmd
+    console.print(f"\U0001f504 Reconciliation window: {reconcile_days} days")
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 1678, in print
+    with self:
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 864, in __exit__
+    self._exit_buffer()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 822, in _exit_buffer
+    self._check_buffer()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 2019, in _check_buffer
+    self._write_buffer()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 2055, in _write_buffer
+    legacy_windows_render(buffer, LegacyWindowsTerm(self.file))
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\_windows_renderer.py", line 19, in legacy_windows_render
+    term.write_text(text)
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\_win32_console.py", line 402, in write_text
+    self.write(text)
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f504' in position 0: character maps to <undefined>
+[2026-05-26T16:12:16] Skipping local props recommendations export for 2026-05-26: props predictions were not refreshed
+[2026-05-26T16:12:16] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-recommendations --date 2026-05-26
+Predictions not found: 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed
+\games_predictions_npu_2026-05-26.csv
+[2026-05-26T16:12:17] export-recommendations did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\recommendations_2026-05-26.csv

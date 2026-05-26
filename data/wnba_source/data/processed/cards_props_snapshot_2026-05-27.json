@@ -1,0 +1,845 @@
+{
+  "date": "2026-05-27",
+  "games": [
+    {
+      "home_tri": "NYL",
+      "away_tri": "PHX",
+      "prop_recommendations": {
+        "home": [],
+        "away": [
+          {
+            "basketball_priority_score": 10.0,
+            "basketball_reasons": [
+              "A healthy PHX rotation keeps touches spread out across the lineup."
+            ],
+            "basketball_summary": "A healthy PHX rotation keeps touches spread out across the lineup.",
+            "best": {
+              "basketball_reasons": [
+                "A healthy PHX rotation keeps touches spread out across the lineup."
+              ],
+              "basketball_summary": "A healthy PHX rotation keeps touches spread out across the lineup.",
+              "book": "draftkings",
+              "edge": 0.23508362477432648,
+              "ev": 0.5218856469990047,
+              "ev_pct": 52.188564699900475,
+              "line": 1.5,
+              "market": "threes",
+              "market_reasons": [
+                "Projected value is +52.2% per unit risked.",
+                "Multiple books are aligned on this side.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at +122.",
+                "Model probability clears the market by 23.5 points."
+              ],
+              "model_prob": 0.6855340752247769,
+              "model_reasons": [
+                "Win probability grades at 68.6%."
+              ],
+              "opponent": "NYL",
+              "p_win": 0.6855340752247769,
+              "player": "Kahleah Copper",
+              "player_name": "Kahleah Copper",
+              "price": 122.0,
+              "prob_calib": 0.6855340752247769,
+              "probability": 0.6855340752247769,
+              "reasons": [
+                "A healthy PHX rotation keeps touches spread out across the lineup.",
+                "Win probability grades at 68.6%.",
+                "Projected value is +52.2% per unit risked.",
+                "Multiple books are aligned on this side.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at +122.",
+                "Model probability clears the market by 23.5 points."
+              ],
+              "side": "under",
+              "sim_mu": 0.8717999999999999,
+              "team": "PHX"
+            },
+            "card_bucket": "official",
+            "card_rank": 1,
+            "date": "2026-05-27",
+            "display_pick": "Kahleah Copper Under 1.5 3PM",
+            "edge": 0.23508362477432648,
+            "ev": 0.5218856469990047,
+            "ev_pct": 52.19,
+            "game_key": "2026-05-27:PHX@NYL",
+            "implied_prob": 0.4505,
+            "line": 1.5,
+            "locked_policy_score": 44.232,
+            "locked_policy_sim_score": 30.0,
+            "locked_policy_trend_score": 10.0,
+            "locked_policy_value_score": 100.0,
+            "market": "threes",
+            "market_reasons": [
+              "Projected value is +52.2% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +122.",
+              "Model probability clears the market by 23.5 points."
+            ],
+            "matchup": "PHX",
+            "model_baseline": 0.8717999999999999,
+            "model_prob": 0.6855340752247769,
+            "model_reasons": [
+              "Win probability grades at 68.6%."
+            ],
+            "opponent": "NYL",
+            "p_win": 0.6855,
+            "picks": [
+              {
+                "book": "draftkings",
+                "edge": 0.23508362477432648,
+                "ev": 0.5218856469990047,
+                "ev_pct": 52.188564699900475,
+                "line": 1.5,
+                "market": "threes",
+                "player": "Kahleah Copper",
+                "player_name": "Kahleah Copper",
+                "price": 122.0,
+                "side": "under",
+                "team": "PHX"
+              },
+              {
+                "book": "williamhill_us",
+                "edge": 0.2330453874419715,
+                "ev": 0.515030306246757,
+                "ev_pct": 51.5030306246757,
+                "line": 1.5,
+                "market": "threes",
+                "player": "Kahleah Copper",
+                "player_name": "Kahleah Copper",
+                "price": 121.0,
+                "side": "under",
+                "team": "PHX"
+              },
+              {
+                "book": "fanduel",
+                "edge": 0.22681847889450168,
+                "ev": 0.49446428399001363,
+                "ev_pct": 49.44642839900136,
+                "line": 1.5,
+                "market": "threes",
+                "player": "Kahleah Copper",
+                "player_name": "Kahleah Copper",
+                "price": 118.0,
+                "side": "under",
+                "team": "PHX"
+              }
+            ],
+            "player": "Kahleah Copper",
+            "portfolio_rank": 1,
+            "portfolio_score": 0.677508,
+            "portfolio_selected": true,
+            "price": 122.0,
+            "prob": 0.6855340752247769,
+            "prob_calib": 0.6855340752247769,
+            "prob_edge": 0.2351,
+            "probability": 0.6855340752247769,
+            "reasons": [
+              "A healthy PHX rotation keeps touches spread out across the lineup.",
+              "Win probability grades at 68.6%.",
+              "Projected value is +52.2% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +122.",
+              "Model probability clears the market by 23.5 points."
+            ],
+            "recommendation_priority_score": 35.0,
+            "selection": "UNDER",
+            "side": "UNDER",
+            "sim_mu": 0.8717999999999999,
+            "sim_reasons": [
+              "Win probability grades at 68.6%."
+            ],
+            "sim_support_score": 30.0,
+            "source": "props_recommendations",
+            "stake_amount": 90.0,
+            "stake_pct": 0.18,
+            "stake_units": 1.8,
+            "team": "PHX",
+            "team_side": "away",
+            "top_play_baseline": 0.8717999999999999,
+            "top_play_consensus": 0.5,
+            "top_play_line_adv": 1.0,
+            "top_play_reasons": [
+              "A healthy PHX rotation keeps touches spread out across the lineup.",
+              "Win probability grades at 68.6%.",
+              "Projected value is +52.2% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +122.",
+              "Model probability clears the market by 23.5 points."
+            ],
+            "value_reasons": [
+              "Projected value is +52.2% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +122.",
+              "Model probability clears the market by 23.5 points."
+            ],
+            "value_support_score": 100.0,
+            "why_explain": "model 0.9 vs line 1.5 (-0.6)",
+            "win_prob": 0.6855340752247769
+          }
+        ]
+      }
+    },
+    {
+      "home_tri": "CHI",
+      "away_tri": "TOR",
+      "prop_recommendations": {
+        "home": [],
+        "away": [
+          {
+            "basketball_priority_score": 10.0,
+            "basketball_reasons": [
+              "A healthy TOR rotation keeps touches spread out across the lineup."
+            ],
+            "basketball_summary": "A healthy TOR rotation keeps touches spread out across the lineup.",
+            "best": {
+              "basketball_reasons": [
+                "A healthy TOR rotation keeps touches spread out across the lineup."
+              ],
+              "basketball_summary": "A healthy TOR rotation keeps touches spread out across the lineup.",
+              "book": "fanduel",
+              "edge": 0.04425976778445495,
+              "ev": 0.0817680455678913,
+              "ev_pct": 8.17680455678913,
+              "line": 24.5,
+              "market": "pr",
+              "market_reasons": [
+                "Projected value is +8.2% per unit risked.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at -118.",
+                "Model probability clears the market by 4.4 points."
+              ],
+              "model_prob": 0.5855441714541797,
+              "model_reasons": [
+                "Win probability grades at 58.6%."
+              ],
+              "opponent": "CHI",
+              "p_win": 0.5855441714541797,
+              "player": "Brittney Sykes",
+              "player_name": "Brittney Sykes",
+              "price": -118.0,
+              "prob_calib": 0.5855441714541797,
+              "probability": 0.5855441714541797,
+              "reasons": [
+                "A healthy TOR rotation keeps touches spread out across the lineup.",
+                "Win probability grades at 58.6%.",
+                "Projected value is +8.2% per unit risked.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at -118.",
+                "Model probability clears the market by 4.4 points."
+              ],
+              "side": "under",
+              "sim_mu": 19.24167713004484,
+              "team": "TOR"
+            },
+            "card_bucket": "official",
+            "card_rank": 3,
+            "date": "2026-05-27",
+            "display_pick": "Brittney Sykes Under 24.5 PR",
+            "edge": 0.04425976778445495,
+            "ev": 0.0817680455678913,
+            "ev_pct": 8.18,
+            "game_key": "2026-05-27:TOR@CHI",
+            "implied_prob": 0.5413,
+            "line": 24.5,
+            "locked_policy_score": 34.337,
+            "locked_policy_sim_score": 30.0,
+            "locked_policy_trend_score": 10.0,
+            "locked_policy_value_score": 72.7,
+            "market": "pr",
+            "market_reasons": [
+              "Projected value is +8.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -118.",
+              "Model probability clears the market by 4.4 points."
+            ],
+            "matchup": "TOR",
+            "model_baseline": 19.24167713004484,
+            "model_prob": 0.5855441714541797,
+            "model_reasons": [
+              "Win probability grades at 58.6%."
+            ],
+            "opponent": "CHI",
+            "p_win": 0.5855,
+            "picks": [
+              {
+                "book": "fanduel",
+                "edge": 0.04425976778445495,
+                "ev": 0.0817680455678913,
+                "ev_pct": 8.17680455678913,
+                "line": 24.5,
+                "market": "pr",
+                "player": "Brittney Sykes",
+                "player_name": "Brittney Sykes",
+                "price": -118.0,
+                "side": "under",
+                "team": "TOR"
+              },
+              {
+                "book": "draftkings",
+                "edge": 0.041528550253850494,
+                "ev": 0.08107955049561288,
+                "ev_pct": 8.107955049561289,
+                "line": 23.5,
+                "market": "pr",
+                "player": "Brittney Sykes",
+                "player_name": "Brittney Sykes",
+                "price": -105.0,
+                "side": "under",
+                "team": "TOR"
+              }
+            ],
+            "player": "Brittney Sykes",
+            "portfolio_rank": 3,
+            "portfolio_score": 0.482586,
+            "portfolio_selected": true,
+            "price": -118.0,
+            "prob": 0.5855441714541797,
+            "prob_calib": 0.5855441714541797,
+            "prob_edge": 0.0443,
+            "probability": 0.5855441714541797,
+            "reasons": [
+              "A healthy TOR rotation keeps touches spread out across the lineup.",
+              "Win probability grades at 58.6%.",
+              "Projected value is +8.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -118.",
+              "Model probability clears the market by 4.4 points."
+            ],
+            "recommendation_priority_score": 29.5,
+            "selection": "UNDER",
+            "side": "UNDER",
+            "sim_mu": 19.24167713004484,
+            "sim_reasons": [
+              "Win probability grades at 58.6%."
+            ],
+            "sim_support_score": 30.0,
+            "source": "props_recommendations",
+            "stake_amount": 90.0,
+            "stake_pct": 0.18,
+            "stake_units": 1.8,
+            "team": "TOR",
+            "team_side": "away",
+            "top_play_baseline": 19.24167713004484,
+            "top_play_consensus": 0.25,
+            "top_play_line_adv": 1.0,
+            "top_play_reasons": [
+              "A healthy TOR rotation keeps touches spread out across the lineup.",
+              "Win probability grades at 58.6%.",
+              "Projected value is +8.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -118.",
+              "Model probability clears the market by 4.4 points."
+            ],
+            "value_reasons": [
+              "Projected value is +8.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -118.",
+              "Model probability clears the market by 4.4 points."
+            ],
+            "value_support_score": 72.7,
+            "why_explain": "model 19.2 vs line 24.5 (-5.3)",
+            "win_prob": 0.5855441714541797
+          }
+        ]
+      }
+    },
+    {
+      "home_tri": "MIN",
+      "away_tri": "ATL",
+      "prop_recommendations": {
+        "home": [],
+        "away": [
+          {
+            "basketball_priority_score": 0.0,
+            "basketball_reasons": [],
+            "best": {
+              "basketball_reasons": [],
+              "book": "draftkings",
+              "edge": 0.25971512713722533,
+              "ev": 0.46421522724527686,
+              "ev_pct": 46.421522724527684,
+              "line": 2.5,
+              "market": "threes",
+              "market_reasons": [
+                "Projected value is +46.4% per unit risked.",
+                "Multiple books are aligned on this side.",
+                "The current book is still hanging the best available line.",
+                "Model probability clears the market by 26.0 points."
+              ],
+              "model_prob": 0.819186492775992,
+              "model_reasons": [
+                "Win probability grades at 81.9%."
+              ],
+              "opponent": "MIN",
+              "p_win": 0.819186492775992,
+              "player": "Rhyne Howard",
+              "player_name": "Rhyne Howard",
+              "price": -127.0,
+              "prob_calib": 0.819186492775992,
+              "probability": 0.819186492775992,
+              "reasons": [
+                "Win probability grades at 81.9%.",
+                "Projected value is +46.4% per unit risked.",
+                "Multiple books are aligned on this side.",
+                "The current book is still hanging the best available line.",
+                "Model probability clears the market by 26.0 points."
+              ],
+              "side": "over",
+              "sim_mu": 3.68595,
+              "team": "ATL"
+            },
+            "card_bucket": "playable",
+            "card_rank": 1,
+            "date": "2026-05-27",
+            "display_pick": "Rhyne Howard Over 2.5 3PM",
+            "edge": 0.25971512713722533,
+            "ev": 0.46421522724527686,
+            "ev_pct": 46.42,
+            "game_key": "2026-05-27:ATL@MIN",
+            "implied_prob": 0.5595,
+            "line": 2.5,
+            "locked_policy_score": 40.175,
+            "locked_policy_sim_score": 30.0,
+            "locked_policy_trend_score": 0.0,
+            "locked_policy_value_score": 100.0,
+            "market": "threes",
+            "market_reasons": [
+              "Projected value is +46.4% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "Model probability clears the market by 26.0 points."
+            ],
+            "matchup": "ATL",
+            "model_baseline": 3.68595,
+            "model_prob": 0.819186492775992,
+            "model_reasons": [
+              "Win probability grades at 81.9%."
+            ],
+            "opponent": "MIN",
+            "p_win": 0.8192,
+            "picks": [
+              {
+                "book": "draftkings",
+                "edge": 0.25971512713722533,
+                "ev": 0.46421522724527686,
+                "ev_pct": 46.421522724527684,
+                "line": 2.5,
+                "market": "threes",
+                "player": "Rhyne Howard",
+                "player_name": "Rhyne Howard",
+                "price": -127.0,
+                "side": "over",
+                "team": "ATL"
+              },
+              {
+                "book": "williamhill_us",
+                "edge": 0.25022097553461253,
+                "ev": 0.43978232063659173,
+                "ev_pct": 43.97823206365917,
+                "line": 2.5,
+                "market": "threes",
+                "player": "Rhyne Howard",
+                "player_name": "Rhyne Howard",
+                "price": -132.0,
+                "side": "over",
+                "team": "ATL"
+              },
+              {
+                "book": "fanduel",
+                "edge": 0.23935456000288258,
+                "ev": 0.4127998933383048,
+                "ev_pct": 41.27998933383048,
+                "line": 2.5,
+                "market": "threes",
+                "player": "Rhyne Howard",
+                "player_name": "Rhyne Howard",
+                "price": -138.0,
+                "side": "over",
+                "team": "ATL"
+              }
+            ],
+            "player": "Rhyne Howard",
+            "portfolio_rank": null,
+            "portfolio_score": 0.651138,
+            "portfolio_selected": false,
+            "price": -127.0,
+            "prob": 0.819186492775992,
+            "prob_calib": 0.819186492775992,
+            "prob_edge": 0.2597,
+            "probability": 0.819186492775992,
+            "reasons": [
+              "Win probability grades at 81.9%.",
+              "Projected value is +46.4% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "Model probability clears the market by 26.0 points."
+            ],
+            "recommendation_priority_score": 30.5,
+            "selection": "OVER",
+            "side": "OVER",
+            "sim_mu": 3.68595,
+            "sim_reasons": [
+              "Win probability grades at 81.9%."
+            ],
+            "sim_support_score": 30.0,
+            "source": "props_recommendations",
+            "stake_amount": null,
+            "stake_pct": null,
+            "stake_units": null,
+            "team": "ATL",
+            "team_side": "away",
+            "top_play_baseline": 3.68595,
+            "top_play_consensus": 0.5,
+            "top_play_line_adv": 1.0,
+            "top_play_reasons": [
+              "Win probability grades at 81.9%.",
+              "Projected value is +46.4% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "Model probability clears the market by 26.0 points."
+            ],
+            "value_reasons": [
+              "Projected value is +46.4% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "Model probability clears the market by 26.0 points."
+            ],
+            "value_support_score": 100.0,
+            "why_explain": "model 3.7 vs line 2.5 (+1.2)",
+            "win_prob": 0.819186492775992
+          }
+        ]
+      }
+    },
+    {
+      "home_tri": "POR",
+      "away_tri": "CON",
+      "prop_recommendations": {
+        "home": [
+          {
+            "basketball_priority_score": 0.0,
+            "basketball_reasons": [],
+            "best": {
+              "basketball_reasons": [],
+              "book": "draftkings",
+              "edge": 0.23111259691364155,
+              "ev": 0.5107588391791478,
+              "ev_pct": 51.07588391791478,
+              "line": 2.5,
+              "market": "threes",
+              "market_reasons": [
+                "Projected value is +51.1% per unit risked.",
+                "Multiple books are aligned on this side.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at +121.",
+                "Model probability clears the market by 23.1 points."
+              ],
+              "model_prob": 0.683601284696447,
+              "model_reasons": [
+                "Win probability grades at 68.4%."
+              ],
+              "opponent": "CON",
+              "p_win": 0.683601284696447,
+              "player": "Bridget Carleton",
+              "player_name": "Bridget Carleton",
+              "price": 121.0,
+              "prob_calib": 0.683601284696447,
+              "probability": 0.683601284696447,
+              "reasons": [
+                "Win probability grades at 68.4%.",
+                "Projected value is +51.1% per unit risked.",
+                "Multiple books are aligned on this side.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at +121.",
+                "Model probability clears the market by 23.1 points."
+              ],
+              "side": "over",
+              "sim_mu": 3.121131034482759,
+              "team": "POR"
+            },
+            "card_bucket": "playable",
+            "card_rank": 2,
+            "date": "2026-05-27",
+            "display_pick": "Bridget Carleton Over 2.5 3PM",
+            "edge": 0.23111259691364155,
+            "ev": 0.5107588391791478,
+            "ev_pct": 51.08,
+            "game_key": "2026-05-27:CON@POR",
+            "implied_prob": 0.4525,
+            "line": 2.5,
+            "locked_policy_score": 39.66,
+            "locked_policy_sim_score": 30.0,
+            "locked_policy_trend_score": 0.0,
+            "locked_policy_value_score": 100.0,
+            "market": "threes",
+            "market_reasons": [
+              "Projected value is +51.1% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +121.",
+              "Model probability clears the market by 23.1 points."
+            ],
+            "matchup": "POR",
+            "model_baseline": 3.121131034482759,
+            "model_prob": 0.683601284696447,
+            "model_reasons": [
+              "Win probability grades at 68.4%."
+            ],
+            "opponent": "CON",
+            "p_win": 0.6836,
+            "picks": [
+              {
+                "book": "draftkings",
+                "edge": 0.23111259691364155,
+                "ev": 0.5107588391791478,
+                "ev_pct": 51.07588391791478,
+                "line": 2.5,
+                "market": "threes",
+                "player": "Bridget Carleton",
+                "player_name": "Bridget Carleton",
+                "price": 121.0,
+                "side": "over",
+                "team": "POR"
+              },
+              {
+                "book": "williamhill_us",
+                "edge": 0.2141177166213296,
+                "ev": 0.456070736403432,
+                "ev_pct": 45.6070736403432,
+                "line": 2.5,
+                "market": "threes",
+                "player": "Bridget Carleton",
+                "player_name": "Bridget Carleton",
+                "price": 113.0,
+                "side": "over",
+                "team": "POR"
+              },
+              {
+                "book": "fanduel",
+                "edge": 0.20741080850597082,
+                "ev": 0.43556269786253876,
+                "ev_pct": 43.55626978625388,
+                "line": 2.5,
+                "market": "threes",
+                "player": "Bridget Carleton",
+                "player_name": "Bridget Carleton",
+                "price": 110.0,
+                "side": "over",
+                "team": "POR"
+              }
+            ],
+            "player": "Bridget Carleton",
+            "portfolio_rank": null,
+            "portfolio_score": 0.64779,
+            "portfolio_selected": false,
+            "price": 121.0,
+            "prob": 0.683601284696447,
+            "prob_calib": 0.683601284696447,
+            "prob_edge": 0.2311,
+            "probability": 0.683601284696447,
+            "reasons": [
+              "Win probability grades at 68.4%.",
+              "Projected value is +51.1% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +121.",
+              "Model probability clears the market by 23.1 points."
+            ],
+            "recommendation_priority_score": 30.5,
+            "selection": "OVER",
+            "side": "OVER",
+            "sim_mu": 3.121131034482759,
+            "sim_reasons": [
+              "Win probability grades at 68.4%."
+            ],
+            "sim_support_score": 30.0,
+            "source": "props_recommendations",
+            "stake_amount": null,
+            "stake_pct": null,
+            "stake_units": null,
+            "team": "POR",
+            "team_side": "home",
+            "top_play_baseline": 3.121131034482759,
+            "top_play_consensus": 0.5,
+            "top_play_line_adv": 1.0,
+            "top_play_reasons": [
+              "Win probability grades at 68.4%.",
+              "Projected value is +51.1% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +121.",
+              "Model probability clears the market by 23.1 points."
+            ],
+            "value_reasons": [
+              "Projected value is +51.1% per unit risked.",
+              "Multiple books are aligned on this side.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at +121.",
+              "Model probability clears the market by 23.1 points."
+            ],
+            "value_support_score": 100.0,
+            "why_explain": "model 3.1 vs line 2.5 (+0.6)",
+            "win_prob": 0.683601284696447
+          }
+        ],
+        "away": []
+      }
+    },
+    {
+      "home_tri": "SEA",
+      "away_tri": "WSH",
+      "prop_recommendations": {
+        "home": [
+          {
+            "basketball_priority_score": 10.0,
+            "basketball_reasons": [
+              "A healthy SEA rotation keeps touches spread out across the lineup."
+            ],
+            "basketball_summary": "A healthy SEA rotation keeps touches spread out across the lineup.",
+            "best": {
+              "basketball_reasons": [
+                "A healthy SEA rotation keeps touches spread out across the lineup."
+              ],
+              "basketball_summary": "A healthy SEA rotation keeps touches spread out across the lineup.",
+              "book": "fanduel",
+              "edge": 0.15272230364200012,
+              "ev": 0.29156076149836385,
+              "ev_pct": 29.156076149836384,
+              "line": 14.5,
+              "market": "pts",
+              "market_reasons": [
+                "Projected value is +29.2% per unit risked.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at -110.",
+                "Model probability clears the market by 15.3 points."
+              ],
+              "model_prob": 0.676531827451524,
+              "model_reasons": [
+                "Win probability grades at 67.7%."
+              ],
+              "opponent": "WSH",
+              "p_win": 0.676531827451524,
+              "player": "Dominique Malonga",
+              "player_name": "Dominique Malonga",
+              "price": -110.0,
+              "prob_calib": 0.676531827451524,
+              "probability": 0.676531827451524,
+              "reasons": [
+                "A healthy SEA rotation keeps touches spread out across the lineup.",
+                "Win probability grades at 67.7%.",
+                "Projected value is +29.2% per unit risked.",
+                "The current book is still hanging the best available line.",
+                "The price stays workable at -110.",
+                "Model probability clears the market by 15.3 points."
+              ],
+              "side": "under",
+              "sim_mu": 5.208888888888888,
+              "team": "SEA"
+            },
+            "card_bucket": "official",
+            "card_rank": 2,
+            "date": "2026-05-27",
+            "display_pick": "Dominique Malonga Under 14.5 PTS",
+            "edge": 0.15272230364200012,
+            "ev": 0.29156076149836385,
+            "ev_pct": 29.16,
+            "game_key": "2026-05-27:WSH@SEA",
+            "implied_prob": 0.5238,
+            "line": 14.5,
+            "locked_policy_score": 40.749,
+            "locked_policy_sim_score": 30.0,
+            "locked_policy_trend_score": 10.0,
+            "locked_policy_value_score": 100.0,
+            "market": "pts",
+            "market_reasons": [
+              "Projected value is +29.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -110.",
+              "Model probability clears the market by 15.3 points."
+            ],
+            "matchup": "SEA",
+            "model_baseline": 5.208888888888888,
+            "model_prob": 0.676531827451524,
+            "model_reasons": [
+              "Win probability grades at 67.7%."
+            ],
+            "opponent": "WSH",
+            "p_win": 0.6765,
+            "picks": [
+              {
+                "book": "fanduel",
+                "edge": 0.15272230364200012,
+                "ev": 0.29156076149836385,
+                "ev_pct": 29.156076149836384,
+                "line": 14.5,
+                "market": "pts",
+                "player": "Dominique Malonga",
+                "player_name": "Dominique Malonga",
+                "price": -110.0,
+                "side": "under",
+                "team": "SEA"
+              }
+            ],
+            "player": "Dominique Malonga",
+            "portfolio_rank": 2,
+            "portfolio_score": 0.654869,
+            "portfolio_selected": true,
+            "price": -110.0,
+            "prob": 0.676531827451524,
+            "prob_calib": 0.676531827451524,
+            "prob_edge": 0.1527,
+            "probability": 0.676531827451524,
+            "reasons": [
+              "A healthy SEA rotation keeps touches spread out across the lineup.",
+              "Win probability grades at 67.7%.",
+              "Projected value is +29.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -110.",
+              "Model probability clears the market by 15.3 points."
+            ],
+            "recommendation_priority_score": 35.0,
+            "selection": "UNDER",
+            "side": "UNDER",
+            "sim_mu": 5.208888888888888,
+            "sim_reasons": [
+              "Win probability grades at 67.7%."
+            ],
+            "sim_support_score": 30.0,
+            "source": "props_recommendations",
+            "stake_amount": 90.0,
+            "stake_pct": 0.18,
+            "stake_units": 1.8,
+            "team": "SEA",
+            "team_side": "home",
+            "top_play_baseline": 5.208888888888888,
+            "top_play_consensus": 0.0,
+            "top_play_line_adv": 1.0,
+            "top_play_reasons": [
+              "A healthy SEA rotation keeps touches spread out across the lineup.",
+              "Win probability grades at 67.7%.",
+              "Projected value is +29.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -110.",
+              "Model probability clears the market by 15.3 points."
+            ],
+            "value_reasons": [
+              "Projected value is +29.2% per unit risked.",
+              "The current book is still hanging the best available line.",
+              "The price stays workable at -110.",
+              "Model probability clears the market by 15.3 points."
+            ],
+            "value_support_score": 100.0,
+            "why_explain": "model 5.2 vs line 14.5 (-9.3)",
+            "win_prob": 0.676531827451524
+          }
+        ],
+        "away": []
+      }
+    }
+  ]
+}

@@ -11,15 +11,16 @@
     <div class="cards-shell syndicate-shell{% if page_shell_class %} {{ page_shell_class }}{% endif %}">
       {% if show_app_header is not defined or show_app_header %}
         <header class="cards-header syndicate-header">
+          {% set nav_date = request.args.get('date') %}
           <div class="cards-title-row">
             <div>
               <div class="eyebrow">Syndicate</div>
               <h1>{% block page_title %}Multi-Sport Betting Hub{% endblock %}</h1>
             </div>
             <nav class="syndicate-nav" aria-label="Sports">
-              <a class="cards-nav-pill" href="/">Home</a>
+              <a class="cards-nav-pill" href="/{% if nav_date %}?date={{ nav_date }}{% endif %}">Home</a>
               {% for sport in syndicate_sports %}
-                <a class="cards-nav-pill" href="/{{ sport.slug }}">{{ sport.name }}</a>
+                <a class="cards-nav-pill" href="/{{ sport.slug }}{% if nav_date %}?date={{ nav_date }}{% endif %}">{{ sport.name }}</a>
               {% endfor %}
               {% if request.args.get('admin_token') %}
                 <a class="cards-nav-pill" href="/ops/odds-refresh?admin_token={{ request.args.get('admin_token') }}">Ops</a>

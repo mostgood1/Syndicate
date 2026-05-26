@@ -1,0 +1,210 @@
+[2026-05-26T03:25:09] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:25:14] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-26T03:25:23] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-recommendations --date 2026-05-25
+Predictions not found: 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed
+\games_predictions_npu_2026-05-25.csv
+[2026-05-26T03:25:24] export-recommendations did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\recommendations_2026-05-25.csv
+[2026-05-26T03:28:18] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:28:20] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-26T03:28:29] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli predict-date --date 2026-05-25
+------------------------------- Predict (Date) --------------------------------
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13021: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-25.
+No games found on 2026-05-25 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-26T03:28:32] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-recommendations --date 2026-05-25
+Predictions not found: 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed
+\games_predictions_npu_2026-05-25.csv
+[2026-05-26T03:28:34] export-recommendations did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\recommendations_2026-05-25.csv
+[2026-05-26T03:32:57] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:32:59] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-26T03:33:07] Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\refresh_nba_oddsapi_props.py", line 879, in _run_refresh_via_cli
+    game_input_rcs = _ensure_source_game_inputs(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\refresh_nba_oddsapi_props.py", line 378, in _ensure_source_game_inputs
+    rc_schedule = _run_source_cli_command(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: _run_source_cli_command() got an unexpected keyword argument 'package_name'
+[2026-05-26T03:34:08] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:34:10] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-26T03:34:19] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli fetch-schedule
+------------------------------- Fetch Schedule --------------------------------
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-26T03:34:21] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli fetch --years 10 --no-periods
+--------------------------------- Fetch data ----------------------------------
+Saved raw to 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw
+   season        date               home_team  ... total_points  home_win  
+margin
+0    2017  2016-10-25     Cleveland Cavaliers  ...          205         1      
+29
+1    2017  2016-10-25   Golden State Warriors  ...          229         0     
+-29
+2    2017  2016-10-25  Portland Trail Blazers  ...          217         1      
+9
+
+[3 rows x 10 columns]
+[2026-05-26T03:34:48] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli build-features
+------------------------------- Build features --------------------------------
+Parquet write skipped (engine missing): Unable to find a usable engine; tried 
+using: 'pyarrow', 'fastparquet'.
+A suitable version of pyarrow or fastparquet is required for parquet support.
+Trying to import the above resulted in these errors:
+ - Missing optional dependency 'pyarrow'. pyarrow is required for parquet 
+support. Use pip or conda to install pyarrow.
+ - Missing optional dependency 'fastparquet'. fastparquet is required for 
+parquet support. Use pip or conda to install fastparquet.
+Saved features to 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed
+\features.csv
+[2026-05-26T03:34:56] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli predict-date --date 2026-05-25
+------------------------------- Predict (Date) --------------------------------
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13021: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-25.
+No games found on 2026-05-25 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-26T03:34:58] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-recommendations --date 2026-05-25
+Predictions not found: 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed
+\games_predictions_npu_2026-05-25.csv
+[2026-05-26T03:34:59] export-recommendations did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\recommendations_2026-05-25.csv
+[2026-05-26T03:34:59] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-game-cards --date 2026-05-25
+------------------------------ Export Game Cards ------------------------------
+{
+    'rows': 0,
+    'output': 
+'C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\vendor\\nba_betting_repo\\data\
+\processed\\game_cards_2026-05-25.csv'
+}
+[2026-05-26T03:35:01] export-game-cards did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_cards_2026-05-25.csv
+[2026-05-26T03:38:08] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:38:10] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-26T03:38:20] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli fetch-schedule
+------------------------------- Fetch Schedule --------------------------------
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-26T03:38:22] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli predict-date --date 2026-05-25
+------------------------------- Predict (Date) --------------------------------
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13021: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-25.
+No games found on 2026-05-25 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-26T03:38:24] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-recommendations --date 2026-05-25
+Predictions not found: 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed
+\games_predictions_npu_2026-05-25.csv
+[2026-05-26T03:38:25] export-recommendations did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\recommendations_2026-05-25.csv
+[2026-05-26T03:38:25] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-game-cards --date 2026-05-25
+------------------------------ Export Game Cards ------------------------------
+{
+    'rows': 0,
+    'output': 
+'C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\vendor\\nba_betting_repo\\data\
+\processed\\game_cards_2026-05-25.csv'
+}
+[2026-05-26T03:38:28] export-game-cards did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_cards_2026-05-25.csv
+[2026-05-26T03:41:08] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:41:09] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-26T03:41:18] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli fetch-schedule
+------------------------------- Fetch Schedule --------------------------------
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-26T03:41:20] Seeded fallback game odds slate from props snapshot: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_odds_2026-05-25.csv (rows=1)
+[2026-05-26T03:41:20] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli predict-date --date 2026-05-25
+------------------------------- Predict (Date) --------------------------------
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-25.
+Updating Elo ---------------------------------------- 100% 0:00:00
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 15310, in <module>
+    cli()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 13079, in predict_date_cmd
+    res = _predict_from_matchups(slate)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 12300, in _predict_from_matchups
+    from .features_enhanced import build_features_enhanced
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\features_enhanced.py", line 14, in <module>
+    from .scrapers import BasketballReferenceScraper, NBAInjuryDatabase
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrapers\__init__.py", line 4, in <module>
+    from .injuries import ESPNInjuryScraper, NBAInjuryDatabase
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrapers\injuries.py", line 18, in <module>
+    from pypdf import PdfReader
+ModuleNotFoundError: No module named 'pypdf'
+[2026-05-26T03:41:24] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-recommendations --date 2026-05-25
+Predictions not found: 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed
+\games_predictions_npu_2026-05-25.csv
+[2026-05-26T03:41:25] export-recommendations did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\recommendations_2026-05-25.csv
+[2026-05-26T03:41:25] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m nba_betting.cli export-game-cards --date 2026-05-25
+------------------------------ Export Game Cards ------------------------------
+{
+    'rows': 1,
+    'output': 
+'C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\vendor\\nba_betting_repo\\data\
+\processed\\game_cards_2026-05-25.csv'
+}
+[2026-05-26T03:44:07] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:44:09] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 429, in export_props_predictions_local
+    finalize_props_predictions_local(
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 357, in finalize_props_predictions_local
+    raise RuntimeError(f"predict-props produced no rows for {date_str}")
+RuntimeError: predict-props produced no rows for 2026-05-25
+[2026-05-26T03:54:09] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
+WARNING: No player props fetched for 2026-05-25; preserving existing snapshot at C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv
+[2026-05-26T03:54:11] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 429, in export_props_predictions_local
+    finalize_props_predictions_local(
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 357, in finalize_props_predictions_local
+    raise RuntimeError(f"predict-props produced no rows for {date_str}")
+RuntimeError: predict-props produced no rows for 2026-05-25
+[2026-05-26T03:54:20] predict-props returned exit code 1 but downstream artifacts already exist for 2026-05-25; continuing

@@ -7,6 +7,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ([string]::IsNullOrWhiteSpace($Date)) {
+    $Date = (Get-Date).ToString('yyyy-MM-dd')
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $destRoot = Join-Path $repoRoot 'data\ncaab_source'
 $destApiRoot = Join-Path $destRoot 'api'

@@ -1,0 +1,246 @@
+[2026-05-26T16:11:13] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-05-27 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-05-27.csv' --regions us
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-05-27.csv with 897 rows.
+[2026-05-26T16:11:16] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\oddsapi_player_props_2026-05-27.csv (rows=897)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 429, in export_props_predictions_local
+    finalize_props_predictions_local(
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 357, in finalize_props_predictions_local
+    raise RuntimeError(f"predict-props produced no rows for {date_str}")
+RuntimeError: predict-props produced no rows for 2026-05-27
+[2026-05-26T16:11:25] predict-props returned exit code 1 but downstream artifacts already exist for 2026-05-27; continuing
+[2026-05-26T16:11:25] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m wnba_betting.cli fetch-schedule
+------------------------------- Fetch Schedule --------------------------------
+Saved schedule to 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processe
+d\schedule_2026.json and 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processe
+d\schedule_2026.csv
+{'rows': 350, 'unique_dates': 119}
+[2026-05-26T16:11:50] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m wnba_betting.cli predict-date --date 2026-05-27
+------------------------------- Predict (Date) --------------------------------
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:13443: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-27.
+Updating Elo ---------------------------------------- 100% 0:00:00
+[Building enhanced features (45 features)...]
+
+======================================================================
+ENHANCED FEATURE ENGINEERING
+======================================================================
+
+[1/3] Building base features (ELO, rest, form, schedule)...
+Built 75 base features
+
+[2/3] Adding advanced statistics (pace, efficiency, Four Factors)...
+No cached advanced stats available for this WNBA season, skipping...
+Added 0 advanced stat features
+
+[3/3] Adding injury impact features...
+No injury data found. Run: python -m wnba_betting.cli fetch-injuries
+Added 9 injury features
+
+======================================================================
+TOTAL FEATURES: 84
+======================================================================
+
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:12706: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  enriched[col] = 0.0
+[NPU] Using NPU-accelerated predictions (ONNX + QNN)
+[INFO][LOADING] Loading NBA Game Models with NPU acceleration...
+[OK] Loaded 56 game features from feature_columns_enhanced.joblib
+[READY] Ready with 0 models (0 NPU-accelerated)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py", line 15557, in <module>
+    cli()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py", line 13496, in predict_date_cmd
+    res = _predict_from_matchups(slate)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py", line 12727, in _predict_from_matchups
+    res["home_win_prob"] = [r["win_prob"] for r in npu_results]
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py", line 12727, in <listcomp>
+    res["home_win_prob"] = [r["win_prob"] for r in npu_results]
+                            ~^^^^^^^^^^^^
+KeyError: 'win_prob'
+[2026-05-26T16:11:52] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-05-26T16:11:52] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m wnba_betting.cli daily-update --date 2026-05-27 --no-npu --no-git-push
+---------------------------- Enhanced Daily Update ----------------------------
+[NPU] Running enhanced daily update for 2026-05-27
+[INFO] NPU Acceleration: Disabled
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py", line 15557, in <module>
+    cli()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\click\core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py", line 12863, in daily_update_cmd
+    console.print(f"\U0001f504 Reconciliation window: {reconcile_days} days")
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 1678, in print
+    with self:
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 864, in __exit__
+    self._exit_buffer()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 822, in _exit_buffer
+    self._check_buffer()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 2019, in _check_buffer
+    self._write_buffer()
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\console.py", line 2055, in _write_buffer
+    legacy_windows_render(buffer, LegacyWindowsTerm(self.file))
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\_windows_renderer.py", line 19, in legacy_windows_render
+    term.write_text(text)
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\site-packages\rich\_win32_console.py", line 402, in write_text
+    self.write(text)
+  File "C:\Users\mostg\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f504' in position 0: character maps to <undefined>
+[2026-05-26T16:11:54] Skipping local props recommendations export for 2026-05-27: props predictions were not refreshed
+[2026-05-26T16:11:54] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' -m wnba_betting.cli export-recommendations --date 2026-05-27
+Predictions not found: 
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processe
+d\games_predictions_npu_2026-05-27.csv
+[2026-05-26T16:11:55] export-recommendations did not create expected artifact: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\recommendations_2026-05-27.csv

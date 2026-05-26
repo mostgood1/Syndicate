@@ -1133,7 +1133,7 @@ class HomeBoardTests(unittest.TestCase):
             ):
                 with patch(
                     "syndicate.blueprints.home.render_template",
-                    side_effect=lambda template, sports: ",".join(str(item.get("slug") or "") for item in sports),
+                    side_effect=lambda template, sports, **kwargs: ",".join(str(item.get("slug") or "") for item in sports),
                 ):
                     first = home_module._home_payload(selected_date="2026-05-20")
                     second = home_module._home_payload(selected_date="2026-05-20", force_refresh=True)
@@ -2436,7 +2436,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("Recent NHL recommendation snapshots", nhl_hub)
         self.assertRegex(nhl_hub, r"/nhl/season/\d{4}/betting-card\?date=\d{4}-\d{2}-\d{2}")
         self.assertIn("Cross-sport daily board", home)
-        self.assertIn("Horizontal game and props rows with full compact-card scroll for the active slate.", home)
+        self.assertIn("Cross-sport betting dashboard with ranked game reads, prop surfaces, and per-sport action counts.", home)
         self.assertIn("Reference module", home)
         self.assertIn("Artifact-backed cards + picks + recap + props lanes", home)
         self.assertIn("Artifact-backed shared board + picks + props + live audit lanes", home)

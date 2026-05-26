@@ -684,6 +684,686 @@
     },
     "2026-05-26": {
       "40Man": {
+        "added": [],
+        "players": [
+          {
+            "full_name": "A.J. Puk",
+            "player_id": 640462,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Adrian Del Castillo",
+            "player_id": 680728,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Andrew Hoffmann",
+            "player_id": 694851,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Andrew Saalfrank",
+            "player_id": 685314,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Aramis Garcia",
+            "player_id": 605244,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Blake Walston",
+            "player_id": 686796,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Brandon Pfaadt",
+            "player_id": 694297,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Brandyn Garcia",
+            "player_id": 805299,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Carlos Santana",
+            "player_id": 467793,
+            "position": "1B",
+            "status": {
+              "code": "D10",
+              "description": "Injured 10-Day"
+            }
+          },
+          {
+            "full_name": "Corbin Burnes",
+            "player_id": 669203,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Corbin Carroll",
+            "player_id": 682998,
+            "position": "RF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Cristian Mena",
+            "player_id": 691441,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Drey Jameson",
+            "player_id": 686753,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Dylan Ray",
+            "player_id": 691009,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Eduardo Rodriguez",
+            "player_id": 593958,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Gabriel Moreno",
+            "player_id": 672515,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Geraldo Perdomo",
+            "player_id": 672695,
+            "position": "SS",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ildemaro Vargas",
+            "player_id": 545121,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "James McCann",
+            "player_id": 543510,
+            "position": "C",
+            "status": {
+              "code": "D10",
+              "description": "Injured 10-Day"
+            }
+          },
+          {
+            "full_name": "Jonathan Loáisiga",
+            "player_id": 642528,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Jordan Lawlar",
+            "player_id": 691783,
+            "position": "LF",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Jorge Barrosa",
+            "player_id": 678489,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Jose Fernandez",
+            "player_id": 699912,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Juan Burgos",
+            "player_id": 686228,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Juan Morillo",
+            "player_id": 666661,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Justin Martinez",
+            "player_id": 679885,
+            "position": "P",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Kade Strowd",
+            "player_id": 669704,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Ketel Marte",
+            "player_id": 606466,
+            "position": "2B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Kevin Ginkel",
+            "player_id": 656464,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Kohl Drake",
+            "player_id": 684442,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Lourdes Gurriel Jr.",
+            "player_id": 666971,
+            "position": "LF",
+            "status": {
+              "code": "D10",
+              "description": "Injured 10-Day"
+            }
+          },
+          {
+            "full_name": "Merrill Kelly",
+            "player_id": 518876,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Michael Soroka",
+            "player_id": 647336,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Mitch Bratt",
+            "player_id": 683352,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Nolan Arenado",
+            "player_id": 571448,
+            "position": "3B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Paul Sewald",
+            "player_id": 623149,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Pavin Smith",
+            "player_id": 656976,
+            "position": "1B",
+            "status": {
+              "code": "D60",
+              "description": "Injured 60-Day"
+            }
+          },
+          {
+            "full_name": "Philip Abner",
+            "player_id": 691769,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Ryan Thompson",
+            "player_id": 657044,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ryan Waldschmidt",
+            "player_id": 814439,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ryne Nelson",
+            "player_id": 669194,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Taylor Clarke",
+            "player_id": 664199,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Taylor Rashi",
+            "player_id": 688497,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Tim Tawa",
+            "player_id": 694374,
+            "position": "LF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tommy Troy",
+            "player_id": 694371,
+            "position": "OF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tyler Locklear",
+            "player_id": 682988,
+            "position": "1B",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Yilber Díaz",
+            "player_id": 700270,
+            "position": "P",
+            "status": {
+              "code": "RM",
+              "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Zac Gallen",
+            "player_id": 668678,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          }
+        ],
+        "removed": []
+      },
+      "active": {
+        "added": [],
+        "players": [
+          {
+            "full_name": "Adrian Del Castillo",
+            "player_id": 680728,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Aramis Garcia",
+            "player_id": 605244,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Brandon Pfaadt",
+            "player_id": 694297,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Brandyn Garcia",
+            "player_id": 805299,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Corbin Carroll",
+            "player_id": 682998,
+            "position": "RF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Eduardo Rodriguez",
+            "player_id": 593958,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Gabriel Moreno",
+            "player_id": 672515,
+            "position": "C",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Geraldo Perdomo",
+            "player_id": 672695,
+            "position": "SS",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ildemaro Vargas",
+            "player_id": 545121,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Jonathan Loáisiga",
+            "player_id": 642528,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Jorge Barrosa",
+            "player_id": 678489,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Jose Fernandez",
+            "player_id": 699912,
+            "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Juan Morillo",
+            "player_id": 666661,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ketel Marte",
+            "player_id": 606466,
+            "position": "2B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Kevin Ginkel",
+            "player_id": 656464,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Merrill Kelly",
+            "player_id": 518876,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Michael Soroka",
+            "player_id": 647336,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Nolan Arenado",
+            "player_id": 571448,
+            "position": "3B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Paul Sewald",
+            "player_id": 623149,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ryan Thompson",
+            "player_id": 657044,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ryan Waldschmidt",
+            "player_id": 814439,
+            "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ryne Nelson",
+            "player_id": 669194,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Taylor Clarke",
+            "player_id": 664199,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tim Tawa",
+            "player_id": 694374,
+            "position": "LF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tommy Troy",
+            "player_id": 694371,
+            "position": "OF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Zac Gallen",
+            "player_id": 668678,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          }
+        ],
+        "removed": []
+      }
+    },
+    "2026-05-27": {
+      "40Man": {
         "added": [
           467793,
           518876,
@@ -1441,5 +2121,5 @@
   },
   "team_abbr": "AZ",
   "team_id": 109,
-  "updated_at": "2026-05-25T19:32:03.324220"
+  "updated_at": "2026-05-26T11:39:16.240652"
 }

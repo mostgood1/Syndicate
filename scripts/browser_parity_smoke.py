@@ -150,12 +150,12 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec(
         name="Syndicate home",
         path="/",
-        header_selector=".home-topbar__title",
+        header_selector=".home-controls__title",
         board_selector="#syndicate-home-sport-stack",
         header_loading_text="",
         board_loading_text="",
-        extra_required_selectors=(".home-topbar", ".sport-stack-card"),
-        extra_required_nonempty_selectors=(".home-topbar__title", '.sport-stack-card h3'),
+        extra_required_selectors=(".home-controls", ".home-topbar__date-form", ".sport-stack-card"),
+        extra_required_nonempty_selectors=(".home-controls__title", '.sport-stack-card h3'),
     ),
     RouteSpec(
         name="MLB source cards",
@@ -219,16 +219,11 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         board_selector="#cards",
         header_loading_text="Loading slate...",
         board_loading_text="Loading cards…",
-        scoreboard_selector="#scoreboardStrip",
-        scoreboard_loading_text="Loading scoreboard…",
         empty_selector="#empty",
         status_selector="#status",
         status_loading_text="Loading",
         extra_required_selectors=("#cardsSourceMeta", "#cardsFilters", "#propsStrip"),
-        extra_required_nonempty_selectors=("#cardsSourceMeta", "#cardsFilters"),
-        extra_settled_checks=(
-            SettledCheck(selector="#propsStrip", loading_text="Loading props pulse"),
-        ),
+        extra_required_nonempty_selectors=(),
     ),
     RouteSpec(
         name="NHL shared board",

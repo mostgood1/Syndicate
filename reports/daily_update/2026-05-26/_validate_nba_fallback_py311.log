@@ -1,0 +1,11 @@
+[2026-05-26T16:09:52] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-26 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-26.csv' --regions us
+Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-26.csv with 2085 rows.
+[2026-05-26T16:09:54] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-26.csv (rows=2085)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 429, in export_props_predictions_local
+    finalize_props_predictions_local(
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 357, in finalize_props_predictions_local
+    raise RuntimeError(f"predict-props produced no rows for {date_str}")
+RuntimeError: predict-props produced no rows for 2026-05-26
+[2026-05-26T16:10:02] predict-props returned exit code 1 but downstream artifacts already exist for 2026-05-26; continuing

@@ -1,0 +1,211 @@
+team,player_id,period,player,game_home,game_away,date,shots,goals,assists,points,blocks,saves,toi_sec,is_dressed
+Vegas Golden Knights,8477964,1,Ivan Barbashev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.681,0.08,0.109,0.189,0.214,0.0,403.822222222222,1
+Vegas Golden Knights,8483890,1,Braeden Bowman,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.682,0.07,0.123,0.193,0.20600000000000002,0.0,403.822222222222,1
+Vegas Golden Knights,8484803,1,Trevor Connelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.712,0.095,0.129,0.224,0.228,0.0,403.822222222222,1
+Vegas Golden Knights,8478397,1,Rasmus Andersson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.562,0.076,0.125,0.201,0.41500000000000004,0.0,492.35555555554913,1
+Vegas Golden Knights,8479639,1,Dylan Coghlan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.487,0.055,0.112,0.167,0.453,0.0,492.35555555554913,1
+Colorado Avalanche,8482947,1,Zakhar Bardakov,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.685,0.077,0.12,0.197,0.212,0.0,405.5111111111106,1
+Colorado Avalanche,8479525,1,Ross Colton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.666,0.067,0.124,0.191,0.229,0.0,405.5111111111106,1
+Colorado Avalanche,8480835,1,Jack Drury,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.67,0.073,0.11,0.183,0.20800000000000002,0.0,405.5111111111106,1
+Colorado Avalanche,8482072,1,Jack Ahcan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.555,0.065,0.105,0.16999999999999998,0.46900000000000003,0.0,493.0666666666599,1
+Colorado Avalanche,8483565,1,Nick Blankenburg,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.544,0.06,0.106,0.16599999999999998,0.39,0.0,454.7111111111067,1
+Vegas Golden Knights,8479394,1,Carter Hart,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,7.643,1199.9999999999998,1
+Colorado Avalanche,8478406,1,Mackenzie Blackwood,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,7.4830000000000005,1199.9999999999998,1
+Vegas Golden Knights,8481604,1,Pavel Dorofeyev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.449,0.059000000000000004,0.084,0.14300000000000002,0.138,0.0,278.933333333334,1
+Vegas Golden Knights,8475343,1,Nic Dowd,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.451,0.046,0.079,0.125,0.14400000000000002,0.0,278.933333333334,1
+Vegas Golden Knights,8478403,1,Jack Eichel,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.417,0.056,0.084,0.14,0.126,0.0,278.933333333334,1
+Vegas Golden Knights,8479602,1,Jeremy Davies,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.398,0.052000000000000005,0.099,0.15100000000000002,0.328,0.0,360.71111111111486,1
+Vegas Golden Knights,8478396,1,Noah Hanifin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.383,0.05,0.081,0.131,0.305,0.0,360.71111111111486,1
+Colorado Avalanche,8480039,1,Martin Necas,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.433,0.059000000000000004,0.07100000000000001,0.13,0.148,0.0,252.17777777777636,1
+Colorado Avalanche,8475754,1,Brock Nelson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.459,0.062,0.076,0.138,0.127,0.0,252.17777777777636,1
+Colorado Avalanche,8477501,1,Valeri Nichushkin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.40800000000000003,0.051000000000000004,0.081,0.132,0.129,0.0,252.17777777777636,1
+Colorado Avalanche,8470613,1,Brent Burns,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.403,0.042,0.083,0.125,0.357,0.0,361.4222222222258,1
+Vegas Golden Knights,8477018,1,Ben Hutton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.381,0.05,0.084,0.134,0.326,0.0,346.9333333333376,1
+Vegas Golden Knights,8481527,1,Kaedan Korczak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.40700000000000003,0.048,0.085,0.133,0.28700000000000003,0.0,346.9333333333376,1
+Colorado Avalanche,8475172,1,Nazem Kadri,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.438,0.06,0.075,0.135,0.128,0.0,278.80000000000007,1
+Colorado Avalanche,8480448,1,Parker Kelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.49,0.051000000000000004,0.07200000000000001,0.12300000000000001,0.107,0.0,278.80000000000007,1
+Colorado Avalanche,8481641,1,Joel Kiviranta,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.458,0.049,0.084,0.133,0.162,0.0,278.80000000000007,1
+Colorado Avalanche,8476967,1,Brett Kulak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.405,0.043000000000000003,0.077,0.12,0.327,0.0,345.5111111111158,1
+Colorado Avalanche,8476455,1,Gabriel Landeskog,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.434,0.046,0.07,0.116,0.135,0.0,263.5111111111097,1
+Colorado Avalanche,8477476,1,Artturi Lehkonen,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.436,0.045,0.077,0.122,0.15,0.0,263.5111111111097,1
+Colorado Avalanche,8477492,1,Nathan MacKinnon,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.41100000000000003,0.047,0.08,0.127,0.14400000000000002,0.0,263.5111111111097,1
+Vegas Golden Knights,8476881,1,Tomas Hertl,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.437,0.044,0.082,0.126,0.11800000000000001,0.0,262.8444444444432,1
+Vegas Golden Knights,8482125,1,Alexander Holtz,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.422,0.052000000000000005,0.083,0.135,0.132,0.0,262.8444444444432,1
+Vegas Golden Knights,8479353,1,Brett Howden,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.446,0.057,0.084,0.14100000000000001,0.123,0.0,262.8444444444432,1
+Colorado Avalanche,8482942,1,Alex Gagne,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.389,0.048,0.09,0.138,0.256,0.0,321.2444444444497,1
+Colorado Avalanche,8480069,1,Cale Makar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.338,0.034,0.082,0.116,0.223,0.0,306.22222222222666,1
+Vegas Golden Knights,8476448,1,William Karlsson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.41600000000000004,0.041,0.075,0.11599999999999999,0.12,0.0,254.39999999999839,1
+Vegas Golden Knights,8478434,1,Keegan Kolesar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.398,0.053,0.094,0.147,0.133,0.0,254.39999999999839,1
+Vegas Golden Knights,8479550,1,Tanner Laczynski,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.395,0.057,0.07100000000000001,0.128,0.14100000000000001,0.0,254.39999999999839,1
+Vegas Golden Knights,8477964,2,Ivan Barbashev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.6940000000000001,0.082,0.12,0.202,0.19,0.0,401.688888888889,1
+Vegas Golden Knights,8483890,2,Braeden Bowman,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.658,0.07100000000000001,0.129,0.2,0.227,0.0,401.688888888889,1
+Vegas Golden Knights,8484803,2,Trevor Connelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.627,0.065,0.106,0.17099999999999999,0.215,0.0,401.688888888889,1
+Vegas Golden Knights,8478397,2,Rasmus Andersson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.558,0.051000000000000004,0.107,0.158,0.454,0.0,490.9333333333272,1
+Vegas Golden Knights,8479639,2,Dylan Coghlan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.545,0.055,0.115,0.17,0.485,0.0,490.9333333333272,1
+Colorado Avalanche,8482947,2,Zakhar Bardakov,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.73,0.074,0.131,0.20500000000000002,0.217,0.0,400.35555555555584,1
+Colorado Avalanche,8479525,2,Ross Colton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.666,0.069,0.127,0.196,0.218,0.0,400.35555555555584,1
+Colorado Avalanche,8480835,2,Jack Drury,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.687,0.096,0.10300000000000001,0.199,0.226,0.0,400.35555555555584,1
+Colorado Avalanche,8482072,2,Jack Ahcan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.588,0.064,0.11,0.174,0.443,0.0,493.11111111110466,1
+Colorado Avalanche,8483565,2,Nick Blankenburg,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.55,0.052000000000000005,0.116,0.168,0.353,0.0,454.08888888888464,1
+Vegas Golden Knights,8479394,2,Carter Hart,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,8.040000000000001,1199.9999999999998,1
+Colorado Avalanche,8478406,2,Mackenzie Blackwood,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,7.964,1199.9999999999998,1
+Vegas Golden Knights,8476881,2,Tomas Hertl,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.47700000000000004,0.054,0.083,0.137,0.147,0.0,265.2888888888876,1
+Vegas Golden Knights,8482125,2,Alexander Holtz,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.453,0.051000000000000004,0.08600000000000001,0.137,0.125,0.0,265.2888888888876,1
+Vegas Golden Knights,8479353,2,Brett Howden,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.47700000000000004,0.064,0.062,0.126,0.14200000000000002,0.0,265.2888888888876,1
+Colorado Avalanche,8480039,2,Martin Necas,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.463,0.056,0.092,0.148,0.16,0.0,254.2666666666655,1
+Colorado Avalanche,8475754,2,Brock Nelson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.454,0.058,0.099,0.157,0.161,0.0,254.2666666666655,1
+Colorado Avalanche,8477501,2,Valeri Nichushkin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.454,0.064,0.093,0.157,0.14100000000000001,0.0,254.2666666666655,1
+Colorado Avalanche,8470613,2,Brent Burns,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.435,0.05,0.083,0.133,0.34800000000000003,0.0,362.3111111111146,1
+Vegas Golden Knights,8481604,2,Pavel Dorofeyev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.514,0.06,0.092,0.152,0.151,0.0,279.1111111111115,1
+Vegas Golden Knights,8475343,2,Nic Dowd,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.488,0.054,0.08600000000000001,0.14,0.152,0.0,279.1111111111115,1
+Vegas Golden Knights,8478403,2,Jack Eichel,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.503,0.063,0.099,0.162,0.136,0.0,279.1111111111115,1
+Colorado Avalanche,8475172,2,Nazem Kadri,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.489,0.054,0.088,0.142,0.138,0.0,279.6000000000005,1
+Colorado Avalanche,8480448,2,Parker Kelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.516,0.046,0.082,0.128,0.152,0.0,279.6000000000005,1
+Colorado Avalanche,8481641,2,Joel Kiviranta,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.486,0.052000000000000005,0.076,0.128,0.194,0.0,279.6000000000005,1
+Vegas Golden Knights,8479602,2,Jeremy Davies,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.4,0.046,0.08600000000000001,0.132,0.342,0.0,363.1555555555589,1
+Vegas Golden Knights,8478396,2,Noah Hanifin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.432,0.037,0.08700000000000001,0.124,0.337,0.0,363.1555555555589,1
+Colorado Avalanche,8482942,2,Alex Gagne,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.399,0.034,0.074,0.108,0.28,0.0,323.466666666672,1
+Colorado Avalanche,8476455,2,Gabriel Landeskog,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.465,0.067,0.092,0.159,0.14200000000000002,0.0,265.7777777777766,1
+Colorado Avalanche,8477476,2,Artturi Lehkonen,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.503,0.063,0.082,0.14500000000000002,0.14400000000000002,0.0,265.7777777777766,1
+Colorado Avalanche,8477492,2,Nathan MacKinnon,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.457,0.062,0.092,0.154,0.155,0.0,265.7777777777766,1
+Vegas Golden Knights,8477018,2,Ben Hutton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.406,0.05,0.089,0.139,0.293,0.0,345.9111111111153,1
+Vegas Golden Knights,8481527,2,Kaedan Korczak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.373,0.039,0.08,0.119,0.331,0.0,345.9111111111153,1
+Colorado Avalanche,8476967,2,Brett Kulak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.405,0.054,0.09,0.144,0.357,0.0,344.57777777778205,1
+Colorado Avalanche,8480069,2,Cale Makar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.355,0.047,0.093,0.14,0.259,0.0,306.75555555555957,1
+Vegas Golden Knights,8476448,2,William Karlsson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.51,0.07200000000000001,0.08,0.15200000000000002,0.117,0.0,253.9111111111097,1
+Vegas Golden Knights,8478434,2,Keegan Kolesar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.42,0.056,0.089,0.145,0.153,0.0,253.9111111111097,1
+Vegas Golden Knights,8479550,2,Tanner Laczynski,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.449,0.05,0.088,0.138,0.131,0.0,253.9111111111097,1
+Vegas Golden Knights,8477964,3,Ivan Barbashev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.686,0.068,0.137,0.20500000000000002,0.198,0.0,406.3999999999994,1
+Vegas Golden Knights,8483890,3,Braeden Bowman,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.654,0.082,0.126,0.20800000000000002,0.223,0.0,406.3999999999994,1
+Vegas Golden Knights,8484803,3,Trevor Connelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.718,0.09,0.106,0.196,0.218,0.0,406.3999999999994,1
+Vegas Golden Knights,8478397,3,Rasmus Andersson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.561,0.063,0.109,0.172,0.495,0.0,496.8444444444383,1
+Vegas Golden Knights,8479639,3,Dylan Coghlan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.577,0.076,0.11800000000000001,0.194,0.46,0.0,496.8444444444383,1
+Colorado Avalanche,8482947,3,Zakhar Bardakov,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.6920000000000001,0.07200000000000001,0.152,0.224,0.213,0.0,405.55555555555526,1
+Colorado Avalanche,8479525,3,Ross Colton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.715,0.092,0.137,0.229,0.217,0.0,405.55555555555526,1
+Colorado Avalanche,8480835,3,Jack Drury,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.74,0.09,0.116,0.20600000000000002,0.192,0.0,405.55555555555526,1
+Colorado Avalanche,8482072,3,Jack Ahcan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.558,0.063,0.139,0.202,0.482,0.0,495.2888888888827,1
+Colorado Avalanche,8483565,3,Nick Blankenburg,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.547,0.089,0.135,0.224,0.424,0.0,455.9999999999957,1
+Vegas Golden Knights,8479394,3,Carter Hart,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,7.663,1199.9999999999998,1
+Colorado Avalanche,8478406,3,Mackenzie Blackwood,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,7.793,1199.9999999999998,1
+Vegas Golden Knights,8481604,3,Pavel Dorofeyev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.456,0.058,0.105,0.163,0.137,0.0,278.6222222222231,1
+Vegas Golden Knights,8475343,3,Nic Dowd,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.485,0.059000000000000004,0.098,0.157,0.151,0.0,278.6222222222231,1
+Vegas Golden Knights,8478403,3,Jack Eichel,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.438,0.057,0.099,0.156,0.124,0.0,278.6222222222231,1
+Colorado Avalanche,8475172,3,Nazem Kadri,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.47500000000000003,0.057,0.096,0.153,0.162,0.0,277.28888888888935,1
+Colorado Avalanche,8480448,3,Parker Kelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.48,0.067,0.085,0.15200000000000002,0.14200000000000002,0.0,277.28888888888935,1
+Colorado Avalanche,8481641,3,Joel Kiviranta,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.466,0.059000000000000004,0.091,0.15,0.137,0.0,277.28888888888935,1
+Vegas Golden Knights,8479602,3,Jeremy Davies,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.399,0.051000000000000004,0.094,0.14500000000000002,0.292,0.0,359.3333333333369,1
+Vegas Golden Knights,8478396,3,Noah Hanifin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.41300000000000003,0.052000000000000005,0.089,0.14100000000000001,0.318,0.0,359.3333333333369,1
+Colorado Avalanche,8470613,3,Brent Burns,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.41200000000000003,0.056,0.10200000000000001,0.158,0.373,0.0,360.7555555555591,1
+Colorado Avalanche,8482942,3,Alex Gagne,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.367,0.032,0.084,0.116,0.277,0.0,321.6888888888941,1
+Vegas Golden Knights,8476448,3,William Karlsson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.467,0.059000000000000004,0.079,0.138,0.125,0.0,251.06666666666513,1
+Vegas Golden Knights,8478434,3,Keegan Kolesar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.455,0.057,0.083,0.14,0.125,0.0,251.06666666666513,1
+Vegas Golden Knights,8479550,3,Tanner Laczynski,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.45,0.055,0.078,0.133,0.116,0.0,251.06666666666513,1
+Vegas Golden Knights,8477018,3,Ben Hutton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.384,0.049,0.092,0.14100000000000001,0.318,0.0,343.8222222222268,1
+Vegas Golden Knights,8481527,3,Kaedan Korczak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.392,0.037,0.095,0.132,0.315,0.0,343.8222222222268,1
+Vegas Golden Knights,8476881,3,Tomas Hertl,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.454,0.055,0.081,0.136,0.11800000000000001,0.0,263.9111111111101,1
+Vegas Golden Knights,8482125,3,Alexander Holtz,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.458,0.05,0.088,0.138,0.15,0.0,263.9111111111101,1
+Vegas Golden Knights,8479353,3,Brett Howden,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.423,0.059000000000000004,0.07,0.129,0.131,0.0,263.9111111111101,1
+Colorado Avalanche,8476455,3,Gabriel Landeskog,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.447,0.057,0.079,0.136,0.127,0.0,264.7555555555542,1
+Colorado Avalanche,8477476,3,Artturi Lehkonen,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.447,0.058,0.08600000000000001,0.14400000000000002,0.164,0.0,264.7555555555542,1
+Colorado Avalanche,8477492,3,Nathan MacKinnon,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.439,0.065,0.088,0.153,0.146,0.0,264.7555555555542,1
+Colorado Avalanche,8476967,3,Brett Kulak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.389,0.04,0.083,0.123,0.35100000000000003,0.0,343.95555555555984,1
+Colorado Avalanche,8480069,3,Cale Makar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.361,0.045,0.08,0.125,0.265,0.0,305.7333333333377,1
+Colorado Avalanche,8480039,3,Martin Necas,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.419,0.066,0.081,0.14700000000000002,0.17500000000000002,0.0,252.3999999999983,1
+Colorado Avalanche,8475754,3,Brock Nelson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.396,0.044,0.091,0.135,0.138,0.0,252.3999999999983,1
+Colorado Avalanche,8477501,3,Valeri Nichushkin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.417,0.052000000000000005,0.08600000000000001,0.138,0.15,0.0,252.3999999999983,1
+Vegas Golden Knights,8477964,4,Ivan Barbashev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.034,0.004,0.005,0.009000000000000001,0.018000000000000002,0.0,17.25,1
+Vegas Golden Knights,8483890,4,Braeden Bowman,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.04,0.005,0.003,0.008,0.022,0.0,17.25,1
+Vegas Golden Knights,8484803,4,Trevor Connelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.01,0.0,0.002,0.002,0.0,0.0,2.9625,1
+Vegas Golden Knights,8478397,4,Rasmus Andersson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.042,0.002,0.009000000000000001,0.011000000000000001,0.029,0.0,22.9875,1
+Vegas Golden Knights,8479639,4,Dylan Coghlan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.012,0.002,0.003,0.005,0.007,0.0,5.0625,1
+Colorado Avalanche,8482947,4,Zakhar Bardakov,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.051000000000000004,0.008,0.007,0.015,0.007,0.0,17.6625,1
+Colorado Avalanche,8479525,4,Ross Colton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.038,0.003,0.011,0.013999999999999999,0.015,0.0,17.6625,1
+Colorado Avalanche,8480835,4,Jack Drury,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.005,0.001,0.001,0.002,0.004,0.0,3.375,1
+Colorado Avalanche,8482072,4,Jack Ahcan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.054,0.005,0.007,0.012,0.027,0.0,22.650000000000002,1
+Vegas Golden Knights,8479394,4,Carter Hart,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.396,59.1,1
+Colorado Avalanche,8478406,4,Mackenzie Blackwood,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.374,59.1,1
+Vegas Golden Knights,8481604,4,Pavel Dorofeyev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.035,0.007,0.006,0.013000000000000001,0.016,0.0,15.637500000000001,1
+Vegas Golden Knights,8475343,4,Nic Dowd,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.04,0.005,0.006,0.011,0.018000000000000002,0.0,15.637500000000001,1
+Vegas Golden Knights,8479602,4,Jeremy Davies,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.025,0.0,0.009000000000000001,0.009000000000000001,0.032,0.0,19.275000000000002,1
+Colorado Avalanche,8475172,4,Nazem Kadri,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.035,0.005,0.008,0.013000000000000001,0.016,0.0,16.6125,1
+Colorado Avalanche,8480448,4,Parker Kelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.045,0.005,0.007,0.012,0.015,0.0,16.6125,1
+Colorado Avalanche,8470613,4,Brent Burns,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.052000000000000005,0.005,0.011,0.016,0.034,0.0,18.9375,1
+Vegas Golden Knights,8476881,4,Tomas Hertl,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.034,0.007,0.004,0.011,0.013000000000000001,0.0,14.7375,1
+Vegas Golden Knights,8482125,4,Alexander Holtz,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.034,0.003,0.004,0.007,0.013000000000000001,0.0,14.7375,1
+Vegas Golden Knights,8477018,4,Ben Hutton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.022,0.001,0.008,0.009000000000000001,0.017,0.0,16.8375,1
+Colorado Avalanche,8476455,4,Gabriel Landeskog,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.042,0.004,0.003,0.007,0.009000000000000001,0.0,13.875,1
+Colorado Avalanche,8477476,4,Artturi Lehkonen,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.026000000000000002,0.003,0.004,0.007,0.013000000000000001,0.0,13.875,1
+Colorado Avalanche,8476967,4,Brett Kulak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.02,0.002,0.008,0.01,0.018000000000000002,0.0,17.5125,1
+Vegas Golden Knights,8476448,4,William Karlsson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.032,0.003,0.002,0.005,0.014,0.0,11.475,1
+Vegas Golden Knights,8478434,4,Keegan Kolesar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.026000000000000002,0.002,0.006,0.008,0.007,0.0,11.475,1
+Colorado Avalanche,8480039,4,Martin Necas,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.037,0.001,0.003,0.004,0.007,0.0,10.950000000000001,1
+Colorado Avalanche,8475754,4,Brock Nelson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.025,0.001,0.002,0.003,0.007,0.0,10.950000000000001,1
+Vegas Golden Knights,8479550,4,Tanner Laczynski,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.002,0.0,0.002,0.002,0.001,0.0,3.1875,1
+Vegas Golden Knights,8481527,4,Kaedan Korczak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.008,0.001,0.0,0.001,0.002,0.0,3.975,1
+Colorado Avalanche,8481641,4,Joel Kiviranta,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.004,0.0,0.001,0.001,0.003,0.0,3.7125,1
+Vegas Golden Knights,8479353,4,Brett Howden,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.009000000000000001,0.0,0.003,0.003,0.0,0.0,4.125,1
+Vegas Golden Knights,8478396,4,Noah Hanifin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.007,0.001,0.002,0.003,0.003,0.0,3.975,1
+Vegas Golden Knights,8478403,4,Jack Eichel,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.006,0.001,0.001,0.002,0.0,0.0,2.7375000000000003,1
+Colorado Avalanche,8477501,4,Valeri Nichushkin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.003,0.0,2.6625,1
+Colorado Avalanche,8477492,4,Nathan MacKinnon,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.006,0.001,0.0,0.001,0.007,0.0,3.2625,1
+Vegas Golden Knights,8477964,0,Ivan Barbashev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,2.095,0.234,0.371,0.605,0.62,0.0,1229.1611111111124,1
+Vegas Golden Knights,8483890,0,Braeden Bowman,Vegas Golden Knights,Colorado Avalanche,2026-05-26,2.0340000000000003,0.228,0.381,0.609,0.678,0.0,1229.1611111111124,1
+Vegas Golden Knights,8484803,0,Trevor Connelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,2.067,0.25,0.343,0.593,0.661,0.0,1214.8736111111125,1
+Vegas Golden Knights,8478397,0,Rasmus Andersson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.723,0.192,0.35000000000000003,0.542,1.393,0.0,1503.12083333333,1
+Vegas Golden Knights,8479639,0,Dylan Coghlan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.621,0.188,0.34800000000000003,0.536,1.405,0.0,1485.1958333333303,1
+Colorado Avalanche,8482947,0,Zakhar Bardakov,Vegas Golden Knights,Colorado Avalanche,2026-05-26,2.158,0.231,0.41000000000000003,0.641,0.649,0.0,1229.0847222222235,1
+Colorado Avalanche,8479525,0,Ross Colton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,2.085,0.231,0.399,0.63,0.679,0.0,1229.0847222222235,1
+Colorado Avalanche,8480835,0,Jack Drury,Vegas Golden Knights,Colorado Avalanche,2026-05-26,2.102,0.26,0.33,0.5900000000000001,0.63,0.0,1214.7972222222236,1
+Colorado Avalanche,8482072,0,Jack Ahcan,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.7550000000000001,0.197,0.361,0.558,1.421,0.0,1504.1166666666654,1
+Colorado Avalanche,8483565,0,Nick Blankenburg,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.641,0.201,0.357,0.558,1.167,0.0,1364.7999999999993,1
+Vegas Golden Knights,8479394,0,Carter Hart,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,23.742,3659.0999999999995,1
+Colorado Avalanche,8478406,0,Mackenzie Blackwood,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,23.614,3659.0999999999995,1
+Vegas Golden Knights,8481604,0,Pavel Dorofeyev,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.454,0.184,0.28700000000000003,0.47100000000000003,0.442,0.0,852.3041666666686,1
+Vegas Golden Knights,8475343,0,Nic Dowd,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.464,0.164,0.269,0.43300000000000005,0.465,0.0,852.3041666666686,1
+Vegas Golden Knights,8478403,0,Jack Eichel,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.364,0.177,0.28300000000000003,0.46,0.386,0.0,839.4041666666686,1
+Vegas Golden Knights,8479602,0,Jeremy Davies,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.222,0.149,0.28800000000000003,0.43700000000000006,0.994,0.0,1102.4750000000106,1
+Vegas Golden Knights,8478396,0,Noah Hanifin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.235,0.14,0.259,0.399,0.963,0.0,1087.1750000000106,1
+Colorado Avalanche,8480039,0,Martin Necas,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.352,0.182,0.247,0.429,0.49,0.0,769.794444444443,1
+Colorado Avalanche,8475754,0,Brock Nelson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.334,0.165,0.268,0.43300000000000005,0.433,0.0,769.794444444443,1
+Colorado Avalanche,8477501,0,Valeri Nichushkin,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.2790000000000001,0.167,0.26,0.42700000000000005,0.423,0.0,761.5069444444431,1
+Colorado Avalanche,8470613,0,Brent Burns,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.302,0.153,0.279,0.43200000000000005,1.112,0.0,1103.4263888888995,1
+Vegas Golden Knights,8477018,0,Ben Hutton,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.193,0.15,0.273,0.42300000000000004,0.9540000000000001,0.0,1053.5041666666798,1
+Vegas Golden Knights,8481527,0,Kaedan Korczak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.18,0.125,0.26,0.385,0.935,0.0,1040.6416666666796,1
+Colorado Avalanche,8475172,0,Nazem Kadri,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.437,0.176,0.267,0.443,0.444,0.0,852.3013888888898,1
+Colorado Avalanche,8480448,0,Parker Kelly,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.5310000000000001,0.169,0.246,0.41500000000000004,0.41600000000000004,0.0,852.3013888888898,1
+Colorado Avalanche,8481641,0,Joel Kiviranta,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.414,0.16,0.252,0.41200000000000003,0.496,0.0,839.4013888888899,1
+Colorado Avalanche,8476967,0,Brett Kulak,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.219,0.139,0.258,0.397,1.053,0.0,1051.5569444444577,1
+Colorado Avalanche,8476455,0,Gabriel Landeskog,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.3880000000000001,0.17400000000000002,0.244,0.41800000000000004,0.41300000000000003,0.0,807.9194444444432,1
+Colorado Avalanche,8477476,0,Artturi Lehkonen,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.412,0.169,0.249,0.41800000000000004,0.47100000000000003,0.0,807.9194444444432,1
+Colorado Avalanche,8477492,0,Nathan MacKinnon,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.313,0.17500000000000002,0.26,0.43500000000000005,0.452,0.0,797.3069444444432,1
+Vegas Golden Knights,8476881,0,Tomas Hertl,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.4020000000000001,0.16,0.25,0.41000000000000003,0.396,0.0,806.7819444444442,1
+Vegas Golden Knights,8482125,0,Alexander Holtz,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.367,0.156,0.261,0.41700000000000004,0.42,0.0,806.7819444444442,1
+Vegas Golden Knights,8479353,0,Brett Howden,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.355,0.18,0.219,0.399,0.396,0.0,796.169444444444,1
+Colorado Avalanche,8482942,0,Alex Gagne,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.155,0.114,0.248,0.362,0.8130000000000001,0.0,966.4000000000158,1
+Colorado Avalanche,8480069,0,Cale Makar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.054,0.126,0.255,0.381,0.747,0.0,918.711111111124,1
+Vegas Golden Knights,8476448,0,William Karlsson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.425,0.17500000000000002,0.23600000000000002,0.41100000000000003,0.376,0.0,770.8527777777766,1
+Vegas Golden Knights,8478434,0,Keegan Kolesar,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.299,0.168,0.272,0.44000000000000006,0.418,0.0,770.8527777777766,1
+Vegas Golden Knights,8479550,0,Tanner Laczynski,Vegas Golden Knights,Colorado Avalanche,2026-05-26,1.296,0.162,0.23900000000000002,0.401,0.389,0.0,762.5652777777767,1
+Vegas Golden Knights,8481534,0,Raphael Lavoie,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8478483,0,Mitch Marner,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8480007,0,Jonas Rondbjerg,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8476438,0,Brandon Saad,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8476925,0,Colton Sissons,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8482062,0,Cole Smith,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8475191,0,Reilly Smith,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8475913,0,Mark Stone,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8485251,0,Kai Uchacz,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8478468,0,Jeremy Lauzon,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8475188,0,Brayden McNabb,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8477034,0,Jaycob Megna,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8477447,0,Shea Theodore,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8478499,0,Adin Hill,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8482761,0,Carl Lindbom,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8481033,0,Akira Schmid,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Colorado Avalanche,8481186,0,Logan O'Connor,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Colorado Avalanche,8478462,0,Nicolas Roy,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Colorado Avalanche,8484258,0,Sam Malinski,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Colorado Avalanche,8476312,0,Josh Manson,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Colorado Avalanche,8478038,0,Devon Toews,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Colorado Avalanche,8485473,0,Isak Posch,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Colorado Avalanche,8475809,0,Scott Wedgewood,Vegas Golden Knights,Colorado Avalanche,2026-05-26,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0

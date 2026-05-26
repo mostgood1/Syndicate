@@ -1,0 +1,13 @@
+[2026-05-26T16:08:45] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-26 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-26.csv' --regions us
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py", line 7, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+[2026-05-26T16:08:45] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-26.csv (rows=2100)
+Traceback (most recent call last):
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 414, in export_props_predictions_local
+    basketball_props_smart_sim.export_props_predictions_with_smart_sim_local(
+  File "C:\Users\mostg\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_smart_sim.py", line 4624, in export_props_predictions_with_smart_sim_local
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+[2026-05-26T16:08:45] predict-props returned exit code 1 but downstream artifacts already exist for 2026-05-26; continuing

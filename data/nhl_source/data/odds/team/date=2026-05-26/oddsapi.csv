@@ -1,0 +1,141 @@
+event_id,commence_time,home,away,bookmaker_key,bookmaker,book_last_update,market,outcome_name,outcome_price,outcome_point,date
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,h2h,Carolina Hurricanes,-152,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,h2h,Montréal Canadiens,125,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,spreads,Carolina Hurricanes,160,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,spreads,Montréal Canadiens,-205,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,totals,Over,-132,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betrivers,BetRivers,,totals,Under,105,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Over,-110,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Under,-110,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Over,-102,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Under,-118,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Over,-103,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Under,-118,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Over,100,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Under,-120,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,h2h,Carolina Hurricanes,-162,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,h2h,Montréal Canadiens,126,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,spreads,Carolina Hurricanes,165,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,spreads,Montréal Canadiens,-220,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,totals,Over,126,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanduel,FanDuel,,totals,Under,-165,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,h2h,Carolina Hurricanes,-145,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,h2h,Montréal Canadiens,110,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,spreads,Carolina Hurricanes,185,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,spreads,Montréal Canadiens,-260,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,totals,Over,105,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,fanatics,Fanatics,,totals,Under,-140,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,h2h,Carolina Hurricanes,-154,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,h2h,Montréal Canadiens,120,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,spreads,Carolina Hurricanes,154,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,spreads,Montréal Canadiens,-200,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,totals,Over,130,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,draftkings,DraftKings,,totals,Under,-166,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,h2h,Carolina Hurricanes,-154,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,h2h,Montréal Canadiens,136,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,spreads,Carolina Hurricanes,157,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,spreads,Montréal Canadiens,-180,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,totals,Over,-122,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,lowvig,LowVig.ag,,totals,Under,106,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,h2h,Carolina Hurricanes,-160,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,h2h,Montréal Canadiens,125,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,spreads,Carolina Hurricanes,165,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,spreads,Montréal Canadiens,-210,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Over,-125,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,williamhill_us,Caesars,,totals,Under,-105,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,h2h,Carolina Hurricanes,-154,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,h2h,Montréal Canadiens,136,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,spreads,Carolina Hurricanes,157,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,spreads,Montréal Canadiens,-180,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,totals,Over,-122,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betonlineag,BetOnline.ag,,totals,Under,106,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,h2h,Carolina Hurricanes,-140,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,h2h,Montréal Canadiens,110,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,spreads,Carolina Hurricanes,180,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,spreads,Montréal Canadiens,-250,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Over,125,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betmgm,BetMGM,,totals,Under,-165,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,h2h,Carolina Hurricanes,-155,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,h2h,Montréal Canadiens,134,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,spreads,Carolina Hurricanes,164,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,spreads,Montréal Canadiens,-190,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,totals,Over,100,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,betus,BetUS,,totals,Under,-120,6.0,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,h2h,Carolina Hurricanes,-133,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,h2h,Montréal Canadiens,105,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,spreads,Carolina Hurricanes,190,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,spreads,Montréal Canadiens,-286,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Over,105,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Under,-143,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,h2h,Carolina Hurricanes,-155,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,h2h,Montréal Canadiens,120,,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,spreads,Carolina Hurricanes,170,-1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,spreads,Montréal Canadiens,-225,1.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Over,115,5.5,2026-05-26
+522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Under,-150,5.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,h2h,Colorado Avalanche,-114,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,h2h,Vegas Golden Knights,-105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,spreads,Vegas Golden Knights,-280,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,totals,Over,108,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,totals,Under,-132,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,h2h,Colorado Avalanche,-115,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,h2h,Vegas Golden Knights,-105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,totals,Over,105,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,totals,Under,-125,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,h2h,Colorado Avalanche,-110,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,h2h,Vegas Golden Knights,-110,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,spreads,Vegas Golden Knights,-260,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,totals,Over,-115,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,totals,Under,-105,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,h2h,Colorado Avalanche,-112,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,h2h,Vegas Golden Knights,-102,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,spreads,Colorado Avalanche,213,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,totals,Over,-113,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,totals,Under,-103,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,h2h,Colorado Avalanche,-112,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,h2h,Vegas Golden Knights,-102,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,spreads,Colorado Avalanche,213,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,totals,Over,-113,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,totals,Under,-103,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanatics,Fanatics,,h2h,Colorado Avalanche,-115,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanatics,Fanatics,,h2h,Vegas Golden Knights,-105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanatics,Fanatics,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanatics,Fanatics,,spreads,Vegas Golden Knights,-270,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanatics,Fanatics,,totals,Over,110,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanatics,Fanatics,,totals,Under,-135,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,h2h,Colorado Avalanche,-115,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,h2h,Vegas Golden Knights,-105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,spreads,Colorado Avalanche,200,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,spreads,Vegas Golden Knights,-250,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,totals,Over,-118,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,totals,Under,-102,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,h2h,Colorado Avalanche,-120,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,h2h,Vegas Golden Knights,-103,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Colorado Avalanche,190,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Vegas Golden Knights,-250,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,totals,Over,104,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,totals,Under,-132,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,h2h,Colorado Avalanche,-115,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,h2h,Vegas Golden Knights,-105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,spreads,Colorado Avalanche,220,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,spreads,Vegas Golden Knights,-270,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,totals,Over,-115,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,totals,Under,-105,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,h2h,Colorado Avalanche,-112,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,h2h,Vegas Golden Knights,-108,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,spreads,Colorado Avalanche,200,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,totals,Over,-112,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,totals,Under,-109,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,h2h,Colorado Avalanche,-115,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,h2h,Vegas Golden Knights,-105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,spreads,Colorado Avalanche,220,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,spreads,Vegas Golden Knights,-260,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,totals,Over,-115,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,totals,Under,-105,6.0,2026-05-26

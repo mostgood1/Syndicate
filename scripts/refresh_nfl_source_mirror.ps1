@@ -7,6 +7,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ([string]::IsNullOrWhiteSpace($Date)) {
+    $Date = (Get-Date).ToString('yyyy-MM-dd')
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_NFL'
 $sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_NFL'
