@@ -68,6 +68,18 @@ _MLB_TEAM_META_BY_ABBR: dict[str, dict[str, Any]] = {
 }
 
 
+_MLB_TEAM_ABBR_ALIASES: dict[str, str] = {
+    "AZ": "ARI",
+    "CHW": "CWS",
+    "KCR": "KC",
+    "SDP": "SD",
+    "SFG": "SF",
+    "TBR": "TB",
+    "WAS": "WSH",
+    "WSN": "WSH",
+}
+
+
 _MLB_USER_TIMEZONE = datetime.now().astimezone().tzinfo
 
 
@@ -257,7 +269,8 @@ def _mlb_logo_url(team_id: int | None) -> str | None:
 
 def _team_display(abbr: str, fallback_name: str | None = None) -> dict[str, Any]:
     team_abbr = str(abbr or "").strip().upper() or "UNK"
-    team_meta = _MLB_TEAM_META_BY_ABBR.get(team_abbr, {})
+    lookup_abbr = _MLB_TEAM_ABBR_ALIASES.get(team_abbr, team_abbr)
+    team_meta = _MLB_TEAM_META_BY_ABBR.get(lookup_abbr, {})
     team_id = team_meta.get("id")
     team_name = str(fallback_name or team_meta.get("name") or team_abbr).strip() or team_abbr
     return {
@@ -1623,7 +1636,19 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         },
     )
 
-    combined_market_warnings = list(market_warnings)
+    # Only keep local fallback warnings when the corresponding snapshot lane is actually unavailable.
+    filtered_market_warnings: list[str] = []
+    for warning in market_warnings:
+        normalized = str(warning or "").strip().lower()
+        if "game lines" in normalized and bool(game_lines_summary.get("available")):
+            continue
+        if "pitcher props" in normalized and bool(pitcher_props_summary.get("available")):
+            continue
+        if "hitter props" in normalized and bool(hitter_props_summary.get("available")):
+            continue
+        filtered_market_warnings.append(warning)
+
+    combined_market_warnings = list(filtered_market_warnings)
     for summary in (game_lines_summary, pitcher_props_summary, hitter_props_summary):
         for warning in summary.get("warnings") or []:
             if warning not in combined_market_warnings:
@@ -3752,6 +3777,11 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     next_date = (parsed_date + timedelta(days=1)).isoformat()
 
     module_links = build_module_links(selected_date, "Cards")
+    module_link_labels = {
+        str(link.get("label") or "").strip().lower()
+        for link in module_links
+        if isinstance(link, dict)
+    }
 
     summary_path = daily_artifact_path(selected_date)
     summary = load_json_file(summary_path)
@@ -3786,20 +3816,27 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         for game in games
     ]
 
+    cards_control_links = [
+        {"label": "Pitcher ladders", "href": f"/mlb/pitcher-ladders?date={selected_date}"},
+        {"label": "Hitter ladders", "href": f"/mlb/hitter-ladders?date={selected_date}"},
+        {"label": "HR targets", "href": f"/mlb/hr-targets?date={selected_date}"},
+        {"label": "Pitcher top props", "href": f"/mlb/pitcher-top-props?date={selected_date}"},
+        {"label": "Hitter top props", "href": f"/mlb/hitter-top-props?date={selected_date}"},
+        {"label": "Season review", "href": f"/mlb/season/{selected_date[:4]}?date={selected_date}"},
+        {"label": "Betting card", "href": f"/mlb/season/{selected_date[:4]}/betting-card?date={selected_date}"},
+    ]
+    cards_control_links = [
+        link
+        for link in cards_control_links
+        if str(link.get("label") or "").strip().lower() not in module_link_labels
+    ]
+
     return apply_game_board_contract({
         "date": selected_date,
         "prev_date": prev_date,
         "next_date": next_date,
         "module_links": module_links,
-        "cards_control_links": [
-            {"label": "Pitcher ladders", "href": f"/mlb/pitcher-ladders?date={selected_date}"},
-            {"label": "Hitter ladders", "href": f"/mlb/hitter-ladders?date={selected_date}"},
-            {"label": "HR targets", "href": f"/mlb/hr-targets?date={selected_date}"},
-            {"label": "Pitcher top props", "href": f"/mlb/pitcher-top-props?date={selected_date}"},
-            {"label": "Hitter top props", "href": f"/mlb/hitter-top-props?date={selected_date}"},
-            {"label": "Season review", "href": f"/mlb/season/{selected_date[:4]}?date={selected_date}"},
-            {"label": "Betting card", "href": f"/mlb/season/{selected_date[:4]}/betting-card?date={selected_date}"},
-        ],
+        "cards_control_links": cards_control_links,
         "games": games,
         "scoreboard_items": scoreboard_items,
         "source_path": Path(summary_path).name,

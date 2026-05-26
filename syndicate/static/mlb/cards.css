@@ -51,6 +51,41 @@ body.syndicate-mlb-cards-page .module-nav {
   justify-content: center;
 }
 
+body.syndicate-mlb-cards-page .module-nav {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: stretch;
+  justify-content: center;
+  width: min(100%, 1240px);
+  gap: 8px;
+  margin: 0 auto;
+  flex-wrap: unset;
+  overflow: visible;
+  padding-bottom: 2px;
+}
+
+body.syndicate-mlb-cards-page .module-nav > * {
+  flex: initial;
+  width: 100%;
+}
+
+body.syndicate-mlb-cards-page .module-nav .cards-nav-pill {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  justify-content: center;
+}
+
+@media (min-width: 1760px) {
+  body.syndicate-mlb-cards-page .module-nav {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    width: min(100%, 1700px);
+  }
+}
+
 body.syndicate-mlb-cards-page .cards-date-form input[type="date"] {
   min-height: 40px;
   border-color: rgba(132, 166, 196, 0.3);

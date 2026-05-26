@@ -33,6 +33,7 @@ from syndicate.features.mlb.sources import season_frontend_day_path
 from syndicate.features.mlb.top_props import build_top_props_page_context
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.timezone import central_year
 
 
 mlb_bp = Blueprint("syndicate_mlb", __name__, url_prefix="/mlb")
@@ -217,7 +218,7 @@ def _season_betting_day_payload(season: int, date_str: str, profile: str) -> tup
 
 def _season_betting_manifest_payload(season: int, profile: str) -> dict:
     profile_slug = (profile or "retuned").strip() or "retuned"
-    root = season_betting_card_day_path(int(season), date.today().isoformat(), profile=profile_slug).parent
+    root = season_betting_card_day_path(int(season), central_today_iso(), profile=profile_slug).parent
     entries = []
     if root.exists() and root.is_dir():
         for path in sorted(root.glob(f"season_betting_day_{int(season)}_*.json")):
@@ -246,7 +247,7 @@ def _season_betting_manifest_payload(season: int, profile: str) -> dict:
 
 
 def _live_lens_daily_accuracy_template_context(selected_date: str) -> dict[str, object]:
-    season = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else date.today().year
+    season = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else central_year()
     return {
         "date": selected_date,
         "season": season,
@@ -259,7 +260,7 @@ def _live_lens_daily_accuracy_template_context(selected_date: str) -> dict[str, 
 
 
 def _market_accuracy_template_context(selected_date: str) -> dict[str, object]:
-    season = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else date.today().year
+    season = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else central_year()
     return {
         "date": selected_date,
         "season": season,
@@ -329,7 +330,7 @@ def api_card_detail(game_pk: int):
     found = bool(isinstance(payload.get("snapshot"), dict) or ((payload.get("sim") or {}).get("found")))
     payload["found"] = found
     payload["error"] = None if found else "card_detail_missing"
-    payload["generatedAt"] = date.today().isoformat()
+    payload["generatedAt"] = central_today_iso()
     return jsonify(payload)
 
 
@@ -566,7 +567,7 @@ def pitcher_top_props():
     context["group"] = "pitcher"
     context["groupLabel"] = "Pitcher"
     context["title"] = "Pitcher Top Props"
-    context["season"] = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else date.today().year
+    context["season"] = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else central_year()
     context["embed_mode"] = (request.args.get("embed") or "").strip().lower() or None
     return render_template("mlb/daily_top_props.html", **context)
 
@@ -610,7 +611,7 @@ def hitter_top_props():
     context["group"] = "hitter"
     context["groupLabel"] = "Hitter"
     context["title"] = "Hitter Top Props"
-    context["season"] = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else date.today().year
+    context["season"] = int(selected_date[:4]) if len(selected_date) >= 4 and selected_date[:4].isdigit() else central_year()
     context["embed_mode"] = (request.args.get("embed") or "").strip().lower() or None
     return render_template("mlb/daily_top_props.html", **context)
 

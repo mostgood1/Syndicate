@@ -95,6 +95,8 @@ def _live_lens_card(game: dict[str, Any], selected_date: str, scoreboard_row: di
         "eyebrow": ("Live" if game_state in {"LIVE", "CRIT"} else "Final" if game_state == "OFF" else str(game.get("status") or "Stored slate lens")).strip() or "Stored slate lens",
         "badge": format_pct(best_edge_value) if best_edge_value is not None else "Watch",
         "meta": (game_state or str(game.get("detail") or selected_date)).strip() or selected_date,
+        "away_logo": str(away.get("logo") or game.get("away_logo") or "").strip() or None,
+        "home_logo": str(home.get("logo") or game.get("home_logo") or "").strip() or None,
         "metrics": metrics,
         "summary": str(game.get("summary") or "Stored NHL slate lens row.").strip() or "Stored NHL slate lens row.",
         "list_items": [label for _, label in ranked_edges[:3]] or panel_titles[:3] or ["No stored lens signals for this matchup."],

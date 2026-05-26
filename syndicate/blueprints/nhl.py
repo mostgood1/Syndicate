@@ -31,6 +31,8 @@ from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import slate_summaries
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.timezone import central_today
+from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.timezone import central_year
 
 
 nhl_bp = Blueprint("syndicate_nhl", __name__, url_prefix="/nhl")
@@ -121,7 +123,7 @@ def _live_lens_daily_accuracy_template_context(selected_date: str) -> dict[str, 
 
 
 def _live_game_accuracy_template_context(selected_date: str) -> dict[str, object]:
-    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else date.today().year
+    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else central_year()
     return {
         "date": selected_date,
         "season": season,
@@ -138,7 +140,7 @@ def _live_game_accuracy_template_context(selected_date: str) -> dict[str, object
 
 
 def _market_accuracy_template_context(selected_date: str) -> dict[str, object]:
-    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else date.today().year
+    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else central_year()
     return {
         "date": selected_date,
         "season": season,
@@ -154,11 +156,11 @@ def _market_accuracy_template_context(selected_date: str) -> dict[str, object]:
 
 
 def _betting_recap_template_context(selected_date: str) -> dict[str, object]:
-    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else date.today().year
+    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else central_year()
     try:
         until_date = parse_iso_date(selected_date)
     except ValueError:
-        until_date = date.today()
+        until_date = central_today()
     since_date = (until_date - timedelta(days=13)).isoformat()
     until_value = until_date.isoformat()
     return {
@@ -211,12 +213,12 @@ def hub():
     return render_template(
         "nhl/hub.html",
         latest_date=latest_date,
-        today_date=date.today().isoformat(),
+        today_date=central_today_iso(),
         recent_slates=recent_slates,
         summary_stats=[
             {"label": "Stored slates", "value": str(len(slates))},
             {"label": "Latest", "value": latest_date},
-            {"label": "Launch date", "value": date.today().isoformat()},
+            {"label": "Launch date", "value": central_today_iso()},
         ],
     )
 

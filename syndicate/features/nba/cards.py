@@ -30,6 +30,26 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
         return []
 
 
+def _espn_logo_abbr(team_tri: str) -> str:
+    value = str(team_tri or "").strip().upper()
+    return {
+        "GSW": "GS",
+        "NOP": "NO",
+        "NYK": "NY",
+        "UTA": "UTAH",
+        "WAS": "WSH",
+        "SAS": "SA",
+        "PHX": "PHO",
+    }.get(value, value)
+
+
+def _nba_logo_url(team_tri: str) -> str | None:
+    abbr = _espn_logo_abbr(team_tri)
+    if not abbr:
+        return None
+    return f"https://a.espncdn.com/i/teamlogos/nba/500/{abbr.lower()}.png"
+
+
 def _recommendation_index(summary: dict[str, Any] | None) -> dict[tuple[str, str], list[dict[str, Any]]]:
     per_game = summary.get("per_game") if isinstance((summary or {}).get("per_game"), list) else []
     index: dict[tuple[str, str], list[dict[str, Any]]] = {}
@@ -278,8 +298,10 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 "away_name": away_tri,
                 "home_tri": home_tri,
                 "home_name": home_tri,
-                "away": {"abbr": away_tri, "name": away_tri},
-                "home": {"abbr": home_tri, "name": home_tri},
+                "away_logo": _nba_logo_url(away_tri),
+                "home_logo": _nba_logo_url(home_tri),
+                "away": {"abbr": away_tri, "name": away_tri, "logo": _nba_logo_url(away_tri)},
+                "home": {"abbr": home_tri, "name": home_tri, "logo": _nba_logo_url(home_tri)},
                 "status": "Final" if final else ("Live" if in_progress else "Scheduled"),
                 "detail": status_text or ("Final" if final else ("Live" if in_progress else "Scheduled")),
                 "summary": "Live scoreboard fallback",
@@ -382,8 +404,10 @@ def _normalize_source_game(game: dict[str, Any], *, idx: int, selected_date: str
         "away_name": away_name,
         "home_tri": home_tri,
         "home_name": home_name,
-        "away": {"abbr": away_tri, "name": away_name},
-        "home": {"abbr": home_tri, "name": home_name},
+        "away_logo": _nba_logo_url(away_tri),
+        "home_logo": _nba_logo_url(home_tri),
+        "away": {"abbr": away_tri, "name": away_name, "logo": _nba_logo_url(away_tri)},
+        "home": {"abbr": home_tri, "name": home_name, "logo": _nba_logo_url(home_tri)},
         "status": str(game.get("live_status") or game.get("date") or "Source API").strip() or "Source API",
         "detail": str(game.get("date") or game.get("live_status") or "Scheduled").strip() or "Scheduled",
         "summary": str(game.get("writeup") or "Source API snapshot").strip() or "Source API snapshot",
@@ -494,8 +518,10 @@ def _game_from_row(
         "away_name": away_name,
         "home_tri": home_tri,
         "home_name": home_name,
-        "away": {"abbr": away_tri, "name": away_name},
-        "home": {"abbr": home_tri, "name": home_name},
+        "away_logo": _nba_logo_url(away_tri),
+        "home_logo": _nba_logo_url(home_tri),
+        "away": {"abbr": away_tri, "name": away_name, "logo": _nba_logo_url(away_tri)},
+        "home": {"abbr": home_tri, "name": home_name, "logo": _nba_logo_url(home_tri)},
         "status": "Processed artifact",
         "detail": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled",
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",

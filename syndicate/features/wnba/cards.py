@@ -517,8 +517,10 @@ def _game_from_row(
     game_id = str(row.get("game_id") or idx)
     return {
         "gamePk": game_id,
-        "away": {"abbr": away_tri, "name": away_name},
-        "home": {"abbr": home_tri, "name": home_name},
+        "away_logo": _source_logo_url(away_tri),
+        "home_logo": _source_logo_url(home_tri),
+        "away": {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)},
+        "home": {"abbr": home_tri, "name": home_name, "logo": _source_logo_url(home_tri)},
         "status": "Processed artifact",
         "detail": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled",
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",

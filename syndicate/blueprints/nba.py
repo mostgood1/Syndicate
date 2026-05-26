@@ -37,7 +37,10 @@ from syndicate.features.nba.sources import available_dates
 from syndicate.features.nba.sources import default_date
 from syndicate.features.nba.sources import default_date_for_season
 from syndicate.features.shared.rank_board import build_rank_api_payload
+from syndicate.features.shared.timezone import central_now
+from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.timezone import central_year
 
 
 nba_bp = Blueprint("syndicate_nba", __name__, url_prefix="/nba")
@@ -155,7 +158,7 @@ def season_betting_card(season: int):
 
 
 def _features_template_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year)
+    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else None)
     if season is not None:
         betting_card_query = f"?profile={normalized_profile}&date={selected_date}" if normalized_profile else f"?date={selected_date}"
@@ -183,12 +186,12 @@ def _features_template_context(selected_date: str, *, season: int | None = None,
 
 
 def _betting_recap_template_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year)
+    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else None)
     try:
         until_date = date.fromisoformat(selected_date)
     except ValueError:
-        until_date = date.today()
+        until_date = central_today()
     since_date = (until_date - timedelta(days=13)).isoformat()
     until_value = until_date.isoformat()
     if season is not None:
@@ -225,7 +228,7 @@ def _betting_recap_template_context(selected_date: str, *, season: int | None = 
 
 
 def _live_lens_template_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year)
+    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else None)
     if season is not None:
         betting_card_query = f"?profile={normalized_profile}&date={selected_date}" if normalized_profile else f"?date={selected_date}"
@@ -255,7 +258,7 @@ def _live_lens_template_context(selected_date: str, *, season: int | None = None
 
 
 def _live_lens_accuracy_template_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year)
+    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else None)
     if season is not None:
         betting_card_query = f"?profile={normalized_profile}&date={selected_date}" if normalized_profile else f"?date={selected_date}"
@@ -289,7 +292,7 @@ def _live_lens_accuracy_template_context(selected_date: str, *, season: int | No
 
 
 def _live_game_accuracy_template_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year)
+    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else None)
     if season is not None:
         betting_card_query = f"?profile={normalized_profile}&date={selected_date}" if normalized_profile else f"?date={selected_date}"
@@ -321,7 +324,7 @@ def _live_game_accuracy_template_context(selected_date: str, *, season: int | No
 
 
 def _live_lens_daily_accuracy_template_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year)
+    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else None)
     if season is not None:
         betting_card_query = f"?profile={normalized_profile}&date={selected_date}" if normalized_profile else f"?date={selected_date}"
@@ -353,7 +356,7 @@ def _live_lens_daily_accuracy_template_context(selected_date: str, *, season: in
 
 
 def _market_accuracy_template_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year)
+    resolved_season = int(season) if season is not None else (date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else None)
     if season is not None:
         betting_card_query = f"?profile={normalized_profile}&date={selected_date}" if normalized_profile else f"?date={selected_date}"
@@ -472,7 +475,7 @@ def season_reconciliation(season: int):
 @nba_bp.get("/features")
 def features():
     selected_date = _selected_date()
-    season = date.fromisoformat(selected_date).year if len(selected_date) == 10 else date.today().year
+    season = date.fromisoformat(selected_date).year if len(selected_date) == 10 else central_year()
     profile = str(request.args.get("profile") or "retuned").strip().lower() or "retuned"
     return render_template("nba/features.html", **_features_template_context(selected_date, season=season, profile=profile))
 
@@ -700,7 +703,7 @@ def api_live_player_lens():
     selected_date = _selected_date()
     event_ids_raw = str(request.args.get("event_ids") or "").strip()
     if not event_ids_raw:
-        return jsonify({"ok": True, "ttl": 20, "date": selected_date or None, "games": [], "generated_at": date.today().isoformat() + "T00:00:00Z"})
+        return jsonify({"ok": True, "ttl": 20, "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
     event_ids = [item.strip() for item in event_ids_raw.split(",") if item.strip()]
     if not event_ids:
         return jsonify({"error": "missing event_ids"}), 400

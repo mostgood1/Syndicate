@@ -472,7 +472,11 @@
 
   function starterMetricBadgeKey(card) {
     const status = String(card?.status?.abstract || "").trim().toLowerCase();
-    if (status === "live") return "miniLadderBadges";
+    if (status === "live") {
+      const awayHasMini = Array.isArray(card?.probable?.away?.miniLadderBadges) && card.probable.away.miniLadderBadges.length;
+      const homeHasMini = Array.isArray(card?.probable?.home?.miniLadderBadges) && card.probable.home.miniLadderBadges.length;
+      return awayHasMini || homeHasMini ? "miniLadderBadges" : "ladderBadges";
+    }
     if (status === "final") {
       const awayHasMini = Array.isArray(card?.probable?.away?.miniLadderBadges) && card.probable.away.miniLadderBadges.length;
       const homeHasMini = Array.isArray(card?.probable?.home?.miniLadderBadges) && card.probable.home.miniLadderBadges.length;
@@ -2833,7 +2837,7 @@
       if (Number(lineCounts.h2h_games || 0) > 0) marketBits.push(`ML ${lineCounts.h2h_games}`);
       if (Number(lineCounts.totals_games || 0) > 0) marketBits.push(`Tot ${lineCounts.totals_games}`);
       if (Number(lineCounts.spreads_games || 0) > 0) marketBits.push(`Spr ${lineCounts.spreads_games}`);
-    } else if (hasArtifactData) {
+    } else if (hasArtifactData && gameLines.exists) {
       marketBits.push("Markets pending");
     }
 
@@ -2856,7 +2860,8 @@
       warningBits.push(`Lineups partial ${lineupHealth.partialTeams}`);
     }
     if (Number(workflow.warningCount || 0) > 0) {
-      warningBits.push(`Workflow warnings ${workflow.warningCount}`);
+      const warningPreview = String((workflow.warnings || [])[0] || "").trim();
+      warningBits.push(warningPreview || `Workflow warnings ${workflow.warningCount}`);
     }
     if (Number(workflow.errorCount || 0) > 0) {
       warningBits.push(`Workflow errors ${workflow.errorCount}`);
