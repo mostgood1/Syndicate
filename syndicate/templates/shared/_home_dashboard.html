@@ -1,0 +1,165 @@
+{% if dashboard %}
+  <section class="home-dashboard" aria-label="Betting dashboard overview">
+    <div class="home-summary-grid" aria-label="Board summary">
+      {% for item in dashboard.summary_cards %}
+        <article class="home-summary-card">
+          <div class="home-summary-card__label">{{ item.label }}</div>
+          <div class="home-summary-card__value">{{ item.value }}</div>
+          <div class="home-summary-card__meta">{{ item.meta }}</div>
+        </article>
+      {% endfor %}
+    </div>
+
+    <section class="home-decision-card" aria-label="Top game bets">
+      <div class="home-decision-card__header">
+        <div>
+          <div class="section-label">Game bets</div>
+          <h2 class="home-decision-card__title">Cross-sport game bet board</h2>
+        </div>
+        <div class="home-decision-card__meta">Structured from saved sides, totals, and live game-lens markets where the sport surface exposes them.</div>
+      </div>
+      {% if dashboard.top_game_bets %}
+        <div class="home-game-table" role="table" aria-label="Cross-sport game bet table">
+          <div class="home-game-table__head" role="row">
+            <div role="columnheader">Bet</div>
+            <div role="columnheader">Line</div>
+            <div role="columnheader">Odds</div>
+            <div role="columnheader">Edge</div>
+            <div role="columnheader">Win</div>
+            <div role="columnheader">Updated</div>
+          </div>
+          {% for row in dashboard.top_game_bets %}
+            <div class="home-game-table__row" role="row">
+              <div class="home-game-table__cell home-game-table__cell--primary" role="cell">
+                <div class="home-opportunity-row__eyebrow">
+                  <span class="home-opportunity-pill home-opportunity-pill--sport">{{ row.sport }}</span>
+                  <span class="home-opportunity-pill">{{ row.market }}</span>
+                </div>
+                <div class="home-prop-table__player">{{ row.pick }}</div>
+                <div class="home-prop-table__matchup">{{ row.matchup }}</div>
+                <div class="home-prop-table__detail">{{ row.detail }}</div>
+                {% if row.href %}
+                  <a class="home-opportunity-row__link" href="{{ row.href }}">{{ row.href_label }}</a>
+                {% endif %}
+              </div>
+              <div class="home-game-table__cell" role="cell">{{ row.line }}</div>
+              <div class="home-game-table__cell" role="cell">{{ row.odds }}</div>
+              <div class="home-game-table__cell" role="cell">{{ row.edge }}</div>
+              <div class="home-game-table__cell" role="cell">{{ row.confidence }}</div>
+              <div class="home-game-table__cell" role="cell">{{ row.updated_at }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="sport-scroll-row__summary">No structured game-bet rows were surfaced from the current boards.</p>
+      {% endif %}
+    </section>
+
+    <div class="home-decision-grid">
+      <section class="home-decision-card" aria-label="Live game watchlist">
+        <div class="home-decision-card__header">
+          <div>
+            <div class="section-label">Watchlist</div>
+            <h2 class="home-decision-card__title">Live game board</h2>
+          </div>
+          <div class="home-decision-card__meta">Ranked from the surfaced game reads already feeding each sport board.</div>
+        </div>
+        {% if dashboard.live_watch %}
+          <div class="home-opportunity-list" role="list">
+            {% for row in dashboard.live_watch %}
+              <article class="home-opportunity-row home-opportunity-row--game" role="listitem">
+                <div class="home-opportunity-row__eyebrow">
+                  <span class="home-opportunity-pill home-opportunity-pill--sport">{{ row.sport }}</span>
+                  <span class="home-opportunity-pill{% if row.is_live %} home-opportunity-pill--live{% endif %}">{{ row.status }}</span>
+                </div>
+                <div class="home-opportunity-row__headline">{{ row.matchup }}</div>
+                <div class="home-opportunity-row__subline">{{ row.detail }}</div>
+                <div class="home-opportunity-row__signal">{{ row.signal }}</div>
+                <div class="home-opportunity-row__summary">{{ row.summary }}</div>
+                {% if row.href %}
+                  <a class="home-opportunity-row__link" href="{{ row.href }}">{{ row.href_label }}</a>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="sport-scroll-row__summary">No live or scheduled game reads were surfaced for this board.</p>
+        {% endif %}
+      </section>
+
+      <section class="home-decision-card" aria-label="Top prop opportunities">
+        <div class="home-decision-card__header">
+          <div>
+            <div class="section-label">Props</div>
+            <h2 class="home-decision-card__title">Cross-sport prop board</h2>
+          </div>
+          <div class="home-decision-card__meta">Default surfaces emphasize Actual, Projected, Odds, and Edge when the source row provides them.</div>
+        </div>
+        {% if dashboard.top_props %}
+          <div class="home-prop-table" role="table" aria-label="Cross-sport prop table">
+            <div class="home-prop-table__head" role="row">
+              <div role="columnheader">Prop</div>
+              <div role="columnheader">Actual</div>
+              <div role="columnheader">Projected</div>
+              <div role="columnheader">Line</div>
+              <div role="columnheader">Odds</div>
+              <div role="columnheader">Edge</div>
+            </div>
+            {% for row in dashboard.top_props %}
+              <div class="home-prop-table__row" role="row">
+                <div class="home-prop-table__cell home-prop-table__cell--primary" role="cell">
+                  <div class="home-opportunity-row__eyebrow">
+                    <span class="home-opportunity-pill home-opportunity-pill--sport">{{ row.sport }}</span>
+                    <span class="home-opportunity-pill{% if row.is_live %} home-opportunity-pill--live{% endif %}">{{ row.surface }}</span>
+                  </div>
+                  <div class="home-prop-table__player">{{ row.name }}</div>
+                  <div class="home-prop-table__market">{{ row.pick }} | {{ row.market }}</div>
+                  <div class="home-prop-table__matchup">{{ row.matchup }}</div>
+                  <div class="home-prop-table__detail">{{ row.detail }}</div>
+                  {% if row.href %}
+                    <a class="home-opportunity-row__link" href="{{ row.href }}">Open prop lane</a>
+                  {% endif %}
+                </div>
+                <div class="home-prop-table__cell" role="cell">{{ row.actual }}</div>
+                <div class="home-prop-table__cell" role="cell">{{ row.projected }}</div>
+                <div class="home-prop-table__cell" role="cell">{{ row.line }}</div>
+                <div class="home-prop-table__cell" role="cell">{{ row.odds }}</div>
+                <div class="home-prop-table__cell" role="cell">
+                  <div>{{ row.edge }}</div>
+                  <div class="home-prop-table__confidence">{{ row.confidence }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="sport-scroll-row__summary">No prop rows were surfaced from the current mirrored boards.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    {% if dashboard.sport_summaries %}
+      <section class="home-sport-summary-grid" aria-label="Sport action summaries">
+        {% for row in dashboard.sport_summaries %}
+          <article class="home-sport-summary-card">
+            <div class="home-opportunity-row__eyebrow">
+              <span class="home-opportunity-pill home-opportunity-pill--sport">{{ row.sport }}</span>
+              <span class="home-opportunity-pill{% if row.is_live %} home-opportunity-pill--live{% endif %}">{{ row.context }}</span>
+            </div>
+            <div class="home-sport-summary-card__stats">
+              <div><span>Games</span><strong>{{ row.games }}</strong></div>
+              <div><span>Props</span><strong>{{ row.props }}</strong></div>
+            </div>
+            <div class="home-sport-summary-card__line">Best signal: {{ row.best_signal }}</div>
+            <div class="home-sport-summary-card__line">Top game bet: {{ row.top_game_bet }}</div>
+            <div class="home-sport-summary-card__line">Top prop: {{ row.top_prop }}</div>
+            {% if row.hub_href %}
+              <a class="home-opportunity-row__link" href="{{ row.hub_href }}">Open {{ row.sport }} hub</a>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </section>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% include "shared/_home_sport_stack.html" %}
