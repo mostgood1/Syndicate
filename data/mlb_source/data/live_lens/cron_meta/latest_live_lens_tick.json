@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-05-25T17:18:09-05:00",
-  "date": "2026-05-25",
+  "recordedAt": "2026-05-26T17:51:54-05:00",
+  "date": "2026-05-26",
   "counts": {
     "games": 0,
     "live": 0,
@@ -10,9 +10,10 @@
     "archivedLiveProps": 0
   },
   "marketsRefreshed": false,
-  "reportPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_05_25.json",
-  "logPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_05_25.jsonl",
-  "propObservationLogPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_observations_2026_05_25.jsonl",
+  "reportPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_05_26.json",
+  "logPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_05_26.jsonl",
+  "propObservationLogPath": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_observations_2026_05_26.jsonl",
   "trigger": "syndicate_refresh",
-  "reused": true
+  "reused": false,
+  "degraded": true
 }
