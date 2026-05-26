@@ -21,6 +21,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ([string]::IsNullOrWhiteSpace($Date)) {
+    $Date = (Get-Date).ToString('yyyy-MM-dd')
+}
+
 $cpuCount = [Environment]::ProcessorCount
 
 function Get-ReasonableWorkerCount {

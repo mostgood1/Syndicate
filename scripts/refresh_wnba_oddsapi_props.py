@@ -507,6 +507,15 @@ def _ensure_source_game_inputs(
         log_file=log_file,
         heartbeat_cb=heartbeat_cb,
     )
+    if int(rc_predict_date) != 0:
+        _append_log(log_file, f"predict-date failed with exit code {int(rc_predict_date)}; retrying via CPU daily-update fallback")
+        rc_predict_date = _run_source_daily_update_cpu_fallback(
+            source_root=source_root,
+            package_name=package_name,
+            date_str=date_str,
+            log_file=log_file,
+            heartbeat_cb=heartbeat_cb,
+        )
     return {
         "schedule": int(rc_schedule),
         "fetch": int(rc_fetch),
@@ -536,6 +545,34 @@ def _run_source_predict_date(
         cwd=source_root,
         env=_source_worker_env(source_root),
         timeout_s=20 * 60,
+        heartbeat_cb=heartbeat_cb,
+        heartbeat_every_s=5.0,
+    )
+
+
+def _run_source_daily_update_cpu_fallback(
+    *,
+    source_root: Path,
+    package_name: str,
+    date_str: str,
+    log_file: Path,
+    heartbeat_cb: callable | None,
+) -> int:
+    return _run_to_file(
+        [
+            _source_python(source_root),
+            "-m",
+            f"{package_name}.cli",
+            "daily-update",
+            "--date",
+            date_str,
+            "--no-npu",
+            "--no-git-push",
+        ],
+        log_file,
+        cwd=source_root,
+        env=_source_worker_env(source_root),
+        timeout_s=45 * 60,
         heartbeat_cb=heartbeat_cb,
         heartbeat_every_s=5.0,
     )
@@ -975,13 +1012,11 @@ def _run_refresh_via_cli(
         elif int(state["snapshot_rows"] or 0) > 0 and int(state["edges_rows"] or 0) <= 0:
             state["error"] = "props-edges produced zero rows after a non-empty snapshot"
 
-    if pred_ready and do_export and not state.get("error"):
+    if do_export and not state.get("error"):
         state["phase"] = "export"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         state["rc_export"] = -1
         try:
-            _touch_progress()
-            _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)
             _touch_progress()
             game_input_rcs = _ensure_source_game_inputs(
                 source_root=source_root,
@@ -990,6 +1025,12 @@ def _run_refresh_via_cli(
                 log_file=log_file,
                 heartbeat_cb=_touch_progress,
             )
+            rc_local_props_export = 0
+            if pred_ready:
+                _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)
+                _touch_progress()
+            else:
+                _append_log(log_file, f"Skipping local props recommendations export for {date_str}: props predictions were not refreshed")
             _, rc_recommendations = _run_source_processed_export(
                 source_root=source_root,
                 package_name="wnba_betting",
@@ -1008,7 +1049,7 @@ def _run_refresh_via_cli(
                 log_file=log_file,
                 heartbeat_cb=_touch_progress,
             )
-            rc_export = 0 if all(int(value) == 0 for value in game_input_rcs.values()) and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
+            rc_export = 0 if all(int(value) == 0 for value in game_input_rcs.values()) and int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
         except Exception:
             _append_log(log_file, traceback.format_exc())
             rc_export = 1

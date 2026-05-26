@@ -4,6 +4,8 @@ param(
     [switch]$Json,
     [switch]$SkipTests,
     [switch]$SkipSmoke,
+    [switch]$SkipGitPush,
+    [switch]$WhatIf,
     [switch]$SkipNFL,
     [switch]$SkipNCAAF,
     [switch]$SkipNCAAB,
@@ -15,6 +17,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ([string]::IsNullOrWhiteSpace($Date)) {
+    $Date = (Get-Date).ToString('yyyy-MM-dd')
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $unifiedArgs = @(
     'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'unified_daily_update.ps1'),
@@ -25,6 +31,8 @@ if ($BaseUrl) { $unifiedArgs += @('-BaseUrl', $BaseUrl) }
 if ($Json) { $unifiedArgs += '-Json' }
 if ($SkipTests) { $unifiedArgs += '-SkipTests' }
 if ($SkipSmoke) { $unifiedArgs += '-SkipSmoke' }
+if ($SkipGitPush) { $unifiedArgs += '-SkipGitPush' }
+if ($WhatIf) { $unifiedArgs += '-DryRun' }
 if ($SkipNFL) { $unifiedArgs += '-SkipNFL' }
 if ($SkipNCAAF) { $unifiedArgs += '-SkipNCAAF' }
 if ($SkipNCAAB) { $unifiedArgs += '-SkipNCAAB' }
