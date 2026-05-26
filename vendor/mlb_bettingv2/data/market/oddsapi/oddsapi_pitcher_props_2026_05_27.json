@@ -1,7 +1,7 @@
 {
   "date": "2026-05-27",
   "mode": "live",
-  "retrieved_at": "2026-05-26T16:39:14.078976",
+  "retrieved_at": "2026-05-26T21:45:48.499991",
   "pitcher_props": {},
   "meta": {
     "markets": [
@@ -16,7 +16,7 @@
     "counts": {
       "players": 0,
       "markets": {},
-      "events_matched": 0
+      "events_matched": 12
     },
     "warnings": []
   }

@@ -36,6 +36,20 @@ LIVE_LENS_FILES = (
 )
 
 
+REQUIRED_ARTIFACTS = (
+    "data/processed/predictions_sim_{date}.csv",
+    "data/processed/recommendations_sim_{date}.csv",
+    "data/processed/props_boxscores_sim_{date}.csv",
+    "data/processed/props_boxscores_sim_hist_{date}.csv",
+    "data/processed/props_recommendations_{date}.csv",
+    "data/processed/roster_snapshot_{date}.csv",
+    "data/processed/lineups_{date}.csv",
+    "data/odds/games/date={date}/scoreboard.csv",
+    "data/odds/team/date={date}/oddsapi.csv",
+    "data/props/player_props_lines/date={date}/oddsapi.csv",
+)
+
+
 def _copy_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_file():
         return False
@@ -145,6 +159,7 @@ def _run_source_generation_multi(*, source_root: Path, artifact_root: Path, date
             for command_args in (
                 ["props-simulate-boxscores", "--date", target_date, "--n-sims", str(int(props_boxscore_n_sims))],
                 ["props-recommendations-boxscores", "--date", target_date],
+                ["props-recommendations", "--date", target_date, "--min-ev", "0.0", "--top", "200"],
                 ["game-recommendations-sim", "--date", target_date],
             ):
                 _run_source_cli(source_root=source_root, artifact_root=artifact_root, command_args=command_args)
@@ -235,6 +250,16 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
     return copied
 
 
+def _missing_required_artifacts(*, artifact_root: Path, date_str: str) -> list[str]:
+    missing: list[str] = []
+    for template in REQUIRED_ARTIFACTS:
+        rel_path = template.format(date=date_str)
+        full_path = artifact_root / rel_path
+        if not full_path.exists():
+            missing.append(rel_path)
+    return missing
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh NHL OddsAPI snapshots through a Syndicate-owned runner.")
     parser.add_argument("--date", required=True)
@@ -272,6 +297,21 @@ def main() -> int:
         return 1
 
     copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
+    missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
+    if missing_required:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "date": args.date,
+                    "artifact_bundle_root": str(artifact_root),
+                    "error": "missing_required_artifacts",
+                    "missing_required_artifacts": missing_required,
+                },
+                indent=2,
+            )
+        )
+        return 1
     lookahead_runs = []
     for target_date in _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))[1:]:
         lookahead_runs.append(
@@ -288,6 +328,7 @@ def main() -> int:
                 "artifact_bundle_root": str(artifact_root),
                 "artifact_bundle_files": copied,
                 "lookahead_runs": lookahead_runs,
+                "required_artifacts": [template.format(date=args.date) for template in REQUIRED_ARTIFACTS],
             },
             indent=2,
         )

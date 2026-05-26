@@ -1,6 +1,6 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\NCAAB",
+    [string]$SourceRepo = "",
     [switch]$RefreshRawOutputsFromSource,
     [switch]$UseExistingRawOutputs
 )

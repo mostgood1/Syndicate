@@ -146,15 +146,15 @@ PROTECTED_LOCAL_RESOLVER_CHECKS = (
     {"slug": "mlb", "description": "daily artifact path stays on local mirror"},
     {"slug": "mlb", "description": "daily summary dates ignore sibling artifacts"},
     {"slug": "mlb", "description": "raw feed path stays on local mirror"},
-    {"slug": "wnba", "description": "processed_path stays on local mirror"},
-    {"slug": "wnba", "description": "live snapshot path stays on local mirror"},
-    {"slug": "wnba", "description": "available_dates ignore sibling artifacts"},
+    {"slug": "wnba", "description": "processed_path resolves from source bundle when available"},
+    {"slug": "wnba", "description": "live snapshot path resolves from source bundle when available"},
+    {"slug": "wnba", "description": "available_dates include source bundle artifacts"},
     {"slug": "ncaaf", "description": "data_path stays on local mirror"},
     {"slug": "ncaab", "description": "mirror_path stays on local mirror"},
     {"slug": "nfl", "description": "data_path stays on local mirror"},
     {"slug": "nfl", "description": "week_summaries ignore sibling snapshots"},
-    {"slug": "nba", "description": "processed_path stays on local mirror"},
-    {"slug": "nba", "description": "available_dates ignore sibling artifacts"},
+    {"slug": "nba", "description": "processed_path resolves from source bundle when available"},
+    {"slug": "nba", "description": "available_dates include source bundle artifacts"},
     {"slug": "nhl", "description": "processed_path stays on local mirror"},
     {"slug": "nhl", "description": "scoreboard snapshot stays on local mirror"},
     {"slug": "nhl", "description": "slate summaries ignore sibling artifacts"},
@@ -502,18 +502,18 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             external_snapshot.parent.mkdir(parents=True, exist_ok=True)
             external_processed.write_text("x", encoding="utf-8")
             external_snapshot.write_text("x", encoding="utf-8")
-            expected_processed = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
-            expected_snapshot = local_root / "data" / "processed" / "live_snapshots" / "live_state_2026-05-17.json"
+            expected_processed = external_processed
+            expected_snapshot = external_snapshot
             with patch("syndicate.features.wnba.sources._source_roots", return_value=[local_root, external_root]):
                 actual_processed = wnba_processed_path("game_cards_2026-05-17.csv")
                 actual_snapshot = wnba_live_snapshot_path("live_state_2026-05-17.json")
                 actual_dates = wnba_available_dates()
             if Path(actual_processed) != expected_processed:
-                _append_violation("wnba", "processed_path stays on local mirror", expected=str(expected_processed), actual=str(actual_processed))
+                _append_violation("wnba", "processed_path resolves from source bundle when available", expected=str(expected_processed), actual=str(actual_processed))
             if Path(actual_snapshot) != expected_snapshot:
-                _append_violation("wnba", "live snapshot path stays on local mirror", expected=str(expected_snapshot), actual=str(actual_snapshot))
-            if actual_dates != []:
-                _append_violation("wnba", "available_dates ignore sibling artifacts", expected=[], actual=actual_dates)
+                _append_violation("wnba", "live snapshot path resolves from source bundle when available", expected=str(expected_snapshot), actual=str(actual_snapshot))
+            if actual_dates != ["2026-05-17"]:
+                _append_violation("wnba", "available_dates include source bundle artifacts", expected=["2026-05-17"], actual=actual_dates)
     except Exception as error:
         _append_violation("wnba", "local resolver contracts", expected="no exceptions", actual=repr(error), issue="exception")
 
@@ -595,14 +595,14 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             external_file = external_root / "data" / "processed" / "game_cards_2026-05-17.csv"
             external_file.parent.mkdir(parents=True, exist_ok=True)
             external_file.write_text("x", encoding="utf-8")
-            expected = local_root / "data" / "processed" / "game_cards_2026-05-17.csv"
+            expected = external_file
             with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
                 actual_path = nba_processed_path("game_cards_2026-05-17.csv")
                 actual_dates = nba_available_dates()
             if Path(actual_path) != expected:
-                _append_violation("nba", "processed_path stays on local mirror", expected=str(expected), actual=str(actual_path))
-            if actual_dates != []:
-                _append_violation("nba", "available_dates ignore sibling artifacts", expected=[], actual=actual_dates)
+                _append_violation("nba", "processed_path resolves from source bundle when available", expected=str(expected), actual=str(actual_path))
+            if actual_dates != ["2026-05-17"]:
+                _append_violation("nba", "available_dates include source bundle artifacts", expected=["2026-05-17"], actual=actual_dates)
     except Exception as error:
         _append_violation("nba", "local resolver contracts", expected="no exceptions", actual=repr(error), issue="exception")
 

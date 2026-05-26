@@ -440,7 +440,13 @@ def export_props_predictions_local(
 
         if not out_path.exists() or not out_path.is_file():
             raise RuntimeError(f"predict-props completed without writing {out_path.name}")
-        return 1, out_path
+        try:
+            import pandas as pd
+
+            out_df = pd.read_csv(out_path)
+            return int(len(out_df.index)), out_path
+        except Exception:
+            return 0, out_path
     except Exception:
         if log_file is not None:
             log_file.parent.mkdir(parents=True, exist_ok=True)

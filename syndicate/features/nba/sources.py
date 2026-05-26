@@ -17,32 +17,54 @@ def _repo_root() -> Path:
 
 
 def _artifact_roots() -> list[Path]:
-    return preferred_source_roots(
+    roots = preferred_source_roots(
         __file__,
         env_var="SYNDICATE_NBA_ARTIFACT_ROOT",
         local_dir_name="nba_source",
     )
+    expanded: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        for candidate in (root, root / "source_artifacts"):
+            resolved = candidate.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            expanded.append(resolved)
+    return expanded
 
 
 def processed_path(filename: str) -> Path:
-    return (_artifact_roots()[0] / "data" / "processed" / filename).resolve()
+    roots = _artifact_roots()
+    for root in roots:
+        candidate = (root / "data" / "processed" / filename).resolve()
+        if candidate.exists():
+            return candidate
+    return (roots[0] / "data" / "processed" / filename).resolve()
 
 
 def live_snapshot_path(filename: str) -> Path:
-    return (_artifact_roots()[0] / "data" / "processed" / "live_snapshots" / filename).resolve()
+    roots = _artifact_roots()
+    for root in roots:
+        candidate = (root / "data" / "processed" / "live_snapshots" / filename).resolve()
+        if candidate.exists():
+            return candidate
+    return (roots[0] / "data" / "processed" / "live_snapshots" / filename).resolve()
 
 
 def _processed_candidate_path(filename: str, *, root: Path | None = None) -> Path:
-    base_root = root or (_artifact_roots()[0] if _artifact_roots() else (_repo_root() / "data" / "nba_source"))
+    roots = _artifact_roots()
+    base_root = root or (roots[0] if roots else (_repo_root() / "data" / "nba_source"))
     return (base_root / "data" / "processed" / filename).resolve()
 
 
 def _resolve_processed_candidates(filenames: list[str]) -> Path:
     roots = _artifact_roots()
-    for filename in filenames:
-        candidate = (roots[0] / "data" / "processed" / filename).resolve()
-        if candidate.exists():
-            return candidate
+    for root in roots:
+        for filename in filenames:
+            candidate = (root / "data" / "processed" / filename).resolve()
+            if candidate.exists():
+                return candidate
     return _processed_candidate_path(filenames[0], root=roots[0] if roots else None)
 
 
@@ -73,8 +95,10 @@ _DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 def available_dates() -> list[str]:
     dates: set[str] = set()
-    processed_dir = (_artifact_roots()[0] / "data" / "processed").resolve()
-    if processed_dir.exists():
+    for root in _artifact_roots():
+        processed_dir = (root / "data" / "processed").resolve()
+        if not processed_dir.exists():
+            continue
         for pattern in ("recommendations_slate_*.json", "game_cards_*.csv", "cards_sim_detail_*.json"):
             for path in processed_dir.glob(pattern):
                 match = _DATE_PATTERN.search(path.stem)

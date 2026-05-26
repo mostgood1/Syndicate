@@ -19,6 +19,7 @@ from syndicate.features.nhl.sources import market_label
 from syndicate.features.nhl.sources import parse_iso_date
 from syndicate.features.nhl.sources import processed_path
 from syndicate.features.nhl.sources import recommendation_path
+from syndicate.features.nhl.sources import props_lines_snapshot_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import team_abbreviation
 from syndicate.features.nhl.sources import team_logo_url
@@ -43,6 +44,14 @@ def _safe_float(value: Any) -> float | None:
 def _pct_text(value: Any) -> str:
     number = _safe_float(value)
     return format_pct(number) if number is not None else "-"
+
+
+def _coalesce_float(row: dict[str, Any], *keys: str) -> float | None:
+    for key in keys:
+        value = _safe_float(row.get(key))
+        if value is not None:
+            return value
+    return None
 
 
 def _period_projection_text(home_value: Any, away_value: Any) -> str:
@@ -78,7 +87,7 @@ def _game_from_row(row: dict[str, str], *, idx: int, selected_date: str) -> dict
     away_abbr = team_abbreviation(away_name)
     home_ml = _safe_float(row.get("home_ml_odds"))
     away_ml = _safe_float(row.get("away_ml_odds"))
-    total_line = _safe_float(row.get("total_line_used"))
+    total_line = _coalesce_float(row, "total_line_used", "totals_line_used", "total_line")
     model_total_value = _safe_float(row.get("model_total"))
     model_spread_value = _safe_float(row.get("model_spread"))
     proj_home_goals = _safe_float(row.get("proj_home_goals"))
@@ -218,10 +227,16 @@ def _game_from_row(row: dict[str, str], *, idx: int, selected_date: str) -> dict
 
 
 def _games_from_artifact(selected_date: str) -> tuple[list[dict[str, Any]], str]:
-    path = processed_path(f"predictions_{selected_date}.csv")
-    rows = _load_csv_rows(path)
+    primary_path = processed_path(f"predictions_{selected_date}.csv")
+    sim_path = processed_path(f"predictions_sim_{selected_date}.csv")
+    rows = _load_csv_rows(primary_path)
+    source_path = primary_path
+    if not rows:
+        rows = _load_csv_rows(sim_path)
+        if rows:
+            source_path = sim_path
     games = [_game_from_row(row, idx=idx, selected_date=selected_date) for idx, row in enumerate(rows, start=1)]
-    return games, str(path)
+    return games, str(source_path)
 
 
 def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, Any]], str]:
@@ -286,8 +301,14 @@ def _recommendation_rows(selected_date: str) -> tuple[list[dict[str, str]], str]
 
 
 def _prediction_bundle_rows(selected_date: str) -> tuple[list[dict[str, Any]], str]:
-    path = processed_path(f"predictions_{selected_date}.csv")
-    rows = _load_csv_rows(path)
+    primary_path = processed_path(f"predictions_{selected_date}.csv")
+    sim_path = processed_path(f"predictions_sim_{selected_date}.csv")
+    rows = _load_csv_rows(primary_path)
+    source_path = primary_path
+    if not rows:
+        rows = _load_csv_rows(sim_path)
+        if rows:
+            source_path = sim_path
     sim_rows_by_game = _prediction_sim_rows_by_game(selected_date)
     goalie_names_by_team = _sim_goalie_names_by_game_team(selected_date)
     schedule_rows_by_game = _schedule_rows_by_game(selected_date)
@@ -367,7 +388,7 @@ def _prediction_bundle_rows(selected_date: str) -> tuple[list[dict[str, Any]], s
         if schedule_row.get("gamePk") is not None:
             enriched["gamePk"] = schedule_row.get("gamePk")
         out.append(enriched)
-    return out, str(path)
+    return out, str(source_path)
 
 
 def _prediction_sim_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, str]]:
@@ -451,6 +472,27 @@ def _schedule_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str
 def _sim_boxscore_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
     path = processed_path(f"props_boxscores_sim_{selected_date}.csv")
     rows = _load_csv_rows(path) if path.exists() else []
+    if not rows:
+        return rows, str(path)
+
+    position_by_player_id, position_by_name = _position_maps_for_date(selected_date)
+    for row in rows:
+        existing = str(row.get("pos") or row.get("position") or row.get("player_position") or "").strip()
+        if existing:
+            continue
+        player_id = str(row.get("player_id") or "").strip()
+        player_name = str(row.get("player") or "").strip().lower()
+        inferred_position = ""
+        if player_id:
+            inferred_position = position_by_player_id.get(player_id, "")
+        if not inferred_position and player_name:
+            inferred_position = position_by_name.get(player_name, "")
+        if not inferred_position:
+            saves_value = _safe_float(row.get("saves"))
+            if saves_value is not None and saves_value > 0:
+                inferred_position = "G"
+        if inferred_position:
+            row["pos"] = inferred_position
     return rows, str(path)
 
 
@@ -496,7 +538,91 @@ def build_sim_summary_payload(selected_date: str | None) -> dict[str, Any]:
 def _props_recommendation_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
     path = processed_path(f"props_recommendations_{selected_date}.csv")
     rows = _load_csv_rows(path) if path.exists() else []
+    if not rows:
+        return rows, str(path)
+
+    lines_path = props_lines_snapshot_path(selected_date)
+    lines_rows = _load_csv_rows(lines_path) if lines_path.exists() else []
+
+    def _norm_text(value: Any) -> str:
+        return str(value or "").strip().lower()
+
+    def _norm_market(value: Any) -> str:
+        return str(value or "").strip().upper()
+
+    def _line_key(value: Any) -> str:
+        number = _safe_float(value)
+        if number is None:
+            return str(value or "").strip()
+        return f"{number:.4f}"
+
+    lines_by_key: dict[tuple[str, str, str, str], dict[str, str]] = {}
+    lines_by_key_no_book: dict[tuple[str, str, str], dict[str, str]] = {}
+    for line_row in lines_rows:
+        player_name = _norm_text(line_row.get("player_name") or line_row.get("player"))
+        market_key = _norm_market(line_row.get("market"))
+        line_value_key = _line_key(line_row.get("line"))
+        book_key = _norm_text(line_row.get("book"))
+        if not player_name or not market_key or not line_value_key:
+            continue
+        full_key = (player_name, market_key, line_value_key, book_key)
+        no_book_key = (player_name, market_key, line_value_key)
+        lines_by_key[full_key] = line_row
+        if no_book_key not in lines_by_key_no_book:
+            lines_by_key_no_book[no_book_key] = line_row
+
+    for row in rows:
+        player_name = _norm_text(row.get("player"))
+        market_key = _norm_market(row.get("market"))
+        line_value_key = _line_key(row.get("line"))
+        book_key = _norm_text(row.get("book"))
+        full_key = (player_name, market_key, line_value_key, book_key)
+        no_book_key = (player_name, market_key, line_value_key)
+        line_row = lines_by_key.get(full_key) or lines_by_key_no_book.get(no_book_key)
+        if not line_row:
+            continue
+
+        side = str(row.get("side") or "").strip().lower()
+        over_price = line_row.get("over_price")
+        under_price = line_row.get("under_price")
+
+        if over_price not in (None, ""):
+            row["over_price"] = over_price
+        if under_price not in (None, ""):
+            row["under_price"] = under_price
+        if line_row.get("book"):
+            row["book"] = line_row.get("book")
+
+        if side == "over" and over_price not in (None, ""):
+            row["price"] = over_price
+        elif side == "under" and under_price not in (None, ""):
+            row["price"] = under_price
+
     return rows, str(path)
+
+
+@lru_cache(maxsize=32)
+def _position_maps_for_date(selected_date: str) -> tuple[dict[str, str], dict[str, str]]:
+    by_id: dict[str, str] = {}
+    by_name: dict[str, str] = {}
+    candidate_paths = (
+        processed_path(f"roster_snapshot_{selected_date}.csv"),
+        processed_path(f"lineups_{selected_date}.csv"),
+    )
+
+    for path in candidate_paths:
+        rows = _load_csv_rows(path) if path.exists() else []
+        for row in rows:
+            raw_position = str(row.get("position") or row.get("pos") or row.get("player_position") or "").strip().upper()
+            if not raw_position:
+                continue
+            player_id = str(row.get("player_id") or "").strip()
+            player_name = str(row.get("full_name") or row.get("player") or "").strip().lower()
+            if player_id and player_id not in by_id:
+                by_id[player_id] = raw_position
+            if player_name and player_name not in by_name:
+                by_name[player_name] = raw_position
+    return by_id, by_name
 
 
 def _split_reason_tokens(value: Any) -> list[str]:
@@ -537,8 +663,6 @@ def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[
         if ev_value is None or price_value is None:
             continue
         if ev_value < 0.02:
-            continue
-        if price_value < -125 or price_value > 125:
             continue
 
         team = team_abbreviation(row.get("team"))
@@ -601,6 +725,7 @@ def _prediction_dates_with_rows() -> list[str]:
         date_str
         for date_str in _prediction_dates()
         if _load_csv_rows(processed_path(f"predictions_{date_str}.csv"))
+        or _load_csv_rows(processed_path(f"predictions_sim_{date_str}.csv"))
         or _load_csv_rows(scoreboard_snapshot_path(date_str))
     ]
 

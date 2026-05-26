@@ -329,7 +329,14 @@ def _source_game_from_row(
 
 
 def build_source_cards_payload(selected_date: str) -> dict[str, Any]:
-    bundle = _artifact_bundle(selected_date)
+    requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
+    resolved_date = requested_date
+    bundle = _artifact_bundle(resolved_date)
+    if not bundle["rows"]:
+        fallback_date = _nearest_available_cards_date(resolved_date)
+        if fallback_date and fallback_date != resolved_date:
+            resolved_date = fallback_date
+            bundle = _artifact_bundle(resolved_date)
     rows = bundle["rows"]
     rec_index = bundle["recommendations"]
     sim_index = bundle["sim"]
@@ -338,7 +345,7 @@ def build_source_cards_payload(selected_date: str) -> dict[str, Any]:
         _source_game_from_row(
             row,
             idx=idx,
-            selected_date=selected_date,
+            selected_date=resolved_date,
             rec_index=rec_index,
             sim_index=sim_index,
             props_index=props_index,
@@ -346,9 +353,9 @@ def build_source_cards_payload(selected_date: str) -> dict[str, Any]:
         for idx, row in enumerate(rows, start=1)
     ]
     return {
-        "date": selected_date,
-        "requested_date": selected_date,
-        "lookahead_applied": False,
+        "date": resolved_date,
+        "requested_date": requested_date,
+        "lookahead_applied": bool(resolved_date != requested_date),
         "players_included": False,
         "pregame_portfolio": {"enabled": False, "selected": 0, "candidates": 0},
         "games": games,
@@ -604,7 +611,7 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
     return games, str(bundle["paths"]["cards"]), str(bundle["paths"]["recommendations"])
 
 
-def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
+def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     parsed_date = parse_iso_date(resolved_date)

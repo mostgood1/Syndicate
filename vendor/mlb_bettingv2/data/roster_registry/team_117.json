@@ -1042,8 +1042,8 @@
             "player_id": 666211,
             "position": "CF",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1069,8 +1069,8 @@
             "player_id": 805904,
             "position": "LF",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1296,18 +1296,18 @@
             }
           },
           {
-            "full_name": "Yordan Alvarez",
-            "player_id": 670541,
-            "position": "DH",
+            "full_name": "Taylor Trammell",
+            "player_id": 666211,
+            "position": "CF",
             "status": {
               "code": "A",
               "description": "Active"
             }
           },
           {
-            "full_name": "Zach Cole",
-            "player_id": 805904,
-            "position": "LF",
+            "full_name": "Yordan Alvarez",
+            "player_id": 670541,
+            "position": "DH",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1751,8 +1751,8 @@
             "player_id": 666211,
             "position": "CF",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1778,8 +1778,8 @@
             "player_id": 805904,
             "position": "LF",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1805,6 +1805,7 @@
           663878,
           663967,
           665161,
+          666211,
           669397,
           669699,
           669920,
@@ -1820,7 +1821,6 @@
           701305,
           701358,
           805123,
-          805904,
           837227
         ],
         "players": [
@@ -2032,18 +2032,18 @@
             }
           },
           {
-            "full_name": "Yordan Alvarez",
-            "player_id": 670541,
-            "position": "DH",
+            "full_name": "Taylor Trammell",
+            "player_id": 666211,
+            "position": "CF",
             "status": {
               "code": "A",
               "description": "Active"
             }
           },
           {
-            "full_name": "Zach Cole",
-            "player_id": 805904,
-            "position": "LF",
+            "full_name": "Yordan Alvarez",
+            "player_id": 670541,
+            "position": "DH",
             "status": {
               "code": "A",
               "description": "Active"
@@ -2065,5 +2065,5 @@
   },
   "team_abbr": "HOU",
   "team_id": 117,
-  "updated_at": "2026-05-26T11:39:16.502603"
+  "updated_at": "2026-05-26T17:15:05.958015"
 }

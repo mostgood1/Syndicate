@@ -73,34 +73,36 @@ event_id,commence_time,home,away,bookmaker_key,bookmaker,book_last_update,market
 522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,spreads,Montréal Canadiens,-225,1.5,2026-05-26
 522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Over,115,5.5,2026-05-26
 522fe470a35764a2541da5b6eac510f5,2026-05-26T00:20:00Z,Montréal Canadiens,Carolina Hurricanes,bovada,Bovada,,totals,Under,-150,5.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Colorado Avalanche,190,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Vegas Golden Knights,-250,1.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,h2h,Colorado Avalanche,-114,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,h2h,Vegas Golden Knights,-105,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,spreads,Vegas Golden Knights,-280,1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,totals,Over,108,6.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,totals,Under,-132,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,spreads,Vegas Golden Knights,-265,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,totals,Over,110,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanduel,FanDuel,,totals,Under,-134,6.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,h2h,Colorado Avalanche,-115,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,h2h,Vegas Golden Knights,-105,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,totals,Over,105,6.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,totals,Under,-125,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,totals,Over,110,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,draftkings,DraftKings,,totals,Under,-130,6.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,h2h,Colorado Avalanche,-110,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,h2h,Vegas Golden Knights,-110,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,spreads,Vegas Golden Knights,-260,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,spreads,Colorado Avalanche,205,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,spreads,Vegas Golden Knights,-250,1.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,totals,Over,-115,6.0,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,williamhill_us,Caesars,,totals,Under,-105,6.0,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,h2h,Colorado Avalanche,-112,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,h2h,Vegas Golden Knights,-102,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,spreads,Colorado Avalanche,213,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,h2h,Colorado Avalanche,-111,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,h2h,Vegas Golden Knights,-103,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,spreads,Colorado Avalanche,217,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,spreads,Vegas Golden Knights,-263,1.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,totals,Over,-113,6.0,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,lowvig,LowVig.ag,,totals,Under,-103,6.0,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,h2h,Colorado Avalanche,-112,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,h2h,Vegas Golden Knights,-102,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,spreads,Colorado Avalanche,213,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,h2h,Colorado Avalanche,-111,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,h2h,Vegas Golden Knights,-103,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,spreads,Colorado Avalanche,217,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,spreads,Vegas Golden Knights,-263,1.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,totals,Over,-113,6.0,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betonlineag,BetOnline.ag,,totals,Under,-103,6.0,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,fanatics,Fanatics,,h2h,Colorado Avalanche,-115,,2026-05-26
@@ -113,29 +115,29 @@ cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Color
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,h2h,Vegas Golden Knights,-105,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,spreads,Colorado Avalanche,200,-1.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,spreads,Vegas Golden Knights,-250,1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,totals,Over,-118,6.0,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,totals,Under,-102,6.0,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,h2h,Colorado Avalanche,-120,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,h2h,Vegas Golden Knights,-103,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Colorado Avalanche,190,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Vegas Golden Knights,-250,1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,totals,Over,104,6.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,totals,Under,-132,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,totals,Over,-115,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betmgm,BetMGM,,totals,Under,-105,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,h2h,Colorado Avalanche,-127,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,h2h,Vegas Golden Knights,105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Colorado Avalanche,-335,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,spreads,Vegas Golden Knights,245,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,totals,Over,102,6.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betrivers,BetRivers,,totals,Under,-130,6.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,h2h,Colorado Avalanche,-115,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,h2h,Vegas Golden Knights,-105,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,spreads,Colorado Avalanche,220,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,spreads,Vegas Golden Knights,-270,1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,totals,Over,-115,6.0,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,totals,Under,-105,6.0,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,h2h,Colorado Avalanche,-112,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,h2h,Vegas Golden Knights,-108,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,spreads,Colorado Avalanche,200,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,spreads,Vegas Golden Knights,-258,1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,totals,Over,-112,6.0,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,totals,Under,-109,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,spreads,Colorado Avalanche,210,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,spreads,Vegas Golden Knights,-250,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,totals,Over,-117,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,bovada,Bovada,,totals,Under,-103,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,h2h,Colorado Avalanche,-115,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,h2h,Vegas Golden Knights,-105,,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,spreads,Colorado Avalanche,199,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,spreads,Vegas Golden Knights,-252,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,totals,Over,-111,6.0,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,mybookieag,MyBookie.ag,,totals,Under,-110,6.0,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,h2h,Colorado Avalanche,-115,,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,h2h,Vegas Golden Knights,-105,,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,spreads,Colorado Avalanche,220,-1.5,2026-05-26
-cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,spreads,Vegas Golden Knights,-260,1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,spreads,Colorado Avalanche,216,-1.5,2026-05-26
+cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,spreads,Vegas Golden Knights,-255,1.5,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,totals,Over,-115,6.0,2026-05-26
 cae1325b579e97af2068204012f27673,2026-05-27T01:20:00Z,Vegas Golden Knights,Colorado Avalanche,betus,BetUS,,totals,Under,-105,6.0,2026-05-26

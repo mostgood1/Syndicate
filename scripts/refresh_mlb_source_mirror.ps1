@@ -110,6 +110,27 @@ function Write-JsonFile {
     $Value | ConvertTo-Json -Depth 6 | Set-Content -Path $Path -Encoding utf8
 }
 
+function Ensure-DateJsonArtifact {
+    param(
+        [string]$RelativePath,
+        [object]$DefaultPayload
+    )
+
+    $targetPath = Join-Path $destDataRoot $RelativePath
+    if (Test-Path $targetPath) {
+        if (-not $copied.Contains($RelativePath)) {
+            $copied.Add($RelativePath) | Out-Null
+        }
+        return $true
+    }
+
+    Write-JsonFile -Path $targetPath -Value $DefaultPayload
+    if (-not $copied.Contains($RelativePath)) {
+        $copied.Add($RelativePath) | Out-Null
+    }
+    return $true
+}
+
 $copied = New-Object System.Collections.Generic.List[string]
 
 $filePairs = @(
@@ -170,6 +191,19 @@ foreach ($pair in $dirPairs) {
         $copied.Add($pair[1]) | Out-Null
     }
 }
+
+# Keep the per-date mirror manifest contract stable even when source generation skipped these files.
+Ensure-DateJsonArtifact -RelativePath (Join-Path 'daily\ladders' ("daily_ladders_{0}.json" -f $dateSlug)) -DefaultPayload ([ordered]@{
+        date = $Date
+        generatedAt = (Get-Date).ToUniversalTime().ToString('o')
+        ladders = @()
+    }) | Out-Null
+
+Ensure-DateJsonArtifact -RelativePath (Join-Path 'daily\top_props' ("daily_top_props_{0}.json" -f $dateSlug)) -DefaultPayload ([ordered]@{
+        date = $Date
+        generatedAt = (Get-Date).ToUniversalTime().ToString('o')
+        top_props = @()
+    }) | Out-Null
 
 $seasonEvalRoot = if ($UseExistingMirrorArtifacts) { Join-Path $destDataRoot (Join-Path 'eval\seasons' $season) } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\eval\seasons' $season) } else { Join-Path $sourceRoot (Join-Path 'data\eval\seasons' $season) }
 $seasonEvalManifest = Join-Path $seasonEvalRoot 'season_eval_manifest.json'

@@ -918,8 +918,8 @@
             "player_id": 681676,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1165,6 +1165,15 @@
           {
             "full_name": "Riley O'Brien",
             "player_id": 676617,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Ryan Fernandez",
+            "player_id": 681676,
             "position": "P",
             "status": {
               "code": "A",
@@ -1558,8 +1567,8 @@
             "player_id": 681676,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1636,6 +1645,7 @@
           676617,
           677865,
           681517,
+          681676,
           686780,
           687363,
           690155,
@@ -1838,6 +1848,15 @@
             }
           },
           {
+            "full_name": "Ryan Fernandez",
+            "player_id": 681676,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Ryne Stanek",
             "player_id": 592773,
             "position": "P",
@@ -1880,5 +1899,5 @@
   },
   "team_abbr": "STL",
   "team_id": 138,
-  "updated_at": "2026-05-26T11:39:16.815890"
+  "updated_at": "2026-05-26T17:15:06.050413"
 }

@@ -817,8 +817,8 @@
             "player_id": 500779,
             "position": "P",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -2009,5 +2009,5 @@
   },
   "team_abbr": "COL",
   "team_id": 115,
-  "updated_at": "2026-05-26T11:39:16.415876"
+  "updated_at": "2026-05-26T17:15:05.941995"
 }

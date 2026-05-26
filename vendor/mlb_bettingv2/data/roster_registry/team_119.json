@@ -1137,9 +1137,7 @@
             }
           }
         ],
-        "removed": [
-          669289
-        ]
+        "removed": []
       },
       "active": {
         "added": [],
@@ -1409,7 +1407,6 @@
           669165,
           669242,
           669257,
-          669289,
           669743,
           669899,
           670090,
@@ -1595,8 +1592,8 @@
             "player_id": 571771,
             "position": "1B",
             "status": {
-              "code": "D60",
-              "description": "Injured 60-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1786,15 +1783,6 @@
             "status": {
               "code": "RM",
               "description": "Reassigned to Minors"
-            }
-          },
-          {
-            "full_name": "Santiago Espinal",
-            "player_id": 669289,
-            "position": "3B",
-            "status": {
-              "code": "A",
-              "description": "Active"
             }
           },
           {
@@ -2161,5 +2149,5 @@
   },
   "team_abbr": "LAD",
   "team_id": 119,
-  "updated_at": "2026-05-26T11:39:16.555997"
+  "updated_at": "2026-05-26T17:15:05.975200"
 }

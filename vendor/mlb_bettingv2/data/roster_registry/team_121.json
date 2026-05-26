@@ -673,8 +673,8 @@
             "player_id": 621345,
             "position": "P",
             "status": {
-              "code": "D60",
-              "description": "Injured 60-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -804,6 +804,15 @@
             }
           },
           {
+            "full_name": "Eric Wagaman",
+            "player_id": 676572,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Francisco Alvarez",
             "player_id": 682626,
             "position": "C",
@@ -853,8 +862,8 @@
             "player_id": 676724,
             "position": "1B",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -880,8 +889,8 @@
             "player_id": 702752,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -979,8 +988,8 @@
             "player_id": 703492,
             "position": "LF",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1042,8 +1051,8 @@
             "player_id": 621438,
             "position": "CF",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D10",
+              "description": "Injured 10-Day"
             }
           },
           {
@@ -1074,6 +1083,15 @@
             "full_name": "A.J. Ewing",
             "player_id": 805999,
             "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "A.J. Minter",
+            "player_id": 621345,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1152,6 +1170,15 @@
             }
           },
           {
+            "full_name": "Eric Wagaman",
+            "player_id": 676572,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Freddy Peralta",
             "player_id": 642547,
             "position": "P",
@@ -1179,17 +1206,17 @@
             }
           },
           {
-            "full_name": "Jonah Tong",
-            "player_id": 804636,
-            "position": "P",
+            "full_name": "Jared Young",
+            "player_id": 676724,
+            "position": "1B",
             "status": {
               "code": "A",
               "description": "Active"
             }
           },
           {
-            "full_name": "Jonathan Pintaro",
-            "player_id": 702752,
+            "full_name": "Jonah Tong",
+            "player_id": 804636,
             "position": "P",
             "status": {
               "code": "A",
@@ -1251,15 +1278,6 @@
             }
           },
           {
-            "full_name": "Nick Morabito",
-            "player_id": 703492,
-            "position": "LF",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Nolan McLean",
             "player_id": 690997,
             "position": "P",
@@ -1281,15 +1299,6 @@
             "full_name": "Tobias Myers",
             "player_id": 668964,
             "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Tyrone Taylor",
-            "player_id": 621438,
-            "position": "CF",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1340,6 +1349,7 @@
           673357,
           673380,
           673540,
+          676572,
           676724,
           677595,
           680702,
@@ -1372,8 +1382,8 @@
             "player_id": 621345,
             "position": "P",
             "status": {
-              "code": "D60",
-              "description": "Injured 60-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1503,6 +1513,15 @@
             }
           },
           {
+            "full_name": "Eric Wagaman",
+            "player_id": 676572,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Francisco Alvarez",
             "player_id": 682626,
             "position": "C",
@@ -1552,8 +1571,8 @@
             "player_id": 676724,
             "position": "1B",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1579,8 +1598,8 @@
             "player_id": 702752,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1678,8 +1697,8 @@
             "player_id": 703492,
             "position": "LF",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1741,8 +1760,8 @@
             "player_id": 621438,
             "position": "CF",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D10",
+              "description": "Injured 10-Day"
             }
           },
           {
@@ -1772,7 +1791,7 @@
           548384,
           596133,
           620443,
-          621438,
+          621345,
           623211,
           640455,
           642207,
@@ -1785,13 +1804,13 @@
           668901,
           668964,
           669004,
+          676572,
+          676724,
           681035,
           681810,
           683146,
           690997,
           701807,
-          702752,
-          703492,
           804636,
           805999
         ],
@@ -1800,6 +1819,15 @@
             "full_name": "A.J. Ewing",
             "player_id": 805999,
             "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "A.J. Minter",
+            "player_id": 621345,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1878,6 +1906,15 @@
             }
           },
           {
+            "full_name": "Eric Wagaman",
+            "player_id": 676572,
+            "position": "1B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Freddy Peralta",
             "player_id": 642547,
             "position": "P",
@@ -1905,17 +1942,17 @@
             }
           },
           {
-            "full_name": "Jonah Tong",
-            "player_id": 804636,
-            "position": "P",
+            "full_name": "Jared Young",
+            "player_id": 676724,
+            "position": "1B",
             "status": {
               "code": "A",
               "description": "Active"
             }
           },
           {
-            "full_name": "Jonathan Pintaro",
-            "player_id": 702752,
+            "full_name": "Jonah Tong",
+            "player_id": 804636,
             "position": "P",
             "status": {
               "code": "A",
@@ -1977,15 +2014,6 @@
             }
           },
           {
-            "full_name": "Nick Morabito",
-            "player_id": 703492,
-            "position": "LF",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Nolan McLean",
             "player_id": 690997,
             "position": "P",
@@ -2013,15 +2041,6 @@
             }
           },
           {
-            "full_name": "Tyrone Taylor",
-            "player_id": 621438,
-            "position": "CF",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Vidal Bruján",
             "player_id": 660644,
             "position": "SS",
@@ -2037,5 +2056,5 @@
   },
   "team_abbr": "NYM",
   "team_id": 121,
-  "updated_at": "2026-05-26T11:39:16.637088"
+  "updated_at": "2026-05-26T17:15:05.992085"
 }

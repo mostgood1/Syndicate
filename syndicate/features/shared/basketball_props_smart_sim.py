@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 import importlib
 import json
@@ -20,6 +20,53 @@ _TOTALS_CALIBRATION_CACHE_LOCAL: dict[tuple[str, str], dict[str, Any] | None] = 
 _TEAM_ADVANCED_STATS_CACHE_LOCAL: dict[tuple[str, int, str], object] = {}
 _PREGAME_EXPECTED_MINUTES_CACHE_LOCAL: dict[tuple[str, str], object] = {}
 _MARKET_PLAYER_NAMES_CACHE_LOCAL: dict[tuple[str, str], dict[tuple[str, str], set[str]]] = {}
+
+
+def _json_default_local(value: Any) -> Any:
+    if is_dataclass(value):
+        return asdict(value)
+    if isinstance(value, set):
+        return sorted(value)
+    value_type = type(value)
+    module_name = str(getattr(value_type, "__module__", ""))
+    if module_name.startswith("numpy"):
+        item_method = getattr(value, "item", None)
+        if callable(item_method):
+            try:
+                return item_method()
+            except Exception:
+                pass
+        tolist_method = getattr(value, "tolist", None)
+        if callable(tolist_method):
+            try:
+                return tolist_method()
+            except Exception:
+                pass
+    if hasattr(value, "__dict__"):
+        try:
+            return dict(value.__dict__)
+        except Exception:
+            pass
+    return str(value)
+
+
+def _json_dumps_safe_local(data: Any) -> str:
+    return json.dumps(data, indent=2, default=_json_default_local)
+
+
+def _smart_sim_file_has_players_local(path: Path) -> bool:
+    try:
+        if not path.exists() or (not path.is_file()) or path.stat().st_size <= 0:
+            return False
+        payload = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+        if not isinstance(payload, dict):
+            return False
+        players = payload.get("players") if isinstance(payload.get("players"), dict) else {}
+        home_rows = players.get("home") if isinstance(players.get("home"), list) else []
+        away_rows = players.get("away") if isinstance(players.get("away"), list) else []
+        return (len(home_rows) + len(away_rows)) > 0
+    except Exception:
+        return False
 
 _NBA_TEAM_ALIASES_LOCAL = {
     "la lakers": "Los Angeles Lakers",
@@ -169,6 +216,7 @@ class LeagueConfigBridgeLocal:
     baseline_def_rating: float
     spread_winprob_sigma: float
     min_event_possessions: float
+    min_team_points: float
 
 
 _NBA_LEAGUE_LOCAL = LeagueConfigBridgeLocal(
@@ -181,6 +229,7 @@ _NBA_LEAGUE_LOCAL = LeagueConfigBridgeLocal(
     baseline_def_rating=110.6,
     spread_winprob_sigma=12.0,
     min_event_possessions=84.0,
+    min_team_points=70.0,
 )
 _WNBA_LEAGUE_LOCAL = LeagueConfigBridgeLocal(
     code="wnba",
@@ -192,6 +241,7 @@ _WNBA_LEAGUE_LOCAL = LeagueConfigBridgeLocal(
     baseline_def_rating=101.5,
     spread_winprob_sigma=9.75,
     min_event_possessions=67.5,
+    min_team_points=55.0,
 )
 
 
@@ -3996,13 +4046,28 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
         except Exception:
             pass
 
+        try:
+            players_obj = out.get("players") if isinstance(out, dict) else None
+            home_players = players_obj.get("home") if isinstance(players_obj, dict) and isinstance(players_obj.get("home"), list) else []
+            away_players = players_obj.get("away") if isinstance(players_obj, dict) and isinstance(players_obj.get("away"), list) else []
+            if (len(home_players) + len(away_players)) <= 0:
+                return {
+                    "status": "failed",
+                    "home": home_tri,
+                    "away": away_tri,
+                    "out_path": out_path_s,
+                    "error": "smart_sim produced zero player rows",
+                }
+        except Exception:
+            pass
+
         out_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
-        tmp_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+        tmp_path.write_text(_json_dumps_safe_local(out), encoding="utf-8")
         try:
             tmp_path.replace(out_path)
         except Exception:
-            out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+            out_path.write_text(_json_dumps_safe_local(out), encoding="utf-8")
             try:
                 tmp_path.unlink(missing_ok=True)
             except Exception:
@@ -4189,6 +4254,12 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
     if pdf.empty:
         return {"date": date_str, "wrote": 0, "skipped": 0, "failures": 0, "reason": "no_valid_games"}
     out_prefix_s = str(out_prefix or "smart_sim").strip() or "smart_sim"
+    failure_path = processed_root / f"{out_prefix_s}_failures_{date_str}.csv"
+    try:
+        if failure_path.exists() and failure_path.is_file():
+            failure_path.unlink()
+    except Exception:
+        pass
     expected_matchups = {(str(row.get("home_tri") or "").strip().upper(), str(row.get("away_tri") or "").strip().upper()) for _, row in pdf.iterrows() if str(row.get("home_tri") or "").strip() and str(row.get("away_tri") or "").strip()}
     try:
         _prune_stale_smart_sim_outputs_local(processed_root=processed_root, date_str=date_str, expected_matchups=expected_matchups, out_prefix=out_prefix_s, remove_all=bool(overwrite and max_games is not None))
@@ -4287,8 +4358,13 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             continue
         out_path = processed_root / f"{out_prefix_s}_{date_str}_{home_tri}_{away_tri}.json"
         if out_path.exists() and (not overwrite):
-            skipped += 1
-            continue
+            if _smart_sim_file_has_players_local(out_path):
+                skipped += 1
+                continue
+            try:
+                out_path.unlink()
+            except Exception:
+                pass
         market_total = _num(row.get("total"))
         home_spread = _num(row.get("home_spread"))
         if (market_total is None or home_spread is None) and (odds_df is not None and not odds_df.empty):
@@ -4419,7 +4495,6 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
                         failures.append({"home": result.get("home"), "away": result.get("away"), "error": result.get("error")})
 
     if failures:
-        failure_path = processed_root / f"{out_prefix_s}_failures_{date_str}.csv"
         try:
             pd.DataFrame(failures).to_csv(failure_path, index=False)
         except Exception:
@@ -4445,16 +4520,24 @@ def _apply_basic_slate_filter(*, preds, processed_root: Path, date_str: str):
     if not home_col or not away_col:
         return preds
     slate_teams: set[str] = set()
+    slate_tricodes: set[str] = set()
     for _, row in game_odds.iterrows():
         for column in (home_col, away_col):
             team = str(row.get(column) or "").strip().upper()
             if team:
                 slate_teams.add(team)
-    if not slate_teams:
+                tri = _to_tricode_local(team)
+                if tri:
+                    slate_tricodes.add(str(tri).strip().upper())
+    # Keep compatibility with either full names or tricodes in prediction rows.
+    slate_all = set(slate_teams) | set(slate_tricodes)
+    if not slate_all:
         return preds
     filtered = preds.copy()
     filtered["team"] = filtered["team"].astype(str).str.upper().str.strip()
-    return filtered[filtered["team"].isin(slate_teams)].copy()
+    filtered["team_tri"] = filtered["team"].map(_to_tricode_local).astype(str).str.upper().str.strip()
+    mask = filtered["team"].isin(slate_all) | filtered["team_tri"].isin(slate_all)
+    return filtered[mask].drop(columns=["team_tri"], errors="ignore").copy()
 
 
 def _load_sim_df(*, processed_root: Path, date_str: str, smart_sim_prefix: str):
@@ -4655,6 +4738,12 @@ def export_props_predictions_with_smart_sim_local(
     )
 
     sim_df = _load_sim_df(processed_root=processed_root, date_str=date_str, smart_sim_prefix="smart_sim")
+    if sim_df is None or sim_df.empty:
+        failures_path = processed_root / f"smart_sim_failures_{date_str}.csv"
+        reason = f"SmartSim produced no player rows for {date_str}"
+        if failures_path.exists() and failures_path.is_file():
+            reason = f"{reason}; see {failures_path.name}"
+        raise RuntimeError(reason)
     preds = _merge_smart_sim_into_preds(preds=preds, sim_df=sim_df)
     preds.to_csv(written_path, index=False)
     return int(len(preds.index)), written_path

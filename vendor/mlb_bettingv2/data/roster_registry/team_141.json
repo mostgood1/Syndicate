@@ -1068,10 +1068,7 @@
         "removed": []
       },
       "active": {
-        "added": [
-          664770,
-          681084
-        ],
+        "added": [],
         "players": [
           {
             "full_name": "Adam Macko",
@@ -1308,10 +1305,7 @@
             }
           }
         ],
-        "removed": [
-          656302,
-          676914
-        ]
+        "removed": []
       }
     },
     "2026-05-27": {
@@ -1779,20 +1773,20 @@
           592332,
           623168,
           643511,
-          656302,
           656546,
           660821,
           662139,
           664702,
+          664770,
           665489,
           665926,
           671936,
           672820,
           672960,
           676391,
-          676914,
           678218,
           680755,
+          681084,
           682818,
           684320,
           686973,
@@ -1851,24 +1845,6 @@
             "full_name": "Daulton Varsho",
             "player_id": 662139,
             "position": "CF",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Davis Schneider",
-            "player_id": 676914,
-            "position": "LF",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Dylan Cease",
-            "player_id": 656302,
-            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1965,6 +1941,15 @@
             }
           },
           {
+            "full_name": "Nathan Lukes",
+            "player_id": 664770,
+            "position": "RF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Patrick Corbin",
             "player_id": 571578,
             "position": "P",
@@ -1976,6 +1961,15 @@
           {
             "full_name": "Spencer Miles",
             "player_id": 693686,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Tanner Andrews",
+            "player_id": 681084,
             "position": "P",
             "status": {
               "code": "A",
@@ -2043,5 +2037,5 @@
   },
   "team_abbr": "TOR",
   "team_id": 141,
-  "updated_at": "2026-05-26T11:39:16.919866"
+  "updated_at": "2026-05-26T17:15:06.079304"
 }

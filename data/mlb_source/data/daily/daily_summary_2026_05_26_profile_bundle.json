@@ -1,7 +1,7 @@
 {
   "date": "2026-05-26",
   "season": 2026,
-  "generated_at": "2026-05-26T11:38:43.913644",
+  "generated_at": "2026-05-26T15:13:51.396227",
   "tool": "tools/daily_update_multi_profile.py",
   "daily_update_tool": "tools\\daily_update.py",
   "python_exe": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
@@ -33,7 +33,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 177.194,
+      "duration_s": 329.282,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -44,7 +44,7 @@
       "snapshot_dir": "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-05-26",
       "extra_args": [],
       "exit_code": 0,
-      "duration_s": 202.163,
+      "duration_s": 348.148,
       "skipped": false
     },
     "hitter_props_recos": {
@@ -64,7 +64,7 @@
         "24"
       ],
       "exit_code": 0,
-      "duration_s": 260.664,
+      "duration_s": 345.161,
       "skipped": false
     }
   },
@@ -107,7 +107,7 @@
     },
     "shadow_counts": {
       "pitcher_props": {
-        "raw_candidates_n": 28,
+        "raw_candidates_n": 33,
         "selected_n": 0,
         "cap": 8,
         "stake_u": 0.0,
@@ -116,7 +116,7 @@
           "hits_allowed",
           "walks_allowed"
         ],
-        "playable_support_removed_n": 28,
+        "playable_support_removed_n": 33,
         "recommendations": []
       },
       "hitter_props": {
@@ -396,7 +396,7 @@
                 "selection": "away",
                 "market": "ml",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the away side in 68.7% of sims, while the market is pricing it closer to 64.3%. NYY wins this matchup in about 68.7% of model runs."
+                "reason_summary": "The model lands on the away side in 70.1% of sims, while the market is pricing it closer to 63.6%. NYY wins this matchup in about 70.1% of model runs."
               }
             ]
           },
@@ -410,11 +410,11 @@
             "selection_shortfall_n": 1,
             "removed_examples": [
               {
-                "subject": "Bailey Falter",
+                "subject": "Jordan Wicks",
                 "selection": "over",
                 "market": "pitcher_props:outs",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 99.7% of sims, while the market is pricing it closer to 44.8%. The model baseline sits around 18.3 outs against a line of 9.5. If he stays on his normal starter path, the matchup against NYY gives him a fair shot to reach full workload volume."
+                "reason_summary": "The model lands on the over side in 97.9% of sims, while the market is pricing it closer to 53.5%. The model baseline sits around 20.4 outs against a line of 14.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume."
               }
             ]
           },
@@ -432,35 +432,35 @@
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 76.6% of sims, while the market is pricing it closer to 52.8%. The model baseline comes in around 1.3 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.6 plate appearances."
+                "reason_summary": "The model lands on the over side in 76.2% of sims, while the market is pricing it closer to 52.8%. The model baseline comes in around 1.3 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.6 plate appearances."
               },
               {
                 "subject": "Tommy Troy",
                 "selection": "over",
                 "market": "hitter_total_bases",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 71.0% of sims, while the market is pricing it closer to 54.5%. The model baseline comes in around 1.7 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.3 plate appearances."
+                "reason_summary": "The model lands on the over side in 71.0% of sims, while the market is pricing it closer to 55.3%. The model baseline comes in around 1.7 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.3 plate appearances."
               },
               {
                 "subject": "Richie Palacios",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 70.6% of sims, while the market is pricing it closer to 55.9%. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
+                "reason_summary": "The model lands on the over side in 70.6% of sims, while the market is pricing it closer to 54.1%. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
               },
               {
-                "subject": "Ryan Kreidler",
+                "subject": "Troy Johnston",
                 "selection": "over",
                 "market": "hitter_total_bases",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 69.7% of sims, while the market is pricing it closer to 48.0%. The model baseline comes in around 1.6 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.4 plate appearances."
+                "reason_summary": "The model lands on the over side in 68.8% of sims, while the market is pricing it closer to 55.3%. The model baseline comes in around 1.5 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.2 plate appearances."
               },
               {
-                "subject": "Blake Dunn",
+                "subject": "Michael Conforto",
                 "selection": "over",
-                "market": "hitter_hits",
+                "market": "hitter_total_bases",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 69.6% of sims, while the market is pricing it closer to 55.7%. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
+                "reason_summary": "The model lands on the over side in 68.6% of sims, while the market is pricing it closer to 48.0%. The model baseline comes in around 1.8 batter total bases against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
               }
             ]
           },
@@ -488,28 +488,28 @@
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 76.6% of sims, while the market is pricing it closer to 52.8%. The model baseline comes in around 1.3 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.6 plate appearances."
+                "reason_summary": "The model lands on the over side in 76.2% of sims, while the market is pricing it closer to 52.8%. The model baseline comes in around 1.3 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.6 plate appearances."
               },
               {
                 "subject": "Richie Palacios",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 70.6% of sims, while the market is pricing it closer to 55.9%. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
+                "reason_summary": "The model lands on the over side in 70.6% of sims, while the market is pricing it closer to 54.1%. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
               },
               {
-                "subject": "Blake Dunn",
+                "subject": "Nick Sogard",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 69.6% of sims, while the market is pricing it closer to 55.7%. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
+                "reason_summary": "The model lands on the over side in 67.8% of sims, while the market is pricing it closer to 55.3%. The model baseline comes in around 1.0 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.3 plate appearances."
               },
               {
                 "subject": "JJ Bleday",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 67.8% of sims, while the market is pricing it closer to 55.2%. The model baseline comes in around 1.1 batter hits against a line of 0.5. He is projected to hit in the 1 spot, which points to about 5.2 plate appearances."
+                "reason_summary": "The model lands on the over side in 67.8% of sims, while the market is pricing it closer to 55.5%. The model baseline comes in around 1.0 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
               }
             ]
           },
@@ -537,14 +537,7 @@
                 "selection": "over",
                 "market": "hitter_total_bases",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 71.0% of sims, while the market is pricing it closer to 54.5%. The model baseline comes in around 1.7 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.3 plate appearances."
-              },
-              {
-                "subject": "Ryan Kreidler",
-                "selection": "over",
-                "market": "hitter_total_bases",
-                "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 69.7% of sims, while the market is pricing it closer to 48.0%. The model baseline comes in around 1.6 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.4 plate appearances."
+                "reason_summary": "The model lands on the over side in 71.0% of sims, while the market is pricing it closer to 55.3%. The model baseline comes in around 1.7 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.3 plate appearances."
               },
               {
                 "subject": "Troy Johnston",
@@ -554,18 +547,25 @@
                 "reason_summary": "The model lands on the over side in 68.8% of sims, while the market is pricing it closer to 55.3%. The model baseline comes in around 1.5 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.2 plate appearances."
               },
               {
-                "subject": "Ozzie Albies",
-                "selection": "under",
-                "market": "hitter_total_bases",
-                "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the under side in 68.2% of sims, while the market is pricing it closer to 54.4%. The model baseline comes in around 1.3 batter total bases against a line of 1.5. He is projected to hit in the 4 spot, which points to about 4.7 plate appearances."
-              },
-              {
                 "subject": "Michael Conforto",
                 "selection": "over",
                 "market": "hitter_total_bases",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 68.0% of sims, while the market is pricing it closer to 48.0%. The model baseline comes in around 1.8 batter total bases against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.5 plate appearances."
+                "reason_summary": "The model lands on the over side in 68.6% of sims, while the market is pricing it closer to 48.0%. The model baseline comes in around 1.8 batter total bases against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
+              },
+              {
+                "subject": "Vladimir Guerrero Jr.",
+                "selection": "under",
+                "market": "hitter_total_bases",
+                "baseball_reasons_n": 0,
+                "reason_summary": "The model lands on the under side in 67.8% of sims, while the market is pricing it closer to 52.1%. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 3 spot, which points to about 4.6 plate appearances."
+              },
+              {
+                "subject": "Ozzie Albies",
+                "selection": "under",
+                "market": "hitter_total_bases",
+                "baseball_reasons_n": 0,
+                "reason_summary": "The model lands on the under side in 67.7% of sims, while the market is pricing it closer to 54.4%. The model baseline comes in around 1.3 batter total bases against a line of 1.5. He is projected to hit in the 4 spot, which points to about 4.7 plate appearances."
               }
             ]
           },
@@ -657,16 +657,16 @@
       "shadow_support_policy": {
         "pitcher_props": {
           "market": "shadow_pitcher_props",
-          "evaluated_n": 28,
+          "evaluated_n": 33,
           "kept_n": 0,
-          "removed_sparse_support_n": 28,
+          "removed_sparse_support_n": 33,
           "removed_examples": [
             {
               "subject": "Cade Cavalli",
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 0,
-              "reason_summary": "The model lands on the over side in 83.5% of sims, while the market is pricing it closer to 51.9%. The model baseline sits around 7.1 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against CLE gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 83.5% of sims, while the market is pricing it closer to 52.9%. The model baseline sits around 7.1 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against CLE gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Joey Cantillo",
@@ -680,7 +680,7 @@
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 0,
-              "reason_summary": "The model lands on the over side in 64.1% of sims, while the market is pricing it closer to 48.1%. The model baseline sits around 6.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 64.1% of sims, while the market is pricing it closer to 47.1%. The model baseline sits around 6.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Jason Alexander",
@@ -725,12 +725,12 @@
   },
   "timings": {
     "profiles": {
-      "game_recos": 177.194,
-      "pitcher_props_recos": 202.163,
-      "hitter_props_recos": 260.664
+      "game_recos": 329.282,
+      "pitcher_props_recos": 348.148,
+      "hitter_props_recos": 345.161
     },
-    "locked_policy_s": 1.433,
-    "total_s": 642.033
+    "locked_policy_s": 1.641,
+    "total_s": 1024.802
   },
   "failures": [],
   "failures_n": 0

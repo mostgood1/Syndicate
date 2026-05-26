@@ -844,8 +844,8 @@
             "player_id": 671106,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -942,6 +942,15 @@
             "full_name": "Travis Bazzana",
             "player_id": 683953,
             "position": "2B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Will Dion",
+            "player_id": 702021,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1089,15 +1098,6 @@
             }
           },
           {
-            "full_name": "Logan Allen",
-            "player_id": 671106,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Matt Festa",
             "player_id": 670036,
             "position": "P",
@@ -1195,6 +1195,15 @@
               "code": "A",
               "description": "Active"
             }
+          },
+          {
+            "full_name": "Will Dion",
+            "player_id": 702021,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
           }
         ],
         "removed": []
@@ -1239,6 +1248,7 @@
           694197,
           696135,
           700932,
+          702021,
           800048,
           800050,
           804926
@@ -1483,8 +1493,8 @@
             "player_id": 671106,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1587,6 +1597,15 @@
             }
           },
           {
+            "full_name": "Will Dion",
+            "player_id": 702021,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Yorman Gómez",
             "player_id": 691414,
             "position": "P",
@@ -1607,7 +1626,6 @@
           668909,
           670036,
           670059,
-          671106,
           671922,
           672275,
           676051,
@@ -1624,6 +1642,7 @@
           683953,
           690984,
           700932,
+          702021,
           800048,
           800050
         ],
@@ -1755,15 +1774,6 @@
             }
           },
           {
-            "full_name": "Logan Allen",
-            "player_id": 671106,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Matt Festa",
             "player_id": 670036,
             "position": "P",
@@ -1861,6 +1871,15 @@
               "code": "A",
               "description": "Active"
             }
+          },
+          {
+            "full_name": "Will Dion",
+            "player_id": 702021,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
           }
         ],
         "removed": []
@@ -1869,5 +1888,5 @@
   },
   "team_abbr": "CLE",
   "team_id": 114,
-  "updated_at": "2026-05-26T11:39:16.399748"
+  "updated_at": "2026-05-26T17:15:05.933397"
 }

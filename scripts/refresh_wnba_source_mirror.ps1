@@ -1,6 +1,6 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\WNBA-Betting",
+    [string]$SourceRepo = "",
     [string]$SourceArtifactRoot = "",
     [switch]$UseExistingMirrorArtifacts
 )

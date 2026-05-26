@@ -927,6 +927,16 @@ def _run_refresh_via_cli(
     if not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
         state["phase"] = "predictions"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
+        source_predictions_path = processed_root / f"predictions_{date_str}.csv"
+        source_game_odds_path = processed_root / f"game_odds_{date_str}.csv"
+        if (not source_predictions_path.exists()) or (not source_game_odds_path.exists()):
+            _ensure_source_game_inputs(
+                source_root=source_root,
+                package_name="wnba_betting",
+                date_str=date_str,
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+            )
         player_logs_ok, player_logs_error = _ensure_player_logs_for_props_refresh(
             source_root=source_root,
             date_str=date_str,

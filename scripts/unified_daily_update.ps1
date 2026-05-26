@@ -322,8 +322,6 @@ $preferLocalMirrorArtifactsForGate = $false
 if (-not $SkipMLB) {
     $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\mlb_bettingv2'
     $mlbVendoredDailyUpdate = if ($mlbVendoredRoot) { Join-Path $mlbVendoredRoot 'tools\daily_update.py' } else { $null }
-    $mlbRepoRoot = Resolve-WorkspaceRepoPath -RepoName 'MLB-BettingV2'
-    $mlbDailyUpdate = if ($mlbRepoRoot) { Join-Path $mlbRepoRoot 'tools\daily_update.py' } else { $null }
     if ($mlbVendoredDailyUpdate -and (Test-Path $mlbVendoredDailyUpdate)) {
         $preferLocalMirrorArtifactsForGate = $true
         $mlbArtifactDataRoot = Join-Path $repoRoot 'data\mlb_source\source_artifacts\data'
@@ -351,29 +349,8 @@ if (-not $SkipMLB) {
             RuntimePolicy = $runtimePolicy.MLB
         }
     }
-    elseif ($mlbDailyUpdate -and (Test-Path $mlbDailyUpdate)) {
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'mlb'
-            Name = 'MLB source daily update'
-            Workflow = 'source_daily_update'
-            Command = @(
-                (Resolve-Python $mlbRepoRoot),
-                'tools\daily_update.py',
-                '--workflow', 'ui-daily',
-                '--date', $Date,
-                '--season', $season,
-                '--sims', [string]$runtimePolicy.MLB.simsPerGame,
-                '--workers', [string]$runtimePolicy.MLB.workers,
-                '--git-push', 'off',
-                '--validate-render-frontend', 'off',
-                '--build-next-day', 'on'
-            )
-            WorkingDirectory = $mlbRepoRoot
-            EnvironmentOverrides = @{}
-            RuntimePolicy = $runtimePolicy.MLB
-        }
-    }
     else {
+        $preferLocalMirrorArtifactsForGate = $true
         $sourceSteps += [pscustomobject]@{
             Sport = 'mlb'
             Name = 'MLB Syndicate daily refresh'
@@ -395,8 +372,6 @@ if (-not $SkipMLB) {
 if (-not $SkipNBA) {
     $nbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nba_betting_repo'
     $nbaVendoredApp = if ($nbaVendoredRoot) { Join-Path $nbaVendoredRoot 'app.py' } else { $null }
-    $nbaRepoRoot = Resolve-WorkspaceRepoPath -RepoName 'NBA-Betting'
-    $nbaDailyUpdate = if ($nbaRepoRoot) { Join-Path $nbaRepoRoot 'scripts\daily_update.ps1' } else { $null }
     if ($nbaVendoredApp -and (Test-Path $nbaVendoredApp)) {
         $preferLocalMirrorArtifactsForGate = $true
         $sourceSteps += [pscustomobject]@{
@@ -419,25 +394,6 @@ if (-not $SkipNBA) {
             EnvironmentOverrides = @{
                 REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
                 REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
-            }
-            RuntimePolicy = $runtimePolicy.NBA
-        }
-    }
-    elseif ($nbaDailyUpdate -and (Test-Path $nbaDailyUpdate)) {
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'nba'
-            Name = 'NBA source daily update'
-            Workflow = 'source_daily_update'
-            Command = @(
-                'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', 'scripts\daily_update.ps1',
-                '-Date', $Date,
-                '-GitPush:$false'
-            )
-            WorkingDirectory = $nbaRepoRoot
-            EnvironmentOverrides = @{
-                DAILY_SMARTSIM_NSIMS = [string]$runtimePolicy.NBA.smartsimNSims
-                DAILY_SMARTSIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
-                DAILY_UPDATE_ALWAYS_PUSH = '0'
             }
             RuntimePolicy = $runtimePolicy.NBA
         }
@@ -470,8 +426,6 @@ if (-not $SkipNBA) {
 if (-not $SkipWNBA) {
     $wnbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\wnba_betting_repo'
     $wnbaVendoredApp = if ($wnbaVendoredRoot) { Join-Path $wnbaVendoredRoot 'app.py' } else { $null }
-    $wnbaRepoRoot = Resolve-WorkspaceRepoPath -RepoName 'WNBA-Betting'
-    $wnbaDailyUpdate = if ($wnbaRepoRoot) { Join-Path $wnbaRepoRoot 'scripts\daily_update.ps1' } else { $null }
     if ($wnbaVendoredApp -and (Test-Path $wnbaVendoredApp)) {
         $preferLocalMirrorArtifactsForGate = $true
         $sourceSteps += [pscustomobject]@{
@@ -494,25 +448,6 @@ if (-not $SkipWNBA) {
             EnvironmentOverrides = @{
                 REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
                 REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
-            }
-            RuntimePolicy = $runtimePolicy.WNBA
-        }
-    }
-    elseif ($wnbaDailyUpdate -and (Test-Path $wnbaDailyUpdate)) {
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'wnba'
-            Name = 'WNBA source daily update'
-            Workflow = 'source_daily_update'
-            Command = @(
-                'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', 'scripts\daily_update.ps1',
-                '-Date', $Date,
-                '-GitPush:$false'
-            )
-            WorkingDirectory = $wnbaRepoRoot
-            EnvironmentOverrides = @{
-                DAILY_SMARTSIM_NSIMS = [string]$runtimePolicy.WNBA.smartsimNSims
-                DAILY_SMARTSIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
-                DAILY_UPDATE_ALWAYS_PUSH = '0'
             }
             RuntimePolicy = $runtimePolicy.WNBA
         }
@@ -545,8 +480,6 @@ if (-not $SkipWNBA) {
 if (-not $SkipNHL) {
     $nhlVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nhl_betting_repo'
     $nhlVendoredCli = if ($nhlVendoredRoot) { Join-Path $nhlVendoredRoot 'nhl_betting\cli.py' } else { $null }
-    $nhlRepoRoot = Resolve-WorkspaceRepoPath -RepoName 'NHL-Betting'
-    $nhlDailyUpdate = if ($nhlRepoRoot) { Join-Path $nhlRepoRoot 'scripts\daily_update.ps1' } else { $null }
     if ($nhlVendoredCli -and (Test-Path $nhlVendoredCli)) {
         $preferLocalMirrorArtifactsForGate = $true
         $sourceSteps += [pscustomobject]@{
@@ -563,24 +496,6 @@ if (-not $SkipNHL) {
                 '--props-boxscore-n-sims', [string]$runtimePolicy.NHL.propsBoxscoreNSims
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{}
-            RuntimePolicy = $runtimePolicy.NHL
-        }
-    }
-    elseif ($nhlDailyUpdate -and (Test-Path $nhlDailyUpdate)) {
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'nhl'
-            Name = 'NHL source daily update'
-            Workflow = 'source_daily_update'
-            Command = @(
-                'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', 'scripts\daily_update.ps1',
-                '-BaseDate', $Date,
-                '-PropsBoxscoreNSims', [string]$runtimePolicy.NHL.propsBoxscoreNSims,
-                '-SimSamples', [string]$runtimePolicy.NHL.gameSimSamples,
-                '-NoRenderSync',
-                '-NoGitPush'
-            )
-            WorkingDirectory = $nhlRepoRoot
             EnvironmentOverrides = @{}
             RuntimePolicy = $runtimePolicy.NHL
         }

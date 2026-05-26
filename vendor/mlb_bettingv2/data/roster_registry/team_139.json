@@ -741,6 +741,15 @@
             }
           },
           {
+            "full_name": "Craig Kimbrel",
+            "player_id": 518886,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Dom Keegan",
             "player_id": 681371,
             "position": "C",
@@ -853,8 +862,8 @@
             "player_id": 669947,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -1098,6 +1107,15 @@
             }
           },
           {
+            "full_name": "Craig Kimbrel",
+            "player_id": 518886,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Drew Rasmussen",
             "player_id": 656876,
             "position": "P",
@@ -1145,15 +1163,6 @@
           {
             "full_name": "Ian Seymour",
             "player_id": 693855,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Jesse Scholtens",
-            "player_id": 669947,
             "position": "P",
             "status": {
               "code": "A",
@@ -1293,6 +1302,7 @@
     "2026-05-27": {
       "40Man": {
         "added": [
+          518886,
           571927,
           592155,
           607259,
@@ -1430,6 +1440,15 @@
             }
           },
           {
+            "full_name": "Craig Kimbrel",
+            "player_id": 518886,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Dom Keegan",
             "player_id": 681371,
             "position": "C",
@@ -1542,8 +1561,8 @@
             "player_id": 669947,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -1740,6 +1759,7 @@
       },
       "active": {
         "added": [
+          518886,
           571927,
           607259,
           641329,
@@ -1753,7 +1773,6 @@
           666018,
           668723,
           668984,
-          669947,
           670764,
           676439,
           680700,
@@ -1814,6 +1833,15 @@
             }
           },
           {
+            "full_name": "Craig Kimbrel",
+            "player_id": 518886,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Drew Rasmussen",
             "player_id": 656876,
             "position": "P",
@@ -1861,15 +1889,6 @@
           {
             "full_name": "Ian Seymour",
             "player_id": 693855,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Jesse Scholtens",
-            "player_id": 669947,
             "position": "P",
             "status": {
               "code": "A",
@@ -2009,5 +2028,5 @@
   },
   "team_abbr": "TB",
   "team_id": 139,
-  "updated_at": "2026-05-26T11:39:16.850404"
+  "updated_at": "2026-05-26T17:15:06.058328"
 }

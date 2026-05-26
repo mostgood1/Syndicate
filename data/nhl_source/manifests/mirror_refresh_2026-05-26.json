@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "nhl",
     "date":  "2026-05-26",
-    "refreshedAtUtc":  "2026-05-26T16:52:09.0599700Z",
+    "refreshedAtUtc":  "2026-05-26T22:21:11.2550546Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NHL",
@@ -9,9 +9,9 @@
     "destinationRoot":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\data\\nhl_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  7,
+    "copiedArtifactCount":  11,
     "artifactGroups":  {
-                           "processed":  4,
+                           "processed":  8,
                            "live_lens":  0,
                            "odds":  2,
                            "props":  1,
@@ -22,6 +22,10 @@
                             "recommendations_sim_2026-05-26.csv",
                             "props_boxscores_sim_2026-05-26.csv",
                             "props_boxscores_sim_hist_2026-05-26.csv",
+                            "props_recommendations_2026-05-26.csv",
+                            "roster_snapshot_2026-05-26.csv",
+                            "lineups_2026-05-26.csv",
+                            "lineups_co_toi_2026-05-26.csv",
                             "odds\\games\\date=2026-05-26\\scoreboard.csv",
                             "odds\\team\\date=2026-05-26\\oddsapi.csv",
                             "props\\player_props_lines\\date=2026-05-26\\oddsapi.csv"

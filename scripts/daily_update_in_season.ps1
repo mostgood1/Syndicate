@@ -4,6 +4,10 @@ param(
     [switch]$Json,
     [switch]$SkipTests,
     [switch]$SkipSmoke,
+    [switch]$SkipSourceUpdates,
+    [switch]$SkipRefreshGate,
+    [switch]$RunGateTests,
+    [switch]$RunGateSmoke,
     [switch]$SkipGitPush,
     [switch]$DryRun,
     [switch]$IncludeOffSeasonSports,
@@ -97,10 +101,15 @@ $dailyArgs = @(
     '-Date', $Date
 )
 
+$effectiveSkipTests = [bool]$SkipTests -or (-not [bool]$RunGateTests)
+$effectiveSkipSmoke = [bool]$SkipSmoke -or (-not [bool]$RunGateSmoke)
+
 if ($BaseUrl) { $dailyArgs += @('-BaseUrl', $BaseUrl) }
 if ($Json) { $dailyArgs += '-Json' }
-if ($SkipTests) { $dailyArgs += '-SkipTests' }
-if ($SkipSmoke) { $dailyArgs += '-SkipSmoke' }
+if ($effectiveSkipTests) { $dailyArgs += '-SkipTests' }
+if ($effectiveSkipSmoke) { $dailyArgs += '-SkipSmoke' }
+if ($SkipSourceUpdates) { $dailyArgs += '-SkipSourceUpdates' }
+if ($SkipRefreshGate) { $dailyArgs += '-SkipRefreshGate' }
 if ($SkipGitPush) { $dailyArgs += '-SkipGitPush' }
 if ($DryRun) { $dailyArgs += '-WhatIf' }
 
@@ -118,6 +127,16 @@ Write-Host ("    active sports: {0}" -f ($activeList -join ', ')) -ForegroundCol
 if ($skippedList.Count -gt 0) {
     Write-Host ("    skipped sports: {0}" -f ($skippedList -join ', ')) -ForegroundColor DarkGray
 }
+$gateTestsStatus = 'enabled'
+if ($effectiveSkipTests) {
+    $gateTestsStatus = 'skipped'
+}
+$gateSmokeStatus = 'enabled'
+if ($effectiveSkipSmoke) {
+    $gateSmokeStatus = 'skipped'
+}
+Write-Host ("    gate tests: {0}" -f $gateTestsStatus) -ForegroundColor DarkGray
+Write-Host ("    gate smoke: {0}" -f $gateSmokeStatus) -ForegroundColor DarkGray
 Write-Host ("    " + ($dailyArgs -join ' ')) -ForegroundColor DarkGray
 
 if ($DryRun) {

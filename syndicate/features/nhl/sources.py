@@ -35,6 +35,10 @@ def scoreboard_snapshot_path(date_str: str) -> Path:
     return default_nhl_source_root().joinpath("data", "odds", "games", f"date={date_str}", "scoreboard.csv")
 
 
+def props_lines_snapshot_path(date_str: str) -> Path:
+    return default_nhl_source_root().joinpath("data", "props", "player_props_lines", f"date={date_str}", "oddsapi.csv")
+
+
 def parse_iso_date(value: str) -> date:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()

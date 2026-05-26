@@ -786,15 +786,6 @@
             }
           },
           {
-            "full_name": "Dietrich Enns",
-            "player_id": 608650,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Dylan Beavers",
             "player_id": 687637,
             "position": "RF",
@@ -934,8 +925,8 @@
             "player_id": 675919,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1161,15 +1152,6 @@
             }
           },
           {
-            "full_name": "Dietrich Enns",
-            "player_id": 608650,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Grant Wolfram",
             "player_id": 664991,
             "position": "P",
@@ -1227,6 +1209,15 @@
             "full_name": "Leody Taveras",
             "player_id": 665750,
             "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Nick Raquet",
+            "player_id": 675919,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1331,7 +1322,6 @@
         "added": [
           552640,
           605135,
-          608650,
           621107,
           621493,
           624413,
@@ -1495,15 +1485,6 @@
             }
           },
           {
-            "full_name": "Dietrich Enns",
-            "player_id": 608650,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Dylan Beavers",
             "player_id": 687637,
             "position": "RF",
@@ -1643,8 +1624,8 @@
             "player_id": 675919,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1798,7 +1779,6 @@
         "added": [
           552640,
           605135,
-          608650,
           621493,
           624413,
           641933,
@@ -1813,6 +1793,7 @@
           669358,
           669432,
           670329,
+          675919,
           677942,
           680694,
           681297,
@@ -1897,15 +1878,6 @@
             }
           },
           {
-            "full_name": "Dietrich Enns",
-            "player_id": 608650,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Grant Wolfram",
             "player_id": 664991,
             "position": "P",
@@ -1963,6 +1935,15 @@
             "full_name": "Leody Taveras",
             "player_id": 665750,
             "position": "CF",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Nick Raquet",
+            "player_id": 675919,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -2065,5 +2046,5 @@
   },
   "team_abbr": "BAL",
   "team_id": 110,
-  "updated_at": "2026-05-26T11:39:16.287818"
+  "updated_at": "2026-05-26T17:15:05.861763"
 }

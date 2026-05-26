@@ -78,13 +78,13 @@ function Invoke-Step {
 
     Write-Host "==> $Name" -ForegroundColor Cyan
     Write-Host ("    " + ($Command -join ' ')) -ForegroundColor DarkGray
-    $output = & $Command[0] $Command[1..($Command.Length - 1)]
+    $output = @(& $Command[0] $Command[1..($Command.Length - 1)] 2>&1 | Tee-Object -Variable __stepOutput)
     if ($LASTEXITCODE -ne 0) {
         throw "$Name failed with exit code $LASTEXITCODE"
     }
 
     if ($ArtifactName) {
-        $outputText = ($output | Out-String)
+        $outputText = ($__stepOutput | Out-String)
         Set-Content -Path (Join-Path $runArtifactsDir $ArtifactName) -Value $outputText -Encoding utf8
     }
 
@@ -95,11 +95,11 @@ $refreshSteps = @()
 if (-not $SkipMLB) {
     $mlbMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_mlb_source_mirror.ps1'), '-Date', $Date)
     $localMlbArtifactRoot = Join-Path $repoRoot 'data\mlb_source\source_artifacts'
-    if ($preferLocalMirrorArtifacts -and (Test-Path $localMlbArtifactRoot)) {
+    if (Test-Path $localMlbArtifactRoot) {
         $mlbMirrorCommand += @('-SourceArtifactRoot', $localMlbArtifactRoot)
     }
     else {
-        $mlbMirrorCommand += @('-SourceRepo', '..\MLB-BettingV2')
+        $mlbMirrorCommand += '-UseExistingMirrorArtifacts'
     }
     $refreshSteps += ,@('MLB mirror refresh', $mlbMirrorCommand)
 }
@@ -109,6 +109,9 @@ if (-not $SkipNBA) {
     if ($preferLocalMirrorArtifacts -and (Test-Path $localNbaArtifactRoot)) {
         $nbaMirrorCommand += @('-SourceArtifactRoot', $localNbaArtifactRoot)
     }
+    else {
+        $nbaMirrorCommand += '-UseExistingMirrorArtifacts'
+    }
     $refreshSteps += ,@('NBA mirror refresh', $nbaMirrorCommand)
 }
 if (-not $SkipNHL) {
@@ -116,6 +119,9 @@ if (-not $SkipNHL) {
     $localNhlArtifactRoot = Join-Path $repoRoot 'data\nhl_source\source_artifacts'
     if ($preferLocalMirrorArtifacts -and (Test-Path $localNhlArtifactRoot)) {
         $nhlMirrorCommand += @('-SourceArtifactRoot', $localNhlArtifactRoot)
+    }
+    else {
+        $nhlMirrorCommand += '-UseExistingMirrorArtifacts'
     }
     $refreshSteps += ,@('NHL mirror refresh', $nhlMirrorCommand)
 }
@@ -125,6 +131,9 @@ if (-not $SkipWNBA) {
     if ($preferLocalMirrorArtifacts -and (Test-Path $localWnbaArtifactRoot)) {
         $wnbaMirrorCommand += @('-SourceArtifactRoot', $localWnbaArtifactRoot)
     }
+    else {
+        $wnbaMirrorCommand += '-UseExistingMirrorArtifacts'
+    }
     $refreshSteps += ,@('WNBA mirror refresh', $wnbaMirrorCommand)
 }
 if (-not $SkipNFL) {
@@ -133,6 +142,9 @@ if (-not $SkipNFL) {
     if ($preferLocalMirrorArtifacts -and (Test-Path $localNflArtifactRoot)) {
         $nflMirrorCommand += @('-SourceArtifactRoot', $localNflArtifactRoot)
     }
+    else {
+        $nflMirrorCommand += '-UseExistingMirrorArtifacts'
+    }
     $refreshSteps += ,@('NFL mirror refresh', $nflMirrorCommand)
 }
 if (-not $SkipNCAAF) {
@@ -140,6 +152,9 @@ if (-not $SkipNCAAF) {
     $localNcaafArtifactRoot = Join-Path $repoRoot 'data\ncaaf_source\source_artifacts'
     if ($preferLocalMirrorArtifacts -and (Test-Path $localNcaafArtifactRoot)) {
         $ncaafMirrorCommand += @('-SourceArtifactRoot', $localNcaafArtifactRoot)
+    }
+    else {
+        $ncaafMirrorCommand += '-UseExistingMirrorArtifacts'
     }
     $refreshSteps += ,@('NCAAF mirror refresh', $ncaafMirrorCommand)
 }

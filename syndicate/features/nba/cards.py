@@ -198,6 +198,11 @@ def _next_available_cards_date(selected_date: str, *, max_ahead_days: int = 14) 
         rows = _load_csv_rows(processed_path(f"game_cards_{candidate}.csv"))
         if rows:
             return candidate
+    for offset in range(1, max_ahead_days + 1):
+        candidate = (parsed_date - timedelta(days=offset)).isoformat()
+        rows = _load_csv_rows(processed_path(f"game_cards_{candidate}.csv"))
+        if rows:
+            return candidate
     return None
 
 
@@ -624,12 +629,51 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
     return games, str(bundle["paths"]["cards"]), str(bundle["paths"]["recommendations"])
 
 
+def _game_has_actionable_data(game: dict[str, Any]) -> bool:
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    sim_score = ((game.get("sim") or {}).get("score") or {}) if isinstance(game.get("sim"), dict) else {}
+    game_recs = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
+    prop_recs = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
+
+    has_market = any(betting.get(key) is not None for key in ("home_ml", "away_ml", "home_spread", "total"))
+    has_sim = any(sim_score.get(key) is not None for key in ("away_mean", "home_mean", "total_mean", "margin_mean"))
+    has_game_recs = bool(game_recs)
+    has_prop_recs = bool(prop_recs.get("away")) or bool(prop_recs.get("home"))
+    return bool(has_market or has_sim or has_game_recs or has_prop_recs)
+
+
+def _games_have_actionable_data(games: list[dict[str, Any]]) -> bool:
+    return any(_game_has_actionable_data(game) for game in games if isinstance(game, dict))
+
+
+def _next_available_actionable_cards_date(selected_date: str, *, max_days: int = 30) -> str | None:
+    parsed_date = parse_iso_date(selected_date)
+    for offset in range(1, max_days + 1):
+        candidate = (parsed_date + timedelta(days=offset)).isoformat()
+        games, _, _ = _games_from_artifacts(candidate)
+        if games and _games_have_actionable_data(games):
+            return candidate
+    for offset in range(1, max_days + 1):
+        candidate = (parsed_date - timedelta(days=offset)).isoformat()
+        games, _, _ = _games_from_artifacts(candidate)
+        if games and _games_have_actionable_data(games):
+            return candidate
+    return None
+
+
 def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     source_title = "NBA processed game cards"
     parsed_date = parse_iso_date(resolved_date)
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+    has_actionable_data = _games_have_actionable_data(games)
+    if games and not has_actionable_data:
+        next_available_date = _next_available_actionable_cards_date(resolved_date)
+        if next_available_date:
+            resolved_date = next_available_date
+            games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+            has_actionable_data = _games_have_actionable_data(games)
     if not games:
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
@@ -642,6 +686,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         if next_available_date:
             resolved_date = next_available_date
             games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+            has_actionable_data = _games_have_actionable_data(games)
 
     parsed_date = parse_iso_date(resolved_date)
 
@@ -681,6 +726,9 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "header_stats": [
             {"label": "Games", "value": str(len(games))},
             {"label": "Recommendations", "value": recs_path.split("\\")[-1] if games else "No data"},
+            *([
+                {"label": "Data", "value": "Placeholder fallback"},
+            ] if games and not has_actionable_data else []),
         ],
         "route_path": "/nba/cards",
         "intro_title": "NBA Cards",

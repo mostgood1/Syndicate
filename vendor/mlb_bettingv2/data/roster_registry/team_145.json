@@ -763,8 +763,8 @@
             "player_id": 689818,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -952,8 +952,8 @@
             "player_id": 702273,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -1161,6 +1161,15 @@
             }
           },
           {
+            "full_name": "David Sandlin",
+            "player_id": 689818,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "Davis Martin",
             "player_id": 663436,
             "position": "P",
@@ -1245,15 +1254,6 @@
             "full_name": "Munetaka Murakami",
             "player_id": 808959,
             "position": "1B",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Noah Schultz",
-            "player_id": 702273,
-            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1482,8 +1482,8 @@
             "player_id": 689818,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1671,8 +1671,8 @@
             "player_id": 702273,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -1840,12 +1840,12 @@
           680732,
           682668,
           685126,
+          689818,
           691011,
           691799,
           695657,
           699823,
           700337,
-          702273,
           803011,
           805367,
           807747,
@@ -1901,6 +1901,15 @@
             "full_name": "Colson Montgomery",
             "player_id": 695657,
             "position": "SS",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "David Sandlin",
+            "player_id": 689818,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1997,15 +2006,6 @@
             }
           },
           {
-            "full_name": "Noah Schultz",
-            "player_id": 702273,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Randal Grichuk",
             "player_id": 545341,
             "position": "RF",
@@ -2093,5 +2093,5 @@
   },
   "team_abbr": "CWS",
   "team_id": 145,
-  "updated_at": "2026-05-26T11:39:17.046698"
+  "updated_at": "2026-05-26T17:15:06.118358"
 }

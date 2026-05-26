@@ -2377,10 +2377,9 @@
       } catch (e) {}
     }
 
-    // Pregame props display cap (American odds). Keeps the UI focused on bettable ranges.
-    // Hard cap by default: only show props with -125 <= price <= +125.
-    const PROPS_AMERICAN_PRICE_MIN = -125;
-    const PROPS_AMERICAN_PRICE_MAX = 125;
+    // Keep all priced props visible; do not hide rows by an arbitrary American-odds band.
+    const PROPS_AMERICAN_PRICE_MIN = null;
+    const PROPS_AMERICAN_PRICE_MAX = null;
     // Small EV floor to avoid thin/noisy picks dominating the list.
     const PROPS_EV_MIN = 0.02;
 
@@ -2994,7 +2993,10 @@
         })
         .filter(r => {
           const p = Number(r.priceNum);
-          return isFinite(p) && p >= PROPS_AMERICAN_PRICE_MIN && p <= PROPS_AMERICAN_PRICE_MAX;
+          if (!isFinite(p)) return false;
+          if (PROPS_AMERICAN_PRICE_MIN !== null && p < Number(PROPS_AMERICAN_PRICE_MIN)) return false;
+          if (PROPS_AMERICAN_PRICE_MAX !== null && p > Number(PROPS_AMERICAN_PRICE_MAX)) return false;
+          return true;
         });
 
       const best = new Map();
@@ -3513,9 +3515,11 @@
           return !isFinite(ev) || ev >= PROPS_EV_MIN;
         })
         .filter(r => {
-          // Hard display cap: only show bettable price ranges.
           const p = Number(r.priceNum);
-          return isFinite(p) && p >= PROPS_AMERICAN_PRICE_MIN && p <= PROPS_AMERICAN_PRICE_MAX;
+          if (!isFinite(p)) return false;
+          if (PROPS_AMERICAN_PRICE_MIN !== null && p < Number(PROPS_AMERICAN_PRICE_MIN)) return false;
+          if (PROPS_AMERICAN_PRICE_MAX !== null && p > Number(PROPS_AMERICAN_PRICE_MAX)) return false;
+          return true;
         });
 
       // Dedupe: show each prop once by best available price.
@@ -3807,13 +3811,28 @@
       if ([p1a, p2a, p3a].every((value) => isFinite(value))) regAway = p1a + p2a + p3a;
       else if (isFinite(Number(pred && pred.proj_away_goals))) regAway = Number(pred.proj_away_goals);
 
-      const final = segmentWinnerProbabilities(regHome, regAway);
-      if (final) {
-        segments.final = final;
-        segments.ot = {
-          yes_prob: Number(final.tie_prob) || 0,
-          no_prob: Math.max(0, 1 - (Number(final.tie_prob) || 0)),
+      const mlHome = Number(pred && pred.p_home_ml);
+      const mlAway = Number(pred && pred.p_away_ml);
+      if (isFinite(mlHome) && isFinite(mlAway) && mlHome >= 0 && mlAway >= 0 && (mlHome + mlAway) > 0) {
+        const total = mlHome + mlAway;
+        segments.final = {
+          away_win_prob: mlAway / total,
+          home_win_prob: mlHome / total,
+          tie_prob: 0,
         };
+        segments.ot = {
+          yes_prob: 0,
+          no_prob: 1,
+        };
+      } else {
+        const final = segmentWinnerProbabilities(regHome, regAway);
+        if (final) {
+          segments.final = final;
+          segments.ot = {
+            yes_prob: Number(final.tie_prob) || 0,
+            no_prob: Math.max(0, 1 - (Number(final.tie_prob) || 0)),
+          };
+        }
       }
       return segments;
     }

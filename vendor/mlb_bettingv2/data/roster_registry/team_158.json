@@ -754,8 +754,8 @@
             "player_id": 689441,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -907,8 +907,8 @@
             "player_id": 701656,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -1080,6 +1080,15 @@
             }
           },
           {
+            "full_name": "Coleman Crow",
+            "player_id": 689441,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "DL Hall",
             "player_id": 669084,
             "position": "P",
@@ -1172,15 +1181,6 @@
           {
             "full_name": "Kyle Harrison",
             "player_id": 690986,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Logan Henderson",
-            "player_id": 701656,
             "position": "P",
             "status": {
               "code": "A",
@@ -1413,8 +1413,8 @@
             "player_id": 689441,
             "position": "P",
             "status": {
-              "code": "RM",
-              "description": "Reassigned to Minors"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1566,8 +1566,8 @@
             "player_id": 701656,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -1676,12 +1676,12 @@
           686217,
           687075,
           687401,
+          689441,
           690986,
           692230,
           694192,
           694477,
-          694819,
-          701656
+          694819
         ],
         "players": [
           {
@@ -1760,6 +1760,15 @@
             "full_name": "Christian Yelich",
             "player_id": 592885,
             "position": "DH",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Coleman Crow",
+            "player_id": 689441,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1865,15 +1874,6 @@
             }
           },
           {
-            "full_name": "Logan Henderson",
-            "player_id": 701656,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Luis Rengifo",
             "player_id": 650859,
             "position": "3B",
@@ -1925,5 +1925,5 @@
   },
   "team_abbr": "MIL",
   "team_id": 158,
-  "updated_at": "2026-05-26T11:39:17.137054"
+  "updated_at": "2026-05-26T17:15:06.167484"
 }

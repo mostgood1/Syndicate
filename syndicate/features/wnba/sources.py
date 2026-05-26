@@ -12,11 +12,21 @@ from syndicate.features.shared.timezone import central_today_iso
 
 
 def _source_roots() -> list[Path]:
-    return preferred_source_roots(
+    roots = preferred_source_roots(
         __file__,
         env_var="SYNDICATE_WNBA_SOURCE_ROOT",
         local_dir_name="wnba_source",
     )
+    expanded: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        for candidate in (root / "source_artifacts", root):
+            resolved = candidate.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            expanded.append(resolved)
+    return expanded
 
 
 def default_wnba_source_root() -> Path:
@@ -24,11 +34,21 @@ def default_wnba_source_root() -> Path:
 
 
 def processed_path(filename: str) -> Path:
-    return default_wnba_source_root() / "data" / "processed" / filename
+    roots = _source_roots()
+    for root in roots:
+        candidate = root / "data" / "processed" / filename
+        if candidate.exists():
+            return candidate
+    return roots[0] / "data" / "processed" / filename
 
 
 def live_snapshot_path(filename: str) -> Path:
-    return default_wnba_source_root() / "data" / "processed" / "live_snapshots" / filename
+    roots = _source_roots()
+    for root in roots:
+        candidate = root / "data" / "processed" / "live_snapshots" / filename
+        if candidate.exists():
+            return candidate
+    return roots[0] / "data" / "processed" / "live_snapshots" / filename
 
 
 def parse_iso_date(value: str) -> date:
@@ -48,15 +68,16 @@ def load_json(path: Path) -> dict[str, Any] | None:
 
 def available_dates() -> list[str]:
     dates: set[str] = set()
-    processed_dir = default_wnba_source_root() / "data" / "processed"
-    if not processed_dir.exists():
-        return []
-    for pattern in ("game_cards_*.csv", "recommendations_slate_*.json"):
-        for path in sorted(processed_dir.glob(pattern)):
-            if path.stem.startswith("game_cards_"):
-                dates.add(path.stem.replace("game_cards_", "", 1))
-            elif path.stem.startswith("recommendations_slate_"):
-                dates.add(path.stem.replace("recommendations_slate_", "", 1))
+    for root in _source_roots():
+        processed_dir = root / "data" / "processed"
+        if not processed_dir.exists():
+            continue
+        for pattern in ("game_cards_*.csv", "recommendations_slate_*.json"):
+            for path in sorted(processed_dir.glob(pattern)):
+                if path.stem.startswith("game_cards_"):
+                    dates.add(path.stem.replace("game_cards_", "", 1))
+                elif path.stem.startswith("recommendations_slate_"):
+                    dates.add(path.stem.replace("recommendations_slate_", "", 1))
     return sorted(dates)
 
 

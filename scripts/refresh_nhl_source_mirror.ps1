@@ -1,6 +1,6 @@
 param(
     [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
-    [string]$SourceRepo = "..\NHL-Betting",
+    [string]$SourceRepo = "",
     [string]$SourceArtifactRoot = "",
     [switch]$UseExistingMirrorArtifacts
 )
@@ -122,7 +122,10 @@ $files = @(
     "recon_props_$Date.csv",
     "props_boxscores_sim_$Date.csv",
     "props_boxscores_sim_hist_$Date.csv",
-    "props_recommendations_$Date.csv"
+    "props_recommendations_$Date.csv",
+    "roster_snapshot_$Date.csv",
+    "lineups_$Date.csv",
+    "lineups_co_toi_$Date.csv"
 )
 
 foreach ($name in $files) {

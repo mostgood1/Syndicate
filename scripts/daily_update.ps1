@@ -4,6 +4,8 @@ param(
     [switch]$Json,
     [switch]$SkipTests,
     [switch]$SkipSmoke,
+    [switch]$SkipSourceUpdates,
+    [switch]$SkipRefreshGate,
     [switch]$SkipGitPush,
     [switch]$WhatIf,
     [switch]$SkipNFL,
@@ -33,6 +35,8 @@ if ($SkipTests) { $unifiedArgs += '-SkipTests' }
 if ($SkipSmoke) { $unifiedArgs += '-SkipSmoke' }
 if ($SkipGitPush) { $unifiedArgs += '-SkipGitPush' }
 if ($WhatIf) { $unifiedArgs += '-DryRun' }
+if ($SkipSourceUpdates) { $unifiedArgs += '-SkipSourceUpdates' }
+if ($SkipRefreshGate) { $unifiedArgs += '-SkipRefreshGate' }
 if ($SkipNFL) { $unifiedArgs += '-SkipNFL' }
 if ($SkipNCAAF) { $unifiedArgs += '-SkipNCAAF' }
 if ($SkipNCAAB) { $unifiedArgs += '-SkipNCAAB' }

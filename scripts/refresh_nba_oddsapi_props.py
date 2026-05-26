@@ -68,6 +68,11 @@ def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path
     if not source.exists() or not source.is_file():
         return None
     destination = processed_root / file_name
+    try:
+        if source.resolve() == destination.resolve():
+            return str(destination)
+    except Exception:
+        pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
     return str(destination)
@@ -168,6 +173,38 @@ def _count_csv_rows_quick(path: Path | None) -> int:
         return 0
 
 
+def _count_cards_sim_detail_games(path: Path | None) -> int:
+    try:
+        if path is None or not path.exists() or not path.is_file() or path.stat().st_size <= 0:
+            return 0
+        payload = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+        games = payload.get("games") if isinstance(payload, dict) else None
+        if not isinstance(games, list):
+            return 0
+        count = 0
+        for row in games:
+            if not isinstance(row, dict):
+                continue
+            sim = row.get("sim") if isinstance(row.get("sim"), dict) else {}
+            players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+            home_players = players.get("home") if isinstance(players.get("home"), list) else []
+            away_players = players.get("away") if isinstance(players.get("away"), list) else []
+            if len(home_players) + len(away_players) > 0:
+                count += 1
+        return int(count)
+    except Exception:
+        return 0
+
+
+def _count_matching_files(source_directory: Path | None, pattern: str) -> int:
+    try:
+        if source_directory is None or not source_directory.exists() or not source_directory.is_dir():
+            return 0
+        return int(sum(1 for path in source_directory.glob(pattern) if path.is_file()))
+    except Exception:
+        return 0
+
+
 def _path_has_meaningful_content(path: Path | None) -> bool:
     try:
         if path is None or not path.exists() or not path.is_file() or path.stat().st_size <= 0:
@@ -256,6 +293,8 @@ def _local_python() -> str:
 def _local_worker_env() -> dict[str, str]:
     env = dict(os.environ)
     env.setdefault("PYTHONUNBUFFERED", "1")
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     return env
 
 
@@ -285,6 +324,8 @@ def _source_worker_env(source_root: Path) -> dict[str, str]:
     existing = str(env.get("PYTHONPATH") or "").strip()
     env["PYTHONPATH"] = src_dir if not existing else f"{src_dir}{os.pathsep}{existing}"
     env.setdefault("PYTHONUNBUFFERED", "1")
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("OMP_NUM_THREADS", "1")
     env.setdefault("OMP_THREAD_LIMIT", "1")
     env.setdefault("OPENBLAS_NUM_THREADS", "1")
@@ -879,6 +920,9 @@ def _run_refresh_via_cli(
         "predictions_rows": 0,
         "edges_rows": 0,
         "recs_rows": 0,
+        "game_cards_rows": 0,
+        "cards_sim_detail_games": 0,
+        "smart_sim_files": 0,
         "snapshot_path": str(raw_fp),
         "predictions_path": str(pred_fp),
         "edges_path": str(edges_fp),
@@ -962,11 +1006,9 @@ def _run_refresh_via_cli(
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
             existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
             existing_recs_rows = int(_count_csv_rows_quick(rec_fp))
-            existing_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
             have_downstream_artifacts = (
                 (not do_edges or existing_edges_rows > 0)
                 and (not do_export or existing_recs_rows > 0)
-                and (not do_export or existing_game_cards_rows > 0)
             )
             if int(rc_pred) != 0:
                 if have_downstream_artifacts:
@@ -1056,18 +1098,55 @@ def _run_refresh_via_cli(
         state["rc_export"] = int(rc_export)
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
-        if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0 and source_game_cards_rows > 0:
+        if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0:
             state["rc_export"] = 0
+            _append_log(log_file, f"export stage returned non-zero for {date_str} but recommendations were written; continuing")
         elif int(rc_export) != 0:
             state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
-            state["error"] = f"export-game-cards completed without writing rows to game_cards_{date_str}.csv"
+            _append_log(log_file, f"export-game-cards wrote no rows to game_cards_{date_str}.csv; continuing with props artifacts")
+
+    # Build cards_sim_detail in source processed space before parity gating.
+    # The source CLI does not emit this file directly; we derive it from /api/cards.
+    source_processed_root = source_root / "data" / "processed"
+    if do_export and not state.get("error") and int(state.get("snapshot_rows") or 0) > 0:
+        try:
+            _export_cards_sim_detail_snapshot(
+                source_root=source_root,
+                date_str=date_str,
+                processed_root=source_processed_root,
+            )
+        except Exception as exc:
+            _append_log(log_file, f"cards_sim_detail snapshot export failed before parity gate: {exc}")
 
     state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
     state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
     state["edges_rows"] = int(_count_csv_rows_quick(edges_fp))
     state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
     state["snapshot_alias_rows"] = int(_count_csv_rows_quick(Path(str(state.get("snapshot_alias_path") or ""))))
+    source_game_cards_path = source_processed_root / f"game_cards_{date_str}.csv"
+    source_cards_sim_detail_path = source_processed_root / f"cards_sim_detail_{date_str}.json"
+    state["game_cards_rows"] = int(_count_csv_rows_quick(source_game_cards_path))
+    state["cards_sim_detail_games"] = int(_count_cards_sim_detail_games(source_cards_sim_detail_path))
+    state["smart_sim_files"] = int(_count_matching_files(source_processed_root, f"smart_sim_{date_str}_*.json"))
+    if bool(do_export) and int(state["snapshot_rows"] or 0) > 0 and int(state["game_cards_rows"] or 0) > 0 and int(state["cards_sim_detail_games"] or 0) <= 0:
+        state["error"] = f"cards_sim_detail_{date_str}.json has zero games while game_cards_{date_str}.csv has rows"
+        stale_exports = [
+            source_game_cards_path,
+            source_cards_sim_detail_path,
+            source_processed_root / f"cards_props_snapshot_{date_str}.json",
+            source_processed_root / f"recommendations_slate_{date_str}.json",
+        ]
+        for stale_path in stale_exports:
+            try:
+                if stale_path.exists() and stale_path.is_file():
+                    stale_path.unlink()
+                    _append_log(log_file, f"removed stale export artifact after sim parity failure: {stale_path}")
+            except Exception:
+                pass
+        state["game_cards_rows"] = int(_count_csv_rows_quick(source_game_cards_path))
+        state["cards_sim_detail_games"] = int(_count_cards_sim_detail_games(source_cards_sim_detail_path))
+        state["smart_sim_files"] = int(_count_matching_files(source_processed_root, f"smart_sim_{date_str}_*.json"))
     state["phase"] = "done"
     ended = dt.datetime.utcnow().isoformat()
     state["phase_started_at"] = ended
@@ -1098,6 +1177,14 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     if any(not path.exists() or not path.is_file() for path in required_paths):
         return None
 
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    cards_sim_detail_path = processed_root / f"cards_sim_detail_{date_str}.json"
+    game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
+    cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
+    smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
+    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0:
+        return None
+
     started = str(started_at or dt.datetime.utcnow().isoformat())
     ended = dt.datetime.utcnow().isoformat()
     return {
@@ -1114,6 +1201,9 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
         "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
         "edges_rows": int(_count_csv_rows_quick(edges_path)),
         "recs_rows": int(_count_csv_rows_quick(recs_path)),
+        "game_cards_rows": game_cards_rows,
+        "cards_sim_detail_games": cards_sim_detail_games,
+        "smart_sim_files": smart_sim_files,
         "snapshot_path": str(snapshot_path),
         "predictions_path": str(predictions_path),
         "edges_path": str(edges_path),
@@ -1145,6 +1235,14 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     if any(not path.exists() or not path.is_file() for path in required_paths):
         return None
 
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    cards_sim_detail_path = processed_root / f"cards_sim_detail_{date_str}.json"
+    game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
+    cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
+    smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
+    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0:
+        return None
+
     started = str(started_at or dt.datetime.utcnow().isoformat())
     ended = dt.datetime.utcnow().isoformat()
     return {
@@ -1161,6 +1259,9 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         "predictions_rows": int(_count_csv_rows_quick(predictions_path)),
         "edges_rows": int(_count_csv_rows_quick(edges_path)),
         "recs_rows": int(_count_csv_rows_quick(recs_path)),
+        "game_cards_rows": game_cards_rows,
+        "cards_sim_detail_games": cards_sim_detail_games,
+        "smart_sim_files": smart_sim_files,
         "snapshot_path": str(snapshot_path),
         "predictions_path": str(predictions_path),
         "edges_path": str(edges_path),
@@ -1529,11 +1630,15 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
                 continue
             sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
             players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+            home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
+            away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
+            if len(home_players) + len(away_players) <= 0:
+                continue
             missing = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {}
             injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {}
             summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {
-                "home": len(players.get("home") or []),
-                "away": len(players.get("away") or []),
+                "home": len(home_players),
+                "away": len(away_players),
                 "missing_home": len(missing.get("home") or []),
                 "missing_away": len(missing.get("away") or []),
                 "injured_home": len(injuries.get("home") or []),
@@ -1546,8 +1651,8 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
                     "sim": {
                         "players_summary": dict(summary),
                         "players": {
-                            "home": [row for row in (players.get("home") or []) if isinstance(row, dict)],
-                            "away": [row for row in (players.get("away") or []) if isinstance(row, dict)],
+                            "home": home_players,
+                            "away": away_players,
                         },
                         "missing_prop_players": {
                             "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
@@ -1843,7 +1948,7 @@ def main() -> int:
             )
         if source_root is not None:
             state["playoff_transition"] = _run_playoff_transition_if_needed(source_root=source_root, date_str=target_date)
-        if artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle"):
+        if artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle") and not state.get("error"):
             copied = _materialize_artifact_bundle(
                 state=state,
                 artifact_root=artifact_root_path,
@@ -1862,16 +1967,22 @@ def main() -> int:
     alias_rows = int(state.get("snapshot_alias_rows") or 0)
     edges_rows = int(state.get("edges_rows") or 0)
     recs_rows = int(state.get("recs_rows") or 0)
+    game_cards_rows = int(state.get("game_cards_rows") or 0)
+    cards_sim_detail_games = int(state.get("cards_sim_detail_games") or 0)
     if state.get("error"):
         return 1
     for extra_state in states[1:]:
         if extra_state.get("error"):
+            return 1
+        if bool(args.do_export) and int(extra_state.get("snapshot_rows") or 0) > 0 and int(extra_state.get("game_cards_rows") or 0) > 0 and int(extra_state.get("cards_sim_detail_games") or 0) <= 0:
             return 1
     if snapshot_rows > 0 and alias_rows <= 0:
         return 1
     if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:
         return 1
     if bool(args.do_export) and snapshot_rows > 0 and recs_rows <= 0:
+        return 1
+    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0:
         return 1
     return 0
 

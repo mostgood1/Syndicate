@@ -39,20 +39,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       660670,
       643289,
       621566,
       645277,
       663586,
-      671739,
       642201,
+      671739,
       673490,
       506702
     ],
-    "lineup_source": "projected_rotowire_default_vs_lhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 675911,
       "source": "feed_gameData_probablePitchers",
@@ -258,35 +258,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 671739,
-        "name": "Michael Harris II",
-        "pos": "CF",
-        "bat": "L",
-        "throw": "L",
-        "k_rate": 0.20002280605728878,
-        "bb_rate": 0.0340676883780332,
-        "hbp_rate": 0.005291005291005291,
-        "hr_rate": 0.05981572705710636,
-        "inplay_hit_rate": 0.27269570707070706,
-        "xb_hit_share": 0.09615384615384616,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.0359987521649268,
-          "bb": 1.1925000000000001,
-          "hr": 0.9022085019888644,
-          "inplay": 0.9083863873133464
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9655662098374114,
-          "bb": 0.9545103092783506,
-          "hr": 1.0246816379441819,
-          "inplay": 1.0752390322954046
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 642201,
         "name": "Eli White",
         "pos": "CF",
@@ -311,6 +282,35 @@
           "bb": 0.8075,
           "hr": 1.2049019607843137,
           "inplay": 0.8719984264358773
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 671739,
+        "name": "Michael Harris II",
+        "pos": "CF",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.20002280605728878,
+        "bb_rate": 0.0340676883780332,
+        "hbp_rate": 0.005291005291005291,
+        "hr_rate": 0.05981572705710636,
+        "inplay_hit_rate": 0.27269570707070706,
+        "xb_hit_share": 0.09615384615384616,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0359987521649268,
+          "bb": 1.1925000000000001,
+          "hr": 0.9022085019888644,
+          "inplay": 0.9083863873133464
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9655662098374114,
+          "bb": 0.9545103092783506,
+          "hr": 1.0246816379441819,
+          "inplay": 1.0752390322954046
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -851,20 +851,20 @@
       "use_closer_in_9th_only": true,
       "pinch_hit_aggressiveness": 0.15
     },
-    "confirmed_lineup_ids": [],
-    "projected_lineup_ids": [
+    "confirmed_lineup_ids": [
       680776,
-      807799,
+      678882,
       677800,
       575929,
-      678882,
+      807799,
+      681508,
       686765,
-      665966,
       691785,
-      702332
+      643396
     ],
-    "lineup_source": "projected_rotowire_default_vs_rhp",
-    "lineup_confidence": 0.66,
+    "projected_lineup_ids": [],
+    "lineup_source": "confirmed_feed_live",
+    "lineup_confidence": 1.0,
     "probable_pitcher": {
       "id": 624133,
       "source": "feed_gameData_probablePitchers",
@@ -960,30 +960,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 807799,
-        "name": "Masataka Yoshida",
-        "pos": "DH",
-        "bat": "L",
+        "id": 678882,
+        "name": "Ceddanne Rafaela",
+        "pos": "CF",
+        "bat": "R",
         "throw": "R",
-        "k_rate": 0.0732039911308204,
-        "bb_rate": 0.10004434589800443,
-        "hbp_rate": 0.01818181818181818,
-        "hr_rate": 0.01138580931263858,
-        "inplay_hit_rate": 0.25816696914700543,
-        "xb_hit_share": 0.28,
+        "k_rate": 0.21066433566433565,
+        "bb_rate": 0.06608391608391609,
+        "hbp_rate": 0.03208556149732621,
+        "hr_rate": 0.02395104895104895,
+        "inplay_hit_rate": 0.3307017543859649,
+        "xb_hit_share": 0.23404255319148937,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
-          "bb": 0.8165041371158392,
-          "hr": 0.78,
-          "inplay": 0.9826010544815466
+          "bb": 0.8075,
+          "hr": 0.9718978102189781,
+          "inplay": 1.1891688770999116
         },
         "platoon_mult_vs_rhp": {
-          "k": 1.003608009118662,
-          "bb": 1.0865598170959314,
-          "hr": 0.9584815251370882,
-          "inplay": 1.0465131810193322
+          "k": 0.924688796680498,
+          "bb": 1.0902116402116402,
+          "hr": 0.9317518248175183,
+          "inplay": 0.9554610703697924
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1047,30 +1047,59 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 678882,
-        "name": "Ceddanne Rafaela",
-        "pos": "CF",
-        "bat": "R",
+        "id": 807799,
+        "name": "Masataka Yoshida",
+        "pos": "DH",
+        "bat": "L",
         "throw": "R",
-        "k_rate": 0.21066433566433565,
-        "bb_rate": 0.06608391608391609,
-        "hbp_rate": 0.03208556149732621,
-        "hr_rate": 0.02395104895104895,
-        "inplay_hit_rate": 0.3307017543859649,
-        "xb_hit_share": 0.23404255319148937,
+        "k_rate": 0.0732039911308204,
+        "bb_rate": 0.10004434589800443,
+        "hbp_rate": 0.01818181818181818,
+        "hr_rate": 0.01138580931263858,
+        "inplay_hit_rate": 0.25816696914700543,
+        "xb_hit_share": 0.28,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
           "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 0.9718978102189781,
-          "inplay": 1.1891688770999116
+          "bb": 0.8165041371158392,
+          "hr": 0.78,
+          "inplay": 0.9826010544815466
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.924688796680498,
-          "bb": 1.0902116402116402,
-          "hr": 0.9317518248175183,
-          "inplay": 0.9554610703697924
+          "k": 1.003608009118662,
+          "bb": 1.0865598170959314,
+          "hr": 0.9584815251370882,
+          "inplay": 1.0465131810193322
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 681508,
+        "name": "Mickey Gasper",
+        "pos": "C",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.23076923076923078,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.02564102564102564,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.41172413793103446,
+        "xb_hit_share": 0.16666666666666666,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.130952380952381,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.9843383584589616
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9713541666666666,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.006602456728085
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1105,35 +1134,6 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 665966,
-        "name": "Carlos Narv\u00e1ez",
-        "pos": "C",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.28730263157894737,
-        "bb_rate": 0.10081140350877192,
-        "hbp_rate": 0.017543859649122806,
-        "hr_rate": 0.014912280701754385,
-        "inplay_hit_rate": 0.28728590250329383,
-        "xb_hit_share": 0.22727272727272727,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 0.8075,
-          "bb": 1.056192444347763,
-          "hr": 0.78,
-          "inplay": 1.1925000000000001
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 1.0681780016792612,
-          "bb": 0.9046443332608223,
-          "hr": 1.2183823529411764,
-          "inplay": 0.9025108919972482
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
         "id": 691785,
         "name": "Marcelo Mayer",
         "pos": "2B",
@@ -1163,30 +1163,30 @@
         "vs_pitcher_history": {}
       },
       {
-        "id": 702332,
-        "name": "Caleb Durbin",
-        "pos": "3B",
+        "id": 643396,
+        "name": "Isiah Kiner-Falefa",
+        "pos": "2B",
         "bat": "R",
         "throw": "R",
-        "k_rate": 0.16200560316413976,
-        "bb_rate": 0.05701219512195122,
-        "hbp_rate": 0.024390243902439025,
-        "hr_rate": 0.005182926829268293,
-        "inplay_hit_rate": 0.17835094549499442,
-        "xb_hit_share": 0.3333333333333333,
+        "k_rate": 0.14784688995215312,
+        "bb_rate": 0.09501594896331737,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3099179206566347,
+        "xb_hit_share": 0.15384615384615385,
         "vs_pitch_type": {},
         "vs_pitch_type_hr": {},
         "platoon_mult_vs_lhp": {
-          "k": 0.8743680382483088,
-          "bb": 1.173529411764706,
-          "hr": 0.78,
-          "inplay": 0.9639679322262935
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8675678658132863
         },
         "platoon_mult_vs_rhp": {
-          "k": 0.9975716622558823,
-          "bb": 1.072390891840607,
-          "hr": 1.275,
-          "inplay": 1.0405163476642523
+          "k": 0.8075,
+          "bb": 1.151636592530424,
+          "hr": 1.0,
+          "inplay": 1.0643065718214693
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1223,6 +1223,64 @@
         "vs_pitcher_history": {}
       },
       {
+        "id": 702332,
+        "name": "Caleb Durbin",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.16200560316413976,
+        "bb_rate": 0.05701219512195122,
+        "hbp_rate": 0.024390243902439025,
+        "hr_rate": 0.005182926829268293,
+        "inplay_hit_rate": 0.17835094549499442,
+        "xb_hit_share": 0.3333333333333333,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8743680382483088,
+          "bb": 1.173529411764706,
+          "hr": 0.78,
+          "inplay": 0.9639679322262935
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9975716622558823,
+          "bb": 1.072390891840607,
+          "hr": 1.275,
+          "inplay": 1.0405163476642523
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 665966,
+        "name": "Carlos Narv\u00e1ez",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.28730263157894737,
+        "bb_rate": 0.10081140350877192,
+        "hbp_rate": 0.017543859649122806,
+        "hr_rate": 0.014912280701754385,
+        "inplay_hit_rate": 0.28728590250329383,
+        "xb_hit_share": 0.22727272727272727,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.056192444347763,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0681780016792612,
+          "bb": 0.9046443332608223,
+          "hr": 1.2183823529411764,
+          "inplay": 0.9025108919972482
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
         "id": 657136,
         "name": "Connor Wong",
         "pos": "C",
@@ -1247,64 +1305,6 @@
           "bb": 0.9967076095019581,
           "hr": 1.0,
           "inplay": 1.1422399882646324
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 643396,
-        "name": "Isiah Kiner-Falefa",
-        "pos": "2B",
-        "bat": "R",
-        "throw": "R",
-        "k_rate": 0.14784688995215312,
-        "bb_rate": 0.09501594896331737,
-        "hbp_rate": 0.0,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.3099179206566347,
-        "xb_hit_share": 0.15384615384615385,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.1925000000000001,
-          "bb": 0.8075,
-          "hr": 1.0,
-          "inplay": 0.8675678658132863
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.8075,
-          "bb": 1.151636592530424,
-          "hr": 1.0,
-          "inplay": 1.0643065718214693
-        },
-        "statcast_quality_mult": {},
-        "vs_pitcher_history": {}
-      },
-      {
-        "id": 681508,
-        "name": "Mickey Gasper",
-        "pos": "C",
-        "bat": "S",
-        "throw": "R",
-        "k_rate": 0.23076923076923078,
-        "bb_rate": 0.0,
-        "hbp_rate": 0.02564102564102564,
-        "hr_rate": 0.0,
-        "inplay_hit_rate": 0.41172413793103446,
-        "xb_hit_share": 0.16666666666666666,
-        "vs_pitch_type": {},
-        "vs_pitch_type_hr": {},
-        "platoon_mult_vs_lhp": {
-          "k": 1.130952380952381,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 0.9843383584589616
-        },
-        "platoon_mult_vs_rhp": {
-          "k": 0.9713541666666666,
-          "bb": 1.0,
-          "hr": 1.0,
-          "inplay": 1.006602456728085
         },
         "statcast_quality_mult": {},
         "vs_pitcher_history": {}
@@ -1709,16 +1709,16 @@
   },
   "weather": {
     "source": "statsapi_live_feed",
-    "condition": "",
-    "temperature_f": null,
-    "wind_speed_mph": null,
-    "wind_direction": "unknown",
-    "wind_raw": "",
+    "condition": "Partly Cloudy",
+    "temperature_f": 80.0,
+    "wind_speed_mph": 9.0,
+    "wind_direction": "out",
+    "wind_raw": "9 mph, Out To CF",
     "is_dome": null,
     "multipliers": {
-      "hr_mult": 1.0,
-      "inplay_hit_mult": 1.0,
-      "xb_share_mult": 1.0
+      "hr_mult": 1.03,
+      "inplay_hit_mult": 1.015,
+      "xb_share_mult": 1.008
     }
   },
   "park": {
@@ -1738,8 +1738,8 @@
   },
   "umpire": {
     "source": "statsapi_live_feed",
-    "home_plate_umpire_id": null,
-    "home_plate_umpire_name": "",
+    "home_plate_umpire_id": 605673,
+    "home_plate_umpire_name": "Alex Tosi",
     "called_strike_mult": 1.0,
     "multipliers": {
       "called_strike_mult": 1.0

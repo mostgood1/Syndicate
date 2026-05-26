@@ -628,8 +628,8 @@
             "player_id": 650644,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -727,8 +727,8 @@
             "player_id": 672016,
             "position": "CF",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "D60",
+              "description": "Injured 60-Day"
             }
           },
           {
@@ -738,6 +738,15 @@
             "status": {
               "code": "RM",
               "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Gage Jump",
+            "player_id": 695611,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -999,15 +1008,6 @@
         "added": [],
         "players": [
           {
-            "full_name": "Aaron Civale",
-            "player_id": 650644,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Alika Williams",
             "player_id": 675961,
             "position": "2B",
@@ -1047,6 +1047,15 @@
             "full_name": "Darell Hernaiz",
             "player_id": 687231,
             "position": "3B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Gage Jump",
+            "player_id": 695611,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1274,6 +1283,7 @@
           691777,
           692013,
           695391,
+          695611,
           701762,
           703607,
           800018,
@@ -1287,8 +1297,8 @@
             "player_id": 650644,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "D15",
+              "description": "Injured 15-Day"
             }
           },
           {
@@ -1386,8 +1396,8 @@
             "player_id": 672016,
             "position": "CF",
             "status": {
-              "code": "D10",
-              "description": "Injured 10-Day"
+              "code": "D60",
+              "description": "Injured 60-Day"
             }
           },
           {
@@ -1397,6 +1407,15 @@
             "status": {
               "code": "RM",
               "description": "Reassigned to Minors"
+            }
+          },
+          {
+            "full_name": "Gage Jump",
+            "player_id": 695611,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1662,7 +1681,6 @@
           641680,
           643410,
           643446,
-          650644,
           660761,
           663687,
           665622,
@@ -1680,19 +1698,11 @@
           687231,
           687515,
           691016,
+          695611,
           701762,
           703607
         ],
         "players": [
-          {
-            "full_name": "Aaron Civale",
-            "player_id": 650644,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
           {
             "full_name": "Alika Williams",
             "player_id": 675961,
@@ -1733,6 +1743,15 @@
             "full_name": "Darell Hernaiz",
             "player_id": 687231,
             "position": "3B",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Gage Jump",
+            "player_id": 695611,
+            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1925,5 +1944,5 @@
   },
   "team_abbr": "ATH",
   "team_id": 133,
-  "updated_at": "2026-05-26T11:39:16.672040"
+  "updated_at": "2026-05-26T17:15:06.001096"
 }

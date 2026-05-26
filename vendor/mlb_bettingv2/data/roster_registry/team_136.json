@@ -799,8 +799,8 @@
             "player_id": 642100,
             "position": "P",
             "status": {
-              "code": "D15",
-              "description": "Injured 15-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -943,8 +943,8 @@
             "player_id": 689546,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1125,6 +1125,15 @@
             }
           },
           {
+            "full_name": "Gabe Speier",
+            "player_id": 642100,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
             "full_name": "George Kirby",
             "player_id": 669923,
             "position": "P",
@@ -1218,15 +1227,6 @@
             "full_name": "Mitch Garver",
             "player_id": 641598,
             "position": "C",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
-            "full_name": "Nick Davila",
-            "player_id": 689546,
-            "position": "P",
             "status": {
               "code": "A",
               "description": "Active"
@@ -1478,8 +1478,8 @@
             "player_id": 642100,
             "position": "P",
             "status": {
-              "code": "D15",
-              "description": "Injured 15-Day"
+              "code": "A",
+              "description": "Active"
             }
           },
           {
@@ -1622,8 +1622,8 @@
             "player_id": 689546,
             "position": "P",
             "status": {
-              "code": "A",
-              "description": "Active"
+              "code": "RM",
+              "description": "Reassigned to Minors"
             }
           },
           {
@@ -1718,6 +1718,7 @@
           640902,
           641487,
           641598,
+          642100,
           645302,
           647304,
           660825,
@@ -1733,7 +1734,6 @@
           681867,
           682243,
           686527,
-          689546,
           693433,
           695380,
           702284,
@@ -1824,6 +1824,15 @@
           {
             "full_name": "Emerson Hancock",
             "player_id": 676106,
+            "position": "P",
+            "status": {
+              "code": "A",
+              "description": "Active"
+            }
+          },
+          {
+            "full_name": "Gabe Speier",
+            "player_id": 642100,
             "position": "P",
             "status": {
               "code": "A",
@@ -1930,15 +1939,6 @@
             }
           },
           {
-            "full_name": "Nick Davila",
-            "player_id": 689546,
-            "position": "P",
-            "status": {
-              "code": "A",
-              "description": "Active"
-            }
-          },
-          {
             "full_name": "Patrick Wisdom",
             "player_id": 621550,
             "position": "3B",
@@ -1981,5 +1981,5 @@
   },
   "team_abbr": "SEA",
   "team_id": 136,
-  "updated_at": "2026-05-26T11:39:16.755798"
+  "updated_at": "2026-05-26T17:15:06.026813"
 }

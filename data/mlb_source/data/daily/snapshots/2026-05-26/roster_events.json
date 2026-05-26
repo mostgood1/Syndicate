@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-05-26",
-  "generated_at": "2026-05-26T11:28:03.355391",
+  "generated_at": "2026-05-26T17:15:06.425059",
   "include_baseline": false,
   "teams": {
     "108": {
@@ -46,7 +46,7 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-05-25",
-          "n_players": 46,
+          "n_players": 45,
           "n_added": 0,
           "n_removed": 0
         },
@@ -118,7 +118,7 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-05-25",
-          "n_players": 39,
+          "n_players": 40,
           "n_added": 0,
           "n_removed": 0
         },
@@ -210,13 +210,7 @@
           "prev_date": "2026-05-25",
           "n_players": 49,
           "n_added": 0,
-          "n_removed": 1,
-          "added": [],
-          "removed": [],
-          "added_ids": [],
-          "removed_ids": [
-            669289
-          ]
+          "n_removed": 0
         },
         "active": {
           "prev_date": "2026-05-25",
@@ -250,7 +244,7 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-05-25",
-          "n_players": 45,
+          "n_players": 46,
           "n_added": 0,
           "n_removed": 0
         },
@@ -268,7 +262,7 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-05-25",
-          "n_players": 41,
+          "n_players": 42,
           "n_added": 0,
           "n_removed": 0
         },
@@ -364,7 +358,7 @@
         },
         "active": {
           "prev_date": "2026-05-25",
-          "n_players": 25,
+          "n_players": 26,
           "n_added": 0,
           "n_removed": 0
         }
@@ -376,7 +370,7 @@
       "roster_types": {
         "40Man": {
           "prev_date": "2026-05-25",
-          "n_players": 44,
+          "n_players": 45,
           "n_added": 0,
           "n_removed": 0
         },
@@ -419,37 +413,8 @@
         "active": {
           "prev_date": "2026-05-25",
           "n_players": 26,
-          "n_added": 2,
-          "n_removed": 2,
-          "added": [
-            {
-              "full_name": "Nathan Lukes",
-              "player_id": 664770,
-              "position": "RF",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            },
-            {
-              "full_name": "Tanner Andrews",
-              "player_id": 681084,
-              "position": "P",
-              "status": {
-                "code": "A",
-                "description": "Active"
-              }
-            }
-          ],
-          "removed": [],
-          "added_ids": [
-            664770,
-            681084
-          ],
-          "removed_ids": [
-            656302,
-            676914
-          ]
+          "n_added": 0,
+          "n_removed": 0
         }
       }
     },
