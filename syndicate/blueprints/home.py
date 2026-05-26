@@ -330,6 +330,349 @@ def _prop_metric_text(value: Any) -> str | None:
     return raw or None
 
 
+def _metric_value(metrics: list[dict[str, Any]], labels: list[str]) -> str | None:
+    wanted = [label.strip().lower() for label in labels if label.strip()]
+    for metric in metrics:
+        if not isinstance(metric, dict):
+            continue
+        label = str(metric.get("label") or "").strip().lower()
+        if not label:
+            continue
+        if any(label == item or item in label for item in wanted):
+            value = _prop_metric_text(metric.get("value"))
+            if value:
+                return value
+    return None
+
+
+def _pct_number(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    match = re.search(r"([+-]?\d+(?:\.\d+)?)\s*%", text)
+    if match:
+        try:
+            return float(match.group(1))
+        except Exception:
+            return None
+    numeric = _numeric_value(value)
+    if numeric is None:
+        return None
+    if abs(numeric) <= 1.0:
+        numeric *= 100.0
+    return float(numeric)
+
+
+def _format_home_timestamp(epoch: float | None) -> str:
+    try:
+        if not epoch:
+            return "-"
+        return datetime.fromtimestamp(float(epoch)).strftime("%I:%M %p").lstrip("0")
+    except Exception:
+        return "-"
+
+
+def _first_present_text(*values: Any) -> str | None:
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return None
+
+
+def _market_label_from_pick_text(text: str) -> str:
+    lowered = text.lower()
+    if "total" in lowered or lowered.startswith("over") or lowered.startswith("under"):
+        return "Total"
+    if "+1.5" in lowered or "-1.5" in lowered or "spread" in lowered or "puck" in lowered:
+        return "Spread"
+    if "moneyline" in lowered or lowered.startswith("ml"):
+        return "Moneyline"
+    if "first 10" in lowered:
+        return "First 10"
+    return "Game bet"
+
+
+def _game_row_updated_epoch(game: dict[str, Any], fallback_epoch: float) -> float:
+    for value in [
+        game.get("updated_at"),
+        game.get("updatedAt"),
+        game.get("generatedAt"),
+        game.get("generated_at"),
+        game.get("lastSeenAt"),
+        game.get("last_seen_at"),
+    ]:
+        parsed = _parse_timestamp_epoch(value)
+        if parsed > 0:
+            return parsed
+    return fallback_epoch
+
+
+def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, detail: str | None = None, fallback_epoch: float) -> None:
+    pick_text = _safe_text(pick, "-")
+    if pick_text == "-":
+        return
+    line_text = _prop_metric_text(line) if line is not None else None
+    odds_text = _prop_metric_text(odds) if odds is not None else None
+    edge_text = _pct_text(edge) if edge is not None and _numeric_value(edge) is not None else _safe_text(edge, "-") if edge is not None else "-"
+    confidence_text = _pct_text(confidence) if confidence is not None and _numeric_value(confidence) is not None else _safe_text(confidence, "-") if confidence is not None else "-"
+    edge_value = _pct_number(edge_text)
+    confidence_value = _pct_number(confidence_text)
+    updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
+    href = str(game.get("href") or sport.get("hub_href") or sport.get("primary_href") or "").strip() or None
+    candidates.append(
+        {
+            "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
+            "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
+            "matchup": _sport_matchup(game),
+            "market": _safe_text(market, _market_label_from_pick_text(pick_text)),
+            "pick": pick_text,
+            "line": line_text or "-",
+            "odds": odds_text or "-",
+            "edge": edge_text,
+            "confidence": confidence_text,
+            "updated_at": _format_home_timestamp(updated_epoch),
+            "updated_epoch": updated_epoch,
+            "detail": _safe_text(detail or game.get("summary") or game.get("detail"), "No game-bet summary available."),
+            "href": href,
+            "href_label": _safe_text(game.get("href_label"), "Open game"),
+            "score": float((edge_value or 0.0) * 1.8 + (confidence_value or 0.0) + (20.0 if odds_text and odds_text != "-" else 0.0)),
+        }
+    )
+
+
+def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], *, fallback_epoch: float) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    game_recs = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
+    for row in game_recs:
+        if not isinstance(row, dict):
+            continue
+        _append_game_bet_candidate(
+            candidates,
+            sport=sport,
+            game=game,
+            market=_first_present_text(row.get("market_label"), row.get("market"), row.get("label")) or "Game bet",
+            pick=_first_present_text(row.get("display_pick"), row.get("selection"), row.get("pick")) or "-",
+            line=row.get("line") if row.get("line") is not None else row.get("market_line"),
+            odds=_first_present_text(row.get("odds"), row.get("price"), row.get("american_odds")),
+            edge=row.get("ev_pct") if row.get("ev_pct") is not None else row.get("edge"),
+            confidence=row.get("p_win") if row.get("p_win") is not None else row.get("confidence"),
+            detail=_first_present_text(row.get("summary"), row.get("reason"), game.get("summary")),
+            fallback_epoch=fallback_epoch,
+        )
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    if betting:
+        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Away ML", odds=betting.get("away_ml"), edge=betting.get("away_ml_ev"), confidence=betting.get("p_away_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch)
+        _append_game_bet_candidate(candidates, sport=sport, game=game, market="Moneyline", pick=f"Home ML", odds=betting.get("home_ml"), edge=betting.get("home_ml_ev"), confidence=betting.get("p_home_win"), detail=game.get("summary"), fallback_epoch=fallback_epoch)
+        if betting.get("total") is not None:
+            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Total", pick=f"Over { _prop_metric_text(betting.get('total')) or '-' }", line=betting.get("total"), edge=betting.get("over_ev"), confidence=betting.get("p_total_over"), detail=game.get("summary"), fallback_epoch=fallback_epoch)
+            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Total", pick=f"Under { _prop_metric_text(betting.get('total')) or '-' }", line=betting.get("total"), edge=betting.get("under_ev"), confidence=betting.get("p_total_under"), detail=game.get("summary"), fallback_epoch=fallback_epoch)
+        if betting.get("home_puck_line") is not None or betting.get("away_puck_line") is not None:
+            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Away { _prop_metric_text(betting.get('away_puck_line')) or '' }".strip(), line=betting.get("away_puck_line"), edge=betting.get("away_puck_line_ev"), detail=game.get("summary"), fallback_epoch=fallback_epoch)
+            _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Home { _prop_metric_text(betting.get('home_puck_line')) or '' }".strip(), line=betting.get("home_puck_line"), edge=betting.get("home_puck_line_ev"), detail=game.get("summary"), fallback_epoch=fallback_epoch)
+    top_rows = game.get("shared_top_play_rows") if isinstance(game.get("shared_top_play_rows"), list) else []
+    for row in top_rows:
+        if not isinstance(row, dict):
+            continue
+        name = _safe_text(row.get("name"), "-")
+        if name == "-":
+            continue
+        edge_match = re.search(r"([+-]?\d+(?:\.\d+)?)%", name)
+        odds_match = re.search(r"at\s+([+-]?\d+(?:\.\d+)?)", name, re.IGNORECASE)
+        _append_game_bet_candidate(
+            candidates,
+            sport=sport,
+            game=game,
+            market=_safe_text(row.get("heading"), _market_label_from_pick_text(name)),
+            pick=name,
+            odds=odds_match.group(1) if odds_match else None,
+            edge=edge_match.group(1) if edge_match else None,
+            detail=row.get("detail"),
+            fallback_epoch=fallback_epoch,
+        )
+    lenses = game.get("gameLens") if isinstance(game.get("gameLens"), list) else []
+    for lens in lenses:
+        if not isinstance(lens, dict) or bool(lens.get("closed")):
+            continue
+        lens_label = _safe_text(lens.get("label"), "Live")
+        markets = lens.get("markets") if isinstance(lens.get("markets"), dict) else {}
+        for market_key, market_label in [("moneyline", "Moneyline"), ("spread", "Spread"), ("total", "Total")]:
+            market = markets.get(market_key) if isinstance(markets.get(market_key), dict) else {}
+            pick = _first_present_text(market.get("pick"), market.get("selection"))
+            if not pick:
+                continue
+            _append_game_bet_candidate(
+                candidates,
+                sport=sport,
+                game=game,
+                market=f"{lens_label} {market_label}",
+                pick=pick,
+                line=market.get("line") if market_key == "total" else market.get("homeLine"),
+                odds=_first_present_text(market.get("odds"), market.get("price")),
+                edge=market.get("edge"),
+                confidence=market.get("p_win"),
+                detail=game.get("summary"),
+                fallback_epoch=fallback_epoch,
+            )
+    filtered = [row for row in candidates if row.get("edge") not in {"-", None} or row.get("confidence") not in {"-", None}]
+    return sorted(filtered or candidates, key=lambda row: row.get("score", 0.0), reverse=True)
+
+
+def _dashboard_prop_count(sport: dict[str, Any]) -> int:
+    props_bar = sport.get("props_bar") if isinstance(sport.get("props_bar"), dict) else {}
+    base_count = len(props_bar.get("items") or []) if isinstance(props_bar.get("items"), list) else 0
+    if str(sport.get("slug") or "").strip().lower() != "mlb":
+        return base_count
+    mlb_home = sport.get("mlb_home") if isinstance(sport.get("mlb_home"), dict) else {}
+    counts = [
+        base_count,
+        len(mlb_home.get("live_props_items") or []) if isinstance(mlb_home.get("live_props_items"), list) else 0,
+        len(mlb_home.get("pregame_props_items") or []) if isinstance(mlb_home.get("pregame_props_items"), list) else 0,
+        len(mlb_home.get("hr_targets_items") or []) if isinstance(mlb_home.get("hr_targets_items"), list) else 0,
+    ]
+    return max(counts)
+
+
+def _build_game_watch_row(sport: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
+    status_badge = _safe_text(item.get("status_badge"), "Tracked")
+    detail = _safe_text(item.get("detail"), "Board update pending")
+    signals = [str(value).strip() for value in (item.get("signals") or []) if str(value).strip()]
+    chips = [str(value).strip() for value in (item.get("market_chips") or []) if str(value).strip()]
+    primary_signal = signals[0] if signals else (chips[0] if chips else "No market signal surfaced")
+    confidence = _pct_number(primary_signal)
+    live_flag = _is_liveish(status_badge, detail)
+    return {
+        "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
+        "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
+        "matchup": _safe_text(item.get("matchup"), "Game"),
+        "status": status_badge,
+        "detail": detail,
+        "signal": primary_signal,
+        "summary": _safe_text(item.get("summary"), "No board read surfaced."),
+        "href": str(item.get("href") or sport.get("hub_href") or "").strip() or None,
+        "href_label": _safe_text(item.get("href_label"), "Open board"),
+        "is_live": live_flag,
+        "score": (80.0 if live_flag else 25.0) + float(len(signals) * 8 + len(chips) * 4) + float(confidence or 0.0),
+    }
+
+
+def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, default_surface: str) -> dict[str, Any]:
+    heading = _safe_text(item.get("heading"), default_surface)
+    detail = _safe_text(item.get("detail"), "No prop summary available.")
+    confidence = _safe_text(item.get("confidence") or item.get("value"), "-")
+    edge = _safe_text(item.get("edge"), "-")
+    explicit_live = item.get("is_live")
+    if isinstance(explicit_live, bool):
+        live_flag = explicit_live
+    else:
+        live_tokens = [
+            heading.lower(),
+            str(default_surface or "").strip().lower(),
+            detail.lower(),
+        ]
+        live_flag = any(
+            token
+            for token in live_tokens
+            if any(marker in token for marker in ["live props", "prop live", "live lens", "in-game", "live audit"])
+        )
+    confidence_value = _pct_number(confidence)
+    edge_value = _pct_number(edge)
+    score = float((confidence_value or 0.0) + (edge_value or 0.0) * 1.5 + (55.0 if live_flag else 20.0))
+    return {
+        "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
+        "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
+        "surface": heading,
+        "name": _safe_text(item.get("name"), "Prop"),
+        "market": _safe_text(item.get("market"), heading),
+        "pick": _safe_text(item.get("pick"), detail.split("|")[0].strip() if detail else heading),
+        "matchup": _safe_text(item.get("matchup"), "-"),
+        "actual": _safe_text(item.get("actual"), "-"),
+        "projected": _safe_text(item.get("projected"), "-"),
+        "line": _safe_text(item.get("line"), "-"),
+        "odds": _safe_text(item.get("odds"), "-"),
+        "edge": edge,
+        "confidence": confidence,
+        "detail": detail,
+        "href": str(item.get("href") or sport.get("hub_href") or "").strip() or None,
+        "is_live": live_flag,
+        "score": score,
+    }
+
+
+def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str, polled_at: float) -> dict[str, Any]:
+    live_watch: list[dict[str, Any]] = []
+    game_bets: list[dict[str, Any]] = []
+    prop_rows: list[dict[str, Any]] = []
+    sport_summaries: list[dict[str, Any]] = []
+    for sport in overview:
+        if not isinstance(sport, dict):
+            continue
+        game_bar = sport.get("game_bar") if isinstance(sport.get("game_bar"), dict) else {}
+        props_bar = sport.get("props_bar") if isinstance(sport.get("props_bar"), dict) else {}
+        game_items = game_bar.get("items") if isinstance(game_bar.get("items"), list) else []
+        dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
+        prop_items = props_bar.get("items") if isinstance(props_bar.get("items"), list) else []
+        for item in game_items:
+            if isinstance(item, dict):
+                live_watch.append(_build_game_watch_row(sport, item))
+        for game in dashboard_games:
+            if isinstance(game, dict):
+                game_bets.extend(_game_bet_candidates_from_game(sport, game, fallback_epoch=polled_at)[:3])
+        for item in prop_items:
+            if isinstance(item, dict):
+                prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface=_safe_text(props_bar.get("title"), "Props")))
+        if str(sport.get("slug") or "").strip().lower() == "mlb":
+            mlb_home = sport.get("mlb_home") if isinstance(sport.get("mlb_home"), dict) else {}
+            for item in mlb_home.get("live_props_items") if isinstance(mlb_home.get("live_props_items"), list) else []:
+                if isinstance(item, dict):
+                    prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="Live props"))
+            for item in mlb_home.get("pregame_props_items") if isinstance(mlb_home.get("pregame_props_items"), list) else []:
+                if isinstance(item, dict):
+                    prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="Pregame props"))
+            for item in mlb_home.get("hr_targets_items") if isinstance(mlb_home.get("hr_targets_items"), list) else []:
+                if isinstance(item, dict):
+                    prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="HR targets"))
+        sport_slug = _safe_text(sport.get("slug"), "").lower()
+        summary_signals = next((row.get("signal") for row in live_watch if row.get("sport_slug") == sport_slug), "-")
+        top_game_bet = next((row for row in game_bets if row.get("sport_slug") == sport_slug), None)
+        top_prop = next((row for row in prop_rows if row.get("sport_slug") == _safe_text(sport.get("slug"), "").lower()), None)
+        sport_summaries.append(
+            {
+                "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
+                "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
+                "context": _safe_text(sport.get("context_label"), selected_date),
+                "status": _safe_text(sport.get("status"), "Tracked"),
+                "is_live": bool(sport.get("active_today")),
+                "games": len(game_items),
+                "props": _dashboard_prop_count(sport),
+                "best_signal": summary_signals,
+                "top_game_bet": top_game_bet.get("pick") if isinstance(top_game_bet, dict) else "-",
+                "top_prop": top_prop.get("name") if isinstance(top_prop, dict) else "-",
+                "hub_href": str(sport.get("hub_href") or sport.get("primary_href") or "").strip() or None,
+            }
+        )
+
+    live_watch = sorted(live_watch, key=lambda row: row.get("score", 0.0), reverse=True)
+    game_bets = sorted(game_bets, key=lambda row: row.get("score", 0.0), reverse=True)
+    prop_rows = sorted(prop_rows, key=lambda row: row.get("score", 0.0), reverse=True)
+    live_props = [row for row in prop_rows if bool(row.get("is_live"))]
+    live_sports = sum(1 for sport in overview if bool((sport or {}).get("active_today")))
+    summary_cards = [
+        {"label": "Board date", "value": selected_date, "meta": f"Polled {_format_home_timestamp(polled_at)}"},
+        {"label": "Live sports", "value": str(live_sports), "meta": f"{len(live_watch)} game reads surfaced"},
+        {"label": "Game bets", "value": str(len(game_bets)), "meta": "Structured sides and totals surfaced"},
+        {"label": "Props surfaced", "value": str(len(prop_rows)), "meta": f"{len(live_props)} live props in focus"},
+        {"label": "Sports tracked", "value": str(len(overview)), "meta": "Cross-sport board"},
+    ]
+    return {
+        "summary_cards": summary_cards,
+        "top_game_bets": game_bets[:12],
+        "live_watch": live_watch[:10],
+        "top_props": prop_rows[:14],
+        "sport_summaries": sport_summaries,
+    }
+
+
 def _parse_timestamp_epoch(value: Any) -> float:
     text = str(value or "").strip()
     if not text:
@@ -485,6 +828,7 @@ def _prop_item_from_rank_card(card: dict[str, Any], *, fallback_href: str | None
     meta = _safe_text(card.get("meta"), "Props board")
     detail = _safe_text(card.get("summary"), "No prop summary available.")
     badge = str(card.get("badge") or "").strip()
+    metrics = card.get("metrics") if isinstance(card.get("metrics"), list) else []
     value = badge or _safe_text((((card.get("metrics") or [None])[0] or {}).get("value") if isinstance(card.get("metrics"), list) else None), "Top play")
     href = str(card.get("href") or fallback_href or "").strip() or None
     return {
@@ -493,6 +837,15 @@ def _prop_item_from_rank_card(card: dict[str, Any], *, fallback_href: str | None
         "name": title,
         "detail": detail,
         "value": value,
+        "is_live": False,
+        "market": _metric_value(metrics, ["market", "stat"]),
+        "pick": badge or _metric_value(metrics, ["pick", "lean", "selection", "side"]),
+        "actual": _metric_value(metrics, ["actual"]),
+        "projected": _metric_value(metrics, ["projected", "projection", "model", "mean", "median"]),
+        "line": _metric_value(metrics, ["line", "market line", "threshold"]),
+        "odds": _metric_value(metrics, ["odds", "price"]),
+        "edge": _metric_value(metrics, ["edge", "ev"]),
+        "confidence": _metric_value(metrics, ["confidence", "win prob", "probability", "hit rate"]),
         "href": href,
     }
 
@@ -660,9 +1013,16 @@ def _prop_rows_from_nhl_cards(cards: list[dict[str, Any]], *, fallback_href: str
                 "matchup": f"{team} vs {opp}",
                 "heading": "Live props",
                 "name": player,
+                "is_live": True,
+                "market": market,
+                "pick": side,
                 "detail": f"{side} {line} {market} | {_safe_text(card.get('reason_summary'), 'No stored prop summary available.')}",
                 "value": prob_text,
+                "projected": _prop_metric_text(card.get("projection") if card.get("projection") is not None else card.get("mean")),
                 "line": line,
+                "odds": _prop_metric_text(card.get("odds") if card.get("odds") is not None else card.get("price")),
+                "edge": _pct_text(card.get("edge") if card.get("edge") is not None else card.get("ev")),
+                "confidence": prob_text,
                 "href": fallback_href,
             }
         )
@@ -693,11 +1053,17 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
                 "matchup": matchup,
                 "heading": "Live props",
                 "name": player,
+                "is_live": True,
+                "market": market,
+                "pick": selection,
                 "detail": f"{selection} {line} {market}",
                 "value": value,
                 "actual": _prop_metric_text(prop.get("actual")),
                 "projected": _prop_metric_text(prop.get("liveProjection") if prop.get("liveProjection") is not None else prop.get("modelMean")),
                 "line": _prop_metric_text(prop.get("line")),
+                "odds": _prop_metric_text(prop.get("odds")),
+                "edge": _pct_text(prop.get("estimatedEdge") if prop.get("estimatedEdge") is not None else prop.get("ev")),
+                "confidence": _pct_text(probability),
                 "href": href,
             }
             rank = (
@@ -755,11 +1121,17 @@ def _prop_rows_from_nba_live_lens(games: list[dict[str, Any]], *, fallback_href:
                 "matchup": str(row.get("__matchup") or "").strip() or _sport_matchup(game),
                 "heading": heading,
                 "name": f"{player} ({team})",
+                "is_live": True,
+                "market": market,
+                "pick": side,
                 "detail": f"{side} {line} {market} | {_safe_text(row.get('basketball_summary') or row.get('shape_summary'), 'Live prop signal')}",
                 "value": value,
                 "actual": _prop_metric_text(row.get("actual")),
                 "projected": _prop_metric_text(row.get("sim_mu_adjusted") if row.get("sim_mu_adjusted") is not None else row.get("sim_mu")),
                 "line": _prop_metric_text(row.get("line_live") if row.get("line_live") is not None else row.get("line")),
+                "odds": _prop_metric_text(row.get("odds_live") if row.get("odds_live") is not None else row.get("odds")),
+                "edge": _pct_text(row.get("ev") if row.get("ev") is not None else row.get("edge")),
+                "confidence": probability,
                 "href": fallback_href or (str(game.get("href") or "").strip() or None),
             }
         )
@@ -1406,6 +1778,7 @@ def _build_sport_overview(
         "show_on_home": active_today,
         "game_bar": game_bar,
         "props_bar": props_bar,
+        "dashboard_games": home_games,
     }
     if slug == "mlb":
         overview["mlb_home"] = {
@@ -1504,10 +1877,13 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
         }
     sports = current_app.config["SYNDICATE_SPORTS"]
     overview = build_home_overview(sports, selected_date=effective_date, force_refresh=force_refresh)
+    polled_at = time.time()
+    dashboard = _build_home_dashboard(overview, selected_date=effective_date, polled_at=polled_at)
     payload = {
         "sports": overview,
-        "html": render_template("shared/_home_sport_stack.html", sports=overview),
-        "polled_at": time.time(),
+        "dashboard": dashboard,
+        "html": render_template("shared/_home_dashboard.html", sports=overview, dashboard=dashboard),
+        "polled_at": polled_at,
     }
     _HOME_PAYLOAD_CACHE[cache_key] = (time.monotonic(), payload)
     return dict(payload)
@@ -1519,8 +1895,9 @@ def home():
     return render_template(
         "home.html",
         sports=payload["sports"],
+        dashboard=payload["dashboard"],
         tracker_sports=current_app.config["SYNDICATE_SPORTS"],
-        show_app_header=False,
+        show_app_header=True,
         page_body_class="syndicate-home-page",
         page_shell_class="syndicate-home-shell",
     )
@@ -1533,6 +1910,7 @@ def api_home():
         {
             "ok": True,
             "sports": payload["sports"],
+            "dashboard": payload["dashboard"],
             "html": payload["html"],
             "polled_at": payload["polled_at"],
         }

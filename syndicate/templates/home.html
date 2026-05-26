@@ -15,7 +15,6 @@
       gap: 1rem;
     }
 
-    .home-topbar,
     .sport-stack-card {
       border: 1px solid rgba(132, 166, 196, 0.14);
       border-radius: 22px;
@@ -23,67 +22,35 @@
       box-shadow: var(--cards-shadow);
     }
 
-    .home-topbar {
+    .home-controls {
       display: flex;
       justify-content: space-between;
       gap: 1rem;
-      align-items: center;
+      align-items: end;
+      flex-wrap: wrap;
       padding: 1rem 1.2rem;
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(12, 24, 39, 0.96), rgba(7, 15, 26, 0.99));
+      box-shadow: var(--cards-shadow);
     }
 
-    .home-topbar__brand {
+    .home-controls__copy {
       display: grid;
       gap: 0.2rem;
+      max-width: 52rem;
     }
 
-    .home-topbar__controls {
-      display: grid;
-      gap: 0.7rem;
-      justify-items: end;
-    }
-
-    .home-topbar__title {
+    .home-controls__title {
       margin: 0;
       font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
-      font-size: clamp(1.25rem, 2vw, 1.7rem);
+      font-size: clamp(1.15rem, 1.8vw, 1.45rem);
       letter-spacing: -0.04em;
     }
 
-    .home-topbar__meta {
+    .home-controls__meta {
       color: rgba(237, 244, 251, 0.68);
       font-size: 0.92rem;
-    }
-
-    .home-topbar__tracker {
-      display: flex;
-      gap: 0.45rem;
-      flex-wrap: wrap;
-      margin-top: 0.4rem;
-    }
-
-    .home-topbar__tracker-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      min-height: 28px;
-      padding: 0.12rem 0.62rem;
-      border-radius: 999px;
-      border: 1px solid rgba(132, 166, 196, 0.14);
-      background: rgba(255, 255, 255, 0.05);
-      color: rgba(237, 244, 251, 0.78);
-      font-size: 0.78rem;
-    }
-
-    .home-topbar__nav {
-      display: flex;
-      gap: 0.55rem;
-      flex-wrap: wrap;
-      justify-content: flex-end;
     }
 
     .home-topbar__date-form {
@@ -137,11 +104,6 @@
       background: rgba(255, 255, 255, 0.05);
       color: rgba(237, 244, 251, 0.78);
       font-size: 0.82rem;
-    }
-
-    .home-topbar__nav .cards-nav-pill {
-      min-height: 36px;
-      padding: 0 0.9rem;
     }
 
     .sport-stack {
@@ -593,18 +555,243 @@
       font-size: 0.86rem;
     }
 
+    .home-dashboard {
+      display: grid;
+      gap: 0.95rem;
+    }
+
+    .home-summary-grid,
+    .home-sport-summary-grid {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .home-summary-card,
+    .home-decision-card,
+    .home-sport-summary-card {
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(12, 24, 39, 0.96), rgba(7, 15, 26, 0.99));
+      box-shadow: var(--cards-shadow);
+    }
+
+    .home-summary-card {
+      display: grid;
+      gap: 0.24rem;
+      padding: 0.9rem 1rem;
+    }
+
+    .home-summary-card__label {
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(154, 243, 222, 0.82);
+    }
+
+    .home-summary-card__value {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: rgba(244, 246, 255, 0.96);
+      letter-spacing: -0.04em;
+    }
+
+    .home-summary-card__meta,
+    .home-decision-card__meta,
+    .home-prop-table__confidence,
+    .home-sport-summary-card__line {
+      color: rgba(191, 208, 223, 0.84);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .home-decision-grid {
+      display: grid;
+      gap: 0.95rem;
+      grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    }
+
+    .home-decision-card,
+    .home-sport-summary-card {
+      display: grid;
+      gap: 0.8rem;
+      padding: 0.95rem 1rem 1rem;
+    }
+
+    .home-decision-card__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.8rem;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+
+    .home-decision-card__title {
+      margin: 0;
+      font-size: 1.02rem;
+    }
+
+    .home-opportunity-list {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .home-opportunity-row {
+      display: grid;
+      gap: 0.35rem;
+      padding: 0.78rem 0.82rem;
+      border-radius: 14px;
+      border: 1px solid rgba(132, 166, 196, 0.12);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .home-opportunity-row__eyebrow {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .home-opportunity-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 0.52rem;
+      border-radius: 999px;
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(237, 244, 251, 0.82);
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .home-opportunity-pill--sport {
+      color: rgba(154, 243, 222, 0.92);
+    }
+
+    .home-opportunity-pill--live {
+      color: #08131f;
+      background: linear-gradient(135deg, #9af3de, #ffbf69);
+      border-color: transparent;
+    }
+
+    .home-opportunity-row__headline,
+    .home-prop-table__player {
+      color: rgba(244, 246, 255, 0.96);
+      font-size: 0.96rem;
+      font-weight: 700;
+    }
+
+    .home-opportunity-row__subline,
+    .home-prop-table__market,
+    .home-prop-table__matchup {
+      color: rgba(191, 208, 223, 0.9);
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .home-opportunity-row__signal {
+      color: rgba(255, 219, 165, 0.94);
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .home-opportunity-row__summary,
+    .home-prop-table__detail {
+      color: rgba(237, 244, 251, 0.76);
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+
+    .home-opportunity-row__link {
+      color: rgba(154, 243, 222, 0.92);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .home-prop-table {
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .home-game-table {
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .home-game-table__head,
+    .home-game-table__row,
+    .home-prop-table__head,
+    .home-prop-table__row {
+      display: grid;
+      gap: 0.65rem;
+      grid-template-columns: minmax(0, 2.8fr) repeat(5, minmax(66px, 0.72fr));
+      align-items: start;
+    }
+
+    .home-game-table__head,
+    .home-prop-table__head {
+      padding: 0 0.2rem;
+      color: rgba(154, 243, 222, 0.82);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .home-game-table__row,
+    .home-prop-table__row {
+      padding: 0.78rem 0.82rem;
+      border-radius: 14px;
+      border: 1px solid rgba(132, 166, 196, 0.12);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .home-game-table__cell,
+    .home-prop-table__cell {
+      color: rgba(244, 246, 255, 0.92);
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+
+    .home-game-table__cell--primary,
+    .home-prop-table__cell--primary {
+      display: grid;
+      gap: 0.26rem;
+      min-width: 0;
+    }
+
+    .home-sport-summary-card__stats {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+
+    .home-sport-summary-card__stats div {
+      display: grid;
+      gap: 0.14rem;
+    }
+
+    .home-sport-summary-card__stats span {
+      color: rgba(154, 243, 222, 0.82);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .home-sport-summary-card__stats strong {
+      color: rgba(244, 246, 255, 0.96);
+      font-size: 1.02rem;
+    }
+
     @media (max-width: 780px) {
-      .home-topbar,
+      .home-decision-grid,
+      .home-controls,
       .sport-stack-card__header {
         grid-template-columns: 1fr;
-      }
-
-      .home-topbar__controls {
-        justify-items: stretch;
-      }
-
-      .home-topbar {
-        position: static;
       }
 
       .home-topbar__date-form,
@@ -622,6 +809,21 @@
         width: min(19rem, calc(100vw - 5rem));
         flex-basis: min(19rem, calc(100vw - 5rem));
       }
+
+      .home-game-table__head,
+      .home-prop-table__head {
+        display: none;
+      }
+
+      .home-game-table__row,
+      .home-prop-table__row {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .home-game-table__cell--primary,
+      .home-prop-table__cell--primary {
+        grid-column: 1 / -1;
+      }
     }
   </style>
 {% endblock %}
@@ -629,60 +831,34 @@
 {% block content %}
   <section class="home-board">
     {% set selected_home_date = request.args.get('date', '') %}
-    {% set home_href = '/?date=' ~ selected_home_date if selected_home_date else '/' %}
     {% set admin_token = request.args.get('admin_token', '') %}
     {% set dated_home_reset_href = '/?admin_token=' ~ admin_token if admin_token else '/' %}
-    <header class="home-topbar" aria-label="Syndicate home navigation">
-      <div class="home-topbar__brand">
+    <section class="home-controls" aria-label="Syndicate home controls">
+      <div class="home-controls__copy">
         <div class="section-label">Syndicate</div>
-        <h1 class="home-topbar__title">Cross-sport daily board</h1>
-        <div class="home-topbar__meta">Horizontal game and props rows with full compact-card scroll for the active slate.</div>
-        {% if tracker_sports %}
-          <div class="home-topbar__tracker" aria-label="Migration tracker summary">
-            {% for sport in tracker_sports %}
-              {% if sport.phase %}
-                <span class="home-topbar__tracker-chip">{{ sport.name }}: {{ sport.phase }}</span>
-              {% endif %}
-            {% endfor %}
-          </div>
+        <h2 class="home-controls__title">Cross-sport daily board</h2>
+        <div class="home-controls__meta">Cross-sport betting dashboard with ranked game reads, prop surfaces, and per-sport action counts.</div>
+      </div>
+      <form class="home-topbar__date-form" method="get" action="/" aria-label="Select home board date">
+        {% if admin_token %}
+          <input type="hidden" name="admin_token" value="{{ admin_token }}">
         {% endif %}
-      </div>
-      <div class="home-topbar__controls">
-        <form class="home-topbar__date-form" method="get" action="/" aria-label="Select home board date">
-          {% if admin_token %}
-            <input type="hidden" name="admin_token" value="{{ admin_token }}">
+        <label class="home-topbar__date-field" for="home-board-date">Board Date</label>
+        <input id="home-board-date" class="home-topbar__date-input" type="date" name="date" value="{{ selected_home_date }}">
+        <div class="home-topbar__date-actions">
+          {% if selected_home_date %}
+            <span class="home-topbar__selection">Selected: {{ selected_home_date }}</span>
           {% endif %}
-          <label class="home-topbar__date-field" for="home-board-date">Board Date</label>
-          <input id="home-board-date" class="home-topbar__date-input" type="date" name="date" value="{{ selected_home_date }}">
-          <div class="home-topbar__date-actions">
-            {% if selected_home_date %}
-              <span class="home-topbar__selection">Selected: {{ selected_home_date }}</span>
-            {% endif %}
-            <button class="cards-nav-pill" type="submit">Load Date</button>
-            {% if selected_home_date %}
-              <a class="cards-nav-pill" href="{{ dated_home_reset_href }}">Use Today</a>
-            {% endif %}
-          </div>
-        </form>
-
-        <nav class="home-topbar__nav" aria-label="Sports">
-          <a class="cards-nav-pill cards-nav-pill--active" href="{{ home_href }}">Home</a>
-          {% for sport in syndicate_sports %}
-            {% set sport_href = sport.primary_href or ('/' ~ sport.slug) %}
-            {% if selected_home_date and sport.slug in ['mlb', 'nba', 'nhl', 'wnba', 'ncaab'] %}
-              {% set sport_href = sport_href ~ '?date=' ~ selected_home_date %}
-            {% endif %}
-            <a class="cards-nav-pill" href="{{ sport_href }}">{{ sport.name }}</a>
-          {% endfor %}
-          {% if admin_token %}
-            <a class="cards-nav-pill" href="/ops/odds-refresh?admin_token={{ admin_token }}">Ops</a>
+          <button class="cards-nav-pill" type="submit">Load Date</button>
+          {% if selected_home_date %}
+            <a class="cards-nav-pill" href="{{ dated_home_reset_href }}">Use Today</a>
           {% endif %}
-        </nav>
-      </div>
-    </header>
+        </div>
+      </form>
+    </section>
 
     <div id="syndicate-home-sport-stack">
-      {% include "shared/_home_sport_stack.html" %}
+      {% include "shared/_home_dashboard.html" %}
     </div>
   </section>
 {% endblock %}

@@ -13,3 +13,38 @@ tmp_*.json
 
 .DS_Store
 Thumbs.db
+
+# Timestamped run outputs are operational artifacts; keep rolling latest files tracked.
+reports/daily_update/*/*/
+!reports/daily_update/latest/
+reports/migration_runs/**
+!reports/migration_runs/mirror_contract_smoke/
+reports/refresh_status/*/*/
+!reports/refresh_status/latest/
+
+# Local mirror caches and scratch outputs should not be committed.
+data/*_source/data/cache/
+data/*_source/source_artifacts/data/cache/
+data/*_source/source_artifacts/
+
+# MLB local mirror generates additional source-side working trees and raw fetch payloads.
+data/mlb_source/data/daily_hitter_props/
+data/mlb_source/data/daily_pitcher_props/
+data/mlb_source/data/manager/
+data/mlb_source/data/park/
+data/mlb_source/data/roster_registry/
+data/mlb_source/data/runtime/
+data/mlb_source/data/statcast/
+data/mlb_source/data/umpire/
+
+# Keep canonical mirrored summaries, but ignore raw snapshot fetch payloads.
+data/mlb_source/data/daily/snapshots/*/oddsapi_*.json
+data/mlb_source/data/daily/snapshots/*/schedule_raw.json
+data/mlb_source/data/daily/snapshots/*/team_rosters_raw.json
+data/mlb_source/data/daily/snapshots/*/injuries_raw.json
+data/mlb_source/data/daily/snapshots/*/meta.json
+data/mlb_source/source_artifacts/data/daily/snapshots/*/oddsapi_*.json
+data/mlb_source/source_artifacts/data/daily/snapshots/*/schedule_raw.json
+data/mlb_source/source_artifacts/data/daily/snapshots/*/team_rosters_raw.json
+data/mlb_source/source_artifacts/data/daily/snapshots/*/injuries_raw.json
+data/mlb_source/source_artifacts/data/daily/snapshots/*/meta.json

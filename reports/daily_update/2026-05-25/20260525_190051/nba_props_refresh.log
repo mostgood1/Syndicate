@@ -1,8 +1,0 @@
-[2026-05-26T00:27:00] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
-Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv with 1074 rows.
-[2026-05-26T00:27:02] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1074)
-[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
-[2026-05-26T00:27:15] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-26 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-26.csv' --regions us
-Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-26.csv with 1973 rows.
-[2026-05-26T00:27:17] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-26.csv (rows=1973)
-[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions

@@ -1,5 +1,0 @@
-[2026-05-25T23:34:12] $ 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-25 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv' --regions us
-Wrote C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-25.csv with 1968 rows.
-[2026-05-25T23:34:14] Materialized processed OddsAPI props snapshot alias: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-25.csv (rows=1968)
-[2026-05-25T23:34:38] bootstrapped local boxscores history via ESPN: C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\boxscores_history.csv
-[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions

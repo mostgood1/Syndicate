@@ -1,9 +1,0 @@
-﻿{
-    "date":  "2026-05-18",
-    "generatedAt":  "2026-05-18T14:03:21.4265642-05:00",
-    "latestRunDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-18\\20260518_135936",
-    "migrationArtifactsDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-18\\20260518_135936\\migration",
-    "moduleTracker":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-18\\20260518_135936\\module_tracker_snapshot.json",
-    "moduleGapReport":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-18\\20260518_135936\\module_tracker_gap_report.txt",
-    "baseUrl":  "http://127.0.0.1:5000"
-}
