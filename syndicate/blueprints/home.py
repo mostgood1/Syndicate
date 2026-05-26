@@ -36,6 +36,9 @@ from syndicate.features.ncaab.sources import available_dates as ncaab_available_
 from syndicate.features.ncaab.sources import build_module_links as build_ncaab_module_links
 from syndicate.features.ncaab.sources import latest_date as ncaab_latest_date
 from syndicate.features.ncaab.sources import season_for_date as ncaab_season_for_date
+from syndicate.features.shared.timezone import central_datetime_from_epoch
+from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.timezone import central_year
 
 
 home_bp = Blueprint("syndicate_home", __name__)
@@ -367,7 +370,7 @@ def _format_home_timestamp(epoch: float | None) -> str:
     try:
         if not epoch:
             return "-"
-        return datetime.fromtimestamp(float(epoch)).strftime("%I:%M %p").lstrip("0")
+        return central_datetime_from_epoch(float(epoch)).strftime("%I:%M %p").lstrip("0")
     except Exception:
         return "-"
 
@@ -714,7 +717,7 @@ def _mlb_feed_live_payload(selected_date: str, game_pk: int) -> dict[str, Any] |
     payload = load_json_or_gz_file(raw_feed_live_path(selected_date, int(game_pk)))
     if isinstance(payload, dict):
         return payload
-    if selected_date == date.today().isoformat():
+    if selected_date == central_today_iso():
         return _fetch_mlb_feed_live(game_pk)
     return None
 
@@ -949,10 +952,10 @@ def _load_home_game_items(
         if slug == "nfl" and week is not None:
             from syndicate.features.nfl.live_lens import build_live_lens_page_context
 
-            context = build_live_lens_page_context(week, season=int(season or date.today().year))
+            context = build_live_lens_page_context(week, season=int(season or central_year()))
             cards = list(context.get("rank_cards") or [])
             if cards:
-                return _compact_game_items_from_rank_cards(cards, fallback_href=f"/nfl/live-lens?season={int(season or date.today().year)}&week={week}"), len(cards)
+                return _compact_game_items_from_rank_cards(cards, fallback_href=f"/nfl/live-lens?season={int(season or central_year())}&week={week}"), len(cards)
         if slug == "ncaaf" and week is not None:
             from syndicate.features.ncaaf.live_lens import build_live_lens_page_context
 
@@ -1819,7 +1822,7 @@ def build_home_overview(
     selected_date: str | None = None,
     force_refresh: bool = False,
 ) -> list[dict[str, Any]]:
-    today_value = str(selected_date or date.today().isoformat()).strip() or date.today().isoformat()
+    today_value = str(selected_date or central_today_iso()).strip() or central_today_iso()
     preserve_requested_date = selected_date is not None
     sport_items = [sport for sport in sports if isinstance(sport, dict)]
     if len(sport_items) <= 1:
@@ -1862,7 +1865,7 @@ def build_home_overview(
 
 
 def _home_payload(*, selected_date: str | None = None, cached_only: bool = False, force_refresh: bool = False) -> dict[str, Any]:
-    effective_date = str(selected_date or date.today().isoformat()).strip() or date.today().isoformat()
+    effective_date = str(selected_date or central_today_iso()).strip() or central_today_iso()
     cache_key = effective_date
     now = time.monotonic()
     cached = _HOME_PAYLOAD_CACHE.get(cache_key)

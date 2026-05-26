@@ -6,12 +6,14 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.timezone import central_today
+
 
 def _parse_iso_date(value: str) -> date:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except Exception:
-        return date.today()
+        return central_today()
 
 
 def build_rank_page_context(

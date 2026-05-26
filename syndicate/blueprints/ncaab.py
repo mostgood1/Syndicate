@@ -20,6 +20,7 @@ from syndicate.features.ncaab.season import build_season_page_context
 from syndicate.features.ncaab.season import build_season_betting_card_api_payload
 from syndicate.features.ncaab.season import build_season_betting_card_page_context
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.timezone import central_today_iso
 
 
 ncaab_bp = Blueprint("syndicate_ncaab", __name__, url_prefix="/ncaab")
@@ -30,7 +31,7 @@ def _selected_date() -> str:
 
 
 def _selected_live_date() -> str:
-    return (request.args.get("date") or "").strip() or date.today().isoformat()
+    return (request.args.get("date") or "").strip() or central_today_iso()
 
 
 def _selected_season_date(season: int) -> str:
@@ -40,7 +41,7 @@ def _selected_season_date(season: int) -> str:
 @ncaab_bp.get("/hub")
 def hub():
     dates = available_dates()
-    launch_date = date.today().isoformat()
+    launch_date = central_today_iso()
     launch_season = season_for_date(launch_date)
     available_date_cards = [
         {"date": selected_date, "season": season_for_date(selected_date)}
@@ -49,7 +50,7 @@ def hub():
     return render_template(
         "ncaab/hub.html",
         launch_date=launch_date,
-        today_date=date.today().isoformat(),
+        today_date=central_today_iso(),
         launch_season=launch_season,
         season_launch_date=default_season_date(launch_season),
         season_dates_count=len(season_dates(launch_season)),

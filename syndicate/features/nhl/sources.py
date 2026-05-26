@@ -11,6 +11,8 @@ from syndicate.features.shared.formatters import format_num
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.formatters import format_signed_price
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.timezone import central_today
+from syndicate.features.shared.timezone import central_today_iso
 
 
 def _source_roots() -> list[Path]:
@@ -37,7 +39,7 @@ def parse_iso_date(value: str) -> date:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except Exception:
-        return date.today()
+        return central_today()
 
 
 def _candidate_paths(date_str: str) -> list[Path]:
@@ -90,7 +92,7 @@ def available_dates() -> list[str]:
 
 
 def default_date() -> str:
-    return date.today().isoformat()
+    return central_today_iso()
 
 
 def format_price(value: Any) -> str:

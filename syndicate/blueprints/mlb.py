@@ -31,6 +31,8 @@ from syndicate.features.mlb.sources import season_betting_card_day_path
 from syndicate.features.mlb.sources import season_eval_manifest_path
 from syndicate.features.mlb.sources import season_frontend_day_path
 from syndicate.features.mlb.top_props import build_top_props_page_context
+from syndicate.features.shared.timezone import central_today
+from syndicate.features.shared.timezone import central_today_iso
 
 
 mlb_bp = Blueprint("syndicate_mlb", __name__, url_prefix="/mlb")
@@ -59,7 +61,7 @@ def _iso_or_today(value: str | None) -> str:
     text = str(value or "").strip()
     if text:
         return text
-    return date.today().isoformat()
+    return central_today_iso()
 
 
 def _path_label(path: Path | None) -> str | None:
@@ -70,7 +72,7 @@ def _app_meta() -> dict:
     return {
         "service": "syndicate",
         "sport": "mlb",
-        "generatedAt": date.today().isoformat(),
+        "generatedAt": central_today_iso(),
     }
 
 
@@ -78,7 +80,7 @@ def _date_nav(selected_date: str) -> dict:
     try:
         parsed = datetime.strptime(selected_date, "%Y-%m-%d").date()
     except Exception:
-        parsed = date.today()
+        parsed = central_today()
     return {
         "prevDate": (parsed - timedelta(days=1)).isoformat(),
         "nextDate": (parsed + timedelta(days=1)).isoformat(),

@@ -37,6 +37,7 @@ from syndicate.features.nba.sources import available_dates
 from syndicate.features.nba.sources import default_date
 from syndicate.features.nba.sources import default_date_for_season
 from syndicate.features.shared.rank_board import build_rank_api_payload
+from syndicate.features.shared.timezone import central_today_iso
 
 
 nba_bp = Blueprint("syndicate_nba", __name__, url_prefix="/nba")
@@ -102,7 +103,7 @@ def _season_window_query_string(season: int | None = None, *, default_days: int 
 def hub():
     dates = available_dates()
     latest_date = dates[-1] if dates else default_date()
-    today_date = date.today().isoformat()
+    today_date = central_today_iso()
     recent_slates = list(reversed(dates[-4:])) if dates else [latest_date]
     summary_stats = [
         {"label": "Stored dates", "value": str(len(dates))},

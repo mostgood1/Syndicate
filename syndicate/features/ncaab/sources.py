@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.timezone import central_today_iso
 
 
 def _source_roots() -> list[Path]:
@@ -75,7 +76,7 @@ def latest_date() -> str:
 
 
 def default_date() -> str:
-    return date.today().isoformat()
+    return central_today_iso()
 
 
 def schedule_dates() -> list[str]:
@@ -135,7 +136,7 @@ def mirrored_season_dates(season: int) -> list[str]:
 
 
 def default_season_date(season: int) -> str:
-    today_value = date.today().isoformat()
+    today_value = central_today_iso()
     if season_for_date(today_value) == int(season):
         return today_value
     dates = season_dates(season)

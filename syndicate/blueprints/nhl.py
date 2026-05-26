@@ -30,6 +30,7 @@ from syndicate.features.nhl.sources import parse_iso_date
 from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import slate_summaries
 from syndicate.features.shared.rank_board import build_rank_api_payload
+from syndicate.features.shared.timezone import central_today
 
 
 nhl_bp = Blueprint("syndicate_nhl", __name__, url_prefix="/nhl")
@@ -103,7 +104,7 @@ def _selected_season_date(season: int) -> str:
 
 
 def _live_lens_daily_accuracy_template_context(selected_date: str) -> dict[str, object]:
-    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else date.today().year
+    season = parse_iso_date(selected_date).year if len(selected_date) == 10 else central_today().year
     return {
         "date": selected_date,
         "season": season,
