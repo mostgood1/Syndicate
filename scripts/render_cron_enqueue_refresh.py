@@ -12,10 +12,15 @@ def _coerce_base_url(explicit: str | None) -> str:
     value = str(explicit or "").strip()
     if value:
         return value.rstrip("/")
+    env_base_url = str(os.environ.get("SYNDICATE_BASE_URL") or "").strip()
+    if env_base_url:
+        if not (env_base_url.startswith("http://") or env_base_url.startswith("https://")):
+            env_base_url = f"https://{env_base_url}"
+        return env_base_url.rstrip("/")
     host = str(os.environ.get("SYNDICATE_WEB_HOST") or "").strip()
     port = str(os.environ.get("SYNDICATE_WEB_PORT") or "").strip()
     if not host:
-        raise ValueError("Missing SYNDICATE_WEB_HOST (or pass --base-url).")
+        raise ValueError("Missing SYNDICATE_BASE_URL or SYNDICATE_WEB_HOST (or pass --base-url).")
     if port:
         return f"http://{host}:{port}"
     return f"http://{host}"
@@ -32,7 +37,7 @@ def _build_payload(args: argparse.Namespace) -> dict[str, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Render cron helper: enqueue Syndicate odds refresh through web API.")
-    parser.add_argument("--base-url", default="", help="Optional explicit Syndicate base URL, e.g. https://syndicate.onrender.com")
+    parser.add_argument("--base-url", default="", help="Optional explicit Syndicate base URL, e.g. https://syndicate.onrender.com. If omitted, uses SYNDICATE_BASE_URL then SYNDICATE_WEB_HOST/SYNDICATE_WEB_PORT.")
     parser.add_argument("--sports", default="all")
     parser.add_argument("--phase", choices=("live", "pregame", "all"), default="all")
     parser.add_argument("--execution-mode", choices=("source", "ingest"), default="source")
