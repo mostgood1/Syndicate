@@ -1227,7 +1227,9 @@ def _load_home_prop_items(
                 from syndicate.features.mlb.live_lens import build_live_lens_page_context
 
                 live_games = list(build_live_lens_page_context(context_label).get("games") or [])
-                return _prop_rows_from_mlb_live_games(live_games)
+                live_rows = _prop_rows_from_mlb_live_games(live_games)
+                if live_rows:
+                    return live_rows
             from syndicate.features.mlb.top_props import build_top_props_page_context
 
             pitcher_context = build_top_props_page_context(context_label, group="pitcher")
@@ -1244,12 +1246,16 @@ def _load_home_prop_items(
                 limit=9,
                 heading_override="Hitter Top Props",
             )
-            return _interleave_rows(pitcher_rows, hitter_rows, limit=18)
+            top_rows = _interleave_rows(pitcher_rows, hitter_rows, limit=18)
+            if top_rows:
+                return top_rows
         if slug == "nhl":
             from syndicate.features.nhl.cards import build_props_cards_payload
 
             payload = build_props_cards_payload(context_label, top=18)
-            return _prop_rows_from_nhl_cards(list(payload.get("cards") or []), fallback_href=f"/nhl/live-lens?date={context_label}")
+            nhl_rows = _prop_rows_from_nhl_cards(list(payload.get("cards") or []), fallback_href=f"/nhl/live-lens?date={context_label}")
+            if nhl_rows:
+                return nhl_rows
         if slug == "nba":
             if is_active_today:
                 from syndicate.features.nba.cards import build_live_player_lens_payload
@@ -1269,14 +1275,18 @@ def _load_home_prop_items(
             from syndicate.features.nba.props import build_props_page_context
 
             context = build_props_page_context(context_label)
-            return _prop_rows_from_rank_cards(list(context.get("rank_cards") or []), fallback_href=f"/nba/prop-ladders?date={context_label}")
+            nba_rows = _prop_rows_from_rank_cards(list(context.get("rank_cards") or []), fallback_href=f"/nba/prop-ladders?date={context_label}")
+            if nba_rows:
+                return nba_rows
         if slug == "wnba":
             from syndicate.features.wnba.props import build_props_page_context
 
             context = build_props_page_context(context_label)
-            return _prop_rows_from_rank_cards(list(context.get("rank_cards") or []), fallback_href=f"/wnba/props?date={context_label}")
+            wnba_rows = _prop_rows_from_rank_cards(list(context.get("rank_cards") or []), fallback_href=f"/wnba/props?date={context_label}")
+            if wnba_rows:
+                return wnba_rows
     except Exception:
-        return []
+        pass
     rows = _compact_prop_rows(home_games)
     if rows:
         return rows
@@ -1767,7 +1777,7 @@ def _build_sport_overview(
     else:
         if active_today:
             props_bar["status_label"] = "Live prop lens unavailable"
-            props_bar["summary"] = "The active live-lens source did not return any live prop rows for this slate, so the home rail is intentionally empty rather than backfilled from pregame props."
+            props_bar["summary"] = "No prop rows were available from live, stored, or card-level fallback sources for this slate."
         else:
             props_bar["summary"] = "No prop rows were available from the current mirrored board payload for this slate."
 
@@ -1820,6 +1830,7 @@ def _build_sport_overview(
         }
     props_count = _dashboard_prop_count(overview)
     overview["props_count"] = props_count
+    overview["show_on_home"] = bool(active_today and (games_count > 0 or props_count > 0))
     data_warnings: list[str] = []
     if active_today and games_count <= 0:
         data_warnings.append("No game rows surfaced")
