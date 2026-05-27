@@ -328,11 +328,11 @@ def _source_game_from_row(
     }
 
 
-def build_source_cards_payload(selected_date: str) -> dict[str, Any]:
+def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     bundle = _artifact_bundle(resolved_date)
-    if not bundle["rows"]:
+    if not bundle["rows"] and allow_stored_date_fallback:
         fallback_date = _nearest_available_cards_date(resolved_date)
         if fallback_date and fallback_date != resolved_date:
             resolved_date = fallback_date
@@ -768,12 +768,12 @@ def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_i
     return filtered_payload
 
 
-def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any]:
+def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     local_payload = _local_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
 
-    context = build_cards_page_context(selected_date)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     games = context.get("games") if isinstance(context.get("games"), list) else []
     out_games = []
     for game in games:

@@ -9,6 +9,10 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
+from urllib.error import HTTPError
+from urllib.error import URLError
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +38,7 @@ FILE_TEMPLATES = (
     ("data/market/oddsapi/oddsapi_hitter_props_{date_slug}.json", "data/daily/snapshots/{date_str}/oddsapi_hitter_props_{date_slug}.json"),
     ("data/live_lens/live_lens_{date_slug}.jsonl", "data/live_lens/live_lens_{date_slug}.jsonl"),
     ("data/live_lens/live_lens_report_{date_slug}.json", "data/live_lens/live_lens_report_{date_slug}.json"),
+    ("data/live_lens/render_sync/live_lens_reports_{date_slug}.json", "data/live_lens/render_sync/live_lens_reports_{date_slug}.json"),
     ("data/live_lens/prop_registry/live_prop_registry_{date_slug}.json", "data/live_lens/prop_registry/live_prop_registry_{date_slug}.json"),
     ("data/live_lens/prop_registry/live_prop_registry_{date_slug}.jsonl", "data/live_lens/prop_registry/live_prop_registry_{date_slug}.jsonl"),
     ("data/live_lens/prop_registry/live_prop_observations_{date_slug}.jsonl", "data/live_lens/prop_registry/live_prop_observations_{date_slug}.jsonl"),
@@ -105,6 +110,92 @@ def _load_local_fetcher():
         sys.path.insert(0, str(scripts_root))
     importlib.invalidate_caches()
     return importlib.import_module("fetch_mlb_oddsapi_local")
+
+
+def _env_first(*names: str) -> str:
+    for name in names:
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _normalize_render_base_url(value: str) -> str:
+    base_url = str(value or "").strip()
+    if not base_url:
+        return ""
+    if "://" not in base_url:
+        return f"https://{base_url}"
+    return base_url
+
+
+def _fetch_live_lens_reports_payload(*, base_url: str, token: str, date_str: str, timeout_seconds: int) -> dict[str, object]:
+    query = urllib_parse.urlencode({"date": str(date_str)})
+    url = f"{str(base_url).rstrip('/')}/api/cron/live-lens-reports?{query}"
+    request = urllib_request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    with urllib_request.urlopen(request, timeout=max(1, int(timeout_seconds))) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError("live-lens reports response was not a JSON object")
+    return payload
+
+
+def _write_live_lens_reports_payload(*, source_root: Path, date_str: str, payload: dict[str, object], trigger: str) -> dict[str, object]:
+    report_path = _live_lens_report_path(source_root=source_root, date_str=date_str)
+    sync_path = source_root / "data" / "live_lens" / "render_sync" / f"live_lens_reports_{_date_slug(date_str)}.json"
+    log_path = _live_lens_log_path(source_root=source_root, date_str=date_str)
+    registry_path = _live_prop_registry_path(source_root=source_root, date_str=date_str)
+    registry_log_path = _live_prop_registry_log_path(source_root=source_root, date_str=date_str)
+    observation_path = _live_prop_observation_log_path(source_root=source_root, date_str=date_str)
+    _write_json_file(report_path, payload)
+    _write_json_file(sync_path, payload)
+    if log_path.exists():
+        log_path.unlink()
+    _write_jsonl_line(
+        log_path,
+        {
+            "recordedAt": _local_timestamp_text(),
+            "date": str(date_str),
+            "counts": payload.get("counts") if isinstance(payload.get("counts"), dict) else None,
+            "performance": payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
+            "games": payload.get("games") if isinstance(payload.get("games"), list) else [],
+            "degraded": bool(payload.get("error")),
+        },
+    )
+    _write_json_file(
+        registry_path,
+        {
+            "date": str(date_str),
+            "updatedAt": payload.get("generatedAt") or _local_timestamp_text(),
+            "entries": {},
+        },
+    )
+    registry_log_path.parent.mkdir(parents=True, exist_ok=True)
+    if not registry_log_path.exists():
+        registry_log_path.write_text("", encoding="utf-8")
+    observation_path.parent.mkdir(parents=True, exist_ok=True)
+    if not observation_path.exists():
+        observation_path.write_text("", encoding="utf-8")
+    meta = {
+        "recordedAt": _local_timestamp_text(),
+        "date": str(date_str),
+        "counts": payload.get("counts"),
+        "marketsRefreshed": bool(payload.get("games")),
+        "reportPath": str(report_path),
+        "syncPath": str(sync_path),
+        "logPath": str(log_path),
+        "propObservationLogPath": str(observation_path),
+        "trigger": str(trigger),
+        "reused": False,
+        "synced": True,
+    }
+    _write_json_file(_cron_meta_dir(source_root=source_root) / "latest_live_lens_tick.json", meta)
+    return {
+        "ok": True,
+        "date": str(date_str),
+        "counts": payload.get("counts"),
+        "report": meta,
+    }
 
 
 @contextmanager
@@ -212,56 +303,7 @@ def _build_degraded_live_lens_payload(*, source_root: Path, date_str: str) -> di
 
 def _bootstrap_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: str) -> dict[str, object]:
     report_payload = _build_degraded_live_lens_payload(source_root=source_root, date_str=date_str)
-    report_path = _live_lens_report_path(source_root=source_root, date_str=date_str)
-    log_path = _live_lens_log_path(source_root=source_root, date_str=date_str)
-    observation_path = _live_prop_observation_log_path(source_root=source_root, date_str=date_str)
-    registry_path = _live_prop_registry_path(source_root=source_root, date_str=date_str)
-    registry_log_path = _live_prop_registry_log_path(source_root=source_root, date_str=date_str)
-    _write_json_file(report_path, report_payload)
-    if log_path.exists():
-        log_path.unlink()
-    _write_jsonl_line(
-        log_path,
-        {
-            "recordedAt": report_payload.get("generatedAt"),
-            "date": str(date_str),
-            "counts": report_payload.get("counts"),
-            "performance": report_payload.get("performance"),
-            "games": [],
-            "degraded": True,
-        },
-    )
-    _write_json_file(
-        registry_path,
-        {
-            "date": str(date_str),
-            "updatedAt": report_payload.get("generatedAt"),
-            "entries": {},
-        },
-    )
-    registry_log_path.parent.mkdir(parents=True, exist_ok=True)
-    registry_log_path.write_text("", encoding="utf-8")
-    observation_path.parent.mkdir(parents=True, exist_ok=True)
-    observation_path.write_text("", encoding="utf-8")
-    meta = {
-        "recordedAt": _local_timestamp_text(),
-        "date": str(date_str),
-        "counts": report_payload.get("counts"),
-        "marketsRefreshed": False,
-        "reportPath": str(report_path),
-        "logPath": str(log_path),
-        "propObservationLogPath": str(observation_path),
-        "trigger": str(trigger),
-        "reused": False,
-        "degraded": True,
-    }
-    _write_json_file(_cron_meta_dir(source_root=source_root) / "latest_live_lens_tick.json", meta)
-    return {
-        "ok": True,
-        "date": str(date_str),
-        "counts": report_payload.get("counts"),
-        "report": meta,
-    }
+    return _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=report_payload, trigger=trigger)
 
 
 def _reuse_existing_live_lens_tick(*, source_root: Path, date_str: str, trigger: str) -> dict[str, object] | None:
@@ -276,6 +318,8 @@ def _reuse_existing_live_lens_tick(*, source_root: Path, date_str: str, trigger:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
     except Exception:
         payload = {}
+    if isinstance(payload, dict) and not payload.get("games"):
+        return None
     counts = payload.get("counts") if isinstance(payload, dict) and isinstance(payload.get("counts"), dict) else None
     meta = {
         "recordedAt": _local_timestamp_text(),
@@ -378,7 +422,17 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
         "archived": archived,
     }
     _write_json_file(_cron_meta_dir(source_root=source_root) / "latest_refresh_oddsapi.json", meta)
-    live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
+    live_lens = None
+    base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "RENDER_EXTERNAL_URL"))
+    token = _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
+    if base_url and token:
+        try:
+            live_lens_payload = _fetch_live_lens_reports_payload(base_url=base_url, token=token, date_str=date_str, timeout_seconds=45)
+            live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger="syndicate_refresh")
+        except (HTTPError, URLError, OSError, ValueError, RuntimeError):
+            live_lens = None
+    if live_lens is None:
+        live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
     if live_lens is None:
         live_lens = _bootstrap_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
     return {

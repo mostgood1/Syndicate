@@ -294,8 +294,7 @@ def api_cards_odds_movement():
 
 @nhl_bp.get("/live-lens")
 def live_lens():
-    context = build_live_lens_page_context(_selected_date())
-    return render_template("shared/rank_board.html", **context)
+    return redirect(f"/nhl/cards?date={_selected_date()}", code=302)
 
 
 @nhl_bp.get("/live-lens-accuracy")

@@ -72,6 +72,10 @@ def _selected_date() -> str:
     return (request.args.get("date") or default_date()).strip()
 
 
+def _allow_stored_date_fallback() -> bool:
+    return "date" not in request.args
+
+
 def _official_wnba_logo_team_id(team_ref: str) -> int | None:
     raw_ref = str(team_ref or "").strip().upper()
     if not raw_ref:
@@ -317,7 +321,7 @@ def api_source_team_logo(team_id: str):
 @wnba_bp.get("/api/source/cards")
 def api_source_cards():
     selected_date = _selected_date()
-    return jsonify(build_source_cards_payload(selected_date))
+    return jsonify(build_source_cards_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback()))
 
 
 @wnba_bp.get("/api/source/cards/sim-detail")
@@ -361,7 +365,7 @@ def api_game_detail(game_pk: str):
 @wnba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
-    context = build_cards_page_context(selected_date)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
     return jsonify(build_game_board_api_payload(context))
 
 
@@ -488,7 +492,7 @@ def api_live_state():
     except Exception:
         ttl = 12
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_state_payload(selected_date, ttl=ttl))
+    return jsonify(build_live_state_payload(selected_date, ttl=ttl, allow_stored_date_fallback=_allow_stored_date_fallback()))
 
 
 @wnba_bp.get("/api/live_player_boxscore")

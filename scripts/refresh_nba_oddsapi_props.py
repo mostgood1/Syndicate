@@ -96,6 +96,45 @@ def _copy_existing_live_lens_artifact(*, source_root: Path, file_name: str, dest
     return copied
 
 
+def _copy_existing_live_snapshot_artifact(*, source_root: Path, file_name: str, destination: Path) -> str | None:
+    source = source_root / "data" / "processed" / "live_snapshots" / file_name
+    if not source.exists() or not source.is_file():
+        return None
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
+
+
+def _read_live_snapshot_payload(path: Path) -> dict[str, object] | None:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return None
+    for line in reversed(lines):
+        raw = str(line or "").strip()
+        if not raw:
+            continue
+        try:
+            record = json.loads(raw)
+        except Exception:
+            continue
+        payload = record.get("payload") if isinstance(record, dict) and isinstance(record.get("payload"), dict) else None
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(record, dict) and isinstance(record.get("games"), list):
+            return record
+    return None
+
+
+def _write_live_snapshot_payload(path: Path, payload: dict[str, object]) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {"payload": payload}
+    path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+    return True
+
+
 def _boxscores_history_sources(*, source_root: Path, processed_root: Path) -> list[Path]:
     candidates: list[Path] = []
     seen: set[str] = set()
@@ -1774,6 +1813,91 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
     return copied
 
 
+def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, processed_root: Path) -> dict[str, str]:
+    live_snapshots_root = processed_root / "live_snapshots"
+    snapshot_specs = (
+        ("live_state", None),
+        ("live_pbp_stats", "live_pbp_stats_path"),
+        ("live_lines", "live_lines_path"),
+        ("live_player_boxscore", "live_player_boxscore_path"),
+        ("live_player_lens", "live_player_lens_path"),
+    )
+    copied: dict[str, str] = {}
+    state_payload: dict[str, object] | None = None
+
+    state_file = f"live_state_{date_str}.jsonl"
+    state_destination = live_snapshots_root / state_file
+    existing_state = _copy_existing_live_snapshot_artifact(
+        source_root=source_root,
+        file_name=state_file,
+        destination=state_destination,
+    )
+    if existing_state:
+        copied["live_state_path"] = existing_state
+        state_payload = _read_live_snapshot_payload(state_destination)
+
+    source_app = None
+    client = None
+
+    def _ensure_client():
+        nonlocal source_app, client
+        if client is not None:
+            return client
+        source_app = _load_source_app(source_root)
+        if source_app is None:
+            return None
+        client = source_app.app.test_client()
+        return client
+
+    def _fetch_json(query: str) -> dict[str, object] | None:
+        test_client = _ensure_client()
+        if test_client is None:
+            return None
+        try:
+            response = test_client.get(query)
+            if int(getattr(response, "status_code", 0) or 0) != 200:
+                return None
+            payload = response.get_json() if response is not None else None
+        except Exception:
+            payload = None
+        return payload if isinstance(payload, dict) else None
+
+    if state_payload is None:
+        state_payload = _fetch_json(f"/api/live_state?date={date_str}")
+        if state_payload and _write_live_snapshot_payload(state_destination, state_payload):
+            copied["live_state_path"] = str(state_destination)
+
+    event_ids = [
+        str(game.get("event_id") or "").strip()
+        for game in ((state_payload or {}).get("games") or [])
+        if isinstance(game, dict) and str(game.get("event_id") or "").strip()
+    ]
+    joined_event_ids = ",".join(dict.fromkeys(event_ids))
+
+    for kind, copied_key in snapshot_specs[1:]:
+        file_name = f"{kind}_{date_str}.jsonl"
+        destination = live_snapshots_root / file_name
+        existing = _copy_existing_live_snapshot_artifact(
+            source_root=source_root,
+            file_name=file_name,
+            destination=destination,
+        )
+        if existing:
+            if copied_key:
+                copied[copied_key] = existing
+            continue
+        if not joined_event_ids:
+            continue
+        query = f"/api/{kind}?date={date_str}&event_ids={joined_event_ids}"
+        if kind == "live_lines":
+            query = f"{query}&include_period_totals=1"
+        payload = _fetch_json(query)
+        if payload and _write_live_snapshot_payload(destination, payload) and copied_key:
+            copied[copied_key] = str(destination)
+
+    return copied
+
+
 def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path) -> dict[str, object]:
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
@@ -1831,6 +1955,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
             copied["top_by_game_path"] = top_by_game_path
         copied.update(_export_season_betting_card_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
         copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
+        copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
         copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
     if boxscores_history_path:

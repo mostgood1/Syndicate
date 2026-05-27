@@ -151,6 +151,7 @@ $filePairs = @(
     @("data\daily\season_frontend\season_betting_day_$dateSlug.json", "daily\season_frontend\season_betting_day_$dateSlug.json"),
     @("data\live_lens\live_lens_$dateSlug.jsonl", "live_lens\live_lens_$dateSlug.jsonl"),
     @("data\live_lens\live_lens_report_$dateSlug.json", "live_lens\live_lens_report_$dateSlug.json"),
+    @("data\live_lens\render_sync\live_lens_reports_$dateSlug.json", "live_lens\render_sync\live_lens_reports_$dateSlug.json"),
     @("data\live_lens\prop_registry\live_prop_registry_$dateSlug.json", "live_lens\prop_registry\live_prop_registry_$dateSlug.json"),
     @("data\live_lens\prop_registry\live_prop_registry_$dateSlug.jsonl", "live_lens\prop_registry\live_prop_registry_$dateSlug.jsonl"),
     @("data\live_lens\prop_registry\live_prop_observations_$dateSlug.jsonl", "live_lens\prop_registry\live_prop_observations_$dateSlug.jsonl"),
