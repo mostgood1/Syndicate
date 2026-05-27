@@ -1770,6 +1770,8 @@ def _build_sport_overview(
             props_bar["summary"] = "The active live-lens source did not return any live prop rows for this slate, so the home rail is intentionally empty rather than backfilled from pregame props."
         else:
             props_bar["summary"] = "No prop rows were available from the current mirrored board payload for this slate."
+
+    games_count = len(game_bar.get("items") or []) if isinstance(game_bar.get("items"), list) else 0
     overview = {
         **sport,
         "primary_href": primary_href,
@@ -1784,6 +1786,8 @@ def _build_sport_overview(
         "game_bar": game_bar,
         "props_bar": props_bar,
         "dashboard_games": home_games,
+        "home_anchor": f"home-sport-{slug}",
+        "games_count": games_count,
     }
     if slug == "mlb":
         overview["mlb_home"] = {
@@ -1814,6 +1818,15 @@ def _build_sport_overview(
                 is_active_today=True,
             ),
         }
+    props_count = _dashboard_prop_count(overview)
+    overview["props_count"] = props_count
+    data_warnings: list[str] = []
+    if active_today and games_count <= 0:
+        data_warnings.append("No game rows surfaced")
+    if props_count <= 0:
+        data_warnings.append("No prop rows surfaced")
+    overview["data_warnings"] = data_warnings
+    overview["data_health"] = "healthy" if not data_warnings else ("stale" if active_today and games_count <= 0 else "partial")
     _HOME_OVERVIEW_CACHE[cache_key] = (time.monotonic(), overview)
     return dict(overview)
 
@@ -1883,10 +1896,16 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
     sports = current_app.config["SYNDICATE_SPORTS"]
     overview = build_home_overview(sports, selected_date=effective_date, force_refresh=force_refresh)
     polled_at = time.time()
+    polled_label = _format_home_timestamp(polled_at)
+    for sport in overview:
+        if not isinstance(sport, dict):
+            continue
+        sport["freshness_label"] = f"Live \u00b7 {polled_label}" if bool(sport.get("active_today")) else "Stored slate"
     dashboard = _build_home_dashboard(overview, selected_date=effective_date, polled_at=polled_at)
     payload = {
         "sports": overview,
         "dashboard": dashboard,
+        "selected_date": effective_date,
         "html": render_template("shared/_home_dashboard.html", sports=overview, dashboard=dashboard),
         "polled_at": polled_at,
     }
@@ -1901,6 +1920,7 @@ def home():
         "home.html",
         sports=payload["sports"],
         dashboard=payload["dashboard"],
+        selected_home_date=payload.get("selected_date"),
         tracker_sports=current_app.config["SYNDICATE_SPORTS"],
         show_app_header=True,
         page_body_class="syndicate-home-page",
@@ -1916,6 +1936,7 @@ def api_home():
             "ok": True,
             "sports": payload["sports"],
             "dashboard": payload.get("dashboard"),
+            "selected_date": payload.get("selected_date"),
             "html": payload["html"],
             "polled_at": payload["polled_at"],
         }

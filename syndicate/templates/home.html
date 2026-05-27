@@ -111,6 +111,99 @@
       gap: 0.85rem;
     }
 
+    .home-active-strip {
+      display: grid;
+      gap: 0.65rem;
+      padding: 0.85rem 0.95rem;
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(12, 24, 39, 0.96), rgba(7, 15, 26, 0.99));
+      box-shadow: var(--cards-shadow);
+    }
+
+    .home-active-strip__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.7rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .home-active-strip__meta {
+      color: rgba(191, 208, 223, 0.86);
+      font-size: 0.8rem;
+    }
+
+    .home-active-strip__row {
+      display: flex;
+      gap: 0.55rem;
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+    }
+
+    .home-active-chip {
+      display: grid;
+      gap: 0.25rem;
+      min-width: 210px;
+      padding: 0.58rem 0.65rem;
+      border-radius: 13px;
+      border: 1px solid rgba(132, 166, 196, 0.18);
+      background: rgba(255, 255, 255, 0.03);
+      color: rgba(237, 244, 251, 0.94);
+      text-decoration: none;
+    }
+
+    .home-active-chip__top {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.55rem;
+      align-items: baseline;
+    }
+
+    .home-active-chip__sport {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .home-active-chip__date,
+    .home-active-chip__stats {
+      color: rgba(191, 208, 223, 0.9);
+      font-size: 0.76rem;
+    }
+
+    .home-active-chip__health {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      min-height: 22px;
+      padding: 0 0.46rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 700;
+      border: 1px solid rgba(132, 166, 196, 0.22);
+    }
+
+    .home-active-chip__health--healthy {
+      color: rgba(154, 243, 222, 0.95);
+      border-color: rgba(154, 243, 222, 0.35);
+      background: rgba(154, 243, 222, 0.09);
+    }
+
+    .home-active-chip__health--partial {
+      color: rgba(255, 219, 165, 0.95);
+      border-color: rgba(255, 196, 115, 0.35);
+      background: rgba(255, 196, 115, 0.1);
+    }
+
+    .home-active-chip__health--stale {
+      color: rgba(255, 153, 153, 0.95);
+      border-color: rgba(255, 153, 153, 0.35);
+      background: rgba(255, 153, 153, 0.1);
+    }
+
     .sport-stack-card {
       display: grid;
       gap: 0.72rem;
@@ -830,7 +923,7 @@
 
 {% block content %}
   <section class="home-board">
-    {% set selected_home_date = request.args.get('date', '') %}
+    {% set selected_home_date = selected_home_date or request.args.get('date', '') %}
     {% set admin_token = request.args.get('admin_token', '') %}
     {% set dated_home_reset_href = '/?admin_token=' ~ admin_token if admin_token else '/' %}
     <section class="home-controls" aria-label="Syndicate home controls">

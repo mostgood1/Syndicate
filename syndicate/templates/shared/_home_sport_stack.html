@@ -1,7 +1,7 @@
 <section class="sport-stack" aria-label="Sport daily overview">
   {% for sport in sports %}
     {% if sport.slug == 'mlb' %}
-    <article class="sport-stack-card">
+    <article class="sport-stack-card" id="{{ sport.home_anchor }}">
       <div class="sport-stack-card__header">
         <div class="sport-stack-card__identity">
           <div class="section-label">/{{ sport.slug }}</div>
@@ -17,6 +17,18 @@
             {% if sport.active_today %}
               <span class="sport-board-chip">Live slate</span>
             {% endif %}
+            <span class="sport-board-chip">{{ sport.freshness_label }}</span>
+            <span class="sport-board-chip">Data {{ sport.data_health }}</span>
+          </div>
+        </div>
+        <div class="sport-stack-card__stats" aria-label="{{ sport.name }} overview stats">
+          <div class="sport-stack-stat">
+            <div class="sport-stack-stat__label">Games</div>
+            <div class="sport-stack-stat__value">{{ sport.games_count }}</div>
+          </div>
+          <div class="sport-stack-stat">
+            <div class="sport-stack-stat__label">Props</div>
+            <div class="sport-stack-stat__value">{{ sport.props_count }}</div>
           </div>
         </div>
       </div>
@@ -172,7 +184,7 @@
       </div>
     </article>
     {% else %}
-    <article class="sport-stack-card">
+    <article class="sport-stack-card" id="{{ sport.home_anchor }}">
       <div class="sport-stack-card__header">
         <div class="sport-stack-card__identity">
           <div class="section-label">/{{ sport.slug }}</div>
@@ -243,6 +255,8 @@
             </div>
             <div class="sport-scroll-row__meta">
               <span class="sport-board-chip">{{ sport.context_label }}</span>
+              <span class="sport-board-chip">Games {{ sport.games_count }}</span>
+              <span class="sport-board-chip">Data {{ sport.data_health }}</span>
               {% if sport.active_today %}
                 <span class="sport-board-chip">Active games</span>
               {% else %}
@@ -253,6 +267,13 @@
 
           <p class="sport-scroll-row__kicker">{{ sport.game_bar.kicker }}</p>
           <p class="sport-scroll-row__summary">{{ sport.game_bar.summary }}</p>
+          {% if sport.data_warnings %}
+            <div class="sport-board-rail" aria-label="{{ sport.name }} data warnings">
+              {% for warning in sport.data_warnings %}
+                <span class="sport-board-rail__chip">{{ warning }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
 
           <div class="sport-scroll-row__links" aria-label="{{ sport.name }} game row links">
             {% if sport.game_bar.primary_href %}
@@ -325,6 +346,8 @@
                 </article>
               {% endfor %}
             </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No game rows were surfaced for {{ sport.context_label }}. Open the primary lane to verify upstream slate artifacts.</p>
           {% endif %}
 
           {% if sport.game_bar.opportunity_tags %}
@@ -346,6 +369,8 @@
             </div>
             <div class="sport-scroll-row__meta">
               <span class="sport-board-chip">{{ sport.phase }}</span>
+              <span class="sport-board-chip">Props {{ sport.props_count }}</span>
+              <span class="sport-board-chip">{{ sport.freshness_label }}</span>
               {% if sport.active_today %}
                 <span class="sport-board-chip">Active props lane</span>
               {% else %}
@@ -356,6 +381,13 @@
 
           <p class="sport-scroll-row__kicker">{{ sport.props_bar.kicker }}</p>
           <p class="sport-scroll-row__summary">{{ sport.props_bar.summary }}</p>
+          {% if sport.data_warnings %}
+            <div class="sport-board-rail" aria-label="{{ sport.name }} data warnings">
+              {% for warning in sport.data_warnings %}
+                <span class="sport-board-rail__chip">{{ warning }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
 
           <div class="sport-scroll-row__links" aria-label="{{ sport.name }} props row links">
             {% if sport.props_bar.primary_href %}
@@ -425,6 +457,8 @@
                 </article>
               {% endfor %}
             </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No prop rows were surfaced for {{ sport.context_label }}. Open the props lane to check ingestion and mirror freshness.</p>
           {% endif %}
           {% endif %}
 
