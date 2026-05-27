@@ -5,11 +5,11 @@ services:
     plan: standard
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:application
+    startCommand: python scripts/bootstrap_data_root.py ; gunicorn wsgi:application
     healthCheckPath: /
     disk:
       name: syndicate-data
-      mountPath: /opt/render/project/src/data
+      mountPath: /opt/render/project/data
       sizeGB: 50
     envVars:
       - key: PYTHON_VERSION
@@ -21,9 +21,9 @@ services:
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: detached_subprocess
       - key: SYNDICATE_DATA_ROOT
-        value: /opt/render/project/src/data
+        value: /opt/render/project/data
       - key: SYNDICATE_REPORTS_ROOT
-        value: /opt/render/project/src/data/reports
+        value: /opt/render/project/data/reports
 
   - type: cron
     name: syndicate-odds-refresh-live
