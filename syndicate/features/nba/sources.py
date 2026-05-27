@@ -188,7 +188,7 @@ def build_module_links(selected_date: str, active_label: str) -> list[dict[str, 
         ("Betting Card", "Betting Card", f"/nba/season/{season}/betting-card?profile=retuned&date={selected_date}"),
         ("Picks", "Picks", f"/nba/picks?date={selected_date}"),
         ("Props", "Prop Ladders", f"/nba/prop-ladders?date={selected_date}"),
-        ("Sim", "Live Prop Audit", f"/nba/season/{season}/live-lens?date={selected_date}"),
+        ("Live Lens", "Live Lens", f"/nba/season/{season}/live-lens?date={selected_date}&profile=retuned"),
         ("Archive", "Daily Archive", f"/nba/archive?date={selected_date}"),
         ("Hub", "Hub", "/nba/hub"),
     ]

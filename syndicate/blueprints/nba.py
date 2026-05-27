@@ -27,6 +27,8 @@ from syndicate.features.nba.cards import build_live_state_payload
 from syndicate.features.nba.features import build_features_payload
 from syndicate.features.nba.game_detail import build_game_detail_page_context
 from syndicate.features.nba.live_game_accuracy import build_live_game_accuracy_payload
+from syndicate.features.nba.live_lens import build_live_lens_api_payload
+from syndicate.features.nba.live_lens import build_live_lens_page_context
 from syndicate.features.nba.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload
 from syndicate.features.nba.live_prop_accuracy import build_live_prop_accuracy_payload
 from syndicate.features.nba.live_prop_audit import build_live_prop_audit_payload
@@ -390,7 +392,7 @@ def _market_accuracy_template_context(selected_date: str, *, season: int | None 
 @nba_bp.get("/live-lens")
 def live_lens():
     selected_date = _selected_date()
-    return render_template("nba/live_prop_audit.html", **_live_lens_template_context(selected_date))
+    return render_template("shared/rank_board.html", **build_live_lens_page_context(selected_date))
 
 
 @nba_bp.get("/live-player-props-audit")
@@ -434,7 +436,7 @@ def reconciliation_alias():
 def season_live_lens(season: int):
     selected_date = _selected_date(season)
     profile = str(request.args.get("profile") or "").strip().lower() or None
-    return render_template("nba/live_prop_audit.html", **_live_lens_template_context(selected_date, season=season, profile=profile))
+    return render_template("shared/rank_board.html", **build_live_lens_page_context(selected_date, season=season, profile=profile))
 
 
 @nba_bp.get("/season/<int:season>/live-lens-accuracy")
@@ -499,7 +501,7 @@ def api_archive():
     return jsonify(build_archive_api_payload(selected_date))
 
 
-def _live_lens_payload_response(season: int | None = None):
+def _live_prop_audit_payload_response(season: int | None = None):
     query_string = _live_lens_query_string(season)
     payload = build_live_prop_audit_payload(query_string)
     if not isinstance(payload, dict):
@@ -509,12 +511,13 @@ def _live_lens_payload_response(season: int | None = None):
 
 @nba_bp.get("/api/live-lens")
 def api_live_lens():
-    return _live_lens_payload_response()
+    selected_date = _selected_date()
+    return jsonify(build_live_lens_api_payload(selected_date))
 
 
 @nba_bp.get("/api/live-player-props-audit")
 def api_live_player_props_audit():
-    return _live_lens_payload_response()
+    return _live_prop_audit_payload_response()
 
 
 @nba_bp.get("/api/live-player-props-lens-accuracy")
@@ -564,7 +567,9 @@ def api_betting_recap():
 
 @nba_bp.get("/api/season/<int:season>/live-lens")
 def api_season_live_lens(season: int):
-    return _live_lens_payload_response(season)
+    selected_date = _selected_date(season)
+    profile = str(request.args.get("profile") or "").strip().lower() or None
+    return jsonify(build_live_lens_api_payload(selected_date) | {"route_path": f"/nba/season/{season}/live-lens", "hidden_fields": ([{"name": "profile", "value": profile}] if profile else [])})
 
 
 @nba_bp.get("/api/season/<int:season>/live-lens-accuracy")
