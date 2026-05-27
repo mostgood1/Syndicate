@@ -1457,23 +1457,36 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
         if slug == "mlb":
             from syndicate.features.mlb.cards import build_cards_page_context
 
-            return list(build_cards_page_context(context_label).get("games") or [])
+            payload = build_cards_page_context(context_label)
+            return list(payload.get("games") or [])
         if slug == "nba":
             from syndicate.features.nba.cards import build_cards_page_context
 
-            return list(build_cards_page_context(context_label).get("games") or [])
+            payload = build_cards_page_context(context_label)
+            if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
+                return []
+            return list(payload.get("games") or [])
         if slug == "nhl":
             from syndicate.features.nhl.cards import build_cards_page_context
 
-            return list(build_cards_page_context(context_label).get("games") or [])
+            payload = build_cards_page_context(context_label)
+            if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
+                return []
+            return list(payload.get("games") or [])
         if slug == "wnba":
             from syndicate.features.wnba.cards import build_cards_page_context
 
-            return list(build_cards_page_context(context_label).get("games") or [])
+            payload = build_cards_page_context(context_label)
+            if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
+                return []
+            return list(payload.get("games") or [])
         if slug == "ncaab":
             from syndicate.features.ncaab.cards import build_cards_page_context
 
-            return list(build_cards_page_context(context_label).get("games") or [])
+            payload = build_cards_page_context(context_label)
+            if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
+                return []
+            return list(payload.get("games") or [])
         if slug == "nfl" and week is not None:
             from syndicate.features.nfl.cards import build_cards_page_context
 
@@ -1830,7 +1843,7 @@ def _build_sport_overview(
         }
     props_count = _dashboard_prop_count(overview)
     overview["props_count"] = props_count
-    overview["show_on_home"] = bool(active_today and (games_count > 0 or props_count > 0))
+    overview["show_on_home"] = bool(active_today and games_count > 0)
     data_warnings: list[str] = []
     if active_today and games_count <= 0:
         data_warnings.append("No game rows surfaced")
@@ -1887,7 +1900,7 @@ def build_home_overview(
                     )
         overview = [sport for sport in overview if isinstance(sport, dict)]
     active = [sport for sport in overview if bool(sport.get("show_on_home"))]
-    return active or overview
+    return active
 
 
 def _home_payload(*, selected_date: str | None = None, cached_only: bool = False, force_refresh: bool = False) -> dict[str, Any]:
