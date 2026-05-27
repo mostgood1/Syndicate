@@ -114,6 +114,9 @@
         preserveClientParam: {{ (cards_client is defined and cards_client is not none)|tojson }},
       };
     </script>
+    {% if cards_script == 'mlb/cards_source.js' %}
+      <script src="{{ url_for('static', filename='shared/polling.js', v=asset_version) }}"></script>
+    {% endif %}
     {% if cards_script %}
       <script src="{{ url_for('static', filename=cards_script, v=asset_version if cards_script == 'mlb/cards_source.js' else none) }}"></script>
     {% endif %}

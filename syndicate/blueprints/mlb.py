@@ -43,6 +43,7 @@ def _cards_source_asset_version() -> str:
     static_root = Path(__file__).resolve().parents[1] / "static"
     paths = [
         static_root / "shared" / "standalone_shell.css",
+        static_root / "shared" / "polling.js",
         static_root / "mlb" / "cards_exact.css",
         static_root / "mlb" / "cards_source.js",
         static_root / "mlb" / "back_to_top.js",
