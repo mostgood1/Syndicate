@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from datetime import datetime
@@ -21,6 +22,7 @@ from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.nba.sources import available_dates as nba_available_dates
 from syndicate.features.nba.sources import build_module_links as build_nba_module_links
 from syndicate.features.nhl.sources import build_module_links as build_nhl_module_links
+from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import slate_summaries as nhl_slate_summaries
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 from syndicate.features.wnba.sources import build_module_links as build_wnba_module_links
@@ -839,6 +841,186 @@ def _apply_mlb_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
     return enriched
 
 
+def _apply_nba_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
+    try:
+        from syndicate.features.nba.cards import _games_from_live_state_fallback
+    except Exception:
+        return games
+
+    live_games, _ = _games_from_live_state_fallback(selected_date)
+    if not live_games:
+        return games
+
+    keyed_live: dict[tuple[str, str], dict[str, Any]] = {}
+    for game in live_games:
+        if not isinstance(game, dict):
+            continue
+        away_key = str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "")).strip().upper()
+        home_key = str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "")).strip().upper()
+        if away_key and home_key:
+            keyed_live[(away_key, home_key)] = game
+
+    enriched: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        away_key = str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "")).strip().upper()
+        home_key = str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "")).strip().upper()
+        live_game = keyed_live.get((away_key, home_key)) if away_key and home_key else None
+        if not live_game:
+            enriched.append(game)
+            continue
+        seen.add((away_key, home_key))
+        updated = dict(game)
+        away = dict(game.get("away") or {}) if isinstance(game.get("away"), dict) else {}
+        home = dict(game.get("home") or {}) if isinstance(game.get("home"), dict) else {}
+        live_state = dict(live_game.get("live_state") or {}) if isinstance(live_game.get("live_state"), dict) else {}
+        if live_state.get("away_pts") is not None:
+            away["score"] = live_state.get("away_pts")
+        if live_state.get("home_pts") is not None:
+            home["score"] = live_state.get("home_pts")
+        updated["away"] = away
+        updated["home"] = home
+        status = dict(game.get("status") or {}) if isinstance(game.get("status"), dict) else {}
+        if live_state.get("away_pts") is not None:
+            status["away_score"] = live_state.get("away_pts")
+        if live_state.get("home_pts") is not None:
+            status["home_score"] = live_state.get("home_pts")
+        status["is_live"] = bool(live_state.get("in_progress"))
+        status["in_progress"] = bool(live_state.get("in_progress"))
+        status["is_final"] = bool(live_state.get("final"))
+        status["final"] = bool(live_state.get("final"))
+        if live_state.get("in_progress"):
+            status["abstract"] = "Live"
+        elif live_state.get("final"):
+            status["abstract"] = "Final"
+        detail_text = str(live_state.get("status") or live_game.get("detail") or "").strip()
+        if detail_text:
+            status["detailed"] = detail_text
+        updated["status"] = status
+        updated["live_state"] = live_state
+        enriched.append(updated)
+
+    for key, live_game in keyed_live.items():
+        if key not in seen:
+            enriched.append(live_game)
+    return enriched
+
+
+def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
+    path = scoreboard_snapshot_path(selected_date)
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except Exception:
+        return []
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        out.append(
+            {
+                "gamePk": row.get("gamePk") or row.get("game_id"),
+                "away": row.get("away") or row.get("away_team"),
+                "home": row.get("home") or row.get("home_team"),
+                "away_abbr": row.get("away_abbr") or row.get("away_tri"),
+                "home_abbr": row.get("home_abbr") or row.get("home_tri"),
+                "away_goals": row.get("away_goals") or row.get("awayScore") or row.get("away_score"),
+                "home_goals": row.get("home_goals") or row.get("homeScore") or row.get("home_score"),
+                "gameState": row.get("gameState") or row.get("game_state") or row.get("state"),
+                "period": row.get("period") or row.get("web_period"),
+                "clock": row.get("clock") or row.get("web_clock"),
+            }
+        )
+    return out
+
+
+def _apply_nhl_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
+    rows = _load_nhl_scoreboard_rows(selected_date)
+    if not rows:
+        return games
+
+    keyed_rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        row_keys = {
+            (
+                str(row.get("away_abbr") or "").strip().upper(),
+                str(row.get("home_abbr") or "").strip().upper(),
+            ),
+            (
+                str(row.get("away") or "").strip().upper(),
+                str(row.get("home") or "").strip().upper(),
+            ),
+        }
+        for key in row_keys:
+            if key[0] and key[1]:
+                keyed_rows[key] = row
+
+    enriched: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        game_keys = [
+            (
+                str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "")).strip().upper(),
+                str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "")).strip().upper(),
+            ),
+            (
+                str(game.get("away_name") or ((game.get("away") or {}).get("name") if isinstance(game.get("away"), dict) else "")).strip().upper(),
+                str(game.get("home_name") or ((game.get("home") or {}).get("name") if isinstance(game.get("home"), dict) else "")).strip().upper(),
+            ),
+        ]
+        row = next((keyed_rows.get(key) for key in game_keys if key[0] and key[1] and keyed_rows.get(key)), None)
+        if not row:
+            enriched.append(game)
+            continue
+        updated = dict(game)
+        away = dict(game.get("away") or {}) if isinstance(game.get("away"), dict) else {}
+        home = dict(game.get("home") or {}) if isinstance(game.get("home"), dict) else {}
+        away_goals = _numeric_value(row.get("away_goals"))
+        home_goals = _numeric_value(row.get("home_goals"))
+        if away_goals is not None:
+            away["score"] = away_goals
+        if home_goals is not None:
+            home["score"] = home_goals
+        updated["away"] = away
+        updated["home"] = home
+        state = str(row.get("gameState") or "").strip().upper()
+        period = str(row.get("period") or "").strip()
+        clock = str(row.get("clock") or "").strip()
+        detail_bits = [bit for bit in [state, f"P{period}" if period else None, clock or None] if bit]
+        live_state = {
+            "away_pts": away_goals,
+            "home_pts": home_goals,
+            "in_progress": state in {"LIVE", "CRIT"},
+            "final": state == "OFF",
+            "status": " | ".join(detail_bits) if detail_bits else selected_date,
+        }
+        status = dict(game.get("status") or {}) if isinstance(game.get("status"), dict) else {}
+        if away_goals is not None:
+            status["away_score"] = away_goals
+        if home_goals is not None:
+            status["home_score"] = home_goals
+        status["is_live"] = bool(live_state["in_progress"])
+        status["in_progress"] = bool(live_state["in_progress"])
+        status["is_final"] = bool(live_state["final"])
+        status["final"] = bool(live_state["final"])
+        if live_state["in_progress"]:
+            status["abstract"] = "Live"
+        elif live_state["final"]:
+            status["abstract"] = "Final"
+        status["detailed"] = live_state["status"]
+        updated["status"] = status
+        updated["live_state"] = live_state
+        updated["shared_is_live"] = bool(live_state["in_progress"])
+        enriched.append(updated)
+    return enriched
+
+
 def _market_based_projected_scores(game: dict[str, Any]) -> tuple[str | None, str | None]:
     total = _metric_or_tile_value(game, ["total", "full total", "model total"])
     home_line = _metric_or_tile_value(game, ["spread", "home spread"])
@@ -968,7 +1150,7 @@ def _load_home_game_items(
     week: int | None = None,
     is_active_today: bool,
 ) -> tuple[list[dict[str, Any]], int]:
-    home_games = _load_home_games(slug, context_label=context_label, season=season, week=week) if is_active_today else []
+    home_games = _load_home_games(slug, context_label=context_label, season=season, week=week, is_active_today=is_active_today) if is_active_today else []
     if slug == "mlb" and home_games:
         home_games = _apply_mlb_live_scores(home_games, context_label)
     if not is_active_today:
@@ -1499,27 +1681,30 @@ def _compact_prop_rows(games: list[dict[str, Any]], *, limit: int | None = None)
     return rows
 
 
-def _load_home_games(slug: str, *, context_label: str, season: int | None = None, week: int | None = None) -> list[dict[str, Any]]:
+def _load_home_games(slug: str, *, context_label: str, season: int | None = None, week: int | None = None, is_active_today: bool = False) -> list[dict[str, Any]]:
     try:
         if slug == "mlb":
             from syndicate.features.mlb.cards import build_cards_page_context
 
             payload = build_cards_page_context(context_label)
-            return list(payload.get("games") or [])
+            games = list(payload.get("games") or [])
+            return _apply_mlb_live_scores(games, context_label) if is_active_today else games
         if slug == "nba":
             from syndicate.features.nba.cards import build_cards_page_context
 
             payload = build_cards_page_context(context_label)
             if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
                 return []
-            return list(payload.get("games") or [])
+            games = list(payload.get("games") or [])
+            return _apply_nba_live_scores(games, context_label) if is_active_today else games
         if slug == "nhl":
             from syndicate.features.nhl.cards import build_cards_page_context
 
             payload = build_cards_page_context(context_label)
             if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
                 return []
-            return list(payload.get("games") or [])
+            games = list(payload.get("games") or [])
+            return _apply_nhl_live_scores(games, context_label) if is_active_today else games
         if slug == "wnba":
             from syndicate.features.wnba.cards import build_cards_page_context
 
@@ -1820,7 +2005,7 @@ def _build_sport_overview(
         week=selected_week,
         is_active_today=active_today,
     )
-    home_games = _load_home_games(slug, context_label=context_label, season=season, week=selected_week) if active_today else []
+    home_games = _load_home_games(slug, context_label=context_label, season=season, week=selected_week, is_active_today=active_today) if active_today else []
     game_bar["items"] = game_items
     props_bar["items"] = _load_home_prop_items(
         slug,
