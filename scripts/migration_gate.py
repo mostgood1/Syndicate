@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime, timezone
@@ -200,6 +201,7 @@ class CommandResult:
     returncode: int
     stdout: str
     stderr: str
+    timed_out: bool = False
 
     @property
     def ok(self) -> bool:
@@ -234,6 +236,24 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         type=Path,
         help="Optional output directory for persisted migration gate reports.",
     )
+    parser.add_argument(
+        "--command-timeout-sec",
+        type=int,
+        default=600,
+        help="Timeout for audit/module-tracker commands in seconds.",
+    )
+    parser.add_argument(
+        "--tests-timeout-sec",
+        type=int,
+        default=900,
+        help="Timeout for unittest regression command in seconds.",
+    )
+    parser.add_argument(
+        "--smoke-timeout-sec",
+        type=int,
+        default=900,
+        help="Timeout for browser smoke command in seconds.",
+    )
     return parser.parse_args(argv)
 
 
@@ -249,20 +269,35 @@ def write_reports(report: dict[str, object], output_dir: Path) -> dict[str, str]
     }
 
 
-def run_command(name: str, command: list[str]) -> CommandResult:
-    completed = subprocess.run(
-        command,
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
-    return CommandResult(
-        name=name,
-        command=command,
-        returncode=int(completed.returncode),
-        stdout=completed.stdout,
-        stderr=completed.stderr,
-    )
+def run_command(name: str, command: list[str], *, timeout_sec: int | None = None) -> CommandResult:
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+        )
+        return CommandResult(
+            name=name,
+            command=command,
+            returncode=int(completed.returncode),
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            timed_out=False,
+        )
+    except subprocess.TimeoutExpired as error:
+        elapsed = time.monotonic() - started
+        timeout_text = f"{timeout_sec}s" if timeout_sec is not None else "configured timeout"
+        return CommandResult(
+            name=name,
+            command=command,
+            returncode=124,
+            stdout=(error.stdout or "") if isinstance(error.stdout, str) else "",
+            stderr=f"Command timed out after {timeout_text} (elapsed {elapsed:.1f}s).",
+            timed_out=True,
+        )
 
 
 def normalize_audit_findings(payload: object) -> list[dict[str, object]]:
@@ -810,8 +845,16 @@ def render_text_report(report: dict[str, object]) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
 
+    command_timeout = max(1, int(args.command_timeout_sec))
+    tests_timeout = max(1, int(args.tests_timeout_sec))
+    smoke_timeout = max(1, int(args.smoke_timeout_sec))
+
     command_results: list[CommandResult] = []
-    audit_result = run_command("audit", [sys.executable, "scripts/audit_migration.py", "--format", "json"])
+    audit_result = run_command(
+        "audit",
+        [sys.executable, "scripts/audit_migration.py", "--format", "json"],
+        timeout_sec=command_timeout,
+    )
     command_results.append(audit_result)
 
     findings_payload: object = []
@@ -835,7 +878,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     ]
     audit_ok = bool(audit_result.ok and audit_parse_error is None and not unexpected_findings and not missing_allowed_findings)
 
-    module_tracker_result = run_command("module_tracker", [sys.executable, "scripts/module_tracker_snapshot.py", "--json"])
+    module_tracker_result = run_command(
+        "module_tracker",
+        [sys.executable, "scripts/module_tracker_snapshot.py", "--json"],
+        timeout_sec=command_timeout,
+    )
     command_results.append(module_tracker_result)
 
     module_tracker_payload: object = {}
@@ -869,13 +916,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     if not args.skip_tests:
-        command_results.append(run_command("tests", [sys.executable, "-m", "unittest", "tests.test_archives"]))
+        command_results.append(
+            run_command(
+                "tests",
+                [sys.executable, "-m", "unittest", "tests.test_archives"],
+                timeout_sec=tests_timeout,
+            )
+        )
 
     if not args.skip_smoke:
         smoke_command = [sys.executable, "scripts/browser_parity_smoke.py"]
         if args.base_url:
             smoke_command.extend(["--base-url", args.base_url])
-        command_results.append(run_command("browser_smoke", smoke_command))
+        command_results.append(run_command("browser_smoke", smoke_command, timeout_sec=smoke_timeout))
 
     report = {
         "ok": audit_ok and runtime_dependency_ok and all(result.ok for result in command_results if result.name not in {"audit", "module_tracker"}),
@@ -911,6 +964,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "command": result.command,
                 "ok": result.ok,
                 "returncode": result.returncode,
+                "timed_out": bool(result.timed_out),
                 "stdout_excerpt": summarize_command_output(result.stdout),
                 "stderr_excerpt": summarize_command_output(result.stderr),
             }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -14,11 +15,21 @@ from scripts.migration_gate import evaluate_runtime_dependency_findings
 from scripts.migration_gate import evaluate_protected_source_shell_routes
 from scripts.migration_gate import normalize_runtime_dependency_findings
 from scripts.migration_gate import render_text_report
+from scripts.migration_gate import run_command
 from scripts.module_tracker_snapshot import module_snapshot
 from syndicate.features.shared.source_roots import preferred_source_roots
 
 
 class MigrationGateRuntimeDependencyTests(unittest.TestCase):
+    def test_run_command_marks_timeout_as_failure_with_message(self) -> None:
+        with patch("scripts.migration_gate.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["python"], timeout=1)):
+            result = run_command("timeout_test", ["python", "-c", "pass"], timeout_sec=1)
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.returncode, 124)
+        self.assertTrue(result.timed_out)
+        self.assertIn("timed out", result.stderr.lower())
+
     def test_preferred_source_roots_returns_local_mirror_without_sibling_fallback(self) -> None:
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "repo"

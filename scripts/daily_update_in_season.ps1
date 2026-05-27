@@ -66,6 +66,80 @@ function Set-SportActive {
     }
 }
 
+function Get-ScheduledGamesCheck {
+    param(
+        [string]$Sport,
+        [string]$DateValue
+    )
+
+    $result = [ordered]@{
+        known = $false
+        hasGames = $true
+        count = $null
+        source = $null
+        note = $null
+    }
+
+    try {
+        switch ($Sport.ToUpperInvariant()) {
+            'MLB' {
+                $url = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=$DateValue"
+                $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
+                $totalGames = $null
+                if ($payload -and $payload.dates -and $payload.dates.Count -gt 0) {
+                    $totalGames = [int]($payload.dates[0].totalGames)
+                }
+                $result.known = $true
+                $result.source = 'mlb_statsapi_schedule'
+                $result.count = ($totalGames -as [int])
+                $result.hasGames = ([int]($totalGames -as [int]) -gt 0)
+            }
+            'NBA' {
+                $scoreboardDate = $DateValue.Replace('-', '')
+                $url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=$scoreboardDate"
+                $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
+                $eventCount = if ($payload -and $payload.events) { [int]$payload.events.Count } else { 0 }
+                $result.known = $true
+                $result.source = 'espn_nba_scoreboard'
+                $result.count = $eventCount
+                $result.hasGames = ($eventCount -gt 0)
+            }
+            'WNBA' {
+                $scoreboardDate = $DateValue.Replace('-', '')
+                $url = "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=$scoreboardDate"
+                $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
+                $eventCount = if ($payload -and $payload.events) { [int]$payload.events.Count } else { 0 }
+                $result.known = $true
+                $result.source = 'espn_wnba_scoreboard'
+                $result.count = $eventCount
+                $result.hasGames = ($eventCount -gt 0)
+            }
+            'NHL' {
+                $url = "https://api-web.nhle.com/v1/schedule/$DateValue"
+                $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
+                $gameCount = 0
+                foreach ($week in @($payload.gameWeek)) {
+                    if (-not $week) { continue }
+                    if ([string]$week.date -ne $DateValue) { continue }
+                    $gameCount += @($week.games).Count
+                }
+                $result.known = $true
+                $result.source = 'nhle_schedule'
+                $result.count = $gameCount
+                $result.hasGames = ($gameCount -gt 0)
+            }
+            default {
+                $result.note = 'No scheduled-games checker configured for this sport.'
+            }
+        }
+    }
+    catch {
+        $result.note = $_.Exception.Message
+    }
+
+    return [pscustomobject]$result
+}
+
 try {
     $targetDate = [datetime]::ParseExact($Date, 'yyyy-MM-dd', $null)
 }
@@ -89,11 +163,61 @@ Set-SportActive -ActiveSports $activeSports -Sport 'NFL' -ForceActive ([bool]$Fo
 Set-SportActive -ActiveSports $activeSports -Sport 'NCAAF' -ForceActive ([bool]$ForceNCAAF)
 Set-SportActive -ActiveSports $activeSports -Sport 'NCAAB' -ForceActive ([bool]$ForceNCAAB)
 
+$forcedMap = [ordered]@{
+    MLB = [bool]$ForceMLB
+    NBA = [bool]$ForceNBA
+    NHL = [bool]$ForceNHL
+    WNBA = [bool]$ForceWNBA
+    NFL = [bool]$ForceNFL
+    NCAAF = [bool]$ForceNCAAF
+    NCAAB = [bool]$ForceNCAAB
+}
+
+$precheckActiveList = @($activeSports.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key })
+if ($precheckActiveList.Count -eq 0) {
+    throw 'No sports are active for the selected date. Pass -IncludeOffSeasonSports or one or more -Force* switches.'
+}
+
+$noSlateSkips = @()
+$scheduledChecks = @()
+foreach ($sport in @('MLB', 'NBA', 'NHL', 'WNBA')) {
+    if (-not $activeSports[$sport]) { continue }
+    if ($forcedMap[$sport]) {
+        $scheduledChecks += [pscustomobject]@{
+            sport = $sport
+            skipped = $false
+            reason = 'Forced active via -Force* switch'
+            checker = $null
+            count = $null
+        }
+        continue
+    }
+
+    $check = Get-ScheduledGamesCheck -Sport $sport -DateValue $Date
+    $scheduledChecks += [pscustomobject]@{
+        sport = $sport
+        skipped = [bool]($check.known -and -not $check.hasGames)
+        reason = if ($check.known -and -not $check.hasGames) { 'No scheduled games detected for date' } elseif (-not $check.known) { "Checker unavailable: $($check.note)" } else { 'Scheduled games detected' }
+        checker = $check.source
+        count = $check.count
+    }
+    if ($check.known -and -not $check.hasGames) {
+        $activeSports[$sport] = $false
+        $noSlateSkips += $sport
+    }
+}
+
 $activeList = @($activeSports.GetEnumerator() | Where-Object { $_.Value } | ForEach-Object { $_.Key })
 $skippedList = @($activeSports.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key })
 
 if ($activeList.Count -eq 0) {
-    throw 'No sports are active for the selected date. Pass -IncludeOffSeasonSports or one or more -Force* switches.'
+    Write-Host '==> In-season daily update' -ForegroundColor Cyan
+    Write-Host ("    date: {0}" -f $Date) -ForegroundColor DarkGray
+    Write-Host '    no-slate day detected for scheduled-game sports; skipping run.' -ForegroundColor Yellow
+    if ($noSlateSkips.Count -gt 0) {
+        Write-Host ("    no-slate skips: {0}" -f ($noSlateSkips -join ', ')) -ForegroundColor DarkGray
+    }
+    return
 }
 
 $dailyArgs = @(
@@ -126,6 +250,14 @@ Write-Host ("    date: {0}" -f $Date) -ForegroundColor DarkGray
 Write-Host ("    active sports: {0}" -f ($activeList -join ', ')) -ForegroundColor DarkGray
 if ($skippedList.Count -gt 0) {
     Write-Host ("    skipped sports: {0}" -f ($skippedList -join ', ')) -ForegroundColor DarkGray
+}
+if ($noSlateSkips.Count -gt 0) {
+    Write-Host ("    no-slate skips: {0}" -f ($noSlateSkips -join ', ')) -ForegroundColor DarkGray
+}
+foreach ($check in $scheduledChecks) {
+    $countText = if ($null -eq $check.count) { '-' } else { [string]$check.count }
+    $checkerText = if ([string]::IsNullOrWhiteSpace([string]$check.checker)) { 'n/a' } else { [string]$check.checker }
+    Write-Host ("    schedule check [{0}] count={1} source={2} status={3}" -f $check.sport, $countText, $checkerText, $check.reason) -ForegroundColor DarkGray
 }
 $gateTestsStatus = 'enabled'
 if ($effectiveSkipTests) {

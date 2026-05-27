@@ -15,7 +15,10 @@ param(
     [switch]$SkipMLB,
     [switch]$SkipNBA,
     [switch]$SkipNHL,
-    [switch]$SkipWNBA
+    [switch]$SkipWNBA,
+    [int]$GateCommandTimeoutSec = 600,
+    [int]$GateTestsTimeoutSec = 900,
+    [int]$GateSmokeTimeoutSec = 900
 )
 
 $ErrorActionPreference = 'Stop'
@@ -79,13 +82,14 @@ function Invoke-Step {
     Write-Host "==> $Name" -ForegroundColor Cyan
     Write-Host ("    " + ($Command -join ' ')) -ForegroundColor DarkGray
     $output = @(& $Command[0] $Command[1..($Command.Length - 1)] 2>&1 | Tee-Object -Variable __stepOutput)
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Name failed with exit code $LASTEXITCODE"
-    }
 
     if ($ArtifactName) {
         $outputText = ($__stepOutput | Out-String)
         Set-Content -Path (Join-Path $runArtifactsDir $ArtifactName) -Value $outputText -Encoding utf8
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Name failed with exit code $LASTEXITCODE"
     }
 
     return $output
@@ -196,6 +200,9 @@ try {
     if ($SkipSmoke) {
         $gateCommand += '--skip-smoke'
     }
+    $gateCommand += @('--command-timeout-sec', [string][Math]::Max(1, $GateCommandTimeoutSec))
+    $gateCommand += @('--tests-timeout-sec', [string][Math]::Max(1, $GateTestsTimeoutSec))
+    $gateCommand += @('--smoke-timeout-sec', [string][Math]::Max(1, $GateSmokeTimeoutSec))
     $gateCommand += @('--write-dir', $runArtifactsDir)
 
     $gateOutput = Invoke-Step -Name 'Migration gate' -Command $gateCommand -ArtifactName 'migration_gate_console.txt'

@@ -1,13 +1,13 @@
 {
   "counts": {
-    "games": 0,
-    "markets": 0
+    "games": 4,
+    "markets": 2
   },
   "date": "2026-05-27",
   "meta": {
     "inputs": {
       "props_recommendations": "props_recommendations_2026-05-27.csv",
-      "smart_sim_files": 0
+      "smart_sim_files": 5
     },
     "policy": {
       "allowed_markets": [
@@ -29,6 +29,1412 @@
       "view": "slate"
     }
   },
-  "per_game": [],
-  "per_market": {}
+  "per_game": [
+    {
+      "away": "ATL",
+      "game_id": "401856940",
+      "game_key": "2026-05-27:ATL@MIN",
+      "home": "MIN",
+      "matchup": "ATL @ MIN",
+      "picks": [
+        {
+          "away": "ATL",
+          "basketball_priority_score": 66.0,
+          "basketball_reasons": [
+            "Recent form is already clearing this number with a last-five average of 15.0.",
+            "The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+            "The last game landed at 19.0, which is already above this line.",
+            "This is a cleaner rest spot without a back-to-back tax."
+          ],
+          "basketball_summary": "Recent form is already clearing this number with a last-five average of 15.0. The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+          "book": "draftkings",
+          "display_pick": "Natasha Howard Over 10.5 RA",
+          "ev": 0.7759710810222624,
+          "ev_pct": 77.6,
+          "game_id": "401856940",
+          "game_key": "2026-05-27:ATL@MIN",
+          "home": "MIN",
+          "implied_prob": 0.5192,
+          "line": 10.5,
+          "market": "ra",
+          "market_reasons": [
+            "Projected value is +77.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 40.3 points."
+          ],
+          "matchup": "ATL @ MIN",
+          "model_baseline": 14.388607142857143,
+          "model_reasons": [
+            "The model baseline sits at 14.4 against a 10.5 line.",
+            "That leaves roughly +1.42 standard deviations of cushion.",
+            "Win probability grades at 92.2%."
+          ],
+          "model_sd": 2.739215248747354,
+          "p_win": 0.9221,
+          "player": "Natasha Howard",
+          "price": -108.0,
+          "prob_edge": 0.4029,
+          "reasons": [
+            "Recent form is already clearing this number with a last-five average of 15.0.",
+            "The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+            "The last game landed at 19.0, which is already above this line.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 14.4 against a 10.5 line.",
+            "That leaves roughly +1.42 standard deviations of cushion.",
+            "Win probability grades at 92.2%.",
+            "Projected value is +77.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 40.3 points."
+          ],
+          "recommendation_priority_score": 81.7,
+          "score": 0.7759710810222624,
+          "sd_rel": 0.26087764273784325,
+          "selection": "OVER",
+          "side": "OVER",
+          "sim_mean": 14.388607142857145,
+          "sim_reasons": [
+            "The model baseline sits at 14.4 against a 10.5 line.",
+            "That leaves roughly +1.42 standard deviations of cushion.",
+            "Win probability grades at 92.2%."
+          ],
+          "sim_sd": 2.739215248747354,
+          "sim_support_score": 100.0,
+          "team": "MIN",
+          "top_play_reasons": [
+            "Recent form is already clearing this number with a last-five average of 15.0.",
+            "The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+            "The last game landed at 19.0, which is already above this line.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 14.4 against a 10.5 line.",
+            "That leaves roughly +1.42 standard deviations of cushion.",
+            "Win probability grades at 92.2%.",
+            "Projected value is +77.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 40.3 points."
+          ],
+          "value_reasons": [
+            "Projected value is +77.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 40.3 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.92213883053079,
+          "win_prob_raw": 0.92213883053079,
+          "z": 1.4196062703124221
+        },
+        {
+          "away": "ATL",
+          "basketball_priority_score": 82.0,
+          "basketball_reasons": [
+            "Recent form is already clearing this number with a last-five average of 17.0.",
+            "The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+            "The last game landed at 21.0, which is already above this line.",
+            "The minute load looks stable around 30.7.",
+            "This is a cleaner rest spot without a back-to-back tax."
+          ],
+          "basketball_summary": "Recent form is already clearing this number with a last-five average of 17.0. The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+          "book": "draftkings",
+          "display_pick": "Jordin Canada Over 9.5 RA",
+          "ev": 0.7474350077414984,
+          "ev_pct": 74.74,
+          "game_id": "401856940",
+          "game_key": "2026-05-27:ATL@MIN",
+          "home": "MIN",
+          "implied_prob": 0.5556,
+          "line": 9.5,
+          "market": "ra",
+          "market_reasons": [
+            "Projected value is +74.7% per unit risked.",
+            "The price stays workable at -125.",
+            "Model probability clears the market by 41.5 points."
+          ],
+          "matchup": "MIN @ ATL",
+          "model_baseline": 14.496052631578946,
+          "model_reasons": [
+            "The model baseline sits at 14.5 against a 9.5 line.",
+            "That leaves roughly +1.89 standard deviations of cushion.",
+            "Win probability grades at 97.1%."
+          ],
+          "model_sd": 2.639724614840588,
+          "p_win": 0.9708,
+          "player": "Jordin Canada",
+          "price": -125.0,
+          "prob_edge": 0.4152,
+          "reasons": [
+            "Recent form is already clearing this number with a last-five average of 17.0.",
+            "The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+            "The last game landed at 21.0, which is already above this line.",
+            "The minute load looks stable around 30.7.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 14.5 against a 9.5 line.",
+            "That leaves roughly +1.89 standard deviations of cushion.",
+            "Win probability grades at 97.1%.",
+            "Projected value is +74.7% per unit risked.",
+            "The price stays workable at -125.",
+            "Model probability clears the market by 41.5 points."
+          ],
+          "recommendation_priority_score": 88.9,
+          "score": 0.7474350077414984,
+          "sd_rel": 0.2778657489305882,
+          "selection": "OVER",
+          "side": "OVER",
+          "sim_mean": 14.496052631578946,
+          "sim_reasons": [
+            "The model baseline sits at 14.5 against a 9.5 line.",
+            "That leaves roughly +1.89 standard deviations of cushion.",
+            "Win probability grades at 97.1%."
+          ],
+          "sim_sd": 2.639724614840588,
+          "sim_support_score": 100.0,
+          "team": "ATL",
+          "top_play_reasons": [
+            "Recent form is already clearing this number with a last-five average of 17.0.",
+            "The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+            "The last game landed at 21.0, which is already above this line.",
+            "The minute load looks stable around 30.7.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 14.5 against a 9.5 line.",
+            "That leaves roughly +1.89 standard deviations of cushion.",
+            "Win probability grades at 97.1%.",
+            "Projected value is +74.7% per unit risked.",
+            "The price stays workable at -125.",
+            "Model probability clears the market by 41.5 points."
+          ],
+          "value_reasons": [
+            "Projected value is +74.7% per unit risked.",
+            "The price stays workable at -125.",
+            "Model probability clears the market by 41.5 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.9707972265230547,
+          "win_prob_raw": 0.9707972265230547,
+          "z": 1.892641604920086
+        },
+        {
+          "away": "ATL",
+          "basketball_priority_score": 82.0,
+          "basketball_reasons": [
+            "Recent form is already clearing this number with a last-five average of 25.8.",
+            "The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+            "The last game landed at 21.0, which is already above this line.",
+            "The minute load looks stable around 35.0.",
+            "This is a cleaner rest spot without a back-to-back tax."
+          ],
+          "basketball_summary": "Recent form is already clearing this number with a last-five average of 25.8. The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+          "book": "draftkings",
+          "display_pick": "Rhyne Howard Over 20.5 PA",
+          "ev": 0.2809551670497952,
+          "ev_pct": 28.1,
+          "game_id": "401856940",
+          "game_key": "2026-05-27:ATL@MIN",
+          "home": "MIN",
+          "implied_prob": 0.5238,
+          "line": 20.5,
+          "market": "pa",
+          "market_reasons": [
+            "Projected value is +28.1% per unit risked.",
+            "The price stays workable at -110.",
+            "Model probability clears the market by 14.7 points."
+          ],
+          "matchup": "MIN @ ATL",
+          "model_baseline": 22.69628333333333,
+          "model_reasons": [
+            "The model baseline sits at 22.7 against a 20.5 line.",
+            "That leaves roughly +0.44 standard deviations of cushion.",
+            "Win probability grades at 67.1%."
+          ],
+          "model_sd": 4.962104967968208,
+          "p_win": 0.671,
+          "player": "Rhyne Howard",
+          "price": -110.0,
+          "prob_edge": 0.1472,
+          "reasons": [
+            "Recent form is already clearing this number with a last-five average of 25.8.",
+            "The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+            "The last game landed at 21.0, which is already above this line.",
+            "The minute load looks stable around 35.0.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 22.7 against a 20.5 line.",
+            "That leaves roughly +0.44 standard deviations of cushion.",
+            "Win probability grades at 67.1%.",
+            "Projected value is +28.1% per unit risked.",
+            "The price stays workable at -110.",
+            "Model probability clears the market by 14.7 points."
+          ],
+          "recommendation_priority_score": 88.9,
+          "score": 0.2809551670497952,
+          "sd_rel": 0.24205390087649795,
+          "selection": "OVER",
+          "side": "OVER",
+          "sim_mean": 22.696283333333334,
+          "sim_reasons": [
+            "The model baseline sits at 22.7 against a 20.5 line.",
+            "That leaves roughly +0.44 standard deviations of cushion.",
+            "Win probability grades at 67.1%."
+          ],
+          "sim_sd": 4.962104967968208,
+          "sim_support_score": 100.0,
+          "team": "ATL",
+          "top_play_reasons": [
+            "Recent form is already clearing this number with a last-five average of 25.8.",
+            "The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+            "The last game landed at 21.0, which is already above this line.",
+            "The minute load looks stable around 35.0.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 22.7 against a 20.5 line.",
+            "That leaves roughly +0.44 standard deviations of cushion.",
+            "Win probability grades at 67.1%.",
+            "Projected value is +28.1% per unit risked.",
+            "The price stays workable at -110.",
+            "Model probability clears the market by 14.7 points."
+          ],
+          "value_reasons": [
+            "Projected value is +28.1% per unit risked.",
+            "The price stays workable at -110.",
+            "Model probability clears the market by 14.7 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.6709765160737022,
+          "win_prob_raw": 0.6709765160737022,
+          "z": 0.4426112199381037
+        }
+      ]
+    },
+    {
+      "away": "PHX",
+      "game_id": "401856938",
+      "game_key": "2026-05-27:PHX@NYL",
+      "home": "NYL",
+      "matchup": "PHX @ NYL",
+      "picks": [
+        {
+          "away": "PHX",
+          "basketball_priority_score": 82.0,
+          "basketball_reasons": [
+            "Recent form has stayed below this line with a last-five average of 10.8.",
+            "The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+            "The last game landed at 18.0, which stayed under this line.",
+            "Projected minutes sit in a softer band around 25.6.",
+            "A healthy NYL rotation keeps touches spread out across the lineup."
+          ],
+          "basketball_summary": "Recent form has stayed below this line with a last-five average of 10.8. The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+          "book": "draftkings",
+          "display_pick": "Sabrina Ionescu Under 22.5 PA",
+          "ev": 0.9258491290823696,
+          "ev_pct": 92.58,
+          "game_id": "401856938",
+          "game_key": "2026-05-27:PHX@NYL",
+          "home": "NYL",
+          "implied_prob": 0.5192,
+          "line": 22.5,
+          "market": "pa",
+          "market_reasons": [
+            "Projected value is +92.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 47.1 points."
+          ],
+          "matchup": "PHX @ NYL",
+          "model_baseline": 13.12,
+          "model_reasons": [
+            "The model baseline sits at 13.1 against a 22.5 line.",
+            "That leaves roughly +3.95 standard deviations of cushion.",
+            "Win probability grades at 99.0%."
+          ],
+          "model_sd": 2.377603835797713,
+          "p_win": 0.99,
+          "player": "Sabrina Ionescu",
+          "price": -108.0,
+          "prob_edge": 0.4708,
+          "reasons": [
+            "Recent form has stayed below this line with a last-five average of 10.8.",
+            "The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+            "The last game landed at 18.0, which stayed under this line.",
+            "Projected minutes sit in a softer band around 25.6.",
+            "A healthy NYL rotation keeps touches spread out across the lineup.",
+            "The model baseline sits at 13.1 against a 22.5 line.",
+            "That leaves roughly +3.95 standard deviations of cushion.",
+            "Win probability grades at 99.0%.",
+            "Projected value is +92.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 47.1 points."
+          ],
+          "recommendation_priority_score": 88.9,
+          "score": 0.9258491290823696,
+          "sd_rel": 0.10567128159100947,
+          "selection": "UNDER",
+          "side": "UNDER",
+          "sim_mean": 13.12,
+          "sim_reasons": [
+            "The model baseline sits at 13.1 against a 22.5 line.",
+            "That leaves roughly +3.95 standard deviations of cushion.",
+            "Win probability grades at 99.0%."
+          ],
+          "sim_sd": 2.377603835797713,
+          "sim_support_score": 100.0,
+          "team": "NYL",
+          "top_play_reasons": [
+            "Recent form has stayed below this line with a last-five average of 10.8.",
+            "The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+            "The last game landed at 18.0, which stayed under this line.",
+            "Projected minutes sit in a softer band around 25.6.",
+            "A healthy NYL rotation keeps touches spread out across the lineup.",
+            "The model baseline sits at 13.1 against a 22.5 line.",
+            "That leaves roughly +3.95 standard deviations of cushion.",
+            "Win probability grades at 99.0%.",
+            "Projected value is +92.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 47.1 points."
+          ],
+          "value_reasons": [
+            "Projected value is +92.6% per unit risked.",
+            "The price stays workable at -108.",
+            "Model probability clears the market by 47.1 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.9999601247158457,
+          "win_prob_raw": 0.9999601247158457,
+          "z": 3.945148413193447
+        },
+        {
+          "away": "PHX",
+          "basketball_priority_score": 82.0,
+          "basketball_reasons": [
+            "Recent form is already clearing this number with a last-five average of 12.8.",
+            "The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+            "The last game landed at 14.0, which is already above this line.",
+            "The minute load looks stable around 32.9.",
+            "This is a cleaner rest spot without a back-to-back tax."
+          ],
+          "basketball_summary": "Recent form is already clearing this number with a last-five average of 12.8. The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+          "book": "draftkings",
+          "display_pick": "Breanna Stewart Over 10.5 RA",
+          "ev": 0.3454034338414338,
+          "ev_pct": 34.54,
+          "game_id": "401856938",
+          "game_key": "2026-05-27:PHX@NYL",
+          "home": "NYL",
+          "implied_prob": 0.5708,
+          "line": 10.5,
+          "market": "ra",
+          "market_reasons": [
+            "Projected value is +34.5% per unit risked.",
+            "Model probability clears the market by 19.7 points."
+          ],
+          "matchup": "PHX @ NYL",
+          "model_baseline": 12.428353299492386,
+          "model_reasons": [
+            "The model baseline sits at 12.4 against a 10.5 line.",
+            "That leaves roughly +0.73 standard deviations of cushion.",
+            "Win probability grades at 76.8%."
+          ],
+          "model_sd": 2.633639089551618,
+          "p_win": 0.768,
+          "player": "Breanna Stewart",
+          "price": -133.0,
+          "prob_edge": 0.1972,
+          "reasons": [
+            "Recent form is already clearing this number with a last-five average of 12.8.",
+            "The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+            "The last game landed at 14.0, which is already above this line.",
+            "The minute load looks stable around 32.9.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 12.4 against a 10.5 line.",
+            "That leaves roughly +0.73 standard deviations of cushion.",
+            "Win probability grades at 76.8%.",
+            "Projected value is +34.5% per unit risked.",
+            "Model probability clears the market by 19.7 points."
+          ],
+          "recommendation_priority_score": 86.9,
+          "score": 0.3454034338414338,
+          "sd_rel": 0.25082277043348744,
+          "selection": "OVER",
+          "side": "OVER",
+          "sim_mean": 12.428353299492386,
+          "sim_reasons": [
+            "The model baseline sits at 12.4 against a 10.5 line.",
+            "That leaves roughly +0.73 standard deviations of cushion.",
+            "Win probability grades at 76.8%."
+          ],
+          "sim_sd": 2.633639089551618,
+          "sim_support_score": 100.0,
+          "team": "NYL",
+          "top_play_reasons": [
+            "Recent form is already clearing this number with a last-five average of 12.8.",
+            "The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+            "The last game landed at 14.0, which is already above this line.",
+            "The minute load looks stable around 32.9.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 12.4 against a 10.5 line.",
+            "That leaves roughly +0.73 standard deviations of cushion.",
+            "Win probability grades at 76.8%.",
+            "Projected value is +34.5% per unit risked.",
+            "Model probability clears the market by 19.7 points."
+          ],
+          "value_reasons": [
+            "Projected value is +34.5% per unit risked.",
+            "Model probability clears the market by 19.7 points."
+          ],
+          "value_support_score": 75.0,
+          "win_prob": 0.7679770673858828,
+          "win_prob_raw": 0.7679770673858828,
+          "z": 0.7322010472667656
+        }
+      ]
+    },
+    {
+      "away": "TOR",
+      "game_id": "401856939",
+      "game_key": "2026-05-27:TOR@CHI",
+      "home": "CHI",
+      "matchup": "TOR @ CHI",
+      "picks": [
+        {
+          "away": "TOR",
+          "basketball_priority_score": 48.0,
+          "basketball_reasons": [
+            "Recent form has stayed below this line with a last-five average of 14.6.",
+            "The last game landed at 7.0, which stayed under this line.",
+            "A healthy CHI rotation keeps touches spread out across the lineup."
+          ],
+          "basketball_summary": "Recent form has stayed below this line with a last-five average of 14.6. The last game landed at 7.0, which stayed under this line.",
+          "book": "draftkings",
+          "display_pick": "Natasha Cloud Under 16.5 PA",
+          "ev": 0.5665053447127939,
+          "ev_pct": 56.65,
+          "game_id": "401856939",
+          "game_key": "2026-05-27:TOR@CHI",
+          "home": "CHI",
+          "implied_prob": 0.5074,
+          "line": 16.5,
+          "market": "pa",
+          "market_reasons": [
+            "Projected value is +56.7% per unit risked.",
+            "The price stays workable at -103.",
+            "Model probability clears the market by 28.7 points."
+          ],
+          "matchup": "TOR @ CHI",
+          "model_baseline": 14.166525714285712,
+          "model_reasons": [
+            "The model baseline sits at 14.2 against a 16.5 line.",
+            "That leaves roughly +0.82 standard deviations of cushion.",
+            "Win probability grades at 79.5%."
+          ],
+          "model_sd": 2.8343359240256705,
+          "p_win": 0.7948,
+          "player": "Natasha Cloud",
+          "price": -103.0,
+          "prob_edge": 0.2874,
+          "reasons": [
+            "Recent form has stayed below this line with a last-five average of 14.6.",
+            "The last game landed at 7.0, which stayed under this line.",
+            "A healthy CHI rotation keeps touches spread out across the lineup.",
+            "The model baseline sits at 14.2 against a 16.5 line.",
+            "That leaves roughly +0.82 standard deviations of cushion.",
+            "Win probability grades at 79.5%.",
+            "Projected value is +56.7% per unit risked.",
+            "The price stays workable at -103.",
+            "Model probability clears the market by 28.7 points."
+          ],
+          "recommendation_priority_score": 73.6,
+          "score": 0.5665053447127939,
+          "sd_rel": 0.17177793478943457,
+          "selection": "UNDER",
+          "side": "UNDER",
+          "sim_mean": 14.166525714285715,
+          "sim_reasons": [
+            "The model baseline sits at 14.2 against a 16.5 line.",
+            "That leaves roughly +0.82 standard deviations of cushion.",
+            "Win probability grades at 79.5%."
+          ],
+          "sim_sd": 2.8343359240256705,
+          "sim_support_score": 100.0,
+          "team": "CHI",
+          "top_play_reasons": [
+            "Recent form has stayed below this line with a last-five average of 14.6.",
+            "The last game landed at 7.0, which stayed under this line.",
+            "A healthy CHI rotation keeps touches spread out across the lineup.",
+            "The model baseline sits at 14.2 against a 16.5 line.",
+            "That leaves roughly +0.82 standard deviations of cushion.",
+            "Win probability grades at 79.5%.",
+            "Projected value is +56.7% per unit risked.",
+            "The price stays workable at -103.",
+            "Model probability clears the market by 28.7 points."
+          ],
+          "value_reasons": [
+            "Projected value is +56.7% per unit risked.",
+            "The price stays workable at -103.",
+            "Model probability clears the market by 28.7 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.794827835002058,
+          "win_prob_raw": 0.794827835002058,
+          "z": 0.8232878347037987
+        },
+        {
+          "away": "TOR",
+          "basketball_priority_score": 66.0,
+          "basketball_reasons": [
+            "Recent form has stayed below this line with a last-five average of 5.8.",
+            "The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+            "The last game landed at 5.0, which stayed under this line.",
+            "A healthy TOR rotation keeps touches spread out across the lineup."
+          ],
+          "basketball_summary": "Recent form has stayed below this line with a last-five average of 5.8. The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+          "book": "fanduel",
+          "display_pick": "Brittney Sykes Under 8.5 RA",
+          "ev": 0.460637357153439,
+          "ev_pct": 46.06,
+          "game_id": "401856939",
+          "game_key": "2026-05-27:TOR@CHI",
+          "home": "CHI",
+          "implied_prob": 0.5283,
+          "line": 8.5,
+          "market": "ra",
+          "market_reasons": [
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 24.3 points."
+          ],
+          "matchup": "CHI @ TOR",
+          "model_baseline": 7.347782062780269,
+          "model_reasons": [
+            "The model baseline sits at 7.3 against a 8.5 line.",
+            "That leaves roughly +0.74 standard deviations of cushion.",
+            "Win probability grades at 77.2%."
+          ],
+          "model_sd": 1.5480216108925202,
+          "p_win": 0.7717,
+          "player": "Brittney Sykes",
+          "price": -112.0,
+          "prob_edge": 0.2434,
+          "reasons": [
+            "Recent form has stayed below this line with a last-five average of 5.8.",
+            "The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+            "The last game landed at 5.0, which stayed under this line.",
+            "A healthy TOR rotation keeps touches spread out across the lineup.",
+            "The model baseline sits at 7.3 against a 8.5 line.",
+            "That leaves roughly +0.74 standard deviations of cushion.",
+            "Win probability grades at 77.2%.",
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 24.3 points."
+          ],
+          "recommendation_priority_score": 81.1,
+          "score": 0.460637357153439,
+          "sd_rel": 0.1821201895167671,
+          "selection": "UNDER",
+          "side": "UNDER",
+          "sim_mean": 7.347782062780269,
+          "sim_reasons": [
+            "The model baseline sits at 7.3 against a 8.5 line.",
+            "That leaves roughly +0.74 standard deviations of cushion.",
+            "Win probability grades at 77.2%."
+          ],
+          "sim_sd": 1.5480216108925202,
+          "sim_support_score": 98.4,
+          "team": "TOR",
+          "top_play_reasons": [
+            "Recent form has stayed below this line with a last-five average of 5.8.",
+            "The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+            "The last game landed at 5.0, which stayed under this line.",
+            "A healthy TOR rotation keeps touches spread out across the lineup.",
+            "The model baseline sits at 7.3 against a 8.5 line.",
+            "That leaves roughly +0.74 standard deviations of cushion.",
+            "Win probability grades at 77.2%.",
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 24.3 points."
+          ],
+          "value_reasons": [
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 24.3 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.7716574717037037,
+          "win_prob_raw": 0.7716574717037037,
+          "z": 0.7443164417810769
+        }
+      ]
+    },
+    {
+      "away": "WSH",
+      "game_id": "401856942",
+      "game_key": "2026-05-27:WSH@SEA",
+      "home": "SEA",
+      "matchup": "WSH @ SEA",
+      "picks": [
+        {
+          "away": "WSH",
+          "basketball_priority_score": 56.0,
+          "basketball_reasons": [
+            "Recent form is already clearing this number with a last-five average of 24.2.",
+            "The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+            "The last game landed at 29.0, which is already above this line."
+          ],
+          "basketball_summary": "Recent form is already clearing this number with a last-five average of 24.2. The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+          "book": "draftkings",
+          "display_pick": "Natisha Hiedeman Over 18.5 PA",
+          "ev": 0.46057437210698193,
+          "ev_pct": 46.06,
+          "game_id": "401856942",
+          "game_key": "2026-05-27:WSH@SEA",
+          "home": "SEA",
+          "implied_prob": 0.5169,
+          "line": 18.5,
+          "market": "pa",
+          "market_reasons": [
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -107.",
+            "Model probability clears the market by 23.8 points."
+          ],
+          "matchup": "WSH @ SEA",
+          "model_baseline": 21.524251336898395,
+          "model_reasons": [
+            "The model baseline sits at 21.5 against a 18.5 line.",
+            "That leaves roughly +0.69 standard deviations of cushion.",
+            "Win probability grades at 75.5%."
+          ],
+          "model_sd": 4.381357619476034,
+          "p_win": 0.755,
+          "player": "Natisha Hiedeman",
+          "price": -107.0,
+          "prob_edge": 0.2381,
+          "reasons": [
+            "Recent form is already clearing this number with a last-five average of 24.2.",
+            "The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+            "The last game landed at 29.0, which is already above this line.",
+            "The model baseline sits at 21.5 against a 18.5 line.",
+            "That leaves roughly +0.69 standard deviations of cushion.",
+            "Win probability grades at 75.5%.",
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -107.",
+            "Model probability clears the market by 23.8 points."
+          ],
+          "recommendation_priority_score": 77.2,
+          "score": 0.46057437210698193,
+          "sd_rel": 0.2368301415932991,
+          "selection": "OVER",
+          "side": "OVER",
+          "sim_mean": 21.524251336898395,
+          "sim_reasons": [
+            "The model baseline sits at 21.5 against a 18.5 line.",
+            "That leaves roughly +0.69 standard deviations of cushion.",
+            "Win probability grades at 75.5%."
+          ],
+          "sim_sd": 4.3813576194760335,
+          "sim_support_score": 100.0,
+          "team": "SEA",
+          "top_play_reasons": [
+            "Recent form is already clearing this number with a last-five average of 24.2.",
+            "The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+            "The last game landed at 29.0, which is already above this line.",
+            "The model baseline sits at 21.5 against a 18.5 line.",
+            "That leaves roughly +0.69 standard deviations of cushion.",
+            "Win probability grades at 75.5%.",
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -107.",
+            "Model probability clears the market by 23.8 points."
+          ],
+          "value_reasons": [
+            "Projected value is +46.1% per unit risked.",
+            "The price stays workable at -107.",
+            "Model probability clears the market by 23.8 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.7549828879973288,
+          "win_prob_raw": 0.7549828879973288,
+          "z": 0.6902543913454993
+        }
+      ]
+    }
+  ],
+  "per_market": {
+    "pa": [
+      {
+        "away": "PHX",
+        "basketball_priority_score": 82.0,
+        "basketball_reasons": [
+          "Recent form has stayed below this line with a last-five average of 10.8.",
+          "The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+          "The last game landed at 18.0, which stayed under this line.",
+          "Projected minutes sit in a softer band around 25.6.",
+          "A healthy NYL rotation keeps touches spread out across the lineup."
+        ],
+        "basketball_summary": "Recent form has stayed below this line with a last-five average of 10.8. The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+        "book": "draftkings",
+        "display_pick": "Sabrina Ionescu Under 22.5 PA",
+        "ev": 0.9258491290823696,
+        "ev_pct": 92.58,
+        "game_id": "401856938",
+        "game_key": "2026-05-27:PHX@NYL",
+        "home": "NYL",
+        "implied_prob": 0.5192,
+        "line": 22.5,
+        "market": "pa",
+        "market_reasons": [
+          "Projected value is +92.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 47.1 points."
+        ],
+        "matchup": "PHX @ NYL",
+        "model_baseline": 13.12,
+        "model_reasons": [
+          "The model baseline sits at 13.1 against a 22.5 line.",
+          "That leaves roughly +3.95 standard deviations of cushion.",
+          "Win probability grades at 99.0%."
+        ],
+        "model_sd": 2.377603835797713,
+        "p_win": 0.99,
+        "player": "Sabrina Ionescu",
+        "price": -108.0,
+        "prob_edge": 0.4708,
+        "reasons": [
+          "Recent form has stayed below this line with a last-five average of 10.8.",
+          "The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+          "The last game landed at 18.0, which stayed under this line.",
+          "Projected minutes sit in a softer band around 25.6.",
+          "A healthy NYL rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 13.1 against a 22.5 line.",
+          "That leaves roughly +3.95 standard deviations of cushion.",
+          "Win probability grades at 99.0%.",
+          "Projected value is +92.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 47.1 points."
+        ],
+        "recommendation_priority_score": 88.9,
+        "score": 0.9258491290823696,
+        "sd_rel": 0.10567128159100947,
+        "selection": "UNDER",
+        "side": "UNDER",
+        "sim_mean": 13.12,
+        "sim_reasons": [
+          "The model baseline sits at 13.1 against a 22.5 line.",
+          "That leaves roughly +3.95 standard deviations of cushion.",
+          "Win probability grades at 99.0%."
+        ],
+        "sim_sd": 2.377603835797713,
+        "sim_support_score": 100.0,
+        "team": "NYL",
+        "top_play_reasons": [
+          "Recent form has stayed below this line with a last-five average of 10.8.",
+          "The last-10 sample is holding under this line at 6.2, which supports the lower-volume case.",
+          "The last game landed at 18.0, which stayed under this line.",
+          "Projected minutes sit in a softer band around 25.6.",
+          "A healthy NYL rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 13.1 against a 22.5 line.",
+          "That leaves roughly +3.95 standard deviations of cushion.",
+          "Win probability grades at 99.0%.",
+          "Projected value is +92.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 47.1 points."
+        ],
+        "value_reasons": [
+          "Projected value is +92.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 47.1 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.9999601247158457,
+        "win_prob_raw": 0.9999601247158457,
+        "z": 3.945148413193447
+      },
+      {
+        "away": "TOR",
+        "basketball_priority_score": 48.0,
+        "basketball_reasons": [
+          "Recent form has stayed below this line with a last-five average of 14.6.",
+          "The last game landed at 7.0, which stayed under this line.",
+          "A healthy CHI rotation keeps touches spread out across the lineup."
+        ],
+        "basketball_summary": "Recent form has stayed below this line with a last-five average of 14.6. The last game landed at 7.0, which stayed under this line.",
+        "book": "draftkings",
+        "display_pick": "Natasha Cloud Under 16.5 PA",
+        "ev": 0.5665053447127939,
+        "ev_pct": 56.65,
+        "game_id": "401856939",
+        "game_key": "2026-05-27:TOR@CHI",
+        "home": "CHI",
+        "implied_prob": 0.5074,
+        "line": 16.5,
+        "market": "pa",
+        "market_reasons": [
+          "Projected value is +56.7% per unit risked.",
+          "The price stays workable at -103.",
+          "Model probability clears the market by 28.7 points."
+        ],
+        "matchup": "TOR @ CHI",
+        "model_baseline": 14.166525714285712,
+        "model_reasons": [
+          "The model baseline sits at 14.2 against a 16.5 line.",
+          "That leaves roughly +0.82 standard deviations of cushion.",
+          "Win probability grades at 79.5%."
+        ],
+        "model_sd": 2.8343359240256705,
+        "p_win": 0.7948,
+        "player": "Natasha Cloud",
+        "price": -103.0,
+        "prob_edge": 0.2874,
+        "reasons": [
+          "Recent form has stayed below this line with a last-five average of 14.6.",
+          "The last game landed at 7.0, which stayed under this line.",
+          "A healthy CHI rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 14.2 against a 16.5 line.",
+          "That leaves roughly +0.82 standard deviations of cushion.",
+          "Win probability grades at 79.5%.",
+          "Projected value is +56.7% per unit risked.",
+          "The price stays workable at -103.",
+          "Model probability clears the market by 28.7 points."
+        ],
+        "recommendation_priority_score": 73.6,
+        "score": 0.5665053447127939,
+        "sd_rel": 0.17177793478943457,
+        "selection": "UNDER",
+        "side": "UNDER",
+        "sim_mean": 14.166525714285715,
+        "sim_reasons": [
+          "The model baseline sits at 14.2 against a 16.5 line.",
+          "That leaves roughly +0.82 standard deviations of cushion.",
+          "Win probability grades at 79.5%."
+        ],
+        "sim_sd": 2.8343359240256705,
+        "sim_support_score": 100.0,
+        "team": "CHI",
+        "top_play_reasons": [
+          "Recent form has stayed below this line with a last-five average of 14.6.",
+          "The last game landed at 7.0, which stayed under this line.",
+          "A healthy CHI rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 14.2 against a 16.5 line.",
+          "That leaves roughly +0.82 standard deviations of cushion.",
+          "Win probability grades at 79.5%.",
+          "Projected value is +56.7% per unit risked.",
+          "The price stays workable at -103.",
+          "Model probability clears the market by 28.7 points."
+        ],
+        "value_reasons": [
+          "Projected value is +56.7% per unit risked.",
+          "The price stays workable at -103.",
+          "Model probability clears the market by 28.7 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.794827835002058,
+        "win_prob_raw": 0.794827835002058,
+        "z": 0.8232878347037987
+      },
+      {
+        "away": "WSH",
+        "basketball_priority_score": 56.0,
+        "basketball_reasons": [
+          "Recent form is already clearing this number with a last-five average of 24.2.",
+          "The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+          "The last game landed at 29.0, which is already above this line."
+        ],
+        "basketball_summary": "Recent form is already clearing this number with a last-five average of 24.2. The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+        "book": "draftkings",
+        "display_pick": "Natisha Hiedeman Over 18.5 PA",
+        "ev": 0.46057437210698193,
+        "ev_pct": 46.06,
+        "game_id": "401856942",
+        "game_key": "2026-05-27:WSH@SEA",
+        "home": "SEA",
+        "implied_prob": 0.5169,
+        "line": 18.5,
+        "market": "pa",
+        "market_reasons": [
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -107.",
+          "Model probability clears the market by 23.8 points."
+        ],
+        "matchup": "WSH @ SEA",
+        "model_baseline": 21.524251336898395,
+        "model_reasons": [
+          "The model baseline sits at 21.5 against a 18.5 line.",
+          "That leaves roughly +0.69 standard deviations of cushion.",
+          "Win probability grades at 75.5%."
+        ],
+        "model_sd": 4.381357619476034,
+        "p_win": 0.755,
+        "player": "Natisha Hiedeman",
+        "price": -107.0,
+        "prob_edge": 0.2381,
+        "reasons": [
+          "Recent form is already clearing this number with a last-five average of 24.2.",
+          "The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+          "The last game landed at 29.0, which is already above this line.",
+          "The model baseline sits at 21.5 against a 18.5 line.",
+          "That leaves roughly +0.69 standard deviations of cushion.",
+          "Win probability grades at 75.5%.",
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -107.",
+          "Model probability clears the market by 23.8 points."
+        ],
+        "recommendation_priority_score": 77.2,
+        "score": 0.46057437210698193,
+        "sd_rel": 0.2368301415932991,
+        "selection": "OVER",
+        "side": "OVER",
+        "sim_mean": 21.524251336898395,
+        "sim_reasons": [
+          "The model baseline sits at 21.5 against a 18.5 line.",
+          "That leaves roughly +0.69 standard deviations of cushion.",
+          "Win probability grades at 75.5%."
+        ],
+        "sim_sd": 4.3813576194760335,
+        "sim_support_score": 100.0,
+        "team": "SEA",
+        "top_play_reasons": [
+          "Recent form is already clearing this number with a last-five average of 24.2.",
+          "The last-10 sample is still above this number at 23.4, so the over is not just riding a short heater.",
+          "The last game landed at 29.0, which is already above this line.",
+          "The model baseline sits at 21.5 against a 18.5 line.",
+          "That leaves roughly +0.69 standard deviations of cushion.",
+          "Win probability grades at 75.5%.",
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -107.",
+          "Model probability clears the market by 23.8 points."
+        ],
+        "value_reasons": [
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -107.",
+          "Model probability clears the market by 23.8 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.7549828879973288,
+        "win_prob_raw": 0.7549828879973288,
+        "z": 0.6902543913454993
+      },
+      {
+        "away": "ATL",
+        "basketball_priority_score": 82.0,
+        "basketball_reasons": [
+          "Recent form is already clearing this number with a last-five average of 25.8.",
+          "The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+          "The last game landed at 21.0, which is already above this line.",
+          "The minute load looks stable around 35.0.",
+          "This is a cleaner rest spot without a back-to-back tax."
+        ],
+        "basketball_summary": "Recent form is already clearing this number with a last-five average of 25.8. The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+        "book": "draftkings",
+        "display_pick": "Rhyne Howard Over 20.5 PA",
+        "ev": 0.2809551670497952,
+        "ev_pct": 28.1,
+        "game_id": "401856940",
+        "game_key": "2026-05-27:ATL@MIN",
+        "home": "MIN",
+        "implied_prob": 0.5238,
+        "line": 20.5,
+        "market": "pa",
+        "market_reasons": [
+          "Projected value is +28.1% per unit risked.",
+          "The price stays workable at -110.",
+          "Model probability clears the market by 14.7 points."
+        ],
+        "matchup": "MIN @ ATL",
+        "model_baseline": 22.69628333333333,
+        "model_reasons": [
+          "The model baseline sits at 22.7 against a 20.5 line.",
+          "That leaves roughly +0.44 standard deviations of cushion.",
+          "Win probability grades at 67.1%."
+        ],
+        "model_sd": 4.962104967968208,
+        "p_win": 0.671,
+        "player": "Rhyne Howard",
+        "price": -110.0,
+        "prob_edge": 0.1472,
+        "reasons": [
+          "Recent form is already clearing this number with a last-five average of 25.8.",
+          "The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+          "The last game landed at 21.0, which is already above this line.",
+          "The minute load looks stable around 35.0.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 22.7 against a 20.5 line.",
+          "That leaves roughly +0.44 standard deviations of cushion.",
+          "Win probability grades at 67.1%.",
+          "Projected value is +28.1% per unit risked.",
+          "The price stays workable at -110.",
+          "Model probability clears the market by 14.7 points."
+        ],
+        "recommendation_priority_score": 88.9,
+        "score": 0.2809551670497952,
+        "sd_rel": 0.24205390087649795,
+        "selection": "OVER",
+        "side": "OVER",
+        "sim_mean": 22.696283333333334,
+        "sim_reasons": [
+          "The model baseline sits at 22.7 against a 20.5 line.",
+          "That leaves roughly +0.44 standard deviations of cushion.",
+          "Win probability grades at 67.1%."
+        ],
+        "sim_sd": 4.962104967968208,
+        "sim_support_score": 100.0,
+        "team": "ATL",
+        "top_play_reasons": [
+          "Recent form is already clearing this number with a last-five average of 25.8.",
+          "The last-10 sample is still above this number at 23.6, so the over is not just riding a short heater.",
+          "The last game landed at 21.0, which is already above this line.",
+          "The minute load looks stable around 35.0.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 22.7 against a 20.5 line.",
+          "That leaves roughly +0.44 standard deviations of cushion.",
+          "Win probability grades at 67.1%.",
+          "Projected value is +28.1% per unit risked.",
+          "The price stays workable at -110.",
+          "Model probability clears the market by 14.7 points."
+        ],
+        "value_reasons": [
+          "Projected value is +28.1% per unit risked.",
+          "The price stays workable at -110.",
+          "Model probability clears the market by 14.7 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.6709765160737022,
+        "win_prob_raw": 0.6709765160737022,
+        "z": 0.4426112199381037
+      }
+    ],
+    "ra": [
+      {
+        "away": "ATL",
+        "basketball_priority_score": 66.0,
+        "basketball_reasons": [
+          "Recent form is already clearing this number with a last-five average of 15.0.",
+          "The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+          "The last game landed at 19.0, which is already above this line.",
+          "This is a cleaner rest spot without a back-to-back tax."
+        ],
+        "basketball_summary": "Recent form is already clearing this number with a last-five average of 15.0. The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+        "book": "draftkings",
+        "display_pick": "Natasha Howard Over 10.5 RA",
+        "ev": 0.7759710810222624,
+        "ev_pct": 77.6,
+        "game_id": "401856940",
+        "game_key": "2026-05-27:ATL@MIN",
+        "home": "MIN",
+        "implied_prob": 0.5192,
+        "line": 10.5,
+        "market": "ra",
+        "market_reasons": [
+          "Projected value is +77.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 40.3 points."
+        ],
+        "matchup": "ATL @ MIN",
+        "model_baseline": 14.388607142857143,
+        "model_reasons": [
+          "The model baseline sits at 14.4 against a 10.5 line.",
+          "That leaves roughly +1.42 standard deviations of cushion.",
+          "Win probability grades at 92.2%."
+        ],
+        "model_sd": 2.739215248747354,
+        "p_win": 0.9221,
+        "player": "Natasha Howard",
+        "price": -108.0,
+        "prob_edge": 0.4029,
+        "reasons": [
+          "Recent form is already clearing this number with a last-five average of 15.0.",
+          "The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+          "The last game landed at 19.0, which is already above this line.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 14.4 against a 10.5 line.",
+          "That leaves roughly +1.42 standard deviations of cushion.",
+          "Win probability grades at 92.2%.",
+          "Projected value is +77.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 40.3 points."
+        ],
+        "recommendation_priority_score": 81.7,
+        "score": 0.7759710810222624,
+        "sd_rel": 0.26087764273784325,
+        "selection": "OVER",
+        "side": "OVER",
+        "sim_mean": 14.388607142857145,
+        "sim_reasons": [
+          "The model baseline sits at 14.4 against a 10.5 line.",
+          "That leaves roughly +1.42 standard deviations of cushion.",
+          "Win probability grades at 92.2%."
+        ],
+        "sim_sd": 2.739215248747354,
+        "sim_support_score": 100.0,
+        "team": "MIN",
+        "top_play_reasons": [
+          "Recent form is already clearing this number with a last-five average of 15.0.",
+          "The last-10 sample is still above this number at 14.1, so the over is not just riding a short heater.",
+          "The last game landed at 19.0, which is already above this line.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 14.4 against a 10.5 line.",
+          "That leaves roughly +1.42 standard deviations of cushion.",
+          "Win probability grades at 92.2%.",
+          "Projected value is +77.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 40.3 points."
+        ],
+        "value_reasons": [
+          "Projected value is +77.6% per unit risked.",
+          "The price stays workable at -108.",
+          "Model probability clears the market by 40.3 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.92213883053079,
+        "win_prob_raw": 0.92213883053079,
+        "z": 1.4196062703124221
+      },
+      {
+        "away": "ATL",
+        "basketball_priority_score": 82.0,
+        "basketball_reasons": [
+          "Recent form is already clearing this number with a last-five average of 17.0.",
+          "The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+          "The last game landed at 21.0, which is already above this line.",
+          "The minute load looks stable around 30.7.",
+          "This is a cleaner rest spot without a back-to-back tax."
+        ],
+        "basketball_summary": "Recent form is already clearing this number with a last-five average of 17.0. The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+        "book": "draftkings",
+        "display_pick": "Jordin Canada Over 9.5 RA",
+        "ev": 0.7474350077414984,
+        "ev_pct": 74.74,
+        "game_id": "401856940",
+        "game_key": "2026-05-27:ATL@MIN",
+        "home": "MIN",
+        "implied_prob": 0.5556,
+        "line": 9.5,
+        "market": "ra",
+        "market_reasons": [
+          "Projected value is +74.7% per unit risked.",
+          "The price stays workable at -125.",
+          "Model probability clears the market by 41.5 points."
+        ],
+        "matchup": "MIN @ ATL",
+        "model_baseline": 14.496052631578946,
+        "model_reasons": [
+          "The model baseline sits at 14.5 against a 9.5 line.",
+          "That leaves roughly +1.89 standard deviations of cushion.",
+          "Win probability grades at 97.1%."
+        ],
+        "model_sd": 2.639724614840588,
+        "p_win": 0.9708,
+        "player": "Jordin Canada",
+        "price": -125.0,
+        "prob_edge": 0.4152,
+        "reasons": [
+          "Recent form is already clearing this number with a last-five average of 17.0.",
+          "The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+          "The last game landed at 21.0, which is already above this line.",
+          "The minute load looks stable around 30.7.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 14.5 against a 9.5 line.",
+          "That leaves roughly +1.89 standard deviations of cushion.",
+          "Win probability grades at 97.1%.",
+          "Projected value is +74.7% per unit risked.",
+          "The price stays workable at -125.",
+          "Model probability clears the market by 41.5 points."
+        ],
+        "recommendation_priority_score": 88.9,
+        "score": 0.7474350077414984,
+        "sd_rel": 0.2778657489305882,
+        "selection": "OVER",
+        "side": "OVER",
+        "sim_mean": 14.496052631578946,
+        "sim_reasons": [
+          "The model baseline sits at 14.5 against a 9.5 line.",
+          "That leaves roughly +1.89 standard deviations of cushion.",
+          "Win probability grades at 97.1%."
+        ],
+        "sim_sd": 2.639724614840588,
+        "sim_support_score": 100.0,
+        "team": "ATL",
+        "top_play_reasons": [
+          "Recent form is already clearing this number with a last-five average of 17.0.",
+          "The last-10 sample is still above this number at 13.2, so the over is not just riding a short heater.",
+          "The last game landed at 21.0, which is already above this line.",
+          "The minute load looks stable around 30.7.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 14.5 against a 9.5 line.",
+          "That leaves roughly +1.89 standard deviations of cushion.",
+          "Win probability grades at 97.1%.",
+          "Projected value is +74.7% per unit risked.",
+          "The price stays workable at -125.",
+          "Model probability clears the market by 41.5 points."
+        ],
+        "value_reasons": [
+          "Projected value is +74.7% per unit risked.",
+          "The price stays workable at -125.",
+          "Model probability clears the market by 41.5 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.9707972265230547,
+        "win_prob_raw": 0.9707972265230547,
+        "z": 1.892641604920086
+      },
+      {
+        "away": "TOR",
+        "basketball_priority_score": 66.0,
+        "basketball_reasons": [
+          "Recent form has stayed below this line with a last-five average of 5.8.",
+          "The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+          "The last game landed at 5.0, which stayed under this line.",
+          "A healthy TOR rotation keeps touches spread out across the lineup."
+        ],
+        "basketball_summary": "Recent form has stayed below this line with a last-five average of 5.8. The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+        "book": "fanduel",
+        "display_pick": "Brittney Sykes Under 8.5 RA",
+        "ev": 0.460637357153439,
+        "ev_pct": 46.06,
+        "game_id": "401856939",
+        "game_key": "2026-05-27:TOR@CHI",
+        "home": "CHI",
+        "implied_prob": 0.5283,
+        "line": 8.5,
+        "market": "ra",
+        "market_reasons": [
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 24.3 points."
+        ],
+        "matchup": "CHI @ TOR",
+        "model_baseline": 7.347782062780269,
+        "model_reasons": [
+          "The model baseline sits at 7.3 against a 8.5 line.",
+          "That leaves roughly +0.74 standard deviations of cushion.",
+          "Win probability grades at 77.2%."
+        ],
+        "model_sd": 1.5480216108925202,
+        "p_win": 0.7717,
+        "player": "Brittney Sykes",
+        "price": -112.0,
+        "prob_edge": 0.2434,
+        "reasons": [
+          "Recent form has stayed below this line with a last-five average of 5.8.",
+          "The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+          "The last game landed at 5.0, which stayed under this line.",
+          "A healthy TOR rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 7.3 against a 8.5 line.",
+          "That leaves roughly +0.74 standard deviations of cushion.",
+          "Win probability grades at 77.2%.",
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 24.3 points."
+        ],
+        "recommendation_priority_score": 81.1,
+        "score": 0.460637357153439,
+        "sd_rel": 0.1821201895167671,
+        "selection": "UNDER",
+        "side": "UNDER",
+        "sim_mean": 7.347782062780269,
+        "sim_reasons": [
+          "The model baseline sits at 7.3 against a 8.5 line.",
+          "That leaves roughly +0.74 standard deviations of cushion.",
+          "Win probability grades at 77.2%."
+        ],
+        "sim_sd": 1.5480216108925202,
+        "sim_support_score": 98.4,
+        "team": "TOR",
+        "top_play_reasons": [
+          "Recent form has stayed below this line with a last-five average of 5.8.",
+          "The last-10 sample is holding under this line at 7.9, which supports the lower-volume case.",
+          "The last game landed at 5.0, which stayed under this line.",
+          "A healthy TOR rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 7.3 against a 8.5 line.",
+          "That leaves roughly +0.74 standard deviations of cushion.",
+          "Win probability grades at 77.2%.",
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 24.3 points."
+        ],
+        "value_reasons": [
+          "Projected value is +46.1% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 24.3 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.7716574717037037,
+        "win_prob_raw": 0.7716574717037037,
+        "z": 0.7443164417810769
+      },
+      {
+        "away": "PHX",
+        "basketball_priority_score": 82.0,
+        "basketball_reasons": [
+          "Recent form is already clearing this number with a last-five average of 12.8.",
+          "The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+          "The last game landed at 14.0, which is already above this line.",
+          "The minute load looks stable around 32.9.",
+          "This is a cleaner rest spot without a back-to-back tax."
+        ],
+        "basketball_summary": "Recent form is already clearing this number with a last-five average of 12.8. The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+        "book": "draftkings",
+        "display_pick": "Breanna Stewart Over 10.5 RA",
+        "ev": 0.3454034338414338,
+        "ev_pct": 34.54,
+        "game_id": "401856938",
+        "game_key": "2026-05-27:PHX@NYL",
+        "home": "NYL",
+        "implied_prob": 0.5708,
+        "line": 10.5,
+        "market": "ra",
+        "market_reasons": [
+          "Projected value is +34.5% per unit risked.",
+          "Model probability clears the market by 19.7 points."
+        ],
+        "matchup": "PHX @ NYL",
+        "model_baseline": 12.428353299492386,
+        "model_reasons": [
+          "The model baseline sits at 12.4 against a 10.5 line.",
+          "That leaves roughly +0.73 standard deviations of cushion.",
+          "Win probability grades at 76.8%."
+        ],
+        "model_sd": 2.633639089551618,
+        "p_win": 0.768,
+        "player": "Breanna Stewart",
+        "price": -133.0,
+        "prob_edge": 0.1972,
+        "reasons": [
+          "Recent form is already clearing this number with a last-five average of 12.8.",
+          "The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+          "The last game landed at 14.0, which is already above this line.",
+          "The minute load looks stable around 32.9.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 12.4 against a 10.5 line.",
+          "That leaves roughly +0.73 standard deviations of cushion.",
+          "Win probability grades at 76.8%.",
+          "Projected value is +34.5% per unit risked.",
+          "Model probability clears the market by 19.7 points."
+        ],
+        "recommendation_priority_score": 86.9,
+        "score": 0.3454034338414338,
+        "sd_rel": 0.25082277043348744,
+        "selection": "OVER",
+        "side": "OVER",
+        "sim_mean": 12.428353299492386,
+        "sim_reasons": [
+          "The model baseline sits at 12.4 against a 10.5 line.",
+          "That leaves roughly +0.73 standard deviations of cushion.",
+          "Win probability grades at 76.8%."
+        ],
+        "sim_sd": 2.633639089551618,
+        "sim_support_score": 100.0,
+        "team": "NYL",
+        "top_play_reasons": [
+          "Recent form is already clearing this number with a last-five average of 12.8.",
+          "The last-10 sample is still above this number at 11.3, so the over is not just riding a short heater.",
+          "The last game landed at 14.0, which is already above this line.",
+          "The minute load looks stable around 32.9.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 12.4 against a 10.5 line.",
+          "That leaves roughly +0.73 standard deviations of cushion.",
+          "Win probability grades at 76.8%.",
+          "Projected value is +34.5% per unit risked.",
+          "Model probability clears the market by 19.7 points."
+        ],
+        "value_reasons": [
+          "Projected value is +34.5% per unit risked.",
+          "Model probability clears the market by 19.7 points."
+        ],
+        "value_support_score": 75.0,
+        "win_prob": 0.7679770673858828,
+        "win_prob_raw": 0.7679770673858828,
+        "z": 0.7322010472667656
+      }
+    ]
+  }
 }

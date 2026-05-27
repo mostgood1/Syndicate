@@ -1,6 +1,6 @@
-date,home_team,visitor_team,commence_time
-2026-05-27,New York Liberty,Phoenix Mercury,2026-05-27T23:00:00Z
-2026-05-27,Chicago Sky,Toronto Tempo,2026-05-28T00:00:00Z
-2026-05-27,Minnesota Lynx,Atlanta Dream,2026-05-28T01:00:00Z
-2026-05-27,Portland Fire,Connecticut Sun,2026-05-28T02:00:00Z
-2026-05-27,Seattle Storm,Washington Mystics,2026-05-28T02:00:00Z
+date,commence_time,home_team,visitor_team,home_ml,away_ml,home_spread,away_spread,total,bookmaker
+2026-05-28,2026-05-28T02:00:00Z,Seattle Storm,Washington Mystics,141.30837421392573,-141.3083742139258,3.5,-3.5,160.0,oddsapi_consensus
+2026-05-28,2026-05-28T00:00:00Z,Chicago Sky,Toronto Tempo,-181.58145592454798,181.58145592454795,-5.5,5.5,171.5,oddsapi_consensus
+2026-05-28,2026-05-28T01:00:00Z,Minnesota Lynx,Atlanta Dream,140.44708196890937,-140.4470819689093,3.5,-3.5,166.5,oddsapi_consensus
+2026-05-27,2026-05-27T23:00:00Z,New York Liberty,Phoenix Mercury,-158.75410116165727,158.75410116165727,-4.0,4.0,169.5,oddsapi_consensus
+2026-05-28,2026-05-28T02:00:00Z,Portland Fire,Connecticut Sun,-207.98910862098856,207.98910862098856,-6.5,6.5,166.5,oddsapi_consensus

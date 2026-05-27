@@ -1,7 +1,7 @@
 ﻿{
-    "date":  "2026-05-26",
-    "generatedAt":  "2026-05-26T17:20:39.3476725-05:00",
-    "runDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-26\\20260526_172038",
+    "date":  "2026-05-27",
+    "generatedAt":  "2026-05-27T10:01:20.9849128-05:00",
+    "runDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-27\\20260527_100120",
     "latestDir":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -44,7 +44,7 @@
                                             "--workflow",
                                             "ui-daily",
                                             "--date",
-                                            "2026-05-26",
+                                            "2026-05-27",
                                             "--season",
                                             "2026",
                                             "--sims",
@@ -76,13 +76,13 @@
                                             "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
                                             "scripts\\refresh_nba_oddsapi_props.py",
                                             "--date",
-                                            "2026-05-26",
+                                            "2026-05-27",
                                             "--source-root",
                                             "vendor\\nba_betting_repo",
                                             "--artifact-root",
                                             "data\\nba_source",
                                             "--log-file",
-                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-26\\20260526_172038\\nba_props_refresh.log",
+                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-27\\20260527_100120\\nba_props_refresh.log",
                                             "--force-refresh",
                                             "--days-ahead",
                                             "1",
@@ -107,13 +107,13 @@
                                             "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
                                             "scripts\\refresh_wnba_oddsapi_props.py",
                                             "--date",
-                                            "2026-05-26",
+                                            "2026-05-27",
                                             "--source-root",
                                             "vendor\\wnba_betting_repo",
                                             "--artifact-root",
                                             "data\\wnba_source",
                                             "--log-file",
-                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-26\\20260526_172038\\wnba_props_refresh.log",
+                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-27\\20260527_100120\\wnba_props_refresh.log",
                                             "--force-refresh",
                                             "--days-ahead",
                                             "1",
@@ -137,7 +137,7 @@
                                             "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
                                             "scripts\\refresh_nhl_oddsapi.py",
                                             "--date",
-                                            "2026-05-26",
+                                            "2026-05-27",
                                             "--source-root",
                                             "vendor\\nhl_betting_repo",
                                             "--artifact-root",
@@ -146,6 +146,38 @@
                                             "1",
                                             "--props-boxscore-n-sims",
                                             "1000"
+                                        ]
+                        },
+                        {
+                            "sport":  null,
+                            "workflow":  null,
+                            "name":  "NFL local odds refresh",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "runtimePolicy":  null,
+                            "command":  [
+                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
+                                            "scripts\\refresh_nfl_oddsapi.py",
+                                            "--artifact-root",
+                                            "data\\nfl_source\\source_artifacts"
+                                        ]
+                        },
+                        {
+                            "sport":  null,
+                            "workflow":  null,
+                            "name":  "NCAAF local odds refresh",
+                            "workingDirectory":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate",
+                            "environmentOverrides":  {
+
+                                                     },
+                            "runtimePolicy":  null,
+                            "command":  [
+                                            "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
+                                            "scripts\\refresh_ncaaf_oddsapi.py",
+                                            "--artifact-root",
+                                            "data\\ncaaf_source\\source_artifacts"
                                         ]
                         }
                     ],
@@ -162,15 +194,15 @@
                     "nba":  false,
                     "nhl":  false,
                     "wnba":  false,
-                    "nfl":  true,
-                    "ncaaf":  true,
-                    "ncaab":  true
+                    "nfl":  false,
+                    "ncaaf":  false,
+                    "ncaab":  false
                 },
     "dryRun":  false,
     "refreshGate":  {
                         "requested":  true,
-                        "manifestPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-26\\20260526_172038\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-26\\20260526_172038\\migration\\refresh_and_gate_run.json",
+                        "manifestPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-27\\20260527_100120\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-27\\20260527_100120\\migration\\refresh_and_gate_run.json",
                         "status":  "ok"
                     },
     "pushResults":  [
