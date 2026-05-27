@@ -31,8 +31,7 @@ services:
     plan: starter
     schedule: "*/5 * * * *"
     buildCommand: pip install -r requirements.txt
-    startCommand: |
-      python -c "import json, os, urllib.request; token=os.environ['ADMIN_TOKEN']; host=os.environ['SYNDICATE_WEB_HOST']; payload={'sports':'mlb,nba,nhl,nfl,wnba,ncaab,ncaaf','phase':'live','execution_mode':'source','regions':'us'}; req=urllib.request.Request(f'http://{host}/api/ops/odds-refresh/run?admin_token={token}', data=json.dumps(payload).encode('utf-8'), headers={'Content-Type':'application/json'}); urllib.request.urlopen(req, timeout=180).read()"
+    startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase live --execution-mode source --regions us --timeout-sec 180
     envVars:
       - key: ADMIN_TOKEN
         fromService:
@@ -44,6 +43,11 @@ services:
           name: syndicate
           type: web
           property: host
+      - key: SYNDICATE_WEB_PORT
+        fromService:
+          name: syndicate
+          type: web
+          property: port
 
   - type: cron
     name: syndicate-odds-refresh-pregame
@@ -51,8 +55,7 @@ services:
     plan: starter
     schedule: "*/15 * * * *"
     buildCommand: pip install -r requirements.txt
-    startCommand: |
-      python -c "import json, os, urllib.request; token=os.environ['ADMIN_TOKEN']; host=os.environ['SYNDICATE_WEB_HOST']; payload={'sports':'mlb,nba,nhl,nfl,wnba,ncaab,ncaaf','phase':'pregame','execution_mode':'source','regions':'us'}; req=urllib.request.Request(f'http://{host}/api/ops/odds-refresh/run?admin_token={token}', data=json.dumps(payload).encode('utf-8'), headers={'Content-Type':'application/json'}); urllib.request.urlopen(req, timeout=180).read()"
+    startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase pregame --execution-mode source --regions us --timeout-sec 180
     envVars:
       - key: ADMIN_TOKEN
         fromService:
@@ -64,6 +67,11 @@ services:
           name: syndicate
           type: web
           property: host
+      - key: SYNDICATE_WEB_PORT
+        fromService:
+          name: syndicate
+          type: web
+          property: port
 
   - type: cron
     name: syndicate-odds-refresh-daily-prime
@@ -71,8 +79,7 @@ services:
     plan: starter
     schedule: "20 10 * * *"
     buildCommand: pip install -r requirements.txt
-    startCommand: |
-      python -c "import json, os, urllib.request; token=os.environ['ADMIN_TOKEN']; host=os.environ['SYNDICATE_WEB_HOST']; payload={'sports':'all','phase':'pregame','execution_mode':'source','regions':'us'}; req=urllib.request.Request(f'http://{host}/api/ops/odds-refresh/run?admin_token={token}', data=json.dumps(payload).encode('utf-8'), headers={'Content-Type':'application/json'}); urllib.request.urlopen(req, timeout=180).read()"
+    startCommand: python scripts/render_cron_enqueue_refresh.py --sports all --phase pregame --execution-mode source --regions us --timeout-sec 180
     envVars:
       - key: ADMIN_TOKEN
         fromService:
@@ -84,3 +91,8 @@ services:
           name: syndicate
           type: web
           property: host
+      - key: SYNDICATE_WEB_PORT
+        fromService:
+          name: syndicate
+          type: web
+          property: port
