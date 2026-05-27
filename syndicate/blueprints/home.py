@@ -909,6 +909,40 @@ def _apply_nba_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
 
 
 def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
+    if selected_date == central_today_iso():
+        try:
+            from syndicate.local_nhl_odds import NhlWebClient
+
+            rows = NhlWebClient().scoreboard_day(selected_date)
+            if rows:
+                def _coalesce_score(*values: Any) -> Any:
+                    for value in values:
+                        if value is None:
+                            continue
+                        if isinstance(value, str) and not value.strip():
+                            continue
+                        return value
+                    return None
+
+                return [
+                    {
+                        "gamePk": row.get("gamePk") or row.get("game_id"),
+                        "away": row.get("away") or row.get("away_team"),
+                        "home": row.get("home") or row.get("home_team"),
+                        "away_abbr": row.get("away_abbr") or row.get("away_tri"),
+                        "home_abbr": row.get("home_abbr") or row.get("home_tri"),
+                        "away_goals": _coalesce_score(row.get("away_goals"), row.get("awayScore"), row.get("away_score")),
+                        "home_goals": _coalesce_score(row.get("home_goals"), row.get("homeScore"), row.get("home_score")),
+                        "gameState": row.get("gameState") or row.get("game_state") or row.get("state"),
+                        "period": row.get("period") or row.get("web_period"),
+                        "clock": row.get("clock") or row.get("web_clock"),
+                    }
+                    for row in rows
+                    if isinstance(row, dict)
+                ]
+        except Exception:
+            pass
+
     path = scoreboard_snapshot_path(selected_date)
     if not path.exists():
         return []
