@@ -18,7 +18,7 @@
               <h1>{% block page_title %}Multi-Sport Betting Hub{% endblock %}</h1>
             </div>
             <nav class="syndicate-nav" aria-label="Sports">
-              <a class="cards-nav-pill" href="/{% if nav_date %}?date={{ nav_date }}{% endif %}">Home</a>
+              <a class="cards-nav-pill" href="/">Home</a>
               {% for sport in syndicate_sports %}
                 <a class="cards-nav-pill" href="/{{ sport.slug }}{% if nav_date %}?date={{ nav_date }}{% endif %}">{{ sport.name }}</a>
               {% endfor %}
