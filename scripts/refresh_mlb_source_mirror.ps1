@@ -131,6 +131,53 @@ function Ensure-DateJsonArtifact {
     return $true
 }
 
+function Resolve-OddsApiSourcePath {
+    param(
+        [string]$Prefix,
+        [string]$DateSlug,
+        [string]$SourceRoot,
+        [string]$ArtifactRoot,
+        [switch]$UseExisting
+    )
+
+    $fileName = "{0}_{1}.json" -f $Prefix, $DateSlug
+
+    if ($UseExisting) {
+        $existingPath = Join-Path $destDataRoot (Join-Path "daily\snapshots\$Date" $fileName)
+        if (Test-Path $existingPath) {
+            return (Resolve-Path $existingPath).Path
+        }
+        return $null
+    }
+
+    $roots = @()
+    if (-not [string]::IsNullOrWhiteSpace($ArtifactRoot)) {
+        $roots += $ArtifactRoot
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
+        $roots += $SourceRoot
+    }
+
+    foreach ($root in $roots) {
+        $directPath = Join-Path $root (Join-Path 'data\market\oddsapi' $fileName)
+        if (Test-Path $directPath) {
+            return (Resolve-Path $directPath).Path
+        }
+
+        $historyRoot = Join-Path $root (Join-Path 'data\market\oddsapi\refresh_history' $DateSlug)
+        if (-not (Test-Path $historyRoot)) {
+            continue
+        }
+        $historyCandidates = Get-ChildItem -Path $historyRoot -Recurse -File -Filter $fileName -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTimeUtc -Descending
+        if ($historyCandidates -and $historyCandidates.Count -gt 0) {
+            return $historyCandidates[0].FullName
+        }
+    }
+
+    return $null
+}
+
 $copied = New-Object System.Collections.Generic.List[string]
 
 $filePairs = @(
@@ -149,6 +196,9 @@ $filePairs = @(
     @("data\daily\top_props\daily_top_props_$dateSlug.json", "daily\top_props\daily_top_props_$dateSlug.json"),
     @("data\daily\ops\daily_ops_$dateSlug.json", "daily\ops\daily_ops_$dateSlug.json"),
     @("data\daily\season_frontend\season_betting_day_$dateSlug.json", "daily\season_frontend\season_betting_day_$dateSlug.json"),
+    @("data\market\oddsapi\oddsapi_game_lines_$dateSlug.json", "daily\snapshots\$Date\oddsapi_game_lines_$dateSlug.json"),
+    @("data\market\oddsapi\oddsapi_pitcher_props_$dateSlug.json", "daily\snapshots\$Date\oddsapi_pitcher_props_$dateSlug.json"),
+    @("data\market\oddsapi\oddsapi_hitter_props_$dateSlug.json", "daily\snapshots\$Date\oddsapi_hitter_props_$dateSlug.json"),
     @("data\live_lens\live_lens_$dateSlug.jsonl", "live_lens\live_lens_$dateSlug.jsonl"),
     @("data\live_lens\live_lens_report_$dateSlug.json", "live_lens\live_lens_report_$dateSlug.json"),
     @("data\live_lens\render_sync\live_lens_reports_$dateSlug.json", "live_lens\render_sync\live_lens_reports_$dateSlug.json"),
@@ -164,6 +214,26 @@ foreach ($pair in $filePairs) {
     $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot $pair[0] } else { Join-Path $sourceRoot $pair[0] }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add($pair[1]) | Out-Null
+    }
+}
+
+# Ensure canonical odds snapshots exist for the selected date from source-owned outputs.
+$oddsSnapshotSpecs = @(
+    @{ Prefix = 'oddsapi_game_lines'; Relative = Join-Path "daily\snapshots\$Date" "oddsapi_game_lines_$dateSlug.json" },
+    @{ Prefix = 'oddsapi_pitcher_props'; Relative = Join-Path "daily\snapshots\$Date" "oddsapi_pitcher_props_$dateSlug.json" },
+    @{ Prefix = 'oddsapi_hitter_props'; Relative = Join-Path "daily\snapshots\$Date" "oddsapi_hitter_props_$dateSlug.json" }
+)
+
+foreach ($spec in $oddsSnapshotSpecs) {
+    $targetRelative = [string]$spec.Relative
+    $targetPath = Join-Path $destDataRoot $targetRelative
+    $resolvedSource = Resolve-OddsApiSourcePath -Prefix ([string]$spec.Prefix) -DateSlug $dateSlug -SourceRoot $sourceRoot -ArtifactRoot $artifactRoot -UseExisting:$UseExistingMirrorArtifacts
+    if (-not [string]::IsNullOrWhiteSpace($resolvedSource)) {
+        if (Copy-IfExists -SourcePath $resolvedSource -DestinationPath $targetPath) {
+            if (-not $copied.Contains($targetRelative)) {
+                $copied.Add($targetRelative) | Out-Null
+            }
+        }
     }
 }
 
@@ -205,6 +275,24 @@ Ensure-DateJsonArtifact -RelativePath (Join-Path 'daily\top_props' ("daily_top_p
         generatedAt = (Get-Date).ToUniversalTime().ToString('o')
         top_props = @()
     }) | Out-Null
+
+# Strict contract: do not continue when canonical OddsAPI snapshot files are missing.
+$requiredOddsSnapshots = @(
+    (Join-Path "daily\snapshots\$Date" "oddsapi_game_lines_$dateSlug.json"),
+    (Join-Path "daily\snapshots\$Date" "oddsapi_pitcher_props_$dateSlug.json"),
+    (Join-Path "daily\snapshots\$Date" "oddsapi_hitter_props_$dateSlug.json")
+)
+
+$missingOddsSnapshots = @()
+foreach ($required in $requiredOddsSnapshots) {
+    $requiredPath = Join-Path $destDataRoot $required
+    if (-not (Test-Path $requiredPath)) {
+        $missingOddsSnapshots += $required
+    }
+}
+if ($missingOddsSnapshots.Count -gt 0) {
+    throw "Missing required MLB odds snapshot artifacts for ${Date}: $($missingOddsSnapshots -join ', ')"
+}
 
 $seasonEvalRoot = if ($UseExistingMirrorArtifacts) { Join-Path $destDataRoot (Join-Path 'eval\seasons' $season) } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\eval\seasons' $season) } else { Join-Path $sourceRoot (Join-Path 'data\eval\seasons' $season) }
 $seasonEvalManifest = Join-Path $seasonEvalRoot 'season_eval_manifest.json'

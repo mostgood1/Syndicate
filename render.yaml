@@ -12,11 +12,17 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn wsgi:application
     healthCheckPath: /
+    disk:
+      name: syndicate-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 10
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: ADMIN_TOKEN
         generateValue: true
+      - key: ODDS_API_KEY
+        sync: false
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: external_runner
       - key: SYNDICATE_REFRESH_STATE_BACKEND
@@ -28,6 +34,10 @@ services:
           name: syndicate-refresh-state
           type: keyvalue
           property: connectionString
+      - key: SYNDICATE_DATA_ROOT
+        value: /opt/render/project/src/data
+      - key: SYNDICATE_REPORTS_ROOT
+        value: /opt/render/project/src/reports
 
   - type: worker
     name: syndicate-refresh-worker
@@ -39,6 +49,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: ODDS_API_KEY
+        sync: false
       - key: SYNDICATE_REFRESH_STATE_BACKEND
         value: keyvalue
       - key: SYNDICATE_REFRESH_STATE_NAMESPACE
@@ -50,3 +62,43 @@ services:
           property: connectionString
       - key: SYNDICATE_REFRESH_WORKER_POLL_SECONDS
         value: 15
+
+  - type: cron
+    name: syndicate-odds-refresh-live
+    runtime: python
+    plan: starter
+    schedule: "*/10 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: |
+      python -c "import json, os, urllib.request; token=os.environ['ADMIN_TOKEN']; host=os.environ['SYNDICATE_WEB_HOST']; payload={'sports':'mlb,nba,nhl,wnba','phase':'live','execution_mode':'source','regions':'us'}; req=urllib.request.Request(f'http://{host}/api/ops/odds-refresh/run?admin_token={token}', data=json.dumps(payload).encode('utf-8'), headers={'Content-Type':'application/json'}); urllib.request.urlopen(req, timeout=60).read()"
+    envVars:
+      - key: ADMIN_TOKEN
+        fromService:
+          name: syndicate
+          type: web
+          envVarKey: ADMIN_TOKEN
+      - key: SYNDICATE_WEB_HOST
+        fromService:
+          name: syndicate
+          type: web
+          property: host
+
+  - type: cron
+    name: syndicate-odds-refresh-pregame
+    runtime: python
+    plan: starter
+    schedule: "*/30 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: |
+      python -c "import json, os, urllib.request; token=os.environ['ADMIN_TOKEN']; host=os.environ['SYNDICATE_WEB_HOST']; payload={'sports':'mlb,nba,nhl,wnba','phase':'pregame','execution_mode':'source','regions':'us'}; req=urllib.request.Request(f'http://{host}/api/ops/odds-refresh/run?admin_token={token}', data=json.dumps(payload).encode('utf-8'), headers={'Content-Type':'application/json'}); urllib.request.urlopen(req, timeout=60).read()"
+    envVars:
+      - key: ADMIN_TOKEN
+        fromService:
+          name: syndicate
+          type: web
+          envVarKey: ADMIN_TOKEN
+      - key: SYNDICATE_WEB_HOST
+        fromService:
+          name: syndicate
+          type: web
+          property: host

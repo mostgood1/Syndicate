@@ -2125,6 +2125,67 @@ def _actual_pitcher_stat_value(actual_row: dict[str, Any] | None, prop_key: str)
     return None
 
 
+def _pitching_stats_has_appearance(pitching_stats: dict[str, Any] | None) -> bool:
+    if not isinstance(pitching_stats, dict):
+        return False
+    for key in ("outs", "battersFaced", "pitchesThrown", "strikeOuts", "earnedRuns", "runs", "hits", "baseOnBalls"):
+        value = _safe_float(pitching_stats.get(key))
+        if value is not None and float(value) > 0.0:
+            return True
+    outs_from_ip = _parse_ip_to_outs(pitching_stats.get("inningsPitched"))
+    return outs_from_ip is not None and int(outs_from_ip) > 0
+
+
+def _current_pitching_side(actual_payload: dict[str, Any] | None) -> str | None:
+    batting_side = _current_batting_side(actual_payload)
+    if batting_side == "away":
+        return "home"
+    if batting_side == "home":
+        return "away"
+    return None
+
+
+def _starter_removed_from_actual_payload(
+    actual_payload: dict[str, Any] | None,
+    *,
+    side: str,
+    starter_id: int | None,
+    starter_name: str,
+) -> bool:
+    if side not in {"away", "home"} or not isinstance(actual_payload, dict):
+        return False
+    normalized_starter = _normalize_live_name(starter_name)
+    if starter_id is None and not normalized_starter:
+        return False
+
+    if _current_pitching_side(actual_payload) == side:
+        current_play = ((actual_payload.get("liveData") or {}).get("plays") or {}).get("currentPlay")
+        matchup = (current_play or {}).get("matchup") if isinstance(current_play, dict) else {}
+        current_pitcher = (matchup or {}).get("pitcher") if isinstance(matchup, dict) else {}
+        current_pitcher_id = _safe_int((current_pitcher or {}).get("id")) if isinstance(current_pitcher, dict) else None
+        current_pitcher_name = _normalize_live_name((current_pitcher or {}).get("fullName")) if isinstance(current_pitcher, dict) else ""
+        if starter_id is not None and current_pitcher_id is not None and int(current_pitcher_id) != int(starter_id):
+            return True
+        if normalized_starter and current_pitcher_name and current_pitcher_name != normalized_starter:
+            return True
+
+    for player_obj in _iter_team_players(actual_payload, side):
+        person = player_obj.get("person") if isinstance(player_obj, dict) else {}
+        row_id = _safe_int((person or {}).get("id")) if isinstance(person, dict) else None
+        row_name = _normalize_live_name((person or {}).get("fullName")) if isinstance(person, dict) else ""
+        is_starter_row = False
+        if starter_id is not None and row_id is not None:
+            is_starter_row = int(row_id) == int(starter_id)
+        elif normalized_starter and row_name:
+            is_starter_row = row_name == normalized_starter
+        if is_starter_row:
+            continue
+        pitching_stats = ((player_obj.get("stats") or {}).get("pitching")) if isinstance(player_obj, dict) else None
+        if _pitching_stats_has_appearance(pitching_stats if isinstance(pitching_stats, dict) else None):
+            return True
+    return False
+
+
 def _bounded_live_pitcher_projection(actual_value: float | None, model_mean: float | None, progress_fraction: float) -> float | None:
     mean = _safe_float(model_mean)
     actual = _safe_float(actual_value)
@@ -3578,6 +3639,13 @@ def _live_starter_ladder_badges_for_side(
     pitcher_id = _safe_int((probable or {}).get("id")) if isinstance(probable, dict) else None
     pitcher_name = str((probable or {}).get("fullName") or "").strip() if isinstance(probable, dict) else ""
     if pitcher_id is None or not pitcher_name:
+        return []
+    if _starter_removed_from_actual_payload(
+        actual_payload,
+        side=side,
+        starter_id=pitcher_id,
+        starter_name=pitcher_name,
+    ):
         return []
     model_row = pitcher_models.get(str(pitcher_id)) if isinstance(pitcher_models, dict) else None
     market_entry = _market_lines_for_live_name(market_lines, pitcher_name)

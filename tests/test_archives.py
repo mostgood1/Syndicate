@@ -581,6 +581,88 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(live_badges[0].get("targets"), [15, 16])
         self.assertNotIn("miniLadderBadges", games[0]["probable"]["home"])
 
+    def test_mlb_live_starter_ladder_badges_skip_removed_starter(self) -> None:
+        from syndicate.features.mlb.cards import _attach_cards_stateful_starter_ladder_badges
+
+        games = [
+            {
+                "gamePk": 654,
+                "status": {"abstract": "Live", "detailed": "In Progress"},
+                "probable": {
+                    "away": {"id": 101, "fullName": "Away Starter"},
+                    "home": {"id": 202, "fullName": "Home Starter"},
+                },
+            }
+        ]
+
+        sim_payload = {
+            "sim": {
+                "pitcher_props": {
+                    "101": {
+                        "outs_mean": 18.0,
+                        "outs_dist": {"14": 0.05, "15": 0.20, "16": 0.35, "17": 0.25, "18": 0.15},
+                    }
+                }
+            }
+        }
+        actual_payload = {
+            "gameData": {
+                "probablePitchers": {
+                    "away": {"id": 101, "fullName": "Away Starter"},
+                    "home": {"id": 202, "fullName": "Home Starter"},
+                }
+            },
+            "liveData": {
+                "linescore": {"currentInning": 7, "inningHalf": "Bottom", "outs": 1},
+                "plays": {
+                    "currentPlay": {
+                        "matchup": {
+                            "pitcher": {"id": 303, "fullName": "Away Reliever"}
+                        }
+                    }
+                },
+                "boxscore": {
+                    "teams": {
+                        "away": {
+                            "players": {
+                                "ID101": {
+                                    "person": {"id": 101, "fullName": "Away Starter"},
+                                    "stats": {"pitching": {"outs": 9}},
+                                },
+                                "ID303": {
+                                    "person": {"id": 303, "fullName": "Away Reliever"},
+                                    "stats": {"pitching": {"outs": 4, "pitchesThrown": 18}},
+                                },
+                            }
+                        },
+                        "home": {"players": {}},
+                    }
+                },
+            },
+        }
+        market_lines = {
+            "away starter": {
+                "outs": {
+                    "line": 13.5,
+                    "over_odds": -110,
+                    "under_odds": -110,
+                    "alternates": [
+                        {"line": 14.5, "over_odds": 115, "under_odds": -145},
+                        {"line": 15.5, "over_odds": 170, "under_odds": -210},
+                    ],
+                }
+            }
+        }
+
+        with patch("syndicate.features.mlb.cards._pitcher_snapshot_market_lines", return_value=market_lines):
+            _attach_cards_stateful_starter_ladder_badges(
+                games,
+                selected_date="2026-05-20",
+                sim_games={654: sim_payload},
+                actual_games={654: actual_payload},
+            )
+
+        self.assertNotIn("miniLadderBadges", games[0]["probable"]["away"])
     def test_nba_cards_api_fast_path_normalizes_artifact_flags(self) -> None:
         with patch(
             "syndicate.features.nba.cards.build_cards_page_context",
