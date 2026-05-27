@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from datetime import datetime
+from datetime import timezone
 import re
 import time
 from typing import Any
@@ -37,6 +38,7 @@ from syndicate.features.ncaab.sources import build_module_links as build_ncaab_m
 from syndicate.features.ncaab.sources import latest_date as ncaab_latest_date
 from syndicate.features.ncaab.sources import season_for_date as ncaab_season_for_date
 from syndicate.features.shared.timezone import central_datetime_from_epoch
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.timezone import central_year
 
@@ -134,6 +136,49 @@ def _is_liveish(status_badge: Any, status_line: Any) -> bool:
     return any(token in text for token in ("live", "in progress", "top ", "bot ", "q1", "q2", "q3", "q4", "ot", "halftime"))
 
 
+def _central_scheduled_datetime(game: dict[str, Any]) -> datetime | None:
+    candidates = [
+        game.get("scheduled_start_utc"),
+        game.get("start_time_utc"),
+        game.get("gameDate"),
+        game.get("game_date"),
+        game.get("scheduled"),
+        game.get("scheduled_start"),
+        game.get("commence_time"),
+        game.get("detail"),
+    ]
+    for value in candidates:
+        text = str(value or "").strip()
+        if not text or "T" not in text:
+            continue
+        normalized = text.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except Exception:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(CENTRAL_TIMEZONE)
+    return None
+
+
+def _scheduled_status_line(game: dict[str, Any], fallback: str) -> str:
+    scheduled_dt = _central_scheduled_datetime(game)
+    if scheduled_dt is not None:
+        time_text = scheduled_dt.strftime("%I:%M %p").lstrip("0")
+        if scheduled_dt.date().isoformat() == central_today_iso():
+            return f"{time_text} CT"
+        return f"{scheduled_dt.strftime('%b')} {scheduled_dt.day} {time_text} CT"
+    fallback_text = str(fallback or "").strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", fallback_text):
+        if fallback_text == central_today_iso():
+            return "Scheduled today"
+        return f"Scheduled {fallback_text}"
+    if fallback_text.upper() in {"FUT", "PRE"}:
+        return "Scheduled"
+    return fallback_text or "Board update pending"
+
+
 def _scoreboard_state(game: dict[str, Any]) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
@@ -162,19 +207,25 @@ def _scoreboard_state(game: dict[str, Any]) -> dict[str, Any]:
     suppress_zero_zero = not is_live and not is_final and away_score == "0" and home_score == "0"
     has_scores = bool(away_score and home_score and not suppress_zero_zero)
 
-    status_badge = str(
+    raw_status_badge = str(
         status.get("abstract")
         or status.get("status")
         or game.get("status_badge")
         or ("Live" if is_live else "Final" if is_final else "Scheduled")
     ).strip()
-    status_line = str(
+    raw_status_line = str(
         status.get("detailed")
         or live_state.get("status")
         or game.get("detail")
         or game.get("summary")
         or "Board update pending"
     ).strip()
+    status_badge = raw_status_badge
+    status_line = raw_status_line
+    if not is_live and not is_final:
+        if raw_status_badge.lower() in {"processed artifact", "tracked", "stored slate lens"}:
+            status_badge = "Scheduled"
+        status_line = _scheduled_status_line(game, raw_status_line)
     return {
         "away_label": away_label,
         "home_label": home_label,
@@ -938,12 +989,8 @@ def _load_home_game_items(
             if home_games:
                 return _compact_game_cards(home_games), len(home_games)
         if slug == "nhl":
-            from syndicate.features.nhl.live_lens import build_live_lens_page_context
-
-            context = build_live_lens_page_context(context_label)
-            cards = list(context.get("rank_cards") or [])
-            if cards:
-                return _compact_game_items_from_rank_cards(cards, fallback_href=f"/nhl/live-lens?date={context_label}"), len(cards)
+            if home_games:
+                return _compact_game_cards(home_games), len(home_games)
         if slug == "ncaab":
             from syndicate.features.ncaab.live_lens import build_live_lens_page_context
 
