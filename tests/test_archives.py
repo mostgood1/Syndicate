@@ -450,7 +450,30 @@ class DateArchiveHelperTests(unittest.TestCase):
             }
         }
 
-        with patch("syndicate.features.mlb.cards.load_json_file", return_value=ladders_doc):
+        market_lines = {
+            "luis severino": {
+                "strikeouts": {
+                    "line": 5.5,
+                    "over_odds": -110,
+                    "under_odds": -110,
+                    "alternates": [
+                        {"line": 6.5, "over_odds": 130, "under_odds": -165},
+                    ],
+                },
+                "outs": {
+                    "line": 17.5,
+                    "over_odds": -110,
+                    "under_odds": -110,
+                    "alternates": [
+                        {"line": 18.5, "over_odds": 125, "under_odds": -155},
+                    ],
+                },
+            }
+        }
+
+        with patch("syndicate.features.mlb.cards.load_json_file", return_value=ladders_doc), patch(
+            "syndicate.features.mlb.cards._pitcher_snapshot_market_lines", return_value=market_lines
+        ):
             _attach_cards_pregame_starter_ladder_badges(games, selected_date="2026-05-21")
 
         away_badges = games[0]["probable"]["away"].get("pregameLadderBadges") or []
@@ -458,6 +481,48 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(away_badges[0].get("label"), "K up to 7")
         self.assertEqual(away_badges[1].get("label"), "O up to 19")
         self.assertEqual(games[0]["probable"]["away"].get("ladderBadges"), away_badges)
+
+    def test_mlb_pregame_badges_require_current_pitcher_market(self) -> None:
+        from syndicate.features.mlb.cards import _attach_cards_pregame_starter_ladder_badges
+
+        games = [
+            {
+                "gamePk": 824031,
+                "status": {"abstract": "Pregame", "detailed": "Scheduled"},
+                "probable": {
+                    "away": {"id": 622663, "fullName": "Luis Severino"},
+                    "home": {"id": 1001, "fullName": "Home Starter"},
+                },
+            }
+        ]
+        ladders_doc = {
+            "groups": {
+                "pitcher": {
+                    "strikeouts": {
+                        "rows": [
+                            {
+                                "gamePk": 824031,
+                                "pitcherId": 622663,
+                                "pitcherName": "Luis Severino",
+                                "marketLine": 5.5,
+                                "ladder": [
+                                    {"total": 6, "hitProb": 0.399},
+                                    {"total": 7, "hitProb": 0.217},
+                                ],
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        with patch("syndicate.features.mlb.cards.load_json_file", return_value=ladders_doc), patch(
+            "syndicate.features.mlb.cards._pitcher_snapshot_market_lines", return_value={}
+        ):
+            _attach_cards_pregame_starter_ladder_badges(games, selected_date="2026-05-21")
+
+        self.assertNotIn("pregameLadderBadges", games[0]["probable"]["away"])
+        self.assertNotIn("ladderBadges", games[0]["probable"]["away"])
 
     def test_mlb_stateful_badges_attach_final_mini_ladder_settlement(self) -> None:
         from syndicate.features.mlb.cards import _attach_cards_stateful_starter_ladder_badges

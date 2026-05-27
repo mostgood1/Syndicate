@@ -843,6 +843,69 @@ def _merge_starter_badge_lists(primary: list[dict[str, Any]], secondary: list[di
     return merged
 
 
+def _pregame_market_supported_totals(
+    market_entry: dict[str, Any] | None,
+    *,
+    stat_key: str | None,
+) -> list[int]:
+    if not isinstance(market_entry, dict):
+        return []
+    market = market_entry.get(str(stat_key or "").strip().lower())
+    if not isinstance(market, dict):
+        return []
+    out: list[int] = []
+    for candidate in _live_pitcher_ladder_market_candidates(market):
+        line_value = _safe_float(candidate.get("line"))
+        if line_value is None:
+            continue
+        total = int(float(line_value) // 1) + 1
+        if int(total) not in out:
+            out.append(int(total))
+    return out
+
+
+def _filter_badges_to_current_market(
+    badges: list[dict[str, Any]],
+    *,
+    market_entry: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
+    for badge in badges:
+        if not isinstance(badge, dict):
+            continue
+        stat_key = _starter_ladder_badge_stat_key(badge)
+        if not stat_key:
+            continue
+        allowed_totals = _pregame_market_supported_totals(market_entry, stat_key=stat_key)
+        if not allowed_totals:
+            continue
+        raw_targets = [int(total) for total in (badge.get("targets") or []) if _safe_int(total) is not None]
+        if not raw_targets:
+            target_total = _safe_int(badge.get("target"))
+            if target_total is not None:
+                raw_targets = [int(target_total)]
+        if not raw_targets:
+            continue
+        supported = [int(total) for total in raw_targets if int(total) in set(allowed_totals)]
+        if not supported:
+            continue
+        if supported == raw_targets:
+            filtered.append(dict(badge))
+            continue
+        rebuilt = _starter_ladder_badge_from_supported_totals(
+            supported,
+            stat_key=stat_key,
+            short_label=_starter_ladder_badge_short_label(stat_key),
+            last_supported_prob=_safe_float(badge.get("hitProb")),
+            detail_parts=[str(badge.get("detail") or "").strip()],
+            max_rungs=None,
+        )
+        if isinstance(rebuilt, dict):
+            rebuilt["tone"] = badge.get("tone") or rebuilt.get("tone")
+            filtered.append(rebuilt)
+    return filtered
+
+
 def _attach_cards_pregame_starter_ladder_badges(games: list[dict[str, Any]], *, selected_date: str) -> None:
     if not isinstance(games, list):
         return
@@ -850,6 +913,7 @@ def _attach_cards_pregame_starter_ladder_badges(games: list[dict[str, Any]], *, 
     groups = ((ladders_doc or {}).get("groups") or {}).get("pitcher") if isinstance((ladders_doc or {}).get("groups"), dict) else {}
     if not isinstance(groups, dict):
         return
+    market_lines = _pitcher_snapshot_market_lines(selected_date)
     for card in games:
         if not isinstance(card, dict):
             continue
@@ -864,6 +928,7 @@ def _attach_cards_pregame_starter_ladder_badges(games: list[dict[str, Any]], *, 
             starter_name = str(entry.get("fullName") or entry.get("name") or "").strip()
             if not starter_name:
                 continue
+            market_entry = _market_lines_for_live_name(market_lines, starter_name)
             starter_id = _safe_int(entry.get("id"))
             ladder_badges = _pregame_starter_ladder_badges_for_pitcher(
                 groups,
@@ -871,8 +936,7 @@ def _attach_cards_pregame_starter_ladder_badges(games: list[dict[str, Any]], *, 
                 pitcher_id=starter_id,
                 pitcher_name=starter_name,
             )
-            if not ladder_badges:
-                continue
+            ladder_badges = _filter_badges_to_current_market(ladder_badges, market_entry=market_entry)
             existing_badges = [
                 badge
                 for badge in (
@@ -882,9 +946,14 @@ def _attach_cards_pregame_starter_ladder_badges(games: list[dict[str, Any]], *, 
                 )
                 if isinstance(badge, dict)
             ]
+            existing_badges = _filter_badges_to_current_market(existing_badges, market_entry=market_entry)
             merged_badges = _merge_starter_badge_lists(ladder_badges, existing_badges)
-            entry["ladderBadges"] = [dict(badge) for badge in merged_badges]
-            entry["pregameLadderBadges"] = [dict(badge) for badge in merged_badges]
+            if merged_badges:
+                entry["ladderBadges"] = [dict(badge) for badge in merged_badges]
+                entry["pregameLadderBadges"] = [dict(badge) for badge in merged_badges]
+            else:
+                entry.pop("ladderBadges", None)
+                entry.pop("pregameLadderBadges", None)
 
 
 def _source_probable(output: dict[str, Any], betting_game: dict[str, Any] | None = None) -> dict[str, Any]:
