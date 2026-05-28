@@ -3337,6 +3337,12 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
             "reason": "refresh_current_oddsapi=off",
         }
     report["stages"]["current_day_oddsapi"] = odds_stage
+    if str(odds_stage.get("status") or "") == "error":
+        report["status"] = "error"
+        _ensure_dir(ops_report_path.parent)
+        _write_json(ops_report_path, report)
+        _release_daily_update_run_lock(run_lock_path)
+        return 1
 
     current_day_overwrite_stage = _prepare_current_day_overwrite_stage(
         args=args,

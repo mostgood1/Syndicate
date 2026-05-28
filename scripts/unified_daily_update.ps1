@@ -225,9 +225,12 @@ function Get-ProcessEnvValue {
         if ([string]::IsNullOrWhiteSpace($name)) {
             continue
         }
-        $value = [Environment]::GetEnvironmentVariable($name, 'Process')
-        if (-not [string]::IsNullOrWhiteSpace($value)) {
-            return $value
+        $scopes = @('Process', 'User', 'Machine')
+        foreach ($scope in $scopes) {
+            $value = [Environment]::GetEnvironmentVariable($name, $scope)
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                return $value
+            }
         }
     }
     return $null
