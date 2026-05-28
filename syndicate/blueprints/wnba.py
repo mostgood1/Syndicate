@@ -399,7 +399,9 @@ def api_props():
 
 @wnba_bp.get("/live-lens")
 def live_lens():
-    return redirect(url_for("syndicate_wnba.cards", date=_selected_date()), code=302)
+    selected_date = _selected_date()
+    context = build_live_lens_page_context(selected_date)
+    return render_template("shared/rank_board.html", **context)
 
 
 @wnba_bp.get("/live-player-props-audit")

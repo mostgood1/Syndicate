@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -42,6 +43,19 @@ ALLOWED_AUDIT_FINDINGS = (
 
 ALLOWED_RUNTIME_DEPENDENCY_FINDINGS = (
 )
+
+
+def _same_path(expected: Path | str, actual: Path | str) -> bool:
+    expected_path = Path(expected)
+    actual_path = Path(actual)
+    try:
+        if expected_path.exists() and actual_path.exists() and expected_path.samefile(actual_path):
+            return True
+    except Exception:
+        pass
+    expected_norm = os.path.normcase(os.path.normpath(str(expected_path.resolve(strict=False))))
+    actual_norm = os.path.normcase(os.path.normpath(str(actual_path.resolve(strict=False))))
+    return expected_norm == actual_norm
 
 PROTECTED_RUNTIME_CONTRACTS = (
     {
@@ -543,9 +557,9 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
                 actual_processed = wnba_processed_path("game_cards_2026-05-17.csv")
                 actual_snapshot = wnba_live_snapshot_path("live_state_2026-05-17.json")
                 actual_dates = wnba_available_dates()
-            if Path(actual_processed) != expected_processed:
+            if not _same_path(expected_processed, actual_processed):
                 _append_violation("wnba", "processed_path resolves from source bundle when available", expected=str(expected_processed), actual=str(actual_processed))
-            if Path(actual_snapshot) != expected_snapshot:
+            if not _same_path(expected_snapshot, actual_snapshot):
                 _append_violation("wnba", "live snapshot path resolves from source bundle when available", expected=str(expected_snapshot), actual=str(actual_snapshot))
             if actual_dates != ["2026-05-17"]:
                 _append_violation("wnba", "available_dates include source bundle artifacts", expected=["2026-05-17"], actual=actual_dates)
@@ -565,7 +579,7 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             expected = local_root / "data" / "recommendations_summary" / "index.json"
             with patch("syndicate.features.ncaaf.sources._source_roots", return_value=[local_root, sibling_root]):
                 actual = ncaaf_data_path("recommendations_summary", "index.json")
-            if Path(actual) != expected:
+            if not _same_path(expected, actual):
                 _append_violation("ncaaf", "data_path stays on local mirror", expected=str(expected), actual=str(actual))
     except Exception as error:
         _append_violation("ncaaf", "data_path stays on local mirror", expected="local mirror path", actual=repr(error), issue="exception")
@@ -583,7 +597,7 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             expected = local_root / "api" / "display_prediction_dates.json"
             with patch("syndicate.features.ncaab.sources._source_roots", return_value=[local_root, sibling_root]):
                 actual = ncaab_mirror_path("display_prediction_dates.json")
-            if Path(actual) != expected:
+            if not _same_path(expected, actual):
                 _append_violation("ncaab", "mirror_path stays on local mirror", expected=str(expected), actual=str(actual))
     except Exception as error:
         _append_violation("ncaab", "mirror_path stays on local mirror", expected="local mirror path", actual=repr(error), issue="exception")
@@ -602,7 +616,7 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             expected = local_root / "current_week.json"
             with patch("syndicate.features.nfl.sources._source_roots", return_value=[local_root, sibling_root]):
                 actual = nfl_data_path("current_week.json")
-            if Path(actual) != expected:
+            if not _same_path(expected, actual):
                 _append_violation("nfl", "data_path stays on local mirror", expected=str(expected), actual=str(actual))
 
         with TemporaryDirectory() as temp_dir:
@@ -634,7 +648,7 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
             with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
                 actual_path = nba_processed_path("game_cards_2026-05-17.csv")
                 actual_dates = nba_available_dates()
-            if Path(actual_path) != expected:
+            if not _same_path(expected, actual_path):
                 _append_violation("nba", "processed_path resolves from source bundle when available", expected=str(expected), actual=str(actual_path))
             if actual_dates != ["2026-05-17"]:
                 _append_violation("nba", "available_dates include source bundle artifacts", expected=["2026-05-17"], actual=actual_dates)
@@ -662,9 +676,9 @@ def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
                 actual_processed = nhl_processed_path("recommendations_2026-05-17.csv")
                 actual_scoreboard = nhl_scoreboard_snapshot_path("2026-05-17")
                 actual_slates = nhl_slate_summaries()
-            if Path(actual_processed) != expected_processed:
+            if not _same_path(expected_processed, actual_processed):
                 _append_violation("nhl", "processed_path stays on local mirror", expected=str(expected_processed), actual=str(actual_processed))
-            if Path(actual_scoreboard) != expected_scoreboard:
+            if not _same_path(expected_scoreboard, actual_scoreboard):
                 _append_violation("nhl", "scoreboard snapshot stays on local mirror", expected=str(expected_scoreboard), actual=str(actual_scoreboard))
             if actual_slates != []:
                 _append_violation("nhl", "slate summaries ignore sibling artifacts", expected=[], actual=actual_slates)

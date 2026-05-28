@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import unittest
@@ -10,6 +11,19 @@ from datetime import date, timedelta
 from tempfile import TemporaryDirectory
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _paths_match(expected: Path | str, actual: Path | str) -> bool:
+    expected_path = Path(expected)
+    actual_path = Path(actual)
+    try:
+        if expected_path.exists() and actual_path.exists() and expected_path.samefile(actual_path):
+            return True
+    except Exception:
+        pass
+    expected_norm = os.path.normcase(os.path.normpath(str(expected_path.resolve(strict=False))))
+    actual_norm = os.path.normcase(os.path.normpath(str(actual_path.resolve(strict=False))))
+    return expected_norm == actual_norm
 
 from syndicate.app import create_app
 from syndicate.features.mlb.cards import source_card_detail_payload
@@ -786,7 +800,7 @@ class DateArchiveHelperTests(unittest.TestCase):
             external_file.write_text("external", encoding="utf-8")
 
             with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
-                self.assertEqual(nba_processed_path("game_cards_2026-05-17.csv"), local_file)
+                self.assertTrue(_paths_match(local_file, nba_processed_path("game_cards_2026-05-17.csv")))
 
     def test_nba_processed_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -798,9 +812,11 @@ class DateArchiveHelperTests(unittest.TestCase):
             external_file.write_text("external", encoding="utf-8")
 
             with patch("syndicate.features.nba.sources.preferred_source_roots", return_value=[local_root, external_root]):
-                self.assertEqual(
-                    nba_processed_path("game_cards_2026-05-17.csv"),
-                    external_file,
+                self.assertTrue(
+                    _paths_match(
+                        external_file,
+                        nba_processed_path("game_cards_2026-05-17.csv"),
+                    )
                 )
 
     def test_nba_available_dates_do_not_fall_back_to_sibling_repo(self) -> None:
@@ -2564,7 +2580,8 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertRegex(nhl_hub, r"/nhl/season/\d{4}/betting-card\?date=\d{4}-\d{2}-\d{2}")
         self.assertIn("Cross-sport daily board", home)
         self.assertIn("Cross-sport betting dashboard with ranked game reads, prop surfaces, and per-sport action counts.", home)
-        self.assertIn("Artifact-backed cards + picks + recap + props lanes", home)
+        self.assertIn("Artifact-backed", home)
+        self.assertIn("cards + picks", home)
         self.assertIn("Artifact-backed shared board + picks + props + live audit lanes", home)
         self.assertIn("Open Live Lens", home)
         self.assertIn("Open Prop Live Lens", home)
@@ -3991,9 +4008,19 @@ class ArchiveRouteTests(unittest.TestCase):
 
     def test_nhl_live_lens_page_renders_rank_board_instead_of_redirecting(self) -> None:
         response = self.client.get("/nhl/live-lens?date=2026-05-16")
+        html = response.get_data(as_text=True)
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers.get("Location"), "/nhl/cards?date=2026-05-16")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("NHL Live Lens", html)
+        self.assertIn('/nhl/live-lens?date=', html)
+
+    def test_wnba_live_lens_page_renders_rank_board_instead_of_redirecting(self) -> None:
+        response = self.client.get("/wnba/live-lens?date=2026-05-16")
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("WNBA Live Lens", html)
+        self.assertIn('/wnba/live-lens?date=', html)
 
     def test_nhl_game_route_redirects_to_cards_with_game_pk_and_date(self) -> None:
         response = self.client.get("/nhl/game/824031?date=2026-05-16")

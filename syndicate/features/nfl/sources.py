@@ -37,10 +37,8 @@ def _source_roots() -> list[Path]:
 
 
 def default_nfl_source_root() -> Path:
-    for root in _source_roots():
-        if root.exists():
-            return root
-    return _source_roots()[0]
+    roots = _source_roots()
+    return roots[0]
 
 
 def data_path(*parts: str) -> Path:

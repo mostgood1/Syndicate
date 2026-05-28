@@ -4,6 +4,7 @@ import gzip
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -40,16 +41,35 @@ def _resolve_data_path(*parts: str) -> Path:
     return default_mlb_source_root().joinpath("data", *parts)
 
 
+def _reconcile_from_repo_enabled() -> bool:
+    return bool(str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip())
+
+
+def _resolve_data_path_with_reconcile(*parts: str) -> Path:
+    roots = _source_roots()
+    primary = roots[0]
+    target = primary.joinpath("data", *parts)
+    if target.exists() or not _reconcile_from_repo_enabled() or len(roots) <= 1:
+        return target
+    rel = Path("data", *parts)
+    for root in roots[1:]:
+        candidate = root.joinpath(rel)
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(candidate, target)
+        return target
+    return target
+
+
 def default_mlb_source_root() -> Path:
-    for root in _source_roots():
-        if root.exists():
-            return root
-    return _source_roots()[0]
+    roots = _source_roots()
+    return roots[0]
 
 
 def daily_artifact_path(selected_date: str, suffix: str = "") -> Path:
     filename = f"daily_summary_{selected_date.replace('-', '_')}{suffix}.json"
-    return _resolve_data_path("daily", filename)
+    return _resolve_data_path_with_reconcile("daily", filename)
 
 
 def available_daily_summary_dates() -> list[str]:
@@ -152,12 +172,18 @@ def raw_feed_live_path(selected_date: str, game_pk: int) -> Path | None:
         candidate = day_dir / f"{int(game_pk)}{suffix}"
         if candidate.exists() and candidate.is_file():
             return candidate
+    reconciled = _resolve_data_path_with_reconcile("raw", "statsapi", "feed_live", season, selected_date, f"{int(game_pk)}.json")
+    if reconciled.exists() and reconciled.is_file():
+        return reconciled
+    reconciled_gz = _resolve_data_path_with_reconcile("raw", "statsapi", "feed_live", season, selected_date, f"{int(game_pk)}.json.gz")
+    if reconciled_gz.exists() and reconciled_gz.is_file():
+        return reconciled_gz
     return None
 
 
 def live_lens_report_path(selected_date: str) -> Path:
     filename = f"live_lens_report_{selected_date.replace('-', '_')}.json"
-    return _resolve_data_path("live_lens", filename)
+    return _resolve_data_path_with_reconcile("live_lens", filename)
 
 
 def live_prop_registry_path(selected_date: str) -> Path:
