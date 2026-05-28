@@ -1,3 +1,2 @@
-date,commence_time,home_team,visitor_team,home_ml,away_ml,home_spread,away_spread,total,bookmaker
-2026-05-29,2026-05-29T00:10:00Z,Dallas Wings,Las Vegas Aces,130.92976035696066,-130.92976035696066,2.5,-2.5,175.5,oddsapi_consensus
-2026-05-29,2026-05-29T02:10:00Z,Golden State Valkyries,Indiana Fever,106.05024468879262,-106.05024468879262,1.5,-1.5,169.5,oddsapi_consensus
+date,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,home_spread_price,away_spread_price,total,total_over_price,total_under_price,bookmaker
+2026-05-28,San Antonio Spurs,Oklahoma City Thunder,2026-05-29T00:40:00+00:00,-160,135,3.5,-3.5,-250,185,219.0,-110,-110,bovada

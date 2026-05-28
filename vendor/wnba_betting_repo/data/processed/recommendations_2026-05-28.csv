@@ -1,1 +1,4 @@
 market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ML,San Antonio Spurs,San Antonio Spurs,Oklahoma City Thunder,2026-05-28,0.017370673930001357,-160.0,0.5911949685534592,,,,,,Low
+ATS,San Antonio Spurs,San Antonio Spurs,Oklahoma City Thunder,2026-05-28,0.25813716364233763,-250.0,0.7142857142857143,15.288075216179488,3.5,11.788075216179488,-3.5,,High
+TOTAL,Under,San Antonio Spurs,Oklahoma City Thunder,2026-05-28,0.9090889999999999,-110.0,0.5238095238095238,-128.29932730362106,219.0,,,90.70067269637896,High
