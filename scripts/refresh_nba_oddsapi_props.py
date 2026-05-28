@@ -576,9 +576,6 @@ def _ensure_source_game_inputs(
             timeout_s=20 * 60,
         )
     
-    _seed_game_odds_from_props_snapshot(source_root=source_root, date_str=date_str, log_file=log_file)
-    _seed_game_odds_from_raw_history(source_root=source_root, date_str=date_str, log_file=log_file)
-
     rc_predict_date = _run_source_predict_date(
         source_root=source_root,
         package_name=package_name,
@@ -586,15 +583,6 @@ def _ensure_source_game_inputs(
         log_file=log_file,
         heartbeat_cb=heartbeat_cb,
     )
-    if int(rc_predict_date) != 0:
-        _append_log(log_file, f"predict-date failed with exit code {int(rc_predict_date)}; retrying via CPU daily-update fallback")
-        rc_predict_date = _run_source_daily_update_cpu_fallback(
-            source_root=source_root,
-            package_name=package_name,
-            date_str=date_str,
-            log_file=log_file,
-            heartbeat_cb=heartbeat_cb,
-        )
     return {
         "schedule": int(rc_schedule),
         "fetch": int(rc_fetch),
@@ -637,24 +625,7 @@ def _run_source_daily_update_cpu_fallback(
     log_file: Path,
     heartbeat_cb: callable | None,
 ) -> int:
-    return _run_to_file(
-        [
-            _source_python(source_root),
-            "-m",
-            f"{package_name}.cli",
-            "daily-update",
-            "--date",
-            date_str,
-            "--no-npu",
-            "--no-git-push",
-        ],
-        log_file,
-        cwd=source_root,
-        env=_source_worker_env(source_root),
-        timeout_s=45 * 60,
-        heartbeat_cb=heartbeat_cb,
-        heartbeat_every_s=5.0,
-    )
+    raise RuntimeError("CPU daily-update fallback is disabled; fix predict-date input failures instead")
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -1007,16 +978,32 @@ def _run_refresh_via_cli(
         state["error"] = f"snapshot alias write failed: {alias_error}"
 
     pred_ready = False
+    game_input_rcs: dict[str, int] | None = None
     if not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
         state["phase"] = "predictions"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
+        if _env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True):
+            game_input_rcs = _ensure_source_game_inputs(
+                source_root=source_root,
+                package_name="nba_betting",
+                date_str=date_str,
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+            )
+            if any(int(value) != 0 for value in game_input_rcs.values()):
+                state["error"] = (
+                    "required source game inputs failed before predict-props: "
+                    + ", ".join(f"{key}={int(value)}" for key, value in game_input_rcs.items())
+                )
         player_logs_ok, player_logs_error = _ensure_player_logs_for_props_refresh(
             source_root=source_root,
             date_str=date_str,
             log_file=log_file,
             heartbeat_cb=_touch_progress,
         )
-        if not player_logs_ok:
+        if state.get("error"):
+            pass
+        elif not player_logs_ok:
             state["error"] = player_logs_error or f"player_logs missing before predict-props for {date_str}"
         else:
             try:
@@ -1099,13 +1086,14 @@ def _run_refresh_via_cli(
         state["rc_export"] = -1
         try:
             _touch_progress()
-            game_input_rcs = _ensure_source_game_inputs(
-                source_root=source_root,
-                package_name="nba_betting",
-                date_str=date_str,
-                log_file=log_file,
-                heartbeat_cb=_touch_progress,
-            )
+            if game_input_rcs is None:
+                game_input_rcs = _ensure_source_game_inputs(
+                    source_root=source_root,
+                    package_name="nba_betting",
+                    date_str=date_str,
+                    log_file=log_file,
+                    heartbeat_cb=_touch_progress,
+                )
             rc_local_props_export = 0
             if pred_ready:
                 _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)

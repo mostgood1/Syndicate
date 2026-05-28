@@ -3318,18 +3318,17 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
                 odds_warnings.append("current-day OddsAPI ingest captured no pitcher props")
             if int(hitter_counts.get("players") or 0) <= 0:
                 odds_warnings.append("current-day OddsAPI ingest captured no hitter props")
-            if odds_warnings and str(odds_stage.get("status") or "") == "ok":
-                odds_stage["status"] = "warning"
             if odds_warnings:
-                odds_stage["warnings"] = list(odds_warnings)
-                report["warnings"].extend(list(odds_warnings))
+                odds_stage["status"] = "error"
+                odds_stage["errors"] = list(odds_warnings)
+                report["errors"].extend(list(odds_warnings))
         except Exception as exc:
             odds_stage = {
-                "status": "warning",
+                "status": "error",
                 "date": str(args.date),
                 "error": f"{type(exc).__name__}: {exc}",
             }
-            report["warnings"].append(f"current-day OddsAPI ingest failed: {type(exc).__name__}: {exc}")
+            report["errors"].append(f"current-day OddsAPI ingest failed: {type(exc).__name__}: {exc}")
     else:
         odds_stage = {
             "status": "skipped",
@@ -3671,8 +3670,8 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
                     "current-day season frontend artifact build failed: " + "; ".join(artifact_errors)
                 )
             elif soft_artifact_warnings:
-                season_frontend_stage["status"] = "partial"
-                report["warnings"].extend(soft_artifact_warnings)
+                season_frontend_stage["status"] = "error"
+                report["errors"].extend(soft_artifact_warnings)
             elif soft_artifact_notes:
                 season_frontend_stage["status"] = "ok"
                 report["notes"].extend(soft_artifact_notes)

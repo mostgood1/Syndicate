@@ -392,7 +392,7 @@ if (-not $SkipNBA) {
                 '--artifact-root', 'data\nba_source',
                 '--log-file', (Join-Path $runDir 'nba_props_refresh.log'),
                 '--force-refresh',
-                '--days-ahead', '1',
+                '--days-ahead', '0',
                 '--do-edges',
                 '--do-export'
             )
@@ -416,7 +416,7 @@ if (-not $SkipNBA) {
                 '--artifact-root', 'data\nba_source',
                 '--log-file', (Join-Path $runDir 'nba_props_refresh.log'),
                 '--force-refresh',
-                '--days-ahead', '1',
+                '--days-ahead', '0',
                 '--do-edges',
                 '--do-export'
             )
@@ -446,7 +446,7 @@ if (-not $SkipWNBA) {
                 '--artifact-root', 'data\wnba_source',
                 '--log-file', (Join-Path $runDir 'wnba_props_refresh.log'),
                 '--force-refresh',
-                '--days-ahead', '1',
+                '--days-ahead', '0',
                 '--do-edges',
                 '--do-export'
             )
@@ -470,7 +470,7 @@ if (-not $SkipWNBA) {
                 '--artifact-root', 'data\wnba_source',
                 '--log-file', (Join-Path $runDir 'wnba_props_refresh.log'),
                 '--force-refresh',
-                '--days-ahead', '1',
+                '--days-ahead', '0',
                 '--do-edges',
                 '--do-export'
             )

@@ -84,10 +84,14 @@ function Copy-IfExists {
     }
 
     if ($Recurse) {
-        if (Test-Path $DestinationPath) {
-            Remove-Item -Path $DestinationPath -Recurse -Force
+        New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+        try {
+            Copy-Item -Path (Join-Path $SourcePath '*') -Destination $DestinationPath -Recurse -Force -ErrorAction Stop
         }
-        Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
+        catch {
+            Write-Warning ("Skipping recursive copy for {0}: {1}" -f $SourcePath, $_.Exception.Message)
+            return $false
+        }
     }
     else {
         Copy-Item -Path $SourcePath -Destination $DestinationPath -Force
@@ -276,7 +280,7 @@ Ensure-DateJsonArtifact -RelativePath (Join-Path 'daily\top_props' ("daily_top_p
         top_props = @()
     }) | Out-Null
 
-# Strict contract: do not continue when canonical OddsAPI snapshot files are missing.
+# Strict contract: canonical OddsAPI snapshots must exist for the requested date.
 $requiredOddsSnapshots = @(
     (Join-Path "daily\snapshots\$Date" "oddsapi_game_lines_$dateSlug.json"),
     (Join-Path "daily\snapshots\$Date" "oddsapi_pitcher_props_$dateSlug.json"),
@@ -291,7 +295,11 @@ foreach ($required in $requiredOddsSnapshots) {
     }
 }
 if ($missingOddsSnapshots.Count -gt 0) {
-    throw "Missing required MLB odds snapshot artifacts for ${Date}: $($missingOddsSnapshots -join ', ')"
+    $missingDetails = @($missingOddsSnapshots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($missingDetails.Count -eq 0) {
+        $missingDetails = @($requiredOddsSnapshots)
+    }
+    throw ("Missing MLB odds snapshot artifacts for {0}: {1}" -f $Date, ($missingDetails -join ', '))
 }
 
 $seasonEvalRoot = if ($UseExistingMirrorArtifacts) { Join-Path $destDataRoot (Join-Path 'eval\seasons' $season) } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\eval\seasons' $season) } else { Join-Path $sourceRoot (Join-Path 'data\eval\seasons' $season) }
@@ -385,6 +393,7 @@ $manifest = [pscustomobject]@{
     destinationRoot = $destDataRoot
     usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
     usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
+    missingOddsSnapshots = @($missingOddsSnapshots)
     copiedArtifactCount = $copied.Count
     artifactGroups = [pscustomobject]$artifactGroups
     copiedArtifacts = @($copied)

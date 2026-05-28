@@ -12323,11 +12323,15 @@ def _predict_from_matchups(inp: pd.DataFrame) -> pd.DataFrame:
     # Extract only the upcoming games (last N rows)
     enriched = features_df.tail(len(feat_rows))
     
-    # Get feature matrix
-    missing_feat_cols = [col for col in feat_cols if col not in enriched.columns]
-    for col in missing_feat_cols:
-        enriched[col] = 0.0
-    X = enriched[feat_cols].fillna(0)
+    def _align_feature_frame(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+        aligned = frame.copy()
+        for col in columns:
+            if col not in aligned.columns:
+                aligned[col] = 0.0
+        return aligned[columns].fillna(0)
+
+    # Baseline feature matrix (used by sklearn fallback when model metadata is unavailable)
+    X = _align_feature_frame(enriched, list(feat_cols))
 
     # Load models - Use NPU-accelerated predictions for ALL models (game + periods)
     try:
@@ -12337,14 +12341,22 @@ def _predict_from_matchups(inp: pd.DataFrame) -> pd.DataFrame:
         # Create NPU predictor (win, spread, total, quarters, halves with NPU acceleration)
         console.print("[NPU] Using NPU-accelerated predictions (ONNX + QNN)", style="green")
         npu_predictor = NPUGamePredictor()
+
+        # Align the feature matrix to the predictor's declared schema.
+        npu_cols = list(getattr(npu_predictor, "feature_columns", []) or feat_cols)
+        X_npu = _align_feature_frame(enriched, npu_cols)
         
         # Convert features to numpy array for NPU inference
-        X_np = X.values.astype(np.float32)
+        X_np = X_npu.values.astype(np.float32)
         
         # Run NPU predictions for all games with period breakdowns
         # Create result dataframe with original matchup info
         res = pd.DataFrame(feat_rows)[["date", "home_team", "visitor_team"]].copy()
         npu_results = npu_predictor.predict_batch(X_np, include_periods=True)
+        if (not isinstance(npu_results, list)) or (len(npu_results) != len(res.index)):
+            raise RuntimeError("NPU predictor returned an unexpected result shape")
+        if any((not isinstance(row, dict)) or ("win_prob" not in row) for row in npu_results):
+            raise RuntimeError("NPU predictor output is missing required win_prob fields")
         
         # Extract main game predictions
         res["home_win_prob"] = [r["win_prob"] for r in npu_results]
@@ -12386,18 +12398,28 @@ def _predict_from_matchups(inp: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             pass
         
-    except (FileNotFoundError, ImportError) as e:
+    except Exception as e:
         console.print(f"⚠️  NPU predictor not available: {e}", style="yellow")
         console.print("Falling back to sklearn models (requires sklearn installed)...", style="yellow")
         # Fallback to sklearn models
         win_model = joblib.load(paths.models / "win_prob.joblib")
         spread_model = joblib.load(paths.models / "spread_margin.joblib")
         total_model = joblib.load(paths.models / "totals.joblib")
+
+        def _model_input(model: Any) -> pd.DataFrame:
+            model_cols = getattr(model, "feature_names_in_", None)
+            if model_cols is None:
+                return X
+            return _align_feature_frame(enriched, [str(col) for col in model_cols])
+
+        X_win = _model_input(win_model)
+        X_spread = _model_input(spread_model)
+        X_total = _model_input(total_model)
         
         res = pd.DataFrame(feat_rows)
-        res["home_win_prob"] = win_model.predict_proba(X)[:, 1]
-        res["pred_margin"] = spread_model.predict(X)
-        res["pred_total"] = total_model.predict(X)
+        res["home_win_prob"] = win_model.predict_proba(X_win)[:, 1]
+        res["pred_margin"] = spread_model.predict(X_spread)
+        res["pred_total"] = total_model.predict(X_total)
         
         # Load period models (halves/quarters) for fallback
         try:
@@ -12410,14 +12432,14 @@ def _predict_from_matchups(inp: pd.DataFrame) -> pd.DataFrame:
         
         for half in ("h1", "h2"):
             if half in halves:
-                res[f"halves_{half}_win"] = halves[half]["win"].predict_proba(X)[:, 1]
-                res[f"halves_{half}_margin"] = halves[half]["margin"].predict(X)
-                res[f"halves_{half}_total"] = halves[half]["total"].predict(X)
+                res[f"halves_{half}_win"] = halves[half]["win"].predict_proba(_model_input(halves[half]["win"]))[:, 1]
+                res[f"halves_{half}_margin"] = halves[half]["margin"].predict(_model_input(halves[half]["margin"]))
+                res[f"halves_{half}_total"] = halves[half]["total"].predict(_model_input(halves[half]["total"]))
         for q in ("q1", "q2", "q3", "q4"):
             if q in quarters:
-                res[f"quarters_{q}_win"] = quarters[q]["win"].predict_proba(X)[:, 1]
-                res[f"quarters_{q}_margin"] = quarters[q]["margin"].predict(X)
-                res[f"quarters_{q}_total"] = quarters[q]["total"].predict(X)
+                res[f"quarters_{q}_win"] = quarters[q]["win"].predict_proba(_model_input(quarters[q]["win"]))[:, 1]
+                res[f"quarters_{q}_margin"] = quarters[q]["margin"].predict(_model_input(quarters[q]["margin"]))
+                res[f"quarters_{q}_total"] = quarters[q]["total"].predict(_model_input(quarters[q]["total"]))
     return res
 
 @cli.command("daily-update")

@@ -95,6 +95,32 @@ function Invoke-Step {
     return $output
 }
 
+function Assert-MirrorManifestFreshness {
+    param(
+        [string]$Sport,
+        [string]$ExpectedDate
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Sport) -or [string]::IsNullOrWhiteSpace($ExpectedDate)) {
+        throw 'Assert-MirrorManifestFreshness requires sport and expected date.'
+    }
+
+    $slug = $Sport.Trim().ToLowerInvariant()
+    $manifestPath = Join-Path $repoRoot (Join-Path ("data\{0}_source\manifests" -f $slug) 'mirror_refresh_latest.json')
+    if (-not (Test-Path $manifestPath)) {
+        throw ("{0} mirror refresh did not produce latest manifest: {1}" -f $Sport.ToUpperInvariant(), $manifestPath)
+    }
+
+    $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json
+    $actualDate = [string]$manifest.date
+    if ([string]::IsNullOrWhiteSpace($actualDate)) {
+        throw ("{0} mirror latest manifest is missing date field: {1}" -f $Sport.ToUpperInvariant(), $manifestPath)
+    }
+    if ($actualDate -ne $ExpectedDate) {
+        throw ("{0} mirror latest manifest date mismatch. expected={1} actual={2} path={3}" -f $Sport.ToUpperInvariant(), $ExpectedDate, $actualDate, $manifestPath)
+    }
+}
+
 $refreshSteps = @()
 if (-not $SkipMLB) {
     $mlbMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_mlb_source_mirror.ps1'), '-Date', $Date)
@@ -105,7 +131,7 @@ if (-not $SkipMLB) {
     else {
         $mlbMirrorCommand += '-UseExistingMirrorArtifacts'
     }
-    $refreshSteps += ,@('MLB mirror refresh', $mlbMirrorCommand)
+    $refreshSteps += [pscustomobject]@{ Sport = 'mlb'; Name = 'MLB mirror refresh'; Command = $mlbMirrorCommand }
 }
 if (-not $SkipNBA) {
     $nbaMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nba_source_mirror.ps1'), '-Date', $Date)
@@ -116,7 +142,7 @@ if (-not $SkipNBA) {
     else {
         $nbaMirrorCommand += '-UseExistingMirrorArtifacts'
     }
-    $refreshSteps += ,@('NBA mirror refresh', $nbaMirrorCommand)
+    $refreshSteps += [pscustomobject]@{ Sport = 'nba'; Name = 'NBA mirror refresh'; Command = $nbaMirrorCommand }
 }
 if (-not $SkipNHL) {
     $nhlMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nhl_source_mirror.ps1'), '-Date', $Date)
@@ -127,7 +153,7 @@ if (-not $SkipNHL) {
     else {
         $nhlMirrorCommand += '-UseExistingMirrorArtifacts'
     }
-    $refreshSteps += ,@('NHL mirror refresh', $nhlMirrorCommand)
+    $refreshSteps += [pscustomobject]@{ Sport = 'nhl'; Name = 'NHL mirror refresh'; Command = $nhlMirrorCommand }
 }
 if (-not $SkipWNBA) {
     $wnbaMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_wnba_source_mirror.ps1'), '-Date', $Date)
@@ -138,7 +164,7 @@ if (-not $SkipWNBA) {
     else {
         $wnbaMirrorCommand += '-UseExistingMirrorArtifacts'
     }
-    $refreshSteps += ,@('WNBA mirror refresh', $wnbaMirrorCommand)
+    $refreshSteps += [pscustomobject]@{ Sport = 'wnba'; Name = 'WNBA mirror refresh'; Command = $wnbaMirrorCommand }
 }
 if (-not $SkipNFL) {
     $nflMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nfl_source_mirror.ps1'))
@@ -149,7 +175,7 @@ if (-not $SkipNFL) {
     else {
         $nflMirrorCommand += '-UseExistingMirrorArtifacts'
     }
-    $refreshSteps += ,@('NFL mirror refresh', $nflMirrorCommand)
+    $refreshSteps += [pscustomobject]@{ Sport = 'nfl'; Name = 'NFL mirror refresh'; Command = $nflMirrorCommand }
 }
 if (-not $SkipNCAAF) {
     $ncaafMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaaf_source_mirror.ps1'))
@@ -160,10 +186,14 @@ if (-not $SkipNCAAF) {
     else {
         $ncaafMirrorCommand += '-UseExistingMirrorArtifacts'
     }
-    $refreshSteps += ,@('NCAAF mirror refresh', $ncaafMirrorCommand)
+    $refreshSteps += [pscustomobject]@{ Sport = 'ncaaf'; Name = 'NCAAF mirror refresh'; Command = $ncaafMirrorCommand }
 }
 if (-not $SkipNCAAB) {
-    $refreshSteps += ,@('NCAAB mirror refresh', @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaab_source_mirror.ps1'), '-Date', $Date))
+    $refreshSteps += [pscustomobject]@{
+        Sport = 'ncaab'
+        Name = 'NCAAB mirror refresh'
+        Command = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_ncaab_source_mirror.ps1'), '-Date', $Date)
+    }
 }
 
 Push-Location $repoRoot
@@ -183,8 +213,9 @@ try {
     }
 
     foreach ($step in $refreshSteps) {
-        $safeName = ($step[0].ToLowerInvariant() -replace '[^a-z0-9]+', '_').Trim('_') + '.json'
-        Invoke-Step -Name $step[0] -Command $step[1] -ArtifactName $safeName | Out-Null
+        $safeName = ($step.Name.ToLowerInvariant() -replace '[^a-z0-9]+', '_').Trim('_') + '.json'
+        Invoke-Step -Name $step.Name -Command $step.Command -ArtifactName $safeName | Out-Null
+        Assert-MirrorManifestFreshness -Sport $step.Sport -ExpectedDate $Date
     }
 
     $gateCommand = @($python, '.\scripts\migration_gate.py')

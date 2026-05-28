@@ -1,0 +1,70 @@
+[2026-05-28T20:56:04] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-28 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-28.csv' --regions us
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-28.csv with 2017 rows.
+[2026-05-28T20:56:06] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-28.csv (rows=2017)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+Traceback (most recent call last):
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_predictions.py", line 414, in export_props_predictions_local
+    basketball_props_smart_sim.export_props_predictions_with_smart_sim_local(
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_smart_sim.py", line 4746, in export_props_predictions_with_smart_sim_local
+    raise RuntimeError(reason)
+RuntimeError: SmartSim produced no player rows for 2026-05-28
+[2026-05-28T20:57:05] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-28 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-28.csv' --regions us
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-28.csv with 2017 rows.
+[2026-05-28T20:57:06] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-28.csv (rows=2017)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[WARN] SmartSim produced no player rows for 2026-05-28; falling back to non-SmartSim props predictions
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-28T20:57:35] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting.cli fetch-schedule
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 53, in <module>
+    from .scrape_nba_api import fetch_games_nba_api, enrich_periods_existing, backfill_scoreboard
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrape_nba_api.py", line 13, in <module>
+    from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
+ModuleNotFoundError: No module named 'tenacity'
+[2026-05-28T20:57:39] Seeded fallback game odds slate from props snapshot: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_odds_2026-05-28.csv (rows=1)
+[2026-05-28T20:57:39] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting.cli predict-date --date 2026-05-28
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 53, in <module>
+    from .scrape_nba_api import fetch_games_nba_api, enrich_periods_existing, backfill_scoreboard
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrape_nba_api.py", line 13, in <module>
+    from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
+ModuleNotFoundError: No module named 'tenacity'
+[2026-05-28T20:57:39] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-05-28T20:57:39] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting.cli daily-update --date 2026-05-28 --no-npu --no-git-push
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 53, in <module>
+    from .scrape_nba_api import fetch_games_nba_api, enrich_periods_existing, backfill_scoreboard
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrape_nba_api.py", line 13, in <module>
+    from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
+ModuleNotFoundError: No module named 'tenacity'
+[2026-05-28T20:57:40] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting.cli export-recommendations --date 2026-05-28
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 53, in <module>
+    from .scrape_nba_api import fetch_games_nba_api, enrich_periods_existing, backfill_scoreboard
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrape_nba_api.py", line 13, in <module>
+    from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
+ModuleNotFoundError: No module named 'tenacity'
+[2026-05-28T20:57:41] export-recommendations did not create expected artifact: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\recommendations_2026-05-28.csv
+[2026-05-28T20:57:41] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting.cli export-game-cards --date 2026-05-28
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py", line 53, in <module>
+    from .scrape_nba_api import fetch_games_nba_api, enrich_periods_existing, backfill_scoreboard
+  File "C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\scrape_nba_api.py", line 13, in <module>
+    from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
+ModuleNotFoundError: No module named 'tenacity'
+[2026-05-28T20:57:42] export-game-cards did not create expected artifact: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_cards_2026-05-28.csv
+[2026-05-28T20:57:43] export stage returned non-zero for 2026-05-28 but recommendations were written; continuing
