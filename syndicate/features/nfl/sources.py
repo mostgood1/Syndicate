@@ -20,10 +20,26 @@ def _source_roots() -> list[Path]:
         return [Path(env_value).resolve()]
 
     repo_root = repo_root_from(__file__)
-    return [(repo_root / "data" / "nfl_source").resolve()]
+    data_root = str(__import__('os').environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    roots: list[Path] = []
+    if data_root:
+        roots.append((Path(data_root).resolve() / "nfl_source").resolve())
+    roots.append((repo_root / "data" / "nfl_source").resolve())
+
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        if root in seen:
+            continue
+        seen.add(root)
+        deduped.append(root)
+    return deduped
 
 
 def default_nfl_source_root() -> Path:
+    for root in _source_roots():
+        if root.exists():
+            return root
     return _source_roots()[0]
 
 

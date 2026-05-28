@@ -20,7 +20,20 @@ def _source_roots() -> list[Path]:
     if env_value:
         return [Path(env_value).resolve()]
 
-    return [(_repo_root() / "data" / "mlb_source").resolve()]
+    data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    roots: list[Path] = []
+    if data_root:
+        roots.append((Path(data_root).resolve() / "mlb_source").resolve())
+    roots.append((_repo_root() / "data" / "mlb_source").resolve())
+
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        if root in seen:
+            continue
+        seen.add(root)
+        deduped.append(root)
+    return deduped
 
 
 def _resolve_data_path(*parts: str) -> Path:
@@ -28,6 +41,9 @@ def _resolve_data_path(*parts: str) -> Path:
 
 
 def default_mlb_source_root() -> Path:
+    for root in _source_roots():
+        if root.exists():
+            return root
     return _source_roots()[0]
 
 
