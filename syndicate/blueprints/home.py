@@ -181,6 +181,98 @@ def _scheduled_status_line(game: dict[str, Any], fallback: str) -> str:
     return fallback_text or "Board update pending"
 
 
+def _nba_live_state_games(selected_date: str) -> list[dict[str, Any]]:
+    try:
+        from syndicate.features.nba.cards import build_live_state_payload
+
+        payload = build_live_state_payload(selected_date, ttl=12)
+    except Exception:
+        return []
+    rows = payload.get("games") if isinstance(payload, dict) else []
+    if not isinstance(rows, list):
+        return []
+    games: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        away_label = _safe_text(row.get("away"), "Away")
+        home_label = _safe_text(row.get("home"), "Home")
+        games.append(
+            {
+                "gamePk": str(row.get("game_id") or "").strip() or f"{away_label}@{home_label}",
+                "away": {"abbr": away_label, "name": away_label, "score": row.get("away_pts")},
+                "home": {"abbr": home_label, "name": home_label, "score": row.get("home_pts")},
+                "status": {
+                    "abstract": str(row.get("status") or "").strip() or "Scheduled",
+                    "detailed": str(row.get("status") or "").strip() or "Scheduled",
+                    "in_progress": bool(row.get("in_progress")),
+                    "final": bool(row.get("final")),
+                },
+                "live_state": dict(row),
+                "detail": str(row.get("status") or "").strip() or selected_date,
+                "summary": "NBA live-state fallback",
+                "href": f"/nba/cards?date={selected_date}",
+            }
+        )
+    return games
+
+
+def _nba_has_live_games(selected_date: str) -> bool:
+    return len(_nba_live_state_games(selected_date)) > 0
+
+
+def _mlb_schedule_fallback_games(selected_date: str) -> list[dict[str, Any]]:
+    try:
+        with urlopen(f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={selected_date}", timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return []
+    dates = payload.get("dates") if isinstance(payload, dict) else []
+    if not isinstance(dates, list) or not dates:
+        return []
+    events = dates[0].get("games") if isinstance(dates[0], dict) else []
+    if not isinstance(events, list):
+        return []
+    games: list[dict[str, Any]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        teams = event.get("teams") if isinstance(event.get("teams"), dict) else {}
+        away = teams.get("away") if isinstance(teams.get("away"), dict) else {}
+        home = teams.get("home") if isinstance(teams.get("home"), dict) else {}
+        away_team = away.get("team") if isinstance(away.get("team"), dict) else {}
+        home_team = home.get("team") if isinstance(home.get("team"), dict) else {}
+        away_abbr = _safe_text(away_team.get("abbreviation") or away_team.get("name"), "Away")
+        home_abbr = _safe_text(home_team.get("abbreviation") or home_team.get("name"), "Home")
+        game_pk = int(event.get("gamePk") or 0)
+        status = event.get("status") if isinstance(event.get("status"), dict) else {}
+        games.append(
+            {
+                "gamePk": game_pk,
+                "away": {
+                    "abbr": away_abbr,
+                    "name": _safe_text(away_team.get("name"), away_abbr),
+                    "score": away.get("score"),
+                },
+                "home": {
+                    "abbr": home_abbr,
+                    "name": _safe_text(home_team.get("name"), home_abbr),
+                    "score": home.get("score"),
+                },
+                "status": {
+                    "abstract": _safe_text(status.get("abstractGameState"), "Scheduled"),
+                    "detailed": _safe_text(status.get("detailedState"), "Scheduled"),
+                },
+                "scheduled_start_utc": event.get("gameDate"),
+                "detail": _safe_text(status.get("detailedState"), selected_date),
+                "summary": "MLB schedule fallback",
+                "href": f"/mlb/game/{game_pk}?date={selected_date}" if game_pk else f"/mlb/cards?date={selected_date}",
+                "href_label": "Open MLB game",
+            }
+        )
+    return games
+
+
 def _scoreboard_state(game: dict[str, Any]) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
@@ -1722,14 +1814,18 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
 
             payload = build_cards_page_context(context_label)
             games = list(payload.get("games") or [])
+            if is_active_today and not games:
+                games = _mlb_schedule_fallback_games(context_label)
             return _apply_mlb_live_scores(games, context_label) if is_active_today else games
         if slug == "nba":
             from syndicate.features.nba.cards import build_cards_page_context
 
             payload = build_cards_page_context(context_label)
             if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
-                return []
+                return _nba_live_state_games(context_label) if is_active_today else []
             games = list(payload.get("games") or [])
+            if is_active_today and not games:
+                games = _nba_live_state_games(context_label)
             return _apply_nba_live_scores(games, context_label) if is_active_today else games
         if slug == "nhl":
             from syndicate.features.nhl.cards import build_cards_page_context
@@ -1931,6 +2027,8 @@ def _build_sport_overview(
     elif slug == "nba":
         dates = nba_available_dates()
         selected_date = _prefer_today_or_latest(dates, today_value, preserve_requested=preserve_requested_date)
+        if selected_date != today_value and _nba_has_live_games(today_value):
+            selected_date = today_value
         links = build_nba_module_links(selected_date, "Cards")
         context_label = selected_date
         primary_href = f"/nba?date={selected_date}"

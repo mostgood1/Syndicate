@@ -182,6 +182,16 @@ $noSlateSkips = @()
 $scheduledChecks = @()
 foreach ($sport in @('MLB', 'NBA', 'NHL', 'WNBA')) {
     if (-not $activeSports[$sport]) { continue }
+    if ($IncludeOffSeasonSports) {
+        $scheduledChecks += [pscustomobject]@{
+            sport = $sport
+            skipped = $false
+            reason = 'IncludeOffSeasonSports enabled; bypassing no-slate schedule skip'
+            checker = $null
+            count = $null
+        }
+        continue
+    }
     if ($forcedMap[$sport]) {
         $scheduledChecks += [pscustomobject]@{
             sport = $sport
