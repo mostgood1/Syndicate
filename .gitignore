@@ -27,6 +27,13 @@ data/*_source/data/cache/
 data/*_source/source_artifacts/data/cache/
 data/*_source/source_artifacts/
 
+# Generated source trees are operational artifacts, not Render deploy inputs.
+data/*_source/data/
+vendor/*/data/
+
+# Temporary helper scripts should stay local.
+scripts/tmp_*.py
+
 # MLB local mirror generates additional source-side working trees and raw fetch payloads.
 data/mlb_source/data/daily_hitter_props/
 data/mlb_source/data/daily_pitcher_props/

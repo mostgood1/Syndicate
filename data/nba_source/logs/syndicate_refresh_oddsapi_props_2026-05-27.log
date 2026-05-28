@@ -1,0 +1,125 @@
+[2026-05-28T02:54:14] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-27 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-27.csv' --regions us
+ERROR: No player props fetched for 2026-05-27 and no same-day snapshot exists to preserve
+[2026-05-28T02:54:21] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-28T02:54:25] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli predict-date --date 2026-05-27
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-27.
+No games found on 2026-05-27 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-28T02:54:27] game_odds quality check failed for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total; attempting odds-snapshots rebuild
+[2026-05-28T02:54:27] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli odds-snapshots --date 2026-05-27
+────────────────── Odds Snapshots (events + consensus lines) ──────────────────
+No game odds returned (OddsAPI)
+No events found for target date (ET)
+[2026-05-28T02:54:47] game_odds still invalid after odds-snapshots for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total
+[2026-05-28T02:58:48] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-27 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-27.csv' --regions us
+ERROR: No player props fetched for 2026-05-27 and no same-day snapshot exists to preserve
+[2026-05-28T02:58:50] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-28T02:58:53] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli predict-date --date 2026-05-27
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-27.
+No games found on 2026-05-27 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-28T02:58:55] game_odds quality check failed for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total; attempting odds-snapshots rebuild
+[2026-05-28T02:58:55] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli odds-snapshots --date 2026-05-27
+────────────────── Odds Snapshots (events + consensus lines) ──────────────────
+No game odds returned (OddsAPI)
+No events found for target date (ET)
+Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-27.csv' --regions us
+ERROR: No player props fetched for 2026-05-27 and no same-day snapshot exists to preserve
+[2026-05-28T02:58:58] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-28T02:59:00] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli predict-date --date 2026-05-27
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-27.
+No games found on 2026-05-27 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-28T02:59:02] game_odds quality check failed for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total; attempting odds-snapshots rebuild
+[2026-05-28T02:59:02] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli odds-snapshots --date 2026-05-27
+────────────────── Odds Snapshots (events + consensus lines) ──────────────────
+No game odds returned (OddsAPI)
+No events found for target date (ET)
+invalid after odds-snapshots for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total
+[2026-05-28T02:59:16] game_odds still invalid after odds-snapshots for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total
+[2026-05-28T03:00:29] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-27 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-27.csv' --regions us
+ERROR: No player props fetched for 2026-05-27 and no same-day snapshot exists to preserve
+[2026-05-28T03:00:31] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-28T03:00:33] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli predict-date --date 2026-05-27
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-27.
+No games found on 2026-05-27 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-28T03:00:35] game_odds quality check failed for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total; attempting odds-snapshots rebuild
+[2026-05-28T03:00:35] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli odds-snapshots --date 2026-05-27
+────────────────── Odds Snapshots (events + consensus lines) ──────────────────
+No game odds returned (OddsAPI)
+No events found for target date (ET)
+[2026-05-28T03:00:55] game_odds still invalid after odds-snapshots for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total
+[2026-05-28T03:04:59] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-27 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-27.csv' --regions us
+ERROR: No player props fetched for 2026-05-27 and no same-day snapshot exists to preserve
+[2026-05-28T03:05:00] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-28T03:05:02] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli predict-date --date 2026-05-27
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-27.
+No games found on 2026-05-27 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-28T03:05:04] game_odds quality check failed for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total; attempting odds-snapshots rebuild
+[2026-05-28T03:05:04] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli odds-snapshots --date 2026-05-27
+────────────────── Odds Snapshots (events + consensus lines) ──────────────────
+No game odds returned (OddsAPI)
+No events found for target date (ET)
+[2026-05-28T03:05:25] game_odds still invalid after odds-snapshots for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total
+[2026-05-28T03:10:05] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' 'C:\Users\mostg\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-27 --out 'C:\Users\mostg\OneDrive\Coding\Syndicate\data\nba_source\data\raw\odds_nba_player_props_2026-05-27.csv' --regions us
+ERROR: Missing ODDS_API_KEY; set in environment or pass --api-key
+[2026-05-28T03:10:06] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Failed to fetch schedule: Failed to fetch NBA schedule payload: 403 Client 
+Error: Forbidden for url: 
+https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json
+[2026-05-28T03:10:08] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli predict-date --date 2026-05-27
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\mostg\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\src\nba_betting\cli.py:13024: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+Scoreboard fetch failed (Scoreboard returned empty tables); trying fallbacks 
+for 2026-05-27.
+No games found on 2026-05-27 (API down and no history/schedule/game-odds 
+fallback).
+[2026-05-28T03:10:11] game_odds quality check failed for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total; attempting odds-snapshots rebuild
+[2026-05-28T03:10:11] $ 'C:\Users\mostg\OneDrive\Coding\Syndicate\.venv\Scripts\python.exe' -m nba_betting.cli odds-snapshots --date 2026-05-27
+────────────────── Odds Snapshots (events + consensus lines) ──────────────────
+Provide --api-key, set ODDS_API_KEY env, or add to .env at repo root.
+[2026-05-28T03:10:13] game_odds still invalid after odds-snapshots for 2026-05-27: missing required columns: home_team, visitor_team, home_ml, away_ml, home_spread, away_spread, total

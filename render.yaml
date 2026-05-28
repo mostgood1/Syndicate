@@ -17,7 +17,7 @@ services:
       - key: ADMIN_TOKEN
         generateValue: true
       - key: ODDS_API_KEY
-        sync: false
+        value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: detached_subprocess
       - key: SYNDICATE_DATA_ROOT

@@ -150,10 +150,16 @@ function Resolve-Python {
             return $candidate
         }
     }
+
+    if (Test-PythonExecutable -Executable 'py') {
+        return 'py'
+    }
+
     if (Test-PythonExecutable -Executable 'python') {
         return 'python'
     }
-    return 'python'
+
+    throw 'Unable to find a working Python executable. Checked virtual environments, local installs, py launcher, and python on PATH.'
 }
 
 function Resolve-WorkspaceRepoPath {
@@ -602,6 +608,21 @@ try {
         throw 'Cannot push git updates when -SkipRefreshGate is set. Run the gate or pass -SkipGitPush.'
     }
 
+    if (-not $SkipGitPush) {
+        foreach ($repo in $publishRepos) {
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote
+            $runManifest.pushResults += @([ordered]@{
+                name = $result.name
+                repoPath = $result.repoPath
+                remote = $result.remote
+                branch = $result.branch
+                commitMessage = $result.commitMessage
+                status = $result.status
+                commit = $result.commit
+            })
+        }
+    }
+
     if (-not $SkipSourceUpdates) {
         foreach ($step in $sourceSteps) {
             $startedAt = (Get-Date).ToString('o')
@@ -632,6 +653,21 @@ try {
             }
             $sportRun.completedAt = (Get-Date).ToString('o')
             $runManifest.sportRuns += @([pscustomobject]$sportRun)
+
+            if (-not $SkipGitPush) {
+                foreach ($repo in $publishRepos) {
+                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote
+                    $runManifest.pushResults += @([ordered]@{
+                        name = $result.name
+                        repoPath = $result.repoPath
+                        remote = $result.remote
+                        branch = $result.branch
+                        commitMessage = $result.commitMessage
+                        status = $result.status
+                        commit = $result.commit
+                    })
+                }
+            }
         }
     }
 

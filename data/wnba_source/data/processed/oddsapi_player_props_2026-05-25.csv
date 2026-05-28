@@ -1,4 +1,0 @@
-snapshot_ts,event_id,commence_time,bookmaker,bookmaker_title,market,outcome_name,player_name,point,price,last_update,home_team,away_team
-2026-05-26T03:55:23.792785+00:00,cbbb0fa95f5a21e66505280c6fe4b394,2026-05-26T02:03:45Z,fanduel,FanDuel,player_double_double,Yes,Aneesah Morrow,,-145,2026-05-26T03:44:01Z,Golden State Valkyries,Connecticut Sun
-2026-05-26T03:55:23.792785+00:00,cbbb0fa95f5a21e66505280c6fe4b394,2026-05-26T02:03:45Z,fanduel,FanDuel,player_points,Over,Janelle Salaun,9.5,122,2026-05-26T03:49:23Z,Golden State Valkyries,Connecticut Sun
-2026-05-26T03:55:23.792785+00:00,cbbb0fa95f5a21e66505280c6fe4b394,2026-05-26T02:03:45Z,fanduel,FanDuel,player_points,Under,Janelle Salaun,9.5,-160,2026-05-26T03:49:23Z,Golden State Valkyries,Connecticut Sun

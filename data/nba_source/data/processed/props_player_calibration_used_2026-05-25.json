@@ -1,9 +1,0 @@
-{
-  "date": "2026-05-25",
-  "window_days": 30,
-  "global": {
-    "K": 8.0,
-    "min_pairs": 6
-  },
-  "by_stat": {}
-}
