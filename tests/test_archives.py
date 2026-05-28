@@ -1881,25 +1881,26 @@ class HomeBoardTests(unittest.TestCase):
         )
         self.assertTrue(context.get("generatedAt"))
 
-    def test_mlb_live_lens_zero_game_report_does_not_fallback_to_cards(self) -> None:
+    def test_mlb_live_lens_zero_game_report_falls_back_to_cards(self) -> None:
         with patch(
             "syndicate.features.mlb.live_lens.load_json_file",
             return_value={"generatedAt": "2026-05-20T14:58:42-05:00", "counts": {"games": 0, "live": 0, "final": 0, "props": 0}, "games": []},
         ), patch(
             "syndicate.features.mlb.live_lens.build_cards_page_context",
             return_value={
-                "games": [{"gamePk": 1}],
+                "games": [{"gamePk": 1, "away": {"abbr": "AWY"}, "home": {"abbr": "HOM"}, "status": "Live"}],
                 "scoreboard_items": [{"target_id": "game-1"}],
+                "source_path": "daily_summary_2026_05_20.json",
             },
         ):
             from syndicate.features.mlb.live_lens import build_live_lens_page_context as build_mlb_live_lens_page_context
 
             context = build_mlb_live_lens_page_context("2026-05-20")
 
-        self.assertEqual(context.get("games"), [])
-        self.assertEqual(context.get("scoreboard_items"), [])
-        self.assertEqual(context.get("source_title"), "MLB live lens unavailable")
-        self.assertEqual((context.get("empty_state") or {}).get("title"), "No live-lens games were available for this date")
+        self.assertEqual(len(context.get("games") or []), 1)
+        self.assertEqual(context.get("scoreboard_items"), [{"target_id": "game-1"}])
+        self.assertEqual(context.get("source_title"), "MLB cards fallback lens")
+        self.assertIsNone(context.get("empty_state"))
 
     def test_mlb_live_lens_game_rows_preserve_structured_status(self) -> None:
         report = {
