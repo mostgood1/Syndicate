@@ -18,7 +18,50 @@ $manifestRoot = Join-Path $destRoot 'manifests'
 $rawOutputsRoot = Join-Path $destRoot 'raw_outputs'
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_NCAAB'
 $sourceRoot = $null
-$sourcePython = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'py' }
+
+function Test-PythonExecutable {
+    param([string]$Executable)
+
+    if ([string]::IsNullOrWhiteSpace($Executable)) {
+        return $false
+    }
+
+    try {
+        & $Executable '-c' 'import sys' *> $null
+        return ($LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Resolve-Python {
+    param([string]$RepoPath)
+
+    $candidatePaths = @(
+        (Join-Path $RepoPath '.venv_x64\Scripts\python.exe'),
+        (Join-Path $RepoPath '.venv\Scripts\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe')
+    )
+    foreach ($candidate in $candidatePaths) {
+        if ((Test-Path $candidate) -and (Test-PythonExecutable -Executable $candidate)) {
+            return $candidate
+        }
+    }
+
+    if (Test-PythonExecutable -Executable 'py') {
+        return 'py'
+    }
+
+    if (Test-PythonExecutable -Executable 'python') {
+        return 'python'
+    }
+
+    throw 'Unable to find a working Python executable. Checked virtual environments, local installs, py launcher, and python on PATH.'
+}
+
+$sourcePython = Resolve-Python -RepoPath $repoRoot
 
 if ($RefreshRawOutputsFromSource -and $UseExistingRawOutputs) {
     throw "Choose either -RefreshRawOutputsFromSource or -UseExistingRawOutputs, not both."
@@ -34,7 +77,7 @@ if ($RefreshRawOutputsFromSource) {
     }
     $sourceRoot = (Resolve-Path $sourceRootCandidate).Path
     $sourcePythonCandidate = Join-Path $sourceRoot '.venv\Scripts\python.exe'
-    if (Test-Path $sourcePythonCandidate) {
+    if ((Test-Path $sourcePythonCandidate) -and (Test-PythonExecutable -Executable $sourcePythonCandidate)) {
         $sourcePython = $sourcePythonCandidate
     }
 } elseif (-not (Test-Path $rawOutputsRoot)) {

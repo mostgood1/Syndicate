@@ -28,13 +28,51 @@ if ([string]::IsNullOrWhiteSpace($Date)) {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$python = 'C:\Users\mostg\AppData\Local\Programs\Python\Python311\python.exe'
-if (-not (Test-Path $python)) {
-    $python = Join-Path $repoRoot '.venv\Scripts\python.exe'
+
+function Test-PythonExecutable {
+    param([string]$Executable)
+
+    if ([string]::IsNullOrWhiteSpace($Executable)) {
+        return $false
+    }
+
+    try {
+        & $Executable '-c' 'import sys' *> $null
+        return ($LASTEXITCODE -eq 0)
+    }
+    catch {
+        return $false
+    }
 }
-if (-not (Test-Path $python)) {
-    $python = if (Get-Command py -ErrorAction SilentlyContinue) { 'py' } else { 'python' }
+
+function Resolve-Python {
+    param([string]$RepoPath)
+
+    $candidatePaths = @(
+        (Join-Path $RepoPath '.venv_x64\Scripts\python.exe'),
+        (Join-Path $RepoPath '.venv\Scripts\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe')
+    )
+
+    foreach ($candidate in $candidatePaths) {
+        if ((Test-Path $candidate) -and (Test-PythonExecutable -Executable $candidate)) {
+            return $candidate
+        }
+    }
+
+    if (Test-PythonExecutable -Executable 'py') {
+        return 'py'
+    }
+
+    if (Test-PythonExecutable -Executable 'python') {
+        return 'python'
+    }
+
+    throw 'Unable to find a working Python executable. Checked virtual environments, local installs, py launcher, and python on PATH.'
 }
+
+$python = Resolve-Python -RepoPath $repoRoot
 $runStamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
 $runArtifactsDir = if ($ArtifactsDir) {
     if ([System.IO.Path]::IsPathRooted($ArtifactsDir)) { $ArtifactsDir } else { Join-Path $repoRoot $ArtifactsDir }
