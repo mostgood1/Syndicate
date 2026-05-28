@@ -438,7 +438,13 @@ def fetch_and_write_live_odds_for_date(
     hitter_markets: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     load_dotenv_if_present(_ROOT / ".env")
-    api_key = os.environ.get("ODDS_API_KEY") or os.environ.get("ODDSAPI_KEY")
+    api_key = (
+        os.environ.get("ODDS_API_KEY")
+        or os.environ.get("ODDSAPI_KEY")
+        or os.environ.get("THEODDS_API_KEY")
+        or os.environ.get("THEODDSAPI_KEY")
+        or os.environ.get("NCAAB_THEODDS_API_KEY")
+    )
     if not api_key:
         raise RuntimeError("ODDS_API_KEY not set")
 

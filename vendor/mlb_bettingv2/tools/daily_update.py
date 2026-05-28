@@ -3299,6 +3299,7 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
             ]
             odds_stage = fetch_and_write_live_odds_for_date(
                 str(args.date),
+                out_dir=(_DATA_DIR / "market" / "oddsapi"),
                 overwrite=(str(getattr(args, "current_oddsapi_overwrite", "on") or "on") == "on"),
                 regions=str(getattr(args, "current_oddsapi_regions", "us") or "us"),
                 bookmakers=(

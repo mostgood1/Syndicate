@@ -331,6 +331,14 @@ if (-not $SkipMLB) {
     if ($mlbVendoredDailyUpdate -and (Test-Path $mlbVendoredDailyUpdate)) {
         $preferLocalMirrorArtifactsForGate = $true
         $mlbArtifactDataRoot = Join-Path $repoRoot 'data\mlb_source\source_artifacts\data'
+        $mlbOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
+        $mlbEnvOverrides = @{
+            MLB_BETTING_DATA_ROOT = $mlbArtifactDataRoot
+            MLB_LIVE_LENS_DIR = (Join-Path $mlbArtifactDataRoot 'live_lens')
+        }
+        if (-not [string]::IsNullOrWhiteSpace($mlbOddsApiKey)) {
+            $mlbEnvOverrides.ODDS_API_KEY = $mlbOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'mlb'
             Name = 'MLB vendored daily update'
@@ -348,10 +356,7 @@ if (-not $SkipMLB) {
                 '--build-next-day', 'on'
             )
             WorkingDirectory = $mlbVendoredRoot
-            EnvironmentOverrides = @{
-                MLB_BETTING_DATA_ROOT = $mlbArtifactDataRoot
-                MLB_LIVE_LENS_DIR = (Join-Path $mlbArtifactDataRoot 'live_lens')
-            }
+            EnvironmentOverrides = $mlbEnvOverrides
             RuntimePolicy = $runtimePolicy.MLB
         }
     }
