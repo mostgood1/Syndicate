@@ -403,6 +403,8 @@ function Invoke-GitPublish {
 $sourceSteps = @()
 $publishRepos = @()
 $preferLocalMirrorArtifactsForGate = $false
+$sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
+$ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
 
 if (-not $SkipMLB) {
     $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\mlb_bettingv2'
@@ -572,6 +574,10 @@ if (-not $SkipNHL) {
     $nhlVendoredCli = if ($nhlVendoredRoot) { Join-Path $nhlVendoredRoot 'nhl_betting\cli.py' } else { $null }
     if ($nhlVendoredCli -and (Test-Path $nhlVendoredCli)) {
         $preferLocalMirrorArtifactsForGate = $true
+        $nhlEnvOverrides = @{}
+        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+            $nhlEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'nhl'
             Name = 'NHL vendored daily update'
@@ -586,11 +592,15 @@ if (-not $SkipNHL) {
                 '--props-boxscore-n-sims', [string]$runtimePolicy.NHL.propsBoxscoreNSims
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{}
+            EnvironmentOverrides = $nhlEnvOverrides
             RuntimePolicy = $runtimePolicy.NHL
         }
     }
     else {
+        $nhlEnvOverrides = @{}
+        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+            $nhlEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'nhl'
             Name = 'NHL local odds refresh'
@@ -603,12 +613,16 @@ if (-not $SkipNHL) {
                 '--artifact-root', 'data\nhl_source\source_artifacts'
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{}
+            EnvironmentOverrides = $nhlEnvOverrides
             RuntimePolicy = $runtimePolicy.NHL
         }
     }
 }
 if (-not $SkipNFL) {
+    $nflEnvOverrides = @{}
+    if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+        $nflEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+    }
     $sourceSteps += [pscustomobject]@{
         Name = 'NFL local odds refresh'
         Command = @(
@@ -617,10 +631,14 @@ if (-not $SkipNFL) {
             '--artifact-root', 'data\nfl_source\source_artifacts'
         )
         WorkingDirectory = $repoRoot
-        EnvironmentOverrides = @{}
+        EnvironmentOverrides = $nflEnvOverrides
     }
 }
 if (-not $SkipNCAAF) {
+    $ncaafEnvOverrides = @{}
+    if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+        $ncaafEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+    }
     $sourceSteps += [pscustomobject]@{
         Name = 'NCAAF local odds refresh'
         Command = @(
@@ -629,12 +647,12 @@ if (-not $SkipNCAAF) {
             '--artifact-root', 'data\ncaaf_source\source_artifacts'
         )
         WorkingDirectory = $repoRoot
-        EnvironmentOverrides = @{}
+        EnvironmentOverrides = $ncaafEnvOverrides
     }
 }
 if (-not $SkipNCAAB) {
     $ncaabRawOutputsRoot = Join-Path $repoRoot 'data\ncaab_source\raw_outputs'
-    $ncaabApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
+    $ncaabApiKey = $ncaabOddsApiKey
     if (-not [string]::IsNullOrWhiteSpace($ncaabApiKey)) {
         $sourceSteps += [pscustomobject]@{
             Name = 'NCAAB Syndicate odds refresh'
@@ -645,7 +663,7 @@ if (-not $SkipNCAAB) {
                 '--out-dir', (Join-Path 'data\ncaab_source\raw_outputs\by_date' $Date)
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{}
+            EnvironmentOverrides = @{ NCAAB_THEODDS_API_KEY = $ncaabApiKey }
         }
     }
     elseif (-not (Test-Path $ncaabRawOutputsRoot)) {
