@@ -118,6 +118,28 @@ class RefreshStateStoreTests(unittest.TestCase):
             self.assertTrue(status["refresh_status"]["artifacts"]["odds_refresh"]["exists"])
             self.assertGreaterEqual(len(status["refresh_status"]["history"]), 1)
 
+    def test_launch_refresh_run_writes_latest_manifest_through_keyvalue_backend(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
+                "SYNDICATE_REFRESH_STATE_URL": "redis://example",
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+            mocked_popen.return_value.pid = 4321
+
+            result = ops_refresh.launch_refresh_run(sports="wnba", phase="pregame", dry_run=True)
+            status = ops_refresh.load_latest_refresh_status()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["state"], "running")
+        self.assertEqual(status["refresh_status"]["manifest"]["runStamp"], result["run_stamp"])
+        self.assertEqual(status["refresh_status"]["runtime"]["pid"], 4321)
+        self.assertEqual(status["refresh_status"]["runtime"]["launch_owner"], "web_process")
+
 
 if __name__ == "__main__":
     unittest.main()

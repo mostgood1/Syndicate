@@ -532,7 +532,7 @@ def launch_refresh_run(
         "oddsRefreshStderrPath": str(odds_refresh_stderr_path),
         "externalRunner": external_runner,
     }
-    refresh_and_gate_run_path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+    write_json_file(refresh_and_gate_run_path, run_summary)
 
     refresh_status_manifest = {
         "date": selected_date,
@@ -556,8 +556,8 @@ def launch_refresh_run(
         "state": "pending_external" if _is_external_runner_mode(launch_mode) else "running",
         "externalRunner": external_runner,
     }
-    refresh_status_manifest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
-    refresh_status_latest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
+    write_json_file(refresh_status_manifest_path, refresh_status_manifest)
+    write_json_file(refresh_status_latest_path, refresh_status_manifest)
 
     if _is_external_runner_mode(launch_mode):
         return {
@@ -589,11 +589,11 @@ def launch_refresh_run(
     process = subprocess.Popen(command, **popen_kwargs)
 
     refresh_status_manifest["pid"] = int(process.pid)
-    refresh_status_manifest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
-    refresh_status_latest_path.write_text(json.dumps(refresh_status_manifest, indent=2), encoding="utf-8")
+    write_json_file(refresh_status_manifest_path, refresh_status_manifest)
+    write_json_file(refresh_status_latest_path, refresh_status_manifest)
 
     run_summary["pid"] = int(process.pid)
-    refresh_and_gate_run_path.write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+    write_json_file(refresh_and_gate_run_path, run_summary)
 
     return {
         "ok": True,

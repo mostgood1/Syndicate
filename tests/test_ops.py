@@ -137,6 +137,23 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["version"]["branch"], "main")
         self.assertEqual(payload["version"]["render_service_name"], "syndicate-web")
 
+    def test_healthz_exposes_public_render_version_metadata_without_admin_auth(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER_GIT_COMMIT": "e6aa9a6",
+                "RENDER_GIT_BRANCH": "main",
+            },
+            clear=False,
+        ):
+            response = self.client.get("/healthz")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["service"], "syndicate")
+        self.assertEqual(payload["version"], {"commit": "e6aa9a6", "branch": "main"})
+
     def test_status_marks_running_when_pid_is_alive(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)

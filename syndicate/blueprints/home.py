@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from datetime import datetime
 from datetime import timezone
+import os
 import re
 import time
 from typing import Any
@@ -52,9 +53,35 @@ _HOME_OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _HOME_PAYLOAD_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
+def _public_version_payload() -> dict[str, str] | None:
+    commit = str(
+        os.environ.get("RENDER_GIT_COMMIT")
+        or os.environ.get("GIT_COMMIT")
+        or os.environ.get("SOURCE_VERSION")
+        or ""
+    ).strip()
+    branch = str(
+        os.environ.get("RENDER_GIT_BRANCH")
+        or os.environ.get("GIT_BRANCH")
+        or ""
+    ).strip()
+    if not commit and not branch:
+        return None
+    payload: dict[str, str] = {}
+    if commit:
+        payload["commit"] = commit
+    if branch:
+        payload["branch"] = branch
+    return payload
+
+
 @home_bp.get("/healthz")
 def healthz():
-    return jsonify({"ok": True, "service": "syndicate"})
+    payload: dict[str, Any] = {"ok": True, "service": "syndicate"}
+    version = _public_version_payload()
+    if version:
+        payload["version"] = version
+    return jsonify(payload)
 
 
 def _safe_text(value: Any, fallback: str = "-") -> str:
