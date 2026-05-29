@@ -30,6 +30,7 @@ from syndicate.features.mlb.cards import source_card_detail_payload
 from syndicate.features.mlb.cards import source_cards_api_payload
 from syndicate.features.mlb.cards import _apply_source_live_prop_ranking_scores
 from syndicate.features.mlb.sources import daily_artifact_path
+from syndicate.features.mlb.sources import daily_sim_artifact_path
 from syndicate.features.mlb.sources import available_daily_summary_dates
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.nba.cards import build_cards_api_payload as build_nba_cards_api_payload
@@ -424,6 +425,24 @@ class DateArchiveHelperTests(unittest.TestCase):
 
             with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(available_daily_summary_dates(), [])
+
+    def test_mlb_daily_sim_artifact_path_reconciles_from_repo_bundle_when_data_root_is_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "mlb_source"
+            external_root = root / "mlb_source_bundle"
+            sample_name = "sim_0_LAA_at_DET_pk824272_g1.json"
+            sibling_file = external_root / "data" / "daily" / "sims" / "2026-05-28" / sample_name
+            sibling_file.parent.mkdir(parents=True, exist_ok=True)
+            sibling_file.write_text('{"sim": {"aggregate_boxscore": {}}}', encoding="utf-8")
+
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
+                actual = daily_sim_artifact_path("2026-05-28", 824272)
+
+            expected = local_root / "data" / "daily" / "sims" / "2026-05-28" / sample_name
+            self.assertIsNotNone(actual)
+            self.assertTrue(_paths_match(expected, actual))
+            self.assertTrue(expected.exists())
 
     def test_mlb_raw_feed_live_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:

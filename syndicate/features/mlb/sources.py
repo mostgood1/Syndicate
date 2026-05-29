@@ -154,12 +154,24 @@ def daily_ops_report_path(selected_date: str) -> Path:
 
 
 def daily_sim_artifact_path(selected_date: str, game_pk: int) -> Path | None:
-    sims_dir = default_mlb_source_root() / "data" / "daily" / "sims" / selected_date
-    if not sims_dir.exists():
-        return None
-    matches = sorted(sims_dir.glob(f"sim_*_pk{int(game_pk)}_*.json"))
-    if matches:
-        return matches[0]
+    sims_dir = _resolve_data_path_with_reconcile("daily", "sims", selected_date)
+    if sims_dir.exists() and sims_dir.is_dir():
+        matches = sorted(sims_dir.glob(f"sim_*_pk{int(game_pk)}_*.json"))
+        if matches:
+            return matches[0]
+
+    relative_dir = Path("data", "daily", "sims", selected_date)
+    for root in _source_roots()[1:]:
+        fallback_dir = root / relative_dir
+        if not fallback_dir.exists() or not fallback_dir.is_dir():
+            continue
+        matches = sorted(fallback_dir.glob(f"sim_*_pk{int(game_pk)}_*.json"))
+        if not matches:
+            continue
+        target = sims_dir / matches[0].name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(matches[0], target)
+        return target
     return None
 
 
