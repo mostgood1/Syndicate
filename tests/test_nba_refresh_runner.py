@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import importlib.util
+import json
 import tempfile
 import types
 import unittest
@@ -57,6 +59,46 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(calls[0]["date_str"], "2026-05-22")
         self.assertTrue(calls[0]["do_edges"])
         self.assertTrue(calls[0]["do_export"])
+
+    def test_build_local_game_recommendations_artifact_uses_game_cards_and_smart_sim(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir)
+            date_str = "2026-05-22"
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                "2026-05-22,1,Home Team,Away Team,2026-05-22T19:00:00Z,-130,110,-4.5,4.5,219.5,oddsapi_consensus,HTM,ATM\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"smart_sim_{date_str}_HTM_ATM.json").write_text(
+                json.dumps(
+                    {
+                        "date": date_str,
+                        "home": "HTM",
+                        "away": "ATM",
+                        "quarters": [
+                            {"home_pts_mu": 28.0, "away_pts_mu": 24.0},
+                            {"home_pts_mu": 27.0, "away_pts_mu": 25.0},
+                            {"home_pts_mu": 26.0, "away_pts_mu": 24.0},
+                            {"home_pts_mu": 25.0, "away_pts_mu": 23.0},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows, out_path = module._build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
+
+            self.assertEqual(rows, 2)
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            with out_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+
+        self.assertEqual([row.get("market") for row in written], ["ATS", "TOTAL"])
+        self.assertEqual(written[0].get("side"), "Home Team")
+        self.assertEqual(written[1].get("side"), "Under")
 
     def test_run_refresh_via_cli_uses_local_snapshot_fetcher(self) -> None:
         module = self._load_module()

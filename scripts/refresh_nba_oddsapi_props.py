@@ -436,6 +436,171 @@ def _run_source_processed_export(
 
     _append_log(log_file, f"{command_name} did not create expected artifact: {existing_path}")
     return None, int(rc)
+
+
+def _recommendation_tier(*, market: str, ev_value: float | None, edge_value: float | None) -> str:
+    if str(market or "").strip().upper() == "ML":
+        if ev_value is None:
+            return "Low"
+        if ev_value >= 0.04:
+            return "High"
+        if ev_value >= 0.02:
+            return "Medium"
+        return "Low"
+    if edge_value is None:
+        return "Low"
+    abs_edge = abs(float(edge_value))
+    if abs_edge >= 4.0:
+        return "High"
+    if abs_edge >= 2.0:
+        return "Medium"
+    return "Low"
+
+
+def _float_or_none(value: object) -> float | None:
+    try:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        return float(text)
+    except Exception:
+        return None
+
+
+def _smart_sim_projection_index(*, processed_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, float]]:
+    index: dict[tuple[str, str], dict[str, float]] = {}
+    for path in sorted(processed_root.glob(f"smart_sim_{date_str}_*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        home = str(payload.get("home") or "").strip().upper()
+        away = str(payload.get("away") or "").strip().upper()
+        quarters = payload.get("quarters") if isinstance(payload.get("quarters"), list) else []
+        if not home or not away or not quarters:
+            continue
+        home_total = 0.0
+        away_total = 0.0
+        for quarter in quarters:
+            if not isinstance(quarter, dict):
+                continue
+            home_total += float(_float_or_none(quarter.get("home_pts_mu")) or 0.0)
+            away_total += float(_float_or_none(quarter.get("away_pts_mu")) or 0.0)
+        if home_total <= 0 and away_total <= 0:
+            continue
+        index[(home, away)] = {
+            "pred_margin": home_total - away_total,
+            "pred_total": home_total + away_total,
+        }
+    return index
+
+
+def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
+        return 0, None
+    sim_index = _smart_sim_projection_index(processed_root=processed_root, date_str=date_str)
+    if not sim_index:
+        return 0, None
+
+    rows: list[dict[str, object]] = []
+    implied_prob = 110.0 / 210.0
+    with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if not isinstance(row, dict):
+                continue
+            home_tri = str(row.get("home_tri") or "").strip().upper()
+            away_tri = str(row.get("away_tri") or "").strip().upper()
+            projection = sim_index.get((home_tri, away_tri))
+            if projection is None:
+                continue
+            home_name = str(row.get("home_team") or home_tri).strip() or home_tri
+            away_name = str(row.get("visitor_team") or away_tri).strip() or away_tri
+            pred_margin = float(projection.get("pred_margin") or 0.0)
+            pred_total = float(projection.get("pred_total") or 0.0)
+            market_home_margin = _float_or_none(row.get("home_spread"))
+            if market_home_margin is None:
+                away_spread = _float_or_none(row.get("away_spread"))
+                if away_spread is not None:
+                    market_home_margin = -away_spread
+            total_line = _float_or_none(row.get("total"))
+
+            if market_home_margin is not None:
+                cover_edge = pred_margin - market_home_margin
+                pick_home = cover_edge >= 0
+                edge_value = abs(cover_edge)
+                ev_value = edge_value / 100.0
+                rows.append(
+                    {
+                        "market": "ATS",
+                        "side": home_name if pick_home else away_name,
+                        "home": home_name,
+                        "away": away_name,
+                        "date": date_str,
+                        "ev": round(ev_value, 6),
+                        "price": -110.0,
+                        "implied_prob": round(implied_prob, 6),
+                        "edge": round(edge_value, 6),
+                        "line": round(abs(market_home_margin), 6),
+                        "pred_margin": round(pred_margin if pick_home else (-pred_margin), 6),
+                        "market_home_margin": round(market_home_margin, 6),
+                        "pred_total": "",
+                        "tier": _recommendation_tier(market="ATS", ev_value=ev_value, edge_value=edge_value),
+                    }
+                )
+
+            if total_line is not None:
+                total_edge = pred_total - total_line
+                ev_value = abs(total_edge) / 100.0
+                rows.append(
+                    {
+                        "market": "TOTAL",
+                        "side": "Over" if total_edge >= 0 else "Under",
+                        "home": home_name,
+                        "away": away_name,
+                        "date": date_str,
+                        "ev": round(ev_value, 6),
+                        "price": -110.0,
+                        "implied_prob": round(implied_prob, 6),
+                        "edge": round(total_edge, 6),
+                        "line": round(total_line, 6),
+                        "pred_margin": "",
+                        "market_home_margin": "",
+                        "pred_total": round(pred_total, 6),
+                        "tier": _recommendation_tier(market="TOTAL", ev_value=ev_value, edge_value=total_edge),
+                    }
+                )
+
+    if not rows:
+        return 0, None
+
+    out_path = processed_root / f"recommendations_{date_str}.csv"
+    header_order = [
+        "market",
+        "side",
+        "home",
+        "away",
+        "date",
+        "ev",
+        "price",
+        "implied_prob",
+        "edge",
+        "line",
+        "pred_margin",
+        "market_home_margin",
+        "pred_total",
+        "tier",
+    ]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=header_order)
+        writer.writeheader()
+        for current in rows:
+            writer.writerow({field: current.get(field, "") for field in header_order})
+    return len(rows), out_path
     
 def _seed_game_odds_from_raw_history(*, source_root: Path, date_str: str, log_file: Path) -> bool:
     processed_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
@@ -1105,15 +1270,6 @@ def _run_refresh_via_cli(
                 _touch_progress()
             else:
                 _append_log(log_file, f"Skipping local props recommendations export for {date_str}: props predictions were not refreshed")
-            _, rc_recommendations = _run_source_processed_export(
-                source_root=source_root,
-                package_name="nba_betting",
-                command_name="export-recommendations",
-                date_str=date_str,
-                expected_file_name=f"recommendations_{date_str}.csv",
-                log_file=log_file,
-                heartbeat_cb=_touch_progress,
-            )
             _, rc_game_cards = _run_source_processed_export(
                 source_root=source_root,
                 package_name="nba_betting",
@@ -1123,6 +1279,19 @@ def _run_refresh_via_cli(
                 log_file=log_file,
                 heartbeat_cb=_touch_progress,
             )
+            _, local_recommendations_path = _build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
+            if local_recommendations_path is not None:
+                rc_recommendations = 0
+            else:
+                _, rc_recommendations = _run_source_processed_export(
+                    source_root=source_root,
+                    package_name="nba_betting",
+                    command_name="export-recommendations",
+                    date_str=date_str,
+                    expected_file_name=f"recommendations_{date_str}.csv",
+                    log_file=log_file,
+                    heartbeat_cb=_touch_progress,
+                )
             rc_export = 0 if int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
         except Exception:
             _append_log(log_file, traceback.format_exc())
