@@ -331,12 +331,126 @@ function Get-CurrentBranch {
     }
 }
 
+function Get-ForcedPublishArtifactPaths {
+    param(
+        [string]$RepoPath,
+        [string]$DateValue,
+        [bool]$SkipMLB,
+        [bool]$SkipNBA,
+        [bool]$SkipNHL,
+        [bool]$SkipWNBA,
+        [bool]$SkipNCAAB
+    )
+
+    $paths = New-Object System.Collections.Generic.List[string]
+    $dateSlug = $DateValue -replace '-', '_'
+
+    function Add-PathIfPresent {
+        param([string]$RelativePath)
+
+        if ([string]::IsNullOrWhiteSpace($RelativePath)) {
+            return
+        }
+
+        $fullPath = Join-Path $RepoPath $RelativePath
+        if (Test-Path $fullPath) {
+            $paths.Add($RelativePath) | Out-Null
+        }
+    }
+
+    if (-not $SkipMLB) {
+        foreach ($relativePath in @(
+            "data/mlb_source/data/daily/daily_summary_${dateSlug}.json",
+            "data/mlb_source/data/daily/daily_summary_${dateSlug}_profile_bundle.json",
+            "data/mlb_source/data/daily/daily_summary_${dateSlug}_locked_policy.json",
+            "data/mlb_source/data/daily/daily_summary_${dateSlug}_hr_targets.json",
+            "data/mlb_source/data/daily/daily_summary_${dateSlug}_rfi_targets.json",
+            "data/mlb_source/data/daily/ladders/daily_ladders_${dateSlug}.json",
+            "data/mlb_source/data/daily/top_props/daily_top_props_${dateSlug}.json",
+            "data/mlb_source/data/daily/ops/daily_ops_${dateSlug}.json",
+            "data/mlb_source/data/daily/season_frontend/season_betting_day_${dateSlug}.json",
+            "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_game_lines_${dateSlug}.json",
+            "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_pitcher_props_${dateSlug}.json",
+            "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_hitter_props_${dateSlug}.json",
+            "data/mlb_source/data/live_lens/live_lens_${dateSlug}.jsonl",
+            "data/mlb_source/data/live_lens/live_lens_report_${dateSlug}.json",
+            "data/mlb_source/data/live_lens/render_sync/live_lens_reports_${dateSlug}.json"
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
+    }
+
+    if (-not $SkipNBA) {
+        foreach ($relativePath in @(
+            "data/nba_source/data/processed/game_cards_${DateValue}.csv",
+            "data/nba_source/data/processed/recommendations_${DateValue}.csv",
+            "data/nba_source/data/processed/recommendations_slate_${DateValue}.json",
+            "data/nba_source/data/processed/cards_sim_detail_${DateValue}.json",
+            "data/nba_source/data/processed/cards_props_snapshot_${DateValue}.json",
+            "data/nba_source/data/processed/props_recommendations_top_by_game_${DateValue}.json",
+            "data/nba_source/data/processed/live_lens_projections_${DateValue}.jsonl",
+            "data/nba_source/data/processed/live_lens_signals_${DateValue}.jsonl",
+            "data/nba_source/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
+            "data/nba_source/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
+            "data/nba_source/data/live_lens/live_lens_projections_${DateValue}.jsonl",
+            "data/nba_source/data/live_lens/live_lens_signals_${DateValue}.jsonl"
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
+    }
+
+    if (-not $SkipWNBA) {
+        foreach ($relativePath in @(
+            "data/wnba_source/data/processed/game_cards_${DateValue}.csv",
+            "data/wnba_source/data/processed/recommendations_${DateValue}.csv",
+            "data/wnba_source/data/processed/recommendations_slate_${DateValue}.json",
+            "data/wnba_source/data/processed/cards_sim_detail_${DateValue}.json",
+            "data/wnba_source/data/processed/cards_props_snapshot_${DateValue}.json",
+            "data/wnba_source/data/processed/props_recommendations_top_by_game_${DateValue}.json",
+            "data/wnba_source/data/processed/live_lens_projections_${DateValue}.jsonl",
+            "data/wnba_source/data/processed/live_lens_signals_${DateValue}.jsonl",
+            "data/wnba_source/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
+            "data/wnba_source/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
+            "data/wnba_source/data/live_lens/live_lens_projections_${DateValue}.jsonl",
+            "data/wnba_source/data/live_lens/live_lens_signals_${DateValue}.jsonl"
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
+    }
+
+    if (-not $SkipNHL) {
+        foreach ($relativePath in @(
+            "data/nhl_source/data/processed/predictions_${DateValue}.csv",
+            "data/nhl_source/data/processed/recommendations_${DateValue}.csv",
+            "data/nhl_source/data/processed/recommendations_sim_${DateValue}.csv",
+            "data/nhl_source/data/processed/props_recommendations_${DateValue}.csv",
+            "data/nhl_source/data/odds/games/date=${DateValue}/scoreboard.csv",
+            "data/nhl_source/data/props/player_props_lines/date=${DateValue}/oddsapi.csv"
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
+    }
+
+    if (-not $SkipNCAAB) {
+        foreach ($relativePath in @(
+            "data/ncaab_source/api/recommendations/recommendations_${DateValue}.json",
+            "data/ncaab_source/api/live_state/live_state_${DateValue}.json",
+            "data/ncaab_source/api/live_lines/live_lines_${DateValue}.json"
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
+    }
+
+    return @($paths | Select-Object -Unique)
+}
+
 function Invoke-GitPublish {
     param(
         [string]$Name,
         [string]$RepoPath,
         [string]$CommitMessage,
-        [string]$RemoteName
+        [string]$RemoteName,
+        [string[]]$ForceIncludePaths = @()
     )
 
     $result = [ordered]@{
@@ -366,6 +480,13 @@ function Invoke-GitPublish {
         & git add -A
         if ($LASTEXITCODE -ne 0) {
             throw "git add failed for $RepoPath with exit code $LASTEXITCODE"
+        }
+
+        foreach ($relativePath in @($ForceIncludePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
+            & git add -f -- $relativePath
+            if ($LASTEXITCODE -ne 0) {
+                throw "git add -f failed for $RepoPath path $relativePath with exit code $LASTEXITCODE"
+            }
         }
 
         $statusLines = @(& git status --short)
@@ -403,6 +524,7 @@ function Invoke-GitPublish {
 $sourceSteps = @()
 $publishRepos = @()
 $preferLocalMirrorArtifactsForGate = $false
+$forcedPublishArtifactPaths = Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNCAAB ([bool]$SkipNCAAB)
 $sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
 $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
 
@@ -466,6 +588,13 @@ if (-not $SkipNBA) {
     $nbaVendoredApp = if ($nbaVendoredRoot) { Join-Path $nbaVendoredRoot 'app.py' } else { $null }
     if ($nbaVendoredApp -and (Test-Path $nbaVendoredApp)) {
         $preferLocalMirrorArtifactsForGate = $true
+        $nbaEnvOverrides = @{
+            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
+            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
+        }
+        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+            $nbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'nba'
             Name = 'NBA vendored daily update'
@@ -483,14 +612,18 @@ if (-not $SkipNBA) {
                 '--do-export'
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{
-                REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
-                REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
-            }
+            EnvironmentOverrides = $nbaEnvOverrides
             RuntimePolicy = $runtimePolicy.NBA
         }
     }
     else {
+        $nbaEnvOverrides = @{
+            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
+            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
+        }
+        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+            $nbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'nba'
             Name = 'NBA Syndicate props refresh'
@@ -507,10 +640,7 @@ if (-not $SkipNBA) {
                 '--do-export'
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{
-                REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
-                REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
-            }
+            EnvironmentOverrides = $nbaEnvOverrides
             RuntimePolicy = $runtimePolicy.NBA
         }
     }
@@ -520,6 +650,13 @@ if (-not $SkipWNBA) {
     $wnbaVendoredApp = if ($wnbaVendoredRoot) { Join-Path $wnbaVendoredRoot 'app.py' } else { $null }
     if ($wnbaVendoredApp -and (Test-Path $wnbaVendoredApp)) {
         $preferLocalMirrorArtifactsForGate = $true
+        $wnbaEnvOverrides = @{
+            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
+            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
+        }
+        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+            $wnbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'wnba'
             Name = 'WNBA vendored daily update'
@@ -537,14 +674,18 @@ if (-not $SkipWNBA) {
                 '--do-export'
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{
-                REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
-                REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
-            }
+            EnvironmentOverrides = $wnbaEnvOverrides
             RuntimePolicy = $runtimePolicy.WNBA
         }
     }
     else {
+        $wnbaEnvOverrides = @{
+            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
+            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
+        }
+        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+            $wnbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'wnba'
             Name = 'WNBA Syndicate props refresh'
@@ -561,10 +702,7 @@ if (-not $SkipWNBA) {
                 '--do-export'
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{
-                REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
-                REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
-            }
+            EnvironmentOverrides = $wnbaEnvOverrides
             RuntimePolicy = $runtimePolicy.WNBA
         }
     }
@@ -712,7 +850,7 @@ try {
 
     if (-not $SkipGitPush) {
         foreach ($repo in $publishRepos) {
-            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths $forcedPublishArtifactPaths
             $runManifest.pushResults += @([ordered]@{
                 name = $result.name
                 repoPath = $result.repoPath
@@ -758,7 +896,7 @@ try {
 
             if (-not $SkipGitPush) {
                 foreach ($repo in $publishRepos) {
-                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote
+                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote -ForceIncludePaths $forcedPublishArtifactPaths
                     $runManifest.pushResults += @([ordered]@{
                         name = $result.name
                         repoPath = $result.repoPath
@@ -813,7 +951,7 @@ try {
 
     if (-not $SkipGitPush) {
         foreach ($repo in $publishRepos) {
-            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $forcedPublishArtifactPaths
             $runManifest.pushResults += @([ordered]@{
                 name = $result.name
                 repoPath = $result.repoPath
