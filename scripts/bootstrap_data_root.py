@@ -5,18 +5,28 @@ import shutil
 from pathlib import Path
 
 
-def _copy_tree_if_missing(src: Path, dst: Path) -> None:
+def _copy_file_if_needed(src: Path, dst: Path) -> None:
+    if dst.exists():
+        try:
+            src_stat = src.stat()
+            dst_stat = dst.stat()
+            if src_stat.st_size == dst_stat.st_size and src_stat.st_mtime_ns == dst_stat.st_mtime_ns:
+                return
+        except OSError:
+            pass
+    shutil.copy2(src, dst)
+
+
+def _sync_tree(src: Path, dst: Path) -> None:
     if not src.exists() or not src.is_dir():
-        return
-    if dst.exists() and any(dst.iterdir()):
         return
     dst.mkdir(parents=True, exist_ok=True)
     for item in src.iterdir():
         target = dst / item.name
         if item.is_dir():
-            shutil.copytree(item, target, dirs_exist_ok=True)
+            _sync_tree(item, target)
         else:
-            shutil.copy2(item, target)
+            _copy_file_if_needed(item, target)
 
 
 def main() -> int:
@@ -24,8 +34,8 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     bundled_data = (repo_root / "data").resolve()
 
-    # Seed the persistent data root from repo-bundled artifacts only when empty.
-    _copy_tree_if_missing(bundled_data, data_root)
+    # Merge the repo-bundled public artifacts into the data root on startup.
+    _sync_tree(bundled_data, data_root)
     return 0
 
 
