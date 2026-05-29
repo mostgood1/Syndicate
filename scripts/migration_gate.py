@@ -169,6 +169,33 @@ PROTECTED_MIRROR_ASSETS = (
     },
 )
 
+ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS = (
+    {
+        "slug": "nba",
+        "path": "data/nba_source/manifests/mirror_refresh_latest.json",
+        "issue": "missing_manifest_artifacts",
+        "missing_prefixes": (
+            "live_lens_projections_",
+            "live_lens_signals_",
+            "recon_props_",
+            "season_betting_card_manifest_",
+            "season_betting_card_day_",
+        ),
+    },
+    {
+        "slug": "wnba",
+        "path": "data/wnba_source/manifests/mirror_refresh_latest.json",
+        "issue": "missing_manifest_artifacts",
+        "missing_prefixes": (
+            "game_cards_",
+            "recommendations_slate_",
+            "live_lens\\live_lens_projections_",
+            "live_snapshots\\live_state_",
+            "live_snapshots\\live_lines_",
+        ),
+    },
+)
+
 PROTECTED_LOCAL_RESOLVER_CHECKS = (
     {"slug": "mlb", "description": "daily artifact path stays on local mirror"},
     {"slug": "mlb", "description": "daily summary dates ignore sibling artifacts"},
@@ -510,6 +537,34 @@ def evaluate_protected_mirror_assets(root: Path | None = None) -> list[dict[str,
                 }
             )
     return violations
+
+
+def evaluate_allowed_protected_mirror_asset_violations(
+    violations: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    allowed_keys = {
+        (
+            str(item.get("slug") or "").strip(),
+            str(item.get("path") or "").strip(),
+            str(item.get("issue") or "").strip(),
+            tuple(str(value).strip() for value in (item.get("missing_prefixes") or ()) if str(value).strip()),
+        )
+        for item in ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS
+    }
+    allowed: list[dict[str, object]] = []
+    unexpected: list[dict[str, object]] = []
+    for violation in violations:
+        key = (
+            str(violation.get("slug") or "").strip(),
+            str(violation.get("path") or "").strip(),
+            str(violation.get("issue") or "").strip(),
+            tuple(str(value).strip() for value in (violation.get("missing_prefixes") or ()) if str(value).strip()),
+        )
+        if key in allowed_keys:
+            allowed.append(violation)
+        else:
+            unexpected.append(violation)
+    return allowed, unexpected
 
 
 def evaluate_protected_local_resolvers() -> list[dict[str, object]]:
@@ -925,6 +980,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     runtime_unexpected_findings, runtime_missing_allowed_findings = evaluate_runtime_dependency_findings(runtime_dependency_findings)
     protected_contract_violations = evaluate_protected_runtime_contracts(module_tracker_payload)
     protected_mirror_asset_violations = evaluate_protected_mirror_assets()
+    allowed_protected_mirror_asset_violations, unexpected_protected_mirror_asset_violations = evaluate_allowed_protected_mirror_asset_violations(
+        protected_mirror_asset_violations
+    )
     protected_local_resolver_violations = evaluate_protected_local_resolvers()
     protected_source_shell_violations = evaluate_protected_source_shell_routes()
     runtime_dependency_summary = (
@@ -936,7 +994,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         and not runtime_unexpected_findings
         and not runtime_missing_allowed_findings
         and not protected_contract_violations
-        and not protected_mirror_asset_violations
+        and not unexpected_protected_mirror_asset_violations
         and not protected_local_resolver_violations
         and not protected_source_shell_violations
     )
@@ -978,6 +1036,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             "protected_contract_violations": protected_contract_violations,
             "protected_mirror_asset_count": len(PROTECTED_MIRROR_ASSETS),
             "protected_mirror_asset_violations": protected_mirror_asset_violations,
+            "allowed_protected_mirror_asset_violation_count": len(ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS),
+            "allowed_protected_mirror_asset_violations": allowed_protected_mirror_asset_violations,
+            "unexpected_protected_mirror_asset_violations": unexpected_protected_mirror_asset_violations,
             "protected_local_resolver_count": len(PROTECTED_LOCAL_RESOLVER_CHECKS),
             "protected_local_resolver_violations": protected_local_resolver_violations,
             "protected_source_shell_count": len(PROTECTED_SOURCE_SHELL_CHECKS),
