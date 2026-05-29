@@ -2393,27 +2393,52 @@ class HomeBoardTests(unittest.TestCase):
     def test_nba_cards_empty_slate_does_not_inject_fake_sample_game(self) -> None:
         with patch("syndicate.features.nba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recs.json")):
             with patch("syndicate.features.nba.cards._local_live_state_payload", return_value={"games": []}):
-                with patch("syndicate.features.nba.cards._next_available_cards_date", return_value=None):
-                    context = build_nba_cards_page_context("2026-05-17")
+                context = build_nba_cards_page_context("2026-05-17")
 
         self.assertEqual(context.get("date"), "2026-05-17")
         self.assertEqual(context.get("requested_date"), "2026-05-17")
         self.assertFalse(context.get("lookahead_applied"))
+        self.assertFalse(context.get("has_games_on_slate"))
         self.assertEqual(context.get("games"), [])
         self.assertEqual(context.get("scoreboard_items"), [])
         self.assertEqual(context.get("source_title"), "NBA cards unavailable")
         self.assertEqual((context.get("header_stats") or [None, None])[1], {"label": "Recommendations", "value": "No data"})
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No NBA games are scheduled for this date")
 
     def test_nba_cards_api_empty_slate_preserves_empty_state(self) -> None:
         with patch("syndicate.features.nba.cards._games_from_artifacts", return_value=([], "missing_cards.csv", "missing_recs.json")):
             with patch("syndicate.features.nba.cards._local_live_state_payload", return_value={"games": []}):
-                with patch("syndicate.features.nba.cards._next_available_cards_date", return_value=None):
-                    payload = build_nba_cards_api_payload("2026-05-17")
+                payload = build_nba_cards_api_payload("2026-05-17")
 
         self.assertEqual(payload.get("games"), [])
+        self.assertFalse(payload.get("has_games_on_slate"))
         self.assertEqual(payload.get("source_title"), "NBA cards unavailable")
-        self.assertEqual((payload.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        self.assertEqual((payload.get("empty_state") or {}).get("title"), "No NBA games are scheduled for this date")
         self.assertFalse(payload.get("using_sample_data"))
+
+    def test_nba_cards_missing_requested_date_does_not_fall_back_to_previous_slate(self) -> None:
+        previous_day_games = [
+            {
+                "gamePk": "OKC@SAS",
+                "away": {"abbr": "OKC"},
+                "home": {"abbr": "SAS"},
+                "detail": "Scheduled",
+            }
+        ]
+
+        with patch(
+            "syndicate.features.nba.cards._games_from_artifacts",
+            side_effect=[([], "missing_cards.csv", "missing_recs.json"), (previous_day_games, "game_cards_2026-05-28.csv", "recommendations_slate_2026-05-28.json")],
+        ):
+            with patch("syndicate.features.nba.cards._local_live_state_payload", return_value={"games": []}):
+                context = build_nba_cards_page_context("2026-05-29")
+
+        self.assertEqual(context.get("requested_date"), "2026-05-29")
+        self.assertEqual(context.get("date"), "2026-05-29")
+        self.assertFalse(context.get("lookahead_applied"))
+        self.assertFalse(context.get("has_games_on_slate"))
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("source_title"), "NBA cards unavailable")
 
     def test_nba_cards_live_state_fallback_uses_real_same_day_game(self) -> None:
         live_state_payload = {

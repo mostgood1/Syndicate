@@ -695,12 +695,6 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     parsed_date = parse_iso_date(resolved_date)
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
     has_actionable_data = _games_have_actionable_data(games)
-    if games and not has_actionable_data:
-        next_available_date = _next_available_actionable_cards_date(resolved_date)
-        if next_available_date:
-            resolved_date = next_available_date
-            games, cards_path, recs_path = _games_from_artifacts(resolved_date)
-            has_actionable_data = _games_have_actionable_data(games)
     if not games:
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
@@ -708,12 +702,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
             cards_path = live_source_path
             recs_path = live_source_path
             source_title = "NBA live scoreboard fallback"
-    if not games:
-        next_available_date = _next_available_cards_date(resolved_date)
-        if next_available_date:
-            resolved_date = next_available_date
-            games, cards_path, recs_path = _games_from_artifacts(resolved_date)
-            has_actionable_data = _games_have_actionable_data(games)
+    has_games_on_slate = bool(games)
 
     parsed_date = parse_iso_date(resolved_date)
 
@@ -734,6 +723,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "date": resolved_date,
         "requested_date": requested_date,
         "lookahead_applied": bool(resolved_date != requested_date),
+        "has_games_on_slate": has_games_on_slate,
         "prev_date": prev_date,
         "next_date": next_date,
         "games": games,
@@ -743,11 +733,11 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "source_title": source_title if games else "NBA cards unavailable",
         "empty_state": {
             "eyebrow": "NBA cards",
-            "title": "No game cards were available for this date",
-            "body": "The cards board only renders saved NBA source, processed, or live fallback rows, and none were available for the requested date.",
+            "title": "No NBA games are scheduled for this date",
+            "body": "The requested NBA slate is empty, so the cards board does not fall back to a stored board from another date.",
             "list_items": [
                 f"Requested date: {requested_date}",
-                "Choose another stored NBA date from the date control.",
+                "Choose another NBA date from the date control if you want a different slate.",
             ],
         } if not games else None,
         "header_stats": [

@@ -398,6 +398,7 @@ def build_game_board_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         "header_stats",
         "source_title",
         "empty_state",
+        "has_games_on_slate",
         "route_path",
         "module_links",
         "teaser",
