@@ -55,11 +55,18 @@ $destinationSportRoot = Resolve-DestinationSportRoot -LocalDirName 'wnba_source'
 $destDataRoot = Join-Path $destinationSportRoot 'data\processed'
 $destRawRoot = Join-Path $destinationSportRoot 'data\raw'
 $destLiveLensRoot = Join-Path $destinationSportRoot 'data\live_lens'
+$destLiveSnapshotsRoot = Join-Path $destinationSportRoot 'data\processed\live_snapshots'
 
 if (-not $UseExistingMirrorArtifacts) {
     $artifactRootCandidate = $SourceArtifactRoot
     if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
         $artifactRootCandidate = [Environment]::GetEnvironmentVariable($sourceArtifactRootEnvVar)
+    }
+    if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        $defaultArtifactRoot = Join-Path $destinationSportRoot 'source_artifacts'
+        if (Test-Path $defaultArtifactRoot) {
+            $artifactRootCandidate = $defaultArtifactRoot
+        }
     }
     if (-not [string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
         if (-not (Test-Path $artifactRootCandidate)) {
@@ -232,6 +239,22 @@ foreach ($name in $liveLensFiles) {
     }
 }
 
+$liveSnapshotFiles = @(
+    "live_state_$Date.jsonl",
+    "live_pbp_stats_$Date.jsonl",
+    "live_lines_$Date.jsonl",
+    "live_player_boxscore_$Date.jsonl",
+    "live_player_lens_$Date.jsonl"
+)
+
+foreach ($name in $liveSnapshotFiles) {
+    $dst = Join-Path $destLiveSnapshotsRoot $name
+    $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\processed\live_snapshots' $name) } else { Join-Path $sourceRoot (Join-Path 'data\processed\live_snapshots' $name) }
+    if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
+        $copied.Add((Join-Path 'live_snapshots' $name)) | Out-Null
+    }
+}
+
 $rawFiles = @(
     "odds_wnba_player_props_$Date.csv",
     "odds_nba_player_props_$Date.csv"
@@ -254,6 +277,9 @@ $artifactGroups = [ordered]@{
 
 foreach ($artifact in $copied) {
     if ($artifact.StartsWith('live_lens\')) {
+        $artifactGroups.live_lens += 1
+    }
+    elseif ($artifact.StartsWith('live_snapshots\')) {
         $artifactGroups.live_lens += 1
     }
     elseif ($artifact.StartsWith('raw\')) {

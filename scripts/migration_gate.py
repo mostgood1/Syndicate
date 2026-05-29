@@ -155,6 +155,18 @@ PROTECTED_MIRROR_ASSETS = (
             "season_betting_card_day_",
         ),
     },
+    {
+        "slug": "wnba",
+        "description": "live analytics mirror breadth",
+        "path": "data/wnba_source/manifests/mirror_refresh_latest.json",
+        "required_artifact_prefixes": (
+            "game_cards_",
+            "recommendations_slate_",
+            "live_lens\\live_lens_projections_",
+            "live_snapshots\\live_state_",
+            "live_snapshots\\live_lines_",
+        ),
+    },
 )
 
 PROTECTED_LOCAL_RESOLVER_CHECKS = (

@@ -65,6 +65,12 @@ if (-not $UseExistingMirrorArtifacts) {
     if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
         $artifactRootCandidate = [Environment]::GetEnvironmentVariable($sourceArtifactRootEnvVar)
     }
+    if ([string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
+        $defaultArtifactRoot = Join-Path $destinationSportRoot 'source_artifacts'
+        if (Test-Path $defaultArtifactRoot) {
+            $artifactRootCandidate = $defaultArtifactRoot
+        }
+    }
     if (-not [string]::IsNullOrWhiteSpace($artifactRootCandidate)) {
         if (-not (Test-Path $artifactRootCandidate)) {
             throw "Artifact root path not found: $artifactRootCandidate. Set $sourceArtifactRootEnvVar or pass -SourceArtifactRoot with a published NBA artifact bundle path."

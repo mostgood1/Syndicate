@@ -164,81 +164,93 @@ def _local_source_bundle_root(slug: str) -> Path:
     return REPO_ROOT / "data" / f"{slug}_source"
 
 
+def _basketball_source_root(slug: str, vendor_repo_name: str) -> Path:
+    override = str(os.environ.get(_source_root_env_var(slug)) or "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    vendor_root = REPO_ROOT / "vendor" / vendor_repo_name
+    if vendor_root.exists():
+        return vendor_root.resolve()
+    return _local_source_bundle_root(slug)
+
+
 def _local_mlb_bundle_root() -> Path:
     return REPO_ROOT / "data" / "mlb_source"
 
 
 def _build_nba_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _local_source_bundle_root("nba")
+    source_root = _basketball_source_root("nba", "nba_betting_repo")
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="NBA_BETTING_ODDSAPI_PROPS_JOB")["NBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
     artifact_root = _local_source_artifact_root("nba")
+    command = [
+        python_exe,
+        "scripts/refresh_nba_oddsapi_props.py",
+        "--date",
+        args.date,
+        "--regions",
+        args.regions,
+        "--source-root",
+        str(source_root),
+        "--artifact-root",
+        str(artifact_root),
+        "--log-file",
+        str(payload_data.get("log_file") or ""),
+        "--started-at",
+        str(payload_data.get("started_at") or ""),
+        "--do-edges",
+        "--do-export",
+    ]
+    if args.bookmakers:
+        command.extend(["--bookmakers", str(args.bookmakers)])
+    if args.markets:
+        command.extend(["--markets", str(args.markets)])
     return [
         RefreshStep(
             name="nba_oddsapi_props_job",
             phases=("pregame", "live"),
             cwd=REPO_ROOT,
-            command=(
-                python_exe,
-                "scripts/refresh_nba_oddsapi_props.py",
-                "--date",
-                args.date,
-                "--regions",
-                args.regions,
-                "--bookmakers",
-                str(args.bookmakers or ""),
-                "--markets",
-                str(args.markets or ""),
-                "--source-root",
-                str(source_root),
-                "--artifact-root",
-                str(artifact_root),
-                "--log-file",
-                str(payload_data.get("log_file") or ""),
-                "--started-at",
-                str(payload_data.get("started_at") or ""),
-                "--do-edges",
-                "--do-export",
-            ),
+            command=tuple(command),
             description="Refresh NBA OddsAPI props snapshot, edges, and recommendations.",
         )
     ]
 
 
 def _build_wnba_steps(args: argparse.Namespace) -> list[RefreshStep]:
-    source_root = _local_source_bundle_root("wnba")
+    source_root = _basketball_source_root("wnba", "wnba_betting_repo")
     python_exe = _venv_python(REPO_ROOT)
     payload = _build_nba_payload(args, env_key="WNBA_BETTING_ODDSAPI_PROPS_JOB")["WNBA_BETTING_ODDSAPI_PROPS_JOB"]
     payload_data = json.loads(payload)
     artifact_root = _local_source_artifact_root("wnba")
+    command = [
+        python_exe,
+        "scripts/refresh_wnba_oddsapi_props.py",
+        "--date",
+        args.date,
+        "--regions",
+        args.regions,
+        "--source-root",
+        str(source_root),
+        "--artifact-root",
+        str(artifact_root),
+        "--log-file",
+        str(payload_data.get("log_file") or ""),
+        "--started-at",
+        str(payload_data.get("started_at") or ""),
+        "--do-edges",
+        "--do-export",
+    ]
+    if args.bookmakers:
+        command.extend(["--bookmakers", str(args.bookmakers)])
+    if args.markets:
+        command.extend(["--markets", str(args.markets)])
     return [
         RefreshStep(
             name="wnba_oddsapi_props_job",
             phases=("pregame", "live"),
             cwd=REPO_ROOT,
-            command=(
-                python_exe,
-                "scripts/refresh_wnba_oddsapi_props.py",
-                "--date",
-                args.date,
-                "--regions",
-                args.regions,
-                "--bookmakers",
-                str(args.bookmakers or ""),
-                "--markets",
-                str(args.markets or ""),
-                "--source-root",
-                str(source_root),
-                "--artifact-root",
-                str(artifact_root),
-                "--log-file",
-                str(payload_data.get("log_file") or ""),
-                "--started-at",
-                str(payload_data.get("started_at") or ""),
-                "--do-edges",
-                "--do-export",
-            ),
+            command=tuple(command),
             description="Refresh WNBA OddsAPI props snapshot, edges, and recommendations.",
         )
     ]
@@ -349,7 +361,7 @@ REGISTRY: dict[str, SportSpec] = {
     ),
     "nba": SportSpec(
         slug="nba",
-        source_repo_name="nba_source",
+        source_repo_name="Syndicate/vendor/nba_betting_repo",
         mirror_script_name="refresh_nba_source_mirror.ps1",
         step_builder=_build_nba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
@@ -376,7 +388,7 @@ REGISTRY: dict[str, SportSpec] = {
     ),
     "wnba": SportSpec(
         slug="wnba",
-        source_repo_name="wnba_source",
+        source_repo_name="Syndicate/vendor/wnba_betting_repo",
         mirror_script_name="refresh_wnba_source_mirror.ps1",
         step_builder=_build_wnba_steps,
         ingest_contract_kind="artifact_bundle_or_existing_mirror",
@@ -548,10 +560,11 @@ def _validate_source_root(spec: SportSpec) -> str | None:
             return None
         return f"Local MLB bundle root not found: {source_root}."
     if spec.slug in {"nba", "wnba"}:
-        source_root = _local_source_bundle_root(spec.slug)
+        vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
+        source_root = _basketball_source_root(spec.slug, vendor_repo_name)
         if source_root.exists():
             return None
-        return f"Local {spec.slug.upper()} bundle root not found: {source_root}."
+        return f"Local {spec.slug.upper()} source root not found: {source_root}."
     source_root = _source_repo_root(spec.slug, spec.source_repo_name)
     if source_root.exists():
         return None
@@ -656,7 +669,8 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         if spec.slug == "mlb":
             source_root = _local_mlb_bundle_root()
         elif spec.slug in {"nba", "wnba"}:
-            source_root = _local_source_bundle_root(spec.slug)
+            vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
+            source_root = _basketball_source_root(spec.slug, vendor_repo_name)
         else:
             source_root = _source_repo_root(spec.slug, spec.source_repo_name)
         generation_mode = "source_repo"
