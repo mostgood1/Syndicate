@@ -539,9 +539,18 @@ def _game_from_row(
     sim_groups, sim_stats = _sim_table_groups(sim_game, away_tri, home_tri)
     props_groups, prop_items = _props_table_groups(props_game, away_tri, home_tri)
     game_id = str(row.get("game_id") or idx)
+    betting = _source_betting(row)
+    sim_payload = _source_sim_stub(game_id, sim_game, row)
+    prop_recommendations = dict((props_game or {}).get("prop_recommendations") or {"away": [], "home": []})
+    game_market_recommendations = _source_game_market_recommendations(picks)
     return {
+        "game_id": game_id,
         "gamePk": game_id,
         "event_id": row.get("event_id"),
+        "away_tri": away_tri,
+        "away_name": away_name,
+        "home_tri": home_tri,
+        "home_name": home_name,
         "away_logo": _source_logo_url(away_tri),
         "home_logo": _source_logo_url(home_tri),
         "away": {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)},
@@ -549,6 +558,14 @@ def _game_from_row(
         "status": "Processed artifact",
         "detail": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled",
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
+        "start_time": str(row.get("commence_time") or "").strip() or None,
+        "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
+        "betting": betting,
+        "sim": sim_payload,
+        "prop_recommendations": prop_recommendations,
+        "game_market_recommendations": game_market_recommendations,
+        "live_state": None,
+        "warnings": [],
         "metrics": [
             {"label": "Away ML", "value": format_moneyline(row.get("away_ml"))},
             {"label": "Home ML", "value": format_moneyline(row.get("home_ml"))},

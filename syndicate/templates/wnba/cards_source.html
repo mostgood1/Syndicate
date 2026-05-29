@@ -37,6 +37,7 @@
   <div class="site-chrome">
     <main class="site-main">
       <div class="cards-shell cards-page-shell">
+        {% if not embed_mode %}
         <header class="cards-header">
           <div class="cards-title-row">
             <h1>{{ page_heading or 'WNBA Game Cards' }}</h1>
@@ -63,6 +64,7 @@
             <div class="cards-filters" id="cardsFilters" aria-label="Slate filters"></div>
           </div>
         </section>
+        {% endif %}
 
         <div id="note" class="alert hidden"></div>
 

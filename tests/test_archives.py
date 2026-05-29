@@ -1641,6 +1641,8 @@ class HomeBoardTests(unittest.TestCase):
         self.assertIn('NBA Live Lens', html)
         self.assertIn('cards-app-shell--embed', html)
         self.assertNotIn('NBA main cards', html)
+        self.assertNotIn('class="cards-header"', html)
+        self.assertNotIn('class="cards-control-card"', html)
         self.assertIn('data-cards-payload-path="/nba/api/live-lens"', html)
         self.assertIn('id="cardsScoreboard"', html)
         self.assertIn('id="cardsGrid"', html)
@@ -1653,6 +1655,8 @@ class HomeBoardTests(unittest.TestCase):
         self.assertIn('WNBA Live Lens', html)
         self.assertIn('cards-app-shell--embed', html)
         self.assertNotIn('WNBA main cards', html)
+        self.assertNotIn('class="cards-header"', html)
+        self.assertNotIn('class="cards-control-card"', html)
         self.assertIn('data-cards-payload-path="/wnba/api/live-lens"', html)
         self.assertIn('id="cardsScoreboard"', html)
         self.assertIn('id="cardsGrid"', html)
@@ -2072,6 +2076,67 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(context.get("date"), "2026-05-28")
         self.assertEqual(context.get("source_title"), "WNBA live scoreboard fallback")
         self.assertEqual((context.get("games") or [{}])[0].get("event_id"), "evt-9")
+
+    def test_wnba_processed_card_rows_include_live_lens_client_fields(self) -> None:
+        from syndicate.features.wnba.cards import _game_from_row
+
+        row = {
+            "game_id": "game-7",
+            "event_id": "evt-7",
+            "visitor_team": "Las Vegas Aces",
+            "home_team": "Dallas Wings",
+            "away_tri": "LVA",
+            "home_tri": "DAL",
+            "commence_time": "2026-05-29T00:10:00Z",
+            "away_ml": "-130",
+            "home_ml": "+110",
+            "home_spread": "2.5",
+            "total": "175.5",
+            "bookmaker": "oddsapi_consensus",
+        }
+        sim_game = {
+            "players_summary": {"away": 7, "home": 8},
+            "sim": {
+                "players": {
+                    "away": [{"pts_mean": 91.2}],
+                    "home": [{"pts_mean": 94.6}],
+                }
+            },
+        }
+        props_game = {
+            "prop_recommendations": {
+                "away": [{"player": "A'ja Wilson"}],
+                "home": [{"player": "Paige Bueckers"}],
+            }
+        }
+        game = _game_from_row(
+            row,
+            idx=1,
+            selected_date="2026-05-28",
+            rec_index={
+                ("LVA", "DAL"): [
+                    {
+                        "market": "total",
+                        "display_pick": "Over 175.5",
+                        "selection": "OVER",
+                        "p_win": 0.61,
+                        "ev_pct": 7.5,
+                    }
+                ]
+            },
+            sim_index={("LVA", "DAL"): sim_game},
+            props_index={("LVA", "DAL"): props_game},
+        )
+
+        self.assertEqual(game.get("game_id"), "game-7")
+        self.assertEqual(game.get("away_tri"), "LVA")
+        self.assertEqual(game.get("away_name"), "Las Vegas Aces")
+        self.assertEqual(game.get("home_tri"), "DAL")
+        self.assertEqual(game.get("home_name"), "Dallas Wings")
+        self.assertEqual((game.get("betting") or {}).get("total"), 175.5)
+        self.assertAlmostEqual(((game.get("sim") or {}).get("score") or {}).get("total_mean"), 185.8)
+        self.assertEqual(len(game.get("game_market_recommendations") or []), 1)
+        self.assertEqual(sorted((game.get("prop_recommendations") or {}).keys()), ["away", "home"])
 
     def test_home_wnba_uses_today_when_live_state_exists(self) -> None:
         from syndicate.blueprints.home import _build_sport_overview
