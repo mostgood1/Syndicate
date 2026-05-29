@@ -149,6 +149,7 @@ def cards():
 def _live_lens_cards_shell_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
     context = build_cards_page_context(selected_date)
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else "")
+    embed_mode = str(request.args.get("embed") or "").strip().lower()
     cards_base_path = f"/nba/season/{int(season)}/live-lens" if season is not None else "/nba/live-lens"
     cards_query_suffix = f"&profile={normalized_profile}" if normalized_profile else ""
     context.update(
@@ -158,11 +159,13 @@ def _live_lens_cards_shell_context(selected_date: str, *, season: int | None = N
             "page_heading": "NBA Live Lens",
             "cards_base_path": cards_base_path,
             "cards_api_base_path": "/nba/api",
+            "cards_payload_path": f"/nba/api/season/{int(season)}/live-lens" if season is not None else "/nba/api/live-lens",
             "cards_query_suffix": cards_query_suffix,
             "season_betting_profile": normalized_profile or "retuned",
             "cards_live_audit_href": f"{cards_base_path}?date={selected_date}&profile=retuned" if season is not None else f"/nba/live-lens?date={selected_date}",
             "cards_live_audit_label": "Live Lens",
             "query_hidden_fields": ([{"name": "profile", "value": normalized_profile}] if normalized_profile else []),
+            "embed_mode": embed_mode,
         }
     )
     return context

@@ -2182,6 +2182,9 @@ def _build_sport_overview(
             embed_src = f"/nhl/cards?date={context_label}"
         elif not embed_src:
             embed_src = f"/{slug}/live-lens?date={context_label}"
+        if slug in {"nba", "wnba"}:
+            separator = "&" if "?" in embed_src else "?"
+            embed_src = f"{embed_src}{separator}embed=home-live-{slug}"
         overview["home_live_embed"] = {
             "key": f"home-live-{slug}",
             "src": embed_src,

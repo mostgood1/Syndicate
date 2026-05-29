@@ -6,11 +6,33 @@
   <title>{{ page_title or 'NBA Game Cards' }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css', v=asset_version) }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='nba/cards_source.css', v=asset_version) }}" />
+  {% if embed_mode %}
+  <style>
+    .cards-app-shell--embed {
+      background: transparent;
+    }
+
+    .cards-app-shell--embed .site-chrome,
+    .cards-app-shell--embed .site-main,
+    .cards-app-shell--embed .cards-shell {
+      padding: 0;
+      margin: 0;
+      max-width: none;
+    }
+
+    .cards-app-shell--embed .cards-header,
+    .cards-app-shell--embed .cards-control-card {
+      display: none;
+    }
+  </style>
+  {% endif %}
 </head>
-<body data-cards-base-path="{{ cards_base_path or '/nba/cards' }}" data-cards-api-base-path="{{ cards_api_base_path or '/nba/api' }}" data-cards-query-suffix="{{ cards_query_suffix or '' }}" data-cards-season-betting-profile="{{ season_betting_profile or 'retuned' }}" class="cards-body cards-app-shell">
+<body data-cards-base-path="{{ cards_base_path or '/nba/cards' }}" data-cards-api-base-path="{{ cards_api_base_path or '/nba/api' }}" data-cards-payload-path="{{ cards_payload_path or ((cards_api_base_path or '/nba/api') ~ '/cards') }}" data-cards-query-suffix="{{ cards_query_suffix or '' }}" data-cards-season-betting-profile="{{ season_betting_profile or 'retuned' }}" class="cards-body cards-app-shell{% if embed_mode %} cards-app-shell--embed{% endif %}">
+  {% if not embed_mode %}
   {% with active_sport_slug='nba', active_sport_name='NBA' %}
     {% include 'shared/_standalone_app_header.html' %}
   {% endwith %}
+  {% endif %}
   <div class="site-chrome">
     <main class="site-main">
       <div class="cards-shell cards-page-shell">

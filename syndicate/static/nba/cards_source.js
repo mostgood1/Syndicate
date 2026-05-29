@@ -17,6 +17,7 @@
   const gridRoot = document.getElementById('cardsGrid');
   const boardShell = document.querySelector('.cards-page-shell') || document.body;
   const apiBasePath = document.body?.dataset?.cardsApiBasePath || '/nba/api';
+  const cardsPayloadPath = document.body?.dataset?.cardsPayloadPath || `${apiBasePath}/cards`;
   const cardsQuerySuffix = document.body?.dataset?.cardsQuerySuffix || '';
   const seasonBettingProfile = document.body?.dataset?.cardsSeasonBettingProfile || 'retuned';
   if (!scoreboardRoot || !gridRoot) {
@@ -5929,7 +5930,7 @@
     }
     try {
       const payload = await fetchApiJson(
-        `${apiBasePath}/cards?date=${encodeURIComponent(state.date)}`,
+        `${cardsPayloadPath}?date=${encodeURIComponent(state.date)}${cardsQuerySuffix}`,
         'Failed to load game cards.',
         { retries: silent ? 2 : 1 }
       );

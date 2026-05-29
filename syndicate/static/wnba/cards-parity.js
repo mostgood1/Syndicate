@@ -36,6 +36,7 @@
   const pollIntervalMs = 15000;
   const API_BASE_PATH = '/wnba/api';
   const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
+  const CARDS_PAYLOAD_PATH = document.body?.dataset?.cardsPayloadPath || SOURCE_CARDS_API_BASE_PATH;
   const cardsQuerySuffix = document.body?.dataset?.cardsQuerySuffix || '';
   const seasonBettingProfile = document.body?.dataset?.cardsSeasonBettingProfile || 'retuned';
 
@@ -5445,7 +5446,7 @@
     }
     try {
       const payload = await fetchApiJson(
-        `${SOURCE_CARDS_API_BASE_PATH}?date=${encodeURIComponent(state.date)}`,
+        `${CARDS_PAYLOAD_PATH}?date=${encodeURIComponent(state.date)}${cardsQuerySuffix}`,
         'Failed to load game cards.',
         { retries: silent ? 2 : 1 }
       );

@@ -260,6 +260,8 @@ def _live_lens_cards_shell_context(selected_date: str) -> dict[str, object]:
         "page_title": "WNBA Live Lens",
         "page_heading": "WNBA Live Lens",
         "cards_base_path": "/wnba/live-lens",
+        "cards_payload_path": "/wnba/api/live-lens",
+        "embed_mode": str(request.args.get("embed") or "").strip().lower(),
     }
 
 

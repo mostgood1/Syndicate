@@ -7,11 +7,33 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css', v=asset_version) }}" />
   <link rel="stylesheet" href="/wnba/styles.css?v={{ asset_version }}" />
   <link rel="stylesheet" href="/wnba/cards-parity.css?v={{ asset_version }}" />
+  {% if embed_mode %}
+  <style>
+    .cards-app-shell--embed {
+      background: transparent;
+    }
+
+    .cards-app-shell--embed .site-chrome,
+    .cards-app-shell--embed .site-main,
+    .cards-app-shell--embed .cards-shell {
+      padding: 0;
+      margin: 0;
+      max-width: none;
+    }
+
+    .cards-app-shell--embed .cards-header,
+    .cards-app-shell--embed .cards-control-card {
+      display: none;
+    }
+  </style>
+  {% endif %}
 </head>
-<body data-cards-base-path="{{ cards_base_path or '/wnba/cards' }}" data-cards-query-suffix="{{ cards_query_suffix or '' }}" data-cards-season-betting-profile="{{ season_betting_profile or 'retuned' }}" class="cards-body cards-app-shell">
+<body data-cards-base-path="{{ cards_base_path or '/wnba/cards' }}" data-cards-payload-path="{{ cards_payload_path or '/wnba/api/source/cards' }}" data-cards-query-suffix="{{ cards_query_suffix or '' }}" data-cards-season-betting-profile="{{ season_betting_profile or 'retuned' }}" class="cards-body cards-app-shell{% if embed_mode %} cards-app-shell--embed{% endif %}">
+  {% if not embed_mode %}
   {% with active_sport_slug='wnba', active_sport_name='WNBA' %}
     {% include 'shared/_standalone_app_header.html' %}
   {% endwith %}
+  {% endif %}
   <div class="site-chrome">
     <main class="site-main">
       <div class="cards-shell cards-page-shell">

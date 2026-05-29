@@ -1627,11 +1627,35 @@ class HomeBoardTests(unittest.TestCase):
         if 'data-home-preserve-key="home-cards"' in body:
             self.assertRegex(body, r'data-home-preserve-src="/mlb/cards\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}&amp;client=source&amp;embed=home-cards"')
         if 'data-home-preserve-key="home-live-nba"' in body:
-            self.assertRegex(body, r'data-home-preserve-src="/nba/live-lens\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}"')
+            self.assertRegex(body, r'data-home-preserve-src="/nba/(season/[0-9]{4}/)?live-lens\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}(&amp;profile=[a-z0-9_-]+)?&amp;embed=home-live-nba"')
         if 'data-home-preserve-key="home-live-wnba"' in body:
-            self.assertRegex(body, r'data-home-preserve-src="/wnba/live-lens\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}"')
+            self.assertRegex(body, r'data-home-preserve-src="/wnba/live-lens\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}&amp;embed=home-live-wnba"')
         if 'data-home-preserve-key="home-live-nhl"' in body:
             self.assertRegex(body, r'data-home-preserve-src="/nhl/cards\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}"')
+
+    def test_nba_live_lens_embed_mode_omits_standalone_header(self) -> None:
+        response = self.client.get('/nba/live-lens?date=2026-05-16&embed=home-live-nba')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('NBA Live Lens', html)
+        self.assertIn('cards-app-shell--embed', html)
+        self.assertNotIn('NBA main cards', html)
+        self.assertIn('data-cards-payload-path="/nba/api/live-lens"', html)
+        self.assertIn('id="cardsScoreboard"', html)
+        self.assertIn('id="cardsGrid"', html)
+
+    def test_wnba_live_lens_embed_mode_omits_standalone_header(self) -> None:
+        response = self.client.get('/wnba/live-lens?date=2026-05-16&embed=home-live-wnba')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('WNBA Live Lens', html)
+        self.assertIn('cards-app-shell--embed', html)
+        self.assertNotIn('WNBA main cards', html)
+        self.assertIn('data-cards-payload-path="/wnba/api/live-lens"', html)
+        self.assertIn('id="cardsScoreboard"', html)
+        self.assertIn('id="cardsGrid"', html)
 
     def test_mlb_cards_source_js_skips_auto_refresh_for_embeds(self) -> None:
         content = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")
