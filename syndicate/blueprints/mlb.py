@@ -699,21 +699,15 @@ def api_game_detail(game_pk: int):
 @mlb_bp.get("/live-lens")
 def live_lens():
     selected_date = _iso_or_today(request.args.get("date"))
-    context = {
-        "date": selected_date,
-        "season": None,
-        "intro_title": "MLB Live Lens",
-        "api_path": "/mlb/api/live-lens",
-        "back_href": f"/mlb/cards?date={selected_date}",
-        "back_label": "Back to cards",
-        "daily_accuracy_href": f"/mlb/live-lens-accuracy?date={selected_date}",
-        "market_accuracy_href": f"/mlb/market-accuracy?date={selected_date}",
-        "form_action": "/mlb/live-lens",
-        "show_app_header": False,
-        "page_body_class": "syndicate-mlb-live-lens-page",
-        "page_shell_class": "syndicate-mlb-live-lens-shell",
-    }
-    return render_template("mlb/live_lens.html", **context)
+    context = build_cards_page_context(selected_date)
+    context["show_home_link"] = False
+    context["cards_script"] = "mlb/cards_source.js"
+    context["asset_version"] = _cards_source_asset_version()
+    context["cards_client"] = "source"
+    context["cards_header_title"] = "MLB Live Lens"
+    context["page_title"] = f"MLB Live Lens - {selected_date}"
+    context["route_path"] = "/mlb/live-lens"
+    return render_template("mlb/cards.html", **context)
 
 
 @mlb_bp.get("/api/live-lens")

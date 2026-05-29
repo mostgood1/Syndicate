@@ -146,6 +146,28 @@ def cards():
     return render_template("nba/cards_source.html", asset_version=_cards_source_asset_version(), **context)
 
 
+def _live_lens_cards_shell_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
+    context = build_cards_page_context(selected_date)
+    normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else "")
+    cards_base_path = f"/nba/season/{int(season)}/live-lens" if season is not None else "/nba/live-lens"
+    cards_query_suffix = f"&profile={normalized_profile}" if normalized_profile else ""
+    context.update(
+        {
+            "asset_version": _cards_source_asset_version(),
+            "page_title": "NBA Live Lens",
+            "page_heading": "NBA Live Lens",
+            "cards_base_path": cards_base_path,
+            "cards_api_base_path": "/nba/api",
+            "cards_query_suffix": cards_query_suffix,
+            "season_betting_profile": normalized_profile or "retuned",
+            "cards_live_audit_href": f"{cards_base_path}?date={selected_date}&profile=retuned" if season is not None else f"/nba/live-lens?date={selected_date}",
+            "cards_live_audit_label": "Live Lens",
+            "query_hidden_fields": ([{"name": "profile", "value": normalized_profile}] if normalized_profile else []),
+        }
+    )
+    return context
+
+
 @nba_bp.get("/season/<int:season>/betting-card")
 def season_betting_card(season: int):
     selected_date = _selected_date(season)
@@ -392,7 +414,7 @@ def _market_accuracy_template_context(selected_date: str, *, season: int | None 
 @nba_bp.get("/live-lens")
 def live_lens():
     selected_date = _selected_date()
-    return render_template("shared/rank_board.html", **build_live_lens_page_context(selected_date))
+    return render_template("nba/cards_source.html", **_live_lens_cards_shell_context(selected_date))
 
 
 @nba_bp.get("/live-player-props-audit")
@@ -436,7 +458,7 @@ def reconciliation_alias():
 def season_live_lens(season: int):
     selected_date = _selected_date(season)
     profile = str(request.args.get("profile") or "").strip().lower() or None
-    return render_template("shared/rank_board.html", **build_live_lens_page_context(selected_date, season=season, profile=profile))
+    return render_template("nba/cards_source.html", **_live_lens_cards_shell_context(selected_date, season=season, profile=profile))
 
 
 @nba_bp.get("/season/<int:season>/live-lens-accuracy")

@@ -253,6 +253,16 @@ def cards():
     return render_template("wnba/cards_source.html", date=selected_date, asset_version=_cards_source_asset_version())
 
 
+def _live_lens_cards_shell_context(selected_date: str) -> dict[str, object]:
+    return {
+        "date": selected_date,
+        "asset_version": _cards_source_asset_version(),
+        "page_title": "WNBA Live Lens",
+        "page_heading": "WNBA Live Lens",
+        "cards_base_path": "/wnba/live-lens",
+    }
+
+
 @wnba_bp.get("/cards/source")
 def cards_source_alias():
     params = request.args.to_dict(flat=True)
@@ -400,8 +410,7 @@ def api_props():
 @wnba_bp.get("/live-lens")
 def live_lens():
     selected_date = _selected_date()
-    context = build_live_lens_page_context(selected_date)
-    return render_template("shared/rank_board.html", **context)
+    return render_template("wnba/cards_source.html", **_live_lens_cards_shell_context(selected_date))
 
 
 @wnba_bp.get("/live-player-props-audit")

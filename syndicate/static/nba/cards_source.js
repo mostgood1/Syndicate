@@ -17,6 +17,8 @@
   const gridRoot = document.getElementById('cardsGrid');
   const boardShell = document.querySelector('.cards-page-shell') || document.body;
   const apiBasePath = document.body?.dataset?.cardsApiBasePath || '/nba/api';
+  const cardsQuerySuffix = document.body?.dataset?.cardsQuerySuffix || '';
+  const seasonBettingProfile = document.body?.dataset?.cardsSeasonBettingProfile || 'retuned';
   if (!scoreboardRoot || !gridRoot) {
     return;
   }
@@ -3585,17 +3587,18 @@
 
   function updateDateControls() {
     const basePath = document.body?.dataset?.cardsBasePath || '/';
+    const querySuffix = cardsQuerySuffix || '';
     const previousDate = shiftISODate(state.date, -1);
     const nextDate = shiftISODate(state.date, 1);
     const seasonYear = Number(String(state.date || getLocalDateISO()).slice(0, 4)) || Number(new Date().getFullYear());
     if (prevDateLink) {
-      prevDateLink.href = `${basePath}?date=${encodeURIComponent(previousDate)}`;
+      prevDateLink.href = `${basePath}?date=${encodeURIComponent(previousDate)}${querySuffix}`;
     }
     if (nextDateLink) {
-      nextDateLink.href = `${basePath}?date=${encodeURIComponent(nextDate)}`;
+      nextDateLink.href = `${basePath}?date=${encodeURIComponent(nextDate)}${querySuffix}`;
     }
     if (seasonBettingCardLink) {
-      seasonBettingCardLink.href = `/nba/season/${encodeURIComponent(seasonYear)}/betting-card?profile=retuned&date=${encodeURIComponent(state.date || getLocalDateISO())}`;
+      seasonBettingCardLink.href = `/nba/season/${encodeURIComponent(seasonYear)}/betting-card?profile=${encodeURIComponent(seasonBettingProfile)}&date=${encodeURIComponent(state.date || getLocalDateISO())}`;
     }
     if (picksLink) {
       picksLink.href = `/nba/picks?date=${encodeURIComponent(state.date || getLocalDateISO())}`;

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MLB Game Cards — {{ date }}</title>
+    <title>{{ page_title or ('MLB Game Cards — ' ~ date) }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css', v=asset_version if cards_script == 'mlb/cards_source.js' else none) }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename=cards_stylesheet, v=asset_version if cards_script == 'mlb/cards_source.js' else none) }}" />
   </head>
@@ -110,6 +110,7 @@
     <script>
       window.MLBCardsBootstrap = {
         date: {{ date|tojson }},
+        basePath: {{ route_path|tojson }},
         client: {{ (cards_client or ('source' if source_client_shell else 'board'))|tojson }},
         preserveClientParam: {{ (cards_client is defined and cards_client is not none)|tojson }},
       };

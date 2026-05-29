@@ -223,6 +223,46 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(payload.get("snapshot", {}).get("current", {}).get("batter", {}).get("id"), 664983)
         self.assertEqual(payload.get("snapshot", {}).get("current", {}).get("pitcher", {}).get("id"), 656641)
 
+    def test_mlb_source_card_detail_preserves_sim_boxscore_and_run_distribution(self) -> None:
+        sim_payload = {
+            "away": "LAA",
+            "home": "DET",
+            "sim": {
+                "sims": 1000,
+                "aggregate_boxscore": {
+                    "away": {
+                        "totals": {"R": 4.65, "H": 9.24, "E": None},
+                        "batting": [{"name": "Away Batter", "pos": "OF", "AB": 4.1, "H": 1.6, "R": 0.9, "RBI": 1.1, "BB": 0.4, "SO": 1.0, "HR": 0.2, "TB": 2.7}],
+                        "pitching": [{"name": "Away Pitcher", "IP": 5.2, "H": 4.8, "R": 2.1, "BB": 1.4, "SO": 6.5, "HR": 0.7, "BF": 23.0, "P": 88.0}],
+                    },
+                    "home": {
+                        "totals": {"R": 4.67, "H": 9.41, "E": None},
+                        "batting": [{"name": "Home Batter", "pos": "1B", "AB": 4.0, "H": 1.5, "R": 0.8, "RBI": 1.0, "BB": 0.5, "SO": 0.9, "HR": 0.3, "TB": 2.8}],
+                        "pitching": [{"name": "Home Pitcher", "IP": 5.4, "H": 5.0, "R": 2.3, "BB": 1.2, "SO": 6.1, "HR": 0.8, "BF": 24.0, "P": 90.0}],
+                    },
+                },
+                "segments": {
+                    "first1": {"away_runs_mean": 0.4, "home_runs_mean": 0.5, "total_runs_dist": {0: 120, 1: 310, 2: 270}, "samples": [{"away": 0, "home": 1}]},
+                    "first3": {"away_runs_mean": 1.5, "home_runs_mean": 1.6, "total_runs_dist": {1: 90, 2: 210, 3: 280}, "samples": [{"away": 1, "home": 2}]},
+                    "first5": {"away_runs_mean": 2.5, "home_runs_mean": 2.6, "total_runs_dist": {2: 80, 3: 170, 4: 260}, "samples": [{"away": 2, "home": 2}]},
+                    "full": {"away_runs_mean": 4.6, "home_runs_mean": 4.7, "total_runs_dist": {6: 90, 7: 180, 8: 210}, "samples": [{"away": 4, "home": 5}]},
+                },
+            },
+        }
+
+        with patch("syndicate.features.mlb.cards._daily_sim_by_game", return_value={824272: sim_payload}):
+            with patch("syndicate.features.mlb.cards._daily_actual_by_game", return_value={}):
+                with patch("syndicate.features.mlb.cards._live_lens_game_row", return_value=None):
+                    payload = source_card_detail_payload("2026-05-28", 824272)
+
+        sim = payload.get("sim") or {}
+        self.assertTrue(sim.get("found"))
+        self.assertEqual(sim.get("boxscoreMode"), "aggregate")
+        self.assertEqual(len((((sim.get("boxscore") or {}).get("away") or {}).get("batting") or [])), 1)
+        self.assertEqual(len((((sim.get("boxscore") or {}).get("home") or {}).get("pitching") or [])), 1)
+        self.assertEqual(((((sim.get("segments") or {}).get("full") or {}).get("total_runs_dist") or {}).get(8)), 210)
+        self.assertEqual(len((((sim.get("segments") or {}).get("first1") or {}).get("samples") or [])), 1)
+
     def test_mlb_games_from_daily_summary_sets_first1_signal(self) -> None:
         from syndicate.features.mlb.cards import _games_from_daily_summary
 

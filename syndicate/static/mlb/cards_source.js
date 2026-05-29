@@ -49,7 +49,8 @@
     if (state.preserveClientParam && state.client === "source") params.set("client", "source");
     if (state.embedMode) params.set("embed", state.embedMode);
     const query = params.toString();
-    return query ? `/mlb/cards?${query}` : "/mlb/cards";
+    const basePath = String(bootstrap.basePath || "/mlb/cards").trim() || "/mlb/cards";
+    return query ? `${basePath}?${query}` : basePath;
   }
 
   function mlbGameHref(gamePk) {
@@ -3154,6 +3155,7 @@
     const liveNode = stripNode.querySelector('[data-role="strip-live"]');
     const lensNode = stripNode.querySelector('[data-role="strip-lens"]');
     const signalNode = stripNode.querySelector('[data-role="strip-f1-signal"]');
+    const metaNode = stripNode.querySelector('.cards-strip-meta');
     const snapshot = detail.snapshot;
     if (badgeNode) {
       const status = statusBadgePresentation(card, snapshot);
@@ -3177,6 +3179,17 @@
       const lensText = stripLiveTotalLensSummary(card, detail);
       lensNode.textContent = lensText;
       lensNode.hidden = !lensText;
+    }
+    const startersNode = stripNode.querySelector('.cards-strip-starters');
+    const startersMarkup = starterLadderStripMarkup(card);
+    if (startersNode) {
+      if (startersMarkup) {
+        startersNode.outerHTML = startersMarkup;
+      } else {
+        startersNode.remove();
+      }
+    } else if (startersMarkup && metaNode) {
+      metaNode.insertAdjacentHTML('afterend', startersMarkup);
     }
   }
 
@@ -3232,20 +3245,6 @@
       starterRail.innerHTML = `
           ${starterMetricMarkup("Away starter", card?.probable?.away, card)}
           ${starterMetricMarkup("Home starter", card?.probable?.home, card)}`;
-    }
-    if (stripNode) {
-      const metaNode = stripNode.querySelector('.cards-strip-meta');
-      const startersNode = stripNode.querySelector('.cards-strip-starters');
-      const startersMarkup = starterLadderStripMarkup(card);
-      if (startersNode) {
-        if (startersMarkup) {
-          startersNode.outerHTML = startersMarkup;
-        } else {
-          startersNode.remove();
-        }
-      } else if (startersMarkup && metaNode) {
-        metaNode.insertAdjacentHTML('afterend', startersMarkup);
-      }
     }
     if (gameLens) gameLens.innerHTML = renderGameLens(card, detail);
     if (overviewBars) overviewBars.innerHTML = overviewBarGroups(card, detail);

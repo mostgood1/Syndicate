@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WNBA Game Cards</title>
+  <title>{{ page_title or 'WNBA Game Cards' }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='shared/standalone_shell.css', v=asset_version) }}" />
   <link rel="stylesheet" href="/wnba/styles.css?v={{ asset_version }}" />
   <link rel="stylesheet" href="/wnba/cards-parity.css?v={{ asset_version }}" />
 </head>
-<body data-cards-base-path="/wnba/cards" class="cards-body cards-app-shell">
+<body data-cards-base-path="{{ cards_base_path or '/wnba/cards' }}" data-cards-query-suffix="{{ cards_query_suffix or '' }}" data-cards-season-betting-profile="{{ season_betting_profile or 'retuned' }}" class="cards-body cards-app-shell">
   {% with active_sport_slug='wnba', active_sport_name='WNBA' %}
     {% include 'shared/_standalone_app_header.html' %}
   {% endwith %}
@@ -17,18 +17,18 @@
       <div class="cards-shell cards-page-shell">
         <header class="cards-header">
           <div class="cards-title-row">
-            <h1>WNBA Game Cards</h1>
+            <h1>{{ page_heading or 'WNBA Game Cards' }}</h1>
             <div class="cards-header-meta" id="cardsHeaderMeta">Loading slate...</div>
           </div>
         </header>
 
         <section class="cards-control-card" aria-label="Slate controls">
           <form id="controls" class="cards-date-form" onsubmit="return false;">
-            <a class="cards-nav-pill" id="cardsPrevDateLink" href="/wnba/cards?date={{ date }}" rel="prev">Prev</a>
+            <a class="cards-nav-pill" id="cardsPrevDateLink" href="{{ cards_base_path or '/wnba/cards' }}?date={{ prev_date or date }}{{ cards_query_suffix or '' }}" rel="prev">Prev</a>
             <span class="cards-nav-pill cards-form-pill" aria-hidden="true">Date</span>
             <input type="date" id="datePicker" aria-label="Select slate date" title="Select slate date" />
             <button type="button" id="applyBtn">Load</button>
-            <a class="cards-nav-pill" id="cardsNextDateLink" href="/wnba/cards?date={{ date }}" rel="next">Next</a>
+            <a class="cards-nav-pill" id="cardsNextDateLink" href="{{ cards_base_path or '/wnba/cards' }}?date={{ next_date or date }}{{ cards_query_suffix or '' }}" rel="next">Next</a>
             <a class="cards-nav-pill" id="cardsSeasonBettingCardLink" href="{{ '/wnba/season/' ~ date[:4] ~ '/betting-card?profile=retuned&date=' ~ date }}">Betting Card</a>
             <a class="cards-nav-pill" href="/wnba/props?date={{ date }}">Props</a>
             <a class="cards-nav-pill" href="/wnba/live-player-props-audit?date={{ date }}">Live Prop Audit</a>

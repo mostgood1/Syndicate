@@ -36,6 +36,8 @@
   const pollIntervalMs = 15000;
   const API_BASE_PATH = '/wnba/api';
   const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
+  const cardsQuerySuffix = document.body?.dataset?.cardsQuerySuffix || '';
+  const seasonBettingProfile = document.body?.dataset?.cardsSeasonBettingProfile || 'retuned';
 
   const state = {
     activeTabs: new Map(),
@@ -3143,18 +3145,18 @@
 
   function updateDateControls() {
     const basePath = document.body?.dataset?.cardsBasePath || '/';
-    const dateQuery = `?date=${encodeURIComponent(state.date || getLocalDateISO())}`;
+    const querySuffix = cardsQuerySuffix || '';
     const previousDate = shiftISODate(state.date, -1);
     const nextDate = shiftISODate(state.date, 1);
     const seasonYear = Number(String(state.date || getLocalDateISO()).slice(0, 4)) || Number(new Date().getFullYear());
     if (prevDateLink) {
-      prevDateLink.href = `${basePath}?date=${encodeURIComponent(previousDate)}`;
+      prevDateLink.href = `${basePath}?date=${encodeURIComponent(previousDate)}${querySuffix}`;
     }
     if (nextDateLink) {
-      nextDateLink.href = `${basePath}?date=${encodeURIComponent(nextDate)}`;
+      nextDateLink.href = `${basePath}?date=${encodeURIComponent(nextDate)}${querySuffix}`;
     }
     if (seasonBettingCardLink) {
-      seasonBettingCardLink.href = `/season/${encodeURIComponent(seasonYear)}/betting-card?date=${encodeURIComponent(state.date || getLocalDateISO())}&profile=retuned`;
+      seasonBettingCardLink.href = `/wnba/season/${encodeURIComponent(seasonYear)}/betting-card?date=${encodeURIComponent(state.date || getLocalDateISO())}&profile=${encodeURIComponent(seasonBettingProfile)}`;
     }
   }
 
