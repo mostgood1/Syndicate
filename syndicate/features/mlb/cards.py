@@ -1004,6 +1004,28 @@ def _source_predictions(output: dict[str, Any]) -> dict[str, Any]:
     return predictions
 
 
+def _hydrate_output_segments_from_sim(output: dict[str, Any], sim_payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(output, dict):
+        return {}
+    sim_section = sim_payload.get("sim") if isinstance((sim_payload or {}).get("sim"), dict) else {}
+    sim_segments = sim_section.get("segments") if isinstance(sim_section.get("segments"), dict) else {}
+    if not isinstance(sim_segments, dict) or not sim_segments:
+        return output
+
+    hydrated = dict(output)
+    for key in ("first1", "first3", "first5", "full"):
+        output_section = hydrated.get(key) if isinstance(hydrated.get(key), dict) else {}
+        sim_segment = sim_segments.get(key) if isinstance(sim_segments.get(key), dict) else {}
+        if not output_section and not sim_segment:
+            continue
+        merged = dict(output_section)
+        for field in ("away_runs_mean", "home_runs_mean", "away_win_prob", "home_win_prob", "tie_prob", "total_runs_dist"):
+            if merged.get(field) is None and sim_segment.get(field) is not None:
+                merged[field] = sim_segment.get(field)
+        hydrated[key] = merged
+    return hydrated
+
+
 def _source_status(actual_payload: dict[str, Any] | None) -> dict[str, str]:
     status = (actual_payload.get("gameData") or {}).get("status") if isinstance((actual_payload or {}).get("gameData"), dict) else {}
     abstract = str((status or {}).get("abstractGameState") or "Pregame").strip() or "Pregame"
@@ -3923,6 +3945,7 @@ def _games_from_daily_summary(summary: dict[str, Any], *, betting_games: dict[in
         home_starter = str(starter_names.get("home") or "TBD").strip() or "TBD"
         betting_game = (betting_games or {}).get(game_pk)
         sim_payload = (sim_games or {}).get(game_pk)
+        output = _hydrate_output_segments_from_sim(output, sim_payload)
         actual_payload = (actual_games or {}).get(game_pk)
         official_items, official_count, playable_count = _official_market_items(betting_game or {}) if betting_game else ([], 0, 0)
         betting_flags = (betting_game or {}).get("flags") if isinstance((betting_game or {}).get("flags"), dict) else {}

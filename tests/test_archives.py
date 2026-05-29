@@ -295,6 +295,43 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(games[0].get("first1BetSignal", {}).get("label"), "F1 NRFI")
         self.assertEqual(games[0].get("first1BetSignal", {}).get("tone"), "nrfi")
 
+    def test_mlb_games_from_daily_summary_backfills_segment_rows_from_sim_payload(self) -> None:
+        from syndicate.features.mlb.cards import _games_from_daily_summary
+
+        summary = {
+            "date": "2026-05-29",
+            "outputs": [
+                {
+                    "game_pk": 822732,
+                    "away": "SD",
+                    "home": "WSH",
+                    "starter_names": {"away": "Lucas Giolito", "home": "Paxton Schultz"},
+                    "first1": {"nrfi_prob": 0.633},
+                    "first3": {},
+                    "first5": {},
+                    "full": {},
+                }
+            ],
+        }
+        sim_games = {
+            822732: {
+                "sim": {
+                    "segments": {
+                        "first1": {"away_runs_mean": 0.528, "home_runs_mean": 0.357, "away_win_prob": 0.219, "home_win_prob": 0.162, "tie_prob": 0.619},
+                        "first3": {"away_runs_mean": 1.52, "home_runs_mean": 0.983, "away_win_prob": 0.429, "home_win_prob": 0.278, "tie_prob": 0.293},
+                        "first5": {"away_runs_mean": 2.444, "home_runs_mean": 1.642, "away_win_prob": 0.503, "home_win_prob": 0.306, "tie_prob": 0.191},
+                        "full": {"away_runs_mean": 4.246, "home_runs_mean": 3.024, "away_win_prob": 0.597, "home_win_prob": 0.403, "tie_prob": 0.0},
+                    }
+                }
+            }
+        }
+
+        games = _games_from_daily_summary(summary, sim_games=sim_games)
+
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0].get("segment_overview_cards", [])[0].get("subtitle"), "SD 0.53 - WSH 0.36 | Total 0.89")
+        self.assertEqual(games[0].get("run_projection_rows", [])[0].get("summary"), "Mode 1 (34.6%) | Mean 0.89")
+
     def test_mlb_daily_actual_by_game_uses_central_today_for_live_fetch(self) -> None:
         from syndicate.features.mlb.cards import _daily_actual_by_game
 
