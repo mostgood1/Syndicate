@@ -20,7 +20,7 @@ def _source_roots() -> list[Path]:
     expanded: list[Path] = []
     seen: set[Path] = set()
     for root in roots:
-        for candidate in (root / "source_artifacts", root):
+        for candidate in (root, root / "source_artifacts"):
             resolved = candidate.resolve()
             if resolved in seen:
                 continue
