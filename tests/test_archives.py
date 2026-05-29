@@ -2713,6 +2713,40 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("if (value == null)", script)
         self.assertIn("const hasMetrics = hasFiniteMetric(pick?.probability) || hasFiniteMetric(pick?.ev);", script)
 
+    def test_shared_game_board_contract_derives_period_scores_from_total_and_margin(self) -> None:
+        from syndicate.features.shared.game_board_contract import apply_game_board_contract
+
+        context = apply_game_board_contract(
+            {
+                "games": [
+                    {
+                        "away": {"abbr": "PHX", "name": "Phoenix Mercury"},
+                        "home": {"abbr": "NYL", "name": "New York Liberty"},
+                        "status": "Processed artifact",
+                        "detail": "2026-05-29T00:00:00Z",
+                        "summary": "Consensus market snapshot",
+                        "metrics": [{"label": "Spread", "value": "NYL -4.5"}],
+                        "sim": {
+                            "periods": {
+                                "q1": {
+                                    "total_mean": 44.0,
+                                    "margin_mean": 6.0,
+                                    "p_home_win": 0.64,
+                                }
+                            }
+                        },
+                    }
+                ]
+            },
+            sport="wnba",
+            module="game_detail",
+        )
+
+        rows = ((context.get("games") or [])[0].get("shared_period_rows") or [])
+
+        self.assertEqual(rows[0].get("main"), "PHX 19.0 - NYL 25.0")
+        self.assertEqual(rows[0].get("subtitle"), "Projected total 44.0")
+
     def test_wnba_cards_source_alias_preserves_explicit_source_shell(self) -> None:
         response = self.client.get("/wnba/cards/source?date=2026-05-21", follow_redirects=True)
         body = response.get_data(as_text=True)

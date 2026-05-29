@@ -80,6 +80,10 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         away_mean = _safe_float(value.get("away_mean"))
         home_mean = _safe_float(value.get("home_mean"))
         total_mean = _safe_float(value.get("total_mean"))
+        margin_mean = _safe_float(value.get("margin_mean"))
+        if (away_mean is None or home_mean is None) and total_mean is not None and margin_mean is not None:
+            away_mean = round((total_mean - margin_mean) / 2.0, 3)
+            home_mean = round((total_mean + margin_mean) / 2.0, 3)
         if total_mean is None and away_mean is not None and home_mean is not None:
             total_mean = away_mean + home_mean
         total = (away_mean or 0.0) + (home_mean or 0.0)
