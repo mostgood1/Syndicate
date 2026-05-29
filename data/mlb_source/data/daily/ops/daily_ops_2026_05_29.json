@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-29T10:04:38.788673",
+  "generated_at": "2026-05-29T12:16:42.929716",
   "date": "2026-05-29",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-29_b85891982dad.lock",
-    "pid": 19568,
-    "created_at": "2026-05-29T10:04:38.786673"
+    "pid": 18348,
+    "created_at": "2026-05-29T12:16:42.927716"
   },
   "seed": {
     "value": 1337,
@@ -225,24 +225,25 @@
           "spreads_games": 15
         },
         "pitcher_props": {
-          "players": 27,
+          "players": 28,
           "markets": {
             "earned_runs": 27,
             "hits_allowed": 26,
-            "outs": 25,
-            "strikeouts": 26
+            "outs": 26,
+            "strikeouts": 27,
+            "walks_allowed": 19
           },
           "events_matched": 15
         },
         "hitter_props": {
           "players": 289,
           "markets": {
-            "batter_hits": 278,
+            "batter_hits": 277,
             "batter_hits_runs_rbis": 281,
             "batter_home_runs": 271,
-            "batter_rbis": 278,
-            "batter_runs_scored": 278,
-            "batter_total_bases": 271
+            "batter_rbis": 277,
+            "batter_runs_scored": 277,
+            "batter_total_bases": 272
           },
           "events_matched": 15
         }
@@ -755,14 +756,14 @@
       "group_summaries": {
         "pitcher": {
           "found": true,
-          "candidateCount": 102,
-          "displayedCount": 102,
+          "candidateCount": 122,
+          "displayedCount": 122,
           "sectionCount": 5
         },
         "hitter": {
           "found": true,
-          "candidateCount": 1656,
-          "displayedCount": 1656,
+          "candidateCount": 1654,
+          "displayedCount": 1654,
           "sectionCount": 7
         }
       }
@@ -869,14 +870,14 @@
       "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladder_audit_2026_05_29.json",
       "summary": {
         "cards": 15,
-        "badges": 76,
+        "badges": 96,
         "sources": {
-          "none": 76
+          "none": 96
         },
         "tones": {
-          "solid": 29,
-          "strong": 25,
-          "soft": 22
+          "solid": 40,
+          "strong": 31,
+          "soft": 25
         },
         "stats": {
           "hits_allowed": {
@@ -885,12 +886,17 @@
             "rungLosses": 0
           },
           "outs": {
-            "badges": 24,
+            "badges": 25,
             "rungWins": 0,
             "rungLosses": 0
           },
           "strikeouts": {
             "badges": 26,
+            "rungWins": 0,
+            "rungLosses": 0
+          },
+          "walks_allowed": {
+            "badges": 19,
             "rungWins": 0,
             "rungLosses": 0
           }

@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "wnba",
     "date":  "2026-05-29",
-    "refreshedAtUtc":  "2026-05-29T15:24:37.7082494Z",
+    "refreshedAtUtc":  "2026-05-29T17:39:00.0528486Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_WNBA",
@@ -9,16 +9,37 @@
     "destinationRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  3,
+    "copiedArtifactCount":  24,
     "artifactGroups":  {
-                           "processed":  2,
-                           "live_lens":  1,
-                           "raw":  0,
+                           "processed":  17,
+                           "live_lens":  6,
+                           "raw":  1,
                            "other":  0
                        },
     "copiedArtifacts":  [
+                            "game_cards_2026-05-29.csv",
+                            "recommendations_2026-05-29.csv",
+                            "recommendations_slate_2026-05-29.json",
+                            "cards_sim_detail_2026-05-29.json",
+                            "cards_props_snapshot_2026-05-29.json",
+                            "props_recommendations_top_by_game_2026-05-29.json",
+                            "oddsapi_player_props_2026-05-29.csv",
+                            "props_predictions_2026-05-29.csv",
+                            "props_edges_2026-05-29.csv",
+                            "props_recommendations_2026-05-29.csv",
+                            "live_player_lens_tuning_2026-05-29.csv",
                             "boxscores_history.csv",
                             "live_lens_tuning_override.json",
-                            "live_lens\\live_lens_tuning_override.json"
+                            "smart_sim_2026-05-29_CHI_MIN.json",
+                            "smart_sim_2026-05-29_NYL_PHX.json",
+                            "smart_sim_2026-05-29_POR_ATL.json",
+                            "smart_sim_2026-05-29_WSH_LAS.json",
+                            "live_lens\\live_lens_tuning_override.json",
+                            "live_snapshots\\live_state_2026-05-29.jsonl",
+                            "live_snapshots\\live_pbp_stats_2026-05-29.jsonl",
+                            "live_snapshots\\live_lines_2026-05-29.jsonl",
+                            "live_snapshots\\live_player_boxscore_2026-05-29.jsonl",
+                            "live_snapshots\\live_player_lens_2026-05-29.jsonl",
+                            "raw\\odds_wnba_player_props_2026-05-29.csv"
                         ]
 }

@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "nhl",
     "date":  "2026-05-29",
-    "refreshedAtUtc":  "2026-05-29T15:24:37.1939233Z",
+    "refreshedAtUtc":  "2026-05-29T17:38:58.8971927Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NHL",

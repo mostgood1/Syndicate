@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "nba",
     "date":  "2026-05-29",
-    "refreshedAtUtc":  "2026-05-29T15:01:14.2784296Z",
+    "refreshedAtUtc":  "2026-05-29T17:38:57.5099721Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NBA",
