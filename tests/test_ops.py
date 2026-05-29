@@ -113,6 +113,30 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["copied_artifact_count"], 14)
         self.assertEqual(payload["status"]["daily_update"]["manifest"]["date"], "2026-05-19")
 
+    def test_version_endpoint_returns_render_commit_metadata(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "ADMIN_TOKEN": "secret-token",
+                "RENDER_GIT_COMMIT": "273983a",
+                "RENDER_GIT_BRANCH": "main",
+                "RENDER_SERVICE_NAME": "syndicate-web",
+            },
+            clear=False,
+        ), patch("syndicate.blueprints.ops._git_value", return_value=None):
+            response = self.client.get(
+                "/api/ops/version",
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["version"]["commit"], "273983a")
+        self.assertEqual(payload["version"]["commit_source"], "env")
+        self.assertEqual(payload["version"]["branch"], "main")
+        self.assertEqual(payload["version"]["render_service_name"], "syndicate-web")
+
     def test_status_marks_running_when_pid_is_alive(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
