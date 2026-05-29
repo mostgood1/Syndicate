@@ -240,6 +240,15 @@ def season_betting_card_day_path(season: int, selected_date: str, *, profile: st
     return _resolve_data_path("eval", "seasons", str(int(season)), directory, filename)
 
 
+def season_betting_card_manifest_path(season: int, *, profile: str = "retuned") -> Path:
+    profile_slug = str(profile or "retuned").strip().lower() or "retuned"
+    if profile_slug == "retuned":
+        filename = "season_betting_cards_retuned_manifest.json"
+    else:
+        filename = f"season_betting_cards_{profile_slug}_manifest.json"
+    return _resolve_data_path("eval", "seasons", str(int(season)), filename)
+
+
 def season_eval_manifest_path(season: int) -> Path:
     return _resolve_data_path("eval", "seasons", str(int(season)), "season_eval_manifest.json")
 

@@ -3599,7 +3599,7 @@
       nextDateLink.href = `${basePath}?date=${encodeURIComponent(nextDate)}${querySuffix}`;
     }
     if (seasonBettingCardLink) {
-      seasonBettingCardLink.href = `/nba/season/${encodeURIComponent(seasonYear)}/betting-card?profile=${encodeURIComponent(seasonBettingProfile)}&date=${encodeURIComponent(state.date || getLocalDateISO())}`;
+      seasonBettingCardLink.href = `/nba/season/${encodeURIComponent(seasonYear)}/betting-card?profile=retuned&date=${encodeURIComponent(state.date || getLocalDateISO())}`;
     }
     if (picksLink) {
       picksLink.href = `/nba/picks?date=${encodeURIComponent(state.date || getLocalDateISO())}`;

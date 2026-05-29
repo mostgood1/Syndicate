@@ -235,7 +235,6 @@ $filePairs = @(
     @("data\daily\ladders\daily_ladders_$dateSlug.json", "daily\ladders\daily_ladders_$dateSlug.json"),
     @("data\daily\top_props\daily_top_props_$dateSlug.json", "daily\top_props\daily_top_props_$dateSlug.json"),
     @("data\daily\ops\daily_ops_$dateSlug.json", "daily\ops\daily_ops_$dateSlug.json"),
-    @("data\daily\season_frontend\season_betting_day_$dateSlug.json", "daily\season_frontend\season_betting_day_$dateSlug.json"),
     @("data\market\oddsapi\oddsapi_game_lines_$dateSlug.json", "daily\snapshots\$Date\oddsapi_game_lines_$dateSlug.json"),
     @("data\market\oddsapi\oddsapi_pitcher_props_$dateSlug.json", "daily\snapshots\$Date\oddsapi_pitcher_props_$dateSlug.json"),
     @("data\market\oddsapi\oddsapi_hitter_props_$dateSlug.json", "daily\snapshots\$Date\oddsapi_hitter_props_$dateSlug.json"),
@@ -254,6 +253,32 @@ foreach ($pair in $filePairs) {
     $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot $pair[0] } else { Join-Path $sourceRoot $pair[0] }
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst) {
         $copied.Add($pair[1]) | Out-Null
+    }
+}
+
+$seasonFrontendPatterns = @(
+    "data\daily\season_frontend\season_manifest_${season}_$dateSlug.json",
+    "data\daily\season_frontend\season_day_${season}_${dateSlug}_*.json",
+    "data\daily\season_frontend\season_betting_day_${season}_${dateSlug}_*.json",
+    "data\daily\season_frontend\season_official_betting_day_${season}_${dateSlug}_*.json"
+)
+
+foreach ($relativePattern in $seasonFrontendPatterns) {
+    $fullPattern = if ($UseExistingMirrorArtifacts) {
+        Join-Path $destDataRoot ($relativePattern.Substring(5))
+    } elseif ($artifactRoot) {
+        Join-Path $artifactRoot $relativePattern
+    } else {
+        Join-Path $sourceRoot $relativePattern
+    }
+    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+        $targetRelative = Join-Path "daily\season_frontend" $match.Name
+        $destination = Join-Path $destDataRoot $targetRelative
+        if (Copy-IfExists -SourcePath $match.FullName -DestinationPath $destination) {
+            if (-not $copied.Contains($targetRelative)) {
+                $copied.Add($targetRelative) | Out-Null
+            }
+        }
     }
 }
 
@@ -278,23 +303,17 @@ foreach ($spec in $oddsSnapshotSpecs) {
 }
 
 $dirPairs = @(
-    @("data\cache", "cache"),
-    @("data\daily_hitter_props", "daily_hitter_props"),
-    @("data\daily_pitcher_props", "daily_pitcher_props"),
     @("data\daily\snapshots\$Date", "daily\snapshots\$Date"),
     @("data\daily\sims\$Date", "daily\sims\$Date"),
     @("data\manager", "manager"),
     @("data\park", "park"),
     @("data\market\oddsapi\refresh_history\$dateSlug", "market\oddsapi\refresh_history\$dateSlug"),
-    @("data\raw\statcast\pitches", "raw\statcast\pitches"),
-    @("data\raw\statsapi\feed_live", "raw\statsapi\feed_live"),
-    @("data\roster_registry", "roster_registry"),
     @("data\runtime", "runtime"),
-    @("data\statcast", "statcast"),
     @("data\umpire", "umpire"),
     @("data\raw\statsapi\feed_live\$season\$Date", "raw\statsapi\feed_live\$season\$Date")
 )
 
+Write-Host ("MLB mirror refresh: copying date-scoped directories for {0}" -f $Date) -ForegroundColor DarkGray
 foreach ($pair in $dirPairs) {
     $dst = Join-Path $destDataRoot $pair[1]
     $src = if ($UseExistingMirrorArtifacts) { $dst } elseif ($artifactRoot) { Join-Path $artifactRoot $pair[0] } else { Join-Path $sourceRoot $pair[0] }

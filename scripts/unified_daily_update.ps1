@@ -384,7 +384,6 @@ function Get-ForcedPublishArtifactPaths {
             "data/mlb_source/data/daily/ladders/daily_ladders_${dateSlug}.json",
             "data/mlb_source/data/daily/top_props/daily_top_props_${dateSlug}.json",
             "data/mlb_source/data/daily/ops/daily_ops_${dateSlug}.json",
-            "data/mlb_source/data/daily/season_frontend/season_betting_day_${dateSlug}.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/lineups.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/meta.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/probables.json",
@@ -403,6 +402,10 @@ function Get-ForcedPublishArtifactPaths {
         }
 
         Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/sims/${DateValue}/sim_*.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_manifest_*_${dateSlug}.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_day_*_${dateSlug}_*.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_betting_day_*_${dateSlug}_*.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_official_betting_day_*_${dateSlug}_*.json"
     }
 
     if (-not $SkipNBA) {

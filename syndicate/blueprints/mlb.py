@@ -4,11 +4,13 @@ from datetime import date
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, Response, jsonify, render_template, request
 
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.mlb.betting_card import build_betting_card_page_context
+from syndicate.features.mlb.betting_card import build_season_betting_card_day_payload
+from syndicate.features.mlb.betting_card import build_season_betting_card_manifest_payload
 from syndicate.features.mlb.cards import build_cards_page_context
 from syndicate.features.mlb.cards import source_card_detail_payload
 from syndicate.features.mlb.cards import source_cards_api_payload
@@ -18,6 +20,7 @@ from syndicate.features.mlb.game_detail import build_game_detail_page_context
 from syndicate.features.mlb.hub import build_hub_context
 from syndicate.features.mlb.hitter_ladders import build_hitter_ladders_page_context
 from syndicate.features.mlb.hr_targets import build_hr_targets_page_context
+from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.live_lens import build_live_lens_api_payload
 from syndicate.features.mlb.live_lens import build_live_lens_page_context
 from syndicate.features.mlb.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload
@@ -27,9 +30,13 @@ from syndicate.features.mlb.rfi_targets import build_rfi_targets_page_context
 from syndicate.features.mlb.season import build_season_page_context
 from syndicate.features.mlb.sources import available_daily_summary_dates
 from syndicate.features.mlb.sources import load_json_file
-from syndicate.features.mlb.sources import season_betting_card_day_path
 from syndicate.features.mlb.sources import season_eval_manifest_path
 from syndicate.features.mlb.sources import season_frontend_day_path
+from syndicate.features.mlb.betting_card import source_back_to_top_js
+from syndicate.features.mlb.betting_card import source_betting_card_asset_version
+from syndicate.features.mlb.betting_card import source_betting_card_js
+from syndicate.features.mlb.betting_card import source_cards_css
+from syndicate.features.mlb.betting_card import source_season_css
 from syndicate.features.mlb.top_props import build_top_props_page_context
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
@@ -197,53 +204,44 @@ def _season_day_payload(season: int, date_str: str, profile: str) -> tuple[dict,
 
 
 def _season_betting_day_payload(season: int, date_str: str, profile: str) -> tuple[dict, int]:
-    card_path = season_betting_card_day_path(int(season), date_str, profile=profile)
-    payload = load_json_file(card_path)
+    budget_value = request.args.get("dailyBudget") or request.args.get("daily_budget") or "500"
+    try:
+        daily_budget = float(budget_value)
+    except Exception:
+        daily_budget = 500.0
+    payload = build_season_betting_card_day_payload(int(season), date_str, profile, daily_budget=daily_budget)
     if isinstance(payload, dict):
         out = dict(payload)
         out.setdefault("season", int(season))
         out.setdefault("date", str(date_str))
         out["found"] = True
-        out["source_path"] = _path_label(card_path)
+        out["source_path"] = _path_label(season_frontend_day_path(int(season), date_str, profile=profile))
         return out, 200
-    context = build_betting_card_page_context(int(season), date_str, profile=profile)
     return {
         "season": int(season),
         "date": str(date_str),
         "found": False,
-        "source_path": _path_label(card_path),
-        "rank_cards": context.get("rank_cards", []),
-        "using_sample_data": context.get("using_sample_data", False),
+        "source_path": None,
+        "games": [],
     }, 404
 
 
 def _season_betting_manifest_payload(season: int, profile: str) -> dict:
-    profile_slug = (profile or "retuned").strip() or "retuned"
-    root = season_betting_card_day_path(int(season), central_today_iso(), profile=profile_slug).parent
-    entries = []
-    if root.exists() and root.is_dir():
-        for path in sorted(root.glob(f"season_betting_day_{int(season)}_*.json")):
-            stem = path.stem.removeprefix(f"season_betting_day_{int(season)}_")
-            if len(stem) == 10 and stem[4] == "_" and stem[7] == "_":
-                date_str = f"{stem[:4]}-{stem[5:7]}-{stem[8:10]}"
-            else:
-                date_str = stem.replace("_", "-")
-            entries.append({"date": date_str, "source_path": _path_label(path)})
-    months = _season_months_from_days(entries)
+    payload = build_season_betting_card_manifest_payload(int(season), profile)
+    if isinstance(payload, dict):
+        out = dict(payload)
+        out["app"] = _app_meta()
+        return out
     return {
         "season": int(season),
-        "profile": profile_slug,
-        "found": bool(entries),
-        "available_days": entries,
-        "days": entries,
-        "months": months,
-        "available_profiles": [profile_slug],
-        "status": "ok" if entries else "missing",
-        "source_kind": "artifact_backed",
-        "summary": {"days": len(entries), "months": len(months)},
-        "meta": {"sourceDir": _path_label(root)},
+        "profile": (profile or "retuned").strip() or "retuned",
+        "found": False,
+        "available_profiles": [],
+        "days": [],
+        "months": [],
+        "summary": {},
+        "status": "missing",
         "app": _app_meta(),
-        "source_path": _path_label(root),
     }
 
 
@@ -775,17 +773,48 @@ def api_season_live_lens(season: int):
 @mlb_bp.get("/season/<int:season>/betting-card")
 def betting_card(season: int):
     selected_date = _iso_or_today(request.args.get("date"))
-    profile = (request.args.get("profile") or "retuned").strip() or "retuned"
-    context = build_betting_card_page_context(season, selected_date, profile=profile)
-    return render_template("shared/rank_board.html", **context)
+    profile = ((request.args.get("profile") or "retuned").strip().lower() or "retuned")
+    initial_manifest = build_season_betting_card_manifest_payload(int(season), profile)
+    initial_day = build_season_betting_card_day_payload(int(season), selected_date, profile)
+    context = build_betting_card_page_context(
+        season,
+        selected_date,
+        profile=profile,
+        initial_manifest=initial_manifest,
+        initial_day=initial_day,
+    )
+    return render_template("mlb/betting_card.html", **context)
 
 
 @mlb_bp.get("/api/season/<int:season>/betting-card")
 def api_betting_card(season: int):
-    selected_date = _iso_or_today(request.args.get("date"))
     profile = (request.args.get("profile") or "retuned").strip() or "retuned"
-    context = build_betting_card_page_context(season, selected_date, profile=profile)
-    return jsonify(_rank_payload(context))
+    selected_date = (request.args.get("date") or "").strip()
+    if selected_date:
+        payload, status_code = _season_betting_day_payload(int(season), selected_date, profile)
+        payload["artifactDate"] = str(selected_date)
+        payload["artifactPath"] = payload.get("source_path") or payload.get("card_source")
+        payload["artifactSource"] = "season_betting_day"
+        payload["cards_available"] = bool(payload.get("games"))
+        payload["cards_url"] = payload.get("cards_url") or f"/mlb/cards?date={selected_date}"
+        payload["manifest_source"] = payload.get("source_path")
+        payload["control_name"] = "date"
+        payload["route_path"] = f"/mlb/season/{int(season)}/betting-card"
+        payload["module_links"] = build_module_links(selected_date, "Betting Card")
+        payload["warning_panel"] = payload.get("warning_panel") or {
+            "eyebrow": "Official betting card",
+            "title": "MLB betting card is date-scoped off the stored season frontend payload",
+            "body": "This API keeps archive navigation on the dedicated MLB betting-card route while serving the official season-day artifact for the selected date.",
+            "list_items": [
+                "Use the date control to move across the stored season betting-card days.",
+                "Archive, cards, and ladder links stay pinned to the same MLB date.",
+            ],
+        }
+        payload["app"] = _app_meta()
+        return jsonify(payload), status_code
+    payload = _season_betting_manifest_payload(int(season), profile)
+    status_code = 200 if payload.get("found") else 404
+    return jsonify(payload), status_code
 
 
 @mlb_bp.get("/api/season/<int:season>/betting-cards")
@@ -804,9 +833,8 @@ def api_betting_card_day(season: int, date_str: str):
     payload["artifactPath"] = payload.get("source_path") or payload.get("card_source")
     payload["artifactSource"] = "season_betting_day"
     payload["cards_available"] = bool(payload.get("games"))
-    payload["cards_url"] = f"/mlb/season/{int(season)}/betting-card?date={date_str}"
+    payload["cards_url"] = payload.get("cards_url") or f"/mlb/cards?date={date_str}"
     payload["manifest_source"] = payload.get("source_path")
-    payload["staking_plan"] = payload.get("summary", {}).get("staking_plan") if isinstance(payload.get("summary"), dict) else None
     payload["app"] = _app_meta()
     return jsonify(payload), status_code
 
@@ -816,3 +844,35 @@ def api_betting_cards_day(season: int, date_str: str):
     profile = (request.args.get("profile") or "retuned").strip() or "retuned"
     payload, status_code = _season_betting_day_payload(int(season), str(date_str), profile)
     return jsonify(payload), status_code
+
+
+@mlb_bp.get("/assets/cards.css")
+def betting_card_cards_css():
+    content = source_cards_css()
+    if not content:
+        return Response("/* missing cards css */", mimetype="text/css", status=404)
+    return Response(content, mimetype="text/css")
+
+
+@mlb_bp.get("/assets/season.css")
+def betting_card_season_css():
+    content = source_season_css()
+    if not content:
+        return Response("/* missing season css */", mimetype="text/css", status=404)
+    return Response(content, mimetype="text/css")
+
+
+@mlb_bp.get("/assets/betting_card.js")
+def betting_card_js():
+    content = source_betting_card_js()
+    if not content:
+        return Response("", mimetype="application/javascript", status=404)
+    return Response(content, mimetype="application/javascript")
+
+
+@mlb_bp.get("/assets/back_to_top.js")
+def betting_card_back_to_top_js():
+    content = source_back_to_top_js()
+    if not content:
+        return Response("", mimetype="application/javascript", status=404)
+    return Response(content, mimetype="application/javascript")

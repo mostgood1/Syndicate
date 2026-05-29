@@ -542,25 +542,38 @@ def evaluate_protected_mirror_assets(root: Path | None = None) -> list[dict[str,
 def evaluate_allowed_protected_mirror_asset_violations(
     violations: list[dict[str, object]],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    allowed_keys = {
-        (
-            str(item.get("slug") or "").strip(),
-            str(item.get("path") or "").strip(),
-            str(item.get("issue") or "").strip(),
-            tuple(str(value).strip() for value in (item.get("missing_prefixes") or ()) if str(value).strip()),
-        )
+    allowed_entries = [
+        {
+            "slug": str(item.get("slug") or "").strip(),
+            "path": str(item.get("path") or "").strip(),
+            "issue": str(item.get("issue") or "").strip(),
+            "missing_prefixes": {
+                str(value).strip()
+                for value in (item.get("missing_prefixes") or ())
+                if str(value).strip()
+            },
+        }
         for item in ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS
-    }
+    ]
     allowed: list[dict[str, object]] = []
     unexpected: list[dict[str, object]] = []
     for violation in violations:
-        key = (
-            str(violation.get("slug") or "").strip(),
-            str(violation.get("path") or "").strip(),
-            str(violation.get("issue") or "").strip(),
-            tuple(str(value).strip() for value in (violation.get("missing_prefixes") or ()) if str(value).strip()),
+        violation_slug = str(violation.get("slug") or "").strip()
+        violation_path = str(violation.get("path") or "").strip()
+        violation_issue = str(violation.get("issue") or "").strip()
+        violation_prefixes = {
+            str(value).strip()
+            for value in (violation.get("missing_prefixes") or ())
+            if str(value).strip()
+        }
+        is_allowed = any(
+            entry["slug"] == violation_slug
+            and entry["path"] == violation_path
+            and entry["issue"] == violation_issue
+            and violation_prefixes.issubset(entry["missing_prefixes"])
+            for entry in allowed_entries
         )
-        if key in allowed_keys:
+        if is_allowed:
             allowed.append(violation)
         else:
             unexpected.append(violation)

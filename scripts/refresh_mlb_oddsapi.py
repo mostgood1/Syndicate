@@ -33,7 +33,6 @@ FILE_TEMPLATES = (
     ("data/daily/ladders/daily_ladders_{date_slug}.json", "data/daily/ladders/daily_ladders_{date_slug}.json"),
     ("data/daily/top_props/daily_top_props_{date_slug}.json", "data/daily/top_props/daily_top_props_{date_slug}.json"),
     ("data/daily/ops/daily_ops_{date_slug}.json", "data/daily/ops/daily_ops_{date_slug}.json"),
-    ("data/daily/season_frontend/season_betting_day_{date_slug}.json", "data/daily/season_frontend/season_betting_day_{date_slug}.json"),
     ("data/market/oddsapi/oddsapi_game_lines_{date_slug}.json", "data/daily/snapshots/{date_str}/oddsapi_game_lines_{date_slug}.json"),
     ("data/market/oddsapi/oddsapi_pitcher_props_{date_slug}.json", "data/daily/snapshots/{date_str}/oddsapi_pitcher_props_{date_slug}.json"),
     ("data/market/oddsapi/oddsapi_hitter_props_{date_slug}.json", "data/daily/snapshots/{date_str}/oddsapi_hitter_props_{date_slug}.json"),
@@ -506,6 +505,20 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path, date
         destination = artifact_root / Path(destination_template.format(**format_values))
         if _copy_if_exists(source, destination):
             copied.setdefault("files", []).append(str(destination))
+
+    season_frontend_root = source_root / "data" / "daily" / "season_frontend"
+    if season_frontend_root.exists() and season_frontend_root.is_dir():
+        season_frontend_patterns = (
+            f"season_manifest_{season}_{date_slug}.json",
+            f"season_day_{season}_{date_slug}_*.json",
+            f"season_betting_day_{season}_{date_slug}_*.json",
+            f"season_official_betting_day_{season}_{date_slug}_*.json",
+        )
+        for pattern in season_frontend_patterns:
+            for source in season_frontend_root.glob(pattern):
+                destination = artifact_root / "data" / "daily" / "season_frontend" / source.name
+                if _copy_if_exists(source, destination):
+                    copied.setdefault("files", []).append(str(destination))
 
     for source_template, destination_template in DIRECTORY_TEMPLATES:
         source = source_root / Path(source_template.format(**format_values))

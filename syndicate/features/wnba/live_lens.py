@@ -133,11 +133,10 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
 
 def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
     cards_context = build_cards_page_context(selected_date)
-    return {
-        "date": cards_context.get("date"),
-        "requested_date": cards_context.get("requested_date"),
-        "lookahead_applied": bool(cards_context.get("lookahead_applied")),
-        "players_included": False,
-        "pregame_portfolio": {"enabled": False, "selected": 0, "candidates": 0},
-        "games": [dict(game) for game in (cards_context.get("games") or []) if isinstance(game, dict)],
-    }
+    payload = build_rank_api_payload(build_live_lens_page_context(selected_date))
+    payload["requested_date"] = cards_context.get("requested_date")
+    payload["lookahead_applied"] = bool(cards_context.get("lookahead_applied"))
+    payload["players_included"] = False
+    payload["pregame_portfolio"] = {"enabled": False, "selected": 0, "candidates": 0}
+    payload["games"] = [dict(game) for game in (cards_context.get("games") or []) if isinstance(game, dict)]
+    return payload

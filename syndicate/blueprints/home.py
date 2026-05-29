@@ -1759,7 +1759,14 @@ def _load_home_prop_items(
             if nba_rows:
                 return nba_rows
         if slug == "wnba":
-            wnba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+            from syndicate.features.wnba.props import build_props_page_context
+
+            context = build_props_page_context(context_label)
+            wnba_rows = _prop_rows_from_rank_cards(
+                list(context.get("rank_cards") or []),
+                fallback_href=f"/wnba/props?date={context.get('date') or context_label}",
+                heading_override="Props",
+            )
             if wnba_rows:
                 return wnba_rows
         if slug in {"nfl", "ncaaf", "ncaab"}:
@@ -2073,12 +2080,31 @@ def _choose_props_bar(links: list[dict[str, Any]], *, is_active_today: bool) -> 
     betting_href, betting_label = _link_lookup_any(links, ["Betting Card"])
     fallback_href, fallback_label = _link_lookup_any(links, ["Picks", "Season Review", "Betting Card", "Hub"])
 
+    if props_href:
+        extra_links: list[dict[str, str]] = []
+        if live_href and live_href != props_href:
+            extra_links.append({"href": live_href, "label": "Open Prop Live Lens" if is_active_today else "Open Live Lens"})
+        if betting_href and betting_href != props_href:
+            extra_links.append({"href": betting_href, "label": f"Open {betting_label}" if betting_label else "Open Betting Card"})
+        return {
+            "eyebrow": "Props board",
+            "title": props_label or "Props",
+            "kicker": "Pregame props route",
+            "summary": "Start from the sport's local props board when one exists, then use adjacent boards only when you need broader context.",
+            "status_label": "Pregame props",
+            "opportunity_tags": [str(props_label or "Props"), "Pregame props"] + (["Live Lens"] if live_href else []),
+            "primary_href": props_href,
+            "primary_label": f"Open {props_label}" if props_label else "Open Props",
+            "secondary_href": betting_href or fallback_href,
+            "secondary_label": f"Open {betting_label}" if betting_href and betting_label else (f"Open {fallback_label}" if fallback_label else None),
+            "extra_links": extra_links,
+            "items": [],
+        }
+
     if betting_href:
         extra_links: list[dict[str, str]] = []
         if live_href and live_href != betting_href:
             extra_links.append({"href": live_href, "label": "Open Prop Live Lens" if is_active_today else "Open Live Lens"})
-        if props_href and props_href != betting_href:
-            extra_links.append({"href": props_href, "label": f"Open {props_label}" if props_label else "Open Props"})
         return {
             "eyebrow": "Props board",
             "title": betting_label or "Betting Card",
@@ -2091,22 +2117,6 @@ def _choose_props_bar(links: list[dict[str, Any]], *, is_active_today: bool) -> 
             "secondary_href": fallback_href if fallback_href and fallback_href != betting_href else None,
             "secondary_label": f"Open {fallback_label}" if fallback_href and fallback_href != betting_href and fallback_label else None,
             "extra_links": extra_links,
-            "items": [],
-        }
-
-    if props_href:
-        return {
-            "eyebrow": "Props board",
-            "title": props_label or "Props",
-            "kicker": "Pregame props route",
-            "summary": "Start from the sport's stored props or ladder lane, then jump to the broader module family only when you need adjacent views.",
-            "status_label": "Pregame props",
-            "opportunity_tags": [str(props_label or "Props"), "Pregame props"],
-            "primary_href": props_href,
-            "primary_label": f"Open {props_label}" if props_label else "Open Props",
-            "secondary_href": fallback_href,
-            "secondary_label": f"Open {fallback_label}" if fallback_label else None,
-            "extra_links": [],
             "items": [],
         }
 
