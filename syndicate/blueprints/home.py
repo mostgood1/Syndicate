@@ -52,6 +52,11 @@ _HOME_OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _HOME_PAYLOAD_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
+@home_bp.get("/healthz")
+def healthz():
+    return jsonify({"ok": True, "service": "syndicate"})
+
+
 def _safe_text(value: Any, fallback: str = "-") -> str:
     text = str(value or "").strip()
     return text or fallback

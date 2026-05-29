@@ -6,7 +6,7 @@ services:
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/bootstrap_data_root.py ; gunicorn wsgi:application --bind 0.0.0.0:$PORT
-    healthCheckPath: /
+    healthCheckPath: /healthz
     disk:
       name: syndicate-data
       mountPath: /opt/render/project/data
