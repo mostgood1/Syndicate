@@ -601,6 +601,13 @@ def _first_present_text(*values: Any) -> str | None:
     return None
 
 
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
 def _market_label_from_pick_text(text: str) -> str:
     lowered = text.lower()
     if "total" in lowered or lowered.startswith("over") or lowered.startswith("under"):
@@ -1410,6 +1417,71 @@ def _prop_rows_from_rank_cards(cards: list[dict[str, Any]], *, fallback_href: st
     return rows
 
 
+def _betting_card_rank_cards(slug: str, *, context_label: str, season: int | None = None, week: int | None = None) -> tuple[list[dict[str, Any]], str | None, str | None]:
+    if slug == "mlb":
+        from syndicate.features.mlb.betting_card import build_betting_card_page_context
+
+        resolved_season = _int_or_none(str(context_label)[:4]) or central_year()
+        context = build_betting_card_page_context(int(resolved_season), context_label)
+        return list(context.get("rank_cards") or []), context.get("route_path"), context.get("date")
+    if slug == "nba":
+        from syndicate.features.nba.betting_card import build_season_betting_card_day_payload
+
+        resolved_season = _int_or_none(str(context_label)[:4]) or central_year()
+        payload = build_season_betting_card_day_payload(int(resolved_season), context_label, "retuned") or {}
+        return list(payload.get("rank_cards") or []), payload.get("route_path"), payload.get("date")
+    if slug == "wnba":
+        from syndicate.features.wnba.picks import build_betting_card_page_context
+
+        resolved_season = _int_or_none(str(context_label)[:4]) or central_year()
+        context = build_betting_card_page_context(int(resolved_season), context_label)
+        return list(context.get("rank_cards") or []), context.get("route_path"), context.get("date")
+    if slug == "nhl":
+        from syndicate.features.nhl.picks import build_betting_card_page_context
+
+        resolved_season = int(season or (_int_or_none(str(context_label)[:4]) or central_year()))
+        context = build_betting_card_page_context(resolved_season, context_label)
+        return list(context.get("rank_cards") or []), context.get("route_path"), context.get("date")
+    if slug == "nfl" and week is not None and season is not None:
+        from syndicate.features.nfl.picks import build_betting_card_page_context
+
+        context = build_betting_card_page_context(int(season), int(week))
+        return list(context.get("rank_cards") or []), context.get("route_path"), context.get("date")
+    if slug == "ncaaf" and week is not None and season is not None:
+        from syndicate.features.ncaaf.picks import build_betting_card_page_context
+
+        context = build_betting_card_page_context(int(season), int(week))
+        return list(context.get("rank_cards") or []), context.get("route_path"), context.get("date")
+    if slug == "ncaab" and season is not None:
+        from syndicate.features.ncaab.season import build_season_betting_card_page_context
+
+        context = build_season_betting_card_page_context(int(season), context_label)
+        return list(context.get("rank_cards") or []), context.get("route_path"), context.get("date")
+    return [], None, None
+
+
+def _pregame_prop_rows_from_betting_card(
+    slug: str,
+    *,
+    context_label: str,
+    season: int | None = None,
+    week: int | None = None,
+    limit: int = 18,
+) -> list[dict[str, Any]]:
+    cards, route_path, resolved_date = _betting_card_rank_cards(slug, context_label=context_label, season=season, week=week)
+    if not cards:
+        return []
+    fallback_href = None
+    if route_path:
+        if slug in {"nfl", "ncaaf"} and week is not None:
+            fallback_href = f"{route_path}?week={int(week)}"
+        elif resolved_date:
+            fallback_href = f"{route_path}?date={resolved_date}"
+        else:
+            fallback_href = route_path
+    return _prop_rows_from_rank_cards(cards, fallback_href=fallback_href, limit=limit, heading_override="Betting Card")
+
+
 def _interleave_rows(*groups: list[dict[str, Any]], limit: int = 18) -> list[dict[str, Any]]:
     merged: list[dict[str, Any]] = []
     positions = [0 for _ in groups]
@@ -1649,6 +1721,8 @@ def _load_home_prop_items(
     week: int | None = None,
     is_active_today: bool,
 ) -> list[dict[str, Any]]:
+    if slug in {"nfl", "ncaaf"} and not is_active_today:
+        return []
     try:
         if slug == "mlb":
             if is_active_today:
@@ -1658,30 +1732,11 @@ def _load_home_prop_items(
                 live_rows = _prop_rows_from_mlb_live_games(live_games)
                 if live_rows:
                     return live_rows
-            from syndicate.features.mlb.top_props import build_top_props_page_context
-
-            pitcher_context = build_top_props_page_context(context_label, group="pitcher")
-            hitter_context = build_top_props_page_context(context_label, group="hitter")
-            pitcher_rows = _prop_rows_from_rank_cards(
-                list(pitcher_context.get("rank_cards") or []),
-                fallback_href=f"/mlb/pitcher-top-props?date={context_label}",
-                limit=9,
-                heading_override="Pitcher Top Props",
-            )
-            hitter_rows = _prop_rows_from_rank_cards(
-                list(hitter_context.get("rank_cards") or []),
-                fallback_href=f"/mlb/hitter-top-props?date={context_label}",
-                limit=9,
-                heading_override="Hitter Top Props",
-            )
-            top_rows = _interleave_rows(pitcher_rows, hitter_rows, limit=18)
-            if top_rows:
-                return top_rows
+            mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context_label, season=season, week=week)
+            if mlb_rows:
+                return mlb_rows
         if slug == "nhl":
-            from syndicate.features.nhl.cards import build_props_cards_payload
-
-            payload = build_props_cards_payload(context_label, top=18)
-            nhl_rows = _prop_rows_from_nhl_cards(list(payload.get("cards") or []), fallback_href=f"/nhl/live-lens?date={context_label}")
+            nhl_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if nhl_rows:
                 return nhl_rows
         if slug == "nba":
@@ -1700,19 +1755,17 @@ def _load_home_prop_items(
                     rows = _prop_rows_from_nba_live_lens(list(payload.get("games") or []), fallback_href=f"/nba/live-lens?date={context_label}")
                     if rows:
                         return rows
-            from syndicate.features.nba.props import build_props_page_context
-
-            context = build_props_page_context(context_label)
-            nba_rows = _prop_rows_from_rank_cards(list(context.get("rank_cards") or []), fallback_href=f"/nba/prop-ladders?date={context_label}")
+            nba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if nba_rows:
                 return nba_rows
         if slug == "wnba":
-            from syndicate.features.wnba.props import build_props_page_context
-
-            context = build_props_page_context(context_label)
-            wnba_rows = _prop_rows_from_rank_cards(list(context.get("rank_cards") or []), fallback_href=f"/wnba/props?date={context_label}")
+            wnba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if wnba_rows:
                 return wnba_rows
+        if slug in {"nfl", "ncaaf", "ncaab"}:
+            betting_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+            if betting_rows:
+                return betting_rows
     except Exception:
         pass
     rows = _compact_prop_rows(home_games)
@@ -2017,21 +2070,27 @@ def _choose_game_bar(links: list[dict[str, Any]], *, is_active_today: bool, fall
 def _choose_props_bar(links: list[dict[str, Any]], *, is_active_today: bool) -> dict[str, str | None]:
     live_href, _ = _link_lookup_any(links, ["Live Lens", "Live Prop Audit"])
     props_href, props_label = _link_lookup_any(links, ["Props", "Top props", "Prop Ladders", "Pitcher ladders", "Hitter ladders", "HR targets"])
+    betting_href, betting_label = _link_lookup_any(links, ["Betting Card"])
     fallback_href, fallback_label = _link_lookup_any(links, ["Picks", "Season Review", "Betting Card", "Hub"])
 
-    if is_active_today and live_href:
+    if betting_href:
+        extra_links: list[dict[str, str]] = []
+        if live_href and live_href != betting_href:
+            extra_links.append({"href": live_href, "label": "Open Prop Live Lens" if is_active_today else "Open Live Lens"})
+        if props_href and props_href != betting_href:
+            extra_links.append({"href": props_href, "label": f"Open {props_label}" if props_label else "Open Props"})
         return {
             "eyebrow": "Props board",
-            "title": "Prop live lane",
-            "kicker": "In-game prop checks for active slates",
-            "summary": "When the slate is active, reuse the sport's live lane for in-game prop opportunity checks instead of sending users back to pregame ladders.",
-            "status_label": "Live prop lens",
-            "opportunity_tags": ["Prop Live Lens", "Live props", "Tracked props"],
-            "primary_href": live_href,
-            "primary_label": "Open Prop Live Lens",
-            "secondary_href": props_href or fallback_href,
-            "secondary_label": f"Open {props_label}" if props_label else (f"Open {fallback_label}" if fallback_label else None),
-            "extra_links": [],
+            "title": betting_label or "Betting Card",
+            "kicker": "Pregame betting-card route",
+            "summary": "Pregame prop rows on the home board now come from the same ranked recommendation payload used by the sport's betting card.",
+            "status_label": "Betting-card props",
+            "opportunity_tags": [str(betting_label or "Betting Card"), "Pregame props"] + (["Live Lens"] if live_href else []),
+            "primary_href": betting_href,
+            "primary_label": f"Open {betting_label}" if betting_label else "Open Betting Card",
+            "secondary_href": fallback_href if fallback_href and fallback_href != betting_href else None,
+            "secondary_label": f"Open {fallback_label}" if fallback_href and fallback_href != betting_href and fallback_label else None,
+            "extra_links": extra_links,
             "items": [],
         }
 
