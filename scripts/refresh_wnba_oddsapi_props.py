@@ -1560,6 +1560,7 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
                     "home_tri": game.get("home_tri"),
                     "away_tri": game.get("away_tri"),
                     "sim": {
+                        "quarters": [row for row in (sim.get("quarters") or []) if isinstance(row, dict)],
                         "players_summary": dict(summary),
                         "players": {
                             "home": [row for row in (players.get("home") or []) if isinstance(row, dict)],

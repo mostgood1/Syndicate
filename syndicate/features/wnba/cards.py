@@ -59,6 +59,43 @@ def _artifact_games_index(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
     return index
 
 
+def _raw_smart_sim_index(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
+    processed_root = processed_path(f"game_cards_{selected_date}.csv").parent
+    index: dict[tuple[str, str], dict[str, Any]] = {}
+    for path in processed_root.glob(f"smart_sim_{selected_date}_*.json"):
+        payload = load_json(path)
+        if not isinstance(payload, dict):
+            continue
+        away = str(payload.get("away") or "").strip().upper()
+        home = str(payload.get("home") or "").strip().upper()
+        if away and home:
+            index[(away, home)] = {"away_tri": away, "home_tri": home, "sim": payload}
+    return index
+
+
+def _merge_sim_indexes(cards_sim_index: dict[tuple[str, str], dict[str, Any]], raw_sim_index: dict[tuple[str, str], dict[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
+    merged: dict[tuple[str, str], dict[str, Any]] = {
+        key: dict(value) for key, value in cards_sim_index.items() if isinstance(value, dict)
+    }
+    for key, raw_game in raw_sim_index.items():
+        raw_sim = raw_game.get("sim") if isinstance(raw_game.get("sim"), dict) else {}
+        existing = merged.get(key)
+        if not isinstance(existing, dict):
+            merged[key] = {"away_tri": key[0], "home_tri": key[1], "sim": dict(raw_sim)}
+            continue
+        existing_sim = existing.get("sim") if isinstance(existing.get("sim"), dict) else {}
+        merged_sim = dict(existing_sim)
+        raw_quarters = raw_sim.get("quarters") if isinstance(raw_sim.get("quarters"), list) else []
+        if raw_quarters:
+            merged_sim["quarters"] = [dict(item) for item in raw_quarters if isinstance(item, dict)]
+        if not isinstance(merged_sim.get("players_summary"), dict) and isinstance(raw_sim.get("players_summary"), dict):
+            merged_sim["players_summary"] = dict(raw_sim.get("players_summary") or {})
+        merged_game = dict(existing)
+        merged_game["sim"] = merged_sim
+        merged[key] = merged_game
+    return merged
+
+
 def _nearest_available_cards_date(selected_date: str) -> str | None:
     dates = available_dates()
     if not dates:
@@ -104,17 +141,52 @@ def _quarter_values(players: list[dict[str, Any]], stat_key: str, quarter_index:
     return values
 
 
+def _source_quarter_summary_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, float | None]]:
+    if not isinstance(sim_game, dict):
+        return {}
+    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    quarters = sim.get("quarters") if isinstance(sim.get("quarters"), list) else []
+    periods: dict[str, dict[str, float | None]] = {}
+    for quarter in quarters:
+        if not isinstance(quarter, dict):
+            continue
+        quarter_number = int(quarter.get("q") or 0)
+        if quarter_number not in (1, 2, 3, 4):
+            continue
+        away_mean = _safe_float(quarter.get("away_pts_mu"))
+        home_mean = _safe_float(quarter.get("home_pts_mu"))
+        if away_mean is None and home_mean is None:
+            continue
+        total_mean = None if away_mean is None or home_mean is None else round(away_mean + home_mean, 3)
+        margin_mean = None if away_mean is None or home_mean is None else round(home_mean - away_mean, 3)
+        periods[f"q{quarter_number}"] = {
+            "away_mean": away_mean,
+            "home_mean": home_mean,
+            "total_mean": total_mean,
+            "margin_mean": margin_mean,
+            "p_home_win": _margin_win_prob(margin_mean),
+        }
+    return periods
+
+
 def _source_sim_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, float | None]]:
     if not isinstance(sim_game, dict):
         return {}
+    summary_periods = _source_quarter_summary_periods(sim_game)
+    if summary_periods:
+        return summary_periods
     sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
     players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
     home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
     periods: dict[str, dict[str, float | None]] = {}
     for quarter_index, quarter_key in enumerate(("q1", "q2", "q3", "q4")):
-        away_mean = _sum_valid(_quarter_values(away_players, "q_pts", quarter_index))
-        home_mean = _sum_valid(_quarter_values(home_players, "q_pts", quarter_index))
+        away_values = _quarter_values(away_players, "q_pts", quarter_index)
+        home_values = _quarter_values(home_players, "q_pts", quarter_index)
+        if not any((value is not None and abs(value) > 1e-9) for value in (away_values + home_values)):
+            continue
+        away_mean = _sum_valid(away_values)
+        home_mean = _sum_valid(home_values)
         if away_mean is None and home_mean is None:
             continue
         total_mean = None if away_mean is None or home_mean is None else round(away_mean + home_mean, 3)
@@ -231,7 +303,7 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
         "paths": paths,
         "rows": rows,
         "recommendations": _recommendation_index(rec_summary),
-        "sim": _artifact_games_index(paths["sim"]),
+        "sim": _merge_sim_indexes(_artifact_games_index(paths["sim"]), _raw_smart_sim_index(selected_date)),
         "props": _artifact_games_index(paths["props"]),
     }
 

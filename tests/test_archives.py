@@ -2743,6 +2743,30 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual((stub.get("periods") or {}).get("q4", {}).get("away_mean"), 9.0)
         self.assertEqual((stub.get("periods") or {}).get("q4", {}).get("home_mean"), 8.0)
 
+    def test_wnba_source_sim_stub_prefers_top_level_quarter_summary_when_player_quarter_points_are_zero(self) -> None:
+        from syndicate.features.wnba.cards import _source_sim_stub
+
+        sim_game = {
+            "sim": {
+                "quarters": [
+                    {"q": 1, "away_pts_mu": 21.4, "home_pts_mu": 19.8},
+                    {"q": 2, "away_pts_mu": 21.4, "home_pts_mu": 19.8},
+                    {"q": 3, "away_pts_mu": 22.3, "home_pts_mu": 20.6},
+                    {"q": 4, "away_pts_mu": 22.3, "home_pts_mu": 20.6},
+                ],
+                "players": {
+                    "away": [{"pts_mean": 18.0, "q_pts": [0.0, 0.0, 0.0, 0.0]}],
+                    "home": [{"pts_mean": 17.0, "q_pts": [0.0, 0.0, 0.0, 0.0]}],
+                },
+            }
+        }
+
+        stub = _source_sim_stub("game-1", sim_game, {"total": "164.0", "home_spread": "8.5"})
+
+        self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("away_mean"), 21.4)
+        self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("home_mean"), 19.8)
+        self.assertEqual((stub.get("periods") or {}).get("q4", {}).get("total_mean"), 42.9)
+
     def test_wnba_cards_parity_script_treats_missing_metrics_as_missing_not_zero(self) -> None:
         script = self.client.get("/wnba/cards-parity.js").get_data(as_text=True)
 

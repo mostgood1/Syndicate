@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -369,6 +370,53 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 self.assertEqual(copied["live_lens_projections_path"], str(processed_root / f"live_lens_projections_{date_str}.jsonl"))
                 self.assertEqual(copied["live_lens_tuning_override_path"], str(processed_root / "live_lens_tuning_override.json"))
                 self.assertEqual(copied["live_lens_tuning_override_live_lens_path"], str(live_lens_root / "live_lens_tuning_override.json"))
+
+    def test_cards_sim_detail_export_preserves_quarter_summary(self) -> None:
+        module = self._load_module()
+
+        class _FakeResponse:
+            def get_json(self) -> dict[str, object]:
+                return {
+                    "games": [
+                        {
+                            "home_tri": "POR",
+                            "away_tri": "ATL",
+                            "sim": {
+                                "quarters": [{"q": 1, "away_pts_mu": 21.4, "home_pts_mu": 19.8}],
+                                "players_summary": {"home": 1, "away": 1},
+                                "players": {"home": [{"player_name": "Home Player"}], "away": [{"player_name": "Away Player"}]},
+                                "missing_prop_players": {"home": [], "away": []},
+                                "injuries": {"home": [], "away": []},
+                            },
+                        }
+                    ]
+                }
+
+        class _FakeClient:
+            def get(self, _path: str) -> _FakeResponse:
+                return _FakeResponse()
+
+        class _FakeApp:
+            app = None
+
+            def __init__(self) -> None:
+                self.app = self
+
+            def test_client(self) -> _FakeClient:
+                return _FakeClient()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True)
+
+            with patch.object(module, "_copy_existing_processed_artifact", return_value=None), patch.object(module, "_load_source_app", return_value=_FakeApp()):
+                out = module._export_cards_sim_detail_snapshot(source_root=source_root, date_str="2026-05-29", processed_root=processed_root)
+
+            self.assertEqual(out, str(processed_root / "cards_sim_detail_2026-05-29.json"))
+            payload = json.loads((processed_root / "cards_sim_detail_2026-05-29.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["games"][0]["sim"]["quarters"][0]["away_pts_mu"], 21.4)
 
     def test_optional_tool_exports_prefer_existing_processed_files(self) -> None:
         module = self._load_module()
