@@ -1,7 +1,7 @@
 ﻿{
-    "date":  "2026-05-28",
-    "generatedAt":  "2026-05-28T15:38:28.5196886-05:00",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-28\\20260528_153827",
+    "date":  "2026-05-29",
+    "generatedAt":  "2026-05-29T08:59:41.9825631-05:00",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-29\\20260529_085941",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -31,8 +31,9 @@
                             "name":  "MLB vendored daily update",
                             "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2",
                             "environmentOverrides":  {
+                                                         "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
                                                          "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                         "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data"
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
                                                      },
                             "runtimePolicy":  {
                                                   "simsPerGame":  1000,
@@ -44,7 +45,7 @@
                                             "--workflow",
                                             "ui-daily",
                                             "--date",
-                                            "2026-05-28",
+                                            "2026-05-29",
                                             "--season",
                                             "2026",
                                             "--sims",
@@ -58,127 +59,6 @@
                                             "--build-next-day",
                                             "on"
                                         ]
-                        },
-                        {
-                            "sport":  "nba",
-                            "workflow":  "vendored_daily_update",
-                            "name":  "NBA vendored daily update",
-                            "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "environmentOverrides":  {
-                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
-                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000"
-                                                     },
-                            "runtimePolicy":  {
-                                                  "smartsimNSims":  1000,
-                                                  "smartsimWorkers":  4
-                                              },
-                            "command":  [
-                                            "py",
-                                            "scripts\\refresh_nba_oddsapi_props.py",
-                                            "--date",
-                                            "2026-05-28",
-                                            "--source-root",
-                                            "vendor\\nba_betting_repo",
-                                            "--artifact-root",
-                                            "data\\nba_source",
-                                            "--log-file",
-                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-28\\20260528_153827\\nba_props_refresh.log",
-                                            "--force-refresh",
-                                            "--days-ahead",
-                                            "1",
-                                            "--do-edges",
-                                            "--do-export"
-                                        ]
-                        },
-                        {
-                            "sport":  "wnba",
-                            "workflow":  "vendored_daily_update",
-                            "name":  "WNBA vendored daily update",
-                            "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "environmentOverrides":  {
-                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
-                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000"
-                                                     },
-                            "runtimePolicy":  {
-                                                  "smartsimNSims":  1000,
-                                                  "smartsimWorkers":  4
-                                              },
-                            "command":  [
-                                            "py",
-                                            "scripts\\refresh_wnba_oddsapi_props.py",
-                                            "--date",
-                                            "2026-05-28",
-                                            "--source-root",
-                                            "vendor\\wnba_betting_repo",
-                                            "--artifact-root",
-                                            "data\\wnba_source",
-                                            "--log-file",
-                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-28\\20260528_153827\\wnba_props_refresh.log",
-                                            "--force-refresh",
-                                            "--days-ahead",
-                                            "1",
-                                            "--do-edges",
-                                            "--do-export"
-                                        ]
-                        },
-                        {
-                            "sport":  "nhl",
-                            "workflow":  "vendored_daily_update",
-                            "name":  "NHL vendored daily update",
-                            "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "environmentOverrides":  {
-
-                                                     },
-                            "runtimePolicy":  {
-                                                  "gameSimSamples":  1000,
-                                                  "propsBoxscoreNSims":  1000
-                                              },
-                            "command":  [
-                                            "py",
-                                            "scripts\\refresh_nhl_oddsapi.py",
-                                            "--date",
-                                            "2026-05-28",
-                                            "--source-root",
-                                            "vendor\\nhl_betting_repo",
-                                            "--artifact-root",
-                                            "data\\nhl_source\\source_artifacts",
-                                            "--days-ahead",
-                                            "1",
-                                            "--props-boxscore-n-sims",
-                                            "1000"
-                                        ]
-                        },
-                        {
-                            "sport":  null,
-                            "workflow":  null,
-                            "name":  "NFL local odds refresh",
-                            "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "environmentOverrides":  {
-
-                                                     },
-                            "runtimePolicy":  null,
-                            "command":  [
-                                            "py",
-                                            "scripts\\refresh_nfl_oddsapi.py",
-                                            "--artifact-root",
-                                            "data\\nfl_source\\source_artifacts"
-                                        ]
-                        },
-                        {
-                            "sport":  null,
-                            "workflow":  null,
-                            "name":  "NCAAF local odds refresh",
-                            "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "environmentOverrides":  {
-
-                                                     },
-                            "runtimePolicy":  null,
-                            "command":  [
-                                            "py",
-                                            "scripts\\refresh_ncaaf_oddsapi.py",
-                                            "--artifact-root",
-                                            "data\\ncaaf_source\\source_artifacts"
-                                        ]
                         }
                     ],
     "sportRuns":  [
@@ -186,13 +66,14 @@
                           "sport":  "mlb",
                           "workflow":  "vendored_daily_update",
                           "name":  "MLB vendored daily update",
-                          "startedAt":  "2026-05-28T15:38:28.6111564-05:00",
-                          "completedAt":  "2026-05-28T15:38:28.6811056-05:00",
+                          "startedAt":  "2026-05-29T08:59:41.9891406-05:00",
+                          "completedAt":  "2026-05-29T08:59:42.0111696-05:00",
                           "status":  "dry_run",
                           "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2",
                           "environmentOverrides":  {
+                                                       "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
                                                        "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                       "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data"
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
                                                    },
                           "runtimePolicy":  {
                                                 "simsPerGame":  1000,
@@ -204,7 +85,7 @@
                                           "--workflow",
                                           "ui-daily",
                                           "--date",
-                                          "2026-05-28",
+                                          "2026-05-29",
                                           "--season",
                                           "2026",
                                           "--sims",
@@ -218,249 +99,32 @@
                                           "--build-next-day",
                                           "on"
                                       ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-05-28.json",
-                          "mirrorManifestExists":  false
-                      },
-                      {
-                          "sport":  "nba",
-                          "workflow":  "vendored_daily_update",
-                          "name":  "NBA vendored daily update",
-                          "startedAt":  "2026-05-28T15:38:28.7259875-05:00",
-                          "completedAt":  "2026-05-28T15:38:28.7279958-05:00",
-                          "status":  "dry_run",
-                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                          "environmentOverrides":  {
-                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
-                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000"
-                                                   },
-                          "runtimePolicy":  {
-                                                "smartsimNSims":  1000,
-                                                "smartsimWorkers":  4
-                                            },
-                          "command":  [
-                                          "py",
-                                          "scripts\\refresh_nba_oddsapi_props.py",
-                                          "--date",
-                                          "2026-05-28",
-                                          "--source-root",
-                                          "vendor\\nba_betting_repo",
-                                          "--artifact-root",
-                                          "data\\nba_source",
-                                          "--log-file",
-                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-28\\20260528_153827\\nba_props_refresh.log",
-                                          "--force-refresh",
-                                          "--days-ahead",
-                                          "1",
-                                          "--do-edges",
-                                          "--do-export"
-                                      ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\manifests\\mirror_refresh_2026-05-28.json",
-                          "mirrorManifestExists":  false
-                      },
-                      {
-                          "sport":  "wnba",
-                          "workflow":  "vendored_daily_update",
-                          "name":  "WNBA vendored daily update",
-                          "startedAt":  "2026-05-28T15:38:28.7690568-05:00",
-                          "completedAt":  "2026-05-28T15:38:28.7730489-05:00",
-                          "status":  "dry_run",
-                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                          "environmentOverrides":  {
-                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
-                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000"
-                                                   },
-                          "runtimePolicy":  {
-                                                "smartsimNSims":  1000,
-                                                "smartsimWorkers":  4
-                                            },
-                          "command":  [
-                                          "py",
-                                          "scripts\\refresh_wnba_oddsapi_props.py",
-                                          "--date",
-                                          "2026-05-28",
-                                          "--source-root",
-                                          "vendor\\wnba_betting_repo",
-                                          "--artifact-root",
-                                          "data\\wnba_source",
-                                          "--log-file",
-                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-28\\20260528_153827\\wnba_props_refresh.log",
-                                          "--force-refresh",
-                                          "--days-ahead",
-                                          "1",
-                                          "--do-edges",
-                                          "--do-export"
-                                      ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-05-28.json",
-                          "mirrorManifestExists":  false
-                      },
-                      {
-                          "sport":  "nhl",
-                          "workflow":  "vendored_daily_update",
-                          "name":  "NHL vendored daily update",
-                          "startedAt":  "2026-05-28T15:38:28.8110155-05:00",
-                          "completedAt":  "2026-05-28T15:38:28.8133403-05:00",
-                          "status":  "dry_run",
-                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                          "environmentOverrides":  {
-
-                                                   },
-                          "runtimePolicy":  {
-                                                "gameSimSamples":  1000,
-                                                "propsBoxscoreNSims":  1000
-                                            },
-                          "command":  [
-                                          "py",
-                                          "scripts\\refresh_nhl_oddsapi.py",
-                                          "--date",
-                                          "2026-05-28",
-                                          "--source-root",
-                                          "vendor\\nhl_betting_repo",
-                                          "--artifact-root",
-                                          "data\\nhl_source\\source_artifacts",
-                                          "--days-ahead",
-                                          "1",
-                                          "--props-boxscore-n-sims",
-                                          "1000"
-                                      ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\manifests\\mirror_refresh_2026-05-28.json",
-                          "mirrorManifestExists":  false
-                      },
-                      {
-                          "sport":  null,
-                          "workflow":  null,
-                          "name":  "NFL local odds refresh",
-                          "startedAt":  "2026-05-28T15:38:28.8620293-05:00",
-                          "completedAt":  "2026-05-28T15:38:28.8620293-05:00",
-                          "status":  "dry_run",
-                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                          "environmentOverrides":  {
-
-                                                   },
-                          "runtimePolicy":  null,
-                          "command":  [
-                                          "py",
-                                          "scripts\\refresh_nfl_oddsapi.py",
-                                          "--artifact-root",
-                                          "data\\nfl_source\\source_artifacts"
-                                      ],
-                          "mirrorManifestPath":  null,
-                          "mirrorManifestExists":  false
-                      },
-                      {
-                          "sport":  null,
-                          "workflow":  null,
-                          "name":  "NCAAF local odds refresh",
-                          "startedAt":  "2026-05-28T15:38:28.9066615-05:00",
-                          "completedAt":  "2026-05-28T15:38:28.9091364-05:00",
-                          "status":  "dry_run",
-                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                          "environmentOverrides":  {
-
-                                                   },
-                          "runtimePolicy":  null,
-                          "command":  [
-                                          "py",
-                                          "scripts\\refresh_ncaaf_oddsapi.py",
-                                          "--artifact-root",
-                                          "data\\ncaaf_source\\source_artifacts"
-                                      ],
-                          "mirrorManifestPath":  null,
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-05-29.json",
                           "mirrorManifestExists":  false
                       }
                   ],
-    "skipGitPush":  false,
+    "skipGitPush":  true,
     "gitRemote":  "origin",
     "commitMessagePrefix":  "daily update",
     "skipped":  {
                     "sourceUpdates":  false,
-                    "refreshGate":  false,
+                    "refreshGate":  true,
                     "mlb":  false,
-                    "nba":  false,
-                    "nhl":  false,
-                    "wnba":  false,
-                    "nfl":  false,
-                    "ncaaf":  false,
-                    "ncaab":  false
+                    "nba":  true,
+                    "nhl":  true,
+                    "wnba":  true,
+                    "nfl":  true,
+                    "ncaaf":  true,
+                    "ncaab":  true
                 },
     "dryRun":  true,
     "refreshGate":  {
-                        "requested":  true,
-                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-28\\20260528_153827\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-28\\20260528_153827\\migration\\refresh_and_gate_run.json",
-                        "status":  "dry_run"
+                        "requested":  false,
+                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-29\\20260529_085941\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-29\\20260529_085941\\migration\\refresh_and_gate_run.json",
+                        "status":  "skipped"
                     },
     "pushResults":  [
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 (pre-source publish)",
-                            "status":  "dry_run",
-                            "commit":  null
-                        },
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 [MLB vendored daily update]",
-                            "status":  "dry_run",
-                            "commit":  null
-                        },
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 [NBA vendored daily update]",
-                            "status":  "dry_run",
-                            "commit":  null
-                        },
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 [WNBA vendored daily update]",
-                            "status":  "dry_run",
-                            "commit":  null
-                        },
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 [NHL vendored daily update]",
-                            "status":  "dry_run",
-                            "commit":  null
-                        },
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 [NFL local odds refresh]",
-                            "status":  "dry_run",
-                            "commit":  null
-                        },
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 [NCAAF local odds refresh]",
-                            "status":  "dry_run",
-                            "commit":  null
-                        },
-                        {
-                            "name":  "Syndicate",
-                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-                            "remote":  "origin",
-                            "branch":  "main",
-                            "commitMessage":  "daily update 2026-05-28 (Syndicate mirror + gate)",
-                            "status":  "dry_run",
-                            "commit":  null
-                        }
+
                     ]
 }

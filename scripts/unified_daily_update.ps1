@@ -87,7 +87,14 @@ function Invoke-Step {
     }
     Write-Host ("    " + ($Command -join ' ')) -ForegroundColor DarkGray
     if ($EnvironmentOverrides -and $EnvironmentOverrides.Count -gt 0) {
-        $envSummary = @($EnvironmentOverrides.GetEnumerator() | Sort-Object Name | ForEach-Object { "{0}={1}" -f $_.Key, $_.Value }) -join '; '
+        $envSummary = @(
+            $EnvironmentOverrides.GetEnumerator() |
+                Sort-Object Name |
+                ForEach-Object {
+                    $displayValue = if ($_.Key -match '(^|_)(KEY|TOKEN|SECRET)(_|$)') { '<redacted>' } else { $_.Value }
+                    "{0}={1}" -f $_.Key, $displayValue
+                }
+        ) -join '; '
         Write-Host "    env: $envSummary" -ForegroundColor DarkGray
     }
 
@@ -234,6 +241,75 @@ function Get-ProcessEnvValue {
         }
     }
     return $null
+}
+
+function Import-EnvFile {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path $Path)) {
+        return @()
+    }
+
+    $imported = @()
+    foreach ($rawLine in Get-Content -Path $Path) {
+        $line = [string]$rawLine
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
+        $trimmed = $line.Trim()
+        if ($trimmed.StartsWith('#')) {
+            continue
+        }
+        if ($trimmed.StartsWith('export ')) {
+            $trimmed = $trimmed.Substring(7).Trim()
+        }
+
+        $separatorIndex = $trimmed.IndexOf('=')
+        if ($separatorIndex -le 0) {
+            continue
+        }
+
+        $name = $trimmed.Substring(0, $separatorIndex).Trim()
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+        if (Get-ProcessEnvValue -Names @($name)) {
+            continue
+        }
+
+        $value = $trimmed.Substring($separatorIndex + 1).Trim()
+        if ($value.Length -ge 2) {
+            $quotePair = $value.Substring(0, 1) + $value.Substring($value.Length - 1, 1)
+            if ($quotePair -eq '""' -or $quotePair -eq "''") {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+        }
+
+        [Environment]::SetEnvironmentVariable($name, $value, 'Process')
+        $imported += $name
+    }
+
+    return $imported
+}
+
+function Import-RepoEnvFiles {
+    param([string]$RepoPath)
+
+    $envCandidates = @(
+        (Join-Path $RepoPath '.env'),
+        (Join-Path $RepoPath '.env.local')
+    )
+    $imported = @()
+    foreach ($candidate in $envCandidates) {
+        $imported += @(Import-EnvFile -Path $candidate)
+    }
+    return @($imported | Select-Object -Unique)
+}
+
+$importedEnvNames = @(Import-RepoEnvFiles -RepoPath $repoRoot)
+if ($importedEnvNames.Count -gt 0) {
+    Write-Host ("Loaded repo env values into process scope: " + ($importedEnvNames -join ', ')) -ForegroundColor DarkGray
 }
 
 function Get-CurrentBranch {

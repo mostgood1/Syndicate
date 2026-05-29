@@ -3721,7 +3721,13 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
         try:
             next_day_rc = subprocess.run(next_day_cmd, check=False).returncode
             next_day_stage["exit_code"] = int(next_day_rc)
-            if next_day_rc != 0:
+            if int(next_day_rc) == 2:
+                next_day_stage["status"] = "skipped"
+                next_day_stage["reason"] = "next-day forward build found no scheduled games"
+                report["notes"].append(
+                    f"next-day forward build skipped for {next_date_value}: no scheduled games"
+                )
+            elif next_day_rc != 0:
                 next_day_stage["status"] = "error"
                 report["errors"].append(f"next-day forward build failed with exit {next_day_rc}")
         except Exception as exc:

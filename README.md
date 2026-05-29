@@ -245,6 +245,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\daily_update.ps1 -Date 2026-0
 powershell -ExecutionPolicy Bypass -File .\scripts\daily_update.ps1 -Date 2026-05-18 -BaseUrl http://127.0.0.1:5000 -Json
 ```
 
+The PowerShell daily-update wrappers auto-import repo-root `.env` and `.env.local` values into process scope before they resolve per-sport credentials. Keys such as `ODDS_API_KEY` can therefore live in the same local env files the Python refresh scripts already use, while explicit process env and persisted Windows `User` or `Machine` env vars still win.
+
 This daily update writes a timestamped run under [reports/daily_update](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update), keeps a rolling latest manifest under [reports/daily_update/latest](c:/Users/mostg/OneDrive/Coding/Syndicate/reports/daily_update/latest), emits `module_tracker_snapshot.json`, and now publishes `module_tracker_gap_report.txt` so each run shows the highest-leverage MLB parity gaps and a ranked module backlog alongside migration health.
 
 ## Unified Daily Runner
