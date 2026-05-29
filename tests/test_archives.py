@@ -1195,9 +1195,10 @@ class DateArchiveHelperTests(unittest.TestCase):
 
     def test_nhl_cards_missing_requested_date_does_not_fall_back_to_previous_slate(self) -> None:
         with patch("syndicate.features.nhl.cards._prediction_dates_with_rows", return_value=["2026-05-27"]):
-            from syndicate.features.nhl.cards import build_cards_page_context as build_nhl_cards_page_context
+            with patch("syndicate.features.nhl.cards._next_scheduled_game_date_after_empty_slate", return_value=None):
+                from syndicate.features.nhl.cards import build_cards_page_context as build_nhl_cards_page_context
 
-            context = build_nhl_cards_page_context("2026-05-28")
+                context = build_nhl_cards_page_context("2026-05-28")
 
         self.assertEqual(context.get("requested_date"), "2026-05-28")
         self.assertEqual(context.get("date"), "2026-05-28")
@@ -1205,6 +1206,37 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(context.get("games"), [])
         self.assertEqual(context.get("source_title"), "NHL cards unavailable")
         self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+
+    def test_nhl_cards_empty_current_day_looks_ahead_to_next_scheduled_game_day(self) -> None:
+        with patch("syndicate.features.nhl.cards._prediction_dates_with_rows", return_value=["2026-05-27"]):
+            with patch("syndicate.features.nhl.cards._next_scheduled_game_date_after_empty_slate", return_value="2026-05-29"):
+                with patch("syndicate.features.nhl.cards._games_from_artifact", return_value=([], "missing_predictions.csv")):
+                    with patch("syndicate.features.nhl.cards._games_from_scoreboard_snapshot", return_value=([], "missing_scoreboard.csv")):
+                        from syndicate.features.nhl.cards import build_cards_page_context as build_nhl_cards_page_context
+
+                        context = build_nhl_cards_page_context("2026-05-28")
+
+        self.assertEqual(context.get("requested_date"), "2026-05-28")
+        self.assertEqual(context.get("date"), "2026-05-29")
+        self.assertTrue(context.get("lookahead_applied"))
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "Today has no NHL games; next game day is queued")
+        self.assertIn("Next scheduled game day: 2026-05-29", (context.get("empty_state") or {}).get("list_items") or [])
+        self.assertIn({"label": "Next game day", "value": "2026-05-29"}, context.get("header_stats") or [])
+
+    def test_nhl_cards_bundle_empty_current_day_looks_ahead_to_next_scheduled_game_day(self) -> None:
+        with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-05-28", "2026-05-29", True)):
+            with patch("syndicate.features.nhl.cards._prediction_bundle_rows", return_value=([], "missing_predictions.csv")):
+                with patch("syndicate.features.nhl.cards._recommendation_rows", return_value=([], "missing_recommendations.csv")):
+                    with patch("syndicate.features.nhl.cards._props_recommendation_rows", return_value=([], "missing_props.csv")):
+                        payload = build_nhl_source_bundle_payload("2026-05-28")
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("requested_date"), "2026-05-28")
+        self.assertEqual(payload.get("date"), "2026-05-29")
+        self.assertTrue(payload.get("lookahead_applied"))
+        self.assertEqual((payload.get("empty_state") or {}).get("title"), "Today has no NHL games; next game day is queued")
+        self.assertIn("Next scheduled game day: 2026-05-29", (payload.get("empty_state") or {}).get("list_items") or [])
 
     def test_nhl_cards_use_archived_scoreboard_when_predictions_missing(self) -> None:
         scoreboard_games = [

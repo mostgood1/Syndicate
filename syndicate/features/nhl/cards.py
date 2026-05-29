@@ -430,13 +430,56 @@ def _sim_goalie_names_by_game_team(selected_date: str) -> dict[tuple[str, str, s
 
 
 @lru_cache(maxsize=32)
-def _schedule_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
+def _schedule_payload(selected_date: str) -> dict[str, Any]:
     url = f"https://api-web.nhle.com/v1/schedule/{selected_date}"
     try:
         request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urlopen(request, timeout=3) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _next_scheduled_game_date_after_empty_slate(selected_date: str) -> str | None:
+    payload = _schedule_payload(selected_date)
+    game_week = payload.get("gameWeek") or []
+    selected_day_has_games = False
+    for week in game_week:
+        if str(week.get("date") or "") != selected_date:
+            continue
+        games = week.get("games") or []
+        if isinstance(games, list) and games:
+            selected_day_has_games = True
+            break
+        try:
+            selected_day_has_games = int(week.get("numberOfGames") or 0) > 0
+        except Exception:
+            selected_day_has_games = False
+        break
+
+    if selected_day_has_games:
+        return None
+
+    for week in game_week:
+        candidate_date = str(week.get("date") or "").strip()
+        if not candidate_date or candidate_date <= selected_date:
+            continue
+        games = week.get("games") or []
+        if isinstance(games, list) and games:
+            return candidate_date
+        try:
+            if int(week.get("numberOfGames") or 0) > 0:
+                return candidate_date
+        except Exception:
+            continue
+    return None
+
+
+@lru_cache(maxsize=32)
+def _schedule_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
+    payload = _schedule_payload(selected_date)
+    if not payload:
         return {}
 
     def _team_name(team: dict[str, Any]) -> str:
@@ -738,9 +781,15 @@ def _resolve_cards_date(selected_date: str | None) -> tuple[str, str, bool]:
     requested_date = str(selected_date or default_date()).strip() or default_date()
     available_dates = _prediction_dates_with_rows()
     if not available_dates:
+        next_scheduled_date = _next_scheduled_game_date_after_empty_slate(requested_date)
+        if next_scheduled_date:
+            return requested_date, next_scheduled_date, True
         return requested_date, requested_date, False
     if requested_date in available_dates:
         return requested_date, requested_date, False
+    next_scheduled_date = _next_scheduled_game_date_after_empty_slate(requested_date)
+    if next_scheduled_date:
+        return requested_date, next_scheduled_date, True
     return requested_date, requested_date, False
 
 
@@ -751,15 +800,27 @@ def build_source_bundle_payload(selected_date: str | None) -> dict[str, Any]:
     props_rows, props_path = _props_recommendation_rows(resolved_date)
     empty_state = None
     if not prediction_rows:
-        empty_state = {
-            "eyebrow": "NHL cards",
-            "title": "No game cards were available for this date",
-            "body": "The source cards shell only renders saved NHL prediction rows for the selected slate, and none were available for this date.",
-            "list_items": [
-                f"Requested date: {requested_date}",
-                "Choose another stored NHL date from the date control.",
-            ],
-        }
+        if lookahead_applied:
+            empty_state = {
+                "eyebrow": "NHL cards",
+                "title": "Today has no NHL games; next game day is queued",
+                "body": "The requested date is an empty NHL slate, so the cards source advanced to the next scheduled game day. Saved prediction rows are not available for that next slate yet.",
+                "list_items": [
+                    f"Requested date: {requested_date}",
+                    f"Next scheduled game day: {resolved_date}",
+                    "The public NHL schedule confirms no games on the requested date.",
+                ],
+            }
+        else:
+            empty_state = {
+                "eyebrow": "NHL cards",
+                "title": "No game cards were available for this date",
+                "body": "The source cards shell only renders saved NHL prediction rows for the selected slate, and none were available for this date.",
+                "list_items": [
+                    f"Requested date: {requested_date}",
+                    "Choose another stored NHL date from the date control.",
+                ],
+            }
     return {
         "ok": True,
         "date": resolved_date,
@@ -824,11 +885,11 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
         "source_title": source_title if games else "NHL cards unavailable",
         "empty_state": {
             "eyebrow": "NHL cards",
-            "title": "No game cards were available for this date",
-            "body": "The cards board only renders saved NHL prediction or archived scoreboard rows, and none were available for the requested date.",
+            "title": "Today has no NHL games; next game day is queued" if lookahead_applied else "No game cards were available for this date",
+            "body": "The requested date is an empty NHL slate, so the board advanced to the next scheduled game day. Saved prediction or archived scoreboard rows are not available for that next slate yet." if lookahead_applied else "The cards board only renders saved NHL prediction or archived scoreboard rows, and none were available for the requested date.",
             "list_items": [
                 f"Requested date: {requested_date}",
-                "Choose another stored NHL date from the date control.",
+                *( [f"Next scheduled game day: {resolved_date}", "The public NHL schedule confirms no games on the requested date."] if lookahead_applied else ["Choose another stored NHL date from the date control."] ),
             ],
         } if not games else None,
         "show_source_summary": True,
@@ -837,6 +898,7 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
             {"label": "Source", "value": Path(source_path).name if games else "No data"},
             *([
                 {"label": "Requested", "value": requested_date},
+                {"label": "Next game day", "value": resolved_date},
             ] if lookahead_applied else []),
         ],
         "route_path": "/nhl/cards",
