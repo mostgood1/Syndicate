@@ -1005,23 +1005,9 @@ def _run_refresh_via_cli(
         state["error"] = f"snapshot alias write failed: {alias_error}"
 
     pred_ready = False
-    game_input_rcs: dict[str, int] | None = None
     if not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
         state["phase"] = "predictions"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
-        if _env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True):
-            game_input_rcs = _ensure_source_game_inputs(
-                source_root=source_root,
-                package_name="nba_betting",
-                date_str=date_str,
-                log_file=log_file,
-                heartbeat_cb=_touch_progress,
-            )
-            if any(int(value) != 0 for value in game_input_rcs.values()):
-                state["error"] = (
-                    "required source game inputs failed before predict-props: "
-                    + ", ".join(f"{key}={int(value)}" for key, value in game_input_rcs.items())
-                )
         player_logs_ok, player_logs_error = _ensure_player_logs_for_props_refresh(
             source_root=source_root,
             date_str=date_str,
@@ -1113,14 +1099,6 @@ def _run_refresh_via_cli(
         state["rc_export"] = -1
         try:
             _touch_progress()
-            if game_input_rcs is None:
-                game_input_rcs = _ensure_source_game_inputs(
-                    source_root=source_root,
-                    package_name="nba_betting",
-                    date_str=date_str,
-                    log_file=log_file,
-                    heartbeat_cb=_touch_progress,
-                )
             rc_local_props_export = 0
             if pred_ready:
                 _, _ = export_props_recommendations_local(processed_root=processed_root, date_str=date_str)
@@ -1145,7 +1123,7 @@ def _run_refresh_via_cli(
                 log_file=log_file,
                 heartbeat_cb=_touch_progress,
             )
-            rc_export = 0 if all(int(value) == 0 for value in game_input_rcs.values()) and int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
+            rc_export = 0 if int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
         except Exception:
             _append_log(log_file, traceback.format_exc())
             rc_export = 1
@@ -1236,7 +1214,7 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
-    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0:
+    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return None
 
     started = str(started_at or dt.datetime.utcnow().isoformat())
@@ -1294,7 +1272,7 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
-    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0:
+    if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return None
 
     started = str(started_at or dt.datetime.utcnow().isoformat())
@@ -1658,6 +1636,83 @@ def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_
     return str(out_path)
 
 
+def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_str: str) -> list[dict[str, object]]:
+    games_out: list[dict[str, object]] = []
+    for path in sorted(processed_root.glob(f"smart_sim_{date_str}_*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        home_tri = str(payload.get("home") or "").strip().upper()
+        away_tri = str(payload.get("away") or "").strip().upper()
+        if not home_tri or not away_tri:
+            stem = str(path.stem or "")
+            prefix = f"smart_sim_{date_str}_"
+            if stem.startswith(prefix):
+                suffix = stem[len(prefix):]
+                parts = suffix.split("_")
+                if len(parts) >= 2:
+                    home_tri = home_tri or str(parts[0] or "").strip().upper()
+                    away_tri = away_tri or str(parts[1] or "").strip().upper()
+        players = payload.get("players") if isinstance(payload.get("players"), dict) else {}
+        home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
+        away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
+        if not home_tri or not away_tri:
+            continue
+        missing = payload.get("missing_prop_players") if isinstance(payload.get("missing_prop_players"), dict) else {}
+        injuries = payload.get("injuries") if isinstance(payload.get("injuries"), dict) else {}
+        players_summary = payload.get("players_summary") if isinstance(payload.get("players_summary"), dict) else {}
+        periods_payload = payload.get("periods") if isinstance(payload.get("periods"), dict) else {}
+        quarters = []
+        for quarter_number in range(1, 5):
+            quarter_payload = periods_payload.get(f"q{quarter_number}") if isinstance(periods_payload.get(f"q{quarter_number}"), dict) else None
+            if not isinstance(quarter_payload, dict):
+                continue
+            quarters.append(
+                {
+                    "q": int(quarter_number),
+                    "away_pts_mu": quarter_payload.get("away_mean"),
+                    "home_pts_mu": quarter_payload.get("home_mean"),
+                    "total_mean": quarter_payload.get("total_mean"),
+                    "margin_mean": quarter_payload.get("margin_mean"),
+                    "p_home_win": quarter_payload.get("p_home_win"),
+                }
+            )
+        summary = {
+            "home": int(players_summary.get("home") or len(home_players)),
+            "away": int(players_summary.get("away") or len(away_players)),
+            "missing_home": int(players_summary.get("missing_home") or len(missing.get("home") or [])),
+            "missing_away": int(players_summary.get("missing_away") or len(missing.get("away") or [])),
+            "injured_home": int(players_summary.get("injured_home") or len(injuries.get("home") or [])),
+            "injured_away": int(players_summary.get("injured_away") or len(injuries.get("away") or [])),
+        }
+        games_out.append(
+            {
+                "home_tri": home_tri,
+                "away_tri": away_tri,
+                "sim": {
+                    "quarters": quarters,
+                    "players_summary": summary,
+                    "players": {
+                        "home": home_players,
+                        "away": away_players,
+                    },
+                    "missing_prop_players": {
+                        "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
+                        "away": [row for row in (missing.get("away") or []) if isinstance(row, dict)],
+                    },
+                    "injuries": {
+                        "home": [row for row in (injuries.get("home") or []) if isinstance(row, dict)],
+                        "away": [row for row in (injuries.get("away") or []) if isinstance(row, dict)],
+                    },
+                },
+            }
+        )
+    return games_out
+
+
 def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
@@ -1666,59 +1721,62 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
     )
     if existing:
         return existing
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return None
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
-    client = source_app.app.test_client()
-    response = client.get(f"/api/cards?date={date_str}&include_players=1&props_source=auto")
-    try:
-        payload = response.get_json() if response is not None else None
-    except Exception:
-        payload = None
+    games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
+    if not games_out:
+        source_app = _load_source_app(source_root)
+        if source_app is None:
+            return None
+        client = source_app.app.test_client()
+        response = client.get(f"/api/cards?date={date_str}&include_players=1&props_source=auto")
+        try:
+            payload = response.get_json() if response is not None else None
+        except Exception:
+            payload = None
 
-    games_out = []
-    if isinstance(payload, dict):
-        for game in payload.get("games") or []:
-            if not isinstance(game, dict):
-                continue
-            sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
-            players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
-            home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
-            away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
-            if len(home_players) + len(away_players) <= 0:
-                continue
-            missing = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {}
-            injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {}
-            summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {
-                "home": len(home_players),
-                "away": len(away_players),
-                "missing_home": len(missing.get("home") or []),
-                "missing_away": len(missing.get("away") or []),
-                "injured_home": len(injuries.get("home") or []),
-                "injured_away": len(injuries.get("away") or []),
-            }
-            games_out.append(
-                {
-                    "home_tri": game.get("home_tri"),
-                    "away_tri": game.get("away_tri"),
-                    "sim": {
-                        "players_summary": dict(summary),
-                        "players": {
-                            "home": home_players,
-                            "away": away_players,
-                        },
-                        "missing_prop_players": {
-                            "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
-                            "away": [row for row in (missing.get("away") or []) if isinstance(row, dict)],
-                        },
-                        "injuries": {
-                            "home": [row for row in (injuries.get("home") or []) if isinstance(row, dict)],
-                            "away": [row for row in (injuries.get("away") or []) if isinstance(row, dict)],
-                        },
-                    },
+        if isinstance(payload, dict):
+            for game in payload.get("games") or []:
+                if not isinstance(game, dict):
+                    continue
+                sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+                players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+                home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
+                away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
+                if len(home_players) + len(away_players) <= 0:
+                    continue
+                missing = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {}
+                injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {}
+                summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {
+                    "home": len(home_players),
+                    "away": len(away_players),
+                    "missing_home": len(missing.get("home") or []),
+                    "missing_away": len(missing.get("away") or []),
+                    "injured_home": len(injuries.get("home") or []),
+                    "injured_away": len(injuries.get("away") or []),
                 }
-            )
+                games_out.append(
+                    {
+                        "home_tri": game.get("home_tri"),
+                        "away_tri": game.get("away_tri"),
+                        "sim": {
+                            "players_summary": dict(summary),
+                            "players": {
+                                "home": home_players,
+                                "away": away_players,
+                            },
+                            "missing_prop_players": {
+                                "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
+                                "away": [row for row in (missing.get("away") or []) if isinstance(row, dict)],
+                            },
+                            "injuries": {
+                                "home": [row for row in (injuries.get("home") or []) if isinstance(row, dict)],
+                                "away": [row for row in (injuries.get("away") or []) if isinstance(row, dict)],
+                            },
+                        },
+                    }
+                )
+    if not games_out:
+        return None
 
     out = {"date": date_str, "games": games_out}
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1930,6 +1988,13 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
             copied[key] = str(destination)
     date_text = str(state.get("date") or "").strip()
     source_directory = _processed_source_directory(state)
+    reuse_existing_run = bool(state.get("reused_existing_outputs") or state.get("reused_existing_artifact_bundle"))
+    reuse_local_processed = False
+    if source_directory is not None:
+        try:
+            reuse_local_processed = source_directory.resolve() == processed_root.resolve()
+        except Exception:
+            reuse_local_processed = source_directory == processed_root
     if date_text and source_directory is not None:
         smart_sim_files = _copy_matching_files(
             source_directory=source_directory,
@@ -1938,40 +2003,42 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         )
         if smart_sim_files:
             copied["smart_sim_paths"] = smart_sim_files
-        recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if recon_games_path:
-            copied["recon_games_path"] = recon_games_path
-        game_cards_path = _export_game_cards_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if game_cards_path:
-            copied["game_cards_path"] = game_cards_path
-        boxscores_path = _export_boxscores_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if boxscores_path:
-            copied["boxscores_path"] = boxscores_path
-        recommendations_path = _export_recommendations_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if recommendations_path:
-            copied["recommendations_path"] = recommendations_path
-        recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if recon_quarters_path:
-            copied["recon_quarters_path"] = recon_quarters_path
-        recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if recon_props_path:
-            copied["recon_props_path"] = recon_props_path
-        recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if recommendations_slate_path:
-            copied["recommendations_slate_path"] = recommendations_slate_path
-        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if cards_props_snapshot_path:
-            copied["cards_props_snapshot_path"] = cards_props_snapshot_path
-        cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if cards_sim_detail_path:
-            copied["cards_sim_detail_path"] = cards_sim_detail_path
-        top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
-        if top_by_game_path:
-            copied["top_by_game_path"] = top_by_game_path
-        copied.update(_export_season_betting_card_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
-        copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
-        copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
-        copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+        if not reuse_local_processed:
+            recon_games_path = _export_recon_games_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if recon_games_path:
+                copied["recon_games_path"] = recon_games_path
+            game_cards_path = _export_game_cards_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if game_cards_path:
+                copied["game_cards_path"] = game_cards_path
+            boxscores_path = _export_boxscores_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if boxscores_path:
+                copied["boxscores_path"] = boxscores_path
+            recommendations_path = _export_recommendations_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if recommendations_path:
+                copied["recommendations_path"] = recommendations_path
+            recon_quarters_path = _export_recon_quarters_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if recon_quarters_path:
+                copied["recon_quarters_path"] = recon_quarters_path
+            recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if recon_props_path:
+                copied["recon_props_path"] = recon_props_path
+            recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if recommendations_slate_path:
+                copied["recommendations_slate_path"] = recommendations_slate_path
+            cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if cards_props_snapshot_path:
+                copied["cards_props_snapshot_path"] = cards_props_snapshot_path
+            cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if cards_sim_detail_path:
+                copied["cards_sim_detail_path"] = cards_sim_detail_path
+            top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            if top_by_game_path:
+                copied["top_by_game_path"] = top_by_game_path
+            copied.update(_export_season_betting_card_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+            copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
+            if not reuse_existing_run:
+                copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+            copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
     if boxscores_history_path:
         copied["boxscores_history_path"] = boxscores_history_path
@@ -2109,12 +2176,13 @@ def main() -> int:
     recs_rows = int(state.get("recs_rows") or 0)
     game_cards_rows = int(state.get("game_cards_rows") or 0)
     cards_sim_detail_games = int(state.get("cards_sim_detail_games") or 0)
+    smart_sim_files = int(state.get("smart_sim_files") or 0)
     if state.get("error"):
         return 1
     for extra_state in states[1:]:
         if extra_state.get("error"):
             return 1
-        if bool(args.do_export) and int(extra_state.get("snapshot_rows") or 0) > 0 and int(extra_state.get("game_cards_rows") or 0) > 0 and int(extra_state.get("cards_sim_detail_games") or 0) <= 0:
+        if bool(args.do_export) and int(extra_state.get("snapshot_rows") or 0) > 0 and int(extra_state.get("game_cards_rows") or 0) > 0 and int(extra_state.get("cards_sim_detail_games") or 0) <= 0 and int(extra_state.get("smart_sim_files") or 0) <= 0:
             return 1
     if snapshot_rows > 0 and alias_rows <= 0:
         return 1
@@ -2122,7 +2190,7 @@ def main() -> int:
         return 1
     if bool(args.do_export) and snapshot_rows > 0 and recs_rows <= 0:
         return 1
-    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0:
+    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return 1
     return 0
 
