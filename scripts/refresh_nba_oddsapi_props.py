@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import csv
 import datetime as dt
+import errno
 import importlib
 import importlib.util
 import json
@@ -45,7 +46,7 @@ def _copy_if_exists(source_path: str | None, destination_path: Path) -> bool:
     if not source.exists() or not source.is_file():
         return False
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination_path)
+    _copy_file_with_fallback(source, destination_path)
     return True
 
 
@@ -58,7 +59,7 @@ def _copy_matching_files(*, source_directory: Path, pattern: str, destination_di
             continue
         destination = destination_directory / source.name
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
+        _copy_file_with_fallback(source, destination)
         copied.append(str(destination))
     return copied
 
@@ -74,8 +75,34 @@ def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path
     except Exception:
         pass
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    _copy_file_with_fallback(source, destination)
     return str(destination)
+
+
+def _copy_file_with_fallback(source: Path, destination: Path) -> None:
+    try:
+        shutil.copy2(source, destination)
+        return
+    except OSError as exc:
+        if exc.errno != errno.EINVAL:
+            raise
+    source_fd = os.open(str(source), os.O_RDONLY)
+    try:
+        destination_fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+        try:
+            while True:
+                chunk = os.read(source_fd, 1024 * 1024)
+                if not chunk:
+                    break
+                os.write(destination_fd, chunk)
+        finally:
+            os.close(destination_fd)
+    finally:
+        os.close(source_fd)
+    try:
+        shutil.copystat(source, destination)
+    except OSError:
+        pass
 
 
 def _copy_existing_live_lens_artifact(*, source_root: Path, file_name: str, destinations: tuple[tuple[Path, str | None], ...]) -> dict[str, str]:

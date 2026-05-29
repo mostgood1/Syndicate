@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import shutil
@@ -59,8 +60,34 @@ def _copy_if_exists(source: Path, destination: Path) -> bool:
     except Exception:
         pass
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    _copy_file_with_fallback(source, destination)
     return True
+
+
+def _copy_file_with_fallback(source: Path, destination: Path) -> None:
+    try:
+        shutil.copy2(source, destination)
+        return
+    except OSError as exc:
+        if exc.errno != errno.EINVAL:
+            raise
+    source_fd = os.open(str(source), os.O_RDONLY)
+    try:
+        destination_fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+        try:
+            while True:
+                chunk = os.read(source_fd, 1024 * 1024)
+                if not chunk:
+                    break
+                os.write(destination_fd, chunk)
+        finally:
+            os.close(destination_fd)
+    finally:
+        os.close(source_fd)
+    try:
+        shutil.copystat(source, destination)
+    except OSError:
+        pass
 
 
 def _copy_first_existing(*, sources: list[Path], destination: Path) -> bool:

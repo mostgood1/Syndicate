@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
+import errno
 import json
 import os
 import re
@@ -15,20 +17,8 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-YEAR = 2025
-PRED_FILES_GLOB = "college_football_schedule_2025_predicted_totals_enhanced*.csv"
-LINES_FILE = "college_football_betting_lines_2025.csv"
+PRED_FILES_GLOB = "college_football_schedule_*_predicted_totals_enhanced*.csv"
 _SPACE_RE = re.compile(r"\s+")
-
-ROOT_FILES = (
-    "recommendations_latest.json",
-    "recommendations_2025.csv",
-    "college_football_betting_lines_2025.csv",
-)
-
-ROOT_FILE_GLOBS = (
-    PRED_FILES_GLOB,
-)
 
 DIRECTORIES = (
     "recommendations_summary",
@@ -112,7 +102,7 @@ def _copy_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_file():
         return False
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    _copy_file_with_fallback(source, destination)
     return True
 
 
@@ -127,8 +117,43 @@ def _copy_tree_if_exists(source: Path, destination: Path) -> bool:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         shutil.rmtree(destination)
-    shutil.copytree(source, destination)
+    _copy_tree_with_fallback(source, destination)
     return True
+
+
+def _copy_file_with_fallback(source: Path, destination: Path) -> None:
+    try:
+        shutil.copy2(source, destination)
+        return
+    except OSError as exc:
+        if exc.errno != errno.EINVAL:
+            raise
+    source_fd = os.open(str(source), os.O_RDONLY)
+    try:
+        destination_fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+        try:
+            while True:
+                chunk = os.read(source_fd, 1024 * 1024)
+                if not chunk:
+                    break
+                os.write(destination_fd, chunk)
+        finally:
+            os.close(destination_fd)
+    finally:
+        os.close(source_fd)
+    with contextlib.suppress(OSError):
+        shutil.copystat(source, destination)
+
+
+def _copy_tree_with_fallback(source: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for root, _dirs, files in os.walk(source):
+        root_path = Path(root)
+        relative_root = root_path.relative_to(source)
+        target_root = destination / relative_root
+        target_root.mkdir(parents=True, exist_ok=True)
+        for file_name in files:
+            _copy_file_with_fallback(root_path / file_name, target_root / file_name)
 
 
 def _base_norm(name: str) -> str:
@@ -211,42 +236,81 @@ def _parse_utc_datetime(value: object) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _select_predictions_rows(source_root: Path, week: int) -> list[dict[str, str]]:
+def _prediction_files(source_root: Path) -> list[Path]:
     data_root = source_root / "data"
-    files = sorted(data_root.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
-    for path in files:
+    return sorted(data_root.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
+
+
+def _prediction_context(source_root: Path) -> dict[str, Any]:
+    for path in _prediction_files(source_root):
         try:
             rows = _read_csv_rows(path)
         except Exception:
             continue
         if not rows or "season" not in rows[0]:
             continue
-        subset = [row for row in rows if _parse_int(row.get("season")) == YEAR and _parse_int(row.get("week")) == week]
-        if subset:
-            return subset
-    raise FileNotFoundError(f"No predictions file with week {week} found under {data_root}")
+        seasons = sorted({_parse_int(row.get("season")) for row in rows if _parse_int(row.get("season")) is not None}, reverse=True)
+        if not seasons:
+            continue
+        latest_game_dt = None
+        parsed_dates = [
+            parsed
+            for parsed in (
+                _parse_utc_datetime(row.get("start_date_api") or row.get("start_date"))
+                for row in rows
+            )
+            if parsed is not None
+        ]
+        if parsed_dates:
+            latest_game_dt = max(parsed_dates)
+        return {
+            "path": path,
+            "rows": rows,
+            "season": int(seasons[0]),
+            "latest_game_dt": latest_game_dt,
+        }
+    raise FileNotFoundError(f"No predictions files found under {source_root / 'data'}")
+
+
+def _lines_file_name(season: int) -> str:
+    return f"college_football_betting_lines_{int(season)}.csv"
+
+
+def _root_files_for_season(season: int) -> tuple[str, ...]:
+    return (
+        "recommendations_latest.json",
+        f"recommendations_{int(season)}.csv",
+        _lines_file_name(int(season)),
+    )
+
+
+def _should_skip_auto_refresh(*, prediction_season: int, latest_game_dt: datetime | None) -> bool:
+    now_utc = datetime.now(timezone.utc)
+    if latest_game_dt is not None and latest_game_dt < (now_utc - timedelta(days=30)):
+        return True
+    return int(prediction_season) < int(now_utc.year)
+
+
+def _select_predictions_rows(source_root: Path, week: int) -> list[dict[str, str]]:
+    context = _prediction_context(source_root)
+    season = int(context["season"])
+    subset = [row for row in context["rows"] if _parse_int(row.get("season")) == season and _parse_int(row.get("week")) == week]
+    if subset:
+        return subset
+    raise FileNotFoundError(f"No predictions file with season {season} week {week} found under {source_root / 'data'}")
 
 
 def _detect_upcoming_week(source_root: Path) -> int | None:
-    data_root = source_root / "data"
-    files = sorted(data_root.glob(PRED_FILES_GLOB), key=lambda path: path.stat().st_mtime, reverse=True)
-    for path in files:
-        try:
-            rows = _read_csv_rows(path)
-        except Exception:
-            continue
-        if not rows or "week" not in rows[0] or "season" not in rows[0]:
-            continue
-        subset = [row for row in rows if _parse_int(row.get("season")) == YEAR]
-        if not subset:
-            continue
-        done = [row for row in subset if _has_value(row.get("actual_home_points")) and _has_value(row.get("actual_away_points")) and _parse_int(row.get("week")) is not None]
-        if done:
-            return max(_parse_int(row.get("week")) or 0 for row in done) + 1
-        available_weeks = [_parse_int(row.get("week")) for row in subset]
-        available_weeks = [week_value for week_value in available_weeks if week_value is not None]
-        if available_weeks:
-            return min(available_weeks)
+    context = _prediction_context(source_root)
+    season = int(context["season"])
+    subset = [row for row in context["rows"] if _parse_int(row.get("season")) == season]
+    done = [row for row in subset if _has_value(row.get("actual_home_points")) and _has_value(row.get("actual_away_points")) and _parse_int(row.get("week")) is not None]
+    if done:
+        return max(_parse_int(row.get("week")) or 0 for row in done) + 1
+    available_weeks = [_parse_int(row.get("week")) for row in subset]
+    available_weeks = [week_value for week_value in available_weeks if week_value is not None]
+    if available_weeks:
+        return min(available_weeks)
     return None
 
 
@@ -327,6 +391,7 @@ def _extract_markets(bookmaker: dict[str, Any], home_team: str, away_team: str) 
 
 def _build_lines_rows(source_root: Path, week: int, odds_events: list[dict[str, Any]], *, debug: bool = False) -> list[dict[str, Any]]:
     pred_rows = _select_predictions_rows(source_root, week)
+    season = _parse_int((pred_rows[0] or {}).get("season")) if pred_rows else None
     schedule_index: dict[tuple[str, str], tuple[str, str]] = {}
     schedule_team_norms: set[str] = set()
     schedule_dates: dict[tuple[str, str], datetime] = {}
@@ -395,7 +460,7 @@ def _build_lines_rows(source_root: Path, week: int, odds_events: list[dict[str, 
             continue
         rows.append(
             {
-                "year": YEAR,
+                "year": int(season or 0),
                 "week": week,
                 "homeTeam": sched_home,
                 "awayTeam": sched_away,
@@ -410,8 +475,8 @@ def _build_lines_rows(source_root: Path, week: int, odds_events: list[dict[str, 
     return rows
 
 
-def _merge_and_write(source_root: Path, rows: list[dict[str, Any]], week: int) -> dict[str, Any]:
-    lines_path = source_root / "data" / LINES_FILE
+def _merge_and_write(source_root: Path, rows: list[dict[str, Any]], season: int, week: int) -> dict[str, Any]:
+    lines_path = source_root / "data" / _lines_file_name(season)
     if lines_path.exists():
         try:
             old_rows = _read_csv_rows(lines_path)
@@ -428,8 +493,8 @@ def _merge_and_write(source_root: Path, rows: list[dict[str, Any]], week: int) -
         return (year_value, week_value, str(row.get("homeTeam", "")), str(row.get("awayTeam", "")))
 
     new_keys = {_row_key(row) for row in rows if _row_key(row) is not None}
-    keep_rows = [row for row in old_rows if not (_parse_int(row.get("year")) == YEAR and _parse_int(row.get("week")) == week)]
-    preserved_same_week = [row for row in old_rows if _parse_int(row.get("year")) == YEAR and _parse_int(row.get("week")) == week and _row_key(row) not in new_keys]
+    keep_rows = [row for row in old_rows if not (_parse_int(row.get("year")) == int(season) and _parse_int(row.get("week")) == week)]
+    preserved_same_week = [row for row in old_rows if _parse_int(row.get("year")) == int(season) and _parse_int(row.get("week")) == week and _row_key(row) not in new_keys]
     merged = keep_rows + preserved_same_week + rows
     merged.sort(key=lambda row: (_parse_int(row.get("year")) or 0, _parse_int(row.get("week")) or 0, str(row.get("homeTeam", "")), str(row.get("awayTeam", ""))))
 
@@ -451,18 +516,21 @@ def _merge_and_write(source_root: Path, rows: list[dict[str, Any]], week: int) -
 
 
 def _run_refresh(*, source_root: Path, week: int, api_key: str, debug: bool = False) -> dict[str, Any]:
+    context = _prediction_context(source_root)
+    season = int(context["season"])
     sport = os.environ.get("ODDS_API_SPORT", "americanfootball_ncaaf")
     regions = os.environ.get("ODDS_API_REGIONS", "us,us2,eu,uk")
     markets = os.environ.get("ODDS_API_MARKETS", "h2h,spreads,totals")
     odds_format = os.environ.get("ODDS_API_ODDS_FORMAT", "american")
-    print(f"[info] Fetching OddsAPI sport={sport} week={week} regions={regions} markets={markets}")
+    print(f"[info] Fetching OddsAPI sport={sport} season={season} week={week} regions={regions} markets={markets}")
     events = _fetch_odds(api_key=api_key, sport=sport, regions=regions, markets=markets, odds_format=odds_format)
     rows = _build_lines_rows(source_root, week, events, debug=debug)
     if not rows:
-        return {"status": "empty", "week": week, "matched_games": 0, "pred_games_in_week": len(_select_predictions_rows(source_root, week))}
-    result = _merge_and_write(source_root, rows, week)
+        return {"status": "empty", "season": season, "week": week, "matched_games": 0, "pred_games_in_week": len(_select_predictions_rows(source_root, week))}
+    result = _merge_and_write(source_root, rows, season, week)
     return {
         "status": "ok",
+        "season": season,
         "week": week,
         **result,
         "matched_games": len(rows),
@@ -473,18 +541,19 @@ def _run_refresh(*, source_root: Path, week: int, api_key: str, debug: bool = Fa
 def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> dict[str, object]:
     source_data_root = source_root / "data"
     copied: dict[str, object] = {}
+    context = _prediction_context(source_root)
+    season = int(context["season"])
 
-    for name in ROOT_FILES:
+    for name in _root_files_for_season(season):
         source = source_data_root / name
         destination = artifact_root / name
         if _copy_if_exists(source, destination):
             copied.setdefault("files", []).append(str(destination))
 
-    for pattern in ROOT_FILE_GLOBS:
-        for source in sorted(source_data_root.glob(pattern)):
-            destination = artifact_root / source.name
-            if _copy_if_exists(source, destination):
-                copied.setdefault("files", []).append(str(destination))
+    source = Path(context["path"])
+    destination = artifact_root / source.name
+    if _copy_if_exists(source, destination):
+        copied.setdefault("files", []).append(str(destination))
 
     for name in DIRECTORIES:
         source = source_data_root / name
@@ -507,8 +576,28 @@ def main() -> int:
     artifact_root = Path(args.artifact_root).resolve()
     source_root = Path(args.source_root).resolve() if args.source_root else None
     data_root = _resolve_data_root(source_root=source_root, artifact_root=artifact_root)
+    prediction_context = _prediction_context(data_root)
+    prediction_season = int(prediction_context["season"])
     api_key = args.api_key or os.environ.get("ODDS_API_KEY")
     week = args.week if args.week is not None else _detect_upcoming_week(data_root)
+
+    if args.week is None and _should_skip_auto_refresh(prediction_season=prediction_season, latest_game_dt=prediction_context.get("latest_game_dt")):
+        copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root)
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "status": "skipped",
+                    "reason": "stale_source_season",
+                    "season": prediction_season,
+                    "latest_game_dt": prediction_context.get("latest_game_dt").isoformat() if prediction_context.get("latest_game_dt") else None,
+                    "artifact_bundle_root": str(artifact_root),
+                    "artifact_bundle_files": copied,
+                },
+                indent=2,
+            )
+        )
+        return 0
 
     if not api_key:
         print(json.dumps({"ok": False, "error": "Missing Odds API key (provide --api-key or set ODDS_API_KEY)."}))
@@ -533,6 +622,7 @@ def main() -> int:
         json.dumps(
             {
                 "ok": True,
+                "season": prediction_season,
                 "week": week,
                 "artifact_bundle_root": str(artifact_root),
                 "refresh_result": result,

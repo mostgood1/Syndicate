@@ -637,6 +637,11 @@ if (-not $SkipMLB) {
     }
     else {
         $preferLocalMirrorArtifactsForGate = $true
+        $mlbOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
+        $mlbEnvOverrides = @{}
+        if (-not [string]::IsNullOrWhiteSpace($mlbOddsApiKey)) {
+            $mlbEnvOverrides.ODDS_API_KEY = $mlbOddsApiKey
+        }
         $sourceSteps += [pscustomobject]@{
             Sport = 'mlb'
             Name = 'MLB Syndicate daily refresh'
@@ -650,7 +655,7 @@ if (-not $SkipMLB) {
                 '--overwrite', 'on'
             )
             WorkingDirectory = $repoRoot
-            EnvironmentOverrides = @{}
+            EnvironmentOverrides = $mlbEnvOverrides
             RuntimePolicy = $runtimePolicy.MLB
         }
     }
