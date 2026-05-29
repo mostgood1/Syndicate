@@ -14,11 +14,47 @@ if ([string]::IsNullOrWhiteSpace($Date)) {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_WNBA'
 $sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_WNBA'
+
+function Get-EnvOverride {
+    param(
+        [string[]]$Names
+    )
+
+    foreach ($name in $Names) {
+        $value = [Environment]::GetEnvironmentVariable($name)
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+        }
+    }
+
+    return ''
+}
+
+function Resolve-DestinationSportRoot {
+    param(
+        [string]$LocalDirName,
+        [string[]]$ExplicitRootEnvVars
+    )
+
+    $explicitRoot = Get-EnvOverride -Names $ExplicitRootEnvVars
+    if (-not [string]::IsNullOrWhiteSpace($explicitRoot)) {
+        return [System.IO.Path]::GetFullPath($explicitRoot)
+    }
+
+    $dataRoot = Get-EnvOverride -Names @('SYNDICATE_DATA_ROOT')
+    if (-not [string]::IsNullOrWhiteSpace($dataRoot)) {
+        return [System.IO.Path]::GetFullPath((Join-Path $dataRoot $LocalDirName))
+    }
+
+    return Join-Path $repoRoot (Join-Path 'data' $LocalDirName)
+}
+
 $sourceRoot = $null
 $artifactRoot = $null
-$destDataRoot = Join-Path $repoRoot 'data\wnba_source\data\processed'
-$destRawRoot = Join-Path $repoRoot 'data\wnba_source\data\raw'
-$destLiveLensRoot = Join-Path $repoRoot 'data\wnba_source\data\live_lens'
+$destinationSportRoot = Resolve-DestinationSportRoot -LocalDirName 'wnba_source' -ExplicitRootEnvVars @('SYNDICATE_WNBA_SOURCE_ROOT')
+$destDataRoot = Join-Path $destinationSportRoot 'data\processed'
+$destRawRoot = Join-Path $destinationSportRoot 'data\raw'
+$destLiveLensRoot = Join-Path $destinationSportRoot 'data\live_lens'
 
 if (-not $UseExistingMirrorArtifacts) {
     $artifactRootCandidate = $SourceArtifactRoot
@@ -239,7 +275,7 @@ $manifest = [pscustomobject]@{
     sourceArtifactRoot = $artifactRoot
     sourceRootEnvVar = $sourceRootEnvVar
     sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
-    destinationRoot = $destDataRoot
+    destinationRoot = $destinationSportRoot
     usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
     usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
     copiedArtifactCount = $copied.Count
@@ -247,7 +283,7 @@ $manifest = [pscustomobject]@{
     copiedArtifacts = @($copied)
 }
 
-$manifestRoot = Join-Path $repoRoot 'data\wnba_source\manifests'
+$manifestRoot = Join-Path $destinationSportRoot 'manifests'
 $manifestPath = Join-Path $manifestRoot ("mirror_refresh_{0}.json" -f $Date)
 $latestManifestPath = Join-Path $manifestRoot 'mirror_refresh_latest.json'
 

@@ -14,11 +14,47 @@ if ([string]::IsNullOrWhiteSpace($Date)) {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_MLB'
 $sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_MLB'
+
+function Get-EnvOverride {
+    param(
+        [string[]]$Names
+    )
+
+    foreach ($name in $Names) {
+        $value = [Environment]::GetEnvironmentVariable($name)
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+        }
+    }
+
+    return ''
+}
+
+function Resolve-DestinationSportRoot {
+    param(
+        [string]$LocalDirName,
+        [string[]]$ExplicitRootEnvVars
+    )
+
+    $explicitRoot = Get-EnvOverride -Names $ExplicitRootEnvVars
+    if (-not [string]::IsNullOrWhiteSpace($explicitRoot)) {
+        return [System.IO.Path]::GetFullPath($explicitRoot)
+    }
+
+    $dataRoot = Get-EnvOverride -Names @('SYNDICATE_DATA_ROOT')
+    if (-not [string]::IsNullOrWhiteSpace($dataRoot)) {
+        return [System.IO.Path]::GetFullPath((Join-Path $dataRoot $LocalDirName))
+    }
+
+    return Join-Path $repoRoot (Join-Path 'data' $LocalDirName)
+}
+
 $sourceRoot = $null
 $artifactRoot = $null
 $localSourceRoot = Join-Path $repoRoot 'data\mlb_source'
 $localArtifactRoot = Join-Path $localSourceRoot 'source_artifacts'
-$destDataRoot = Join-Path $repoRoot 'data\mlb_source\data'
+$destinationSportRoot = Resolve-DestinationSportRoot -LocalDirName 'mlb_source' -ExplicitRootEnvVars @('SYNDICATE_MLB_SOURCE_ROOT')
+$destDataRoot = Join-Path $destinationSportRoot 'data'
 $dateSlug = $Date -replace '-', '_'
 $season = ($Date -split '-')[0]
 $seasonPayloadSlug = $dateSlug
@@ -390,7 +426,7 @@ $manifest = [pscustomobject]@{
     sourceArtifactRoot = $artifactRoot
     sourceRootEnvVar = $sourceRootEnvVar
     sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
-    destinationRoot = $destDataRoot
+    destinationRoot = $destinationSportRoot
     usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
     usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
     missingOddsSnapshots = @($missingOddsSnapshots)
@@ -399,7 +435,7 @@ $manifest = [pscustomobject]@{
     copiedArtifacts = @($copied)
 }
 
-$manifestRoot = Join-Path $repoRoot 'data\mlb_source\manifests'
+$manifestRoot = Join-Path $destinationSportRoot 'manifests'
 $manifestPath = Join-Path $manifestRoot ("mirror_refresh_{0}.json" -f $Date)
 $latestManifestPath = Join-Path $manifestRoot 'mirror_refresh_latest.json'
 

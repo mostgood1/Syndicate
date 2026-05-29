@@ -14,13 +14,49 @@ if ([string]::IsNullOrWhiteSpace($Date)) {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $sourceRootEnvVar = 'SYNDICATE_SOURCE_ROOT_NBA'
 $sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_NBA'
+
+function Get-EnvOverride {
+    param(
+        [string[]]$Names
+    )
+
+    foreach ($name in $Names) {
+        $value = [Environment]::GetEnvironmentVariable($name)
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value
+        }
+    }
+
+    return ''
+}
+
+function Resolve-DestinationSportRoot {
+    param(
+        [string]$LocalDirName,
+        [string[]]$ExplicitRootEnvVars
+    )
+
+    $explicitRoot = Get-EnvOverride -Names $ExplicitRootEnvVars
+    if (-not [string]::IsNullOrWhiteSpace($explicitRoot)) {
+        return [System.IO.Path]::GetFullPath($explicitRoot)
+    }
+
+    $dataRoot = Get-EnvOverride -Names @('SYNDICATE_DATA_ROOT')
+    if (-not [string]::IsNullOrWhiteSpace($dataRoot)) {
+        return [System.IO.Path]::GetFullPath((Join-Path $dataRoot $LocalDirName))
+    }
+
+    return Join-Path $repoRoot (Join-Path 'data' $LocalDirName)
+}
+
 $sourceRoot = $null
 $artifactRoot = $null
-$destDataRoot = Join-Path $repoRoot 'data\nba_source\data\processed'
-$destRawRoot = Join-Path $repoRoot 'data\nba_source\data\raw'
-$destWebRoot = Join-Path $repoRoot 'data\nba_source\web'
-$destLiveLensRoot = Join-Path $repoRoot 'data\nba_source\data\live_lens'
-$destLiveSnapshotsRoot = Join-Path $repoRoot 'data\nba_source\data\processed\live_snapshots'
+$destinationSportRoot = Resolve-DestinationSportRoot -LocalDirName 'nba_source' -ExplicitRootEnvVars @('SYNDICATE_NBA_ARTIFACT_ROOT')
+$destDataRoot = Join-Path $destinationSportRoot 'data\processed'
+$destRawRoot = Join-Path $destinationSportRoot 'data\raw'
+$destWebRoot = Join-Path $destinationSportRoot 'web'
+$destLiveLensRoot = Join-Path $destinationSportRoot 'data\live_lens'
+$destLiveSnapshotsRoot = Join-Path $destinationSportRoot 'data\processed\live_snapshots'
 $targetDate = [datetime]::ParseExact($Date, 'yyyy-MM-dd', $null)
 $targetSeason = $targetDate.Year
 
@@ -273,7 +309,7 @@ $dataStaticFiles = @(
 )
 
 foreach ($name in $dataStaticFiles) {
-    $dst = Join-Path (Join-Path $repoRoot 'data\nba_source\data') $name
+    $dst = Join-Path (Join-Path $destinationSportRoot 'data') $name
     if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path ($(if ($artifactRoot) { $artifactRoot } else { $sourceRoot })) (Join-Path 'data' $name)) -DestinationPath $dst))) {
         $copied.Add((Join-Path 'data' $name)) | Out-Null
     }
@@ -382,7 +418,7 @@ $manifest = [pscustomobject]@{
     sourceArtifactRoot = $artifactRoot
     sourceRootEnvVar = $sourceRootEnvVar
     sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
-    destinationRoot = (Join-Path $repoRoot 'data\nba_source')
+    destinationRoot = $destinationSportRoot
     usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
     usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
     copiedArtifactCount = $copied.Count
@@ -390,7 +426,7 @@ $manifest = [pscustomobject]@{
     copiedArtifacts = @($copied)
 }
 
-$manifestRoot = Join-Path $repoRoot 'data\nba_source\manifests'
+$manifestRoot = Join-Path $destinationSportRoot 'manifests'
 $manifestPath = Join-Path $manifestRoot ("mirror_refresh_{0}.json" -f $Date)
 $latestManifestPath = Join-Path $manifestRoot 'mirror_refresh_latest.json'
 
