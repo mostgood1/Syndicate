@@ -1178,6 +1178,19 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((payload.get("empty_state") or {}).get("title"), "No game cards were available for this date")
         self.assertEqual((((payload.get("data") or {}).get("games") or {}).get("predictions") or {}).get("rows"), [])
 
+    def test_nhl_cards_missing_requested_date_does_not_fall_back_to_previous_slate(self) -> None:
+        with patch("syndicate.features.nhl.cards._prediction_dates_with_rows", return_value=["2026-05-27"]):
+            from syndicate.features.nhl.cards import build_cards_page_context as build_nhl_cards_page_context
+
+            context = build_nhl_cards_page_context("2026-05-28")
+
+        self.assertEqual(context.get("requested_date"), "2026-05-28")
+        self.assertEqual(context.get("date"), "2026-05-28")
+        self.assertFalse(context.get("lookahead_applied"))
+        self.assertEqual(context.get("games"), [])
+        self.assertEqual(context.get("source_title"), "NHL cards unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+
     def test_nhl_cards_use_archived_scoreboard_when_predictions_missing(self) -> None:
         scoreboard_games = [
             {

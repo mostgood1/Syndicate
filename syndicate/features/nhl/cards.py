@@ -741,12 +741,7 @@ def _resolve_cards_date(selected_date: str | None) -> tuple[str, str, bool]:
         return requested_date, requested_date, False
     if requested_date in available_dates:
         return requested_date, requested_date, False
-
-    requested_value = parse_iso_date(requested_date)
-    future_dates = [date_str for date_str in available_dates if parse_iso_date(date_str) >= requested_value]
-    if future_dates:
-        return requested_date, future_dates[0], True
-    return requested_date, available_dates[-1], True
+    return requested_date, requested_date, False
 
 
 def build_source_bundle_payload(selected_date: str | None) -> dict[str, Any]:
