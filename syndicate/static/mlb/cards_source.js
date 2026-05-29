@@ -704,6 +704,28 @@
   }
 
   function buildGameLensRows(card, detail) {
+    function hasUsableLensMarkets(row) {
+      const markets = row?.markets || {};
+      const moneyline = markets.moneyline || {};
+      const spread = markets.spread || {};
+      const total = markets.total || {};
+      return Boolean(
+        moneyline.pick || moneyline.homeOdds != null || moneyline.awayOdds != null
+        || spread.pick || spread.homeLine != null || spread.homeOdds != null || spread.awayOdds != null
+        || total.pick || total.line != null || total.overOdds != null || total.underOdds != null
+      );
+    }
+
+    function hasUsableLensScores(row) {
+      const actual = row?.actualSegment || {};
+      return toNumber(actual?.away) != null && toNumber(actual?.home) != null;
+    }
+
+    function canUseDetailLensRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) return false;
+      return rows.some((row) => hasUsableLensMarkets(row) || hasUsableLensScores(row));
+    }
+
     function rowFingerprint(row) {
       if (!row || typeof row !== 'object') return '';
       return JSON.stringify({
@@ -750,7 +772,7 @@
       if (rowFingerprint(liveRow) !== rowFingerprint(fullRow)) return rows;
       return rows.filter((row) => row?.key !== 'full');
     }
-    if (Array.isArray(detail?.sim?.gameLens) && detail.sim.gameLens.length) {
+    if (canUseDetailLensRows(detail?.sim?.gameLens)) {
       return dedupeGameLensRows(detail.sim.gameLens);
     }
     const snapshot = detail?.snapshot || null;

@@ -218,6 +218,11 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertIn(824834, payloads)
         fetch_mock.assert_called_once_with(824834)
 
+    def test_mlb_format_start_time_local_uses_central_timezone(self) -> None:
+        from syndicate.features.mlb.cards import _format_start_time_local
+
+        self.assertEqual(_format_start_time_local("2026-05-29T03:35:00Z"), "10:35 PM")
+
     def test_mlb_source_probable_keeps_pregame_badges_out_of_mini_lane(self) -> None:
         from syndicate.features.mlb.cards import _source_probable
 

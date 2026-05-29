@@ -32,6 +32,7 @@ from syndicate.features.mlb.sources import market_refresh_history_oddsapi_path
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.mlb.sources import load_json_or_gz_file
 from syndicate.features.mlb.sources import load_json_file
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -82,7 +83,7 @@ _MLB_TEAM_ABBR_ALIASES: dict[str, str] = {
 }
 
 
-_MLB_USER_TIMEZONE = datetime.now().astimezone().tzinfo
+_MLB_USER_TIMEZONE = CENTRAL_TIMEZONE
 
 
 def _source_live_prop_ranking_roots() -> list[Path]:
