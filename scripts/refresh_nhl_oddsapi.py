@@ -260,6 +260,15 @@ def _missing_required_artifacts(*, artifact_root: Path, date_str: str) -> list[s
     return missing
 
 
+def _required_artifacts_by_date(*, artifact_root: Path, date_values: list[str]) -> dict[str, list[str]]:
+    missing_by_date: dict[str, list[str]] = {}
+    for date_value in date_values:
+        missing = _missing_required_artifacts(artifact_root=artifact_root, date_str=date_value)
+        if missing:
+            missing_by_date[str(date_value)] = list(missing)
+    return missing_by_date
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh NHL OddsAPI snapshots through a Syndicate-owned runner.")
     parser.add_argument("--date", required=True)
@@ -274,10 +283,12 @@ def main() -> int:
     default_source_root = _default_source_root()
     source_root = Path(args.source_root).resolve() if args.source_root else default_source_root
     artifact_root = Path(args.artifact_root).resolve()
+    target_dates = _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))
+    warnings: list[str] = []
 
     try:
         copied_by_date: dict[str, dict[str, object]] = {}
-        for target_date in _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0)):
+        for target_date in target_dates:
             copied_by_date[target_date] = _collect_owned_nhl_artifacts(
                 artifact_root=artifact_root,
                 date_str=target_date,
@@ -285,13 +296,19 @@ def main() -> int:
                 props_source=str(args.props_source or "oddsapi"),
             )
         if source_root is not None:
-            _run_source_generation_multi(
-                source_root=source_root,
-                artifact_root=artifact_root,
-                date_str=args.date,
-                props_boxscore_n_sims=int(args.props_boxscore_n_sims),
-                days_ahead=int(args.days_ahead or 0),
-            )
+            try:
+                _run_source_generation_multi(
+                    source_root=source_root,
+                    artifact_root=artifact_root,
+                    date_str=args.date,
+                    props_boxscore_n_sims=int(args.props_boxscore_n_sims),
+                    days_ahead=int(args.days_ahead or 0),
+                )
+            except Exception as exc:
+                missing_by_date = _required_artifacts_by_date(artifact_root=artifact_root, date_values=target_dates)
+                if missing_by_date:
+                    raise
+                warnings.append(f"source generation skipped: {exc}")
     except Exception as exc:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
@@ -329,6 +346,7 @@ def main() -> int:
                 "artifact_bundle_files": copied,
                 "lookahead_runs": lookahead_runs,
                 "required_artifacts": [template.format(date=args.date) for template in REQUIRED_ARTIFACTS],
+                "warnings": warnings,
             },
             indent=2,
         )
