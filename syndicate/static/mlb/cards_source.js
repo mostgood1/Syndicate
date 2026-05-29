@@ -889,6 +889,7 @@
         key: segment.key,
         label: segment.label,
         closed: !!projection.closed,
+        actualSegment: projection.closed ? null : { away: actualAway, home: actualHome },
         projection,
         baselineHomeWinProb: baselineProb,
         modelHomeWinProb: modelHomeProb,

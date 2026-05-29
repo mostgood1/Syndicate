@@ -117,6 +117,57 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertTrue(payload["hasSampleData"])
         self.assertTrue(payload["hasArtifactData"])
 
+    def test_mlb_cards_api_payload_hydrates_tracked_game_lines_from_snapshot(self) -> None:
+        context = {
+            "date": "2026-05-28",
+            "prev_date": "2026-05-27",
+            "next_date": "2026-05-29",
+            "games": [
+                {
+                    "gamePk": 824834,
+                    "away": {"abbr": "TOR", "name": "Toronto Blue Jays"},
+                    "home": {"abbr": "BAL", "name": "Baltimore Orioles"},
+                    "markets": {},
+                }
+            ],
+            "scoreboard_items": [],
+            "source_path": "artifact.json",
+            "using_sample_data": False,
+            "board_contract": {},
+        }
+
+        game_lines_payload = {
+            "games": [
+                {
+                    "away_team": "Toronto Blue Jays",
+                    "home_team": "Baltimore Orioles",
+                    "markets": {
+                        "h2h": {"home_odds": "-115", "away_odds": "-105"},
+                        "totals": {"line": 9.5, "over_odds": "-110", "under_odds": "-110"},
+                        "segments": {
+                            "full": {"totals": {"line": 9.5, "over_odds": "-110", "under_odds": "-110"}},
+                            "first5": {"totals": {"line": 5.5, "over_odds": "+100", "under_odds": "-120"}},
+                        },
+                    },
+                }
+            ]
+        }
+
+        with patch("syndicate.features.mlb.cards.load_json_file", side_effect=lambda path: game_lines_payload if "oddsapi_game_lines_2026_05_28.json" in str(path) else None):
+            payload = source_cards_api_payload(context)
+
+        tracked = ((payload.get("games") or [{}])[0].get("trackedGameLines") or {})
+        self.assertEqual(((tracked.get("totals") or {}).get("line")), 9.5)
+        self.assertEqual((((tracked.get("segments") or {}).get("first5") or {}).get("totals") or {}).get("line"), 5.5)
+
+    def test_mlb_cards_source_js_computed_lens_rows_preserve_live_actual_segment(self) -> None:
+        content = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")
+
+        self.assertRegex(
+            content,
+            r"actualSegment:\s*projection\.closed\s*\?\s*null\s*:\s*\{\s*away:\s*actualAway,\s*home:\s*actualHome\s*\}",
+        )
+
     def test_mlb_source_card_detail_preserves_source_snapshot_status_and_ids(self) -> None:
         actual_payload = {
             "gameData": {
@@ -2296,6 +2347,32 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn('/wnba/styles.css?v=', body)
         self.assertIn('/wnba/cards-parity.css?v=', body)
         self.assertIn('/wnba/cards-parity.js?v=', body)
+
+    def test_wnba_cards_parity_script_uses_namespaced_api_routes(self) -> None:
+        script = self.client.get("/wnba/cards-parity.js").get_data(as_text=True)
+
+        self.assertIn("const API_BASE_PATH = '/wnba/api';", script)
+        self.assertIn("const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`", script)
+        self.assertNotIn("fetch(`/api/cards", script)
+
+    def test_wnba_source_sim_stub_derives_team_score_from_players(self) -> None:
+        from syndicate.features.wnba.cards import _source_sim_stub
+
+        sim_game = {
+            "sim": {
+                "players": {
+                    "away": [{"pts_mean": 21.5}, {"pts_mean": 12.0}],
+                    "home": [{"pts_mean": 18.0}, {"pts_mean": 15.5}],
+                }
+            }
+        }
+
+        stub = _source_sim_stub("game-1", sim_game, {"total": "175.5", "home_spread": "2.5"})
+
+        self.assertEqual((stub.get("score") or {}).get("away_mean"), 33.5)
+        self.assertEqual((stub.get("score") or {}).get("home_mean"), 33.5)
+        self.assertEqual((stub.get("score") or {}).get("total_mean"), 67.0)
+        self.assertEqual((stub.get("score") or {}).get("margin_mean"), 0.0)
 
     def test_wnba_cards_source_alias_preserves_explicit_source_shell(self) -> None:
         response = self.client.get("/wnba/cards/source?date=2026-05-21", follow_redirects=True)

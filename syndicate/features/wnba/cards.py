@@ -258,8 +258,37 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def _source_sim_score(sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, float | None]:
+    sim = sim_game.get("sim") if isinstance((sim_game or {}).get("sim"), dict) else {}
+    players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+
+    def _team_total(side: str) -> float | None:
+        rows = players.get(side) if isinstance(players.get(side), list) else []
+        points = [_safe_float(item.get("pts_mean")) for item in rows if isinstance(item, dict)]
+        valid = [value for value in points if value is not None]
+        if not valid:
+            return None
+        return round(sum(valid), 3)
+
+    away_mean = _team_total("away")
+    home_mean = _team_total("home")
+    total_mean = _safe_float(row.get("total"))
+    if away_mean is not None and home_mean is not None:
+        total_mean = round(away_mean + home_mean, 3)
+    margin_mean = None
+    if away_mean is not None and home_mean is not None:
+        margin_mean = round(home_mean - away_mean, 3)
+    return {
+        "away_mean": away_mean,
+        "home_mean": home_mean,
+        "total_mean": total_mean,
+        "margin_mean": margin_mean,
+    }
+
+
 def _source_sim_stub(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
     players_summary = dict((sim_game or {}).get("players_summary") or {}) if isinstance(sim_game, dict) else {}
+    score = _source_sim_score(sim_game, row)
     return {
         "game_id": game_id,
         "players_loaded": False,
@@ -274,12 +303,7 @@ def _source_sim_stub(game_id: str, sim_game: dict[str, Any] | None, row: dict[st
         "players": {"away": [], "home": []},
         "missing_prop_players": {"away": [], "home": []},
         "injuries": {"away": [], "home": []},
-        "score": {
-            "away_mean": None,
-            "home_mean": None,
-            "total_mean": _safe_float(row.get("total")),
-            "margin_mean": None,
-        },
+        "score": score,
         "market": {
             "market_home_spread": _safe_float(row.get("home_spread")),
             "market_total": _safe_float(row.get("total")),

@@ -1549,6 +1549,64 @@ def _betting_payload_by_game(selected_date: str) -> dict[int, dict[str, Any]]:
     return out
 
 
+def _normalize_mlb_team_name(value: Any) -> str:
+    text = re.sub(r"[^a-z0-9]+", " ", str(value or "").strip().lower())
+    return " ".join(text.split())
+
+
+def _game_line_market_score(markets: dict[str, Any] | None) -> int:
+    if not isinstance(markets, dict):
+        return 0
+    score = 0
+    for key in ("h2h", "spreads", "totals"):
+        if isinstance(markets.get(key), dict) and markets.get(key):
+            score += 1
+    segments = markets.get("segments") if isinstance(markets.get("segments"), dict) else {}
+    for segment in ("full", "first1", "first3", "first5", "first7"):
+        segment_markets = segments.get(segment) if isinstance(segments.get(segment), dict) else {}
+        for key in ("h2h", "spreads", "totals"):
+            if isinstance(segment_markets.get(key), dict) and segment_markets.get(key):
+                score += 1
+    return score
+
+
+def _tracked_game_lines_index(game_lines_doc: dict[str, Any] | None) -> dict[tuple[str, str], dict[str, Any]]:
+    rows = game_lines_doc.get("games") if isinstance((game_lines_doc or {}).get("games"), list) else []
+    indexed: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        away_name = _normalize_mlb_team_name(row.get("away_team"))
+        home_name = _normalize_mlb_team_name(row.get("home_team"))
+        markets = row.get("markets") if isinstance(row.get("markets"), dict) else {}
+        if not away_name or not home_name or not markets:
+            continue
+        key = (away_name, home_name)
+        current_score = _game_line_market_score(markets)
+        existing_score = _game_line_market_score(indexed.get(key))
+        if current_score >= existing_score:
+            indexed[key] = dict(markets)
+    return indexed
+
+
+def _tracked_game_lines_for_source_card(game: dict[str, Any], game_lines_index: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any]:
+    away_abbr = str(((game.get("away") or {}).get("abbr") or "")).strip().upper()
+    home_abbr = str(((game.get("home") or {}).get("abbr") or "")).strip().upper()
+    away_name = _normalize_mlb_team_name(
+        ((_MLB_TEAM_META_BY_ABBR.get(away_abbr) or {}).get("name"))
+        or ((game.get("away") or {}).get("name"))
+        or away_abbr
+    )
+    home_name = _normalize_mlb_team_name(
+        ((_MLB_TEAM_META_BY_ABBR.get(home_abbr) or {}).get("name"))
+        or ((game.get("home") or {}).get("name"))
+        or home_abbr
+    )
+    if not away_name or not home_name:
+        return {}
+    return dict(game_lines_index.get((away_name, home_name)) or {})
+
+
 def _daily_sim_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
     for game_pk in game_pks:
@@ -1599,6 +1657,15 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     pitcher_props_doc = load_json_file(pitcher_props_path) if pitcher_props_path else None
     hitter_props_doc = load_json_file(hitter_props_path) if hitter_props_path else None
     ops_report_doc = load_json_file(ops_report_path) if ops_report_path else None
+    game_lines_index = _tracked_game_lines_index(game_lines_doc)
+    games = [
+        {
+            **game,
+            "trackedGameLines": _tracked_game_lines_for_source_card(game, game_lines_index),
+        }
+        for game in games
+        if isinstance(game, dict)
+    ]
     top_rows = []
     for row in hr_rows:
         if not isinstance(row, dict):

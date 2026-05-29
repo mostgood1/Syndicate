@@ -34,6 +34,8 @@
   const propsStripEl = document.getElementById('cardsPropsStrip');
   const note = document.getElementById('note');
   const pollIntervalMs = 15000;
+  const API_BASE_PATH = '/wnba/api';
+  const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
 
   const state = {
     activeTabs: new Map(),
@@ -551,7 +553,7 @@
         away,
         home,
       });
-      const response = await fetch(`/api/cards/sim-detail?${params.toString()}`, { cache: 'no-store' });
+      const response = await fetch(`${SOURCE_CARDS_API_BASE_PATH}/sim-detail?${params.toString()}`, { cache: 'no-store' });
       const payload = await readApiJson(response, 'Failed to load game sim details.');
       const detailGame = safeArray(payload?.games)[0] || null;
       if (detailGame) {
@@ -1632,7 +1634,7 @@
     const nextLiveStates = new Map();
     try {
       const liveStatePayload = await fetchApiJson(
-        `/api/live_state?date=${encodeURIComponent(dateValue)}`,
+        `${API_BASE_PATH}/live_state?date=${encodeURIComponent(dateValue)}`,
         'Failed to load live state.',
         { retries: silent ? 2 : 1 }
       );
@@ -1668,18 +1670,18 @@
       if (eventIds.length) {
         const [linesPayload, pbpPayload, tuningPayload, boxscorePayload] = await Promise.all([
           fetchApiJson(
-            `/api/live_lines?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}&include_period_totals=1`,
+            `${API_BASE_PATH}/live_lines?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}&include_period_totals=1`,
             'Failed to load live lines.',
             { retries: silent ? 2 : 1 }
           ),
           fetchApiJson(
-            `/api/live_pbp_stats?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
+            `${API_BASE_PATH}/live_pbp_stats?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live PBP stats.',
             { retries: silent ? 2 : 1 }
           ),
-          fetchApiJson('/api/live_lens_tuning?ttl=300', 'Failed to load live lens tuning.', { retries: 1 }),
+          fetchApiJson(`${API_BASE_PATH}/live_lens_tuning?ttl=300`, 'Failed to load live lens tuning.', { retries: 1 }),
           fetchApiJson(
-            `/api/live_player_boxscore?event_ids=${encodeURIComponent(eventIds.join(','))}`,
+            `${API_BASE_PATH}/live_player_boxscore?event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live player boxscore.',
             { retries: silent ? 2 : 1 }
           ),
@@ -3037,7 +3039,7 @@
     }
     try {
       const payload = await fetchApiJson(
-        `/api/cards/props-strip?date=${encodeURIComponent(dateValue)}&per_game_limit=8&limit=24`,
+        `${SOURCE_CARDS_API_BASE_PATH}/props-strip?date=${encodeURIComponent(dateValue)}&per_game_limit=8&limit=24`,
         'Failed to load prop strip.',
         { retries: silent ? 2 : 1 }
       );
@@ -5441,7 +5443,7 @@
     }
     try {
       const payload = await fetchApiJson(
-        `/api/cards?date=${encodeURIComponent(state.date)}`,
+        `${SOURCE_CARDS_API_BASE_PATH}?date=${encodeURIComponent(state.date)}`,
         'Failed to load game cards.',
         { retries: silent ? 2 : 1 }
       );
