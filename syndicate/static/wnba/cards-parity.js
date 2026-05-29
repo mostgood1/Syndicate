@@ -3036,20 +3036,73 @@
   async function loadPropsStrip(dateValue, options = {}) {
     const silent = Boolean(options?.silent);
     const epoch = Number(options?.epoch) || 0;
+    const games = safeArray(options?.games || state.payload?.games);
     const previousPropsStripPayload = state.propsStripPayload;
     if (propsStripEl && (!silent || !state.propsStripPayload)) {
       setPropsStripLoading();
     }
     try {
-      const payload = await fetchApiJson(
-        `${SOURCE_CARDS_API_BASE_PATH}/props-strip?date=${encodeURIComponent(dateValue)}&per_game_limit=8&limit=24`,
-        'Failed to load prop strip.',
-        { retries: silent ? 2 : 1 }
-      );
-      if (epoch !== state.refreshEpoch || (state.payload?.date || state.date) !== dateValue) {
-        return;
+      let liveStatePayload = null;
+      let eventIds = [];
+      try {
+        liveStatePayload = await fetchApiJson(
+          `${API_BASE_PATH}/live_state?date=${encodeURIComponent(dateValue)}`,
+          'Failed to load live state for player props.',
+          { retries: silent ? 2 : 1 }
+        );
+        const mergedLiveStates = new Map(state.liveStates);
+        safeArray(liveStatePayload?.games).forEach((item) => {
+          const key = matchupKey(item?.away, item?.home);
+          if (key) {
+            mergedLiveStates.set(key, item);
+          }
+        });
+        if (epoch !== state.refreshEpoch || (state.payload?.date || state.date) !== dateValue) {
+          return;
+        }
+        state.liveStates = mergedLiveStates;
+        eventIds = safeArray(liveStatePayload?.games)
+          .filter((game) => Boolean(game?.in_progress) && !Boolean(game?.final) && Boolean(game?.event_id))
+          .map((game) => String(game?.event_id || '').trim())
+          .filter(Boolean);
+      } catch (_error) {
+        liveStatePayload = null;
+        eventIds = [];
       }
-      state.propsStripPayload = payload;
+
+      if (eventIds.length) {
+        const payload = await fetchApiJson(
+          `${API_BASE_PATH}/live_player_lens?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
+          'Failed to load live player props.',
+          { retries: silent ? 2 : 1 }
+        );
+        let transformed = transformLiveStripPayload(payload, dateValue);
+
+        if ((!safeArray(transformed?.items).length) && games.length && liveStatePayload) {
+          const boxscorePayload = await fetchApiJson(
+            `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
+            'Failed to load live player boxscore.',
+            { retries: silent ? 2 : 1 }
+          );
+          transformed = buildLiveBoxscoreSimFallback(boxscorePayload, games, liveStatePayload, dateValue);
+        }
+
+        if (epoch !== state.refreshEpoch || (state.payload?.date || state.date) !== dateValue) {
+          return;
+        }
+        state.propsStripPayload = transformed;
+        state.propsStripVisibleCount = Number(state.propsStripDefaultCount) || 18;
+      } else {
+        const payload = await fetchApiJson(
+          `${SOURCE_CARDS_API_BASE_PATH}/props-strip?date=${encodeURIComponent(dateValue)}&per_game_limit=8&limit=24`,
+          'Failed to load prop strip.',
+          { retries: silent ? 2 : 1 }
+        );
+        if (epoch !== state.refreshEpoch || (state.payload?.date || state.date) !== dateValue) {
+          return;
+        }
+        state.propsStripPayload = payload;
+      }
       renderPropsStrip();
       if (state.payload && (state.payload.date || state.date) === dateValue) {
         renderBoard();

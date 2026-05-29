@@ -541,6 +541,7 @@ def _game_from_row(
     game_id = str(row.get("game_id") or idx)
     return {
         "gamePk": game_id,
+        "event_id": row.get("event_id"),
         "away_logo": _source_logo_url(away_tri),
         "home_logo": _source_logo_url(home_tri),
         "away": {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)},
@@ -637,6 +638,75 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
     return games, str(bundle["paths"]["cards"]), str(bundle["paths"]["recommendations"])
 
 
+def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
+    payload = _local_live_state_payload(selected_date)
+    source_path = None
+    if isinstance(payload, dict):
+        try:
+            source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
+        except FileNotFoundError:
+            source_path = None
+    rows = payload.get("games") if isinstance((payload or {}).get("games"), list) else []
+    games: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        away_tri = str(row.get("away") or "").strip().upper()
+        home_tri = str(row.get("home") or "").strip().upper()
+        if not away_tri or not home_tri:
+            continue
+        away_pts = _safe_float(row.get("away_pts"))
+        home_pts = _safe_float(row.get("home_pts"))
+        total_mean = (away_pts + home_pts) if away_pts is not None and home_pts is not None else None
+        margin_mean = (home_pts - away_pts) if away_pts is not None and home_pts is not None else None
+        status_text = str(row.get("status") or "").strip()
+        in_progress = bool(row.get("in_progress"))
+        final = bool(row.get("final"))
+        game_id = str(row.get("game_id") or f"{away_tri}@{home_tri}")
+        games.append(
+            {
+                "gamePk": game_id,
+                "event_id": row.get("event_id"),
+                "game_id": game_id,
+                "away_tri": away_tri,
+                "away_name": away_tri,
+                "home_tri": home_tri,
+                "home_name": home_tri,
+                "away_logo": _source_logo_url(away_tri),
+                "home_logo": _source_logo_url(home_tri),
+                "away": {"abbr": away_tri, "name": away_tri, "logo": _source_logo_url(away_tri)},
+                "home": {"abbr": home_tri, "name": home_tri, "logo": _source_logo_url(home_tri)},
+                "status": "Final" if final else ("Live" if in_progress else "Scheduled"),
+                "detail": status_text or ("Final" if final else ("Live" if in_progress else "Scheduled")),
+                "summary": "Live scoreboard fallback",
+                "betting": {},
+                "prop_recommendations": {"away": [], "home": []},
+                "live_state": dict(row),
+                "sim": {
+                    "game_id": game_id,
+                    "score": {
+                        "away_mean": away_pts,
+                        "home_mean": home_pts,
+                        "total_mean": total_mean,
+                        "margin_mean": margin_mean,
+                    },
+                    "players_summary": {
+                        "away": 0,
+                        "home": 0,
+                        "missing_away": 0,
+                        "missing_home": 0,
+                        "injured_away": 0,
+                        "injured_home": 0,
+                    },
+                    "players": {"away": [], "home": []},
+                    "missing_prop_players": {"away": [], "home": []},
+                    "injuries": {"away": [], "home": []},
+                },
+            }
+        )
+    return games, str(source_path or f"live_state_{selected_date}.jsonl")
+
+
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
@@ -645,11 +715,27 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     next_date = (parsed_date + timedelta(days=1)).isoformat()
 
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+    source_title = "WNBA processed game cards"
+    if not games:
+        live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
+        if live_games:
+            games = live_games
+            cards_path = live_source_path
+            recs_path = live_source_path
+            source_title = "WNBA live scoreboard fallback"
     if not games and allow_stored_date_fallback:
         fallback_date = _nearest_available_cards_date(resolved_date)
         if fallback_date and fallback_date != resolved_date:
             resolved_date = fallback_date
             games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+            source_title = "WNBA processed game cards"
+            if not games:
+                live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
+                if live_games:
+                    games = live_games
+                    cards_path = live_source_path
+                    recs_path = live_source_path
+                    source_title = "WNBA live scoreboard fallback"
 
     parsed_date = parse_iso_date(resolved_date)
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
@@ -676,7 +762,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             "scoreboard_items": scoreboard_items,
             "using_sample_data": using_sample_data,
             "source_path": cards_path,
-            "source_title": "WNBA processed game cards" if games else "WNBA cards unavailable",
+            "source_title": source_title if games else "WNBA cards unavailable",
             "empty_state": {
                 "eyebrow": "WNBA cards",
                 "title": "No game cards were available for this date",

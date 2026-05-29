@@ -1971,6 +1971,131 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(context.get("source_title"), "WNBA live lens unavailable")
         self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "WNBA live lens")
 
+    def test_nba_live_state_fallback_preserves_event_id_from_cards_context(self) -> None:
+        from syndicate.features.nba.cards import build_live_state_payload as build_nba_live_state_payload
+
+        with patch("syndicate.features.nba.cards._local_live_state_payload", return_value=None), patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "gamePk": "game-1",
+                        "event_id": "evt-123",
+                        "away_tri": "NYK",
+                        "home_tri": "BOS",
+                        "status": "Live",
+                        "detail": "Q3 08:12",
+                    }
+                ]
+            },
+        ):
+            payload = build_nba_live_state_payload("2026-05-28")
+
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "evt-123")
+
+    def test_wnba_live_state_fallback_preserves_event_id_from_cards_context(self) -> None:
+        from syndicate.features.wnba.cards import build_live_state_payload as build_wnba_live_state_payload
+
+        with patch("syndicate.features.wnba.cards._local_live_state_payload", return_value=None), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "gamePk": "game-1",
+                        "event_id": "evt-456",
+                        "away_tri": "LAS",
+                        "home_tri": "NYL",
+                        "status": "Live",
+                        "detail": "Q4 04:21",
+                    }
+                ]
+            },
+        ):
+            payload = build_wnba_live_state_payload("2026-05-28")
+
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "evt-456")
+
+    def test_nba_live_lens_api_payload_uses_cards_contract(self) -> None:
+        from syndicate.features.nba.live_lens import build_live_lens_api_payload as build_nba_live_lens_api_payload
+
+        with patch(
+            "syndicate.features.nba.live_lens.build_cards_api_payload",
+            return_value={"date": "2026-05-28", "games": [{"gamePk": "game-1"}]},
+        ):
+            payload = build_nba_live_lens_api_payload("2026-05-28")
+
+        self.assertEqual(payload.get("date"), "2026-05-28")
+        self.assertEqual((payload.get("games") or [{}])[0].get("gamePk"), "game-1")
+
+    def test_wnba_live_lens_api_payload_uses_cards_contract(self) -> None:
+        from syndicate.features.wnba.live_lens import build_live_lens_api_payload as build_wnba_live_lens_api_payload
+
+        with patch(
+            "syndicate.features.wnba.live_lens.build_cards_page_context",
+            return_value={
+                "date": "2026-05-28",
+                "requested_date": "2026-05-28",
+                "lookahead_applied": False,
+                "games": [{"gamePk": "game-2"}],
+            },
+        ):
+            payload = build_wnba_live_lens_api_payload("2026-05-28")
+
+        self.assertEqual(payload.get("date"), "2026-05-28")
+        self.assertEqual((payload.get("games") or [{}])[0].get("gamePk"), "game-2")
+
+    def test_wnba_cards_page_uses_live_state_fallback_when_artifacts_empty(self) -> None:
+        from syndicate.features.wnba.cards import build_cards_page_context as build_wnba_cards_page_context
+
+        live_payload = {
+            "games": [
+                {
+                    "game_id": "game-9",
+                    "event_id": "evt-9",
+                    "away": "LAS",
+                    "home": "NYL",
+                    "status": "Q3 02:11",
+                    "in_progress": True,
+                    "final": False,
+                    "away_pts": 61,
+                    "home_pts": 58,
+                }
+            ]
+        }
+
+        with patch("syndicate.features.wnba.cards._games_from_artifacts", return_value=([], "cards.csv", "recs.json")), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=live_payload,
+        ):
+            context = build_wnba_cards_page_context("2026-05-28", allow_stored_date_fallback=False)
+
+        self.assertEqual(context.get("date"), "2026-05-28")
+        self.assertEqual(context.get("source_title"), "WNBA live scoreboard fallback")
+        self.assertEqual((context.get("games") or [{}])[0].get("event_id"), "evt-9")
+
+    def test_home_wnba_uses_today_when_live_state_exists(self) -> None:
+        from syndicate.blueprints.home import _build_sport_overview
+
+        sport = {"slug": "wnba", "name": "WNBA", "primary_href": "/wnba", "primary_label": "Open WNBA cards"}
+
+        with patch("syndicate.blueprints.home.wnba_available_dates", return_value=["2026-05-27"]), patch(
+            "syndicate.blueprints.home._wnba_has_live_games",
+            return_value=True,
+        ), patch(
+            "syndicate.blueprints.home.build_wnba_module_links",
+            return_value=[{"label": "Live Lens", "href": "/wnba/live-lens?date=2026-05-28", "active": False}],
+        ), patch(
+            "syndicate.blueprints.home._load_home_game_items",
+            return_value=([], 0),
+        ), patch(
+            "syndicate.blueprints.home._load_home_prop_items",
+            return_value=[],
+        ):
+            overview = _build_sport_overview(sport, "2026-05-28", force_refresh=True)
+
+        self.assertEqual(overview.get("context_label"), "2026-05-28")
+        self.assertTrue(bool(overview.get("active_today")))
+
     def test_wnba_archive_without_dates_uses_empty_state_not_sample_card(self) -> None:
         with patch("syndicate.features.wnba.archive.available_dates", return_value=[]):
             from syndicate.features.wnba.archive import build_archive_page_context as build_wnba_archive_page_context

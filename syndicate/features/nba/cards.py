@@ -514,6 +514,7 @@ def _game_from_row(
     }
     return {
         "gamePk": game_id,
+        "event_id": row.get("event_id"),
         "away_tri": away_tri,
         "away_name": away_name,
         "home_tri": home_tri,
@@ -857,7 +858,7 @@ def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any
         out_games.append(
             {
                 "game_id": game.get("gamePk"),
-                "event_id": None,
+                "event_id": game.get("event_id"),
                 "home": game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else None),
                 "away": game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else None),
                 "home_pts": None,

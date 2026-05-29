@@ -221,6 +221,47 @@ def _nba_has_live_games(selected_date: str) -> bool:
     return len(_nba_live_state_games(selected_date)) > 0
 
 
+def _wnba_live_state_games(selected_date: str) -> list[dict[str, Any]]:
+    try:
+        from syndicate.features.wnba.cards import build_live_state_payload
+
+        payload = build_live_state_payload(selected_date, ttl=12, allow_stored_date_fallback=False)
+    except Exception:
+        return []
+    rows = payload.get("games") if isinstance(payload, dict) else []
+    if not isinstance(rows, list):
+        return []
+    games: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        away_label = _safe_text(row.get("away"), "Away")
+        home_label = _safe_text(row.get("home"), "Home")
+        games.append(
+            {
+                "gamePk": str(row.get("game_id") or "").strip() or f"{away_label}@{home_label}",
+                "event_id": row.get("event_id"),
+                "away": {"abbr": away_label, "name": away_label, "score": row.get("away_pts")},
+                "home": {"abbr": home_label, "name": home_label, "score": row.get("home_pts")},
+                "status": {
+                    "abstract": str(row.get("status") or "").strip() or "Scheduled",
+                    "detailed": str(row.get("status") or "").strip() or "Scheduled",
+                    "in_progress": bool(row.get("in_progress")),
+                    "final": bool(row.get("final")),
+                },
+                "live_state": dict(row),
+                "detail": str(row.get("status") or "").strip() or selected_date,
+                "summary": "WNBA live-state fallback",
+                "href": f"/wnba/cards?date={selected_date}",
+            }
+        )
+    return games
+
+
+def _wnba_has_live_games(selected_date: str) -> bool:
+    return len(_wnba_live_state_games(selected_date)) > 0
+
+
 def _mlb_schedule_fallback_games(selected_date: str) -> list[dict[str, Any]]:
     try:
         with urlopen(f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={selected_date}", timeout=8) as response:
@@ -1840,8 +1881,11 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
 
             payload = build_cards_page_context(context_label)
             if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
-                return []
-            return list(payload.get("games") or [])
+                return _wnba_live_state_games(context_label) if is_active_today else []
+            games = list(payload.get("games") or [])
+            if is_active_today and not games:
+                games = _wnba_live_state_games(context_label)
+            return games
         if slug == "ncaab":
             from syndicate.features.ncaab.cards import build_cards_page_context
 
@@ -2052,6 +2096,8 @@ def _build_sport_overview(
     elif slug == "wnba":
         dates = wnba_available_dates()
         selected_date = _prefer_today_or_latest(dates, today_value, preserve_requested=preserve_requested_date)
+        if selected_date != today_value and _wnba_has_live_games(today_value):
+            selected_date = today_value
         links = build_wnba_module_links(selected_date, "Cards")
         context_label = selected_date
         primary_href = f"/wnba?date={selected_date}"

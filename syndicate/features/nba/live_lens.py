@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.nba.cards import build_cards_api_payload
 from syndicate.features.nba.cards import build_cards_page_context
 from syndicate.features.nba.sources import build_module_links
 from syndicate.features.nba.sources import parse_iso_date
@@ -155,5 +156,4 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
 
 
 def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
-    context = build_live_lens_page_context(selected_date)
-    return build_rank_api_payload(context)
+    return build_cards_api_payload(selected_date)
