@@ -849,11 +849,19 @@ if (-not $SkipNCAAF) {
     if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
         $ncaafEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
     }
+    $ncaafSourceRoot = [Environment]::GetEnvironmentVariable('SYNDICATE_SOURCE_ROOT_NCAAF')
+    if ([string]::IsNullOrWhiteSpace($ncaafSourceRoot)) {
+        $ncaafSourceRoot = Resolve-WorkspaceRepoPath 'NCAAFCompare'
+    }
+    if ([string]::IsNullOrWhiteSpace($ncaafSourceRoot) -or (-not (Test-Path $ncaafSourceRoot))) {
+        throw 'NCAAF local odds refresh requires a usable source root. Set SYNDICATE_SOURCE_ROOT_NCAAF or open the NCAAFCompare workspace repo.'
+    }
     $sourceSteps += [pscustomobject]@{
         Name = 'NCAAF local odds refresh'
         Command = @(
             (Resolve-Python $repoRoot),
             'scripts\refresh_ncaaf_oddsapi.py',
+            '--source-root', $ncaafSourceRoot,
             '--artifact-root', 'data\ncaaf_source\source_artifacts'
         )
         WorkingDirectory = $repoRoot
