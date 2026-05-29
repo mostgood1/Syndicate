@@ -285,7 +285,17 @@
             <a class="cards-nav-pill" href="{{ sport.hub_href }}">Open {{ sport.name }} hub</a>
           </div>
 
-          {% if sport.game_bar["items"] %}
+          {% if sport.home_live_embed %}
+            <div class="sport-embed-shell" data-home-preserve-key="{{ sport.home_live_embed.key }}" data-home-preserve-src="{{ sport.home_live_embed.src }}">
+              <iframe
+                class="sport-embed-frame"
+                src="{{ sport.home_live_embed.src }}"
+                title="{{ sport.home_live_embed.title }}"
+                loading="lazy"
+                referrerpolicy="same-origin"
+              ></iframe>
+            </div>
+          {% elif sport.game_bar["items"] %}
             <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} compact game cards">
               {% for item in sport.game_bar["items"] %}
                 <article class="sport-compact-card">

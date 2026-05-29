@@ -1618,7 +1618,7 @@ class HomeBoardTests(unittest.TestCase):
         self.assertNotIn('id="cardsGrid"', body)
         self.assertNotIn('id="cardsHrTargets"', body)
 
-    def test_home_page_preserves_only_mlb_embed_shell(self) -> None:
+    def test_home_page_preserves_live_embed_shells_for_active_solo_clients(self) -> None:
         response = self.client.get('/')
         body = response.get_data(as_text=True)
 
@@ -1626,6 +1626,12 @@ class HomeBoardTests(unittest.TestCase):
         self.assertNotIn('data-home-preserve-key="home-cards-section"', body)
         if 'data-home-preserve-key="home-cards"' in body:
             self.assertRegex(body, r'data-home-preserve-src="/mlb/cards\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}&amp;client=source&amp;embed=home-cards"')
+        if 'data-home-preserve-key="home-live-nba"' in body:
+            self.assertRegex(body, r'data-home-preserve-src="/nba/live-lens\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}"')
+        if 'data-home-preserve-key="home-live-wnba"' in body:
+            self.assertRegex(body, r'data-home-preserve-src="/wnba/live-lens\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}"')
+        if 'data-home-preserve-key="home-live-nhl"' in body:
+            self.assertRegex(body, r'data-home-preserve-src="/nhl/cards\?date=[0-9]{4}-[0-9]{2}-[0-9]{2}"')
 
     def test_mlb_cards_source_js_skips_auto_refresh_for_embeds(self) -> None:
         content = (REPO_ROOT / "syndicate" / "static" / "mlb" / "cards_source.js").read_text(encoding="utf-8")

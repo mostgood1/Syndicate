@@ -2176,6 +2176,17 @@ def _build_sport_overview(
         "home_anchor": f"home-sport-{slug}",
         "games_count": games_count,
     }
+    if slug in {"nba", "wnba", "nhl"} and active_today:
+        embed_src = _link_lookup(links, "Live Lens")
+        if slug == "nhl":
+            embed_src = f"/nhl/cards?date={context_label}"
+        elif not embed_src:
+            embed_src = f"/{slug}/live-lens?date={context_label}"
+        overview["home_live_embed"] = {
+            "key": f"home-live-{slug}",
+            "src": embed_src,
+            "title": f"{sport.get('name') or slug.upper()} live board",
+        }
     if slug == "mlb":
         overview["mlb_home"] = {
             "cards_href": f"/mlb/cards?date={context_label}&client=source",
