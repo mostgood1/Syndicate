@@ -6,6 +6,7 @@ from datetime import timedelta
 from datetime import timezone
 from functools import lru_cache
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +78,55 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _sum_valid(values: list[float | None]) -> float | None:
+    valid = [value for value in values if value is not None]
+    if not valid:
+        return None
+    return round(sum(valid), 3)
+
+
+def _margin_win_prob(margin_mean: float | None, scale: float = 3.4) -> float | None:
+    margin = _safe_float(margin_mean)
+    if margin is None:
+        return None
+    exponent = max(-60.0, min(60.0, -margin / max(scale, 0.001)))
+    return 1.0 / (1.0 + math.exp(exponent))
+
+
+def _quarter_values(players: list[dict[str, Any]], stat_key: str, quarter_index: int) -> list[float | None]:
+    values: list[float | None] = []
+    for row in players:
+        buckets = row.get(stat_key) if isinstance(row.get(stat_key), list) else []
+        if quarter_index < len(buckets):
+            values.append(_safe_float(buckets[quarter_index]))
+    return values
+
+
+def _source_sim_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, float | None]]:
+    if not isinstance(sim_game, dict):
+        return {}
+    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+    away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
+    home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
+    periods: dict[str, dict[str, float | None]] = {}
+    for quarter_index, quarter_key in enumerate(("q1", "q2", "q3", "q4")):
+        away_mean = _sum_valid(_quarter_values(away_players, "q_pts", quarter_index))
+        home_mean = _sum_valid(_quarter_values(home_players, "q_pts", quarter_index))
+        if away_mean is None and home_mean is None:
+            continue
+        total_mean = None if away_mean is None or home_mean is None else round(away_mean + home_mean, 3)
+        margin_mean = None if away_mean is None or home_mean is None else round(home_mean - away_mean, 3)
+        periods[quarter_key] = {
+            "away_mean": away_mean,
+            "home_mean": home_mean,
+            "total_mean": total_mean,
+            "margin_mean": margin_mean,
+            "p_home_win": _margin_win_prob(margin_mean),
+        }
+    return periods
 
 
 def _format_pct_100(value: Any) -> str:
@@ -289,6 +339,7 @@ def _source_sim_score(sim_game: dict[str, Any] | None, row: dict[str, str]) -> d
 def _source_sim_stub(game_id: str, sim_game: dict[str, Any] | None, row: dict[str, str]) -> dict[str, Any]:
     players_summary = dict((sim_game or {}).get("players_summary") or {}) if isinstance(sim_game, dict) else {}
     score = _source_sim_score(sim_game, row)
+    periods = _source_sim_periods(sim_game)
     return {
         "game_id": game_id,
         "players_loaded": False,
@@ -304,6 +355,7 @@ def _source_sim_stub(game_id: str, sim_game: dict[str, Any] | None, row: dict[st
         "missing_prop_players": {"away": [], "home": []},
         "injuries": {"away": [], "home": []},
         "score": score,
+        "periods": periods,
         "market": {
             "market_home_spread": _safe_float(row.get("home_spread")),
             "market_total": _safe_float(row.get("total")),

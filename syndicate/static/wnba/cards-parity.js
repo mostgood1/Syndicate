@@ -171,18 +171,33 @@
     throw lastError || new Error(fallbackMessage);
   }
 
-  function fmtNumber(value, digits = 1) {
+  function toFiniteNumber(value) {
+    if (value == null) {
+      return null;
+    }
+    if (typeof value === 'string' && !value.trim()) {
+      return null;
+    }
     const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function hasFiniteMetric(value) {
+    return toFiniteNumber(value) != null;
+  }
+
+  function fmtNumber(value, digits = 1) {
+    const number = toFiniteNumber(value);
     return Number.isFinite(number) ? number.toFixed(digits) : '--';
   }
 
   function fmtInteger(value) {
-    const number = Number(value);
+    const number = toFiniteNumber(value);
     return Number.isFinite(number) ? number.toFixed(0) : '--';
   }
 
   function fmtSigned(value, digits = 1) {
-    const number = Number(value);
+    const number = toFiniteNumber(value);
     if (!Number.isFinite(number)) {
       return '--';
     }
@@ -202,17 +217,17 @@
   }
 
   function fmtPercent(value, digits = 0) {
-    const number = Number(value);
+    const number = toFiniteNumber(value);
     return Number.isFinite(number) ? `${(number * 100).toFixed(digits)}%` : '--';
   }
 
   function fmtPercentValue(value, digits = 1) {
-    const number = Number(value);
+    const number = toFiniteNumber(value);
     return Number.isFinite(number) ? `${number.toFixed(digits)}%` : '--';
   }
 
   function fmtCurrency(value, digits = 0) {
-    const number = Number(value);
+    const number = toFiniteNumber(value);
     if (!Number.isFinite(number)) {
       return '--';
     }
@@ -225,7 +240,7 @@
   }
 
   function fmtStakeUnits(value, digits = 2) {
-    const number = Number(value);
+    const number = toFiniteNumber(value);
     if (!Number.isFinite(number)) {
       return '--';
     }
@@ -271,7 +286,7 @@
   }
 
   function fmtAmerican(value) {
-    const number = Number(value);
+    const number = toFiniteNumber(value);
     if (!Number.isFinite(number)) {
       return '--';
     }
@@ -3220,24 +3235,24 @@
     const away = game?.away_tri || 'AWAY';
     if (marketKey === 'moneyline') {
       const candidates = [
-        { detail: `${home} ML ${fmtAmerican(betting.home_ml)}`, ev: Number(betting.home_ml_ev), probability: betting.p_home_win, tabTarget: 'game' },
-        { detail: `${away} ML ${fmtAmerican(betting.away_ml)}`, ev: Number(betting.away_ml_ev), probability: betting.p_away_win, tabTarget: 'game' },
+        { detail: `${home} ML ${fmtAmerican(betting.home_ml)}`, ev: toFiniteNumber(betting.home_ml_ev), probability: betting.p_home_win, tabTarget: 'game' },
+        { detail: `${away} ML ${fmtAmerican(betting.away_ml)}`, ev: toFiniteNumber(betting.away_ml_ev), probability: betting.p_away_win, tabTarget: 'game' },
       ].filter((item) => Number.isFinite(item.ev));
       return candidates.sort((a, b) => b.ev - a.ev)[0] || null;
     }
     if (marketKey === 'spread') {
-      const spread = Number(betting.home_spread);
+      const spread = toFiniteNumber(betting.home_spread);
       const candidates = [
-        { detail: `${home} ${Number.isFinite(spread) ? fmtSigned(spread) : '--'}`, ev: Number(betting.home_spread_ev), probability: betting.p_home_cover, tabTarget: 'game' },
-        { detail: `${away} ${Number.isFinite(spread) ? fmtSigned(-spread) : '--'}`, ev: Number(betting.away_spread_ev), probability: betting.p_away_cover, tabTarget: 'game' },
+        { detail: `${home} ${Number.isFinite(spread) ? fmtSigned(spread) : '--'}`, ev: toFiniteNumber(betting.home_spread_ev), probability: betting.p_home_cover, tabTarget: 'game' },
+        { detail: `${away} ${Number.isFinite(spread) ? fmtSigned(-spread) : '--'}`, ev: toFiniteNumber(betting.away_spread_ev), probability: betting.p_away_cover, tabTarget: 'game' },
       ].filter((item) => Number.isFinite(item.ev));
       return candidates.sort((a, b) => b.ev - a.ev)[0] || null;
     }
     if (marketKey === 'total') {
-      const total = Number(betting.total);
+      const total = toFiniteNumber(betting.total);
       const candidates = [
-        { detail: `Over ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: Number(betting.over_ev), probability: betting.p_total_over, tabTarget: 'game' },
-        { detail: `Under ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: Number(betting.under_ev), probability: betting.p_total_under, tabTarget: 'game' },
+        { detail: `Over ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.over_ev), probability: betting.p_total_over, tabTarget: 'game' },
+        { detail: `Under ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.under_ev), probability: betting.p_total_under, tabTarget: 'game' },
       ].filter((item) => Number.isFinite(item.ev));
       return candidates.sort((a, b) => b.ev - a.ev)[0] || null;
     }
@@ -3820,20 +3835,20 @@
     const rows = [
       {
         label: 'Moneyline win split',
-        away: Number(betting.p_away_win),
-        home: Number(betting.p_home_win),
+        away: toFiniteNumber(betting.p_away_win),
+        home: toFiniteNumber(betting.p_home_win),
         meta: `${game.away_tri} ${fmtPercent(betting.p_away_win, 0)} · ${game.home_tri} ${fmtPercent(betting.p_home_win, 0)}`,
       },
       {
         label: 'Spread cover split',
-        away: Number(betting.p_away_cover),
-        home: Number(betting.p_home_cover),
+        away: toFiniteNumber(betting.p_away_cover),
+        home: toFiniteNumber(betting.p_home_cover),
         meta: `${game.away_tri} ${fmtPercent(betting.p_away_cover, 0)} · ${game.home_tri} ${fmtPercent(betting.p_home_cover, 0)}`,
       },
       {
         label: 'Total split',
-        away: Number(betting.p_total_under),
-        home: Number(betting.p_total_over),
+        away: toFiniteNumber(betting.p_total_under),
+        home: toFiniteNumber(betting.p_total_over),
         meta: `Under ${fmtPercent(betting.p_total_under, 0)} · Over ${fmtPercent(betting.p_total_over, 0)}`,
       },
     ];
@@ -4269,19 +4284,21 @@
 
   function miniMetrics(game) {
     const context = game?.sim?.context || {};
+    const score = game?.sim?.score || {};
+    const playersSummary = game?.sim?.players_summary || {};
     const liveLens = getLiveLens(game);
     const counts = {
       home: safeArray(game?.prop_recommendations?.home).length,
       away: safeArray(game?.prop_recommendations?.away).length,
     };
-    const awayPace = Number.isFinite(Number(liveLens?.awayPace))
-      ? Number(liveLens.awayPace)
-      : Number(context.away_pace);
-    const homePace = Number.isFinite(Number(liveLens?.homePace))
-      ? Number(liveLens.homePace)
-      : Number(context.home_pace);
-    const liveAwayPoss = Number(liveLens?.awayPossessions);
-    const liveHomePoss = Number(liveLens?.homePossessions);
+    const awayPace = hasFiniteMetric(liveLens?.awayPace)
+      ? toFiniteNumber(liveLens.awayPace)
+      : toFiniteNumber(context.away_pace);
+    const homePace = hasFiniteMetric(liveLens?.homePace)
+      ? toFiniteNumber(liveLens.homePace)
+      : toFiniteNumber(context.home_pace);
+    const liveAwayPoss = toFiniteNumber(liveLens?.awayPossessions);
+    const liveHomePoss = toFiniteNumber(liveLens?.homePossessions);
 
     function shootingBreakdown(bucket) {
       if (!bucket || typeof bucket !== 'object') {
@@ -4317,17 +4334,25 @@
       };
     }
 
+    const pregameEntries = hasFiniteMetric(awayPace) || hasFiniteMetric(homePace)
+      ? [
+        { label: `${game.away_tri} pace`, value: fmtNumber(awayPace, 1), sub: 'expected possessions' },
+        { label: `${game.home_tri} pace`, value: fmtNumber(homePace, 1), sub: 'expected possessions' },
+        { label: 'Official props', value: String(counts.home + counts.away), sub: `${counts.away} away · ${counts.home} home` },
+      ]
+      : [
+        { label: 'Model total', value: fmtNumber(score.total_mean, 1), sub: `${game.away_tri} @ ${game.home_tri}` },
+        { label: 'Model margin', value: fmtSigned(score.margin_mean, 1), sub: `${game.home_tri} minus ${game.away_tri}` },
+        { label: 'Sim rows', value: fmtInteger((toFiniteNumber(playersSummary.away) || 0) + (toFiniteNumber(playersSummary.home) || 0)), sub: `${fmtInteger(playersSummary.away)} away · ${fmtInteger(playersSummary.home)} home` },
+      ];
+
     const entries = boardHasStartedGames()
       ? [
         livePaceTile(game.away_tri, awayPace, liveAwayPoss, liveLens?.awayAttempts),
         livePaceTile(game.home_tri, homePace, liveHomePoss, liveLens?.homeAttempts),
         { label: 'Official props', value: String(counts.home + counts.away), sub: `${counts.away} away · ${counts.home} home` },
       ]
-      : [
-        { label: `${game.away_tri} pace`, value: fmtNumber(awayPace, 1), sub: 'expected possessions' },
-        { label: `${game.home_tri} pace`, value: fmtNumber(homePace, 1), sub: 'expected possessions' },
-        { label: 'Official props', value: String(counts.home + counts.away), sub: `${counts.away} away · ${counts.home} home` },
-      ];
+      : pregameEntries;
 
     return entries.map((entry) => `
       <div class="cards-mini-metric ${safeArray(entry.extra).length ? 'is-rich' : ''}">
@@ -4438,7 +4463,7 @@
   }
 
   function renderMarketTile(title, pick, auxLine, noteText, cardIdValue) {
-    const hasMetrics = Number.isFinite(Number(pick?.probability)) || Number.isFinite(Number(pick?.ev));
+    const hasMetrics = hasFiniteMetric(pick?.probability) || hasFiniteMetric(pick?.ev);
     const compactSub = pick
       ? (hasMetrics ? `Win ${fmtPercent(pick.probability, 0)} | EV ${fmtPercentValue(pick.ev)}` : (pick.meta || 'Off card'))
       : 'Off card';

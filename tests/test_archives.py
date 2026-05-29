@@ -2678,6 +2678,41 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual((stub.get("score") or {}).get("total_mean"), 67.0)
         self.assertEqual((stub.get("score") or {}).get("margin_mean"), 0.0)
 
+    def test_wnba_source_sim_stub_derives_quarter_periods_from_player_quarter_points(self) -> None:
+        from syndicate.features.wnba.cards import _source_sim_stub
+
+        sim_game = {
+            "sim": {
+                "players": {
+                    "away": [
+                        {"q_pts": [5.0, 6.0, 7.0, 8.0]},
+                        {"q_pts": [4.0, 3.0, 2.0, 1.0]},
+                    ],
+                    "home": [
+                        {"q_pts": [6.0, 5.0, 4.0, 3.0]},
+                        {"q_pts": [2.0, 3.0, 4.0, 5.0]},
+                    ],
+                }
+            }
+        }
+
+        stub = _source_sim_stub("game-1", sim_game, {"total": "170.5", "home_spread": "-4.5"})
+
+        self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("away_mean"), 9.0)
+        self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("home_mean"), 8.0)
+        self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("total_mean"), 17.0)
+        self.assertEqual((stub.get("periods") or {}).get("q1", {}).get("margin_mean"), -1.0)
+        self.assertIsNotNone((stub.get("periods") or {}).get("q1", {}).get("p_home_win"))
+        self.assertEqual((stub.get("periods") or {}).get("q4", {}).get("away_mean"), 9.0)
+        self.assertEqual((stub.get("periods") or {}).get("q4", {}).get("home_mean"), 8.0)
+
+    def test_wnba_cards_parity_script_treats_missing_metrics_as_missing_not_zero(self) -> None:
+        script = self.client.get("/wnba/cards-parity.js").get_data(as_text=True)
+
+        self.assertIn("function toFiniteNumber(value)", script)
+        self.assertIn("if (value == null)", script)
+        self.assertIn("const hasMetrics = hasFiniteMetric(pick?.probability) || hasFiniteMetric(pick?.ev);", script)
+
     def test_wnba_cards_source_alias_preserves_explicit_source_shell(self) -> None:
         response = self.client.get("/wnba/cards/source?date=2026-05-21", follow_redirects=True)
         body = response.get_data(as_text=True)
