@@ -32,6 +32,8 @@ from syndicate.features.mlb.sources import market_refresh_history_oddsapi_path
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.mlb.sources import load_json_or_gz_file
 from syndicate.features.mlb.sources import load_json_file
+from syndicate.features.shared.timezone import central_today
+from syndicate.features.shared.timezone import central_today_iso
 
 
 _MLB_TEAM_META_BY_ABBR: dict[str, dict[str, Any]] = {
@@ -199,7 +201,7 @@ def _parse_iso_date(value: str) -> date:
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except Exception:
-        return date.today()
+        return central_today()
 
 
 def _format_start_time_local(game_date: Any, *, fallback_time: Any = None, fallback_ampm: Any = None) -> str:
@@ -1560,7 +1562,7 @@ def _daily_sim_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dic
 
 def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
-    today_iso = date.today().isoformat()
+    today_iso = central_today_iso()
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
@@ -2837,7 +2839,7 @@ def _source_live_prop_rows(live_lens_row: dict[str, Any] | None) -> list[dict[st
 def _source_snapshot_detail(selected_date: str, game_pk: int, actual_payload: dict[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(actual_payload, dict):
         return None
-    today_iso = date.today().isoformat()
+    today_iso = central_today_iso()
     status = (actual_payload.get("gameData") or {}).get("status") if isinstance(actual_payload.get("gameData"), dict) else {}
     teams = (actual_payload.get("gameData") or {}).get("teams") if isinstance(actual_payload.get("gameData"), dict) else {}
     linescore = ((actual_payload.get("liveData") or {}).get("linescore")) if isinstance(actual_payload.get("liveData"), dict) else {}
@@ -2897,7 +2899,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
     matchup = (live_lens_row or {}).get("matchup") if isinstance((live_lens_row or {}).get("matchup"), dict) else {}
     away_team = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
     home_team = matchup.get("home") if isinstance(matchup.get("home"), dict) else {}
-    today_iso = date.today().isoformat()
+    today_iso = central_today_iso()
     is_historical_date = bool(selected_date and selected_date != today_iso)
     has_live_props = isinstance((live_lens_row or {}).get("liveProps"), list) and bool((live_lens_row or {}).get("liveProps"))
     has_archived_live_props = isinstance((live_lens_row or {}).get("archivedLiveProps"), list) and bool((live_lens_row or {}).get("archivedLiveProps"))

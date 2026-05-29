@@ -203,6 +203,21 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(games[0].get("first1BetSignal", {}).get("label"), "F1 NRFI")
         self.assertEqual(games[0].get("first1BetSignal", {}).get("tone"), "nrfi")
 
+    def test_mlb_daily_actual_by_game_uses_central_today_for_live_fetch(self) -> None:
+        from syndicate.features.mlb.cards import _daily_actual_by_game
+
+        with patch("syndicate.features.mlb.cards.central_today_iso", return_value="2026-05-28"):
+            with patch("syndicate.features.mlb.cards.raw_feed_live_path", return_value=None):
+                with patch("syndicate.features.mlb.cards.load_json_or_gz_file", return_value=None):
+                    with patch(
+                        "syndicate.features.mlb.cards._fetch_current_feed_live",
+                        return_value={"gameData": {"status": {"abstractGameState": "Live"}}},
+                    ) as fetch_mock:
+                        payloads = _daily_actual_by_game("2026-05-28", [824834])
+
+        self.assertIn(824834, payloads)
+        fetch_mock.assert_called_once_with(824834)
+
     def test_mlb_source_probable_keeps_pregame_badges_out_of_mini_lane(self) -> None:
         from syndicate.features.mlb.cards import _source_probable
 
