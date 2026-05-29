@@ -230,54 +230,52 @@
           ],
           "basketball_summary": "Recent form has stayed below this line with a last-five average of 4.4. The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
           "book": "draftkings",
-          "display_pick": "Shakira Austin Under 10.5 RA",
-          "ev": 0.8964074156490371,
-          "ev_pct": 89.64,
+          "display_pick": "Shakira Austin Under 11.5 RA",
+          "ev": 0.6637429331357507,
+          "ev_pct": 66.37,
           "game_id": null,
           "game_key": "2026-05-29:LAS@WSH",
           "home": "WSH",
-          "implied_prob": 0.4878,
-          "line": 10.5,
+          "implied_prob": 0.5868,
+          "line": 11.5,
           "market": "ra",
           "market_reasons": [
-            "Projected value is +89.6% per unit risked.",
-            "The price stays workable at +105.",
-            "Model probability clears the market by 43.7 points."
+            "Projected value is +66.4% per unit risked.",
+            "Model probability clears the market by 38.9 points."
           ],
           "matchup": "LAS @ WSH",
           "model_baseline": 7.841399999999999,
           "model_reasons": [
-            "The model baseline sits at 7.8 against a 10.5 line.",
-            "That leaves roughly +1.44 standard deviations of cushion.",
-            "Win probability grades at 92.5%."
+            "The model baseline sits at 7.8 against a 11.5 line.",
+            "That leaves roughly +1.98 standard deviations of cushion.",
+            "Win probability grades at 97.6%."
           ],
           "model_sd": 1.8461549452730122,
-          "p_win": 0.9251,
+          "p_win": 0.9762,
           "player": "Shakira Austin",
-          "price": 105.0,
-          "prob_edge": 0.4373,
+          "price": -142.0,
+          "prob_edge": 0.3895,
           "reasons": [
             "Recent form has stayed below this line with a last-five average of 4.4.",
             "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
             "The last game landed at 4.0, which stayed under this line.",
             "A healthy WSH rotation keeps touches spread out across the lineup.",
-            "The model baseline sits at 7.8 against a 10.5 line.",
-            "That leaves roughly +1.44 standard deviations of cushion.",
-            "Win probability grades at 92.5%.",
-            "Projected value is +89.6% per unit risked.",
-            "The price stays workable at +105.",
-            "Model probability clears the market by 43.7 points."
+            "The model baseline sits at 7.8 against a 11.5 line.",
+            "That leaves roughly +1.98 standard deviations of cushion.",
+            "Win probability grades at 97.6%.",
+            "Projected value is +66.4% per unit risked.",
+            "Model probability clears the market by 38.9 points."
           ],
-          "recommendation_priority_score": 81.7,
-          "score": 0.8964074156490371,
-          "sd_rel": 0.17582428050219165,
+          "recommendation_priority_score": 79.7,
+          "score": 0.6637429331357507,
+          "sd_rel": 0.16053521263243586,
           "selection": "UNDER",
           "side": "UNDER",
           "sim_mean": 7.841399999999999,
           "sim_reasons": [
-            "The model baseline sits at 7.8 against a 10.5 line.",
-            "That leaves roughly +1.44 standard deviations of cushion.",
-            "Win probability grades at 92.5%."
+            "The model baseline sits at 7.8 against a 11.5 line.",
+            "That leaves roughly +1.98 standard deviations of cushion.",
+            "Win probability grades at 97.6%."
           ],
           "sim_sd": 1.8461549452730124,
           "sim_support_score": 100.0,
@@ -287,22 +285,20 @@
             "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
             "The last game landed at 4.0, which stayed under this line.",
             "A healthy WSH rotation keeps touches spread out across the lineup.",
-            "The model baseline sits at 7.8 against a 10.5 line.",
-            "That leaves roughly +1.44 standard deviations of cushion.",
-            "Win probability grades at 92.5%.",
-            "Projected value is +89.6% per unit risked.",
-            "The price stays workable at +105.",
-            "Model probability clears the market by 43.7 points."
+            "The model baseline sits at 7.8 against a 11.5 line.",
+            "That leaves roughly +1.98 standard deviations of cushion.",
+            "Win probability grades at 97.6%.",
+            "Projected value is +66.4% per unit risked.",
+            "Model probability clears the market by 38.9 points."
           ],
           "value_reasons": [
-            "Projected value is +89.6% per unit risked.",
-            "The price stays workable at +105.",
-            "Model probability clears the market by 43.7 points."
+            "Projected value is +66.4% per unit risked.",
+            "Model probability clears the market by 38.9 points."
           ],
-          "value_support_score": 85.0,
-          "win_prob": 0.9250767881214816,
-          "win_prob_raw": 0.9250767881214816,
-          "z": 1.4400741426429096
+          "value_support_score": 75.0,
+          "win_prob": 0.9762458533275893,
+          "win_prob_raw": 0.9762458533275893,
+          "z": 1.9817404868251516
         },
         {
           "away": "LAS",
@@ -579,18 +575,18 @@
           "basketball_summary": "Recent form has stayed below this line with a last-five average of 3.4. The last-10 sample is holding under this line at 8.2, which supports the lower-volume case.",
           "book": "draftkings",
           "display_pick": "Marine Johannes Under 14.5 PA",
-          "ev": 0.9100927542318045,
-          "ev_pct": 91.01,
+          "ev": 0.8856127548183756,
+          "ev_pct": 88.56,
           "game_id": null,
           "game_key": "2026-05-29:PHX@NYL",
           "home": "NYL",
-          "implied_prob": 0.5215,
+          "implied_prob": 0.5283,
           "line": 14.5,
           "market": "pa",
           "market_reasons": [
-            "Projected value is +91.0% per unit risked.",
-            "The price stays workable at -109.",
-            "Model probability clears the market by 46.8 points."
+            "Projected value is +88.6% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 46.2 points."
           ],
           "matchup": "PHX @ NYL",
           "model_baseline": 9.81090689655172,
@@ -602,8 +598,8 @@
           "model_sd": 1.7582272098780174,
           "p_win": 0.99,
           "player": "Marine Johannes",
-          "price": -109.0,
-          "prob_edge": 0.4685,
+          "price": -112.0,
+          "prob_edge": 0.4617,
           "reasons": [
             "Recent form has stayed below this line with a last-five average of 3.4.",
             "The last-10 sample is holding under this line at 8.2, which supports the lower-volume case.",
@@ -613,12 +609,12 @@
             "The model baseline sits at 9.8 against a 14.5 line.",
             "That leaves roughly +2.67 standard deviations of cushion.",
             "Win probability grades at 99.0%.",
-            "Projected value is +91.0% per unit risked.",
-            "The price stays workable at -109.",
-            "Model probability clears the market by 46.8 points."
+            "Projected value is +88.6% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 46.2 points."
           ],
           "recommendation_priority_score": 88.9,
-          "score": 0.9100927542318045,
+          "score": 0.8856127548183756,
           "sd_rel": 0.12125704895710467,
           "selection": "UNDER",
           "side": "UNDER",
@@ -640,14 +636,14 @@
             "The model baseline sits at 9.8 against a 14.5 line.",
             "That leaves roughly +2.67 standard deviations of cushion.",
             "Win probability grades at 99.0%.",
-            "Projected value is +91.0% per unit risked.",
-            "The price stays workable at -109.",
-            "Model probability clears the market by 46.8 points."
+            "Projected value is +88.6% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 46.2 points."
           ],
           "value_reasons": [
-            "Projected value is +91.0% per unit risked.",
-            "The price stays workable at -109.",
-            "Model probability clears the market by 46.8 points."
+            "Projected value is +88.6% per unit risked.",
+            "The price stays workable at -112.",
+            "Model probability clears the market by 46.2 points."
           ],
           "value_support_score": 85.0,
           "win_prob": 0.9961727761304626,
@@ -667,18 +663,18 @@
           "basketball_summary": "Recent form is already clearing this number with a last-five average of 28.2. The last-10 sample is still above this number at 26.9, so the over is not just riding a short heater.",
           "book": "fanduel",
           "display_pick": "Alyssa Thomas Over 24.5 PA",
-          "ev": 0.2679372247876921,
-          "ev_pct": 26.79,
+          "ev": 0.2777056163500009,
+          "ev_pct": 27.77,
           "game_id": null,
           "game_key": "2026-05-29:PHX@NYL",
           "home": "NYL",
-          "implied_prob": 0.5455,
+          "implied_prob": 0.5413,
           "line": 24.5,
           "market": "pa",
           "market_reasons": [
-            "Projected value is +26.8% per unit risked.",
-            "The price stays workable at -120.",
-            "Model probability clears the market by 14.6 points."
+            "Projected value is +27.8% per unit risked.",
+            "The price stays workable at -118.",
+            "Model probability clears the market by 15.0 points."
           ],
           "matchup": "NYL @ PHX",
           "model_baseline": 27.10593417721519,
@@ -690,8 +686,8 @@
           "model_sd": 5.207736214690698,
           "p_win": 0.6916,
           "player": "Alyssa Thomas",
-          "price": -120.0,
-          "prob_edge": 0.1461,
+          "price": -118.0,
+          "prob_edge": 0.1503,
           "reasons": [
             "Recent form is already clearing this number with a last-five average of 28.2.",
             "The last-10 sample is still above this number at 26.9, so the over is not just riding a short heater.",
@@ -701,12 +697,12 @@
             "The model baseline sits at 27.1 against a 24.5 line.",
             "That leaves roughly +0.50 standard deviations of cushion.",
             "Win probability grades at 69.2%.",
-            "Projected value is +26.8% per unit risked.",
-            "The price stays workable at -120.",
-            "Model probability clears the market by 14.6 points."
+            "Projected value is +27.8% per unit risked.",
+            "The price stays workable at -118.",
+            "Model probability clears the market by 15.0 points."
           ],
           "recommendation_priority_score": 88.9,
-          "score": 0.2679372247876921,
+          "score": 0.2777056163500009,
           "sd_rel": 0.21256066182411013,
           "selection": "OVER",
           "side": "OVER",
@@ -728,14 +724,14 @@
             "The model baseline sits at 27.1 against a 24.5 line.",
             "That leaves roughly +0.50 standard deviations of cushion.",
             "Win probability grades at 69.2%.",
-            "Projected value is +26.8% per unit risked.",
-            "The price stays workable at -120.",
-            "Model probability clears the market by 14.6 points."
+            "Projected value is +27.8% per unit risked.",
+            "The price stays workable at -118.",
+            "Model probability clears the market by 15.0 points."
           ],
           "value_reasons": [
-            "Projected value is +26.8% per unit risked.",
-            "The price stays workable at -120.",
-            "Model probability clears the market by 14.6 points."
+            "Projected value is +27.8% per unit risked.",
+            "The price stays workable at -118.",
+            "Model probability clears the market by 15.0 points."
           ],
           "value_support_score": 85.0,
           "win_prob": 0.6916021226114684,
@@ -845,18 +841,18 @@
         "basketball_summary": "Recent form has stayed below this line with a last-five average of 3.4. The last-10 sample is holding under this line at 8.2, which supports the lower-volume case.",
         "book": "draftkings",
         "display_pick": "Marine Johannes Under 14.5 PA",
-        "ev": 0.9100927542318045,
-        "ev_pct": 91.01,
+        "ev": 0.8856127548183756,
+        "ev_pct": 88.56,
         "game_id": null,
         "game_key": "2026-05-29:PHX@NYL",
         "home": "NYL",
-        "implied_prob": 0.5215,
+        "implied_prob": 0.5283,
         "line": 14.5,
         "market": "pa",
         "market_reasons": [
-          "Projected value is +91.0% per unit risked.",
-          "The price stays workable at -109.",
-          "Model probability clears the market by 46.8 points."
+          "Projected value is +88.6% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 46.2 points."
         ],
         "matchup": "PHX @ NYL",
         "model_baseline": 9.81090689655172,
@@ -868,8 +864,8 @@
         "model_sd": 1.7582272098780174,
         "p_win": 0.99,
         "player": "Marine Johannes",
-        "price": -109.0,
-        "prob_edge": 0.4685,
+        "price": -112.0,
+        "prob_edge": 0.4617,
         "reasons": [
           "Recent form has stayed below this line with a last-five average of 3.4.",
           "The last-10 sample is holding under this line at 8.2, which supports the lower-volume case.",
@@ -879,12 +875,12 @@
           "The model baseline sits at 9.8 against a 14.5 line.",
           "That leaves roughly +2.67 standard deviations of cushion.",
           "Win probability grades at 99.0%.",
-          "Projected value is +91.0% per unit risked.",
-          "The price stays workable at -109.",
-          "Model probability clears the market by 46.8 points."
+          "Projected value is +88.6% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 46.2 points."
         ],
         "recommendation_priority_score": 88.9,
-        "score": 0.9100927542318045,
+        "score": 0.8856127548183756,
         "sd_rel": 0.12125704895710467,
         "selection": "UNDER",
         "side": "UNDER",
@@ -906,14 +902,14 @@
           "The model baseline sits at 9.8 against a 14.5 line.",
           "That leaves roughly +2.67 standard deviations of cushion.",
           "Win probability grades at 99.0%.",
-          "Projected value is +91.0% per unit risked.",
-          "The price stays workable at -109.",
-          "Model probability clears the market by 46.8 points."
+          "Projected value is +88.6% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 46.2 points."
         ],
         "value_reasons": [
-          "Projected value is +91.0% per unit risked.",
-          "The price stays workable at -109.",
-          "Model probability clears the market by 46.8 points."
+          "Projected value is +88.6% per unit risked.",
+          "The price stays workable at -112.",
+          "Model probability clears the market by 46.2 points."
         ],
         "value_support_score": 85.0,
         "win_prob": 0.9961727761304626,
@@ -1014,18 +1010,18 @@
         "basketball_summary": "Recent form is already clearing this number with a last-five average of 28.2. The last-10 sample is still above this number at 26.9, so the over is not just riding a short heater.",
         "book": "fanduel",
         "display_pick": "Alyssa Thomas Over 24.5 PA",
-        "ev": 0.2679372247876921,
-        "ev_pct": 26.79,
+        "ev": 0.2777056163500009,
+        "ev_pct": 27.77,
         "game_id": null,
         "game_key": "2026-05-29:PHX@NYL",
         "home": "NYL",
-        "implied_prob": 0.5455,
+        "implied_prob": 0.5413,
         "line": 24.5,
         "market": "pa",
         "market_reasons": [
-          "Projected value is +26.8% per unit risked.",
-          "The price stays workable at -120.",
-          "Model probability clears the market by 14.6 points."
+          "Projected value is +27.8% per unit risked.",
+          "The price stays workable at -118.",
+          "Model probability clears the market by 15.0 points."
         ],
         "matchup": "NYL @ PHX",
         "model_baseline": 27.10593417721519,
@@ -1037,8 +1033,8 @@
         "model_sd": 5.207736214690698,
         "p_win": 0.6916,
         "player": "Alyssa Thomas",
-        "price": -120.0,
-        "prob_edge": 0.1461,
+        "price": -118.0,
+        "prob_edge": 0.1503,
         "reasons": [
           "Recent form is already clearing this number with a last-five average of 28.2.",
           "The last-10 sample is still above this number at 26.9, so the over is not just riding a short heater.",
@@ -1048,12 +1044,12 @@
           "The model baseline sits at 27.1 against a 24.5 line.",
           "That leaves roughly +0.50 standard deviations of cushion.",
           "Win probability grades at 69.2%.",
-          "Projected value is +26.8% per unit risked.",
-          "The price stays workable at -120.",
-          "Model probability clears the market by 14.6 points."
+          "Projected value is +27.8% per unit risked.",
+          "The price stays workable at -118.",
+          "Model probability clears the market by 15.0 points."
         ],
         "recommendation_priority_score": 88.9,
-        "score": 0.2679372247876921,
+        "score": 0.2777056163500009,
         "sd_rel": 0.21256066182411013,
         "selection": "OVER",
         "side": "OVER",
@@ -1075,14 +1071,14 @@
           "The model baseline sits at 27.1 against a 24.5 line.",
           "That leaves roughly +0.50 standard deviations of cushion.",
           "Win probability grades at 69.2%.",
-          "Projected value is +26.8% per unit risked.",
-          "The price stays workable at -120.",
-          "Model probability clears the market by 14.6 points."
+          "Projected value is +27.8% per unit risked.",
+          "The price stays workable at -118.",
+          "Model probability clears the market by 15.0 points."
         ],
         "value_reasons": [
-          "Projected value is +26.8% per unit risked.",
-          "The price stays workable at -120.",
-          "Model probability clears the market by 14.6 points."
+          "Projected value is +27.8% per unit risked.",
+          "The price stays workable at -118.",
+          "Model probability clears the market by 15.0 points."
         ],
         "value_support_score": 85.0,
         "win_prob": 0.6916021226114684,
@@ -1091,91 +1087,6 @@
       }
     ],
     "ra": [
-      {
-        "away": "LAS",
-        "basketball_priority_score": 66.0,
-        "basketball_reasons": [
-          "Recent form has stayed below this line with a last-five average of 4.4.",
-          "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
-          "The last game landed at 4.0, which stayed under this line.",
-          "A healthy WSH rotation keeps touches spread out across the lineup."
-        ],
-        "basketball_summary": "Recent form has stayed below this line with a last-five average of 4.4. The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
-        "book": "draftkings",
-        "display_pick": "Shakira Austin Under 10.5 RA",
-        "ev": 0.8964074156490371,
-        "ev_pct": 89.64,
-        "game_id": null,
-        "game_key": "2026-05-29:LAS@WSH",
-        "home": "WSH",
-        "implied_prob": 0.4878,
-        "line": 10.5,
-        "market": "ra",
-        "market_reasons": [
-          "Projected value is +89.6% per unit risked.",
-          "The price stays workable at +105.",
-          "Model probability clears the market by 43.7 points."
-        ],
-        "matchup": "LAS @ WSH",
-        "model_baseline": 7.841399999999999,
-        "model_reasons": [
-          "The model baseline sits at 7.8 against a 10.5 line.",
-          "That leaves roughly +1.44 standard deviations of cushion.",
-          "Win probability grades at 92.5%."
-        ],
-        "model_sd": 1.8461549452730122,
-        "p_win": 0.9251,
-        "player": "Shakira Austin",
-        "price": 105.0,
-        "prob_edge": 0.4373,
-        "reasons": [
-          "Recent form has stayed below this line with a last-five average of 4.4.",
-          "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
-          "The last game landed at 4.0, which stayed under this line.",
-          "A healthy WSH rotation keeps touches spread out across the lineup.",
-          "The model baseline sits at 7.8 against a 10.5 line.",
-          "That leaves roughly +1.44 standard deviations of cushion.",
-          "Win probability grades at 92.5%.",
-          "Projected value is +89.6% per unit risked.",
-          "The price stays workable at +105.",
-          "Model probability clears the market by 43.7 points."
-        ],
-        "recommendation_priority_score": 81.7,
-        "score": 0.8964074156490371,
-        "sd_rel": 0.17582428050219165,
-        "selection": "UNDER",
-        "side": "UNDER",
-        "sim_mean": 7.841399999999999,
-        "sim_reasons": [
-          "The model baseline sits at 7.8 against a 10.5 line.",
-          "That leaves roughly +1.44 standard deviations of cushion.",
-          "Win probability grades at 92.5%."
-        ],
-        "sim_sd": 1.8461549452730124,
-        "sim_support_score": 100.0,
-        "team": "WSH",
-        "top_play_reasons": [
-          "Recent form has stayed below this line with a last-five average of 4.4.",
-          "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
-          "The last game landed at 4.0, which stayed under this line.",
-          "A healthy WSH rotation keeps touches spread out across the lineup.",
-          "The model baseline sits at 7.8 against a 10.5 line.",
-          "That leaves roughly +1.44 standard deviations of cushion.",
-          "Win probability grades at 92.5%.",
-          "Projected value is +89.6% per unit risked.",
-          "The price stays workable at +105.",
-          "Model probability clears the market by 43.7 points."
-        ],
-        "value_reasons": [
-          "Projected value is +89.6% per unit risked.",
-          "The price stays workable at +105.",
-          "Model probability clears the market by 43.7 points."
-        ],
-        "value_support_score": 85.0,
-        "win_prob": 0.9250767881214816,
-        "win_prob_raw": 0.9250767881214816,
-        "z": 1.4400741426429096
-      },
       {
         "away": "ATL",
         "basketball_priority_score": 82.0,
@@ -1263,6 +1174,87 @@
         "win_prob": 0.9707972265230547,
         "win_prob_raw": 0.9707972265230547,
         "z": 1.892641604920086
+      },
+      {
+        "away": "LAS",
+        "basketball_priority_score": 66.0,
+        "basketball_reasons": [
+          "Recent form has stayed below this line with a last-five average of 4.4.",
+          "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
+          "The last game landed at 4.0, which stayed under this line.",
+          "A healthy WSH rotation keeps touches spread out across the lineup."
+        ],
+        "basketball_summary": "Recent form has stayed below this line with a last-five average of 4.4. The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
+        "book": "draftkings",
+        "display_pick": "Shakira Austin Under 11.5 RA",
+        "ev": 0.6637429331357507,
+        "ev_pct": 66.37,
+        "game_id": null,
+        "game_key": "2026-05-29:LAS@WSH",
+        "home": "WSH",
+        "implied_prob": 0.5868,
+        "line": 11.5,
+        "market": "ra",
+        "market_reasons": [
+          "Projected value is +66.4% per unit risked.",
+          "Model probability clears the market by 38.9 points."
+        ],
+        "matchup": "LAS @ WSH",
+        "model_baseline": 7.841399999999999,
+        "model_reasons": [
+          "The model baseline sits at 7.8 against a 11.5 line.",
+          "That leaves roughly +1.98 standard deviations of cushion.",
+          "Win probability grades at 97.6%."
+        ],
+        "model_sd": 1.8461549452730122,
+        "p_win": 0.9762,
+        "player": "Shakira Austin",
+        "price": -142.0,
+        "prob_edge": 0.3895,
+        "reasons": [
+          "Recent form has stayed below this line with a last-five average of 4.4.",
+          "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
+          "The last game landed at 4.0, which stayed under this line.",
+          "A healthy WSH rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 7.8 against a 11.5 line.",
+          "That leaves roughly +1.98 standard deviations of cushion.",
+          "Win probability grades at 97.6%.",
+          "Projected value is +66.4% per unit risked.",
+          "Model probability clears the market by 38.9 points."
+        ],
+        "recommendation_priority_score": 79.7,
+        "score": 0.6637429331357507,
+        "sd_rel": 0.16053521263243586,
+        "selection": "UNDER",
+        "side": "UNDER",
+        "sim_mean": 7.841399999999999,
+        "sim_reasons": [
+          "The model baseline sits at 7.8 against a 11.5 line.",
+          "That leaves roughly +1.98 standard deviations of cushion.",
+          "Win probability grades at 97.6%."
+        ],
+        "sim_sd": 1.8461549452730124,
+        "sim_support_score": 100.0,
+        "team": "WSH",
+        "top_play_reasons": [
+          "Recent form has stayed below this line with a last-five average of 4.4.",
+          "The last-10 sample is holding under this line at 8.3, which supports the lower-volume case.",
+          "The last game landed at 4.0, which stayed under this line.",
+          "A healthy WSH rotation keeps touches spread out across the lineup.",
+          "The model baseline sits at 7.8 against a 11.5 line.",
+          "That leaves roughly +1.98 standard deviations of cushion.",
+          "Win probability grades at 97.6%.",
+          "Projected value is +66.4% per unit risked.",
+          "Model probability clears the market by 38.9 points."
+        ],
+        "value_reasons": [
+          "Projected value is +66.4% per unit risked.",
+          "Model probability clears the market by 38.9 points."
+        ],
+        "value_support_score": 75.0,
+        "win_prob": 0.9762458533275893,
+        "win_prob_raw": 0.9762458533275893,
+        "z": 1.9817404868251516
       },
       {
         "away": "MIN",

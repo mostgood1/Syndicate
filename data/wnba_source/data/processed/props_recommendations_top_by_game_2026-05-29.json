@@ -4,17 +4,17 @@
     {
       "opponent": null,
       "player": "BRIDGET CARLETON",
-      "score": 0.764,
-      "score_adj": 0.787894,
+      "score": 0.734,
+      "score_adj": 0.765911,
       "team": "POR",
       "team_tricode": "POR",
-      "tier": "High",
+      "tier": "Medium",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.3229072507905859,
-        "ev": 0.7878936919290296,
-        "ev_calib_pct": 92.2460608306832,
-        "ev_pct": 78.78936919290295,
+        "edge": 0.3178055570282568,
+        "ev": 0.7659113924380989,
+        "ev_calib_pct": 84.58464557758185,
+        "ev_pct": 76.59113924380989,
         "implied_move": null,
         "line": 2.5,
         "line_move": null,
@@ -23,10 +23,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 144,
-        "prob_calib": 78.78936919290295,
+        "price": 141,
+        "prob_calib": 76.59113924380989,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -54,63 +54,35 @@
         "price": -114,
         "prob_calib": 33.24234268685015,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "JOVANA NOGIC",
-      "score": 0.329,
-      "score_adj": 0.248318,
+      "score": 0.374,
+      "score_adj": 0.304487,
       "team": "PHX",
       "team_tricode": "PHX",
       "tier": "Low",
       "top_play": {
-        "book": "draftkings",
-        "edge": 0.1265932887646864,
-        "ev": 0.2483176048845772,
-        "ev_calib_pct": -51.291546734179086,
-        "ev_pct": 24.831760488457718,
+        "book": "williamhill_us",
+        "edge": 0.1615355647443452,
+        "ev": 0.3044873919517304,
+        "ev_calib_pct": -42.605473906443734,
+        "ev_pct": 30.44873919517304,
         "implied_move": null,
-        "line": 10.5,
+        "line": 8.5,
         "line_move": null,
         "market": "pts",
         "open_implied_prob": null,
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": -104,
-        "prob_calib": 24.831760488457718,
+        "price": -113,
+        "prob_calib": 30.44873919517304,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "SHAKIRA AUSTIN",
-      "score": 0.219,
-      "score_adj": 0.19721,
-      "team": "WSH",
-      "team_tricode": "WSH",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0961998197805168,
-        "ev": 0.1972096305500594,
-        "ev_calib_pct": -59.57202573723782,
-        "ev_pct": 19.720963055005942,
-        "implied_move": null,
-        "line": 10.5,
-        "line_move": null,
-        "market": "ra",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": 105,
-        "prob_calib": 19.720963055005942,
-        "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -138,35 +110,35 @@
         "price": -116,
         "prob_calib": 17.76921061652464,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
-      "player": "SATOU SABALLY",
-      "score": 0.288,
-      "score_adj": 0.147079,
-      "team": "NYL",
-      "team_tricode": "NYL",
+      "player": "SHAKIRA AUSTIN",
+      "score": 0.21,
+      "score_adj": 0.146023,
+      "team": "WSH",
+      "team_tricode": "WSH",
       "tier": "Low",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.0665514936853862,
-        "ev": 0.1470788010447035,
-        "ev_calib_pct": -67.49558496912053,
-        "ev_pct": 14.70788010447035,
+        "edge": 0.0856831791072134,
+        "ev": 0.1460234460841243,
+        "ev_calib_pct": -75.11431411805769,
+        "ev_pct": 14.602344608412428,
         "implied_move": null,
-        "line": 3.5,
+        "line": 11.5,
         "line_move": null,
-        "market": "reb",
+        "market": "ra",
         "open_implied_prob": null,
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 121,
-        "prob_calib": 14.70788010447035,
+        "price": -142,
+        "prob_calib": 14.602344608412428,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -194,7 +166,7 @@
         "price": -127,
         "prob_calib": 14.2611126564207,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -222,13 +194,13 @@
         "price": 134,
         "prob_calib": 13.639294475102808,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "NATASHA MACK",
-      "score": 0.255,
+      "score": 0.354,
       "score_adj": 0.049914,
       "team": "PHX",
       "team_tricode": "PHX",
@@ -250,7 +222,7 @@
         "price": -130,
         "prob_calib": 12.991418497610018,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -278,7 +250,7 @@
         "price": -120,
         "prob_calib": 12.08293294357091,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -306,7 +278,7 @@
         "price": -113,
         "prob_calib": 10.50679481925208,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -334,7 +306,7 @@
         "price": 118,
         "prob_calib": 10.23781526800332,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -362,14 +334,42 @@
         "price": -140,
         "prob_calib": 9.34156639524338,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "OLIVIA MILES",
+      "score": 0.431,
+      "score_adj": 0.007615,
+      "team": "MIN",
+      "team_tricode": "MIN",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.0472395111862509,
+        "ev": 0.0876151617727901,
+        "ev_calib_pct": -83.75000845752525,
+        "ev_pct": 8.761516177279011,
+        "implied_move": null,
+        "line": 4.5,
+        "line_move": null,
+        "market": "reb",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -117,
+        "prob_calib": 8.761516177279011,
+        "side": "OVER",
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "COURTNEY WILLIAMS",
       "score": 0.418,
-      "score_adj": 0.007558,
+      "score_adj": 0.0,
       "team": "MIN",
       "team_tricode": "MIN",
       "tier": "Low",
@@ -390,35 +390,7 @@
         "price": 108,
         "prob_calib": 8.75578541548688,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "OLIVIA MILES",
-      "score": 0.43,
-      "score_adj": 0.0,
-      "team": "MIN",
-      "team_tricode": "MIN",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0456826547906847,
-        "ev": 0.0831274537994429,
-        "ev_calib_pct": -84.8735288987899,
-        "ev_pct": 8.31274537994429,
-        "implied_move": null,
-        "line": 4.5,
-        "line_move": null,
-        "market": "reb",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": -122,
-        "prob_calib": 8.31274537994429,
-        "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -446,14 +418,14 @@
         "price": -114,
         "prob_calib": 6.459750287494249,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "BREANNA STEWART",
       "score": 0.409,
-      "score_adj": 0.0,
+      "score_adj": 0.06321,
       "team": "NYL",
       "team_tricode": "NYL",
       "tier": "Low",
@@ -474,7 +446,7 @@
         "price": -137,
         "prob_calib": 6.32104569561926,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -502,7 +474,7 @@
         "price": -114,
         "prob_calib": 6.28692749375671,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -530,7 +502,7 @@
         "price": -125,
         "prob_calib": 5.60926095928744,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -558,7 +530,7 @@
         "price": -144,
         "prob_calib": 5.4777668293811494,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -586,7 +558,7 @@
         "price": -115,
         "prob_calib": 5.12424738734218,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -614,7 +586,7 @@
         "price": -144,
         "prob_calib": 4.74912936320237,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -642,7 +614,7 @@
         "price": -122,
         "prob_calib": 4.55073463079931,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -670,7 +642,7 @@
         "price": -134,
         "prob_calib": 4.38251891469704,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -698,7 +670,35 @@
         "price": 114,
         "prob_calib": 4.30655626393812,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "SATOU SABALLY",
+      "score": 0.246,
+      "score_adj": 0.0,
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.023281375522959,
+        "ev": 0.0394489974139028,
+        "ev_calib_pct": -93.31558654931091,
+        "ev_pct": 3.94489974139028,
+        "implied_move": null,
+        "line": 2.5,
+        "line_move": null,
+        "market": "ast",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -144,
+        "prob_calib": 3.94489974139028,
+        "side": "UNDER",
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     }
   ],
@@ -711,17 +711,17 @@
     {
       "opponent": null,
       "player": "BRIDGET CARLETON",
-      "score": 0.764,
-      "score_adj": 0.787894,
+      "score": 0.734,
+      "score_adj": 0.765911,
       "team": "POR",
       "team_tricode": "POR",
-      "tier": "High",
+      "tier": "Medium",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.3229072507905859,
-        "ev": 0.7878936919290296,
-        "ev_calib_pct": 92.2460608306832,
-        "ev_pct": 78.78936919290295,
+        "edge": 0.3178055570282568,
+        "ev": 0.7659113924380989,
+        "ev_calib_pct": 84.58464557758185,
+        "ev_pct": 76.59113924380989,
         "implied_move": null,
         "line": 2.5,
         "line_move": null,
@@ -730,10 +730,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 144,
-        "prob_calib": 78.78936919290295,
+        "price": 141,
+        "prob_calib": 76.59113924380989,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -761,63 +761,35 @@
         "price": -114,
         "prob_calib": 33.24234268685015,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "JOVANA NOGIC",
-      "score": 0.329,
-      "score_adj": 0.248318,
+      "score": 0.374,
+      "score_adj": 0.304487,
       "team": "PHX",
       "team_tricode": "PHX",
       "tier": "Low",
       "top_play": {
-        "book": "draftkings",
-        "edge": 0.1265932887646864,
-        "ev": 0.2483176048845772,
-        "ev_calib_pct": -51.291546734179086,
-        "ev_pct": 24.831760488457718,
+        "book": "williamhill_us",
+        "edge": 0.1615355647443452,
+        "ev": 0.3044873919517304,
+        "ev_calib_pct": -42.605473906443734,
+        "ev_pct": 30.44873919517304,
         "implied_move": null,
-        "line": 10.5,
+        "line": 8.5,
         "line_move": null,
         "market": "pts",
         "open_implied_prob": null,
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": -104,
-        "prob_calib": 24.831760488457718,
+        "price": -113,
+        "prob_calib": 30.44873919517304,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "SHAKIRA AUSTIN",
-      "score": 0.219,
-      "score_adj": 0.19721,
-      "team": "WSH",
-      "team_tricode": "WSH",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0961998197805168,
-        "ev": 0.1972096305500594,
-        "ev_calib_pct": -59.57202573723782,
-        "ev_pct": 19.720963055005942,
-        "implied_move": null,
-        "line": 10.5,
-        "line_move": null,
-        "market": "ra",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": 105,
-        "prob_calib": 19.720963055005942,
-        "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -845,35 +817,35 @@
         "price": -116,
         "prob_calib": 17.76921061652464,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
-      "player": "SATOU SABALLY",
-      "score": 0.288,
-      "score_adj": 0.147079,
-      "team": "NYL",
-      "team_tricode": "NYL",
+      "player": "SHAKIRA AUSTIN",
+      "score": 0.21,
+      "score_adj": 0.146023,
+      "team": "WSH",
+      "team_tricode": "WSH",
       "tier": "Low",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.0665514936853862,
-        "ev": 0.1470788010447035,
-        "ev_calib_pct": -67.49558496912053,
-        "ev_pct": 14.70788010447035,
+        "edge": 0.0856831791072134,
+        "ev": 0.1460234460841243,
+        "ev_calib_pct": -75.11431411805769,
+        "ev_pct": 14.602344608412428,
         "implied_move": null,
-        "line": 3.5,
+        "line": 11.5,
         "line_move": null,
-        "market": "reb",
+        "market": "ra",
         "open_implied_prob": null,
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 121,
-        "prob_calib": 14.70788010447035,
+        "price": -142,
+        "prob_calib": 14.602344608412428,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -901,7 +873,7 @@
         "price": -127,
         "prob_calib": 14.2611126564207,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -929,13 +901,13 @@
         "price": 134,
         "prob_calib": 13.639294475102808,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "NATASHA MACK",
-      "score": 0.255,
+      "score": 0.354,
       "score_adj": 0.049914,
       "team": "PHX",
       "team_tricode": "PHX",
@@ -957,7 +929,7 @@
         "price": -130,
         "prob_calib": 12.991418497610018,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -985,7 +957,7 @@
         "price": -120,
         "prob_calib": 12.08293294357091,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1013,7 +985,7 @@
         "price": -113,
         "prob_calib": 10.50679481925208,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1041,7 +1013,7 @@
         "price": 118,
         "prob_calib": 10.23781526800332,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1069,14 +1041,42 @@
         "price": -140,
         "prob_calib": 9.34156639524338,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "OLIVIA MILES",
+      "score": 0.431,
+      "score_adj": 0.007615,
+      "team": "MIN",
+      "team_tricode": "MIN",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.0472395111862509,
+        "ev": 0.0876151617727901,
+        "ev_calib_pct": -83.75000845752525,
+        "ev_pct": 8.761516177279011,
+        "implied_move": null,
+        "line": 4.5,
+        "line_move": null,
+        "market": "reb",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -117,
+        "prob_calib": 8.761516177279011,
+        "side": "OVER",
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "COURTNEY WILLIAMS",
       "score": 0.418,
-      "score_adj": 0.007558,
+      "score_adj": 0.0,
       "team": "MIN",
       "team_tricode": "MIN",
       "tier": "Low",
@@ -1097,35 +1097,7 @@
         "price": 108,
         "prob_calib": 8.75578541548688,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "OLIVIA MILES",
-      "score": 0.43,
-      "score_adj": 0.0,
-      "team": "MIN",
-      "team_tricode": "MIN",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0456826547906847,
-        "ev": 0.0831274537994429,
-        "ev_calib_pct": -84.8735288987899,
-        "ev_pct": 8.31274537994429,
-        "implied_move": null,
-        "line": 4.5,
-        "line_move": null,
-        "market": "reb",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": -122,
-        "prob_calib": 8.31274537994429,
-        "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1153,14 +1125,14 @@
         "price": -114,
         "prob_calib": 6.459750287494249,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "BREANNA STEWART",
       "score": 0.409,
-      "score_adj": 0.0,
+      "score_adj": 0.06321,
       "team": "NYL",
       "team_tricode": "NYL",
       "tier": "Low",
@@ -1181,7 +1153,7 @@
         "price": -137,
         "prob_calib": 6.32104569561926,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1209,7 +1181,7 @@
         "price": -114,
         "prob_calib": 6.28692749375671,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1237,7 +1209,7 @@
         "price": -125,
         "prob_calib": 5.60926095928744,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1265,7 +1237,7 @@
         "price": -144,
         "prob_calib": 5.4777668293811494,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1293,7 +1265,7 @@
         "price": -115,
         "prob_calib": 5.12424738734218,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1321,7 +1293,7 @@
         "price": -144,
         "prob_calib": 4.74912936320237,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1349,7 +1321,7 @@
         "price": -122,
         "prob_calib": 4.55073463079931,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1377,7 +1349,7 @@
         "price": -134,
         "prob_calib": 4.38251891469704,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1405,7 +1377,35 @@
         "price": 114,
         "prob_calib": 4.30655626393812,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "SATOU SABALLY",
+      "score": 0.246,
+      "score_adj": 0.0,
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.023281375522959,
+        "ev": 0.0394489974139028,
+        "ev_calib_pct": -93.31558654931091,
+        "ev_pct": 3.94489974139028,
+        "implied_move": null,
+        "line": 2.5,
+        "line_move": null,
+        "market": "ast",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -144,
+        "prob_calib": 3.94489974139028,
+        "side": "UNDER",
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     }
   ],
@@ -1419,17 +1419,17 @@
     {
       "opponent": null,
       "player": "BRIDGET CARLETON",
-      "score": 0.764,
-      "score_adj": 0.787894,
+      "score": 0.734,
+      "score_adj": 0.765911,
       "team": "POR",
       "team_tricode": "POR",
-      "tier": "High",
+      "tier": "Medium",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.3229072507905859,
-        "ev": 0.7878936919290296,
-        "ev_calib_pct": 92.2460608306832,
-        "ev_pct": 78.78936919290295,
+        "edge": 0.3178055570282568,
+        "ev": 0.7659113924380989,
+        "ev_calib_pct": 84.58464557758185,
+        "ev_pct": 76.59113924380989,
         "implied_move": null,
         "line": 2.5,
         "line_move": null,
@@ -1438,10 +1438,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 144,
-        "prob_calib": 78.78936919290295,
+        "price": 141,
+        "prob_calib": 76.59113924380989,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1469,63 +1469,35 @@
         "price": -114,
         "prob_calib": 33.24234268685015,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "JOVANA NOGIC",
-      "score": 0.329,
-      "score_adj": 0.248318,
+      "score": 0.374,
+      "score_adj": 0.304487,
       "team": "PHX",
       "team_tricode": "PHX",
       "tier": "Low",
       "top_play": {
-        "book": "draftkings",
-        "edge": 0.1265932887646864,
-        "ev": 0.2483176048845772,
-        "ev_calib_pct": -51.291546734179086,
-        "ev_pct": 24.831760488457718,
+        "book": "williamhill_us",
+        "edge": 0.1615355647443452,
+        "ev": 0.3044873919517304,
+        "ev_calib_pct": -42.605473906443734,
+        "ev_pct": 30.44873919517304,
         "implied_move": null,
-        "line": 10.5,
+        "line": 8.5,
         "line_move": null,
         "market": "pts",
         "open_implied_prob": null,
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": -104,
-        "prob_calib": 24.831760488457718,
+        "price": -113,
+        "prob_calib": 30.44873919517304,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "SHAKIRA AUSTIN",
-      "score": 0.219,
-      "score_adj": 0.19721,
-      "team": "WSH",
-      "team_tricode": "WSH",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0961998197805168,
-        "ev": 0.1972096305500594,
-        "ev_calib_pct": -59.57202573723782,
-        "ev_pct": 19.720963055005942,
-        "implied_move": null,
-        "line": 10.5,
-        "line_move": null,
-        "market": "ra",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": 105,
-        "prob_calib": 19.720963055005942,
-        "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1553,35 +1525,35 @@
         "price": -116,
         "prob_calib": 17.76921061652464,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
-      "player": "SATOU SABALLY",
-      "score": 0.288,
-      "score_adj": 0.147079,
-      "team": "NYL",
-      "team_tricode": "NYL",
+      "player": "SHAKIRA AUSTIN",
+      "score": 0.21,
+      "score_adj": 0.146023,
+      "team": "WSH",
+      "team_tricode": "WSH",
       "tier": "Low",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.0665514936853862,
-        "ev": 0.1470788010447035,
-        "ev_calib_pct": -67.49558496912053,
-        "ev_pct": 14.70788010447035,
+        "edge": 0.0856831791072134,
+        "ev": 0.1460234460841243,
+        "ev_calib_pct": -75.11431411805769,
+        "ev_pct": 14.602344608412428,
         "implied_move": null,
-        "line": 3.5,
+        "line": 11.5,
         "line_move": null,
-        "market": "reb",
+        "market": "ra",
         "open_implied_prob": null,
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 121,
-        "prob_calib": 14.70788010447035,
+        "price": -142,
+        "prob_calib": 14.602344608412428,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1609,7 +1581,7 @@
         "price": -127,
         "prob_calib": 14.2611126564207,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1637,13 +1609,13 @@
         "price": 134,
         "prob_calib": 13.639294475102808,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "NATASHA MACK",
-      "score": 0.255,
+      "score": 0.354,
       "score_adj": 0.049914,
       "team": "PHX",
       "team_tricode": "PHX",
@@ -1665,7 +1637,7 @@
         "price": -130,
         "prob_calib": 12.991418497610018,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1693,7 +1665,7 @@
         "price": -120,
         "prob_calib": 12.08293294357091,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1721,7 +1693,7 @@
         "price": -113,
         "prob_calib": 10.50679481925208,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1749,7 +1721,7 @@
         "price": 118,
         "prob_calib": 10.23781526800332,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1777,14 +1749,42 @@
         "price": -140,
         "prob_calib": 9.34156639524338,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "OLIVIA MILES",
+      "score": 0.431,
+      "score_adj": 0.007615,
+      "team": "MIN",
+      "team_tricode": "MIN",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.0472395111862509,
+        "ev": 0.0876151617727901,
+        "ev_calib_pct": -83.75000845752525,
+        "ev_pct": 8.761516177279011,
+        "implied_move": null,
+        "line": 4.5,
+        "line_move": null,
+        "market": "reb",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -117,
+        "prob_calib": 8.761516177279011,
+        "side": "OVER",
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "COURTNEY WILLIAMS",
       "score": 0.418,
-      "score_adj": 0.007558,
+      "score_adj": 0.0,
       "team": "MIN",
       "team_tricode": "MIN",
       "tier": "Low",
@@ -1805,35 +1805,7 @@
         "price": 108,
         "prob_calib": 8.75578541548688,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "OLIVIA MILES",
-      "score": 0.43,
-      "score_adj": 0.0,
-      "team": "MIN",
-      "team_tricode": "MIN",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0456826547906847,
-        "ev": 0.0831274537994429,
-        "ev_calib_pct": -84.8735288987899,
-        "ev_pct": 8.31274537994429,
-        "implied_move": null,
-        "line": 4.5,
-        "line_move": null,
-        "market": "reb",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": -122,
-        "prob_calib": 8.31274537994429,
-        "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1861,14 +1833,14 @@
         "price": -114,
         "prob_calib": 6.459750287494249,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
       "opponent": null,
       "player": "BREANNA STEWART",
       "score": 0.409,
-      "score_adj": 0.0,
+      "score_adj": 0.06321,
       "team": "NYL",
       "team_tricode": "NYL",
       "tier": "Low",
@@ -1889,7 +1861,7 @@
         "price": -137,
         "prob_calib": 6.32104569561926,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1917,7 +1889,7 @@
         "price": -114,
         "prob_calib": 6.28692749375671,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1945,7 +1917,7 @@
         "price": -125,
         "prob_calib": 5.60926095928744,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -1973,7 +1945,7 @@
         "price": -144,
         "prob_calib": 5.4777668293811494,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -2001,7 +1973,7 @@
         "price": -115,
         "prob_calib": 5.12424738734218,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -2029,7 +2001,7 @@
         "price": -144,
         "prob_calib": 4.74912936320237,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -2057,7 +2029,7 @@
         "price": -122,
         "prob_calib": 4.55073463079931,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -2085,7 +2057,7 @@
         "price": -134,
         "prob_calib": 4.38251891469704,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     },
     {
@@ -2113,7 +2085,35 @@
         "price": 114,
         "prob_calib": 4.30655626393812,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "SATOU SABALLY",
+      "score": 0.246,
+      "score_adj": 0.0,
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.023281375522959,
+        "ev": 0.0394489974139028,
+        "ev_calib_pct": -93.31558654931091,
+        "ev_pct": 3.94489974139028,
+        "implied_move": null,
+        "line": 2.5,
+        "line_move": null,
+        "market": "ast",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -144,
+        "prob_calib": 3.94489974139028,
+        "side": "UNDER",
+        "snapshot_ts": "2026-05-29T20:38:35.899803+00:00"
       }
     }
   ],
