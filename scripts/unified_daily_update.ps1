@@ -374,6 +374,26 @@ function Get-ForcedPublishArtifactPaths {
         }
     }
 
+    function Add-PathsUnderRoot {
+        param([string]$RelativeRoot)
+
+        if ([string]::IsNullOrWhiteSpace($RelativeRoot)) {
+            return
+        }
+
+        $fullRoot = Join-Path $RepoPath $RelativeRoot
+        if (-not (Test-Path $fullRoot)) {
+            return
+        }
+
+        foreach ($match in @(Get-ChildItem -Path $fullRoot -File -Recurse -ErrorAction SilentlyContinue)) {
+            $relativePath = $match.FullName.Substring($RepoPath.Length).TrimStart('\', '/') -replace '\\', '/'
+            if (-not [string]::IsNullOrWhiteSpace($relativePath)) {
+                $paths.Add($relativePath) | Out-Null
+            }
+        }
+    }
+
     if (-not $SkipMLB) {
         foreach ($relativePath in @(
             "data/mlb_source/data/daily/daily_summary_${dateSlug}.json",
@@ -606,185 +626,111 @@ $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODD
 if (-not $SkipMLB) {
     $mlbVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\mlb_bettingv2'
     $mlbVendoredDailyUpdate = if ($mlbVendoredRoot) { Join-Path $mlbVendoredRoot 'tools\daily_update.py' } else { $null }
-    if ($mlbVendoredDailyUpdate -and (Test-Path $mlbVendoredDailyUpdate)) {
-        $preferLocalMirrorArtifactsForGate = $true
-        $mlbArtifactDataRoot = Join-Path $repoRoot 'data\mlb_source\source_artifacts\data'
-        $mlbOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
-        $mlbEnvOverrides = @{
-            MLB_BETTING_DATA_ROOT = $mlbArtifactDataRoot
-            MLB_LIVE_LENS_DIR = (Join-Path $mlbArtifactDataRoot 'live_lens')
-        }
-        if (-not [string]::IsNullOrWhiteSpace($mlbOddsApiKey)) {
-            $mlbEnvOverrides.ODDS_API_KEY = $mlbOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'mlb'
-            Name = 'MLB vendored daily update'
-            Workflow = 'vendored_daily_update'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'tools\daily_update.py',
-                '--workflow', 'ui-daily',
-                '--date', $Date,
-                '--season', $season,
-                '--sims', [string]$runtimePolicy.MLB.simsPerGame,
-                '--workers', [string]$runtimePolicy.MLB.workers,
-                '--git-push', 'off',
-                '--validate-render-frontend', 'off',
-                '--build-next-day', 'on'
-            )
-            WorkingDirectory = $mlbVendoredRoot
-            EnvironmentOverrides = $mlbEnvOverrides
-            RuntimePolicy = $runtimePolicy.MLB
-        }
+    if (-not ($mlbVendoredDailyUpdate -and (Test-Path $mlbVendoredDailyUpdate))) {
+        throw "MLB self-contained daily update is unavailable because vendor\\mlb_bettingv2\\tools\\daily_update.py was not found. The fallback Syndicate MLB refresh only materializes existing artifacts and is not equivalent to the full ui-daily workflow."
     }
-    else {
-        $preferLocalMirrorArtifactsForGate = $true
-        $mlbOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
-        $mlbEnvOverrides = @{}
-        if (-not [string]::IsNullOrWhiteSpace($mlbOddsApiKey)) {
-            $mlbEnvOverrides.ODDS_API_KEY = $mlbOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'mlb'
-            Name = 'MLB Syndicate daily refresh'
-            Workflow = 'syndicate_refresh'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'scripts\refresh_mlb_oddsapi.py',
-                '--date', $Date,
-                '--source-root', 'data\mlb_source',
-                '--artifact-root', 'data\mlb_source\source_artifacts',
-                '--overwrite', 'on'
-            )
-            WorkingDirectory = $repoRoot
-            EnvironmentOverrides = $mlbEnvOverrides
-            RuntimePolicy = $runtimePolicy.MLB
-        }
+
+    $preferLocalMirrorArtifactsForGate = $true
+    $mlbArtifactDataRoot = Join-Path $repoRoot 'data\mlb_source\source_artifacts\data'
+    $mlbOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
+    $mlbEnvOverrides = @{
+        MLB_BETTING_DATA_ROOT = $mlbArtifactDataRoot
+        MLB_LIVE_LENS_DIR = (Join-Path $mlbArtifactDataRoot 'live_lens')
+    }
+    if (-not [string]::IsNullOrWhiteSpace($mlbOddsApiKey)) {
+        $mlbEnvOverrides.ODDS_API_KEY = $mlbOddsApiKey
+    }
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'mlb'
+        Name = 'MLB vendored daily update'
+        Workflow = 'vendored_daily_update'
+        Command = @(
+            (Resolve-Python $repoRoot),
+            'tools\daily_update.py',
+            '--workflow', 'ui-daily',
+            '--date', $Date,
+            '--season', $season,
+            '--sims', [string]$runtimePolicy.MLB.simsPerGame,
+            '--workers', [string]$runtimePolicy.MLB.workers,
+            '--git-push', 'off',
+            '--validate-render-frontend', 'off',
+            '--build-next-day', 'on'
+        )
+        WorkingDirectory = $mlbVendoredRoot
+        EnvironmentOverrides = $mlbEnvOverrides
+        RuntimePolicy = $runtimePolicy.MLB
     }
 }
 if (-not $SkipNBA) {
     $nbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nba_betting_repo'
     $nbaVendoredApp = if ($nbaVendoredRoot) { Join-Path $nbaVendoredRoot 'app.py' } else { $null }
-    if ($nbaVendoredApp -and (Test-Path $nbaVendoredApp)) {
-        $preferLocalMirrorArtifactsForGate = $true
-        $nbaEnvOverrides = @{
-            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
-            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
-        }
-        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
-            $nbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'nba'
-            Name = 'NBA vendored daily update'
-            Workflow = 'vendored_daily_update'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'scripts\refresh_nba_oddsapi_props.py',
-                '--date', $Date,
-                '--source-root', 'vendor\nba_betting_repo',
-                '--artifact-root', 'data\nba_source',
-                '--log-file', (Join-Path $runDir 'nba_props_refresh.log'),
-                '--force-refresh',
-                '--days-ahead', '0',
-                '--do-edges',
-                '--do-export'
-            )
-            WorkingDirectory = $repoRoot
-            EnvironmentOverrides = $nbaEnvOverrides
-            RuntimePolicy = $runtimePolicy.NBA
-        }
+    if (-not ($nbaVendoredApp -and (Test-Path $nbaVendoredApp))) {
+        throw "NBA self-contained refresh is unavailable because vendor\\nba_betting_repo\\app.py was not found. The fallback NBA Syndicate props refresh still requires a source-root for fresh runs and is not a self-contained replacement."
     }
-    else {
-        $nbaEnvOverrides = @{
-            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
-            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
-        }
-        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
-            $nbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'nba'
-            Name = 'NBA Syndicate props refresh'
-            Workflow = 'syndicate_refresh'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'scripts\refresh_nba_oddsapi_props.py',
-                '--date', $Date,
-                '--artifact-root', 'data\nba_source',
-                '--log-file', (Join-Path $runDir 'nba_props_refresh.log'),
-                '--force-refresh',
-                '--days-ahead', '0',
-                '--do-edges',
-                '--do-export'
-            )
-            WorkingDirectory = $repoRoot
-            EnvironmentOverrides = $nbaEnvOverrides
-            RuntimePolicy = $runtimePolicy.NBA
-        }
+
+    $preferLocalMirrorArtifactsForGate = $true
+    $nbaEnvOverrides = @{
+        REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.NBA.smartsimNSims
+        REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.NBA.smartsimWorkers
+    }
+    if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+        $nbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+    }
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'nba'
+        Name = 'NBA vendored daily update'
+        Workflow = 'vendored_daily_update'
+        Command = @(
+            (Resolve-Python $repoRoot),
+            'scripts\refresh_nba_oddsapi_props.py',
+            '--date', $Date,
+            '--source-root', 'vendor\nba_betting_repo',
+            '--artifact-root', 'data\nba_source',
+            '--log-file', (Join-Path $runDir 'nba_props_refresh.log'),
+            '--force-refresh',
+            '--days-ahead', '0',
+            '--do-edges',
+            '--do-export'
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = $nbaEnvOverrides
+        RuntimePolicy = $runtimePolicy.NBA
     }
 }
 if (-not $SkipWNBA) {
     $wnbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\wnba_betting_repo'
     $wnbaVendoredApp = if ($wnbaVendoredRoot) { Join-Path $wnbaVendoredRoot 'app.py' } else { $null }
-    if ($wnbaVendoredApp -and (Test-Path $wnbaVendoredApp)) {
-        $preferLocalMirrorArtifactsForGate = $true
-        $wnbaEnvOverrides = @{
-            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
-            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
-        }
-        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
-            $wnbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'wnba'
-            Name = 'WNBA vendored daily update'
-            Workflow = 'vendored_daily_update'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'scripts\refresh_wnba_oddsapi_props.py',
-                '--date', $Date,
-                '--source-root', 'vendor\wnba_betting_repo',
-                '--artifact-root', 'data\wnba_source',
-                '--log-file', (Join-Path $runDir 'wnba_props_refresh.log'),
-                '--force-refresh',
-                '--days-ahead', '0',
-                '--do-edges',
-                '--do-export'
-            )
-            WorkingDirectory = $repoRoot
-            EnvironmentOverrides = $wnbaEnvOverrides
-            RuntimePolicy = $runtimePolicy.WNBA
-        }
+    if (-not ($wnbaVendoredApp -and (Test-Path $wnbaVendoredApp))) {
+        throw "WNBA self-contained refresh is unavailable because vendor\\wnba_betting_repo\\app.py was not found. The fallback WNBA Syndicate props refresh still requires a source-root for fresh runs and is not a self-contained replacement."
     }
-    else {
-        $wnbaEnvOverrides = @{
-            REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
-            REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
-        }
-        if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
-            $wnbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
-        }
-        $sourceSteps += [pscustomobject]@{
-            Sport = 'wnba'
-            Name = 'WNBA Syndicate props refresh'
-            Workflow = 'syndicate_refresh'
-            Command = @(
-                (Resolve-Python $repoRoot),
-                'scripts\refresh_wnba_oddsapi_props.py',
-                '--date', $Date,
-                '--artifact-root', 'data\wnba_source',
-                '--log-file', (Join-Path $runDir 'wnba_props_refresh.log'),
-                '--force-refresh',
-                '--days-ahead', '0',
-                '--do-edges',
-                '--do-export'
-            )
-            WorkingDirectory = $repoRoot
-            EnvironmentOverrides = $wnbaEnvOverrides
-            RuntimePolicy = $runtimePolicy.WNBA
-        }
+
+    $preferLocalMirrorArtifactsForGate = $true
+    $wnbaEnvOverrides = @{
+        REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
+        REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
+    }
+    if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
+        $wnbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
+    }
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'wnba'
+        Name = 'WNBA vendored daily update'
+        Workflow = 'vendored_daily_update'
+        Command = @(
+            (Resolve-Python $repoRoot),
+            'scripts\refresh_wnba_oddsapi_props.py',
+            '--date', $Date,
+            '--source-root', 'vendor\wnba_betting_repo',
+            '--artifact-root', 'data\wnba_source',
+            '--log-file', (Join-Path $runDir 'wnba_props_refresh.log'),
+            '--force-refresh',
+            '--days-ahead', '0',
+            '--do-edges',
+            '--do-export'
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = $wnbaEnvOverrides
+        RuntimePolicy = $runtimePolicy.WNBA
     }
 }
 if (-not $SkipNHL) {

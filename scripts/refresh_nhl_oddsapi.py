@@ -10,6 +10,7 @@ import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -25,9 +26,18 @@ PROCESSED_FILES = (
     "props_reconciliations_log.csv",
     "recon_games_{date}.csv",
     "recon_props_{date}.csv",
+    "props_projections_all_{date}.csv",
     "props_boxscores_sim_{date}.csv",
     "props_boxscores_sim_hist_{date}.csv",
+    "props_boxscores_sim_samples_{date}.csv",
     "props_recommendations_{date}.csv",
+    "roster_snapshot_{date}.csv",
+    "injuries_{date}.csv",
+    "lineups_{date}.csv",
+    "lineups_co_toi_{date}.csv",
+    "shifts_{date}.csv",
+    "co_toi_shifts_{date}.csv",
+    "starting_goalies_{date}.csv",
 )
 
 LIVE_LENS_FILES = (
@@ -40,6 +50,7 @@ LIVE_LENS_FILES = (
 REQUIRED_ARTIFACTS = (
     "data/processed/predictions_sim_{date}.csv",
     "data/processed/recommendations_sim_{date}.csv",
+    "data/processed/props_projections_all_{date}.csv",
     "data/processed/props_boxscores_sim_{date}.csv",
     "data/processed/props_boxscores_sim_hist_{date}.csv",
     "data/processed/props_recommendations_{date}.csv",
@@ -125,9 +136,8 @@ def _source_python_executable(source_root: Path) -> str:
         Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311-arm64" / "python.exe",
     ):
         if installed.exists():
-            return str(installed)
     candidate = source_root / ".venv" / "Scripts" / "python.exe"
-    if candidate.exists() and "windowsapps" not in str(candidate).lower():
+        "data/processed/recommendations_sim_{date}.csv",
         return str(candidate)
     return sys.executable
 
@@ -140,9 +150,14 @@ def _default_source_root() -> Path | None:
     return None
 
 
+def _source_data_root(source_root: Path) -> Path:
+    return source_root / "data"
+
+
 def _run_source_cli(*, source_root: Path, artifact_root: Path, command_args: list[str]) -> None:
     env = os.environ.copy()
-    data_dir = artifact_root / "data"
+    data_dir = _source_data_root(source_root)
+    data_dir.mkdir(parents=True, exist_ok=True)
     env["NHL_DATA_DIR"] = str(data_dir)
     env["DATA_DIR"] = str(data_dir)
     print(json.dumps({"phase": "source_cli", "command": command_args}))
@@ -176,6 +191,7 @@ def _run_source_generation_multi(*, source_root: Path, artifact_root: Path, date
             ["lineup-update", "--date", target_date, "--prefer-source", "none"],
             ["team-odds-collect", "--date", target_date],
             ["props-collect", "--date", target_date],
+            ["props-project-all", "--date", target_date],
         ]
         if index == 0:
             pregame_batches.insert(2, ["shifts-update", "--date", target_date])
@@ -314,9 +330,8 @@ def main() -> int:
     warnings: list[str] = []
 
     try:
-        copied_by_date: dict[str, dict[str, object]] = {}
         for target_date in target_dates:
-            copied_by_date[target_date] = _collect_owned_nhl_artifacts(
+            _collect_owned_nhl_artifacts(
                 artifact_root=artifact_root,
                 date_str=target_date,
                 team_markets=str(args.team_markets or "h2h,spreads,totals"),

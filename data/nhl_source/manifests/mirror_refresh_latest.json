@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "nhl",
     "date":  "2026-05-29",
-    "refreshedAtUtc":  "2026-05-29T21:04:10.0115290Z",
+    "refreshedAtUtc":  "2026-05-29T21:41:04.7984712Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  null,
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NHL",
@@ -13,10 +13,22 @@
     "artifactGroups":  {
                            "processed":  10,
                            "live_lens":  0,
+                           "models":  0,
                            "odds":  2,
                            "props":  1,
                            "other":  0
                        },
+    "modelStatus":  {
+                        "modelRoot":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\data\\models",
+                        "eloRatingsPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\data\\models\\elo_ratings.json",
+                        "configPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\data\\models\\config.json",
+                        "nnGamesPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\data\\models\\nn_games",
+                        "nnPropsPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nhl_source\\data\\models\\nn_props",
+                        "eloRatingsPresent":  false,
+                        "configPresent":  false,
+                        "nnGamesPresent":  false,
+                        "nnPropsPresent":  false
+                    },
     "copiedArtifacts":  [
                             "predictions_sim_2026-05-29.csv",
                             "recommendations_sim_2026-05-29.csv",

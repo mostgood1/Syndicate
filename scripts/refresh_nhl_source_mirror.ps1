@@ -101,6 +101,25 @@ function Copy-IfExists {
     return $true
 }
 
+function Copy-TreeIfExists {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationPath
+    )
+
+    if (-not (Test-Path $SourcePath)) {
+        return $false
+    }
+
+    $parent = Split-Path -Parent $DestinationPath
+    if ($parent) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
+    return $true
+}
+
 function Write-JsonFile {
     param(
         [string]$Path,
@@ -156,12 +175,18 @@ $files = @(
     "props_reconciliations_log.csv",
     "recon_games_$Date.csv",
     "recon_props_$Date.csv",
+    "props_projections_all_$Date.csv",
     "props_boxscores_sim_$Date.csv",
     "props_boxscores_sim_hist_$Date.csv",
+    "props_boxscores_sim_samples_$Date.csv",
     "props_recommendations_$Date.csv",
     "roster_snapshot_$Date.csv",
+    "injuries_$Date.csv",
     "lineups_$Date.csv",
-    "lineups_co_toi_$Date.csv"
+    "lineups_co_toi_$Date.csv",
+    "shifts_$Date.csv",
+    "co_toi_shifts_$Date.csv",
+    "starting_goalies_$Date.csv"
 )
 
 foreach ($name in $files) {
