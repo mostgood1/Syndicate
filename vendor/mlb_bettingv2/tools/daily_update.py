@@ -2535,6 +2535,7 @@ def _build_next_day_ui_daily_command(args: argparse.Namespace, raw_argv: List[st
             "--current-oddsapi-regions",
             "--current-oddsapi-bookmakers",
             "--current-oddsapi-hitter-markets",
+            "--allow-empty-current-oddsapi",
             "--git-push",
             "--git-push-remote",
             "--git-push-branch",
@@ -2568,6 +2569,8 @@ def _build_next_day_ui_daily_command(args: argparse.Namespace, raw_argv: List[st
         "off",
         "--reconcile-hr-target-history",
         "off",
+        "--allow-empty-current-oddsapi",
+        "on",
         "--git-push",
         "off",
         "--build-next-day",
@@ -3320,9 +3323,15 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
             if int(hitter_counts.get("players") or 0) <= 0:
                 odds_warnings.append("current-day OddsAPI ingest captured no hitter props")
             if odds_warnings:
-                odds_stage["status"] = "error"
-                odds_stage["errors"] = list(odds_warnings)
-                report["errors"].extend(list(odds_warnings))
+                allow_empty_oddsapi = str(getattr(args, "allow_empty_current_oddsapi", "off") or "off") == "on"
+                if allow_empty_oddsapi:
+                    odds_stage["status"] = "warning"
+                    odds_stage["warnings"] = list(odds_warnings)
+                    report["warnings"].extend(list(odds_warnings))
+                else:
+                    odds_stage["status"] = "error"
+                    odds_stage["errors"] = list(odds_warnings)
+                    report["errors"].extend(list(odds_warnings))
         except Exception as exc:
             odds_stage = {
                 "status": "error",
@@ -4947,6 +4956,12 @@ def main() -> int:
         "--current-oddsapi-hitter-markets",
         default="",
         help="Optional comma-separated hitter market keys for the current-day OddsAPI fetch during --workflow ui-daily.",
+    )
+    ap.add_argument(
+        "--allow-empty-current-oddsapi",
+        choices=["on", "off"],
+        default="off",
+        help="If on, treat empty current-day OddsAPI counts as a warning instead of a workflow failure. Used by forward-build lookahead runs.",
     )
     ap.add_argument(
         "--git-push",
