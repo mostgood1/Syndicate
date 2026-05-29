@@ -38,7 +38,7 @@ def _source_roots() -> list[Path]:
 
 
 def _resolve_data_path(*parts: str) -> Path:
-    return default_mlb_source_root().joinpath("data", *parts)
+    return _resolve_data_path_with_reconcile(*parts)
 
 
 def _reconcile_from_repo_enabled() -> bool:
@@ -49,13 +49,37 @@ def _resolve_data_path_with_reconcile(*parts: str) -> Path:
     roots = _source_roots()
     primary = roots[0]
     target = primary.joinpath("data", *parts)
-    if target.exists() or not _reconcile_from_repo_enabled() or len(roots) <= 1:
+    if not _reconcile_from_repo_enabled() or len(roots) <= 1:
         return target
+
+    target_stat = None
+    if target.exists() and target.is_file():
+        try:
+            target_stat = target.stat()
+        except OSError:
+            target_stat = None
+
     rel = Path("data", *parts)
     for root in roots[1:]:
         candidate = root.joinpath(rel)
         if not candidate.exists() or not candidate.is_file():
             continue
+        should_copy = False
+        if target_stat is None:
+            should_copy = True
+        else:
+            try:
+                candidate_stat = candidate.stat()
+            except OSError:
+                candidate_stat = None
+            if candidate_stat is None:
+                continue
+            should_copy = (
+                candidate_stat.st_mtime_ns > target_stat.st_mtime_ns
+                or (target_stat.st_size <= 0 and candidate_stat.st_size > 0)
+            )
+        if not should_copy:
+            return target
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(candidate, target)
         return target
