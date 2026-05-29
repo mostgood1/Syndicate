@@ -486,18 +486,18 @@
           "basketball_summary": "Recent form has stayed below this line with a last-five average of 7.0. The last game landed at 3.0, which stayed under this line.",
           "book": "fanduel",
           "display_pick": "Natasha Cloud Under 9.5 RA",
-          "ev": 0.5611597109534281,
-          "ev_pct": 56.12,
+          "ev": 0.549224239157148,
+          "ev_pct": 54.92,
           "game_id": null,
           "game_key": "2026-05-29:MIN@CHI",
           "home": "CHI",
-          "implied_prob": 0.5413,
+          "implied_prob": 0.5455,
           "line": 9.5,
           "market": "ra",
           "market_reasons": [
-            "Projected value is +56.1% per unit risked.",
-            "The price stays workable at -118.",
-            "Model probability clears the market by 30.4 points."
+            "Projected value is +54.9% per unit risked.",
+            "The price stays workable at -120.",
+            "Model probability clears the market by 30.0 points."
           ],
           "matchup": "MIN @ CHI",
           "model_baseline": 7.985452857142857,
@@ -509,8 +509,8 @@
           "model_sd": 1.4916446856697683,
           "p_win": 0.845,
           "player": "Natasha Cloud",
-          "price": -118.0,
-          "prob_edge": 0.3037,
+          "price": -120.0,
+          "prob_edge": 0.2996,
           "reasons": [
             "Recent form has stayed below this line with a last-five average of 7.0.",
             "The last game landed at 3.0, which stayed under this line.",
@@ -518,12 +518,12 @@
             "The model baseline sits at 8.0 against a 9.5 line.",
             "That leaves roughly +1.02 standard deviations of cushion.",
             "Win probability grades at 84.5%.",
-            "Projected value is +56.1% per unit risked.",
-            "The price stays workable at -118.",
-            "Model probability clears the market by 30.4 points."
+            "Projected value is +54.9% per unit risked.",
+            "The price stays workable at -120.",
+            "Model probability clears the market by 30.0 points."
           ],
           "recommendation_priority_score": 73.6,
-          "score": 0.5611597109534281,
+          "score": 0.549224239157148,
           "sd_rel": 0.15701523007050192,
           "selection": "UNDER",
           "side": "UNDER",
@@ -543,14 +543,14 @@
             "The model baseline sits at 8.0 against a 9.5 line.",
             "That leaves roughly +1.02 standard deviations of cushion.",
             "Win probability grades at 84.5%.",
-            "Projected value is +56.1% per unit risked.",
-            "The price stays workable at -118.",
-            "Model probability clears the market by 30.4 points."
+            "Projected value is +54.9% per unit risked.",
+            "The price stays workable at -120.",
+            "Model probability clears the market by 30.0 points."
           ],
           "value_reasons": [
-            "Projected value is +56.1% per unit risked.",
-            "The price stays workable at -118.",
-            "Model probability clears the market by 30.4 points."
+            "Projected value is +54.9% per unit risked.",
+            "The price stays workable at -120.",
+            "Model probability clears the market by 30.0 points."
           ],
           "value_support_score": 85.0,
           "win_prob": 0.8450314031766262,
@@ -1356,18 +1356,18 @@
         "basketball_summary": "Recent form has stayed below this line with a last-five average of 7.0. The last game landed at 3.0, which stayed under this line.",
         "book": "fanduel",
         "display_pick": "Natasha Cloud Under 9.5 RA",
-        "ev": 0.5611597109534281,
-        "ev_pct": 56.12,
+        "ev": 0.549224239157148,
+        "ev_pct": 54.92,
         "game_id": null,
         "game_key": "2026-05-29:MIN@CHI",
         "home": "CHI",
-        "implied_prob": 0.5413,
+        "implied_prob": 0.5455,
         "line": 9.5,
         "market": "ra",
         "market_reasons": [
-          "Projected value is +56.1% per unit risked.",
-          "The price stays workable at -118.",
-          "Model probability clears the market by 30.4 points."
+          "Projected value is +54.9% per unit risked.",
+          "The price stays workable at -120.",
+          "Model probability clears the market by 30.0 points."
         ],
         "matchup": "MIN @ CHI",
         "model_baseline": 7.985452857142857,
@@ -1379,8 +1379,8 @@
         "model_sd": 1.4916446856697683,
         "p_win": 0.845,
         "player": "Natasha Cloud",
-        "price": -118.0,
-        "prob_edge": 0.3037,
+        "price": -120.0,
+        "prob_edge": 0.2996,
         "reasons": [
           "Recent form has stayed below this line with a last-five average of 7.0.",
           "The last game landed at 3.0, which stayed under this line.",
@@ -1388,12 +1388,12 @@
           "The model baseline sits at 8.0 against a 9.5 line.",
           "That leaves roughly +1.02 standard deviations of cushion.",
           "Win probability grades at 84.5%.",
-          "Projected value is +56.1% per unit risked.",
-          "The price stays workable at -118.",
-          "Model probability clears the market by 30.4 points."
+          "Projected value is +54.9% per unit risked.",
+          "The price stays workable at -120.",
+          "Model probability clears the market by 30.0 points."
         ],
         "recommendation_priority_score": 73.6,
-        "score": 0.5611597109534281,
+        "score": 0.549224239157148,
         "sd_rel": 0.15701523007050192,
         "selection": "UNDER",
         "side": "UNDER",
@@ -1413,14 +1413,14 @@
           "The model baseline sits at 8.0 against a 9.5 line.",
           "That leaves roughly +1.02 standard deviations of cushion.",
           "Win probability grades at 84.5%.",
-          "Projected value is +56.1% per unit risked.",
-          "The price stays workable at -118.",
-          "Model probability clears the market by 30.4 points."
+          "Projected value is +54.9% per unit risked.",
+          "The price stays workable at -120.",
+          "Model probability clears the market by 30.0 points."
         ],
         "value_reasons": [
-          "Projected value is +56.1% per unit risked.",
-          "The price stays workable at -118.",
-          "Model probability clears the market by 30.4 points."
+          "Projected value is +54.9% per unit risked.",
+          "The price stays workable at -120.",
+          "Model probability clears the market by 30.0 points."
         ],
         "value_support_score": 85.0,
         "win_prob": 0.8450314031766262,

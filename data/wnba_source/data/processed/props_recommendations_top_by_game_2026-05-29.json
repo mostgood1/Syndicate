@@ -4,17 +4,17 @@
     {
       "opponent": null,
       "player": "BRIDGET CARLETON",
-      "score": 0.774,
-      "score_adj": 0.795221,
+      "score": 0.764,
+      "score_adj": 0.787894,
       "team": "POR",
       "team_tricode": "POR",
       "tier": "High",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.3245800510582339,
-        "ev": 0.7952211250926733,
-        "ev_calib_pct": 94.82917564770497,
-        "ev_pct": 79.52211250926733,
+        "edge": 0.3229072507905859,
+        "ev": 0.7878936919290296,
+        "ev_calib_pct": 92.2460608306832,
+        "ev_pct": 78.78936919290295,
         "implied_move": null,
         "line": 2.5,
         "line_move": null,
@@ -23,10 +23,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 145,
-        "prob_calib": 79.52211250926733,
+        "price": 144,
+        "prob_calib": 78.78936919290295,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -54,7 +54,7 @@
         "price": -114,
         "prob_calib": 33.24234268685015,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -82,7 +82,7 @@
         "price": -104,
         "prob_calib": 24.831760488457718,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -110,7 +110,7 @@
         "price": 105,
         "prob_calib": 19.720963055005942,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -138,7 +138,7 @@
         "price": -116,
         "prob_calib": 17.76921061652464,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -166,7 +166,7 @@
         "price": 121,
         "prob_calib": 14.70788010447035,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -194,7 +194,7 @@
         "price": -127,
         "prob_calib": 14.2611126564207,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -222,7 +222,7 @@
         "price": 134,
         "prob_calib": 13.639294475102808,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -250,23 +250,23 @@
         "price": -130,
         "prob_calib": 12.991418497610018,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
       "opponent": null,
       "player": "NATASHA CLOUD",
-      "score": 0.271,
-      "score_adj": 0.123455,
+      "score": 0.27,
+      "score_adj": 0.120829,
       "team": "CHI",
       "team_tricode": "CHI",
       "tier": "Low",
       "top_play": {
         "book": "fanduel",
-        "edge": 0.0668243381575928,
-        "ev": 0.1234551332064002,
-        "ev_calib_pct": -77.19218725508878,
-        "ev_pct": 12.34551332064002,
+        "edge": 0.0659069069649322,
+        "ev": 0.1208293294357091,
+        "ev_calib_pct": -77.84795627012,
+        "ev_pct": 12.08293294357091,
         "implied_move": null,
         "line": 9.5,
         "line_move": null,
@@ -275,10 +275,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": -118,
-        "prob_calib": 12.34551332064002,
+        "price": -120,
+        "prob_calib": 12.08293294357091,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -306,7 +306,7 @@
         "price": -113,
         "prob_calib": 10.50679481925208,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -334,7 +334,7 @@
         "price": 118,
         "prob_calib": 10.23781526800332,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -362,7 +362,7 @@
         "price": -140,
         "prob_calib": 9.34156639524338,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -390,7 +390,7 @@
         "price": 108,
         "prob_calib": 8.75578541548688,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -418,7 +418,7 @@
         "price": -122,
         "prob_calib": 8.31274537994429,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -446,7 +446,7 @@
         "price": -114,
         "prob_calib": 6.459750287494249,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -474,7 +474,7 @@
         "price": -137,
         "prob_calib": 6.32104569561926,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -502,7 +502,7 @@
         "price": -114,
         "prob_calib": 6.28692749375671,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -530,7 +530,7 @@
         "price": -125,
         "prob_calib": 5.60926095928744,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -558,7 +558,7 @@
         "price": -144,
         "prob_calib": 5.4777668293811494,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -586,7 +586,35 @@
         "price": -115,
         "prob_calib": 5.12424738734218,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "NNEKA OGWUMIKE",
+      "score": 0.211,
+      "score_adj": 0.047491,
+      "team": "LAS",
+      "team_tricode": "LAS",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.0280276487008664,
+        "ev": 0.0474912936320237,
+        "ev_calib_pct": -91.95286413457376,
+        "ev_pct": 4.74912936320237,
+        "implied_move": null,
+        "line": 9.5,
+        "line_move": null,
+        "market": "ra",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -144,
+        "prob_calib": 4.74912936320237,
+        "side": "UNDER",
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -614,35 +642,7 @@
         "price": -122,
         "prob_calib": 4.55073463079931,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "NNEKA OGWUMIKE",
-      "score": 0.21,
-      "score_adj": 0.045254,
-      "team": "LAS",
-      "team_tricode": "LAS",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0269325401855681,
-        "ev": 0.0452539960941177,
-        "ev_calib_pct": -92.39609725493396,
-        "ev_pct": 4.52539960941177,
-        "implied_move": null,
-        "line": 9.5,
-        "line_move": null,
-        "market": "ra",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": -147,
-        "prob_calib": 4.52539960941177,
-        "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -670,7 +670,7 @@
         "price": -134,
         "prob_calib": 4.38251891469704,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -698,7 +698,7 @@
         "price": 114,
         "prob_calib": 4.30655626393812,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     }
   ],
@@ -711,17 +711,17 @@
     {
       "opponent": null,
       "player": "BRIDGET CARLETON",
-      "score": 0.774,
-      "score_adj": 0.795221,
+      "score": 0.764,
+      "score_adj": 0.787894,
       "team": "POR",
       "team_tricode": "POR",
       "tier": "High",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.3245800510582339,
-        "ev": 0.7952211250926733,
-        "ev_calib_pct": 94.82917564770497,
-        "ev_pct": 79.52211250926733,
+        "edge": 0.3229072507905859,
+        "ev": 0.7878936919290296,
+        "ev_calib_pct": 92.2460608306832,
+        "ev_pct": 78.78936919290295,
         "implied_move": null,
         "line": 2.5,
         "line_move": null,
@@ -730,10 +730,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 145,
-        "prob_calib": 79.52211250926733,
+        "price": 144,
+        "prob_calib": 78.78936919290295,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -761,7 +761,7 @@
         "price": -114,
         "prob_calib": 33.24234268685015,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -789,7 +789,7 @@
         "price": -104,
         "prob_calib": 24.831760488457718,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -817,7 +817,7 @@
         "price": 105,
         "prob_calib": 19.720963055005942,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -845,7 +845,7 @@
         "price": -116,
         "prob_calib": 17.76921061652464,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -873,7 +873,7 @@
         "price": 121,
         "prob_calib": 14.70788010447035,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -901,7 +901,7 @@
         "price": -127,
         "prob_calib": 14.2611126564207,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -929,7 +929,7 @@
         "price": 134,
         "prob_calib": 13.639294475102808,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -957,23 +957,23 @@
         "price": -130,
         "prob_calib": 12.991418497610018,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
       "opponent": null,
       "player": "NATASHA CLOUD",
-      "score": 0.271,
-      "score_adj": 0.123455,
+      "score": 0.27,
+      "score_adj": 0.120829,
       "team": "CHI",
       "team_tricode": "CHI",
       "tier": "Low",
       "top_play": {
         "book": "fanduel",
-        "edge": 0.0668243381575928,
-        "ev": 0.1234551332064002,
-        "ev_calib_pct": -77.19218725508878,
-        "ev_pct": 12.34551332064002,
+        "edge": 0.0659069069649322,
+        "ev": 0.1208293294357091,
+        "ev_calib_pct": -77.84795627012,
+        "ev_pct": 12.08293294357091,
         "implied_move": null,
         "line": 9.5,
         "line_move": null,
@@ -982,10 +982,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": -118,
-        "prob_calib": 12.34551332064002,
+        "price": -120,
+        "prob_calib": 12.08293294357091,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1013,7 +1013,7 @@
         "price": -113,
         "prob_calib": 10.50679481925208,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1041,7 +1041,7 @@
         "price": 118,
         "prob_calib": 10.23781526800332,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1069,7 +1069,7 @@
         "price": -140,
         "prob_calib": 9.34156639524338,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1097,7 +1097,7 @@
         "price": 108,
         "prob_calib": 8.75578541548688,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1125,7 +1125,7 @@
         "price": -122,
         "prob_calib": 8.31274537994429,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1153,7 +1153,7 @@
         "price": -114,
         "prob_calib": 6.459750287494249,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1181,7 +1181,7 @@
         "price": -137,
         "prob_calib": 6.32104569561926,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1209,7 +1209,7 @@
         "price": -114,
         "prob_calib": 6.28692749375671,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1237,7 +1237,7 @@
         "price": -125,
         "prob_calib": 5.60926095928744,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1265,7 +1265,7 @@
         "price": -144,
         "prob_calib": 5.4777668293811494,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1293,7 +1293,35 @@
         "price": -115,
         "prob_calib": 5.12424738734218,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "NNEKA OGWUMIKE",
+      "score": 0.211,
+      "score_adj": 0.047491,
+      "team": "LAS",
+      "team_tricode": "LAS",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.0280276487008664,
+        "ev": 0.0474912936320237,
+        "ev_calib_pct": -91.95286413457376,
+        "ev_pct": 4.74912936320237,
+        "implied_move": null,
+        "line": 9.5,
+        "line_move": null,
+        "market": "ra",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -144,
+        "prob_calib": 4.74912936320237,
+        "side": "UNDER",
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1321,35 +1349,7 @@
         "price": -122,
         "prob_calib": 4.55073463079931,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "NNEKA OGWUMIKE",
-      "score": 0.21,
-      "score_adj": 0.045254,
-      "team": "LAS",
-      "team_tricode": "LAS",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0269325401855681,
-        "ev": 0.0452539960941177,
-        "ev_calib_pct": -92.39609725493396,
-        "ev_pct": 4.52539960941177,
-        "implied_move": null,
-        "line": 9.5,
-        "line_move": null,
-        "market": "ra",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": -147,
-        "prob_calib": 4.52539960941177,
-        "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1377,7 +1377,7 @@
         "price": -134,
         "prob_calib": 4.38251891469704,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1405,7 +1405,7 @@
         "price": 114,
         "prob_calib": 4.30655626393812,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     }
   ],
@@ -1419,17 +1419,17 @@
     {
       "opponent": null,
       "player": "BRIDGET CARLETON",
-      "score": 0.774,
-      "score_adj": 0.795221,
+      "score": 0.764,
+      "score_adj": 0.787894,
       "team": "POR",
       "team_tricode": "POR",
       "tier": "High",
       "top_play": {
         "book": "draftkings",
-        "edge": 0.3245800510582339,
-        "ev": 0.7952211250926733,
-        "ev_calib_pct": 94.82917564770497,
-        "ev_pct": 79.52211250926733,
+        "edge": 0.3229072507905859,
+        "ev": 0.7878936919290296,
+        "ev_calib_pct": 92.2460608306832,
+        "ev_pct": 78.78936919290295,
         "implied_move": null,
         "line": 2.5,
         "line_move": null,
@@ -1438,10 +1438,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": 145,
-        "prob_calib": 79.52211250926733,
+        "price": 144,
+        "prob_calib": 78.78936919290295,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1469,7 +1469,7 @@
         "price": -114,
         "prob_calib": 33.24234268685015,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1497,7 +1497,7 @@
         "price": -104,
         "prob_calib": 24.831760488457718,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1525,7 +1525,7 @@
         "price": 105,
         "prob_calib": 19.720963055005942,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1553,7 +1553,7 @@
         "price": -116,
         "prob_calib": 17.76921061652464,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1581,7 +1581,7 @@
         "price": 121,
         "prob_calib": 14.70788010447035,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1609,7 +1609,7 @@
         "price": -127,
         "prob_calib": 14.2611126564207,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1637,7 +1637,7 @@
         "price": 134,
         "prob_calib": 13.639294475102808,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1665,23 +1665,23 @@
         "price": -130,
         "prob_calib": 12.991418497610018,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
       "opponent": null,
       "player": "NATASHA CLOUD",
-      "score": 0.271,
-      "score_adj": 0.123455,
+      "score": 0.27,
+      "score_adj": 0.120829,
       "team": "CHI",
       "team_tricode": "CHI",
       "tier": "Low",
       "top_play": {
         "book": "fanduel",
-        "edge": 0.0668243381575928,
-        "ev": 0.1234551332064002,
-        "ev_calib_pct": -77.19218725508878,
-        "ev_pct": 12.34551332064002,
+        "edge": 0.0659069069649322,
+        "ev": 0.1208293294357091,
+        "ev_calib_pct": -77.84795627012,
+        "ev_pct": 12.08293294357091,
         "implied_move": null,
         "line": 9.5,
         "line_move": null,
@@ -1690,10 +1690,10 @@
         "open_line": null,
         "open_price": null,
         "open_snapshot_ts": null,
-        "price": -118,
-        "prob_calib": 12.34551332064002,
+        "price": -120,
+        "prob_calib": 12.08293294357091,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1721,7 +1721,7 @@
         "price": -113,
         "prob_calib": 10.50679481925208,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1749,7 +1749,7 @@
         "price": 118,
         "prob_calib": 10.23781526800332,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1777,7 +1777,7 @@
         "price": -140,
         "prob_calib": 9.34156639524338,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1805,7 +1805,7 @@
         "price": 108,
         "prob_calib": 8.75578541548688,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1833,7 +1833,7 @@
         "price": -122,
         "prob_calib": 8.31274537994429,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1861,7 +1861,7 @@
         "price": -114,
         "prob_calib": 6.459750287494249,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1889,7 +1889,7 @@
         "price": -137,
         "prob_calib": 6.32104569561926,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1917,7 +1917,7 @@
         "price": -114,
         "prob_calib": 6.28692749375671,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1945,7 +1945,7 @@
         "price": -125,
         "prob_calib": 5.60926095928744,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -1973,7 +1973,7 @@
         "price": -144,
         "prob_calib": 5.4777668293811494,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -2001,7 +2001,35 @@
         "price": -115,
         "prob_calib": 5.12424738734218,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
+      }
+    },
+    {
+      "opponent": null,
+      "player": "NNEKA OGWUMIKE",
+      "score": 0.211,
+      "score_adj": 0.047491,
+      "team": "LAS",
+      "team_tricode": "LAS",
+      "tier": "Low",
+      "top_play": {
+        "book": "draftkings",
+        "edge": 0.0280276487008664,
+        "ev": 0.0474912936320237,
+        "ev_calib_pct": -91.95286413457376,
+        "ev_pct": 4.74912936320237,
+        "implied_move": null,
+        "line": 9.5,
+        "line_move": null,
+        "market": "ra",
+        "open_implied_prob": null,
+        "open_line": null,
+        "open_price": null,
+        "open_snapshot_ts": null,
+        "price": -144,
+        "prob_calib": 4.74912936320237,
+        "side": "UNDER",
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -2029,35 +2057,7 @@
         "price": -122,
         "prob_calib": 4.55073463079931,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
-      }
-    },
-    {
-      "opponent": null,
-      "player": "NNEKA OGWUMIKE",
-      "score": 0.21,
-      "score_adj": 0.045254,
-      "team": "LAS",
-      "team_tricode": "LAS",
-      "tier": "Low",
-      "top_play": {
-        "book": "draftkings",
-        "edge": 0.0269325401855681,
-        "ev": 0.0452539960941177,
-        "ev_calib_pct": -92.39609725493396,
-        "ev_pct": 4.52539960941177,
-        "implied_move": null,
-        "line": 9.5,
-        "line_move": null,
-        "market": "ra",
-        "open_implied_prob": null,
-        "open_line": null,
-        "open_price": null,
-        "open_snapshot_ts": null,
-        "price": -147,
-        "prob_calib": 4.52539960941177,
-        "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -2085,7 +2085,7 @@
         "price": -134,
         "prob_calib": 4.38251891469704,
         "side": "UNDER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     },
     {
@@ -2113,7 +2113,7 @@
         "price": 114,
         "prob_calib": 4.30655626393812,
         "side": "OVER",
-        "snapshot_ts": "2026-05-29T19:55:07.058067+00:00"
+        "snapshot_ts": "2026-05-29T20:09:45.111343+00:00"
       }
     }
   ],
