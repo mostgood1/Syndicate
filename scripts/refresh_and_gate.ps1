@@ -173,7 +173,7 @@ if (-not $SkipMLB) {
 }
 if (-not $SkipNBA) {
     $nbaMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_nba_source_mirror.ps1'), '-Date', $Date)
-    $localNbaArtifactRoot = Join-Path $repoRoot 'data\nba_source\source_artifacts'
+    $localNbaArtifactRoot = Join-Path $repoRoot 'data\nba_source'
     if ($preferLocalMirrorArtifacts -and (Test-Path $localNbaArtifactRoot)) {
         $nbaMirrorCommand += @('-SourceArtifactRoot', $localNbaArtifactRoot)
     }
@@ -195,7 +195,7 @@ if (-not $SkipNHL) {
 }
 if (-not $SkipWNBA) {
     $wnbaMirrorCommand = @('powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_wnba_source_mirror.ps1'), '-Date', $Date)
-    $localWnbaArtifactRoot = Join-Path $repoRoot 'data\wnba_source\source_artifacts'
+    $localWnbaArtifactRoot = Join-Path $repoRoot 'data\wnba_source'
     if ($preferLocalMirrorArtifacts -and (Test-Path $localWnbaArtifactRoot)) {
         $wnbaMirrorCommand += @('-SourceArtifactRoot', $localWnbaArtifactRoot)
     }
