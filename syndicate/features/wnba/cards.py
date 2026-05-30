@@ -1098,6 +1098,224 @@ def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_i
     return filtered_payload
 
 
+def _status_from_game(game: dict[str, Any]) -> dict[str, Any]:
+    status_text = str(game.get("status") or "").strip()
+    detail_text = str(game.get("detail") or "").strip()
+    status_lower = f"{status_text} {detail_text}".lower()
+    in_progress = any(token in status_lower for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
+    final = any(token in status_lower for token in ("final", "finished", "complete"))
+    return {
+        "status": detail_text or status_text,
+        "in_progress": bool(in_progress and not final),
+        "final": bool(final),
+        "period": None,
+        "clock": "",
+    }
+
+
+def _cards_games_for_live_fallback(selected_date: str) -> list[dict[str, Any]]:
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=True)
+    return [game for game in (context.get("games") or []) if isinstance(game, dict)]
+
+
+def _game_index_by_event_id(selected_date: str) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for game in _cards_games_for_live_fallback(selected_date):
+        event_id = str(game.get("event_id") or "").strip()
+        if event_id:
+            out[event_id] = game
+    return out
+
+
+def _player_sim_stat(player_row: dict[str, Any], market: str) -> float | None:
+    key = str(market or "").strip().lower()
+    pts = _safe_float(player_row.get("pts_mean"))
+    reb = _safe_float(player_row.get("reb_mean"))
+    ast = _safe_float(player_row.get("ast_mean"))
+    if key == "pts":
+        return pts
+    if key == "reb":
+        return reb
+    if key == "ast":
+        return ast
+    if key == "threes":
+        return _safe_float(player_row.get("threes_mean"))
+    if key == "stl":
+        return _safe_float(player_row.get("stl_mean"))
+    if key == "blk":
+        return _safe_float(player_row.get("blk_mean"))
+    if key == "tov":
+        return _safe_float(player_row.get("tov_mean"))
+    if key == "pra":
+        return None if pts is None or reb is None or ast is None else round(pts + reb + ast, 3)
+    if key == "pr":
+        return None if pts is None or reb is None else round(pts + reb, 3)
+    if key == "pa":
+        return None if pts is None or ast is None else round(pts + ast, 3)
+    if key == "ra":
+        return None if reb is None or ast is None else round(reb + ast, 3)
+    return None
+
+
+def _fallback_live_lines_game(game: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    sim_periods = _source_sim_periods({"sim": game.get("sim")}) if isinstance(game.get("sim"), dict) else {}
+    period_totals: dict[str, float] = {}
+    period_spreads: dict[str, float] = {}
+    for period_key, period_payload in sim_periods.items():
+        if not isinstance(period_payload, dict):
+            continue
+        total_mean = _safe_float(period_payload.get("total_mean"))
+        margin_mean = _safe_float(period_payload.get("margin_mean"))
+        if total_mean is not None:
+            period_totals[period_key] = round(total_mean, 3)
+        if margin_mean is not None:
+            period_spreads[period_key] = round(-margin_mean, 3)
+
+    q1 = _safe_float(period_totals.get("q1"))
+    q2 = _safe_float(period_totals.get("q2"))
+    q3 = _safe_float(period_totals.get("q3"))
+    q4 = _safe_float(period_totals.get("q4"))
+    if q1 is not None and q2 is not None:
+        period_totals.setdefault("h1", round(q1 + q2, 3))
+    if q3 is not None and q4 is not None:
+        period_totals.setdefault("h2", round(q3 + q4, 3))
+    s1 = _safe_float(period_spreads.get("q1"))
+    s2 = _safe_float(period_spreads.get("q2"))
+    s3 = _safe_float(period_spreads.get("q3"))
+    s4 = _safe_float(period_spreads.get("q4"))
+    if s1 is not None and s2 is not None:
+        period_spreads.setdefault("h1", round(s1 + s2, 3))
+    if s3 is not None and s4 is not None:
+        period_spreads.setdefault("h2", round(s3 + s4, 3))
+
+    return {
+        "event_id": game.get("event_id"),
+        "found": True,
+        "lines": {
+            "total": _safe_float(betting.get("total")),
+            "home_spread": _safe_float(betting.get("home_spread")),
+            "away_spread": _safe_float(betting.get("away_spread")),
+            "home_ml": _safe_float(betting.get("home_ml")),
+            "away_ml": _safe_float(betting.get("away_ml")),
+            "period_totals": period_totals if include_period_totals else {},
+            "period_spreads": period_spreads,
+        },
+    }
+
+
+def _fallback_live_player_boxscore_game(game: dict[str, Any]) -> dict[str, Any]:
+    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+    away_tri = str(game.get("away_tri") or "").strip().upper()
+    home_tri = str(game.get("home_tri") or "").strip().upper()
+    out_players: list[dict[str, Any]] = []
+    for side_key, team_tri in (("away", away_tri), ("home", home_tri)):
+        side_rows = players.get(side_key) if isinstance(players.get(side_key), list) else []
+        for row in side_rows:
+            if not isinstance(row, dict):
+                continue
+            out_players.append(
+                {
+                    "player": row.get("player_name"),
+                    "player_id": row.get("player_id"),
+                    "team_tri": team_tri,
+                    "mp": _safe_float(row.get("min_mean")),
+                    "pts": _safe_float(row.get("pts_mean")),
+                    "reb": _safe_float(row.get("reb_mean")),
+                    "ast": _safe_float(row.get("ast_mean")),
+                    "threes": _safe_float(row.get("threes_mean")),
+                    "stl": _safe_float(row.get("stl_mean")),
+                    "blk": _safe_float(row.get("blk_mean")),
+                    "tov": _safe_float(row.get("tov_mean")),
+                }
+            )
+    return {"event_id": game.get("event_id"), "players": out_players}
+
+
+def _fallback_live_player_lens_game(game: dict[str, Any]) -> dict[str, Any]:
+    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    sim_players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+    away_tri = str(game.get("away_tri") or "").strip().upper()
+    home_tri = str(game.get("home_tri") or "").strip().upper()
+    player_lookup: dict[tuple[str, str], dict[str, Any]] = {}
+    for side_key, team_tri in (("away", away_tri), ("home", home_tri)):
+        side_rows = sim_players.get(side_key) if isinstance(sim_players.get(side_key), list) else []
+        for row in side_rows:
+            if not isinstance(row, dict):
+                continue
+            name_key = str(row.get("player_name") or "").strip().upper()
+            if name_key and team_tri:
+                player_lookup[(team_tri, name_key)] = row
+
+    rows: list[dict[str, Any]] = []
+    props = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
+    for side_key, team_tri, opp_tri in (("away", away_tri, home_tri), ("home", home_tri, away_tri)):
+        side_rows = props.get(side_key) if isinstance(props.get(side_key), list) else []
+        for pick in side_rows:
+            if not isinstance(pick, dict):
+                continue
+            player_name = str(pick.get("player") or pick.get("display_pick") or "").strip()
+            market = str(pick.get("market") or "").strip().lower()
+            line_value = _safe_float(pick.get("line"))
+            if not player_name or not market or line_value is None:
+                continue
+            side_value = str(pick.get("side") or pick.get("selection") or "").strip().upper()
+            sim_row = player_lookup.get((team_tri, player_name.upper()), {})
+            sim_mu = _player_sim_stat(sim_row if isinstance(sim_row, dict) else {}, market)
+            if sim_mu is None:
+                sim_mu = line_value
+            pace_proj = sim_mu
+            pace_vs_line = None if pace_proj is None else round(pace_proj - line_value, 3)
+            ev_value = _safe_float(pick.get("ev_pct"))
+            klass = "NONE"
+            if ev_value is not None:
+                abs_ev = abs(ev_value)
+                if abs_ev >= 8.0:
+                    klass = "BET"
+                elif abs_ev >= 4.0:
+                    klass = "WATCH"
+            rows.append(
+                {
+                    "player": player_name,
+                    "player_id": sim_row.get("player_id") if isinstance(sim_row, dict) else None,
+                    "player_photo": None,
+                    "team_tri": team_tri,
+                    "event_id": game.get("event_id"),
+                    "stat": market,
+                    "line": line_value,
+                    "line_live": line_value,
+                    "line_source": "cards_fallback",
+                    "lean": side_value,
+                    "ev_side": side_value,
+                    "price_over": _safe_float(pick.get("price_over")),
+                    "price_under": _safe_float(pick.get("price_under")),
+                    "ev": None if ev_value is None else round(ev_value / 100.0, 6),
+                    "win_prob": _safe_float(pick.get("p_win")),
+                    "recommendation_priority_score": ev_value,
+                    "klass": klass,
+                    "actual": None,
+                    "pace_proj": pace_proj,
+                    "pace_vs_line": pace_vs_line,
+                    "sim_mu": sim_mu,
+                    "sim_mu_adjusted": sim_mu,
+                    "sim_vs_line": None if sim_mu is None else round(sim_mu - line_value, 3),
+                    "sim_vs_line_adjusted": None if sim_mu is None else round(sim_mu - line_value, 3),
+                    "status_label": "Live",
+                    "opponent_tri": opp_tri,
+                }
+            )
+
+    return {
+        "event_id": game.get("event_id"),
+        "game_id": game.get("gamePk"),
+        "home": home_tri,
+        "away": away_tri,
+        "status": _status_from_game(game),
+        "rows": rows,
+    }
+
+
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     local_payload = _local_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
@@ -1121,14 +1339,15 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         final = any(token in status_lower for token in ("final", "finished", "complete"))
         away_info = game.get("away") if isinstance(game.get("away"), dict) else {}
         home_info = game.get("home") if isinstance(game.get("home"), dict) else {}
+        sim_score = ((game.get("sim") or {}).get("score") or {}) if isinstance(game.get("sim"), dict) else {}
         out_games.append(
             {
                 "game_id": game.get("gamePk"),
                 "event_id": game.get("event_id"),
                 "home": game.get("home_tri") or home_info.get("abbr"),
                 "away": game.get("away_tri") or away_info.get("abbr"),
-                "home_pts": None,
-                "away_pts": None,
+            "home_pts": _safe_float(sim_score.get("home_mean")),
+            "away_pts": _safe_float(sim_score.get("away_mean")),
                 "status_id": None,
                 "status": detail_text or status_text,
                 "period": None,
@@ -1162,6 +1381,22 @@ def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str],
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return remote_payload
+
+    game_index = _game_index_by_event_id(selected_date)
+    fallback_games = [
+        _fallback_live_player_boxscore_game(game)
+        for event_id in normalized_event_ids
+        for game in [game_index.get(event_id)]
+        if isinstance(game, dict)
+    ]
+    if fallback_games:
+        return {
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date or None,
+            "games": fallback_games,
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        }
     return {
         "ok": True,
         "ttl": int(ttl),
@@ -1185,6 +1420,22 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return remote_payload
+
+    game_index = _game_index_by_event_id(selected_date)
+    fallback_games = [
+        _fallback_live_player_lens_game(game)
+        for event_id in normalized_event_ids
+        for game in [game_index.get(event_id)]
+        if isinstance(game, dict)
+    ]
+    if fallback_games:
+        return {
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date or None,
+            "games": fallback_games,
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        }
     return {
         "ok": True,
         "ttl": int(ttl),
@@ -1219,6 +1470,23 @@ def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int 
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return remote_payload
+
+    game_index = _game_index_by_event_id(selected_date)
+    fallback_games = [
+        _fallback_live_lines_game(game, include_period_totals=bool(include_period_totals))
+        for event_id in normalized_event_ids
+        for game in [game_index.get(event_id)]
+        if isinstance(game, dict)
+    ]
+    if fallback_games:
+        return {
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date,
+            "include_period_totals": bool(include_period_totals),
+            "games": fallback_games,
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        }
     return {
         "ok": True,
         "ttl": int(ttl),
@@ -1243,6 +1511,35 @@ def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: 
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return remote_payload
+
+    game_index = _game_index_by_event_id(selected_date)
+    fallback_games = []
+    for event_id in normalized_event_ids:
+        game = game_index.get(event_id)
+        if not isinstance(game, dict):
+            continue
+        fallback_games.append(
+            {
+                "event_id": event_id,
+                "game_id": game.get("gamePk"),
+                "home": game.get("home_tri"),
+                "away": game.get("away_tri"),
+                "pbp_attempts": {"home": {}, "away": {}, "unknown": {}, "total": {}},
+                "pbp_attempts_periods": {},
+                "pbp_possessions": {"home": {}, "away": {}, "unknown": {}, "total": {}},
+                "pbp_possessions_periods": {},
+                "pbp_quarters": {"q_totals": {"q1": None, "q2": None, "q3": None, "q4": None}, "current": {"period": None, "q_total": None}},
+                "pbp_recent": {"window_sec": 180, "points_total": None, "attempts": None, "possessions": None, "current_scoring_run": {"team": None, "points": None}, "seconds_since_score": None},
+            }
+        )
+    if fallback_games:
+        return {
+            "ok": True,
+            "ttl": int(ttl),
+            "date": selected_date or None,
+            "games": fallback_games,
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        }
     return {
         "ok": True,
         "ttl": int(ttl),
