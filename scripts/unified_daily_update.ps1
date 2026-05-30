@@ -522,7 +522,9 @@ function Assert-AdvancedDataReady {
 
             $reportCandidates = @(
                 (Join-Path $processedRoot ("live_lens_report_{0}.json" -f $DateValue)),
-                (Join-Path $liveLensRoot ("live_lens_report_{0}.json" -f $DateValue))
+                (Join-Path $processedRoot ("live_lens_report_{0}.json" -f $dateSlug)),
+                (Join-Path $liveLensRoot ("live_lens_report_{0}.json" -f $DateValue)),
+                (Join-Path $liveLensRoot ("live_lens_report_{0}.json" -f $dateSlug))
             )
             $reportPath = $null
             foreach ($candidate in $reportCandidates) {
