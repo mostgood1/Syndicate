@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-30T10:37:29.915086",
+  "generated_at": "2026-05-30T10:48:25.096142",
   "date": "2026-05-30",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-30_b85891982dad.lock",
-    "pid": 5684,
-    "created_at": "2026-05-30T10:37:29.902637"
+    "pid": 17384,
+    "created_at": "2026-05-30T10:48:25.094143"
   },
   "seed": {
     "value": 1337,
@@ -257,7 +257,7 @@
             "hits_allowed": 30,
             "outs": 30,
             "strikeouts": 30,
-            "walks_allowed": 6
+            "walks_allowed": 12
           },
           "events_matched": 15
         },
