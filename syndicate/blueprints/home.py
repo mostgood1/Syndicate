@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import csv
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
@@ -1645,6 +1646,82 @@ def _prop_rows_from_nba_live_lens(games: list[dict[str, Any]], *, fallback_href:
     return rows
 
 
+def _prop_rows_from_props_recommendations_csv(
+    slug: str,
+    *,
+    context_label: str,
+    fallback_href: str | None = None,
+    limit: int = 18,
+) -> list[dict[str, Any]]:
+    sport_slug = str(slug or "").strip().lower()
+    if sport_slug not in {"nba", "wnba"}:
+        return []
+
+    try:
+        if sport_slug == "nba":
+            from syndicate.features.nba.sources import processed_path
+        else:
+            from syndicate.features.wnba.sources import processed_path
+
+        csv_path = processed_path(f"props_recommendations_{context_label}.csv")
+    except Exception:
+        return []
+
+    if not csv_path.exists():
+        return []
+
+    rows: list[dict[str, Any]] = []
+    try:
+        with csv_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for raw in reader:
+                if not isinstance(raw, dict):
+                    continue
+                player = _safe_text(raw.get("player"), "Prop")
+                if player == "Prop":
+                    continue
+                team = _safe_text(raw.get("team"), "Team")
+                top_play_raw = str(raw.get("top_play") or "").strip()
+                if not top_play_raw:
+                    continue
+                try:
+                    top_play = ast.literal_eval(top_play_raw)
+                except Exception:
+                    continue
+                if not isinstance(top_play, dict):
+                    continue
+                market = _safe_text(top_play.get("market"), "Market").upper()
+                side = _safe_text(top_play.get("side"), "Watch")
+                line_text = _prop_metric_text(top_play.get("line"))
+                summary = _safe_text(raw.get("top_play_explain") or raw.get("top_play_baseline"), "Top prop recommendation")
+                ev_pct = _numeric_value(top_play.get("ev_pct"))
+                edge_text = _pct_text(top_play.get("ev") if top_play.get("ev") is not None else top_play.get("edge"))
+                rows.append(
+                    {
+                        "matchup": team,
+                        "heading": "Props",
+                        "name": f"{player} ({team})",
+                        "is_live": False,
+                        "market": market,
+                        "pick": side,
+                        "detail": f"{side} {line_text} {market} | {summary}",
+                        "value": f"EV {ev_pct:.1f}%" if ev_pct is not None else edge_text,
+                        "projected": _prop_metric_text(raw.get("top_play_baseline")),
+                        "line": line_text,
+                        "odds": _prop_metric_text(top_play.get("price")),
+                        "edge": edge_text,
+                        "confidence": _safe_text(raw.get("top_play_consensus"), "Model"),
+                        "href": fallback_href or f"/{sport_slug}/props?date={context_label}",
+                    }
+                )
+                if len(rows) >= limit:
+                    break
+    except Exception:
+        return []
+
+    return rows
+
+
 def _compact_game_items_from_nhl_live_payload(games: list[dict[str, Any]], *, selected_date: str, limit: int | None = None) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for game in games:
@@ -1758,6 +1835,9 @@ def _load_home_prop_items(
             nba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if nba_rows:
                 return nba_rows
+            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/nba/cards?date={context_label}")
+            if csv_rows:
+                return csv_rows
         if slug == "wnba":
             from syndicate.features.wnba.props import build_props_page_context
 
@@ -1769,6 +1849,9 @@ def _load_home_prop_items(
             )
             if wnba_rows:
                 return wnba_rows
+            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/wnba/cards?date={context_label}")
+            if csv_rows:
+                return csv_rows
         if slug in {"nfl", "ncaaf", "ncaab"}:
             betting_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if betting_rows:
