@@ -106,8 +106,6 @@ function Invoke-Step {
     $previousEnv = @{}
     $hadNativeErrorPreference = $false
     $priorNativeErrorPreference = $null
-    $stdoutPath = $null
-    $stderrPath = $null
     try {
         if ($EnvironmentOverrides) {
             foreach ($entry in $EnvironmentOverrides.GetEnumerator()) {
@@ -122,23 +120,23 @@ function Invoke-Step {
             $Global:PSNativeCommandUseErrorActionPreference = $false
         }
 
-        $stdoutPath = [System.IO.Path]::GetTempFileName()
-        $stderrPath = [System.IO.Path]::GetTempFileName()
         $resolvedCommand = $Command[0]
         $commandInfo = Get-Command -Name $Command[0] -ErrorAction SilentlyContinue
         if ($commandInfo -and -not [string]::IsNullOrWhiteSpace($commandInfo.Source)) {
             $resolvedCommand = $commandInfo.Source
         }
-        $process = Start-Process -FilePath $resolvedCommand -ArgumentList $Command[1..($Command.Length - 1)] -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -NoNewWindow -PassThru -Wait
+        $argumentList = @()
+        if ($Command.Length -gt 1) {
+            $argumentList = $Command[1..($Command.Length - 1)]
+        }
 
-        foreach ($streamPath in @($stdoutPath, $stderrPath)) {
-            if (-not [string]::IsNullOrWhiteSpace($streamPath) -and (Test-Path $streamPath)) {
-                Get-Content -Path $streamPath -ErrorAction SilentlyContinue | ForEach-Object {
-                    if ($null -ne $_) {
-                        Write-Host $_
-                    }
-                }
-            }
+        # Run in the current terminal so command output is visible as it happens.
+        $process = Start-Process -FilePath $resolvedCommand -ArgumentList $argumentList -WorkingDirectory $WorkingDirectory -NoNewWindow -PassThru
+        Write-Host ("    pid: {0}" -f $process.Id) -ForegroundColor DarkGray
+        $pollIntervalMs = 15000
+        while (-not $process.WaitForExit($pollIntervalMs)) {
+            $elapsed = (Get-Date) - $process.StartTime
+            Write-Host ("    ... still running ({0:hh\\:mm\\:ss})" -f $elapsed) -ForegroundColor DarkGray
         }
 
         $LASTEXITCODE = $process.ExitCode
@@ -147,11 +145,6 @@ function Invoke-Step {
         }
     }
     finally {
-        foreach ($streamPath in @($stdoutPath, $stderrPath)) {
-            if (-not [string]::IsNullOrWhiteSpace($streamPath) -and (Test-Path $streamPath)) {
-                Remove-Item -Path $streamPath -Force -ErrorAction SilentlyContinue
-            }
-        }
         if ($hadNativeErrorPreference) {
             $Global:PSNativeCommandUseErrorActionPreference = $priorNativeErrorPreference
         }
