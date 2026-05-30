@@ -1,7 +1,7 @@
 {
   "date": "2026-05-29",
   "mode": "live",
-  "retrieved_at": "2026-05-30T04:19:29.171171",
+  "retrieved_at": "2026-05-30T04:30:08.496586",
   "games": [
     {
       "event_id": "26c7991c125b7365c82472e2468e59a6",
@@ -12,15 +12,15 @@
       "markets": {
         "h2h": null,
         "spreads": {
-          "home_line": 7.5,
-          "home_odds": "-310",
-          "away_line": -7.5,
-          "away_odds": "+220"
+          "home_line": 6.5,
+          "home_odds": "-260",
+          "away_line": -6.5,
+          "away_odds": "+188"
         },
         "totals": {
           "line": 9.5,
-          "over_odds": "-130",
-          "under_odds": "-102"
+          "over_odds": "-260",
+          "under_odds": "+188"
         }
       }
     },
@@ -29,73 +29,22 @@
       "commence_time": "2026-05-30T02:11:00Z",
       "home_team": "Seattle Mariners",
       "away_team": "Arizona Diamondbacks",
-      "bookmaker": "fanatics",
+      "bookmaker": "fanduel",
       "markets": {
         "h2h": {
-          "home_odds": "-650",
-          "away_odds": "+410"
+          "home_odds": "-350",
+          "away_odds": "+255"
         },
         "spreads": {
           "home_line": -1.5,
-          "home_odds": "+240",
+          "home_odds": "+400",
           "away_line": 1.5,
-          "away_odds": "-340"
+          "away_odds": "-670"
         },
         "totals": {
           "line": 12.5,
-          "over_odds": "+100",
-          "under_odds": "-130"
-        },
-        "segments": {
-          "full": {
-            "h2h": {
-              "home_odds": "-650",
-              "away_odds": "+410"
-            },
-            "spreads": {
-              "home_line": -1.5,
-              "home_odds": "+240",
-              "away_line": 1.5,
-              "away_odds": "-340"
-            },
-            "totals": {
-              "line": 12.5,
-              "over_odds": "+100",
-              "under_odds": "-130"
-            }
-          },
-          "first1": {
-            "h2h": null,
-            "spreads": null,
-            "totals": null
-          },
-          "first3": {
-            "h2h": null,
-            "spreads": null,
-            "totals": null
-          },
-          "first5": {
-            "h2h": null,
-            "spreads": null,
-            "totals": null
-          },
-          "first7": {
-            "h2h": {
-              "home_odds": "-1400",
-              "away_odds": "+700"
-            },
-            "spreads": {
-              "home_line": -1.5,
-              "home_odds": "+275",
-              "away_line": 1.5,
-              "away_odds": "-425"
-            },
-            "totals": {
-              "line": 11.5,
-              "over_odds": "+130",
-              "under_odds": "-170"
-            }
-          }
+          "over_odds": "-125",
+          "under_odds": "-106"
         }
       }
     },
@@ -104,22 +53,22 @@
       "commence_time": "2026-05-30T02:16:00Z",
       "home_team": "Los Angeles Dodgers",
       "away_team": "Philadelphia Phillies",
-      "bookmaker": "williamhill_us",
+      "bookmaker": "betmgm",
       "markets": {
         "h2h": {
-          "home_odds": "-2500",
-          "away_odds": "+1000"
+          "home_odds": "-10000",
+          "away_odds": "+3000"
         },
         "spreads": {
           "home_line": -1.5,
-          "home_odds": "-500",
+          "home_odds": "-2000",
           "away_line": 1.5,
-          "away_odds": "+350"
+          "away_odds": "+850"
         },
         "totals": {
           "line": 6.5,
-          "over_odds": "+120",
-          "under_odds": "-150"
+          "over_odds": "+850",
+          "under_odds": "-2000"
         }
       }
     }

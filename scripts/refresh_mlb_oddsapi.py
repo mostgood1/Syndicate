@@ -336,6 +336,16 @@ def _live_lens_report_path(*, source_root: Path, date_str: str) -> Path:
     return source_root / "data" / "live_lens" / f"live_lens_report_{_date_slug(date_str)}.json"
 
 
+def _required_live_lens_relative_paths(*, date_str: str) -> tuple[Path, ...]:
+    date_slug = _date_slug(date_str)
+    return (
+        Path("data") / "live_lens" / f"live_lens_{date_slug}.jsonl",
+        Path("data") / "live_lens" / f"live_lens_report_{date_slug}.json",
+        Path("data") / "live_lens" / "render_sync" / f"live_lens_reports_{date_slug}.json",
+        Path("data") / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json",
+    )
+
+
 def _live_prop_observation_log_path(*, source_root: Path, date_str: str) -> Path:
     return _ensure_dir(source_root / "data" / "live_lens" / "prop_registry") / f"live_prop_observations_{_date_slug(date_str)}.jsonl"
 
@@ -664,6 +674,27 @@ def main() -> int:
         return 1
 
     copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=str(args.date))
+    required_live_lens_paths = _required_live_lens_relative_paths(date_str=str(args.date))
+    missing_source_live_lens = [str(path) for path in required_live_lens_paths if not (source_root / path).exists()]
+    missing_artifact_live_lens = [str(path) for path in required_live_lens_paths if not (artifact_root / path).exists()]
+    if missing_source_live_lens or missing_artifact_live_lens:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "date": args.date,
+                    "error": "mlb_live_lens_artifacts_missing",
+                    "missing_source_live_lens": missing_source_live_lens,
+                    "missing_artifact_live_lens": missing_artifact_live_lens,
+                    "refresh": refresh_payload,
+                    "artifact_bundle_root": str(artifact_root),
+                    "artifact_bundle_files": copied,
+                },
+                indent=2,
+            )
+        )
+        return 1
+
     print(
         json.dumps(
             {

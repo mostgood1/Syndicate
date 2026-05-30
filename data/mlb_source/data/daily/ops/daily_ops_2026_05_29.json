@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-29T23:19:12.528196",
+  "generated_at": "2026-05-29T23:29:54.498915",
   "date": "2026-05-29",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-29_b85891982dad.lock",
-    "pid": 20996,
-    "created_at": "2026-05-29T23:19:12.523425"
+    "pid": 14664,
+    "created_at": "2026-05-29T23:29:54.497793"
   },
   "seed": {
     "value": 1337,
@@ -236,10 +236,10 @@
           "events_matched": 13
         },
         "hitter_props": {
-          "players": 23,
+          "players": 10,
           "markets": {
             "batter_hits_runs_rbis": 1,
-            "batter_home_runs": 23
+            "batter_home_runs": 9
           },
           "events_matched": 3
         }
@@ -761,8 +761,8 @@
         },
         "hitter": {
           "found": true,
-          "candidateCount": 93,
-          "displayedCount": 93,
+          "candidateCount": 357,
+          "displayedCount": 357,
           "sectionCount": 7
         }
       }

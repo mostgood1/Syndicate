@@ -10,8 +10,8 @@
     "game_number": 1,
     "series_game_number": 1,
     "status": {
-      "abstract": "Live",
-      "detailed": "In Progress"
+      "abstract": "Final",
+      "detailed": "Final"
     }
   },
   "away": {
