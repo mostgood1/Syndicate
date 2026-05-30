@@ -459,19 +459,7 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
         "archived": archived,
     }
     _write_json_file(_cron_meta_dir(source_root=source_root) / "latest_refresh_oddsapi.json", meta)
-    live_lens = None
-    base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "RENDER_EXTERNAL_URL"))
-    token = _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
-    if base_url and token:
-        try:
-            live_lens_payload = _fetch_live_lens_reports_payload(base_url=base_url, token=token, date_str=date_str, timeout_seconds=45)
-            live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger="syndicate_refresh")
-        except (HTTPError, URLError, OSError, ValueError, RuntimeError):
-            live_lens = None
-    if live_lens is None:
-        live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
-    if live_lens is None:
-        live_lens = _bootstrap_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
+
     return {
         "market_refresh": {
             "ok": True,
@@ -480,8 +468,25 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
             "copied": copied,
             "archived": archived,
         },
-        "live_lens": live_lens,
+        "live_lens": _refresh_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh"),
     }
+
+
+def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: str) -> dict[str, object]:
+    live_lens = None
+    base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "RENDER_EXTERNAL_URL"))
+    token = _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
+    if base_url and token:
+        try:
+            live_lens_payload = _fetch_live_lens_reports_payload(base_url=base_url, token=token, date_str=date_str, timeout_seconds=45)
+            live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
+        except (HTTPError, URLError, OSError, ValueError, RuntimeError):
+            live_lens = None
+    if live_lens is None:
+        live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger=trigger)
+    if live_lens is None:
+        live_lens = _bootstrap_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger=trigger)
+    return live_lens
 
 
 def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path, date_str: str) -> dict[str, object]:
@@ -583,7 +588,8 @@ def main() -> int:
                     "date": str(args.date),
                     "skipped": True,
                     "reason": "existing_source_artifacts",
-                }
+                },
+                "live_lens": _refresh_live_lens_artifacts(source_root=source_root, date_str=str(args.date), trigger="syndicate_refresh"),
             }
         else:
             odds_module = _load_local_fetcher()

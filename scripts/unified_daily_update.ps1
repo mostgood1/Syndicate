@@ -664,6 +664,22 @@ if (-not $SkipMLB) {
         EnvironmentOverrides = $mlbEnvOverrides
         RuntimePolicy = $runtimePolicy.MLB
     }
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'mlb'
+        Name = 'MLB current-day live-lens refresh'
+        Workflow = 'syndicate_refresh'
+        Command = @(
+            (Resolve-Python $repoRoot),
+            'scripts\refresh_mlb_oddsapi.py',
+            '--date', $Date,
+            '--source-root', 'data\mlb_source\source_artifacts',
+            '--artifact-root', 'data\mlb_source',
+            '--overwrite', 'off'
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = $mlbEnvOverrides
+        RuntimePolicy = $runtimePolicy.MLB
+    }
 }
 if (-not $SkipNBA) {
     $nbaVendoredRoot = Resolve-VendoredRepoPath -RelativePath 'vendor\nba_betting_repo'
