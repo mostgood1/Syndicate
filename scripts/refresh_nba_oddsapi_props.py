@@ -225,6 +225,21 @@ def _refresh_boxscores_history_artifact(*, source_root: Path, processed_root: Pa
     return str(destination)
 
 
+def _export_team_advanced_stats_artifacts(*, source_root: Path, processed_root: Path) -> list[str]:
+    copied: list[str] = []
+    source_processed = source_root / "data" / "processed"
+    if not source_processed.exists() or not source_processed.is_dir():
+        return copied
+    for source in sorted(source_processed.glob("team_advanced_stats_*.csv")):
+        if not source.is_file():
+            continue
+        destination = processed_root / source.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        _copy_file_with_fallback(source, destination)
+        copied.append(str(destination))
+    return copied
+
+
 def _count_csv_rows_quick(path: Path | None) -> int:
     try:
         if path is None or not path.exists() or not path.is_file():
@@ -3125,6 +3140,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
     if boxscores_history_path:
         copied["boxscores_history_path"] = boxscores_history_path
+    advanced_stats_paths = _export_team_advanced_stats_artifacts(source_root=source_root, processed_root=processed_root)
+    if advanced_stats_paths:
+        copied["team_advanced_stats_paths"] = advanced_stats_paths
     for transition_path in sorted((source_root / "data" / "processed").glob(f"playoff_transition_*_{date_text}.json")):
         if not transition_path.is_file():
             continue

@@ -1,10 +1,51 @@
 {
   "date": "2026-05-29",
   "counts": {
-    "games": 3,
+    "games": 4,
     "picks": 8
   },
   "per_game": [
+    {
+      "home": "POR",
+      "away": "ATL",
+      "matchup": "ATL @ POR",
+      "picks": [
+        {
+          "market": "ATS",
+          "team": "Atlanta Dream",
+          "display_pick": "Atlanta Dream -8.5",
+          "selection": "Atlanta Dream",
+          "price": -110.0,
+          "score": 15.264736,
+          "ev_pct": 15.264700000000001,
+          "win_prob": 0.676457,
+          "p_win": 0.676457,
+          "basketball_summary": "Model margin 6.8 vs market -8.5",
+          "top_play_reasons": [
+            "Edge 15.3",
+            "EV 15.3%"
+          ],
+          "matchup": "ATL @ POR"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Over 164.0",
+          "selection": "Over",
+          "price": -110.0,
+          "score": 4.4625,
+          "ev_pct": 4.4624999999999995,
+          "win_prob": 0.568435,
+          "p_win": 0.568435,
+          "basketball_summary": "Model total 168.5 vs line 164.0",
+          "top_play_reasons": [
+            "Edge 4.5",
+            "EV 4.5%"
+          ],
+          "matchup": "ATL @ POR"
+        }
+      ]
+    },
     {
       "home": "NYL",
       "away": "PHX",
@@ -13,17 +54,17 @@
         {
           "market": "ATS",
           "team": "New York Liberty",
-          "display_pick": "New York Liberty +5.5",
+          "display_pick": "New York Liberty -5.5",
           "selection": "New York Liberty",
           "price": -110.0,
-          "score": 54.57222198530588,
-          "ev_pct": 90.90857317133725,
-          "win_prob": 1.0,
-          "p_win": 1.0,
-          "basketball_summary": "Model margin 60.1 vs market +5.5",
+          "score": 11.378523,
+          "ev_pct": 11.378499999999999,
+          "win_prob": 0.637595,
+          "p_win": 0.637595,
+          "basketball_summary": "Model margin 5.9 vs market -5.5",
           "top_play_reasons": [
-            "Edge 54.6",
-            "EV 90.9%"
+            "Edge 11.4",
+            "EV 11.4%"
           ],
           "matchup": "PHX @ NYL"
         },
@@ -33,30 +74,14 @@
           "display_pick": "Under 170.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -54.11400624290238,
-          "ev_pct": 90.84043302702838,
-          "win_prob": 1.0,
-          "p_win": 1.0,
-          "basketball_summary": "Model total 116.4 vs line 170.5",
+          "score": -2.023768,
+          "ev_pct": 2.0238,
+          "win_prob": 0.544048,
+          "p_win": 0.544048,
+          "basketball_summary": "Model total 168.5 vs line 170.5",
           "top_play_reasons": [
-            "Edge -54.1",
-            "EV 90.8%"
-          ],
-          "matchup": "PHX @ NYL"
-        },
-        {
-          "market": "ML",
-          "team": "Total",
-          "display_pick": "New York Liberty -",
-          "selection": "New York Liberty",
-          "price": -197.11064729302237,
-          "score": 9.998957292613554,
-          "ev_pct": 9.998957292613554,
-          "win_prob": 0.7634146271572753,
-          "p_win": 0.7634146271572753,
-          "basketball_summary": "Model total - vs line -",
-          "top_play_reasons": [
-            "EV 10.0%"
+            "Edge -2.0",
+            "EV 2.0%"
           ],
           "matchup": "PHX @ NYL"
         }
@@ -70,17 +95,17 @@
         {
           "market": "ATS",
           "team": "Washington Mystics",
-          "display_pick": "Washington Mystics +2.5",
+          "display_pick": "Washington Mystics -2.5",
           "selection": "Washington Mystics",
           "price": -110.0,
-          "score": 52.91487227694783,
-          "ev_pct": 90.90810224065157,
-          "win_prob": 1.0,
-          "p_win": 1.0,
-          "basketball_summary": "Model margin 55.4 vs market +2.5",
+          "score": 5.438746,
+          "ev_pct": 5.4387,
+          "win_prob": 0.578197,
+          "p_win": 0.578197,
+          "basketball_summary": "Model margin 2.9 vs market -2.5",
           "top_play_reasons": [
-            "Edge 52.9",
-            "EV 90.9%"
+            "Edge 5.4",
+            "EV 5.4%"
           ],
           "matchup": "LAS @ WSH"
         },
@@ -90,30 +115,14 @@
           "display_pick": "Under 166.0",
           "selection": "Under",
           "price": -110.0,
-          "score": -48.18464513324318,
-          "ev_pct": 90.66097984188417,
-          "win_prob": 1.0,
-          "p_win": 1.0,
-          "basketball_summary": "Model total 117.8 vs line 166.0",
+          "score": -1.157966,
+          "ev_pct": 1.158,
+          "win_prob": 0.53539,
+          "p_win": 0.53539,
+          "basketball_summary": "Model total 164.8 vs line 166.0",
           "top_play_reasons": [
-            "Edge -48.2",
-            "EV 90.7%"
-          ],
-          "matchup": "LAS @ WSH"
-        },
-        {
-          "market": "ML",
-          "team": "Total",
-          "display_pick": "Washington Mystics -",
-          "selection": "Washington Mystics",
-          "price": -126.74077047435982,
-          "score": 15.432214967445667,
-          "ev_pct": 15.432214967445667,
-          "win_prob": 0.713289865137397,
-          "p_win": 0.713289865137397,
-          "basketball_summary": "Model total - vs line -",
-          "top_play_reasons": [
-            "EV 15.4%"
+            "Edge -1.2",
+            "EV 1.2%"
           ],
           "matchup": "LAS @ WSH"
         }
@@ -126,18 +135,18 @@
       "picks": [
         {
           "market": "ATS",
-          "team": "Chicago Sky",
-          "display_pick": "Chicago Sky -4.5",
-          "selection": "Chicago Sky",
+          "team": "Minnesota Lynx",
+          "display_pick": "Minnesota Lynx -4.5",
+          "selection": "Minnesota Lynx",
           "price": -110.0,
-          "score": 74.63203413881116,
-          "ev_pct": 90.90889999999999,
-          "win_prob": 1.0,
-          "p_win": 1.0,
-          "basketball_summary": "Model margin 70.1 vs market -4.5",
+          "score": 7.935952,
+          "ev_pct": 7.936,
+          "win_prob": 0.60317,
+          "p_win": 0.60317,
+          "basketball_summary": "Model margin 3.4 vs market -4.5",
           "top_play_reasons": [
-            "Edge 74.6",
-            "EV 90.9%"
+            "Edge 7.9",
+            "EV 7.9%"
           ],
           "matchup": "MIN @ CHI"
         },
@@ -147,14 +156,14 @@
           "display_pick": "Under 172.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -58.70892544408947,
-          "ev_pct": 90.88587559319359,
-          "win_prob": 1.0,
-          "p_win": 1.0,
-          "basketball_summary": "Model total 113.8 vs line 172.5",
+          "score": -1.504034,
+          "ev_pct": 1.504,
+          "win_prob": 0.53885,
+          "p_win": 0.53885,
+          "basketball_summary": "Model total 171.0 vs line 172.5",
           "top_play_reasons": [
-            "Edge -58.7",
-            "EV 90.9%"
+            "Edge -1.5",
+            "EV 1.5%"
           ],
           "matchup": "MIN @ CHI"
         }

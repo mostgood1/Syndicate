@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-30T00:36:18.824156",
+  "generated_at": "2026-05-30T13:18:31.524060",
   "date": "2026-05-29",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-29_b85891982dad.lock",
-    "pid": 8496,
-    "created_at": "2026-05-30T00:36:18.820933"
+    "pid": 6780,
+    "created_at": "2026-05-30T13:18:31.523173"
   },
   "seed": {
     "value": 1337,
@@ -876,8 +876,8 @@
         },
         "tones": {
           "strong": 16,
-          "solid": 22,
-          "soft": 8
+          "solid": 18,
+          "soft": 12
         },
         "stats": {
           "hits_allowed": {
@@ -945,7 +945,7 @@
       }
     },
     "next_day_forward_build": {
-      "status": "ok",
+      "status": "error",
       "date": "2026-05-30",
       "season": 2026,
       "command": [
@@ -984,7 +984,7 @@
         "--seed-source",
         "default_fixed"
       ],
-      "exit_code": 0
+      "exit_code": 3
     },
     "current_day_roster_snapshot": {
       "status": "ok",
@@ -1034,7 +1034,9 @@
     "prior-day eval report refresh failed for 2026-05-28: exit 1; continuing without season manifest publish"
   ],
   "validation_errors": [],
-  "errors": [],
+  "errors": [
+    "next-day forward build failed with exit 3"
+  ],
   "next_day": {
     "requested": true,
     "date": "2026-05-30",
@@ -1069,5 +1071,5 @@
     ],
     "status": "skipped"
   },
-  "status": "partial"
+  "status": "error"
 }

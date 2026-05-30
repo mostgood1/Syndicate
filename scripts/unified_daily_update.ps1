@@ -332,6 +332,217 @@ function Get-SportPolicySnapshot {
     return $runtimePolicy[$sportKey]
 }
 
+function Convert-ToDoubleOrNull {
+    param($Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    $parsed = 0.0
+    if ([double]::TryParse([string]$Value, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsed)) {
+        return $parsed
+    }
+    return $null
+}
+
+function Test-NhlPlaceholderLineupProfile {
+    param([string]$LineupsCsvPath)
+
+    if ([string]::IsNullOrWhiteSpace($LineupsCsvPath) -or -not (Test-Path $LineupsCsvPath)) {
+        return $false
+    }
+
+    $rows = @(Import-Csv -Path $LineupsCsvPath)
+    if ($rows.Count -eq 0) {
+        return $false
+    }
+
+    $skaters = @($rows | Where-Object {
+        $positionText = [string]$_.position
+        -not $positionText.Trim().ToUpperInvariant().StartsWith('G')
+    })
+    if ($skaters.Count -eq 0) {
+        return $false
+    }
+
+    foreach ($row in $skaters) {
+        $toiValue = Convert-ToDoubleOrNull $row.proj_toi
+        $confidenceValue = Convert-ToDoubleOrNull $row.confidence
+        if ($null -eq $toiValue -or $null -eq $confidenceValue) {
+            return $false
+        }
+        if ([Math]::Abs($toiValue - 15.0) -gt 0.000001) {
+            return $false
+        }
+        if ([Math]::Abs($confidenceValue - 0.5) -gt 0.000001) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Assert-AdvancedDataReady {
+    param(
+        [string]$Sport,
+        [string]$DateValue,
+        [string]$RepoRoot
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Sport) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($RepoRoot)) {
+        return
+    }
+
+    $sportSlug = $Sport.Trim().ToLowerInvariant()
+    switch ($sportSlug) {
+        'nba' {
+            $processedRoot = Join-Path $RepoRoot 'data\nba_source\data\processed'
+            if (-not (Test-Path $processedRoot)) {
+                throw "NBA advanced-data gate failed: missing processed root $processedRoot"
+            }
+            $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
+            if ($smartSimFiles.Count -eq 0) {
+                throw "NBA advanced-data gate failed: missing smart_sim artifacts for $DateValue"
+            }
+            $advancedFiles = @(Get-ChildItem -Path $processedRoot -File -Filter 'team_advanced_stats_*.csv' -ErrorAction SilentlyContinue)
+            if ($advancedFiles.Count -eq 0) {
+                throw 'NBA advanced-data gate failed: missing mirrored team_advanced_stats artifacts'
+            }
+            $foundNonBaselinePace = $false
+            foreach ($smartSimFile in $smartSimFiles) {
+                try {
+                    $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                    $homePace = Convert-ToDoubleOrNull $payload.home_pace
+                    $awayPace = Convert-ToDoubleOrNull $payload.away_pace
+                    if (($null -ne $homePace -and [Math]::Abs($homePace - 100.0) -gt 0.01) -or ($null -ne $awayPace -and [Math]::Abs($awayPace - 100.0) -gt 0.01)) {
+                        $foundNonBaselinePace = $true
+                        break
+                    }
+                }
+                catch {
+                }
+            }
+            if (-not $foundNonBaselinePace) {
+                throw "NBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
+            }
+            return
+        }
+        'wnba' {
+            $processedRoot = Join-Path $RepoRoot 'data\wnba_source\data\processed'
+            if (-not (Test-Path $processedRoot)) {
+                throw "WNBA advanced-data gate failed: missing processed root $processedRoot"
+            }
+            $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
+            if ($smartSimFiles.Count -eq 0) {
+                throw "WNBA advanced-data gate failed: missing smart_sim artifacts for $DateValue"
+            }
+            $advancedFiles = @(Get-ChildItem -Path $processedRoot -File -Filter 'team_advanced_stats_*.csv' -ErrorAction SilentlyContinue)
+            if ($advancedFiles.Count -eq 0) {
+                throw 'WNBA advanced-data gate failed: missing mirrored team_advanced_stats artifacts'
+            }
+            $foundNonBaselinePace = $false
+            foreach ($smartSimFile in $smartSimFiles) {
+                try {
+                    $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                    $homePace = Convert-ToDoubleOrNull $payload.home_pace
+                    $awayPace = Convert-ToDoubleOrNull $payload.away_pace
+                    if (($null -ne $homePace -and [Math]::Abs($homePace - 79.5) -gt 0.01) -or ($null -ne $awayPace -and [Math]::Abs($awayPace - 79.5) -gt 0.01)) {
+                        $foundNonBaselinePace = $true
+                        break
+                    }
+                }
+                catch {
+                }
+            }
+            if (-not $foundNonBaselinePace) {
+                throw "WNBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
+            }
+            return
+        }
+        'mlb' {
+            $processedRoot = Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\processed'
+            $liveLensRoot = Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\live_lens'
+            $requiredPaths = @(
+                (Join-Path $processedRoot ("props_predictions_{0}.csv" -f $DateValue)),
+                (Join-Path $processedRoot ("props_recommendations_{0}.csv" -f $DateValue)),
+                (Join-Path $processedRoot ("top_props_{0}.json" -f $DateValue))
+            )
+            foreach ($requiredPath in $requiredPaths) {
+                if (-not (Test-Path $requiredPath)) {
+                    throw "MLB advanced-data gate failed: missing required artifact $requiredPath"
+                }
+            }
+
+            $reportCandidates = @(
+                (Join-Path $processedRoot ("live_lens_report_{0}.json" -f $DateValue)),
+                (Join-Path $liveLensRoot ("live_lens_report_{0}.json" -f $DateValue))
+            )
+            $reportPath = $null
+            foreach ($candidate in $reportCandidates) {
+                if (Test-Path $candidate) {
+                    $reportPath = $candidate
+                    break
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace($reportPath)) {
+                throw "MLB advanced-data gate failed: missing live_lens_report for $DateValue"
+            }
+
+            try {
+                $reportPayload = Get-Content -Path $reportPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                if ($null -ne $reportPayload.error) {
+                    throw "MLB advanced-data gate failed: live_lens_report has error payload ($reportPath)"
+                }
+                $performance = $reportPayload.performance
+                if ($null -ne $performance -and $performance.degraded -eq $true) {
+                    throw "MLB advanced-data gate failed: live_lens_report is degraded ($reportPath)"
+                }
+            }
+            catch {
+                if ($_.Exception.Message -like 'MLB advanced-data gate failed:*') {
+                    throw
+                }
+                throw "MLB advanced-data gate failed: unable to validate live_lens_report payload ($reportPath): $($_.Exception.Message)"
+            }
+            return
+        }
+        'nhl' {
+            $processedRoot = Join-Path $RepoRoot 'data\nhl_source\source_artifacts\data\processed'
+            if (-not (Test-Path $processedRoot)) {
+                throw "NHL advanced-data gate failed: missing processed root $processedRoot"
+            }
+
+            $lineupsPath = Join-Path $processedRoot ("lineups_{0}.csv" -f $DateValue)
+            $requiredPaths = @(
+                $lineupsPath,
+                (Join-Path $processedRoot ("lineups_co_toi_{0}.csv" -f $DateValue)),
+                (Join-Path $processedRoot ("shifts_{0}.csv" -f $DateValue)),
+                (Join-Path $processedRoot ("props_predictions_{0}.csv" -f $DateValue)),
+                (Join-Path $processedRoot ("props_recommendations_{0}.csv" -f $DateValue))
+            )
+            foreach ($requiredPath in $requiredPaths) {
+                if (-not (Test-Path $requiredPath)) {
+                    throw "NHL advanced-data gate failed: missing required artifact $requiredPath"
+                }
+            }
+
+            $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
+            if ($smartSimFiles.Count -eq 0) {
+                throw "NHL advanced-data gate failed: missing smart_sim artifacts for $DateValue"
+            }
+
+            if (Test-NhlPlaceholderLineupProfile -LineupsCsvPath $lineupsPath) {
+                throw "NHL advanced-data gate failed: placeholder lineup profile detected in $lineupsPath"
+            }
+            return
+        }
+        default {
+            return
+        }
+    }
+}
+
 function Get-ProcessEnvValue {
     param([string[]]$Names)
 
@@ -1107,6 +1318,10 @@ try {
             $sportRun.status = if ($DryRun) { 'dry_run' } else { 'ok' }
             $sportRun.completedAt = (Get-Date).ToString('o')
             $runManifest.sportRuns += @([pscustomobject]$sportRun)
+
+            if (-not $DryRun) {
+                Assert-AdvancedDataReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot
+            }
 
             if (-not $SkipGitPush) {
                 foreach ($repo in $publishRepos) {

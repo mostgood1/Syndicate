@@ -18294,6 +18294,27 @@ if __name__ == "__main__":
 
     @app.command(name="lineup-update")
     def lineup_update_cmd(date: Optional[str] = typer.Option(None, help="ET date YYYY-MM-DD to stamp output"), prefer_source: Optional[str] = typer.Option("dailyfaceoff", help="Optional external source to try first (dailyfaceoff|none)")):
+        def _is_placeholder_lineup_snapshot(frame: pd.DataFrame) -> bool:
+            if frame is None or frame.empty:
+                return True
+            needed = {"position", "proj_toi", "confidence"}
+            if not needed.issubset(set(frame.columns)):
+                return True
+            skaters = frame[~frame["position"].astype(str).str.upper().str.startswith("G")].copy()
+            if skaters.empty:
+                return True
+            toi = pd.to_numeric(skaters["proj_toi"], errors="coerce")
+            conf = pd.to_numeric(skaters["confidence"], errors="coerce")
+            if toi.dropna().empty or conf.dropna().empty:
+                return True
+            # Hard-stop only for the known synthetic fallback profile.
+            return (
+                int(toi.dropna().nunique()) == 1
+                and int(conf.dropna().nunique()) == 1
+                and abs(float(toi.dropna().iloc[0]) - 15.0) < 1e-9
+                and abs(float(conf.dropna().iloc[0]) - 0.5) < 1e-9
+            )
+
         d = date or ymd(today_utc())
         frames = []
         for ab in TEAM_ABBRS:
@@ -18313,6 +18334,10 @@ if __name__ == "__main__":
             except Exception as e:
                 print({"team": ab, "error": str(e)})
         out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["player_id","full_name","position","line_slot","pp_unit","pk_unit","proj_toi","confidence","team"])
+        if _is_placeholder_lineup_snapshot(out):
+            raise RuntimeError(
+                f"lineup-update generated placeholder TOI/confidence profile for {d}; real lineup/shift inputs are required"
+            )
         out_path = PROC_DIR / f"lineups_{d}.csv"
         save_df(out, out_path)
         print(f"Saved lineup snapshot to {out_path} ({len(out)} rows)")
