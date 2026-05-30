@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-29T23:29:54.498915",
+  "generated_at": "2026-05-30T00:13:25.279733",
   "date": "2026-05-29",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-29_b85891982dad.lock",
-    "pid": 14664,
-    "created_at": "2026-05-29T23:29:54.497793"
+    "pid": 21728,
+    "created_at": "2026-05-30T00:13:25.265675"
   },
   "seed": {
     "value": 1337,
@@ -218,11 +218,11 @@
       "hitter_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_29.json",
       "counts": {
         "game_lines": {
-          "events_matched": 3,
-          "games": 3,
-          "h2h_games": 2,
-          "totals_games": 3,
-          "spreads_games": 3
+          "events_matched": 1,
+          "games": 1,
+          "h2h_games": 1,
+          "totals_games": 1,
+          "spreads_games": 1
         },
         "pitcher_props": {
           "players": 8,
@@ -236,16 +236,16 @@
           "events_matched": 13
         },
         "hitter_props": {
-          "players": 10,
+          "players": 4,
           "markets": {
-            "batter_hits_runs_rbis": 1,
-            "batter_home_runs": 9
+            "batter_home_runs": 4
           },
-          "events_matched": 3
+          "events_matched": 1
         }
       },
       "warnings": [
-        "preserved existing pitcher props for 2026-05-29 because live refresh returned no player props"
+        "preserved existing pitcher props for 2026-05-29 because live refresh returned no player props",
+        "preserved existing hitter props for 2026-05-29 because live refresh returned no player props"
       ]
     },
     "current_day_overwrite_prep": {
@@ -761,8 +761,8 @@
         },
         "hitter": {
           "found": true,
-          "candidateCount": 357,
-          "displayedCount": 357,
+          "candidateCount": 4,
+          "displayedCount": 4,
           "sectionCount": 7
         }
       }
@@ -874,9 +874,9 @@
           "none": 45
         },
         "tones": {
-          "soft": 8,
+          "solid": 21,
           "strong": 16,
-          "solid": 21
+          "soft": 8
         },
         "stats": {
           "hits_allowed": {

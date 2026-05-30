@@ -125,8 +125,21 @@ function Copy-IfExists {
             Copy-Item -Path (Join-Path $SourcePath '*') -Destination $DestinationPath -Recurse -Force -ErrorAction Stop
         }
         catch {
-            Write-Warning ("Skipping recursive copy for {0}: {1}" -f $SourcePath, $_.Exception.Message)
-            return $false
+            try {
+                Get-ChildItem -Path $SourcePath -Recurse -File -ErrorAction Stop | ForEach-Object {
+                    $relativePath = $_.FullName.Substring($resolvedSourcePath.Length).TrimStart('\')
+                    $destinationFile = Join-Path $DestinationPath $relativePath
+                    $destinationParent = Split-Path -Parent $destinationFile
+                    if ($destinationParent) {
+                        New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
+                    }
+                    Copy-Item -Path $_.FullName -Destination $destinationFile -Force -ErrorAction Stop
+                }
+            }
+            catch {
+                Write-Warning ("Skipping recursive copy for {0}: {1}" -f $SourcePath, $_.Exception.Message)
+                return $false
+            }
         }
     }
     else {

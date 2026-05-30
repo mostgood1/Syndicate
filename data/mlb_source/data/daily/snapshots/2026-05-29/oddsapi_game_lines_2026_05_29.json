@@ -1,29 +1,8 @@
 {
   "date": "2026-05-29",
   "mode": "live",
-  "retrieved_at": "2026-05-30T04:30:08.496586",
+  "retrieved_at": "2026-05-30T05:13:39.411786",
   "games": [
-    {
-      "event_id": "26c7991c125b7365c82472e2468e59a6",
-      "commence_time": "2026-05-30T01:41:00Z",
-      "home_team": "Athletics",
-      "away_team": "New York Yankees",
-      "bookmaker": "fanduel",
-      "markets": {
-        "h2h": null,
-        "spreads": {
-          "home_line": 6.5,
-          "home_odds": "-260",
-          "away_line": -6.5,
-          "away_odds": "+188"
-        },
-        "totals": {
-          "line": 9.5,
-          "over_odds": "-260",
-          "under_odds": "+188"
-        }
-      }
-    },
     {
       "event_id": "bc8152dee5f6a9c85e452cc78f0747e4",
       "commence_time": "2026-05-30T02:11:00Z",
@@ -32,43 +11,19 @@
       "bookmaker": "fanduel",
       "markets": {
         "h2h": {
-          "home_odds": "-350",
-          "away_odds": "+255"
+          "home_odds": "+102",
+          "away_odds": "-130"
         },
         "spreads": {
-          "home_line": -1.5,
-          "home_odds": "+400",
-          "away_line": 1.5,
-          "away_odds": "-670"
+          "home_line": 1.5,
+          "home_odds": "-490",
+          "away_line": -1.5,
+          "away_odds": "+320"
         },
         "totals": {
-          "line": 12.5,
-          "over_odds": "-125",
-          "under_odds": "-106"
-        }
-      }
-    },
-    {
-      "event_id": "18e8a4acb1d40019544cfef0a5f07ef1",
-      "commence_time": "2026-05-30T02:16:00Z",
-      "home_team": "Los Angeles Dodgers",
-      "away_team": "Philadelphia Phillies",
-      "bookmaker": "betmgm",
-      "markets": {
-        "h2h": {
-          "home_odds": "-10000",
-          "away_odds": "+3000"
-        },
-        "spreads": {
-          "home_line": -1.5,
-          "home_odds": "-2000",
-          "away_line": 1.5,
-          "away_odds": "+850"
-        },
-        "totals": {
-          "line": 6.5,
-          "over_odds": "+850",
-          "under_odds": "-2000"
+          "line": 13.5,
+          "over_odds": "-146",
+          "under_odds": "+110"
         }
       }
     }
@@ -106,11 +61,11 @@
     "regions": "us",
     "bookmakers": null,
     "counts": {
-      "events_matched": 3,
-      "games": 3,
-      "h2h_games": 2,
-      "totals_games": 3,
-      "spreads_games": 3
+      "events_matched": 1,
+      "games": 1,
+      "h2h_games": 1,
+      "totals_games": 1,
+      "spreads_games": 1
     }
   }
 }

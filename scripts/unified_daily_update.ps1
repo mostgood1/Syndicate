@@ -104,6 +104,10 @@ function Invoke-Step {
 
     Push-Location $WorkingDirectory
     $previousEnv = @{}
+    $hadNativeErrorPreference = $false
+    $priorNativeErrorPreference = $null
+    $stdoutPath = $null
+    $stderrPath = $null
     try {
         if ($EnvironmentOverrides) {
             foreach ($entry in $EnvironmentOverrides.GetEnumerator()) {
@@ -111,12 +115,46 @@ function Invoke-Step {
                 [Environment]::SetEnvironmentVariable($entry.Key, [string]$entry.Value, 'Process')
             }
         }
-        & $Command[0] $Command[1..($Command.Length - 1)]
-        if ($LASTEXITCODE -ne 0) {
-            throw "$Name failed with exit code $LASTEXITCODE"
+
+        if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -ErrorAction SilentlyContinue) {
+            $hadNativeErrorPreference = $true
+            $priorNativeErrorPreference = $Global:PSNativeCommandUseErrorActionPreference
+            $Global:PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        $stdoutPath = [System.IO.Path]::GetTempFileName()
+        $stderrPath = [System.IO.Path]::GetTempFileName()
+        $resolvedCommand = $Command[0]
+        $commandInfo = Get-Command -Name $Command[0] -ErrorAction SilentlyContinue
+        if ($commandInfo -and -not [string]::IsNullOrWhiteSpace($commandInfo.Source)) {
+            $resolvedCommand = $commandInfo.Source
+        }
+        $process = Start-Process -FilePath $resolvedCommand -ArgumentList $Command[1..($Command.Length - 1)] -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -NoNewWindow -PassThru -Wait
+
+        foreach ($streamPath in @($stdoutPath, $stderrPath)) {
+            if (-not [string]::IsNullOrWhiteSpace($streamPath) -and (Test-Path $streamPath)) {
+                Get-Content -Path $streamPath -ErrorAction SilentlyContinue | ForEach-Object {
+                    if ($null -ne $_) {
+                        Write-Host $_
+                    }
+                }
+            }
+        }
+
+        $LASTEXITCODE = $process.ExitCode
+        if ($process.ExitCode -ne 0) {
+            throw "$Name failed with exit code $($process.ExitCode)"
         }
     }
     finally {
+        foreach ($streamPath in @($stdoutPath, $stderrPath)) {
+            if (-not [string]::IsNullOrWhiteSpace($streamPath) -and (Test-Path $streamPath)) {
+                Remove-Item -Path $streamPath -Force -ErrorAction SilentlyContinue
+            }
+        }
+        if ($hadNativeErrorPreference) {
+            $Global:PSNativeCommandUseErrorActionPreference = $priorNativeErrorPreference
+        }
         if ($EnvironmentOverrides) {
             foreach ($entry in $EnvironmentOverrides.GetEnumerator()) {
                 $priorValue = $previousEnv[$entry.Key]

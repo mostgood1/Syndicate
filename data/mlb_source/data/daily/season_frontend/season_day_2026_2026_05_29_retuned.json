@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-05-29T23:32:13-05:00",
+    "generated_at": "2026-05-30T00:16:46-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -141,93 +141,6 @@
     }
   },
   "games": [
-    {
-      "game_pk": 825002,
-      "game_date": "2026-05-30T01:40:00Z",
-      "start_time": "8:40 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "away": {
-        "id": 147,
-        "abbr": "NYY",
-        "name": "New York Yankees",
-        "logo": "https://www.mlbstatic.com/team-logos/147.svg"
-      },
-      "home": {
-        "id": 133,
-        "abbr": "ATH",
-        "name": "Athletics",
-        "logo": "https://www.mlbstatic.com/team-logos/133.svg"
-      },
-      "starter_names": {
-        "away": "Carlos Rod\u00f3n",
-        "home": "Luis Severino"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
     {
       "game_pk": 823135,
       "game_date": "2026-05-30T02:10:00Z",
@@ -1296,6 +1209,93 @@
       "starter_names": {
         "away": "Logan Webb",
         "home": "Michael Lorenzen"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 825002,
+      "game_date": "2026-05-30T01:40:00Z",
+      "start_time": "8:40 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "away": {
+        "id": 147,
+        "abbr": "NYY",
+        "name": "New York Yankees",
+        "logo": "https://www.mlbstatic.com/team-logos/147.svg"
+      },
+      "home": {
+        "id": 133,
+        "abbr": "ATH",
+        "name": "Athletics",
+        "logo": "https://www.mlbstatic.com/team-logos/133.svg"
+      },
+      "starter_names": {
+        "away": "Carlos Rod\u00f3n",
+        "home": "Luis Severino"
       },
       "segments": {},
       "pitcher_props": {},
