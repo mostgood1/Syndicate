@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-29T20:39:30.205290",
+  "generated_at": "2026-05-29T23:19:12.528196",
   "date": "2026-05-29",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-29_b85891982dad.lock",
-    "pid": 10152,
-    "created_at": "2026-05-29T20:39:30.181295"
+    "pid": 20996,
+    "created_at": "2026-05-29T23:19:12.523425"
   },
   "seed": {
     "value": 1337,
@@ -209,7 +209,7 @@
       }
     },
     "current_day_oddsapi": {
-      "status": "ok",
+      "status": "warning",
       "date": "2026-05-29",
       "mode": "live",
       "out_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi",
@@ -218,11 +218,11 @@
       "hitter_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_29.json",
       "counts": {
         "game_lines": {
-          "events_matched": 13,
-          "games": 13,
-          "h2h_games": 13,
-          "totals_games": 13,
-          "spreads_games": 13
+          "events_matched": 3,
+          "games": 3,
+          "h2h_games": 2,
+          "totals_games": 3,
+          "spreads_games": 3
         },
         "pitcher_props": {
           "players": 8,
@@ -236,18 +236,17 @@
           "events_matched": 13
         },
         "hitter_props": {
-          "players": 148,
+          "players": 23,
           "markets": {
-            "batter_hits": 121,
-            "batter_hits_runs_rbis": 124,
-            "batter_home_runs": 138,
-            "batter_rbis": 123,
-            "batter_runs_scored": 121,
-            "batter_total_bases": 96
+            "batter_hits_runs_rbis": 1,
+            "batter_home_runs": 23
           },
-          "events_matched": 13
+          "events_matched": 3
         }
-      }
+      },
+      "warnings": [
+        "preserved existing pitcher props for 2026-05-29 because live refresh returned no player props"
+      ]
     },
     "current_day_overwrite_prep": {
       "status": "ok",
@@ -762,8 +761,8 @@
         },
         "hitter": {
           "found": true,
-          "candidateCount": 723,
-          "displayedCount": 723,
+          "candidateCount": 93,
+          "displayedCount": 93,
           "sectionCount": 7
         }
       }
@@ -875,9 +874,9 @@
           "none": 45
         },
         "tones": {
-          "soft": 18,
-          "strong": 15,
-          "solid": 12
+          "soft": 8,
+          "strong": 16,
+          "solid": 21
         },
         "stats": {
           "hits_allowed": {

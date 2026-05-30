@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-05-29T20:54:14-05:00",
+    "generated_at": "2026-05-29T23:22:25-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -142,528 +142,6 @@
   },
   "games": [
     {
-      "game_pk": 822732,
-      "game_date": "2026-05-29T22:45:00Z",
-      "start_time": "5:45 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "away": {
-        "id": 135,
-        "abbr": "SD",
-        "name": "San Diego Padres",
-        "logo": "https://www.mlbstatic.com/team-logos/135.svg"
-      },
-      "home": {
-        "id": 120,
-        "abbr": "WSH",
-        "name": "Washington Nationals",
-        "logo": "https://www.mlbstatic.com/team-logos/120.svg"
-      },
-      "starter_names": {
-        "away": "Lucas Giolito",
-        "home": "Paxton Schultz"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 823623,
-      "game_date": "2026-05-29T23:10:00Z",
-      "start_time": "6:10 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "away": {
-        "id": 146,
-        "abbr": "MIA",
-        "name": "Miami Marlins",
-        "logo": "https://www.mlbstatic.com/team-logos/146.svg"
-      },
-      "home": {
-        "id": 121,
-        "abbr": "NYM",
-        "name": "New York Mets",
-        "logo": "https://www.mlbstatic.com/team-logos/121.svg"
-      },
-      "starter_names": {
-        "away": "Max Meyer",
-        "home": "Freddy Peralta"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 824594,
-      "game_date": "2026-05-29T23:40:00Z",
-      "start_time": "6:40 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "away": {
-        "id": 116,
-        "abbr": "DET",
-        "name": "Detroit Tigers",
-        "logo": "https://www.mlbstatic.com/team-logos/116.svg"
-      },
-      "home": {
-        "id": 145,
-        "abbr": "CWS",
-        "name": "Chicago White Sox",
-        "logo": "https://www.mlbstatic.com/team-logos/145.svg"
-      },
-      "starter_names": {
-        "away": "Troy Melton",
-        "home": "Erick Fedde"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 822894,
-      "game_date": "2026-05-30T00:05:00Z",
-      "start_time": "7:05 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "away": {
-        "id": 118,
-        "abbr": "KC",
-        "name": "Kansas City Royals",
-        "logo": "https://www.mlbstatic.com/team-logos/118.svg"
-      },
-      "home": {
-        "id": 140,
-        "abbr": "TEX",
-        "name": "Texas Rangers",
-        "logo": "https://www.mlbstatic.com/team-logos/140.svg"
-      },
-      "starter_names": {
-        "away": "Stephen Kolek",
-        "home": "MacKenzie Gore"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 824191,
-      "game_date": "2026-05-30T00:10:00Z",
-      "start_time": "7:10 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "away": {
-        "id": 158,
-        "abbr": "MIL",
-        "name": "Milwaukee Brewers",
-        "logo": "https://www.mlbstatic.com/team-logos/158.svg"
-      },
-      "home": {
-        "id": 117,
-        "abbr": "HOU",
-        "name": "Houston Astros",
-        "logo": "https://www.mlbstatic.com/team-logos/117.svg"
-      },
-      "starter_names": {
-        "away": "Coleman Crow",
-        "home": "Kai-Wei Teng"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 824353,
-      "game_date": "2026-05-30T00:40:00Z",
-      "start_time": "7:40 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "away": {
-        "id": 137,
-        "abbr": "SF",
-        "name": "San Francisco Giants",
-        "logo": "https://www.mlbstatic.com/team-logos/137.svg"
-      },
-      "home": {
-        "id": 115,
-        "abbr": "COL",
-        "name": "Colorado Rockies",
-        "logo": "https://www.mlbstatic.com/team-logos/115.svg"
-      },
-      "starter_names": {
-        "away": "Logan Webb",
-        "home": "Michael Lorenzen"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
       "game_pk": 825002,
       "game_date": "2026-05-30T01:40:00Z",
       "start_time": "8:40 PM",
@@ -757,7 +235,7 @@
       "official_date": "2026-05-29",
       "status": {
         "abstract": "Live",
-        "detailed": "Warmup"
+        "detailed": "In Progress"
       },
       "away": {
         "id": 109,
@@ -774,93 +252,6 @@
       "starter_names": {
         "away": "Zac Gallen",
         "home": "George Kirby"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 823946,
-      "game_date": "2026-05-30T02:15:00Z",
-      "start_time": "9:15 PM",
-      "official_date": "2026-05-29",
-      "status": {
-        "abstract": "Live",
-        "detailed": "Warmup"
-      },
-      "away": {
-        "id": 143,
-        "abbr": "PHI",
-        "name": "Philadelphia Phillies",
-        "logo": "https://www.mlbstatic.com/team-logos/143.svg"
-      },
-      "home": {
-        "id": 119,
-        "abbr": "LAD",
-        "name": "Los Angeles Dodgers",
-        "logo": "https://www.mlbstatic.com/team-logos/119.svg"
-      },
-      "starter_names": {
-        "away": "Zack Wheeler",
-        "home": "Justin Wrobleski"
       },
       "segments": {},
       "pitcher_props": {},
@@ -948,6 +339,93 @@
       "starter_names": {
         "away": "Grant Holmes",
         "home": "Chris Paddack"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 822732,
+      "game_date": "2026-05-29T22:45:00Z",
+      "start_time": "5:45 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "away": {
+        "id": 135,
+        "abbr": "SD",
+        "name": "San Diego Padres",
+        "logo": "https://www.mlbstatic.com/team-logos/135.svg"
+      },
+      "home": {
+        "id": 120,
+        "abbr": "WSH",
+        "name": "Washington Nationals",
+        "logo": "https://www.mlbstatic.com/team-logos/120.svg"
+      },
+      "starter_names": {
+        "away": "Lucas Giolito",
+        "home": "Paxton Schultz"
       },
       "segments": {},
       "pitcher_props": {},
@@ -1273,6 +751,93 @@
       }
     },
     {
+      "game_pk": 823623,
+      "game_date": "2026-05-29T23:10:00Z",
+      "start_time": "6:10 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "away": {
+        "id": 146,
+        "abbr": "MIA",
+        "name": "Miami Marlins",
+        "logo": "https://www.mlbstatic.com/team-logos/146.svg"
+      },
+      "home": {
+        "id": 121,
+        "abbr": "NYM",
+        "name": "New York Mets",
+        "logo": "https://www.mlbstatic.com/team-logos/121.svg"
+      },
+      "starter_names": {
+        "away": "Max Meyer",
+        "home": "Freddy Peralta"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
       "game_pk": 824433,
       "game_date": "2026-05-29T23:10:00Z",
       "start_time": "6:10 PM",
@@ -1366,7 +931,7 @@
       "official_date": "2026-05-29",
       "status": {
         "abstract": "Final",
-        "detailed": "Game Over"
+        "detailed": "Final"
       },
       "away": {
         "id": 112,
@@ -1383,6 +948,441 @@
       "starter_names": {
         "away": "Shota Imanaga",
         "home": "Andre Pallante"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 824594,
+      "game_date": "2026-05-29T23:40:00Z",
+      "start_time": "6:40 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "away": {
+        "id": 116,
+        "abbr": "DET",
+        "name": "Detroit Tigers",
+        "logo": "https://www.mlbstatic.com/team-logos/116.svg"
+      },
+      "home": {
+        "id": 145,
+        "abbr": "CWS",
+        "name": "Chicago White Sox",
+        "logo": "https://www.mlbstatic.com/team-logos/145.svg"
+      },
+      "starter_names": {
+        "away": "Troy Melton",
+        "home": "Erick Fedde"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 822894,
+      "game_date": "2026-05-30T00:05:00Z",
+      "start_time": "7:05 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "away": {
+        "id": 118,
+        "abbr": "KC",
+        "name": "Kansas City Royals",
+        "logo": "https://www.mlbstatic.com/team-logos/118.svg"
+      },
+      "home": {
+        "id": 140,
+        "abbr": "TEX",
+        "name": "Texas Rangers",
+        "logo": "https://www.mlbstatic.com/team-logos/140.svg"
+      },
+      "starter_names": {
+        "away": "Stephen Kolek",
+        "home": "MacKenzie Gore"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 824191,
+      "game_date": "2026-05-30T00:10:00Z",
+      "start_time": "7:10 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "away": {
+        "id": 158,
+        "abbr": "MIL",
+        "name": "Milwaukee Brewers",
+        "logo": "https://www.mlbstatic.com/team-logos/158.svg"
+      },
+      "home": {
+        "id": 117,
+        "abbr": "HOU",
+        "name": "Houston Astros",
+        "logo": "https://www.mlbstatic.com/team-logos/117.svg"
+      },
+      "starter_names": {
+        "away": "Coleman Crow",
+        "home": "Kai-Wei Teng"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 824353,
+      "game_date": "2026-05-30T00:40:00Z",
+      "start_time": "7:40 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "away": {
+        "id": 137,
+        "abbr": "SF",
+        "name": "San Francisco Giants",
+        "logo": "https://www.mlbstatic.com/team-logos/137.svg"
+      },
+      "home": {
+        "id": 115,
+        "abbr": "COL",
+        "name": "Colorado Rockies",
+        "logo": "https://www.mlbstatic.com/team-logos/115.svg"
+      },
+      "starter_names": {
+        "away": "Logan Webb",
+        "home": "Michael Lorenzen"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 823946,
+      "game_date": "2026-05-30T02:15:00Z",
+      "start_time": "9:15 PM",
+      "official_date": "2026-05-29",
+      "status": {
+        "abstract": "Final",
+        "detailed": "Game Over"
+      },
+      "away": {
+        "id": 143,
+        "abbr": "PHI",
+        "name": "Philadelphia Phillies",
+        "logo": "https://www.mlbstatic.com/team-logos/143.svg"
+      },
+      "home": {
+        "id": 119,
+        "abbr": "LAD",
+        "name": "Los Angeles Dodgers",
+        "logo": "https://www.mlbstatic.com/team-logos/119.svg"
+      },
+      "starter_names": {
+        "away": "Zack Wheeler",
+        "home": "Justin Wrobleski"
       },
       "segments": {},
       "pitcher_props": {},
