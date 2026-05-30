@@ -59,6 +59,53 @@ def _load_scoreboard_index(selected_date: str) -> dict[tuple[str, str], dict[str
     return index
 
 
+def _source_title(cards_context: dict[str, Any], matched_scoreboard_rows: list[dict[str, Any]]) -> str:
+    cards_source_title = str(cards_context.get("source_title") or "").strip()
+    if cards_source_title == "NHL archived scoreboard":
+        return "NHL live scoreboard fallback"
+    if matched_scoreboard_rows:
+        return "NHL shared cards + scoreboard lens"
+    if cards_context.get("games"):
+        return "NHL shared cards lens"
+    return "NHL live lens unavailable"
+
+
+def _warning_panel(
+    *,
+    requested_date: str,
+    resolved_date: str,
+    latest_date: str,
+    cards_context: dict[str, Any],
+    rank_cards: list[dict[str, Any]],
+    matched_scoreboard_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if not rank_cards:
+        return {
+            "eyebrow": "NHL live lens",
+            "title": "No NHL slate cards were available for this date",
+            "body": "The live-lens board needs either Syndicate NHL cards artifacts or a saved scoreboard snapshot for the selected date.",
+            "list_items": [f"Requested date: {requested_date or resolved_date}"],
+        }
+    source_name = Path(str(cards_context.get("source_path") or "")).name or "unknown"
+    scoreboard_states = sorted(
+        {
+            str(row.get("gameState") or "").strip().upper()
+            for row in matched_scoreboard_rows
+            if isinstance(row, dict) and str(row.get("gameState") or "").strip()
+        }
+    )
+    return {
+        "eyebrow": "Artifact-backed lens",
+        "title": "NHL live lens runs on the shared Syndicate game board artifacts",
+        "body": "This board reads the same NHL cards artifact lane and overlays scoreboard state when that snapshot is available, keeping the live-lens route self-contained inside Syndicate.",
+        "list_items": [
+            f"Primary artifact: {source_name}",
+            f"Matched scoreboard rows: {len(matched_scoreboard_rows)}",
+            *( [f"Observed game states: {', '.join(scoreboard_states)}"] if scoreboard_states else [f"Latest detected NHL slate: {latest_date}"] ),
+        ],
+    }
+
+
 def _live_lens_card(game: dict[str, Any], selected_date: str, scoreboard_row: dict[str, Any] | None = None) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
@@ -127,36 +174,47 @@ def build_live_lens_page_context(selected_date: str | None) -> dict[str, Any]:
     ]
     using_sample_data = False
     latest_date = (slate_summaries()[-1]["date"] if slate_summaries() else resolved_date)
-    warning_panel = {
-        "eyebrow": "Stored slate lens",
-        "title": "NHL live lens currently projects the active slate from stored predictions",
-        "body": "This first NHL live-lens surface upgrades the old stub into a real ranked board by turning the persisted processed predictions slate into a compact lens view.",
-        "list_items": [
-            "The route stays artifact-backed until a stronger live source workflow is promoted into Syndicate.",
-            f"Latest detected stored slate: {latest_date}",
-        ],
-    }
-    if not rank_cards:
-        warning_panel = {
-            "eyebrow": "Stored slate lens",
-            "title": "No NHL slate cards were available for this date",
-            "body": "The live-lens board can only project stored slate rows that already exist in the NHL processed predictions artifact.",
-            "list_items": [f"Requested date: {cards_context.get('requested_date') or resolved_date}"],
-        }
+    matched_scoreboard_rows = [
+        row
+        for game in games
+        if isinstance(game, dict)
+        for row in [
+            scoreboard_index.get(
+                (
+                    str((game.get("away") or {}).get("name") or game.get("away_name") or "").strip(),
+                    str((game.get("home") or {}).get("name") or game.get("home_name") or "").strip(),
+                )
+            )
+        ]
+        if isinstance(row, dict)
+    ]
+    live_count = sum(1 for row in matched_scoreboard_rows if str(row.get("gameState") or "").strip().upper() in {"LIVE", "CRIT"})
+    final_count = sum(1 for row in matched_scoreboard_rows if str(row.get("gameState") or "").strip().upper() == "OFF")
+    warning_panel = _warning_panel(
+        requested_date=requested_date,
+        resolved_date=resolved_date,
+        latest_date=latest_date,
+        cards_context=cards_context,
+        rank_cards=rank_cards,
+        matched_scoreboard_rows=matched_scoreboard_rows,
+    )
+    source_title = _source_title(cards_context, matched_scoreboard_rows)
 
     context = build_rank_page_context(
         selected_date=requested_date,
         route_path="/nhl/live-lens",
         intro_title="NHL Live Lens",
-        intro_body="This first NHL live-lens surface reuses the shared ranked-board shell and the stored processed predictions slate, so the module gains a real live-lens family before a deeper source-side monitor is migrated.",
+        intro_body="The NHL live lens reuses the shared ranked-board shell on top of the Syndicate cards artifact lane, adding scoreboard state when that snapshot is available for the selected date.",
         aria_label="NHL live lens board",
         source_path=str(cards_context.get("source_path") or "NHL processed predictions"),
-        source_title="NHL processed predictions lens" if rank_cards else "NHL live lens unavailable",
+        source_title=source_title,
         rank_cards=rank_cards,
         using_sample_data=using_sample_data,
         header_stats=[
             {"label": "Cards", "value": str(len(rank_cards))},
             {"label": "Games", "value": str(len(games))},
+            {"label": "Live", "value": str(live_count)},
+            {"label": "Final", "value": str(final_count)},
             {"label": "Source", "value": Path(str(cards_context.get('source_path') or '')).name if cards_context.get("source_path") else "Fallback"},
         ],
         module_links=build_module_links(requested_date, "Live Lens"),

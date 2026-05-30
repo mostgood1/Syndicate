@@ -160,6 +160,61 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 1,
             )
 
+    def test_main_builds_live_lens_locally_when_http_refresh_is_unavailable(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            artifact_root = tmp_root / "bundle"
+            date_str = "2026-05-22"
+            date_slug = "2026_05_22"
+            season = "2026"
+
+            ready_paths = (
+                source_root / "data" / "daily" / f"daily_summary_{date_slug}.json",
+                source_root / "data" / "live_lens" / f"live_lens_report_{date_slug}.json",
+                source_root / "data" / "daily" / "snapshots" / date_str / f"oddsapi_game_lines_{date_slug}.json",
+                source_root / "data" / "market" / "oddsapi" / "refresh_history" / date_slug / "20260522T120000_000000Z" / "refresh_meta.json",
+                source_root / "data" / "eval" / "seasons" / season / "season_eval_manifest.json",
+                source_root / "data" / "live_lens" / "prop_registry" / f"live_prop_registry_{date_slug}.json",
+                source_root / "data" / "tuning" / "live_prop_ranking" / "default.json",
+                source_root / "sim_engine" / "live_prop_ranking.py",
+            )
+            for path in ready_paths:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("{}\n", encoding="utf-8")
+
+            payload = {
+                "generatedAt": "2026-05-22T19:15:00-05:00",
+                "counts": {"games": 2, "live": 1, "pregame": 1, "final": 0, "props": 3, "archivedLiveProps": 0},
+                "games": [{"gamePk": 1}, {"gamePk": 2}],
+            }
+            argv = [
+                "refresh_mlb_oddsapi.py",
+                "--date",
+                date_str,
+                "--source-root",
+                str(source_root),
+                "--artifact-root",
+                str(artifact_root),
+                "--overwrite",
+                "off",
+            ]
+            with patch.object(module, "_load_local_fetcher", side_effect=AssertionError("local fetcher should not load")), \
+                patch.object(module, "_build_local_live_lens_reports_payload", return_value=payload) as local_builder, \
+                patch.dict("os.environ", {"MLB_BETTING_BASE_URL": "", "MLB_BETTING_CRON_TOKEN": ""}, clear=False), \
+                patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(local_builder.call_count, 1)
+            self.assertEqual(local_builder.call_args.kwargs["source_root"].resolve(), source_root.resolve())
+            self.assertEqual(local_builder.call_args.kwargs["date_str"], date_str)
+            report_path = source_root / "data" / "live_lens" / f"live_lens_report_{date_slug}.json"
+            self.assertTrue(report_path.exists())
+            self.assertEqual(json.loads(report_path.read_text(encoding="utf-8"))["counts"]["props"], 3)
+
     def test_main_materializes_mlb_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 

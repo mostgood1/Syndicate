@@ -58,6 +58,7 @@ from syndicate.features.ncaaf.picks import build_picks_page_context as build_nca
 from syndicate.features.mlb.hub import build_hub_context as build_mlb_hub_context
 from syndicate.features.nhl.sources import processed_path as nhl_processed_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
+from syndicate.features.nhl.live_lens import build_live_lens_page_context as build_nhl_live_lens_page_context
 from syndicate.features.ncaab.season import build_season_page_context
 from syndicate.features.ncaab.cards import build_cards_page_context as build_ncaab_cards_page_context
 from syndicate.features.ncaab.game_detail import build_game_detail_page_context as build_ncaab_game_detail_page_context
@@ -3257,6 +3258,8 @@ class ArchiveRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('<title>MLB Live Lens - 2026-05-16</title>', body)
+        self.assertIn('window.MLBLiveLensBootstrap', body)
+        self.assertIn('Loading live lens', body)
         self.assertNotIn('Live Lens Accuracy', body)
         self.assertNotIn('Market Accuracy', body)
 
@@ -4580,8 +4583,57 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(payload.get("control_name"), "date")
         self.assertEqual(payload.get("route_path"), "/nhl/live-lens")
         self.assertTrue(payload.get("warning_panel"))
+        self.assertIn(payload.get("source_title"), {"NHL shared cards lens", "NHL shared cards + scoreboard lens", "NHL live scoreboard fallback", "NHL live lens unavailable"})
+        self.assertEqual(len(payload.get("header_stats") or []), 5)
         self.assertTrue(any(link.get("href") == "/nhl/live-lens?date=2026-05-16" for link in (payload.get("module_links") or [])))
         self.assertTrue(isinstance(payload.get("available_dates"), list))
+
+    def test_nhl_live_lens_context_uses_shared_cards_and_scoreboard_contract(self) -> None:
+        cards_context = {
+            "requested_date": "2026-05-16",
+            "date": "2026-05-16",
+            "prev_date": "2026-05-15",
+            "next_date": "2026-05-17",
+            "source_path": str(REPO_ROOT / "data" / "processed" / "predictions_2026-05-16.csv"),
+            "source_title": "NHL processed predictions",
+            "games": [
+                {
+                    "gamePk": "1",
+                    "away": {"abbr": "TOR", "name": "Toronto Maple Leafs", "logo": "away.svg"},
+                    "home": {"abbr": "MTL", "name": "Montreal Canadiens", "logo": "home.svg"},
+                    "status": "Scheduled",
+                    "detail": "7:00 PM ET",
+                    "summary": "Stored game card",
+                    "betting": {"home_ml_ev": 0.05},
+                    "sim": {
+                        "score": {"total_mean": 5.8, "margin_mean": 0.4},
+                        "first10": {"prob_yes": 0.52, "ev_yes": 0.03},
+                    },
+                    "panels": [],
+                }
+            ],
+        }
+        scoreboard_index = {
+            (
+                "Toronto Maple Leafs",
+                "Montreal Canadiens",
+            ): {
+                "away": "Toronto Maple Leafs",
+                "home": "Montreal Canadiens",
+                "away_goals": "2",
+                "home_goals": "1",
+                "gameState": "LIVE",
+            }
+        }
+
+        with patch("syndicate.features.nhl.live_lens.build_cards_page_context", return_value=cards_context), patch(
+            "syndicate.features.nhl.live_lens._load_scoreboard_index", return_value=scoreboard_index
+        ), patch("syndicate.features.nhl.live_lens.slate_summaries", return_value=[{"date": "2026-05-16"}]):
+            context = build_nhl_live_lens_page_context("2026-05-16")
+
+        self.assertEqual(context.get("source_title"), "NHL shared cards + scoreboard lens")
+        self.assertEqual((context.get("header_stats") or [None, None, None])[2], {"label": "Live", "value": "1"})
+        self.assertEqual((context.get("warning_panel") or {}).get("title"), "NHL live lens runs on the shared Syndicate game board artifacts")
 
     def test_nhl_live_lens_page_renders_rank_board_instead_of_redirecting(self) -> None:
         response = self.client.get("/nhl/live-lens?date=2026-05-16")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import errno
 import importlib
+import importlib.util
 import json
 import os
 import shutil
@@ -157,6 +158,35 @@ def _env_first(*names: str) -> str:
     return ""
 
 
+def _load_module_from_path(module_name: str, module_path: Path):
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load module from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@contextmanager
+def _temporary_env(overrides: dict[str, str | None]):
+    original: dict[str, str | None] = {}
+    for key, value in overrides.items():
+        original[key] = os.environ.get(key)
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = str(value)
+    try:
+        yield
+    finally:
+        for key, value in original.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def _normalize_render_base_url(value: str) -> str:
     base_url = str(value or "").strip()
     if not base_url:
@@ -174,6 +204,28 @@ def _fetch_live_lens_reports_payload(*, base_url: str, token: str, date_str: str
         payload = json.loads(response.read().decode("utf-8"))
     if not isinstance(payload, dict):
         raise RuntimeError("live-lens reports response was not a JSON object")
+    return payload
+
+
+def _build_local_live_lens_reports_payload(*, source_root: Path, date_str: str) -> dict[str, object]:
+    module_path = (REPO_ROOT / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py").resolve()
+    if not module_path.exists() or not module_path.is_file():
+        raise RuntimeError(f"Vendored MLB live-lens source app not found at {module_path}")
+    data_root = (source_root / "data").resolve()
+    module_name = f"syndicate_mlb_live_lens_source_{abs(hash((str(module_path), str(data_root))))}"
+    with _temporary_env(
+        {
+            "MLB_BETTING_DATA_ROOT": str(data_root),
+            "MLB_LIVE_LENS_DIR": str((data_root / "live_lens").resolve()),
+        }
+    ):
+        source_app = _load_module_from_path(module_name, module_path)
+        builder = getattr(source_app, "_live_lens_reports_payload", None)
+        if not callable(builder):
+            raise RuntimeError("Vendored MLB live-lens payload builder is unavailable")
+        payload = builder(str(date_str), include_archive=False)
+    if not isinstance(payload, dict):
+        raise RuntimeError("Vendored MLB live-lens payload builder did not return a JSON object")
     return payload
 
 
@@ -481,6 +533,12 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
             live_lens_payload = _fetch_live_lens_reports_payload(base_url=base_url, token=token, date_str=date_str, timeout_seconds=45)
             live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
         except (HTTPError, URLError, OSError, ValueError, RuntimeError):
+            live_lens = None
+    if live_lens is None:
+        try:
+            live_lens_payload = _build_local_live_lens_reports_payload(source_root=source_root, date_str=date_str)
+            live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
+        except Exception:
             live_lens = None
     if live_lens is None:
         live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger=trigger)
