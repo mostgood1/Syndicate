@@ -20,8 +20,16 @@ services:
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
         value: detached_subprocess
+      - key: SYNDICATE_DATA_ROOT
+        value: /opt/render/project/data
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
+      - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
+        value: "false"
+      - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
+        value: "false"
+      - key: SYNDICATE_NHL_SOURCE_CLI_GENERATION
+        value: "false"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "true"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS

@@ -40,6 +40,10 @@ def _json_ready(value):
     return value
 
 
+def _source_app_fallback_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_WNBA_SOURCE_APP_FALLBACK") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _copy_if_exists(source_path: str | None, destination_path: Path) -> bool:
     source_text = str(source_path or "").strip()
     if not source_text:
@@ -257,6 +261,9 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
     if existing_state:
         copied["live_state_path"] = existing_state
         state_payload = _read_live_snapshot_payload(state_destination)
+
+    if not _source_app_fallback_enabled():
+        return copied
 
     source_app = None
     client = None
@@ -2857,6 +2864,8 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
     local_rows, local_path = _build_local_recon_games_artifact(processed_root=processed_root, date_str=date_str)
     if local_rows > 0 and local_path is not None:
         return str(local_path)
+    if not _source_app_fallback_enabled():
+        return None
     source_app = _load_source_app(source_root)
     if source_app is None:
         return None
@@ -2959,6 +2968,9 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
                 continue
         missing_exports.append((file_name, query, destinations))
     if not missing_exports:
+        return copied
+
+    if not _source_app_fallback_enabled():
         return copied
 
     source_app = _load_source_app(source_root)

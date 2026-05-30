@@ -341,6 +341,11 @@ def _lineup_quality_issues(*, artifact_root: Path, date_str: str) -> list[str]:
     return issues
 
 
+def _source_cli_generation_enabled() -> bool:
+    value = str(os.environ.get("SYNDICATE_NHL_SOURCE_CLI_GENERATION") or "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh NHL OddsAPI snapshots through a Syndicate-owned runner.")
     parser.add_argument("--date", required=True)
@@ -366,7 +371,7 @@ def main() -> int:
                 team_markets=str(args.team_markets or "h2h,spreads,totals"),
                 props_source=str(args.props_source or "oddsapi"),
             )
-        if source_root is not None:
+        if source_root is not None and _source_cli_generation_enabled():
             try:
                 _run_source_generation_multi(
                     source_root=source_root,
@@ -380,6 +385,8 @@ def main() -> int:
                 if missing_by_date:
                     raise
                 warnings.append(f"source generation skipped: {exc}")
+        elif source_root is not None:
+            warnings.append("source generation disabled by default (set SYNDICATE_NHL_SOURCE_CLI_GENERATION=1 to enable)")
     except Exception as exc:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
