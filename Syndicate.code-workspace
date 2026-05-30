@@ -15,5 +15,8 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		"powershell.cwd": "Syndicate"
+	}
 }
