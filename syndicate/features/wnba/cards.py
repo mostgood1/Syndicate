@@ -145,6 +145,11 @@ def _remote_source_auth_token() -> str:
     return ""
 
 
+def _remote_source_fallback_enabled() -> bool:
+    value = str(os.environ.get("WNBA_LIVE_REMOTE_FALLBACK") or "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def _remote_live_snapshot_payload(
     kind: str,
     *,
@@ -1094,13 +1099,14 @@ def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_i
 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
-    remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
-    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
-        return remote_payload
-
     local_payload = _local_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
+
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return remote_payload
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     games = context.get("games") if isinstance(context.get("games"), list) else []
@@ -1144,17 +1150,18 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
 
 def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    remote_payload = _remote_live_snapshot_payload(
-        "live_player_boxscore",
-        selected_date=selected_date,
-        event_ids=normalized_event_ids,
-    )
-    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
-        return remote_payload
-
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
+
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_player_boxscore",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return remote_payload
     return {
         "ok": True,
         "ttl": int(ttl),
@@ -1166,17 +1173,18 @@ def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str],
 
 def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    remote_payload = _remote_live_snapshot_payload(
-        "live_player_lens",
-        selected_date=selected_date,
-        event_ids=normalized_event_ids,
-    )
-    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
-        return remote_payload
-
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
+
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_player_lens",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return remote_payload
     return {
         "ok": True,
         "ttl": int(ttl),
@@ -1198,18 +1206,19 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
 
 def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int = 20, include_period_totals: bool = False) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    remote_payload = _remote_live_snapshot_payload(
-        "live_lines",
-        selected_date=selected_date,
-        event_ids=normalized_event_ids,
-        include_period_totals=bool(include_period_totals),
-    )
-    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
-        return remote_payload
-
     local_payload = _filtered_local_live_snapshot_payload("live_lines", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
+
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_lines",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+            include_period_totals=bool(include_period_totals),
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return remote_payload
     return {
         "ok": True,
         "ttl": int(ttl),
@@ -1222,17 +1231,18 @@ def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int 
 
 def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    remote_payload = _remote_live_snapshot_payload(
-        "live_pbp_stats",
-        selected_date=selected_date,
-        event_ids=normalized_event_ids,
-    )
-    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
-        return remote_payload
-
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
+
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_pbp_stats",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return remote_payload
     return {
         "ok": True,
         "ttl": int(ttl),
