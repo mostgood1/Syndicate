@@ -460,6 +460,10 @@ function Get-ForcedPublishArtifactPaths {
         }
 
         Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/smart_sim_${DateValue}_*.json"
+        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_manifest_*_retuned_${DateValue}.json"
+        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_manifest_*_retuned.json"
+        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_day_*_retuned_${DateValue}.json"
+        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_day_*_retuned_${DateValue}_insights.json"
     }
 
     if (-not $SkipWNBA) {

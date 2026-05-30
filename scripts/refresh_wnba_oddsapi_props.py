@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import argparse
 import contextlib
 import csv
@@ -26,6 +27,7 @@ if str(REPO_ROOT) not in sys.path:
 from syndicate.features.shared.basketball_props_edges import export_props_edges_local
 from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
+from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
 
 
 def _json_ready(value):
@@ -543,6 +545,460 @@ def _float_or_none(value: object) -> float | None:
         return None
 
 
+def _mean_or_none(values: list[float]) -> float | None:
+    cleaned = [float(value) for value in values if value is not None]
+    if not cleaned:
+        return None
+    return float(sum(cleaned) / len(cleaned))
+
+
+def _structured_literal_or_none(value: object) -> object | None:
+    if isinstance(value, (dict, list)):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    try:
+        return ast.literal_eval(text)
+    except Exception:
+        return None
+
+
+def _american_price_to_prob(value: object) -> float | None:
+    number = _float_or_none(value)
+    if number is None or number == 0:
+        return None
+    if number > 0:
+        return 100.0 / (number + 100.0)
+    return abs(number) / (abs(number) + 100.0)
+
+
+def _clamp_probability(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return max(0.0, min(1.0, float(value)))
+
+
+def _format_signed_line(value: float | None) -> str:
+    number = _float_or_none(value)
+    if number is None:
+        return "-"
+    return f"{number:+.1f}"
+
+
+def _format_plain_line(value: float | None) -> str:
+    number = _float_or_none(value)
+    if number is None:
+        return "-"
+    return f"{number:.1f}"
+
+
+def _local_props_tier(ev_pct: float | None) -> str:
+    if ev_pct is None:
+        return "Low"
+    if ev_pct >= 8.0:
+        return "High"
+    if ev_pct >= 4.0:
+        return "Medium"
+    return "Low"
+
+
+def _local_game_cards_index(*, processed_root: Path, date_str: str) -> tuple[list[dict[str, str]], dict[str, dict[str, str]], dict[tuple[str, str], dict[str, str]]]:
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
+        return [], {}, {}
+
+    rows: list[dict[str, str]] = []
+    by_team: dict[str, dict[str, str]] = {}
+    by_names: dict[tuple[str, str], dict[str, str]] = {}
+    with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if not isinstance(row, dict):
+                continue
+            normalized = {str(key): str(value or "").strip() for key, value in row.items()}
+            home_tri = normalized.get("home_tri", "").upper()
+            away_tri = normalized.get("away_tri", "").upper()
+            home_team = normalized.get("home_team", "")
+            away_team = normalized.get("visitor_team", "")
+            if not home_tri or not away_tri:
+                continue
+            rows.append(normalized)
+            by_team[home_tri] = {
+                "side": "home",
+                "opponent": away_tri,
+                "home_tri": home_tri,
+                "away_tri": away_tri,
+                "home_team": home_team,
+                "away_team": away_team,
+                "game_id": normalized.get("game_id", ""),
+            }
+            by_team[away_tri] = {
+                "side": "away",
+                "opponent": home_tri,
+                "home_tri": home_tri,
+                "away_tri": away_tri,
+                "home_team": home_team,
+                "away_team": away_team,
+                "game_id": normalized.get("game_id", ""),
+            }
+            if home_team and away_team:
+                by_names[(home_team.lower(), away_team.lower())] = normalized
+    return rows, by_team, by_names
+
+
+def _load_local_props_recommendations(*, processed_root: Path, date_str: str) -> list[dict[str, object]]:
+    out_path = processed_root / f"props_recommendations_{date_str}.csv"
+    if not out_path.exists() or not out_path.is_file() or _count_csv_rows_quick(out_path) <= 0:
+        return []
+
+    rows_out: list[dict[str, object]] = []
+    with out_path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if not isinstance(row, dict):
+                continue
+            parsed = dict(row)
+            parsed["model"] = _structured_literal_or_none(row.get("model")) or {}
+            parsed["top_play"] = _structured_literal_or_none(row.get("top_play")) or {}
+            parsed["top_play_reasons"] = _structured_literal_or_none(row.get("top_play_reasons")) or []
+            parsed["top_play_explain"] = str(row.get("top_play_explain") or "").strip()
+            rows_out.append(parsed)
+    return rows_out
+
+
+def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    rows, _, by_names = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
+    recommendations_path = processed_root / f"recommendations_{date_str}.csv"
+    if not rows or not recommendations_path.exists() or not recommendations_path.is_file() or _count_csv_rows_quick(recommendations_path) <= 0:
+        return 0, None
+
+    grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
+    with recommendations_path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if not isinstance(row, dict):
+                continue
+            home_name = str(row.get("home") or "").strip()
+            away_name = str(row.get("away") or "").strip()
+            game_row = by_names.get((home_name.lower(), away_name.lower()))
+            if game_row is None:
+                continue
+            home_tri = str(game_row.get("home_tri") or "").strip().upper()
+            away_tri = str(game_row.get("away_tri") or "").strip().upper()
+            market = str(row.get("market") or "").strip().upper()
+            side = str(row.get("side") or "").strip() or market
+            line = _float_or_none(row.get("line"))
+            price = _float_or_none(row.get("price"))
+            ev = _float_or_none(row.get("ev"))
+            implied_prob = _float_or_none(row.get("implied_prob"))
+            edge = _float_or_none(row.get("edge"))
+            pred_margin = _float_or_none(row.get("pred_margin"))
+            pred_total = _float_or_none(row.get("pred_total"))
+            market_home_margin = _float_or_none(row.get("market_home_margin"))
+            ev_pct = (ev * 100.0) if ev is not None else None
+            win_prob = _clamp_probability((implied_prob or 0.5) + (ev or 0.0))
+
+            if market == "ATS":
+                side_is_home = side.lower() == home_name.lower()
+                signed_line = market_home_margin if market_home_margin is not None and side_is_home else (
+                    (-market_home_margin) if market_home_margin is not None else (-abs(line) if side_is_home and line is not None else abs(line) if line is not None else None)
+                )
+                display_pick = f"{side} {_format_signed_line(signed_line)}".strip()
+                summary = f"Model margin {_format_plain_line(pred_margin)} vs market {_format_signed_line(signed_line)}"
+                team_label = side
+            else:
+                display_pick = f"{side} {_format_plain_line(line)}".strip()
+                summary = f"Model total {_format_plain_line(pred_total)} vs line {_format_plain_line(line)}"
+                team_label = "Total"
+
+            grouped.setdefault((home_tri, away_tri), []).append(
+                {
+                    "market": market,
+                    "team": team_label,
+                    "display_pick": display_pick,
+                    "selection": side,
+                    "price": price,
+                    "score": edge if edge is not None else ev_pct,
+                    "ev_pct": ev_pct,
+                    "win_prob": win_prob,
+                    "p_win": win_prob,
+                    "basketball_summary": summary,
+                    "top_play_reasons": [
+                        bit
+                        for bit in [
+                            f"Edge {_format_plain_line(edge)}" if edge is not None else "",
+                            f"EV {ev_pct:.1f}%" if ev_pct is not None else "",
+                        ]
+                        if bit
+                    ],
+                    "matchup": f"{away_tri} @ {home_tri}",
+                }
+            )
+
+    per_game: list[dict[str, object]] = []
+    picks_count = 0
+    for game_row in rows:
+        home_tri = str(game_row.get("home_tri") or "").strip().upper()
+        away_tri = str(game_row.get("away_tri") or "").strip().upper()
+        picks = grouped.get((home_tri, away_tri), [])
+        if not picks:
+            continue
+        picks.sort(key=lambda item: float(item.get("ev_pct") or float("-inf")), reverse=True)
+        picks_count += len(picks)
+        per_game.append({"home": home_tri, "away": away_tri, "matchup": f"{away_tri} @ {home_tri}", "picks": picks})
+
+    if not per_game:
+        return 0, None
+
+    payload = {"date": date_str, "counts": {"games": len(per_game), "picks": picks_count}, "per_game": per_game}
+    out_path = processed_root / f"recommendations_slate_{date_str}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return len(per_game), out_path
+
+
+def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    _, by_team, _ = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
+    prop_rows = _load_local_props_recommendations(processed_root=processed_root, date_str=date_str)
+    if not by_team or not prop_rows:
+        return 0, None
+
+    rows_out: list[dict[str, object]] = []
+    per_game_counts: dict[str, int] = {}
+    ordered = sorted(
+        prop_rows,
+        key=lambda row: float((((row.get("top_play") or {}) if isinstance(row.get("top_play"), dict) else {}).get("ev_pct") or float("-inf"))),
+        reverse=True,
+    )
+    for row in ordered:
+        team_tri = str(row.get("team") or "").strip().upper()
+        meta = by_team.get(team_tri)
+        top_play = row.get("top_play") if isinstance(row.get("top_play"), dict) else {}
+        if meta is None or not top_play:
+            continue
+        home_tri = str(meta.get("home_tri") or "").strip().upper()
+        away_tri = str(meta.get("away_tri") or "").strip().upper()
+        game_key = f"{away_tri}@{home_tri}"
+        if per_game_counts.get(game_key, 0) >= 3:
+            continue
+        ev_pct = _float_or_none(top_play.get("ev_pct"))
+        win_prob = _clamp_probability((_american_price_to_prob(top_play.get("price")) or 0.5) + (_float_or_none(top_play.get("ev")) or 0.0))
+        enriched_top_play = dict(top_play)
+        enriched_top_play["p_win"] = win_prob
+        enriched_top_play["snapshot_ts"] = None
+        rows_out.append(
+            {
+                "game_key": game_key,
+                "game_id": meta.get("game_id"),
+                "player": str(row.get("player") or "").strip(),
+                "team": team_tri,
+                "team_tricode": team_tri,
+                "opponent": str(meta.get("opponent") or "").strip().upper(),
+                "score": ev_pct,
+                "score_adj": ev_pct,
+                "tier": _local_props_tier(ev_pct),
+                "model": row.get("model") if isinstance(row.get("model"), dict) else {},
+                "top_play": enriched_top_play,
+                "top_play_reasons": row.get("top_play_reasons") if isinstance(row.get("top_play_reasons"), list) else [],
+                "basketball_summary": str(row.get("top_play_explain") or "").strip() or None,
+            }
+        )
+        per_game_counts[game_key] = int(per_game_counts.get(game_key, 0) + 1)
+        if len(rows_out) >= 25:
+            break
+
+    if not rows_out:
+        return 0, None
+
+    out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps({"date": date_str, "data": rows_out}, indent=2), encoding="utf-8")
+    return len(rows_out), out_path
+
+
+def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    rows, by_team, _ = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
+    prop_rows = _load_local_props_recommendations(processed_root=processed_root, date_str=date_str)
+    if not rows or not by_team or not prop_rows:
+        return 0, None
+
+    grouped: dict[tuple[str, str], dict[str, list[dict[str, object]]]] = {}
+    for game_row in rows:
+        home_tri = str(game_row.get("home_tri") or "").strip().upper()
+        away_tri = str(game_row.get("away_tri") or "").strip().upper()
+        grouped[(home_tri, away_tri)] = {"home": [], "away": []}
+
+    for row in prop_rows:
+        team_tri = str(row.get("team") or "").strip().upper()
+        meta = by_team.get(team_tri)
+        top_play = row.get("top_play") if isinstance(row.get("top_play"), dict) else {}
+        if meta is None or not top_play:
+            continue
+        home_tri = str(meta.get("home_tri") or "").strip().upper()
+        away_tri = str(meta.get("away_tri") or "").strip().upper()
+        if (home_tri, away_tri) not in grouped:
+            continue
+        ev_pct = _float_or_none(top_play.get("ev_pct"))
+        win_prob = _clamp_probability((_american_price_to_prob(top_play.get("price")) or 0.5) + (_float_or_none(top_play.get("ev")) or 0.0))
+        base_pick = dict(top_play)
+        base_pick["player"] = str(row.get("player") or "").strip()
+        base_pick["team"] = team_tri
+        base_pick["opponent"] = str(meta.get("opponent") or "").strip().upper()
+        base_pick["p_win"] = win_prob
+        base_pick["tier"] = _local_props_tier(ev_pct)
+        base_pick["score"] = ev_pct
+        base_pick["recommendation_priority_score"] = ev_pct
+        base_pick["basketball_priority_score"] = ev_pct
+        base_pick["basketball_summary"] = str(row.get("top_play_explain") or "").strip() or None
+        pick_row = dict(base_pick)
+        pick_row["picks"] = [dict(base_pick)]
+        pick_row["best"] = dict(base_pick)
+        grouped[(home_tri, away_tri)][str(meta.get("side") or "away")].append(pick_row)
+
+    games_out: list[dict[str, object]] = []
+    for game_row in rows:
+        home_tri = str(game_row.get("home_tri") or "").strip().upper()
+        away_tri = str(game_row.get("away_tri") or "").strip().upper()
+        current = grouped.get((home_tri, away_tri), {"home": [], "away": []})
+        home_rows = sorted(current.get("home") or [], key=lambda item: float(item.get("ev_pct") or float("-inf")), reverse=True)
+        away_rows = sorted(current.get("away") or [], key=lambda item: float(item.get("ev_pct") or float("-inf")), reverse=True)
+        if not home_rows and not away_rows:
+            continue
+        games_out.append({"home_tri": home_tri, "away_tri": away_tri, "game_id": game_row.get("game_id"), "prop_recommendations": {"home": home_rows, "away": away_rows}})
+
+    if not games_out:
+        return 0, None
+
+    out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps({"date": date_str, "games": games_out}, indent=2), encoding="utf-8")
+    return len(games_out), out_path
+
+
+def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path) -> tuple[int, Path | None]:
+    out_path = processed_root / f"game_cards_{date_str}.csv"
+
+    raw_candidates = [
+        source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.csv",
+        source_root / "data" / "raw" / f"odds_wnba_current_{date_str}.parquet",
+    ]
+    raw_path = next((path for path in raw_candidates if path.exists() and path.is_file()), None)
+    if raw_path is None:
+        _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
+        return 0, None
+
+    try:
+        import pandas as pd
+
+        if raw_path.suffix.lower() == ".parquet":
+            raw_frame = pd.read_parquet(raw_path)
+        else:
+            raw_frame = pd.read_csv(raw_path)
+    except Exception as exc:
+        _append_log(log_file, f"Failed to read raw team odds snapshot {raw_path}: {exc}")
+        return 0, None
+
+    if raw_frame.empty:
+        return 0, None
+
+    required_columns = {"event_id", "commence_time", "market", "outcome_name", "point", "price", "home_team", "away_team"}
+    if not required_columns.issubset(set(str(column) for column in raw_frame.columns)):
+        _append_log(log_file, f"Local game_cards build skipped for {date_str}: raw team odds snapshot missing required columns")
+        return 0, None
+
+    working = raw_frame.copy()
+    working["commence_time"] = working["commence_time"].astype(str)
+    working = working[working["commence_time"].str.startswith(date_str)].copy()
+    if working.empty:
+        return 0, None
+
+    rows_out: list[dict[str, object]] = []
+    grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
+    for (event_id, commence_time, home_team, away_team), group in grouped:
+        home_name = str(home_team or "").strip()
+        away_name = str(away_team or "").strip()
+        if not home_name or not away_name:
+            continue
+
+        group_rows = group.to_dict("records")
+        home_ml_values: list[float] = []
+        away_ml_values: list[float] = []
+        home_spread_values: list[float] = []
+        away_spread_values: list[float] = []
+        total_values: list[float] = []
+
+        for current in group_rows:
+            market = str(current.get("market") or "").strip().lower()
+            outcome_name = str(current.get("outcome_name") or "").strip()
+            point_value = _float_or_none(current.get("point"))
+            price_value = _float_or_none(current.get("price"))
+            if market == "h2h":
+                if outcome_name == home_name and price_value is not None:
+                    home_ml_values.append(price_value)
+                elif outcome_name == away_name and price_value is not None:
+                    away_ml_values.append(price_value)
+            elif market == "spreads" and point_value is not None:
+                if outcome_name == home_name:
+                    home_spread_values.append(point_value)
+                elif outcome_name == away_name:
+                    away_spread_values.append(point_value)
+            elif market == "totals" and point_value is not None:
+                total_values.append(point_value)
+
+        home_spread = _mean_or_none(home_spread_values)
+        away_spread = _mean_or_none(away_spread_values)
+        if home_spread is None and away_spread is not None:
+            home_spread = -float(away_spread)
+        if away_spread is None and home_spread is not None:
+            away_spread = -float(home_spread)
+
+        rows_out.append(
+            {
+                "date": date_str,
+                "game_id": f"0{str(event_id or '').strip()}" if str(event_id or "").strip() else "",
+                "home_team": home_name,
+                "visitor_team": away_name,
+                "commence_time": str(commence_time or "").strip(),
+                "home_ml": _mean_or_none(home_ml_values),
+                "away_ml": _mean_or_none(away_ml_values),
+                "home_spread": home_spread,
+                "away_spread": away_spread,
+                "total": _mean_or_none(total_values),
+                "bookmaker": "oddsapi_consensus",
+                "home_tri": _to_tricode_local(home_name),
+                "away_tri": _to_tricode_local(away_name),
+            }
+        )
+
+    if not rows_out:
+        return 0, None
+
+    header_order = [
+        "date",
+        "game_id",
+        "home_team",
+        "visitor_team",
+        "commence_time",
+        "home_ml",
+        "away_ml",
+        "home_spread",
+        "away_spread",
+        "total",
+        "bookmaker",
+        "home_tri",
+        "away_tri",
+    ]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=header_order)
+        writer.writeheader()
+        for current in rows_out:
+            writer.writerow({field: current.get(field, "") for field in header_order})
+    return len(rows_out), out_path
+
+
 def _smart_sim_projection_index(*, processed_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, float]]:
     index: dict[tuple[str, str], dict[str, float]] = {}
     for path in sorted(processed_root.glob(f"smart_sim_{date_str}_*.json")):
@@ -555,6 +1011,18 @@ def _smart_sim_projection_index(*, processed_root: Path, date_str: str) -> dict[
         home = str(payload.get("home") or "").strip().upper()
         away = str(payload.get("away") or "").strip().upper()
         quarters = payload.get("quarters") if isinstance(payload.get("quarters"), list) else []
+        if not quarters:
+            periods_payload = payload.get("periods") if isinstance(payload.get("periods"), dict) else {}
+            for quarter_number in range(1, 5):
+                quarter_payload = periods_payload.get(f"q{quarter_number}") if isinstance(periods_payload.get(f"q{quarter_number}"), dict) else None
+                if not isinstance(quarter_payload, dict):
+                    continue
+                quarters.append(
+                    {
+                        "home_pts_mu": quarter_payload.get("home_mean"),
+                        "away_pts_mu": quarter_payload.get("away_mean"),
+                    }
+                )
         if not home or not away or not quarters:
             continue
         home_total = 0.0
@@ -571,6 +1039,189 @@ def _smart_sim_projection_index(*, processed_root: Path, date_str: str) -> dict[
             "pred_total": home_total + away_total,
         }
     return index
+
+
+def _build_local_live_lens_signals_artifact(*, processed_root: Path, date_str: str, live_lens_root: Path) -> dict[str, str]:
+    try:
+        from syndicate.features.wnba.cards import build_live_lens_tuning_payload
+
+        tuning_payload = build_live_lens_tuning_payload()
+    except Exception:
+        tuning_payload = {}
+
+    total_market = tuning_payload.get("markets", {}).get("total", {}) if isinstance(tuning_payload, dict) else {}
+    watch_threshold = float(_float_or_none(total_market.get("watch")) or 3.0)
+    bet_threshold = float(_float_or_none(total_market.get("bet")) or 6.0)
+
+    projections = _smart_sim_projection_index(processed_root=processed_root, date_str=date_str)
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    if not projections or not game_cards_path.exists() or not game_cards_path.is_file():
+        return {}
+
+    rows_out: list[dict[str, object]] = []
+    with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            home_tri = str(row.get("home_tri") or "").strip().upper()
+            away_tri = str(row.get("away_tri") or "").strip().upper()
+            projection = projections.get((home_tri, away_tri))
+            total_line = _float_or_none(row.get("total"))
+            if projection is None or total_line is None:
+                continue
+            pred_total = _float_or_none(projection.get("pred_total"))
+            if pred_total is None:
+                continue
+            edge = pred_total - total_line
+            abs_edge = abs(float(edge))
+            if abs_edge < watch_threshold:
+                continue
+            rows_out.append(
+                {
+                    "market": "total",
+                    "klass": "BET" if abs_edge >= bet_threshold else "WATCH",
+                    "game_id": str(row.get("game_id") or "").strip(),
+                    "home": str(row.get("home_tri") or row.get("home_team") or "").strip().upper(),
+                    "away": str(row.get("away_tri") or row.get("visitor_team") or "").strip().upper(),
+                    "side": "OVER" if edge > 0 else "UNDER",
+                    "live_line": round(total_line, 3),
+                    "pred": round(pred_total, 3),
+                    "edge": round(edge, 3),
+                    "edge_adj": round(edge, 3),
+                    "elapsed": 0,
+                    "remaining": 40,
+                    "tags": ["sim:pregame"],
+                }
+            )
+
+    if not rows_out:
+        return {}
+
+    raw = "\n".join(json.dumps(row, separators=(",", ":")) for row in rows_out).encode("utf-8")
+    copied: dict[str, str] = {}
+    for out_path, copied_key in (
+        (processed_root / f"live_lens_signals_{date_str}.jsonl", "live_lens_signals_path"),
+        (live_lens_root / f"live_lens_signals_{date_str}.jsonl", None),
+    ):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(raw)
+        if copied_key:
+            copied[copied_key] = str(out_path)
+    return copied
+
+
+def _build_local_live_lens_projections_artifact(*, processed_root: Path, date_str: str, live_lens_root: Path) -> dict[str, str]:
+    predictions_path = processed_root / f"props_predictions_{date_str}.csv"
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    if not predictions_path.exists() or not predictions_path.is_file() or not game_cards_path.exists() or not game_cards_path.is_file():
+        return {}
+
+    game_lookup: dict[tuple[str, str], dict[str, str]] = {}
+    pair_lookup: dict[tuple[str, str], dict[str, str]] = {}
+    with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            home_tri = str(row.get("home_tri") or "").strip().upper()
+            away_tri = str(row.get("away_tri") or "").strip().upper()
+            if not home_tri or not away_tri:
+                continue
+            payload = {
+                "game_id": str(row.get("game_id") or "").strip(),
+                "home": home_tri,
+                "away": away_tri,
+            }
+            game_lookup[(home_tri, away_tri)] = payload
+            pair_lookup[tuple(sorted((home_tri, away_tri)))] = payload
+
+    line_lookup: dict[tuple[str, str, str], float] = {}
+    edges_path = processed_root / f"props_edges_{date_str}.csv"
+    if edges_path.exists() and edges_path.is_file():
+        with edges_path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                player_name = str(row.get("player_name") or row.get("player") or "").strip()
+                team_tri = str(row.get("team") or "").strip().upper()
+                stat_key = str(row.get("stat") or row.get("market") or "").strip().lower()
+                line_value = _float_or_none(row.get("line"))
+                if not player_name or not team_tri or not stat_key or line_value is None:
+                    continue
+                line_lookup.setdefault((player_name.upper(), team_tri, stat_key), float(line_value))
+
+    stat_columns = (
+        ("pts", "pred_pts", "mean_pts"),
+        ("reb", "pred_reb", "mean_reb"),
+        ("ast", "pred_ast", "mean_ast"),
+        ("threes", "pred_threes", "mean_threes"),
+        ("stl", "pred_stl", "mean_stl"),
+        ("blk", "pred_blk", "mean_blk"),
+        ("tov", "pred_tov", "mean_tov"),
+        ("pra", "pred_pra", "mean_pra"),
+    )
+    rows_out: list[dict[str, object]] = []
+    with predictions_path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            player_name = str(row.get("player_name") or row.get("player") or "").strip()
+            team_tri = str(row.get("team") or "").strip().upper()
+            opponent_tri = str(row.get("opponent") or "").strip().upper()
+            if not player_name or not team_tri:
+                continue
+
+            matchup = None
+            if team_tri and opponent_tri:
+                matchup = game_lookup.get((team_tri, opponent_tri)) or game_lookup.get((opponent_tri, team_tri)) or pair_lookup.get(tuple(sorted((team_tri, opponent_tri))))
+            if matchup is None:
+                continue
+
+            line_name_key = player_name.upper()
+            for stat_key, proj_col, sim_col in stat_columns:
+                proj = _float_or_none(row.get(proj_col))
+                sim_mu = _float_or_none(row.get(sim_col))
+                if proj is None and sim_mu is None:
+                    continue
+                if proj is None:
+                    proj = sim_mu
+                if sim_mu is None:
+                    sim_mu = proj
+                line_value = line_lookup.get((line_name_key, team_tri, stat_key))
+                context: dict[str, object] = {
+                    "pregame_team_total_ratio": 1.0,
+                    "pregame_game_total_ratio": 1.0,
+                }
+                if line_value is not None and sim_mu is not None:
+                    context["sim_vs_line"] = round(float(sim_mu) - float(line_value), 3)
+                    context["sim_vs_line_adjusted"] = round(float(sim_mu) - float(line_value), 3)
+                rows_out.append(
+                    {
+                        "market": "player_prop",
+                        "game_id": matchup.get("game_id"),
+                        "home": matchup.get("home"),
+                        "away": matchup.get("away"),
+                        "player": player_name,
+                        "name_key": player_name,
+                        "team_tri": team_tri,
+                        "stat": stat_key,
+                        "line": line_value,
+                        "proj": round(float(proj), 3) if proj is not None else None,
+                        "proj_original": round(float(proj), 3) if proj is not None else None,
+                        "sim_mu": round(float(sim_mu), 3) if sim_mu is not None else None,
+                        "sim_mu_adjusted": round(float(sim_mu), 3) if sim_mu is not None else None,
+                        "sim_mu_adjusted_original": round(float(sim_mu), 3) if sim_mu is not None else None,
+                        "elapsed": 0,
+                        "strength": abs(float(sim_mu) - float(line_value)) if (sim_mu is not None and line_value is not None) else None,
+                        "context": context,
+                    }
+                )
+
+    if not rows_out:
+        return {}
+
+    raw = "\n".join(json.dumps(row, separators=(",", ":")) for row in rows_out).encode("utf-8")
+    copied: dict[str, str] = {}
+    for out_path, copied_key in (
+        (processed_root / f"live_lens_projections_{date_str}.jsonl", "live_lens_projections_path"),
+        (live_lens_root / f"live_lens_projections_{date_str}.jsonl", None),
+    ):
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(raw)
+        if copied_key:
+            copied[copied_key] = str(out_path)
+    return copied
 
 
 def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
@@ -1379,28 +2030,15 @@ def _run_refresh_via_cli(
                 _touch_progress()
             else:
                 _append_log(log_file, f"Skipping local props recommendations export for {date_str}: props predictions were not refreshed")
-            _, rc_game_cards = _run_source_processed_export(
+            game_cards_rows, local_game_cards_path = _build_local_game_cards_artifact(
                 source_root=source_root,
-                package_name="wnba_betting",
-                command_name="export-game-cards",
+                processed_root=processed_root,
                 date_str=date_str,
-                expected_file_name=f"game_cards_{date_str}.csv",
                 log_file=log_file,
-                heartbeat_cb=_touch_progress,
             )
+            rc_game_cards = 0 if local_game_cards_path is not None and int(game_cards_rows) > 0 else 1
             _, local_recommendations_path = _build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)
-            if local_recommendations_path is not None:
-                rc_recommendations = 0
-            else:
-                _, rc_recommendations = _run_source_processed_export(
-                    source_root=source_root,
-                    package_name="wnba_betting",
-                    command_name="export-recommendations",
-                    date_str=date_str,
-                    expected_file_name=f"recommendations_{date_str}.csv",
-                    log_file=log_file,
-                    heartbeat_cb=_touch_progress,
-                )
+            rc_recommendations = 0 if local_recommendations_path is not None else 1
             rc_export = 0 if all(int(value) == 0 for value in game_input_rcs.values()) and int(rc_local_props_export) == 0 and int(rc_recommendations) == 0 and int(rc_game_cards) == 0 else 1
         except Exception:
             _append_log(log_file, traceback.format_exc())
@@ -1413,7 +2051,7 @@ def _run_refresh_via_cli(
         elif int(rc_export) != 0:
             state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
-            state["error"] = f"export-game-cards completed without writing rows to game_cards_{date_str}.csv"
+            state["error"] = f"local game_cards builder completed without writing rows to game_cards_{date_str}.csv"
 
     state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
     state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
@@ -1564,8 +2202,181 @@ def _load_module_from_path(module_name: str, module_path: Path):
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load module from {module_path}")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _canon_boxscore_game_id(value: object) -> str:
+    text = str(value or "").strip()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if len(digits) == 8:
+        return f"00{digits}"
+    if len(digits) == 9:
+        return f"0{digits}"
+    return digits or text
+
+
+def _split_player_name(value: object) -> tuple[str, str]:
+    text = str(value or "").strip()
+    if not text:
+        return "", ""
+    parts = text.split()
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
+
+
+def _materialize_local_boxscore_cache_for_player_artifacts(*, processed_root: Path, date_str: str) -> int:
+    boxscores_path = processed_root / f"boxscores_{date_str}.csv"
+    if not boxscores_path.exists():
+        return 0
+
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    team_to_game_id: dict[str, str] = {}
+    if game_cards_path.exists():
+        with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                game_id = _canon_boxscore_game_id((row or {}).get("game_id"))
+                if not game_id:
+                    continue
+                for key in ("home_tri", "away_tri"):
+                    team_tri = str((row or {}).get(key) or "").strip().upper()
+                    if team_tri and team_tri not in team_to_game_id:
+                        team_to_game_id[team_tri] = game_id
+
+    rows_by_game: dict[str, list[dict[str, str]]] = {}
+    with boxscores_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            normalized = {str(key or "").strip().upper(): value for key, value in (row or {}).items()}
+            team_tri = str(normalized.get("TEAM_ABBREVIATION") or normalized.get("TEAM") or "").strip().upper()
+            game_id = _canon_boxscore_game_id(normalized.get("GAME_ID") or normalized.get("GAMEID") or team_to_game_id.get(team_tri))
+            player_name = str(normalized.get("PLAYER_NAME") or normalized.get("PLAYER") or "").strip()
+            if not game_id or not team_tri or not player_name:
+                continue
+            first_name, family_name = _split_player_name(player_name)
+            rows_by_game.setdefault(game_id, []).append(
+                {
+                    "personId": str(normalized.get("PLAYER_ID") or normalized.get("PERSONID") or "").strip(),
+                    "teamTricode": team_tri,
+                    "minutes": str(normalized.get("MIN") or normalized.get("MINUTES") or "").strip(),
+                    "points": str(normalized.get("PTS") or normalized.get("POINTS") or "").strip(),
+                    "reboundsTotal": str(normalized.get("REB") or normalized.get("TREB") or normalized.get("REBOUNDSTOTAL") or "").strip(),
+                    "assists": str(normalized.get("AST") or normalized.get("ASSISTS") or "").strip(),
+                    "threePointersMade": str(normalized.get("FG3M") or normalized.get("THREEPOINTERSMADE") or "").strip(),
+                    "threePointersAttempted": str(normalized.get("FG3A") or normalized.get("THREEPOINTERSATTEMPTED") or "").strip(),
+                    "fieldGoalsMade": str(normalized.get("FGM") or normalized.get("FIELDGOALSMADE") or "").strip(),
+                    "fieldGoalsAttempted": str(normalized.get("FGA") or normalized.get("FIELDGOALSATTEMPTED") or "").strip(),
+                    "freeThrowsMade": str(normalized.get("FTM") or normalized.get("FREETHROWSMADE") or "").strip(),
+                    "freeThrowsAttempted": str(normalized.get("FTA") or normalized.get("FREETHROWSATTEMPTED") or "").strip(),
+                    "steals": str(normalized.get("STL") or normalized.get("STEALS") or "").strip(),
+                    "blocks": str(normalized.get("BLK") or normalized.get("BLOCKS") or "").strip(),
+                    "turnovers": str(normalized.get("TOV") or normalized.get("TURNOVERS") or normalized.get("TO") or "").strip(),
+                    "foulsPersonal": str(normalized.get("PF") or normalized.get("FOULSPERSONAL") or "").strip(),
+                    "reboundsOffensive": str(normalized.get("OREB") or normalized.get("REBOUNDSOFFENSIVE") or "").strip(),
+                    "reboundsDefensive": str(normalized.get("DREB") or normalized.get("REBOUNDSDEFENSIVE") or "").strip(),
+                    "plusMinusPoints": str(normalized.get("PLUS_MINUS") or normalized.get("PLUSMINUSPOINTS") or "").strip(),
+                    "firstName": first_name,
+                    "familyName": family_name,
+                    "nameI": player_name,
+                }
+            )
+
+    if not rows_by_game:
+        return 0
+
+    boxscore_dir = processed_root / "boxscores"
+    boxscore_dir.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "personId",
+        "teamTricode",
+        "minutes",
+        "points",
+        "reboundsTotal",
+        "assists",
+        "threePointersMade",
+        "threePointersAttempted",
+        "fieldGoalsMade",
+        "fieldGoalsAttempted",
+        "freeThrowsMade",
+        "freeThrowsAttempted",
+        "steals",
+        "blocks",
+        "turnovers",
+        "foulsPersonal",
+        "reboundsOffensive",
+        "reboundsDefensive",
+        "plusMinusPoints",
+        "firstName",
+        "familyName",
+        "nameI",
+    ]
+    total_rows = 0
+    for game_id, rows in rows_by_game.items():
+        out_path = boxscore_dir / f"boxscore_{game_id}.csv"
+        with out_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row.get(field, "") for field in fieldnames})
+        total_rows += len(rows)
+    return total_rows
+
+
+def _build_local_optional_player_recon_artifacts(*, processed_root: Path, date_str: str) -> dict[str, str]:
+    if _materialize_local_boxscore_cache_for_player_artifacts(processed_root=processed_root, date_str=date_str) <= 0:
+        return {}
+
+    copied: dict[str, str] = {}
+    data_root = processed_root.parent
+    vendor_root = REPO_ROOT / "vendor" / "wnba_betting_repo"
+    tool_specs = (
+        (
+            vendor_root / "tools" / "build_recon_players.py",
+            "syndicate_wnba_vendor_build_recon_players",
+            "build_recon_players",
+            processed_root / f"recon_players_{date_str}.csv",
+            "recon_players_path",
+        ),
+        (
+            vendor_root / "tools" / "build_live_player_lens_tuning.py",
+            "syndicate_wnba_vendor_build_live_player_lens_tuning",
+            "build_live_player_lens_tuning",
+            processed_root / f"live_player_lens_tuning_{date_str}.csv",
+            "live_player_lens_tuning_path",
+        ),
+    )
+    original_nba_root = os.environ.get("NBA_BETTING_DATA_ROOT")
+    original_wnba_root = os.environ.get("WNBA_BETTING_DATA_ROOT")
+    try:
+        os.environ["NBA_BETTING_DATA_ROOT"] = str(data_root)
+        os.environ["WNBA_BETTING_DATA_ROOT"] = str(data_root)
+        for module_path, module_name, function_name, out_path, copied_key in tool_specs:
+            if not module_path.exists() or not module_path.is_file():
+                continue
+            try:
+                module = _load_module_from_path(module_name, module_path)
+                builder = getattr(module, function_name, None)
+                if builder is None:
+                    continue
+                df = builder(date_str)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                df.to_csv(out_path, index=False)
+                copied[copied_key] = str(out_path)
+            except Exception:
+                continue
+    finally:
+        if original_nba_root is None:
+            os.environ.pop("NBA_BETTING_DATA_ROOT", None)
+        else:
+            os.environ["NBA_BETTING_DATA_ROOT"] = original_nba_root
+        if original_wnba_root is None:
+            os.environ.pop("WNBA_BETTING_DATA_ROOT", None)
+        else:
+            os.environ["WNBA_BETTING_DATA_ROOT"] = original_wnba_root
+    return copied
 
 
 def _target_refresh_dates(*, date_str: str, days_ahead: int) -> list[str]:
@@ -1631,34 +2442,7 @@ def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, 
     if len(copied) == len(existing_specs):
         return copied
 
-    tool_specs = (
-        (
-            source_root / "tools" / "build_recon_players.py",
-            "syndicate_wnba_build_recon_players",
-            "build_recon_players",
-            processed_root / f"recon_players_{date_str}.csv",
-            "recon_players_path",
-        ),
-        (
-            source_root / "tools" / "build_live_player_lens_tuning.py",
-            "syndicate_wnba_build_live_player_lens_tuning",
-            "build_live_player_lens_tuning",
-            processed_root / f"live_player_lens_tuning_{date_str}.csv",
-            "live_player_lens_tuning_path",
-        ),
-    )
-    for module_path, module_name, function_name, out_path, copied_key in tool_specs:
-        try:
-            module = _load_module_from_path(module_name, module_path)
-            builder = getattr(module, function_name, None)
-            if builder is None:
-                continue
-            df = builder(date_str)
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            df.to_csv(out_path, index=False)
-            copied[copied_key] = str(out_path)
-        except Exception:
-            continue
+    copied.update(_build_local_optional_player_recon_artifacts(processed_root=processed_root, date_str=date_str))
     return copied
 
 
@@ -1670,26 +2454,8 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
     )
     if existing:
         return existing
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return None
-    out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
-    query = (
-        f"/api/props/recommendations?date={date_str}&compact=1&portfolio_only=1"
-        "&use_snapshot=0&limit=25&per_game_limit=3&per_market=1&slate_per_market_limit=4"
-        "&markets=pts,reb,ast,threes,blk,stl,pra,pr,pa,ra,dd,td"
-    )
-    client = source_app.app.test_client()
-    response = client.get(query)
-    try:
-        payload = response.get_json() if response is not None else None
-    except Exception:
-        payload = None
-    if not isinstance(payload, dict):
-        payload = {"error": "no_json", "status": int(getattr(response, "status_code", 0) or 0)}
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return str(out_path)
+    _, out_path = _build_local_top_by_game_snapshot(processed_root=processed_root, date_str=date_str)
+    return str(out_path) if out_path is not None else None
 
 
 def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
@@ -1700,21 +2466,8 @@ def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, 
     )
     if existing:
         return existing
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return None
-    out_path = processed_root / f"recommendations_slate_{date_str}.json"
-    client = source_app.app.test_client()
-    response = client.get(f"/recommendations?format=json&view=slate&date={date_str}")
-    try:
-        payload = response.get_json() if response is not None else None
-    except Exception:
-        payload = None
-    if not isinstance(payload, dict):
-        payload = {"error": "no_json", "status": int(getattr(response, "status_code", 0) or 0)}
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return str(out_path)
+    _, out_path = _build_local_recommendations_slate_artifact(processed_root=processed_root, date_str=date_str)
+    return str(out_path) if out_path is not None else None
 
 
 def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
@@ -1725,38 +2478,8 @@ def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_
     )
     if existing:
         return existing
-    source_app = _load_source_app(source_root)
-    if source_app is None:
-        return None
-    out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
-    client = source_app.app.test_client()
-    response = client.get(f"/api/cards?date={date_str}&props_source=source")
-    try:
-        payload = response.get_json() if response is not None else None
-    except Exception:
-        payload = None
-
-    games_out = []
-    if isinstance(payload, dict):
-        for game in payload.get("games") or []:
-            if not isinstance(game, dict):
-                continue
-            prop_recommendations = game.get("prop_recommendations") if isinstance(game.get("prop_recommendations"), dict) else {}
-            games_out.append(
-                {
-                    "home_tri": game.get("home_tri"),
-                    "away_tri": game.get("away_tri"),
-                    "prop_recommendations": {
-                        "home": [row for row in (prop_recommendations.get("home") or []) if isinstance(row, dict)],
-                        "away": [row for row in (prop_recommendations.get("away") or []) if isinstance(row, dict)],
-                    },
-                }
-            )
-
-    out = {"date": date_str, "games": games_out}
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
-    return str(out_path)
+    _, out_path = _build_local_cards_props_snapshot_artifact(processed_root=processed_root, date_str=date_str)
+    return str(out_path) if out_path is not None else None
 
 
 def _build_cards_sim_detail_from_local_smart_sim(*, processed_root: Path, date_str: str) -> list[dict[str, object]]:
@@ -1847,61 +2570,89 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
     if not games_out:
-        source_app = _load_source_app(source_root)
-        if source_app is None:
-            return None
-        client = source_app.app.test_client()
-        response = client.get(f"/api/cards?date={date_str}&include_players=1&props_source=auto")
-        try:
-            payload = response.get_json() if response is not None else None
-        except Exception:
-            payload = None
-
-        if isinstance(payload, dict):
-            for game in payload.get("games") or []:
-                if not isinstance(game, dict):
-                    continue
-                sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
-                players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
-                missing = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {}
-                injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {}
-                summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {
-                    "home": len(players.get("home") or []),
-                    "away": len(players.get("away") or []),
-                    "missing_home": len(missing.get("home") or []),
-                    "missing_away": len(missing.get("away") or []),
-                    "injured_home": len(injuries.get("home") or []),
-                    "injured_away": len(injuries.get("away") or []),
-                }
-                games_out.append(
-                    {
-                        "home_tri": game.get("home_tri"),
-                        "away_tri": game.get("away_tri"),
-                        "sim": {
-                            "quarters": [row for row in (sim.get("quarters") or []) if isinstance(row, dict)],
-                            "players_summary": dict(summary),
-                            "players": {
-                                "home": [row for row in (players.get("home") or []) if isinstance(row, dict)],
-                                "away": [row for row in (players.get("away") or []) if isinstance(row, dict)],
-                            },
-                            "missing_prop_players": {
-                                "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
-                                "away": [row for row in (missing.get("away") or []) if isinstance(row, dict)],
-                            },
-                            "injuries": {
-                                "home": [row for row in (injuries.get("home") or []) if isinstance(row, dict)],
-                                "away": [row for row in (injuries.get("away") or []) if isinstance(row, dict)],
-                            },
-                        },
-                    }
-                )
-    if not games_out:
         return None
 
     out = {"date": date_str, "games": games_out}
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, indent=2), encoding="utf-8")
     return str(out_path)
+
+
+def _build_local_recon_games_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    boxscores_path = processed_root / f"boxscores_{date_str}.csv"
+    if not game_cards_path.exists() or not boxscores_path.exists():
+        return 0, None
+
+    games_by_id: dict[str, dict[str, str]] = {}
+    with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            game_id = str((row or {}).get("game_id") or "").strip()
+            if not game_id or game_id in games_by_id:
+                continue
+            games_by_id[game_id] = {
+                "game_id": game_id,
+                "home_team": str((row or {}).get("home_team") or "").strip(),
+                "visitor_team": str((row or {}).get("visitor_team") or "").strip(),
+                "home_tri": str((row or {}).get("home_tri") or "").strip().upper(),
+                "away_tri": str((row or {}).get("away_tri") or "").strip().upper(),
+            }
+
+    if not games_by_id:
+        return 0, None
+
+    team_points_by_game: dict[str, dict[str, float]] = {}
+    with boxscores_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            normalized = {str(key or "").strip().upper(): value for key, value in (row or {}).items()}
+            game_id = str(normalized.get("GAME_ID") or normalized.get("GAMEID") or "").strip()
+            team_tri = str(normalized.get("TEAM_ABBREVIATION") or normalized.get("TEAM") or "").strip().upper()
+            try:
+                pts_value = float(normalized.get("PTS"))
+            except (TypeError, ValueError):
+                continue
+            if not game_id or not team_tri:
+                continue
+            per_game = team_points_by_game.setdefault(game_id, {})
+            per_game[team_tri] = float(per_game.get(team_tri, 0.0)) + pts_value
+
+    rows: list[dict[str, str]] = []
+    for game_id, game_row in games_by_id.items():
+        home_tri = str(game_row.get("home_tri") or "").strip().upper()
+        away_tri = str(game_row.get("away_tri") or "").strip().upper()
+        points = team_points_by_game.get(game_id) or {}
+        home_pts = points.get(home_tri)
+        away_pts = points.get(away_tri)
+        if not home_tri or not away_tri or home_pts is None or away_pts is None:
+            continue
+        total_actual = float(home_pts) + float(away_pts)
+        rows.append(
+            {
+                "game_id": game_id,
+                "home_team": str(game_row.get("home_team") or home_tri),
+                "visitor_team": str(game_row.get("visitor_team") or away_tri),
+                "home_tri": home_tri,
+                "away_tri": away_tri,
+                "home_pts": f"{home_pts:g}",
+                "visitor_pts": f"{away_pts:g}",
+                "total_actual": f"{total_actual:g}",
+            }
+        )
+
+    if not rows:
+        return 0, None
+
+    out_path = processed_root / f"recon_games_{date_str}.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = ["game_id", "home_team", "visitor_team", "home_tri", "away_tri", "home_pts", "visitor_pts", "total_actual"]
+    with out_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
+    return len(rows), out_path
 
 
 def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
@@ -1912,6 +2663,9 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
     )
     if existing:
         return existing
+    local_rows, local_path = _build_local_recon_games_artifact(processed_root=processed_root, date_str=date_str)
+    if local_rows > 0 and local_path is not None:
+        return str(local_path)
     source_app = _load_source_app(source_root)
     if source_app is None:
         return None
@@ -1938,6 +2692,29 @@ def _export_recon_games_artifact(*, source_root: Path, date_str: str, processed_
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, destination)
     return str(destination)
+
+
+def _build_local_live_lens_tuning_artifact(*, processed_root: Path, live_lens_root: Path) -> dict[str, str]:
+    try:
+        from syndicate.features.wnba.cards import build_live_lens_tuning_payload
+
+        payload = build_live_lens_tuning_payload()
+    except Exception:
+        return {}
+    if not isinstance(payload, dict) or not payload:
+        return {}
+
+    raw = json.dumps(payload, indent=2).encode("utf-8")
+    outputs = (
+        (processed_root / "live_lens_tuning_override.json", "live_lens_tuning_override_path"),
+        (live_lens_root / "live_lens_tuning_override.json", "live_lens_tuning_override_live_lens_path"),
+    )
+    copied: dict[str, str] = {}
+    for out_path, copied_key in outputs:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(raw)
+        copied[copied_key] = str(out_path)
+    return copied
 
 
 def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_root: Path, live_lens_root: Path) -> dict[str, str]:
@@ -1970,10 +2747,25 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
     copied: dict[str, str] = {}
     missing_exports: list[tuple[str, str, tuple[tuple[Path, str | None], ...]]] = []
     for file_name, query, destinations in exports:
+        if file_name == f"live_lens_signals_{date_str}.jsonl":
+            local = _build_local_live_lens_signals_artifact(processed_root=processed_root, date_str=date_str, live_lens_root=live_lens_root)
+            if local:
+                copied.update(local)
+                continue
+        if file_name == f"live_lens_projections_{date_str}.jsonl":
+            local = _build_local_live_lens_projections_artifact(processed_root=processed_root, date_str=date_str, live_lens_root=live_lens_root)
+            if local:
+                copied.update(local)
+                continue
         existing = _copy_existing_live_lens_artifact(source_root=source_root, file_name=file_name, destinations=destinations)
         if existing:
             copied.update(existing)
             continue
+        if file_name == "live_lens_tuning_override.json":
+            local = _build_local_live_lens_tuning_artifact(processed_root=processed_root, live_lens_root=live_lens_root)
+            if local:
+                copied.update(local)
+                continue
         missing_exports.append((file_name, query, destinations))
     if not missing_exports:
         return copied
@@ -2107,6 +2899,116 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
     return str(destination)
 
 
+def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
+    boxscores_path = processed_root / f"boxscores_{date_str}.csv"
+    if not boxscores_path.exists():
+        return 0, None
+
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    team_to_game_id: dict[str, str] = {}
+    if game_cards_path.exists():
+        with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                game_id = str((row or {}).get("game_id") or "").strip()
+                if not game_id:
+                    continue
+                for team_key in ("home_tri", "away_tri"):
+                    team_tri = str((row or {}).get(team_key) or "").strip().upper()
+                    if team_tri and team_tri not in team_to_game_id:
+                        team_to_game_id[team_tri] = game_id
+
+    rows: list[dict[str, str]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+    with boxscores_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            normalized = {str(key or "").strip().upper(): value for key, value in (row or {}).items()}
+            game_id = str(normalized.get("GAME_ID") or normalized.get("GAMEID") or "").strip()
+            team_abbr = str(normalized.get("TEAM_ABBREVIATION") or normalized.get("TEAM") or "").strip().upper()
+            if not game_id and team_abbr:
+                game_id = str(team_to_game_id.get(team_abbr) or "").strip()
+            player_name = str(normalized.get("PLAYER_NAME") or normalized.get("PLAYER") or "").strip()
+            player_id = str(normalized.get("PLAYER_ID") or "").strip()
+            if not game_id or not player_name:
+                continue
+
+            dedupe_key = (game_id, team_abbr, player_name.casefold())
+            if dedupe_key in seen_keys:
+                continue
+            seen_keys.add(dedupe_key)
+
+            def _stat_value(*keys: str) -> str:
+                for key in keys:
+                    value = normalized.get(key)
+                    if value is None:
+                        continue
+                    text = str(value).strip()
+                    if text:
+                        return text
+                return ""
+
+            pts = _stat_value("PTS")
+            reb = _stat_value("REB")
+            ast = _stat_value("AST")
+            threes = _stat_value("FG3M", "FG3_M")
+            stl = _stat_value("STL")
+            blk = _stat_value("BLK")
+            tov = _stat_value("TOV", "TO")
+
+            pra = ""
+            pr = ""
+            pa = ""
+            ra = ""
+            try:
+                pts_num = float(pts) if pts else None
+                reb_num = float(reb) if reb else None
+                ast_num = float(ast) if ast else None
+            except ValueError:
+                pts_num = reb_num = ast_num = None
+            if pts_num is not None and reb_num is not None:
+                pr = f"{pts_num + reb_num:g}"
+            if pts_num is not None and ast_num is not None:
+                pa = f"{pts_num + ast_num:g}"
+            if reb_num is not None and ast_num is not None:
+                ra = f"{reb_num + ast_num:g}"
+            if pts_num is not None and reb_num is not None and ast_num is not None:
+                pra = f"{pts_num + reb_num + ast_num:g}"
+
+            rows.append(
+                {
+                    "game_id": game_id,
+                    "player_id": player_id,
+                    "player_name": player_name,
+                    "team_abbr": team_abbr,
+                    "pts": pts,
+                    "reb": reb,
+                    "ast": ast,
+                    "threes": threes,
+                    "stl": stl,
+                    "blk": blk,
+                    "tov": tov,
+                    "pr": pr,
+                    "pa": pa,
+                    "ra": ra,
+                    "pra": pra,
+                }
+            )
+
+    if not rows:
+        return 0, None
+
+    out_path = processed_root / f"recon_props_{date_str}.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = ["game_id", "player_id", "player_name", "team_abbr", "pts", "reb", "ast", "threes", "stl", "blk", "tov", "pr", "pa", "ra", "pra"]
+    with out_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
+    return len(rows), out_path
+
+
 def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
@@ -2115,6 +3017,9 @@ def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_
     )
     if existing:
         return existing
+    local_rows, local_path = _build_local_recon_props_artifact(processed_root=processed_root, date_str=date_str)
+    if local_rows > 0 and local_path is not None:
+        return str(local_path)
     source = source_root / "data" / "processed" / f"recon_props_{date_str}.csv"
     if not source.exists() or not source.is_file():
         return None
