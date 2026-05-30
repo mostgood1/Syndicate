@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -39,6 +40,11 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _public_schedule_fallback_enabled() -> bool:
+    value = str(os.environ.get("NHL_PUBLIC_SCHEDULE_FALLBACK") or "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
 
 
 def _pct_text(value: Any) -> str:
@@ -431,6 +437,8 @@ def _sim_goalie_names_by_game_team(selected_date: str) -> dict[tuple[str, str, s
 
 @lru_cache(maxsize=32)
 def _schedule_payload(selected_date: str) -> dict[str, Any]:
+    if not _public_schedule_fallback_enabled():
+        return {}
     url = f"https://api-web.nhle.com/v1/schedule/{selected_date}"
     try:
         request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -808,7 +816,7 @@ def build_source_bundle_payload(selected_date: str | None) -> dict[str, Any]:
                 "list_items": [
                     f"Requested date: {requested_date}",
                     f"Next scheduled game day: {resolved_date}",
-                    "The public NHL schedule confirms no games on the requested date.",
+                    "No local saved rows were found for the requested date.",
                 ],
             }
         else:
@@ -889,7 +897,7 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
             "body": "The requested date is an empty NHL slate, so the board advanced to the next scheduled game day. Saved prediction or archived scoreboard rows are not available for that next slate yet." if lookahead_applied else "The cards board only renders saved NHL prediction or archived scoreboard rows, and none were available for the requested date.",
             "list_items": [
                 f"Requested date: {requested_date}",
-                *( [f"Next scheduled game day: {resolved_date}", "The public NHL schedule confirms no games on the requested date."] if lookahead_applied else ["Choose another stored NHL date from the date control."] ),
+                *( [f"Next scheduled game day: {resolved_date}", "No local saved rows were found for the requested date."] if lookahead_applied else ["Choose another stored NHL date from the date control."] ),
             ],
         } if not games else None,
         "show_source_summary": True,
