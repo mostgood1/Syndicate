@@ -389,6 +389,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
 
 
 def build_live_lens_api_payload(context: dict[str, Any]) -> dict[str, Any]:
+    refreshed_at = context.get("odds_refreshed_at") or context.get("oddsRefreshedAt") or context.get("generatedAt")
     return {
         "date": context.get("date"),
         "requested_date": context.get("requested_date", context.get("date")),
@@ -396,6 +397,8 @@ def build_live_lens_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         "games": context.get("games") if isinstance(context.get("games"), list) else [],
         "counts": context.get("counts") if isinstance(context.get("counts"), dict) else {},
         "generatedAt": context.get("generatedAt"),
+        "odds_refreshed_at": refreshed_at,
+        "oddsRefreshedAt": refreshed_at,
         "dataRoot": context.get("dataRoot"),
         "liveLensDir": context.get("liveLensDir"),
         "source_path": context.get("source_path"),

@@ -139,6 +139,18 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
     context["source_date_display"] = str(live_state.get("date") or selected_date)
     context["live_state_count"] = int(live_state.get("count") or 0)
     context["live_lines_count"] = int((live_lines or {}).get("count") or 0)
+    refresh_ts = (
+        live_lines.get("odds_refreshed_at")
+        or live_lines.get("generated_at")
+        or live_lines.get("generatedAt")
+        or live_state.get("odds_refreshed_at")
+        or live_state.get("generated_at")
+        or live_state.get("generatedAt")
+    ) if isinstance(live_lines, dict) and isinstance(live_state, dict) else None
+    if refresh_ts:
+        context["generatedAt"] = refresh_ts
+        context["odds_refreshed_at"] = refresh_ts
+        context["oddsRefreshedAt"] = refresh_ts
     return context
 
 

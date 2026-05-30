@@ -385,6 +385,16 @@ def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_i
     return filtered_payload
 
 
+def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
+    out = dict(payload)
+    timestamp = str(out.get("odds_refreshed_at") or out.get("generated_at") or "").strip()
+    if not timestamp:
+        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    out["odds_refreshed_at"] = timestamp
+    out.setdefault("generated_at", timestamp)
+    return out
+
+
 def _normalize_source_game(game: dict[str, Any], *, idx: int, selected_date: str) -> dict[str, Any]:
     away_tri = str(game.get("away_tri") or "AWY").strip().upper() or "AWY"
     home_tri = str(game.get("home_tri") or "HOM").strip().upper() or "HOM"
@@ -832,7 +842,7 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
 def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any]:
     local_payload = _local_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
-        return local_payload
+        return _attach_odds_refresh_timestamp(local_payload)
 
     context = build_cards_page_context(selected_date)
     games = context.get("games") if isinstance(context.get("games"), list) else []
@@ -863,34 +873,34 @@ def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any
             }
         )
 
-    return {
+    return _attach_odds_refresh_timestamp({
         "date": selected_date,
         "ttl": int(ttl),
         "source": "syndicate_cards_fallback",
         "games": out_games,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-    }
+    })
 
 
 def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
-        return local_payload
-    return {
+        return _attach_odds_refresh_timestamp(local_payload)
+    return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": selected_date or None,
         "games": [{"event_id": event_id, "players": []} for event_id in normalized_event_ids],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-    }
+    })
 
 def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
-        return local_payload
-    return {
+        return _attach_odds_refresh_timestamp(local_payload)
+    return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": selected_date or None,
@@ -906,27 +916,27 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
             for event_id in normalized_event_ids
         ],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-    }
+    })
 
 def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int = 20, include_period_totals: bool = False) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
     local_payload = _filtered_local_live_snapshot_payload("live_lines", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
-        return local_payload
-    return {
+        return _attach_odds_refresh_timestamp(local_payload)
+    return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": selected_date,
         "games": [{"event_id": event_id, "found": False} for event_id in normalized_event_ids],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-    }
+    })
 
 def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
-        return local_payload
-    return {
+        return _attach_odds_refresh_timestamp(local_payload)
+    return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": selected_date or None,
@@ -946,7 +956,7 @@ def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: 
             for event_id in normalized_event_ids
         ],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-    }
+    })
 
 def build_live_lens_tuning_payload(ttl: int = 300) -> dict[str, Any]:
     return {

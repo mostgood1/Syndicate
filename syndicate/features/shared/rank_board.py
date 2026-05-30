@@ -99,6 +99,10 @@ def build_rank_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     optional_keys = (
         "source_title",
         "source_date_display",
+        "generatedAt",
+        "generated_at",
+        "oddsRefreshedAt",
+        "odds_refreshed_at",
         "header_stats",
         "route_path",
         "module_links",
@@ -122,4 +126,12 @@ def build_rank_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     for key in optional_keys:
         if key in context:
             payload[key] = context.get(key)
+    if "odds_refreshed_at" not in payload:
+        fallback_ts = payload.get("oddsRefreshedAt") or payload.get("generatedAt") or payload.get("generated_at")
+        if fallback_ts:
+            payload["odds_refreshed_at"] = fallback_ts
+    if "oddsRefreshedAt" not in payload:
+        camel_ts = payload.get("odds_refreshed_at") or payload.get("generatedAt") or payload.get("generated_at")
+        if camel_ts:
+            payload["oddsRefreshedAt"] = camel_ts
     return payload

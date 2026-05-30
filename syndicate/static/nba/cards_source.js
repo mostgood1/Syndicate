@@ -970,7 +970,7 @@
     return state.liveGameLens.get(gameMatchupKey(game)) || null;
   }
 
-  function computeLiveGameLens(game, liveState, liveLines, pbpStats, tuning) {
+  function computeLiveGameLens(game, liveState, liveLines, pbpStats, tuning, oddsRefreshedAt) {
     if (!liveState) {
       return null;
     }
@@ -1909,6 +1909,7 @@
     return {
       statusLabel,
       scoreLabel,
+      oddsRefreshedAt: oddsRefreshedAt || liveLines?.odds_refreshed_at || liveLines?.generated_at || null,
       currentTotal,
       currentMargin,
       elapsedMinutes,
@@ -1976,6 +1977,7 @@
       let pbpMap = new Map();
       let tuning = null;
       let liveBoxscorePayload = null;
+      const oddsRefreshedByEvent = new Map();
 
       if (eventIds.length) {
         const [linesPayload, pbpPayload, tuningPayload, boxscorePayload] = await Promise.all([
@@ -1998,11 +2000,13 @@
         ]);
         tuning = tuningPayload || null;
         liveBoxscorePayload = boxscorePayload || null;
+        const globalOddsRefreshedAt = linesPayload?.odds_refreshed_at || linesPayload?.generated_at || null;
 
         safeArray(linesPayload?.games).forEach((item) => {
           const eventId = String(item?.event_id || '').trim();
           if (eventId) {
             liveLinesMap.set(eventId, item);
+            oddsRefreshedByEvent.set(eventId, item?.odds_refreshed_at || item?.generated_at || globalOddsRefreshedAt || null);
           }
         });
         safeArray(pbpPayload?.games).forEach((item) => {
@@ -2040,7 +2044,10 @@
         const eventId = String(liveState?.event_id || '').trim();
         const liveLines = eventId ? liveLinesMap.get(eventId) : null;
         const pbpStats = eventId ? pbpMap.get(eventId) : null;
-        const lens = computeLiveGameLens(game, liveState, liveLines, pbpStats, tuning);
+        const oddsRefreshedAt = (eventId && typeof oddsRefreshedByEvent?.get === 'function')
+          ? oddsRefreshedByEvent.get(eventId)
+          : (liveLines?.odds_refreshed_at || liveLines?.generated_at || null);
+        const lens = computeLiveGameLens(game, liveState, liveLines, pbpStats, tuning, oddsRefreshedAt);
         const key = gameMatchupKey(game);
         if (key && lens) {
           nextLiveGameLens.set(key, lens);
@@ -2090,7 +2097,12 @@
     if (!hasStartedGame(liveState)) {
       return scheduledStatusText(game);
     }
-    return liveLens?.statusLabel || String(liveState?.status || 'Live');
+    const status = liveLens?.statusLabel || String(liveState?.status || 'Live');
+    const refreshedAt = liveLens?.oddsRefreshedAt;
+    if (refreshedAt) {
+      return `${status} · Odds ${formatTimestampShort(refreshedAt)}`;
+    }
+    return status;
   }
 
   function liveSignalChipClass(signal) {
@@ -3349,8 +3361,10 @@
 
   function transformLiveStripPayload(payload, dateValue) {
     const items = [];
+    const payloadOddsRefreshedAt = payload?.odds_refreshed_at || payload?.generated_at || null;
     safeArray(payload?.games).forEach((game) => {
       const status = game?.status || {};
+      const gameOddsRefreshedAt = game?.odds_refreshed_at || game?.generated_at || payloadOddsRefreshedAt || null;
       const gameItems = safeArray(game?.rows)
         .filter((row) => row && row.player && row.team_tri)
         .filter((row) => row.line_source && row.line_source !== 'model')
@@ -3370,7 +3384,14 @@
               side: row?.lean || row?.ev_side,
               ev_side: row?.ev_side,
               line: row?.line_live ?? row?.line,
-              price: String(row?.ev_side || row?.lean).toUpperCase() === 'UNDER' ? row?.price_under : row?.price_over,
+              price: finiteFirst(
+                String(row?.ev_side || row?.lean).toUpperCase() === 'UNDER' ? row?.price_under : row?.price_over,
+                row?.price,
+                row?.price_american,
+                row?.odds,
+                row?.price_over,
+                row?.price_under
+              ),
               ev_pct: Number.isFinite(Number(row?.ev)) ? Number(row.ev) * 100 : null,
               probability: row?.win_prob,
               recommendation_priority_score: row?.recommendation_priority_score,
@@ -3401,6 +3422,7 @@
               line_pregame: row?.line_pregame,
               first_seen_at: row?.first_seen_at,
               last_seen_at: row?.last_seen_at,
+              odds_refreshed_at: row?.odds_refreshed_at || gameOddsRefreshedAt,
               seen_observations: row?.seen_observations,
               pregame_team_total_ratio: row?.pregame_team_total_ratio,
               pregame_game_total_ratio: row?.pregame_game_total_ratio,
@@ -3420,7 +3442,8 @@
       mode: 'live',
       date: dateValue,
       title: 'Live player props',
-      subtitle: 'Ranked by live projection first, then sim support, then betting edge.',
+      subtitle: `Ranked by live projection first, then sim support, then betting edge.${payloadOddsRefreshedAt ? ` Odds refreshed ${formatTimestampShort(payloadOddsRefreshedAt)}.` : ''}`,
+      odds_refreshed_at: payloadOddsRefreshedAt,
       rows: sortedItems.length,
       items: sortedItems,
     };
