@@ -250,7 +250,12 @@ def cards():
             allow_stored_date_fallback="date" not in request.args,
         )
         return render_template("shared/game_cards_board.html", **context)
-    return render_template("wnba/cards_source.html", date=selected_date, asset_version=_cards_source_asset_version())
+    return render_template(
+        "wnba/cards_source.html",
+        date=selected_date,
+        asset_version=_cards_source_asset_version(),
+        cards_payload_path="/wnba/api/cards",
+    )
 
 
 def _live_lens_cards_shell_context(selected_date: str) -> dict[str, object]:
