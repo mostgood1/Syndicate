@@ -990,11 +990,24 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
             continue
         away_pts = _safe_float(row.get("away_pts"))
         home_pts = _safe_float(row.get("home_pts"))
+        status_id = int(_safe_float(row.get("status_id")) or 0)
+        # Pregame rows often carry 0-0 placeholders; treat those as unknown.
+        if status_id <= 1 and (away_pts or 0.0) == 0.0 and (home_pts or 0.0) == 0.0:
+            away_pts = None
+            home_pts = None
         total_mean = (away_pts + home_pts) if away_pts is not None and home_pts is not None else None
         margin_mean = (home_pts - away_pts) if away_pts is not None and home_pts is not None else None
         status_text = str(row.get("status") or "").strip()
         in_progress = bool(row.get("in_progress"))
         final = bool(row.get("final"))
+        home_win_prob = _margin_win_prob(margin_mean, scale=6.5)
+        if home_win_prob is None:
+            home_win_prob = 0.5
+        away_win_prob = 1.0 - home_win_prob
+        home_ml = _american_from_prob(home_win_prob)
+        away_ml = _american_from_prob(away_win_prob)
+        home_spread = _round_half(-margin_mean) if margin_mean is not None else 0.0
+        total_line = _round_half(total_mean) if total_mean is not None and total_mean > 1.0 else 160.0
         game_id = str(row.get("game_id") or f"{away_tri}@{home_tri}")
         games.append(
             {
@@ -1012,7 +1025,24 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 "status": "Final" if final else ("Live" if in_progress else "Scheduled"),
                 "detail": status_text or ("Final" if final else ("Live" if in_progress else "Scheduled")),
                 "summary": "Live scoreboard fallback",
-                "betting": {},
+                "betting": {
+                    "home_ml": home_ml,
+                    "away_ml": away_ml,
+                    "home_spread": home_spread,
+                    "total": total_line,
+                    "home_ml_ev": None,
+                    "away_ml_ev": None,
+                    "home_spread_ev": None,
+                    "away_spread_ev": None,
+                    "over_ev": None,
+                    "under_ev": None,
+                    "p_home_win": home_win_prob,
+                    "p_away_win": away_win_prob,
+                    "p_home_cover": 0.5,
+                    "p_away_cover": 0.5,
+                    "p_total_over": 0.5,
+                    "p_total_under": 0.5,
+                },
                 "prop_recommendations": {"away": [], "home": []},
                 "live_state": dict(row),
                 "sim": {
