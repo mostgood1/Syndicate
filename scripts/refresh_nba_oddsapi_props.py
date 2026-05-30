@@ -829,8 +829,68 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     ]
     raw_path = next((path for path in raw_candidates if path.exists() and path.is_file()), None)
     if raw_path is None:
-        _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
-        return 0, None
+        # Fallback to processed game_odds when raw team odds snapshots are unavailable.
+        game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
+        if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:
+            _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
+            return 0, None
+
+        rows_out: list[dict[str, object]] = []
+        with game_odds_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for idx, row in enumerate(reader, start=1):
+                if not isinstance(row, dict):
+                    continue
+                home_name = str(row.get("home_team") or "").strip()
+                away_name = str(row.get("visitor_team") or row.get("away_team") or "").strip()
+                if not home_name or not away_name:
+                    continue
+                rows_out.append(
+                    {
+                        "date": date_str,
+                        "game_id": str(row.get("game_id") or idx),
+                        "home_team": home_name,
+                        "visitor_team": away_name,
+                        "commence_time": str(row.get("commence_time") or "").strip(),
+                        "home_ml": _float_or_none(row.get("home_ml")),
+                        "away_ml": _float_or_none(row.get("away_ml")),
+                        "home_spread": _float_or_none(row.get("home_spread")),
+                        "away_spread": _float_or_none(row.get("away_spread")),
+                        "total": _float_or_none(row.get("total")),
+                        "bookmaker": str(row.get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
+                        "home_tri": _to_tricode_local(home_name),
+                        "away_tri": _to_tricode_local(away_name),
+                    }
+                )
+
+        if not rows_out:
+            _append_log(log_file, f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
+            return 0, None
+
+        header_order = [
+            "date",
+            "game_id",
+            "home_team",
+            "visitor_team",
+            "commence_time",
+            "home_ml",
+            "away_ml",
+            "home_spread",
+            "away_spread",
+            "total",
+            "bookmaker",
+            "home_tri",
+            "away_tri",
+        ]
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=header_order)
+            writer.writeheader()
+            for current in rows_out:
+                writer.writerow({field: current.get(field, "") for field in header_order})
+
+        _append_log(log_file, f"Built local game_cards from game_odds fallback: {out_path} (rows={len(rows_out)})")
+        return len(rows_out), out_path
 
     try:
         import pandas as pd

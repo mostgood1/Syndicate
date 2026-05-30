@@ -419,6 +419,16 @@ function Assert-AdvancedDataReady {
             if (-not (Test-Path $processedRoot)) {
                 throw "NBA advanced-data gate failed: missing processed root $processedRoot"
             }
+            $requiredBoardArtifacts = @(
+                (Join-Path $processedRoot ("game_cards_{0}.csv" -f $DateValue)),
+                (Join-Path $processedRoot ("recommendations_slate_{0}.json" -f $DateValue)),
+                (Join-Path $processedRoot ("cards_props_snapshot_{0}.json" -f $DateValue))
+            )
+            foreach ($requiredArtifact in $requiredBoardArtifacts) {
+                if (-not (Test-Path $requiredArtifact)) {
+                    throw "NBA advanced-data gate failed: missing required board artifact $requiredArtifact"
+                }
+            }
             $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
             if ($smartSimFiles.Count -eq 0) {
                 throw "NBA advanced-data gate failed: missing smart_sim artifacts for $DateValue"
