@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.mlb.cards import build_cards_page_context
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.ladders_common import format_num
 from syndicate.features.mlb.ladders_common import format_pct
@@ -330,6 +331,16 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         "pregame": 0,
         "props": 0,
     }
+    used_cards_fallback = False
+    if report and not games and int(counts.get("games") or 0) <= 0:
+        fallback_context = build_cards_page_context(selected_date)
+        fallback_games = fallback_context.get("games") if isinstance(fallback_context.get("games"), list) else []
+        fallback_scoreboard = fallback_context.get("scoreboard_items") if isinstance(fallback_context.get("scoreboard_items"), list) else []
+        if fallback_games:
+            games = fallback_games
+            scoreboard_items = fallback_scoreboard
+            used_cards_fallback = True
+
     data_root = (report or {}).get("dataRoot") or "data"
     live_lens_dir = (report or {}).get("liveLensDir") or "data/live_lens"
     route_path = f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens"
@@ -351,7 +362,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         "scoreboard_items": scoreboard_items,
         "source_path": str(report_path),
         "using_sample_data": using_sample_data,
-        "source_title": "MLB live-lens report artifact" if games else "MLB live lens unavailable",
+        "source_title": "MLB cards fallback lens" if used_cards_fallback else ("MLB live-lens report artifact" if games else "MLB live lens unavailable"),
         "generatedAt": generated_at,
         "counts": counts,
         "app": (report or {}).get("app") if isinstance((report or {}).get("app"), dict) else {},

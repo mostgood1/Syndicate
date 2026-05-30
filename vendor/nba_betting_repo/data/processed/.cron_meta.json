@@ -1,9 +1,9 @@
 {
   "last_reconcile_games": {
-    "date": "2026-05-28",
+    "date": "2026-05-30",
     "rows": 1,
-    "output": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\recon_games_2026-05-28.csv",
+    "output": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\recon_games_2026-05-30.csv",
     "pushed": null,
-    "timestamp": "2026-05-28T21:07:50Z"
+    "timestamp": "2026-05-30T16:31:50Z"
   }
 }

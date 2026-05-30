@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-05-30T13:25:54-05:00",
+    "generated_at": "2026-05-30T14:41:57-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -234,8 +234,8 @@
       "start_time": "3:05 PM",
       "official_date": "2026-05-30",
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "away": {
         "id": 135,
@@ -252,6 +252,93 @@
       "starter_names": {
         "away": "Michael King",
         "home": "Foster Griffin"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 824833,
+      "game_date": "2026-05-30T20:05:00Z",
+      "start_time": "3:05 PM",
+      "official_date": "2026-05-30",
+      "status": {
+        "abstract": "Live",
+        "detailed": "Warmup"
+      },
+      "away": {
+        "id": 141,
+        "abbr": "TOR",
+        "name": "Toronto Blue Jays",
+        "logo": "https://www.mlbstatic.com/team-logos/141.svg"
+      },
+      "home": {
+        "id": 110,
+        "abbr": "BAL",
+        "name": "Baltimore Orioles",
+        "logo": "https://www.mlbstatic.com/team-logos/110.svg"
+      },
+      "starter_names": {
+        "away": "Trey Yesavage",
+        "home": "Brandon Young"
       },
       "segments": {},
       "pitcher_props": {},
@@ -426,93 +513,6 @@
       "starter_names": {
         "away": "Bailey Ober",
         "home": "Mitch Keller"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 824833,
-      "game_date": "2026-05-30T20:05:00Z",
-      "start_time": "3:05 PM",
-      "official_date": "2026-05-30",
-      "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
-      },
-      "away": {
-        "id": 141,
-        "abbr": "TOR",
-        "name": "Toronto Blue Jays",
-        "logo": "https://www.mlbstatic.com/team-logos/141.svg"
-      },
-      "home": {
-        "id": 110,
-        "abbr": "BAL",
-        "name": "Baltimore Orioles",
-        "logo": "https://www.mlbstatic.com/team-logos/110.svg"
-      },
-      "starter_names": {
-        "away": "Trey Yesavage",
-        "home": "Brandon Young"
       },
       "segments": {},
       "pitcher_props": {},
@@ -931,7 +931,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 112,

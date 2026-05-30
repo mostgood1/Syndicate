@@ -394,6 +394,24 @@ function Assert-AdvancedDataReady {
         return
     }
 
+    function Resolve-ExistingRoot {
+        param([string[]]$Candidates)
+
+        foreach ($candidate in @($Candidates)) {
+            if ([string]::IsNullOrWhiteSpace($candidate)) {
+                continue
+            }
+            if (Test-Path $candidate) {
+                return $candidate
+            }
+        }
+
+        if ($Candidates -and $Candidates.Count -gt 0) {
+            return $Candidates[0]
+        }
+        return $null
+    }
+
     $sportSlug = $Sport.Trim().ToLowerInvariant()
     switch ($sportSlug) {
         'nba' {
@@ -461,17 +479,45 @@ function Assert-AdvancedDataReady {
             return
         }
         'mlb' {
-            $processedRoot = Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\processed'
-            $liveLensRoot = Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\live_lens'
-            $requiredPaths = @(
+            $dateSlug = $DateValue -replace '-', '_'
+            $mlbDataRoot = Resolve-ExistingRoot @(
+                (Join-Path $RepoRoot 'data\mlb_source\data'),
+                (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data')
+            )
+            $processedRoot = Resolve-ExistingRoot @(
+                (Join-Path $mlbDataRoot 'processed'),
+                (Join-Path $RepoRoot 'data\mlb_source\data\processed'),
+                (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\processed')
+            )
+            $dailyRoot = Resolve-ExistingRoot @(
+                (Join-Path $mlbDataRoot 'daily'),
+                (Join-Path $RepoRoot 'data\mlb_source\data\daily'),
+                (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\daily')
+            )
+            $liveLensRoot = Resolve-ExistingRoot @(
+                (Join-Path $mlbDataRoot 'live_lens'),
+                (Join-Path $RepoRoot 'data\mlb_source\data\live_lens'),
+                (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\live_lens')
+            )
+
+            $legacyRequiredPaths = @(
                 (Join-Path $processedRoot ("props_predictions_{0}.csv" -f $DateValue)),
                 (Join-Path $processedRoot ("props_recommendations_{0}.csv" -f $DateValue)),
                 (Join-Path $processedRoot ("top_props_{0}.json" -f $DateValue))
             )
-            foreach ($requiredPath in $requiredPaths) {
-                if (-not (Test-Path $requiredPath)) {
-                    throw "MLB advanced-data gate failed: missing required artifact $requiredPath"
+            $legacyArtifactsReady = $true
+            foreach ($legacyPath in $legacyRequiredPaths) {
+                if (-not (Test-Path $legacyPath)) {
+                    $legacyArtifactsReady = $false
+                    break
                 }
+            }
+
+            $dailyTopPropsPath = Join-Path $dailyRoot ("top_props\daily_top_props_{0}.json" -f $dateSlug)
+            $modernArtifactsReady = Test-Path $dailyTopPropsPath
+
+            if (-not $legacyArtifactsReady -and -not $modernArtifactsReady) {
+                throw "MLB advanced-data gate failed: missing both legacy processed props artifacts and daily top-props artifact for $DateValue"
             }
 
             $reportCandidates = @(
@@ -508,7 +554,10 @@ function Assert-AdvancedDataReady {
             return
         }
         'nhl' {
-            $processedRoot = Join-Path $RepoRoot 'data\nhl_source\source_artifacts\data\processed'
+            $processedRoot = Resolve-ExistingRoot @(
+                (Join-Path $RepoRoot 'data\nhl_source\data\processed'),
+                (Join-Path $RepoRoot 'data\nhl_source\source_artifacts\data\processed')
+            )
             if (-not (Test-Path $processedRoot)) {
                 throw "NHL advanced-data gate failed: missing processed root $processedRoot"
             }

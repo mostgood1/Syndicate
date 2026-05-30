@@ -1,7 +1,7 @@
 {
   "date": "2026-05-30",
   "season": 2026,
-  "generated_at": "2026-05-30T13:24:29.619289",
+  "generated_at": "2026-05-30T14:41:07.341709",
   "tool": "tools/daily_update_multi_profile.py",
   "daily_update_tool": "tools\\daily_update.py",
   "python_exe": "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
@@ -33,7 +33,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 141.779,
+      "duration_s": 115.991,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -565,10 +565,10 @@
   },
   "timings": {
     "profiles": {
-      "game_recos": 141.779
+      "game_recos": 115.991
     },
-    "locked_policy_s": 0.782,
-    "total_s": 143.162
+    "locked_policy_s": 0.336,
+    "total_s": 116.867
   },
   "failures": [],
   "failures_n": 0
