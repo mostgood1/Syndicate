@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-30T00:28:36.780316",
+  "generated_at": "2026-05-30T10:37:29.915086",
   "date": "2026-05-30",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-30_b85891982dad.lock",
-    "pid": 15572,
-    "created_at": "2026-05-30T00:28:36.778185"
+    "pid": 5684,
+    "created_at": "2026-05-30T10:37:29.902637"
   },
   "seed": {
     "value": 1337,
@@ -152,7 +152,7 @@
       "used_local_registry": true,
       "registry_summary": {
         "date": "2026-05-29",
-        "updatedAt": "2026-05-30T00:24:17-05:00",
+        "updatedAt": "2026-05-30T00:41:58-05:00",
         "totalEntries": 0,
         "uniqueGames": 0,
         "uniqueOwners": 0,
@@ -253,21 +253,23 @@
         "pitcher_props": {
           "players": 30,
           "markets": {
-            "earned_runs": 15,
-            "hits_allowed": 14,
-            "outs": 21,
-            "strikeouts": 30
+            "earned_runs": 30,
+            "hits_allowed": 30,
+            "outs": 30,
+            "strikeouts": 30,
+            "walks_allowed": 6
           },
           "events_matched": 15
         },
         "hitter_props": {
-          "players": 229,
+          "players": 288,
           "markets": {
-            "batter_hits": 151,
-            "batter_hits_runs_rbis": 14,
-            "batter_home_runs": 212,
-            "batter_rbis": 15,
-            "batter_total_bases": 68
+            "batter_hits": 281,
+            "batter_hits_runs_rbis": 282,
+            "batter_home_runs": 274,
+            "batter_rbis": 281,
+            "batter_runs_scored": 281,
+            "batter_total_bases": 276
           },
           "events_matched": 15
         }
@@ -899,8 +901,8 @@
           "none": 65
         },
         "tones": {
-          "solid": 30,
-          "soft": 14,
+          "solid": 25,
+          "soft": 19,
           "strong": 21
         },
         "stats": {
@@ -1019,13 +1021,13 @@
       "games": 15,
       "summary": {
         "games": 15,
-        "projected_teams": 30,
+        "projected_teams": 28,
         "adjusted_teams": 0,
         "partial_teams": 0,
         "fallback_pool_teams": 0,
-        "confirmed_teams": 0,
-        "projected_only_teams": 30,
-        "confirmed_only_teams": 0,
+        "confirmed_teams": 2,
+        "projected_only_teams": 28,
+        "confirmed_only_teams": 2,
         "comparable_teams": 0,
         "exact_match_teams": 0,
         "true_mismatch_teams": 0

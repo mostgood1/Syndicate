@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-05-30T00:31:53-05:00",
+    "generated_at": "2026-05-30T10:39:54-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -148,7 +148,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 116,

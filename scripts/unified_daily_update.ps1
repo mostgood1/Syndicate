@@ -139,9 +139,29 @@ function Invoke-Step {
             Write-Host ("    ... still running ({0}s)" -f [int]$elapsed.TotalSeconds) -ForegroundColor DarkGray
         }
 
-        $LASTEXITCODE = $process.ExitCode
-        if ($process.ExitCode -ne 0) {
-            $exitCodeText = if ($null -eq $process.ExitCode) { 'unknown' } else { [string]$process.ExitCode }
+        # Ensure process metadata is fully updated before reading ExitCode.
+        $process.WaitForExit()
+        $process.Refresh()
+
+        $exitCode = $null
+        try {
+            $exitCode = [int]$process.ExitCode
+        }
+        catch {
+            $exitCode = $null
+        }
+
+        if ($null -eq $exitCode -and ($LASTEXITCODE -is [int])) {
+            $exitCode = [int]$LASTEXITCODE
+        }
+
+        if ($null -eq $exitCode) {
+            throw "$Name failed because the child process exit code could not be determined (pid $($process.Id))."
+        }
+
+        $LASTEXITCODE = $exitCode
+        if ($exitCode -ne 0) {
+            $exitCodeText = [string]$exitCode
             throw "$Name failed with exit code $exitCodeText"
         }
     }

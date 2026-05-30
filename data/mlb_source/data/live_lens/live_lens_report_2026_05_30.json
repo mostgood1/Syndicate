@@ -18,12 +18,103 @@
   "registryLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_30.jsonl",
   "reportPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_05_30.json",
   "dailyRecapPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_05_30.json",
-  "entries": 0,
-  "latestEntry": null,
-  "latestReport": {},
+  "entries": 1,
+  "latestEntry": {
+    "recordedAt": "2026-05-30T00:37:04-05:00",
+    "date": "2026-05-30",
+    "counts": null,
+    "performance": null,
+    "games": [],
+    "degraded": false
+  },
+  "latestReport": {
+    "ok": true,
+    "date": "2026-05-30",
+    "optimizationRegime": {
+      "date": "2026-05-30",
+      "kind": "forward_tuned_live",
+      "label": "Forward tuned live",
+      "isLegacyComparison": false,
+      "isCleanBaseline": false,
+      "baselineStartDate": "2026-03-31",
+      "legacyWindowStartDate": "2026-03-25",
+      "recommendedUse": "post_retune_monitoring",
+      "forwardTuningStartDate": "2026-04-14"
+    },
+    "logPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_05_30.jsonl",
+    "propObservationLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_05_30.jsonl",
+    "registryPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_30.json",
+    "registryLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_30.jsonl",
+    "reportPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_05_30.json",
+    "dailyRecapPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_05_30.json",
+    "entries": 0,
+    "latestEntry": null,
+    "latestReport": {},
+    "registrySummary": {
+      "date": "2026-05-30",
+      "updatedAt": null,
+      "totalEntries": 0,
+      "uniqueGames": 0,
+      "uniqueOwners": 0,
+      "settledEntries": 0,
+      "resultCounts": {
+        "win": 0,
+        "loss": 0,
+        "push": 0,
+        "pending": 0
+      },
+      "byProp": {},
+      "bySelection": {},
+      "topStable": [],
+      "topEdges": []
+    },
+    "summary": {
+      "counts": {},
+      "performance": {},
+      "topStable": [],
+      "topEdges": []
+    },
+    "firstObservationArchive": [],
+    "rawArtifacts": {
+      "total_bytes": 0,
+      "total_bytes_text": "0 B",
+      "files": {
+        "log": {
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_05_30.jsonl",
+          "exists": false,
+          "bytes": 0,
+          "bytes_text": "0 B"
+        },
+        "observation_log": {
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_05_30.jsonl",
+          "exists": false,
+          "bytes": 0,
+          "bytes_text": "0 B"
+        },
+        "registry": {
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_30.json",
+          "exists": false,
+          "bytes": 0,
+          "bytes_text": "0 B"
+        },
+        "registry_log": {
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_30.jsonl",
+          "exists": false,
+          "bytes": 0,
+          "bytes_text": "0 B"
+        },
+        "report": {
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_05_30.json",
+          "exists": false,
+          "bytes": 0,
+          "bytes_text": "0 B"
+        }
+      }
+    }
+  },
   "registrySummary": {
     "date": "2026-05-30",
-    "updatedAt": null,
+    "updatedAt": "2026-05-30T00:37:04-05:00",
     "totalEntries": 0,
     "uniqueGames": 0,
     "uniqueOwners": 0,
@@ -47,38 +138,43 @@
   },
   "firstObservationArchive": [],
   "rawArtifacts": {
-    "total_bytes": 0,
-    "total_bytes_text": "0 B",
+    "total_bytes": 3592,
+    "total_bytes_text": "3.51 KB",
     "files": {
       "log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_05_30.jsonl",
-        "exists": false,
-        "bytes": 0,
-        "bytes_text": "0 B"
+        "exists": true,
+        "bytes": 136,
+        "bytes_text": "136 B",
+        "modified_at": "2026-05-30T00:37:04-05:00"
       },
       "observation_log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_05_30.jsonl",
-        "exists": false,
+        "exists": true,
         "bytes": 0,
-        "bytes_text": "0 B"
+        "bytes_text": "0 B",
+        "modified_at": "2026-05-30T00:37:04-05:00"
       },
       "registry": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_30.json",
-        "exists": false,
-        "bytes": 0,
-        "bytes_text": "0 B"
+        "exists": true,
+        "bytes": 91,
+        "bytes_text": "91 B",
+        "modified_at": "2026-05-30T00:37:04-05:00"
       },
       "registry_log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_30.jsonl",
-        "exists": false,
+        "exists": true,
         "bytes": 0,
-        "bytes_text": "0 B"
+        "bytes_text": "0 B",
+        "modified_at": "2026-05-30T00:37:04-05:00"
       },
       "report": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_05_30.json",
-        "exists": false,
-        "bytes": 0,
-        "bytes_text": "0 B"
+        "exists": true,
+        "bytes": 3365,
+        "bytes_text": "3.29 KB",
+        "modified_at": "2026-05-30T00:37:04-05:00"
       }
     }
   }
