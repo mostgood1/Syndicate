@@ -980,6 +980,7 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
         except FileNotFoundError:
             source_path = None
     rows = payload.get("games") if isinstance((payload or {}).get("games"), list) else []
+    sim_index = _artifact_bundle(selected_date).get("sim", {})
     games: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict):
@@ -995,20 +996,25 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
         if status_id <= 1 and (away_pts or 0.0) == 0.0 and (home_pts or 0.0) == 0.0:
             away_pts = None
             home_pts = None
-        total_mean = (away_pts + home_pts) if away_pts is not None and home_pts is not None else None
-        margin_mean = (home_pts - away_pts) if away_pts is not None and home_pts is not None else None
         status_text = str(row.get("status") or "").strip()
         in_progress = bool(row.get("in_progress"))
         final = bool(row.get("final"))
-        home_win_prob = _margin_win_prob(margin_mean, scale=6.5)
-        if home_win_prob is None:
-            home_win_prob = 0.5
-        away_win_prob = 1.0 - home_win_prob
-        home_ml = _american_from_prob(home_win_prob)
-        away_ml = _american_from_prob(away_win_prob)
-        home_spread = _round_half(-margin_mean) if margin_mean is not None else 0.0
-        total_line = _round_half(total_mean) if total_mean is not None and total_mean > 1.0 else 160.0
         game_id = str(row.get("game_id") or f"{away_tri}@{home_tri}")
+        sim_game = sim_index.get((away_tri, home_tri)) if isinstance(sim_index, dict) else None
+        sim_payload = _source_sim_stub(game_id, sim_game if isinstance(sim_game, dict) else None, {})
+        score = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
+        sim_away = _safe_float(score.get("away_mean"))
+        sim_home = _safe_float(score.get("home_mean"))
+        sim_total = _safe_float(score.get("total_mean"))
+        sim_margin = _safe_float(score.get("margin_mean"))
+        total_mean = (away_pts + home_pts) if away_pts is not None and home_pts is not None else sim_total
+        margin_mean = (home_pts - away_pts) if away_pts is not None and home_pts is not None else sim_margin
+        betting = _source_betting(
+            {
+                "margin_mean": margin_mean,
+                "total_mean": total_mean,
+            }
+        )
         games.append(
             {
                 "gamePk": game_id,
@@ -1025,45 +1031,17 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 "status": "Final" if final else ("Live" if in_progress else "Scheduled"),
                 "detail": status_text or ("Final" if final else ("Live" if in_progress else "Scheduled")),
                 "summary": "Live scoreboard fallback",
-                "betting": {
-                    "home_ml": home_ml,
-                    "away_ml": away_ml,
-                    "home_spread": home_spread,
-                    "total": total_line,
-                    "home_ml_ev": None,
-                    "away_ml_ev": None,
-                    "home_spread_ev": None,
-                    "away_spread_ev": None,
-                    "over_ev": None,
-                    "under_ev": None,
-                    "p_home_win": home_win_prob,
-                    "p_away_win": away_win_prob,
-                    "p_home_cover": 0.5,
-                    "p_away_cover": 0.5,
-                    "p_total_over": 0.5,
-                    "p_total_under": 0.5,
-                },
+                "betting": betting,
                 "prop_recommendations": {"away": [], "home": []},
                 "live_state": dict(row),
                 "sim": {
-                    "game_id": game_id,
+                    **sim_payload,
                     "score": {
-                        "away_mean": away_pts,
-                        "home_mean": home_pts,
+                        "away_mean": away_pts if away_pts is not None else sim_away,
+                        "home_mean": home_pts if home_pts is not None else sim_home,
                         "total_mean": total_mean,
                         "margin_mean": margin_mean,
                     },
-                    "players_summary": {
-                        "away": 0,
-                        "home": 0,
-                        "missing_away": 0,
-                        "missing_home": 0,
-                        "injured_away": 0,
-                        "injured_home": 0,
-                    },
-                    "players": {"away": [], "home": []},
-                    "missing_prop_players": {"away": [], "home": []},
-                    "injuries": {"away": [], "home": []},
                 },
             }
         )
