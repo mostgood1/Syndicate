@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-29T15:29:54.592203",
+  "generated_at": "2026-05-29T20:39:30.205290",
   "date": "2026-05-29",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-29_b85891982dad.lock",
-    "pid": 13436,
-    "created_at": "2026-05-29T15:29:54.591085"
+    "pid": 10152,
+    "created_at": "2026-05-29T20:39:30.181295"
   },
   "seed": {
     "value": 1337,
@@ -218,34 +218,34 @@
       "hitter_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_29.json",
       "counts": {
         "game_lines": {
-          "events_matched": 15,
-          "games": 15,
-          "h2h_games": 15,
-          "totals_games": 15,
-          "spreads_games": 15
+          "events_matched": 13,
+          "games": 13,
+          "h2h_games": 13,
+          "totals_games": 13,
+          "spreads_games": 13
         },
         "pitcher_props": {
-          "players": 27,
+          "players": 8,
           "markets": {
-            "earned_runs": 27,
-            "hits_allowed": 26,
-            "outs": 26,
-            "strikeouts": 26,
-            "walks_allowed": 24
+            "earned_runs": 6,
+            "hits_allowed": 8,
+            "outs": 8,
+            "strikeouts": 8,
+            "walks_allowed": 7
           },
-          "events_matched": 15
+          "events_matched": 13
         },
         "hitter_props": {
-          "players": 278,
+          "players": 148,
           "markets": {
-            "batter_hits": 268,
-            "batter_hits_runs_rbis": 271,
-            "batter_home_runs": 268,
-            "batter_rbis": 268,
-            "batter_runs_scored": 268,
-            "batter_total_bases": 267
+            "batter_hits": 121,
+            "batter_hits_runs_rbis": 124,
+            "batter_home_runs": 138,
+            "batter_rbis": 123,
+            "batter_runs_scored": 121,
+            "batter_total_bases": 96
           },
-          "events_matched": 15
+          "events_matched": 13
         }
       }
     },
@@ -756,14 +756,14 @@
       "group_summaries": {
         "pitcher": {
           "found": true,
-          "candidateCount": 127,
-          "displayedCount": 127,
+          "candidateCount": 52,
+          "displayedCount": 52,
           "sectionCount": 5
         },
         "hitter": {
           "found": true,
-          "candidateCount": 1610,
-          "displayedCount": 1610,
+          "candidateCount": 723,
+          "displayedCount": 723,
           "sectionCount": 7
         }
       }
@@ -813,52 +813,52 @@
         "hitter": {
           "hits": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "hits_runs_rbis": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "home_runs": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "total_bases": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "runs": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "rbi": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "hitter_strikeouts": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "doubles": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "triples": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           },
           "stolen_bases": {
             "found": true,
-            "rowCount": 388,
+            "rowCount": 390,
             "error": null
           }
         }
@@ -870,33 +870,33 @@
       "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladder_audit_2026_05_29.json",
       "summary": {
         "cards": 15,
-        "badges": 101,
+        "badges": 45,
         "sources": {
-          "none": 101
+          "none": 45
         },
         "tones": {
-          "solid": 42,
-          "strong": 31,
-          "soft": 28
+          "soft": 18,
+          "strong": 15,
+          "solid": 12
         },
         "stats": {
           "hits_allowed": {
-            "badges": 26,
+            "badges": 12,
             "rungWins": 0,
             "rungLosses": 0
           },
           "outs": {
-            "badges": 25,
+            "badges": 12,
             "rungWins": 0,
             "rungLosses": 0
           },
           "strikeouts": {
-            "badges": 26,
+            "badges": 12,
             "rungWins": 0,
             "rungLosses": 0
           },
           "walks_allowed": {
-            "badges": 24,
+            "badges": 9,
             "rungWins": 0,
             "rungLosses": 0
           }
@@ -1000,13 +1000,13 @@
       "games": 15,
       "summary": {
         "games": 15,
-        "projected_teams": 12,
+        "projected_teams": 0,
         "adjusted_teams": 0,
         "partial_teams": 0,
         "fallback_pool_teams": 0,
-        "confirmed_teams": 18,
-        "projected_only_teams": 12,
-        "confirmed_only_teams": 18,
+        "confirmed_teams": 30,
+        "projected_only_teams": 0,
+        "confirmed_only_teams": 30,
         "comparable_teams": 0,
         "exact_match_teams": 0,
         "true_mismatch_teams": 0

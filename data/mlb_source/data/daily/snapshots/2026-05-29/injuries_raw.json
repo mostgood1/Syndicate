@@ -366,8 +366,8 @@
           "player_id": 665152,
           "full_name": "Dean Kremer",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "1",
@@ -1191,13 +1191,13 @@
         572143,
         595879,
         650402,
+        663554,
         669373,
         676428,
         678009,
         680744,
         681481,
         681857,
-        689225,
         690544,
         695549,
         700242
@@ -1219,8 +1219,8 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 689225,
-          "full_name": "Beau Brieske",
+          "player_id": 676428,
+          "full_name": "Brant Hurter",
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
@@ -1234,8 +1234,8 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 676428,
-          "full_name": "Brant Hurter",
+          "player_id": 572143,
+          "full_name": "Burch Smith",
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
@@ -1249,8 +1249,8 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 572143,
-          "full_name": "Burch Smith",
+          "player_id": 663554,
+          "full_name": "Casey Mize",
           "status": {
             "code": "D15",
             "description": "Injured 15-Day"
@@ -1646,7 +1646,8 @@
         663697,
         663704,
         666142,
-        679525
+        679525,
+        683232
       ],
       "injured": [
         {
@@ -1753,6 +1754,21 @@
             "abbreviation": "P"
           },
           "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 683232,
+          "full_name": "Nick Mears",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
         }
       ]
     },
@@ -1766,6 +1782,7 @@
         571771,
         592779,
         605483,
+        606192,
         607192,
         621242,
         623465,
@@ -1798,8 +1815,8 @@
           "player_id": 605483,
           "full_name": "Blake Snell",
           "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
+            "code": "D60",
+            "description": "Injured 60-Day"
           },
           "position": {
             "code": "1",
@@ -1956,6 +1973,21 @@
             "name": "Pitcher",
             "type": "Pitcher",
             "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 606192,
+          "full_name": "Teoscar Hern\u00e1ndez",
+          "status": {
+            "code": "D10",
+            "description": "Injured 10-Day"
+          },
+          "position": {
+            "code": "7",
+            "name": "Outfielder",
+            "type": "Outfielder",
+            "abbreviation": "LF"
           },
           "roster_type_source": "40Man"
         },
@@ -2721,15 +2753,14 @@
       },
       "injured_ids": [
         592858,
-        657277,
+        641816,
         665665,
         666931,
         671218,
         671345,
         676130,
         678495,
-        806185,
-        808982
+        806185
       ],
       "injured": [
         {
@@ -2808,36 +2839,6 @@
           "roster_type_source": "40Man"
         },
         {
-          "player_id": 808982,
-          "full_name": "Jung Hoo Lee",
-          "status": {
-            "code": "D10",
-            "description": "Injured 10-Day"
-          },
-          "position": {
-            "code": "9",
-            "name": "Outfielder",
-            "type": "Outfielder",
-            "abbreviation": "RF"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 657277,
-          "full_name": "Logan Webb",
-          "status": {
-            "code": "D15",
-            "description": "Injured 15-Day"
-          },
-          "position": {
-            "code": "1",
-            "name": "Pitcher",
-            "type": "Pitcher",
-            "abbreviation": "P"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
           "player_id": 678495,
           "full_name": "Randy Rodr\u00edguez",
           "status": {
@@ -2873,6 +2874,21 @@
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 641816,
+          "full_name": "Tyler Mahle",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -4036,8 +4052,8 @@
       },
       "injured_ids": [
         665052,
-        677870,
         678692,
+        691587,
         702281,
         800049
       ],
@@ -4048,6 +4064,21 @@
           "status": {
             "code": "D60",
             "description": "Injured 60-Day"
+          },
+          "position": {
+            "code": "1",
+            "name": "Pitcher",
+            "type": "Pitcher",
+            "abbreviation": "P"
+          },
+          "roster_type_source": "40Man"
+        },
+        {
+          "player_id": 691587,
+          "full_name": "Eury P\u00e9rez",
+          "status": {
+            "code": "D15",
+            "description": "Injured 15-Day"
           },
           "position": {
             "code": "1",
@@ -4069,21 +4100,6 @@
             "name": "Outfielder",
             "type": "Outfielder",
             "abbreviation": "LF"
-          },
-          "roster_type_source": "40Man"
-        },
-        {
-          "player_id": 677870,
-          "full_name": "Leo Jim\u00e9nez",
-          "status": {
-            "code": "D7",
-            "description": "Injured 7-Day"
-          },
-          "position": {
-            "code": "5",
-            "name": "Third Base",
-            "type": "Infielder",
-            "abbreviation": "3B"
           },
           "roster_type_source": "40Man"
         },
@@ -4660,8 +4676,8 @@
       "player_id": 665152,
       "full_name": "Dean Kremer",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "1",
@@ -5441,8 +5457,8 @@
     },
     {
       "team_id": 116,
-      "player_id": 689225,
-      "full_name": "Beau Brieske",
+      "player_id": 676428,
+      "full_name": "Brant Hurter",
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"
@@ -5457,8 +5473,8 @@
     },
     {
       "team_id": 116,
-      "player_id": 676428,
-      "full_name": "Brant Hurter",
+      "player_id": 572143,
+      "full_name": "Burch Smith",
       "status": {
         "code": "D15",
         "description": "Injured 15-Day"
@@ -5473,8 +5489,8 @@
     },
     {
       "team_id": 116,
-      "player_id": 572143,
-      "full_name": "Burch Smith",
+      "player_id": 663554,
+      "full_name": "Casey Mize",
       "status": {
         "code": "D15",
         "description": "Injured 15-Day"
@@ -5968,6 +5984,22 @@
       "roster_type_source": "40Man"
     },
     {
+      "team_id": 118,
+      "player_id": 683232,
+      "full_name": "Nick Mears",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
       "team_id": 119,
       "player_id": 676508,
       "full_name": "Ben Casparius",
@@ -5988,8 +6020,8 @@
       "player_id": 605483,
       "full_name": "Blake Snell",
       "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
+        "code": "D60",
+        "description": "Injured 60-Day"
       },
       "position": {
         "code": "1",
@@ -6156,6 +6188,22 @@
         "name": "Pitcher",
         "type": "Pitcher",
         "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 119,
+      "player_id": 606192,
+      "full_name": "Teoscar Hern\u00e1ndez",
+      "status": {
+        "code": "D10",
+        "description": "Injured 10-Day"
+      },
+      "position": {
+        "code": "7",
+        "name": "Outfielder",
+        "type": "Outfielder",
+        "abbreviation": "LF"
       },
       "roster_type_source": "40Man"
     },
@@ -6929,38 +6977,6 @@
     },
     {
       "team_id": 137,
-      "player_id": 808982,
-      "full_name": "Jung Hoo Lee",
-      "status": {
-        "code": "D10",
-        "description": "Injured 10-Day"
-      },
-      "position": {
-        "code": "9",
-        "name": "Outfielder",
-        "type": "Outfielder",
-        "abbreviation": "RF"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 137,
-      "player_id": 657277,
-      "full_name": "Logan Webb",
-      "status": {
-        "code": "D15",
-        "description": "Injured 15-Day"
-      },
-      "position": {
-        "code": "1",
-        "name": "Pitcher",
-        "type": "Pitcher",
-        "abbreviation": "P"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 137,
       "player_id": 678495,
       "full_name": "Randy Rodr\u00edguez",
       "status": {
@@ -6998,6 +7014,22 @@
       "status": {
         "code": "D60",
         "description": "Injured 60-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 137,
+      "player_id": 641816,
+      "full_name": "Tyler Mahle",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
       },
       "position": {
         "code": "1",
@@ -8081,6 +8113,22 @@
     },
     {
       "team_id": 146,
+      "player_id": 691587,
+      "full_name": "Eury P\u00e9rez",
+      "status": {
+        "code": "D15",
+        "description": "Injured 15-Day"
+      },
+      "position": {
+        "code": "1",
+        "name": "Pitcher",
+        "type": "Pitcher",
+        "abbreviation": "P"
+      },
+      "roster_type_source": "40Man"
+    },
+    {
+      "team_id": 146,
       "player_id": 665052,
       "full_name": "Griffin Conine",
       "status": {
@@ -8092,22 +8140,6 @@
         "name": "Outfielder",
         "type": "Outfielder",
         "abbreviation": "LF"
-      },
-      "roster_type_source": "40Man"
-    },
-    {
-      "team_id": 146,
-      "player_id": 677870,
-      "full_name": "Leo Jim\u00e9nez",
-      "status": {
-        "code": "D7",
-        "description": "Injured 7-Day"
-      },
-      "position": {
-        "code": "5",
-        "name": "Third Base",
-        "type": "Infielder",
-        "abbreviation": "3B"
       },
       "roster_type_source": "40Man"
     },

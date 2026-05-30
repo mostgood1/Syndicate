@@ -2048,6 +2048,9 @@ def _run_refresh_via_cli(
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
         if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0 and source_game_cards_rows > 0:
             state["rc_export"] = 0
+        elif int(rc_export) != 0 and int(state["snapshot_rows"] or 0) <= 0 and source_game_cards_rows <= 0:
+            state["rc_export"] = 0
+            _append_log(log_file, f"export stage returned non-zero for {date_str} with no snapshot rows and no game cards; continuing")
         elif int(rc_export) != 0:
             state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
@@ -3173,7 +3176,7 @@ def main() -> int:
         return 1
     if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:
         return 1
-    if bool(args.do_export) and snapshot_rows > 0 and recs_rows <= 0:
+    if bool(args.do_export) and snapshot_rows > 0 and int(state.get("game_cards_rows") or 0) > 0 and recs_rows <= 0:
         return 1
     return 0
 

@@ -1940,6 +1940,9 @@ def _run_refresh_via_cli(
         if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0:
             state["rc_export"] = 0
             _append_log(log_file, f"export stage returned non-zero for {date_str} but recommendations were written; continuing")
+        elif int(rc_export) != 0 and int(state["snapshot_rows"] or 0) <= 0 and source_game_cards_rows <= 0:
+            state["rc_export"] = 0
+            _append_log(log_file, f"export stage returned non-zero for {date_str} with no snapshot rows and no game cards; continuing")
         elif int(rc_export) != 0:
             state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
@@ -3324,7 +3327,7 @@ def main() -> int:
         return 1
     if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:
         return 1
-    if bool(args.do_export) and snapshot_rows > 0 and recs_rows <= 0:
+    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and recs_rows <= 0:
         return 1
     if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return 1
