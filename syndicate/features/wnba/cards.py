@@ -120,6 +120,32 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _implied_prob_from_american(price: float | None) -> float | None:
+    value = _safe_float(price)
+    if value is None or value == 0:
+        return None
+    if value > 0:
+        return 100.0 / (value + 100.0)
+    return abs(value) / (abs(value) + 100.0)
+
+
+def _american_from_prob(probability: float | None) -> float | None:
+    prob = _safe_float(probability)
+    if prob is None:
+        return None
+    prob = max(0.02, min(0.98, prob))
+    if prob >= 0.5:
+        return round(-100.0 * prob / max(0.001, 1.0 - prob), 0)
+    return round(100.0 * (1.0 - prob) / max(0.001, prob), 0)
+
+
+def _round_half(value: float | None) -> float | None:
+    number = _safe_float(value)
+    if number is None:
+        return None
+    return round(number * 2.0) / 2.0
+
+
 def _remote_source_base_url() -> str:
     for name in (
         "WNBA_BETTING_BASE_URL",
@@ -439,6 +465,75 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
     away_ml = _safe_float(row.get("away_ml"))
     home_spread = _safe_float(row.get("home_spread"))
     total = _safe_float(row.get("total"))
+    if total is not None and total <= 1.0:
+        total = None
+
+    home_win_prob = _safe_float(row.get("p_home_win") or row.get("prob_home_win"))
+    away_win_prob = _safe_float(row.get("p_away_win") or row.get("prob_away_win"))
+    if home_win_prob is None and away_win_prob is not None:
+        home_win_prob = 1.0 - away_win_prob
+    if away_win_prob is None and home_win_prob is not None:
+        away_win_prob = 1.0 - home_win_prob
+
+    if home_win_prob is None:
+        home_win_prob = _implied_prob_from_american(home_ml)
+    if away_win_prob is None:
+        away_win_prob = _implied_prob_from_american(away_ml)
+
+    if home_win_prob is None and away_win_prob is not None:
+        home_win_prob = 1.0 - away_win_prob
+    if away_win_prob is None and home_win_prob is not None:
+        away_win_prob = 1.0 - home_win_prob
+
+    if home_win_prob is None:
+        margin_hint = _safe_float(row.get("pred_margin") or row.get("margin_mean"))
+        home_win_prob = _margin_win_prob(margin_hint, scale=6.5)
+        if home_win_prob is not None:
+            away_win_prob = 1.0 - home_win_prob
+
+    if home_ml is None and home_win_prob is not None:
+        home_ml = _american_from_prob(home_win_prob)
+    if away_ml is None and away_win_prob is not None:
+        away_ml = _american_from_prob(away_win_prob)
+
+    if home_spread is None:
+        margin_hint = _safe_float(row.get("pred_margin") or row.get("margin_mean"))
+        if margin_hint is not None:
+            home_spread = _round_half(-margin_hint)
+
+    if total is None:
+        total_hint = _safe_float(row.get("pred_total") or row.get("total_mean"))
+        if total_hint is not None and total_hint > 1.0:
+            total = _round_half(total_hint)
+
+    home_cover_prob = _safe_float(row.get("p_home_cover") or row.get("prob_home_cover"))
+    away_cover_prob = _safe_float(row.get("p_away_cover") or row.get("prob_away_cover"))
+    if home_cover_prob is None and away_cover_prob is not None:
+        home_cover_prob = 1.0 - away_cover_prob
+    if away_cover_prob is None and home_cover_prob is not None:
+        away_cover_prob = 1.0 - home_cover_prob
+
+    if home_cover_prob is None and home_spread is not None:
+        margin_hint = _safe_float(row.get("pred_margin") or row.get("margin_mean"))
+        if margin_hint is not None:
+            home_cover_prob = _margin_win_prob(margin_hint + home_spread, scale=7.5)
+            if home_cover_prob is not None:
+                away_cover_prob = 1.0 - home_cover_prob
+
+    total_over_prob = _safe_float(row.get("p_total_over") or row.get("prob_total_over"))
+    total_under_prob = _safe_float(row.get("p_total_under") or row.get("prob_total_under"))
+    if total_over_prob is None and total_under_prob is not None:
+        total_over_prob = 1.0 - total_under_prob
+    if total_under_prob is None and total_over_prob is not None:
+        total_under_prob = 1.0 - total_over_prob
+
+    if total_over_prob is None and total is not None:
+        total_hint = _safe_float(row.get("pred_total") or row.get("total_mean"))
+        if total_hint is not None:
+            total_over_prob = _margin_win_prob(total_hint - total, scale=10.5)
+            if total_over_prob is not None:
+                total_under_prob = 1.0 - total_over_prob
+
     return {
         "home_ml": home_ml,
         "away_ml": away_ml,
@@ -450,12 +545,12 @@ def _source_betting(row: dict[str, str]) -> dict[str, Any]:
         "away_spread_ev": None,
         "over_ev": None,
         "under_ev": None,
-        "p_home_win": None,
-        "p_away_win": None,
-        "p_home_cover": None,
-        "p_away_cover": None,
-        "p_total_over": None,
-        "p_total_under": None,
+        "p_home_win": home_win_prob,
+        "p_away_win": away_win_prob,
+        "p_home_cover": home_cover_prob,
+        "p_away_cover": away_cover_prob,
+        "p_total_over": total_over_prob,
+        "p_total_under": total_under_prob,
     }
 
 
@@ -474,6 +569,8 @@ def _source_sim_score(sim_game: dict[str, Any] | None, row: dict[str, str]) -> d
     away_mean = _team_total("away")
     home_mean = _team_total("home")
     total_mean = _safe_float(row.get("total"))
+    if total_mean is not None and total_mean <= 1.0:
+        total_mean = None
     if away_mean is not None and home_mean is not None:
         total_mean = round(away_mean + home_mean, 3)
     margin_mean = None
@@ -531,6 +628,15 @@ def _source_game_from_row(
     sim_game = sim_index.get((away_tri, home_tri))
     props_game = props_index.get((away_tri, home_tri)) if isinstance(props_index.get((away_tri, home_tri)), dict) else {}
     game_id = str(row.get("game_id") or idx)
+    sim_payload = _source_sim_stub(game_id, sim_game, row)
+    score = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
+    betting = _source_betting(
+        {
+            **row,
+            "margin_mean": score.get("margin_mean"),
+            "total_mean": score.get("total_mean"),
+        }
+    )
     return {
         "game_id": game_id,
         "gamePk": game_id,
@@ -546,8 +652,8 @@ def _source_game_from_row(
         "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
         "status": {"detailed": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled"},
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
-        "betting": _source_betting(row),
-        "sim": _source_sim_stub(game_id, sim_game, row),
+        "betting": betting,
+        "sim": sim_payload,
         "prop_recommendations": dict((props_game or {}).get("prop_recommendations") or {"away": [], "home": []}),
         "game_market_recommendations": _source_game_market_recommendations(picks),
         "live_state": None,
@@ -742,8 +848,15 @@ def _game_from_row(
     sim_groups, sim_stats = _sim_table_groups(sim_game, away_tri, home_tri)
     props_groups, prop_items = _props_table_groups(props_game, away_tri, home_tri)
     game_id = str(row.get("game_id") or idx)
-    betting = _source_betting(row)
     sim_payload = _source_sim_stub(game_id, sim_game, row)
+    score = sim_payload.get("score") if isinstance(sim_payload.get("score"), dict) else {}
+    betting = _source_betting(
+        {
+            **row,
+            "margin_mean": score.get("margin_mean"),
+            "total_mean": score.get("total_mean"),
+        }
+    )
     prop_recommendations = dict((props_game or {}).get("prop_recommendations") or {"away": [], "home": []})
     game_market_recommendations = _source_game_market_recommendations(picks)
     return {

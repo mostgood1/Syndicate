@@ -56,6 +56,7 @@ _WNBA_OFFICIAL_LOGO_TEAM_IDS: dict[str, int] = {
     "DAL": 1611661321,
     "GSV": 1611661331,
     "IND": 1611661325,
+    "LA": 1611661320,
     "LAS": 1611661320,
     "LVA": 1611661319,
     "MIN": 1611661324,
@@ -315,7 +316,7 @@ def team_logo_badge(team_code: str):
 def api_source_team_logo(team_id: str):
     official_team_id = _official_wnba_logo_team_id(team_id)
     if official_team_id is None:
-        return Response(status=404)
+        return team_logo_badge(team_id)
     request_obj = Request(
         f"https://cdn.wnba.com/logos/wnba/{official_team_id}/primary/L/logo.svg",
         headers={
@@ -327,9 +328,9 @@ def api_source_team_logo(team_id: str):
         with urlopen(request_obj, timeout=10) as response:
             data = response.read()
     except (HTTPError, URLError, OSError, ValueError):
-        return Response(status=404)
+        return team_logo_badge(team_id)
     if not data:
-        return Response(status=404)
+        return team_logo_badge(team_id)
     output = Response(data, mimetype="image/svg+xml")
     output.headers["Cache-Control"] = "public, max-age=86400"
     return output
@@ -510,7 +511,10 @@ def api_live_state():
     except Exception:
         ttl = 12
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_state_payload(selected_date, ttl=ttl, allow_stored_date_fallback=_allow_stored_date_fallback()))
+    try:
+        return jsonify(build_live_state_payload(selected_date, ttl=ttl, allow_stored_date_fallback=_allow_stored_date_fallback()))
+    except Exception:
+        return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
 
 @wnba_bp.get("/api/live_player_boxscore")
@@ -527,7 +531,10 @@ def api_live_player_boxscore():
     except Exception:
         ttl = 20
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_player_boxscore_payload(selected_date, event_ids, ttl=ttl))
+    try:
+        return jsonify(build_live_player_boxscore_payload(selected_date, event_ids, ttl=ttl))
+    except Exception:
+        return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
 
 @wnba_bp.get("/api/live_player_lens")
@@ -544,7 +551,10 @@ def api_live_player_lens():
     except Exception:
         ttl = 20
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_player_lens_payload(selected_date, event_ids, ttl=ttl))
+    try:
+        return jsonify(build_live_player_lens_payload(selected_date, event_ids, ttl=ttl))
+    except Exception:
+        return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
 
 @wnba_bp.get("/api/live_lines")
@@ -562,7 +572,10 @@ def api_live_lines():
         ttl = 20
     ttl = max(1, min(300, ttl))
     include_period_totals = str(request.args.get("include_period_totals") or "").strip().lower() in {"1", "true", "yes", "on"}
-    return jsonify(build_live_lines_payload(selected_date, event_ids, ttl=ttl, include_period_totals=include_period_totals))
+    try:
+        return jsonify(build_live_lines_payload(selected_date, event_ids, ttl=ttl, include_period_totals=include_period_totals))
+    except Exception:
+        return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "include_period_totals": bool(include_period_totals), "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
 
 @wnba_bp.get("/api/live_pbp_stats")
@@ -579,7 +592,10 @@ def api_live_pbp_stats():
     except Exception:
         ttl = 20
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl))
+    try:
+        return jsonify(build_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl))
+    except Exception:
+        return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
 
 @wnba_bp.get("/api/live_lens_tuning")
