@@ -167,6 +167,94 @@ def _game_metrics(row: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def _coerce_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _first_present(raw: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in raw and raw.get(key) is not None:
+            return raw.get(key)
+    return None
+
+
+def _market_has_signal(market: dict[str, Any]) -> bool:
+    if not isinstance(market, dict):
+        return False
+    return any(
+        market.get(key) is not None
+        for key in ("pick", "line", "selectedLine", "homeLine", "edge", "homeOdds", "awayOdds", "overOdds", "underOdds", "reason")
+    )
+
+
+def _normalize_game_market_entry(raw: dict[str, Any], *, kind: str) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        return {}
+    if kind == "moneyline":
+        out = {
+            "pick": _first_present(raw, ("pick", "selection", "side")),
+            "edge": _coerce_float(_first_present(raw, ("edge", "edgePct", "winEdge"))),
+            "homeOdds": _first_present(raw, ("homeOdds", "home_odds", "homePrice", "home_price", "homeAmerican", "home_american")),
+            "awayOdds": _first_present(raw, ("awayOdds", "away_odds", "awayPrice", "away_price", "awayAmerican", "away_american")),
+            "line": _coerce_float(_first_present(raw, ("line", "price", "ml"))),
+            "reason": _first_present(raw, ("reason", "summary", "note")),
+        }
+    elif kind == "total":
+        out = {
+            "pick": _first_present(raw, ("pick", "selection", "side")),
+            "edge": _coerce_float(_first_present(raw, ("edge", "edgePct", "winEdge"))),
+            "line": _coerce_float(_first_present(raw, ("line", "total", "marketLine"))),
+            "overOdds": _first_present(raw, ("overOdds", "over_odds", "overPrice", "over_price", "overAmerican", "over_american")),
+            "underOdds": _first_present(raw, ("underOdds", "under_odds", "underPrice", "under_price", "underAmerican", "under_american")),
+            "reason": _first_present(raw, ("reason", "summary", "note")),
+        }
+    else:
+        out = {
+            "pick": _first_present(raw, ("pick", "selection", "side")),
+            "edge": _coerce_float(_first_present(raw, ("edge", "edgePct", "winEdge"))),
+            "homeLine": _coerce_float(_first_present(raw, ("homeLine", "line", "spread", "runLine", "run_line"))),
+            "selectedLine": _coerce_float(_first_present(raw, ("selectedLine", "line", "spread", "runLine", "run_line"))),
+            "homeOdds": _first_present(raw, ("homeOdds", "home_odds", "homePrice", "home_price", "homeAmerican", "home_american")),
+            "awayOdds": _first_present(raw, ("awayOdds", "away_odds", "awayPrice", "away_price", "awayAmerican", "away_american")),
+            "reason": _first_present(raw, ("reason", "summary", "note")),
+        }
+    return {key: value for key, value in out.items() if value is not None}
+
+
+def _normalized_game_markets(row: dict[str, Any]) -> dict[str, Any]:
+    raw = row.get("gameMarkets") if isinstance(row.get("gameMarkets"), dict) else {}
+    totals_raw = raw.get("totals") if isinstance(raw.get("totals"), dict) else {}
+    moneyline_raw = raw.get("ml") if isinstance(raw.get("ml"), dict) else {}
+    spread_raw = raw.get("spread") if isinstance(raw.get("spread"), dict) else {}
+    return {
+        "moneyline": _normalize_game_market_entry(moneyline_raw, kind="moneyline"),
+        "spread": _normalize_game_market_entry(spread_raw, kind="spread"),
+        "total": _normalize_game_market_entry(totals_raw, kind="total"),
+    }
+
+
+def _with_market_fallback_lenses(row: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    fallback_markets = _normalized_game_markets(row)
+    lens_rows: list[dict[str, Any]] = []
+    for lens in _lens_rows(row):
+        current = lens.get("markets") if isinstance(lens.get("markets"), dict) else {}
+        merged = {
+            "moneyline": current.get("moneyline") if isinstance(current.get("moneyline"), dict) else {},
+            "spread": current.get("spread") if isinstance(current.get("spread"), dict) else {},
+            "total": current.get("total") if isinstance(current.get("total"), dict) else {},
+        }
+        for key in ("moneyline", "spread", "total"):
+            if not _market_has_signal(merged[key]) and _market_has_signal(fallback_markets.get(key) if isinstance(fallback_markets.get(key), dict) else {}):
+                merged[key] = dict(fallback_markets.get(key) or {})
+        out_lens = dict(lens)
+        out_lens["markets"] = merged
+        lens_rows.append(out_lens)
+    return lens_rows, fallback_markets
+
+
 def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at: str) -> dict[str, Any]:
     matchup = row.get("matchup") if isinstance(row.get("matchup"), dict) else {}
     away = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
@@ -174,10 +262,16 @@ def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at
     status = _structured_status(row, fallback_date=report_date)
     summary = str(matchup.get("liveText") or "Live-lens snapshot loaded from artifact.").strip() or "Live-lens snapshot loaded from artifact."
     live_props = row.get("liveProps") if isinstance(row.get("liveProps"), list) else []
+    lens_rows, fallback_markets = _with_market_fallback_lenses(row)
+    live_lens = _find_lens({"gameLens": lens_rows}, "live") or _find_lens({"gameLens": lens_rows}, "full")
+    top_level_markets = live_lens.get("markets") if isinstance(live_lens.get("markets"), dict) else {}
+    if not any(_market_has_signal(top_level_markets.get(key) if isinstance(top_level_markets.get(key), dict) else {}) for key in ("moneyline", "spread", "total")):
+        top_level_markets = fallback_markets
     return {
         "archivedLiveProps": row.get("archivedLiveProps") if isinstance(row.get("archivedLiveProps"), list) else [],
-        "gameLens": _lens_rows(row),
+        "gameLens": lens_rows,
         "gameMarkets": row.get("gameMarkets") if isinstance(row.get("gameMarkets"), dict) else {},
+        "markets": top_level_markets,
         "gamePk": int(row.get("gamePk") or 0),
         "liveProps": live_props,
         "matchup": matchup,
