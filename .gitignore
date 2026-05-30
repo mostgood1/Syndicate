@@ -26,6 +26,7 @@ reports/refresh_status/*/*/
 data/*_source/data/cache/
 data/*_source/source_artifacts/data/cache/
 data/*_source/source_artifacts/
+data/tmp_*/
 
 # Generated source trees are operational artifacts, not Render deploy inputs.
 data/*_source/data/

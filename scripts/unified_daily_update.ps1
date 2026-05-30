@@ -405,9 +405,7 @@ function Get-ForcedPublishArtifactPaths {
             "data/mlb_source/data/daily/top_props/daily_top_props_${dateSlug}.json",
             "data/mlb_source/data/daily/ops/daily_ops_${dateSlug}.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/lineups.json",
-            "data/mlb_source/data/daily/snapshots/${DateValue}/meta.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/probables.json",
-            "data/mlb_source/data/daily/snapshots/${DateValue}/injuries_raw.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_game_lines_${dateSlug}.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_pitcher_props_${dateSlug}.json",
             "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_hitter_props_${dateSlug}.json",
@@ -579,6 +577,35 @@ function Invoke-GitPublish {
         & git add -A
         if ($LASTEXITCODE -ne 0) {
             throw "git add failed for $RepoPath with exit code $LASTEXITCODE"
+        }
+
+        $defaultExcludeRegexes = @(
+            '^Syndicate\.code-workspace$',
+            '^data/[^/]+_source/manifests/mirror_refresh.*\.json$',
+            '^vendor/[^/]+/data/processed/\.cron_meta\.json$'
+        )
+        $stagedPaths = @(& git diff --cached --name-only --relative)
+        if ($LASTEXITCODE -ne 0) {
+            throw "git diff --cached failed for $RepoPath with exit code $LASTEXITCODE"
+        }
+        foreach ($stagedPath in $stagedPaths) {
+            if ([string]::IsNullOrWhiteSpace($stagedPath)) {
+                continue
+            }
+            $shouldExclude = $false
+            foreach ($excludeRegex in $defaultExcludeRegexes) {
+                if ($stagedPath -match $excludeRegex) {
+                    $shouldExclude = $true
+                    break
+                }
+            }
+            if (-not $shouldExclude) {
+                continue
+            }
+            & git restore --staged -- $stagedPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "git restore --staged failed for $RepoPath path $stagedPath with exit code $LASTEXITCODE"
+            }
         }
 
         foreach ($relativePath in @($ForceIncludePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
