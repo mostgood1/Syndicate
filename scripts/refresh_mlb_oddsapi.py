@@ -223,42 +223,54 @@ def _build_local_live_lens_reports_payload(*, source_root: Path, date_str: str) 
         builder = getattr(source_app, "_live_lens_reports_payload", None)
         if not callable(builder):
             raise RuntimeError("Vendored MLB live-lens payload builder is unavailable")
-        payload = builder(str(date_str), include_archive=False)
+        payload = builder(str(date_str), include_archive=True)
     if not isinstance(payload, dict):
         raise RuntimeError("Vendored MLB live-lens payload builder did not return a JSON object")
     return payload
 
 
 def _write_live_lens_reports_payload(*, source_root: Path, date_str: str, payload: dict[str, object], trigger: str) -> dict[str, object]:
+    report_payload = payload.get("latestReport") if isinstance(payload.get("latestReport"), dict) else payload
+    if not isinstance(report_payload, dict):
+        report_payload = {}
+    counts_payload = report_payload.get("counts") if isinstance(report_payload.get("counts"), dict) else payload.get("counts")
+    performance_payload = report_payload.get("performance") if isinstance(report_payload.get("performance"), dict) else payload.get("performance")
+    games_payload = report_payload.get("games") if isinstance(report_payload.get("games"), list) else payload.get("games")
+
     report_path = _live_lens_report_path(source_root=source_root, date_str=date_str)
     sync_path = source_root / "data" / "live_lens" / "render_sync" / f"live_lens_reports_{_date_slug(date_str)}.json"
     log_path = _live_lens_log_path(source_root=source_root, date_str=date_str)
     registry_path = _live_prop_registry_path(source_root=source_root, date_str=date_str)
     registry_log_path = _live_prop_registry_log_path(source_root=source_root, date_str=date_str)
     observation_path = _live_prop_observation_log_path(source_root=source_root, date_str=date_str)
-    _write_json_file(report_path, payload)
+    _write_json_file(report_path, report_payload)
     _write_json_file(sync_path, payload)
-    if log_path.exists():
-        log_path.unlink()
-    _write_jsonl_line(
-        log_path,
-        {
-            "recordedAt": _local_timestamp_text(),
-            "date": str(date_str),
-            "counts": payload.get("counts") if isinstance(payload.get("counts"), dict) else None,
-            "performance": payload.get("performance") if isinstance(payload.get("performance"), dict) else None,
-            "games": payload.get("games") if isinstance(payload.get("games"), list) else [],
-            "degraded": bool(payload.get("error")),
-        },
-    )
-    _write_json_file(
-        registry_path,
-        {
-            "date": str(date_str),
-            "updatedAt": payload.get("generatedAt") or _local_timestamp_text(),
-            "entries": {},
-        },
-    )
+
+    latest_entry = payload.get("latestEntry") if isinstance(payload.get("latestEntry"), dict) else {}
+    if latest_entry:
+        _write_jsonl_line(log_path, latest_entry)
+    elif not log_path.exists():
+        _write_jsonl_line(
+            log_path,
+            {
+                "recordedAt": _local_timestamp_text(),
+                "date": str(date_str),
+                "counts": counts_payload if isinstance(counts_payload, dict) else None,
+                "performance": performance_payload if isinstance(performance_payload, dict) else None,
+                "games": games_payload if isinstance(games_payload, list) else [],
+                "degraded": bool(payload.get("error") or report_payload.get("error")),
+            },
+        )
+
+    if not registry_path.exists():
+        _write_json_file(
+            registry_path,
+            {
+                "date": str(date_str),
+                "updatedAt": report_payload.get("generatedAt") or _local_timestamp_text(),
+                "entries": {},
+            },
+        )
     registry_log_path.parent.mkdir(parents=True, exist_ok=True)
     if not registry_log_path.exists():
         registry_log_path.write_text("", encoding="utf-8")
@@ -268,8 +280,8 @@ def _write_live_lens_reports_payload(*, source_root: Path, date_str: str, payloa
     meta = {
         "recordedAt": _local_timestamp_text(),
         "date": str(date_str),
-        "counts": payload.get("counts"),
-        "marketsRefreshed": bool(payload.get("games")),
+        "counts": counts_payload if isinstance(counts_payload, dict) else None,
+        "marketsRefreshed": bool(games_payload if isinstance(games_payload, list) else []),
         "reportPath": str(report_path),
         "syncPath": str(sync_path),
         "logPath": str(log_path),
@@ -282,7 +294,7 @@ def _write_live_lens_reports_payload(*, source_root: Path, date_str: str, payloa
     return {
         "ok": True,
         "date": str(date_str),
-        "counts": payload.get("counts"),
+        "counts": counts_payload if isinstance(counts_payload, dict) else None,
         "report": meta,
     }
 
@@ -535,13 +547,24 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
 
 
 def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: str) -> dict[str, object]:
+    def _coerce_report_payload(payload: dict[str, object] | None) -> dict[str, object]:
+        if not isinstance(payload, dict):
+            return {}
+        latest_report = payload.get("latestReport")
+        if isinstance(latest_report, dict):
+            return latest_report
+        return payload
+
     def _payload_is_usable(payload: dict[str, object] | None) -> bool:
         if not isinstance(payload, dict):
             return False
-        if payload.get("error"):
+        report_payload = _coerce_report_payload(payload)
+        if payload.get("error") or report_payload.get("error"):
             return False
-        performance = payload.get("performance")
+        performance = report_payload.get("performance")
         if isinstance(performance, dict) and performance.get("degraded"):
+            return False
+        if not isinstance(report_payload.get("games"), list):
             return False
         return True
 

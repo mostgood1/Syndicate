@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from syndicate.features.mlb.cards import build_cards_page_context
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.ladders_common import format_num
@@ -312,32 +311,16 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
     rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
-    fallback_cards_context: dict[str, Any] = {}
-    fallback_from_cards = False
-    if not games:
-        fallback_cards_context = build_cards_page_context(selected_date)
-        fallback_games = fallback_cards_context.get("games") if isinstance(fallback_cards_context.get("games"), list) else []
-        if fallback_games:
-            games = [game for game in fallback_games if isinstance(game, dict)]
-            fallback_from_cards = True
     using_sample_data = False
-
-    if fallback_from_cards:
-        scoreboard_items = [
-            item
-            for item in (fallback_cards_context.get("scoreboard_items") or [])
-            if isinstance(item, dict)
-        ]
-    else:
-        scoreboard_items = [
-            {
-                "target_id": f"game-{game.get('gamePk')}",
-                "label": f"{((game.get('away') or {}).get('abbr') or 'AWY')} @ {((game.get('home') or {}).get('abbr') or 'HOM')}",
-                "status": game.get("status"),
-            }
-            for game in games
-            if isinstance(game, dict)
-        ]
+    scoreboard_items = [
+        {
+            "target_id": f"game-{game.get('gamePk')}",
+            "label": f"{((game.get('away') or {}).get('abbr') or 'AWY')} @ {((game.get('home') or {}).get('abbr') or 'HOM')}",
+            "status": game.get("status"),
+        }
+        for game in games
+        if isinstance(game, dict)
+    ]
 
     counts = (report or {}).get("counts") if isinstance((report or {}).get("counts"), dict) else {
         "archivedLiveProps": 0,
@@ -347,30 +330,6 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         "pregame": 0,
         "props": 0,
     }
-    if fallback_from_cards:
-        live_count = 0
-        final_count = 0
-        pregame_count = 0
-        for game in games:
-            status = game.get("status")
-            if isinstance(status, dict):
-                status_text = str(status.get("abstract") or status.get("detailed") or "").strip().lower()
-            else:
-                status_text = str(status or game.get("detail") or "").strip().lower()
-            if any(token in status_text for token in ("live", "in progress", "warmup")):
-                live_count += 1
-            elif any(token in status_text for token in ("final", "game over", "completed")):
-                final_count += 1
-            else:
-                pregame_count += 1
-        counts = {
-            "archivedLiveProps": 0,
-            "final": final_count,
-            "games": len(games),
-            "live": live_count,
-            "pregame": pregame_count,
-            "props": 0,
-        }
     data_root = (report or {}).get("dataRoot") or "data"
     live_lens_dir = (report or {}).get("liveLensDir") or "data/live_lens"
     route_path = f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens"
@@ -390,9 +349,9 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         "module_links": build_module_links(selected_date, "Live lens"),
         "games": games,
         "scoreboard_items": scoreboard_items,
-        "source_path": str(fallback_cards_context.get("source_path") or report_path) if fallback_from_cards else str(report_path),
+        "source_path": str(report_path),
         "using_sample_data": using_sample_data,
-        "source_title": "MLB cards fallback lens" if fallback_from_cards else ("MLB live-lens report artifact" if games else "MLB live lens unavailable"),
+        "source_title": "MLB live-lens report artifact" if games else "MLB live lens unavailable",
         "generatedAt": generated_at,
         "counts": counts,
         "app": (report or {}).get("app") if isinstance((report or {}).get("app"), dict) else {},

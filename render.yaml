@@ -22,6 +22,16 @@ services:
         value: detached_subprocess
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
+      - key: MLB_ENABLE_LIVE_LENS_LOOP
+        value: "true"
+      - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
+        value: "true"
+      - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
+        value: "30"
+      - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
+        value: "120"
+      - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
+        value: "30"
 
   - type: cron
     name: syndicate-odds-refresh-live
