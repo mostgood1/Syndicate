@@ -1,0 +1,2 @@
+EXIT_CODE=1
+LOG=reports\daily_update\tmp_wrapper_run_20260530_003226.log
