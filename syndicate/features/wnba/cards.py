@@ -7,8 +7,11 @@ from datetime import timezone
 from functools import lru_cache
 import json
 import math
+import os
 from pathlib import Path
 from typing import Any
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.wnba.sources import available_dates
@@ -115,6 +118,77 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _remote_source_base_url() -> str:
+    for name in (
+        "WNBA_BETTING_BASE_URL",
+        "NBA_BETTING_BASE_URL",
+    ):
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            if "://" not in value:
+                return f"https://{value}".rstrip("/")
+            return value.rstrip("/")
+    return ""
+
+
+def _remote_source_auth_token() -> str:
+    for name in (
+        "WNBA_BETTING_CRON_TOKEN",
+        "WNBA_CRON_TOKEN",
+        "CRON_TOKEN",
+    ):
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _remote_live_snapshot_payload(
+    kind: str,
+    *,
+    selected_date: str,
+    event_ids: list[str] | None = None,
+    include_period_totals: bool = False,
+) -> dict[str, Any] | None:
+    base_url = _remote_source_base_url()
+    if not base_url:
+        return None
+    endpoint_map = {
+        "live_state": "/api/live_state",
+        "live_player_boxscore": "/api/live_player_boxscore",
+        "live_player_lens": "/api/live_player_lens",
+        "live_lines": "/api/live_lines",
+        "live_pbp_stats": "/api/live_pbp_stats",
+    }
+    endpoint = endpoint_map.get(str(kind or "").strip().lower())
+    if not endpoint:
+        return None
+    params: dict[str, str] = {}
+    date_value = str(selected_date or "").strip()
+    if date_value:
+        params["date"] = date_value
+    cleaned_event_ids = [str(item).strip() for item in (event_ids or []) if str(item).strip()]
+    if cleaned_event_ids:
+        params["event_ids"] = ",".join(dict.fromkeys(cleaned_event_ids))
+    if str(kind).strip().lower() == "live_lines":
+        params["include_period_totals"] = "1" if include_period_totals else "0"
+    query = urllib_parse.urlencode(params)
+    url = f"{base_url}{endpoint}{'?' + query if query else ''}"
+
+    headers = {"User-Agent": "Syndicate-WNBA/1.0"}
+    token = _remote_source_auth_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    request = urllib_request.Request(url, headers=headers)
+    try:
+        with urllib_request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _sum_valid(values: list[float | None]) -> float | None:
@@ -1020,6 +1094,10 @@ def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_i
 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+    remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
+    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        return remote_payload
+
     local_payload = _local_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
@@ -1066,6 +1144,14 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
 
 def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    remote_payload = _remote_live_snapshot_payload(
+        "live_player_boxscore",
+        selected_date=selected_date,
+        event_ids=normalized_event_ids,
+    )
+    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        return remote_payload
+
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
@@ -1080,6 +1166,14 @@ def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str],
 
 def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    remote_payload = _remote_live_snapshot_payload(
+        "live_player_lens",
+        selected_date=selected_date,
+        event_ids=normalized_event_ids,
+    )
+    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        return remote_payload
+
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
@@ -1104,6 +1198,15 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
 
 def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int = 20, include_period_totals: bool = False) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    remote_payload = _remote_live_snapshot_payload(
+        "live_lines",
+        selected_date=selected_date,
+        event_ids=normalized_event_ids,
+        include_period_totals=bool(include_period_totals),
+    )
+    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        return remote_payload
+
     local_payload = _filtered_local_live_snapshot_payload("live_lines", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
@@ -1119,6 +1222,14 @@ def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int 
 
 def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    remote_payload = _remote_live_snapshot_payload(
+        "live_pbp_stats",
+        selected_date=selected_date,
+        event_ids=normalized_event_ids,
+    )
+    if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        return remote_payload
+
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return local_payload
