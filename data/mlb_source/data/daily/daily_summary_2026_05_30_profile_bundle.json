@@ -1,7 +1,7 @@
 {
-  "date": "2026-05-29",
+  "date": "2026-05-30",
   "season": 2026,
-  "generated_at": "2026-05-30T00:38:20.045691",
+  "generated_at": "2026-05-30T00:30:58.074936",
   "tool": "tools/daily_update_multi_profile.py",
   "daily_update_tool": "tools\\daily_update.py",
   "python_exe": "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
@@ -23,9 +23,9 @@
     "game_recos": {
       "profile": "game_roi",
       "out_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily",
-      "summary_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_29.json",
-      "sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-05-29",
-      "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-05-29",
+      "summary_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_30.json",
+      "sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-05-30",
+      "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-05-30",
       "extra_args": [
         "--write-derived-artifacts",
         "off",
@@ -33,26 +33,26 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 105.156,
+      "duration_s": 115.849,
       "skipped": false
     },
     "pitcher_props_recos": {
       "profile": "pitcher_props",
       "out_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props",
-      "summary_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\daily_summary_2026_05_29.json",
-      "sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\sims\\2026-05-29",
-      "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-05-29",
+      "summary_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\daily_summary_2026_05_30.json",
+      "sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\sims\\2026-05-30",
+      "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-05-30",
       "extra_args": [],
       "exit_code": 0,
       "skipped": true,
-      "skip_reason": "no pitcher prop market entries in data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_29.json"
+      "skip_reason": "no pitcher prop market entries in data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_30.json"
     },
     "hitter_props_recos": {
       "profile": "hitter_props",
       "out_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props",
-      "summary_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\daily_summary_2026_05_29.json",
-      "sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\sims\\2026-05-29",
-      "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\snapshots\\2026-05-29",
+      "summary_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\daily_summary_2026_05_30.json",
+      "sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\sims\\2026-05-30",
+      "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_hitter_props\\snapshots\\2026-05-30",
       "extra_args": [
         "--bip-roe-rate",
         "0.015",
@@ -65,13 +65,13 @@
       ],
       "exit_code": 0,
       "skipped": true,
-      "skip_reason": "no hitter prop market entries in data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_29.json"
+      "skip_reason": "no hitter prop market entries in data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_30.json"
     }
   },
   "selection_source": "_tmp_best_set_selection_holdout13.json",
   "best_selection": null,
   "official_locked_policy": {
-    "card_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_29_locked_policy.json",
+    "card_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_30_locked_policy.json",
     "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
     "caps": {
       "totals": 0,
@@ -133,9 +133,9 @@
       }
     },
     "warnings": [
-      "Missing game lines: data\\market\\oddsapi\\oddsapi_game_lines_2026_05_29.json",
-      "Missing pitcher lines: data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_29.json",
-      "Missing hitter lines: data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_29.json",
+      "Missing game lines: data\\market\\oddsapi\\oddsapi_game_lines_2026_05_30.json",
+      "Missing pitcher lines: data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_30.json",
+      "Missing hitter lines: data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_30.json",
       "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet."
     ],
     "explanation_diagnostics": {
@@ -550,25 +550,25 @@
     "error": null
   },
   "hr_targets": {
-    "artifact_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_29_hr_targets.json",
+    "artifact_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_30_hr_targets.json",
     "games": 15,
     "rows": 30,
     "policy_preset": "default",
     "error": null
   },
   "rfi_targets": {
-    "artifact_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_29_rfi_targets.json",
-    "games": 2,
-    "rows": 2,
+    "artifact_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_05_30_rfi_targets.json",
+    "games": 0,
+    "rows": 0,
     "locked": true,
     "error": null
   },
   "timings": {
     "profiles": {
-      "game_recos": 105.156
+      "game_recos": 115.849
     },
-    "locked_policy_s": 0.302,
-    "total_s": 105.917
+    "locked_policy_s": 0.51,
+    "total_s": 116.965
   },
   "failures": [],
   "failures_n": 0

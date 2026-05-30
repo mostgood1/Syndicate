@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-30T00:36:18.824156",
-  "date": "2026-05-29",
+  "generated_at": "2026-05-30T00:28:36.780316",
+  "date": "2026-05-30",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
-    "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-29_b85891982dad.lock",
-    "pid": 8496,
-    "created_at": "2026-05-30T00:36:18.820933"
+    "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-30_b85891982dad.lock",
+    "pid": 15572,
+    "created_at": "2026-05-30T00:28:36.778185"
   },
   "seed": {
     "value": 1337,
@@ -16,51 +16,51 @@
     "explicit_cli": false
   },
   "prior_day": {
-    "date": "2026-05-28",
+    "date": "2026-05-29",
     "season": 2026,
-    "eval_report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-05-28.json",
-    "top_props_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_28.json",
+    "eval_report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-05-29.json",
+    "top_props_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_29.json",
     "live_lens": {
-      "status": "skipped",
-      "source": null,
-      "sync_out_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/render_sync/live_lens_reports_2026_05_28.json",
-      "headline": null
+      "status": "ok",
+      "source": "local_files",
+      "sync_out_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/render_sync/live_lens_reports_2026_05_29.json",
+      "headline": "No prior-day live-lens activity found for 2026-05-29."
     }
   },
   "current_day": {
-    "date": "2026-05-29",
+    "date": "2026-05-30",
     "season": 2026,
     "out_game": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily",
     "out_pitcher": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily_pitcher_props",
     "out_hitter": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily_hitter_props",
-    "summary_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29.json",
-    "profile_bundle_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_profile_bundle.json",
-    "locked_policy_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_locked_policy.json",
-    "top_props_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_29.json",
+    "summary_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30.json",
+    "profile_bundle_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_profile_bundle.json",
+    "locked_policy_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_locked_policy.json",
+    "top_props_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_30.json",
     "season_frontend_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend",
-    "season_manifest_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_manifest_2026_2026_05_29.json",
-    "season_day_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_day_2026_2026_05_29_retuned.json",
-    "season_betting_day_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_betting_day_2026_2026_05_29_retuned.json",
-    "season_official_betting_day_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_official_betting_day_2026_2026_05_29_retuned.json"
+    "season_manifest_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_manifest_2026_2026_05_30.json",
+    "season_day_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_day_2026_2026_05_30_retuned.json",
+    "season_betting_day_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_betting_day_2026_2026_05_30_retuned.json",
+    "season_official_betting_day_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_official_betting_day_2026_2026_05_30_retuned.json"
   },
   "stages": {
     "prior_day_feed_live_refresh": {
       "status": "ok",
-      "date": "2026-05-28",
+      "date": "2026-05-29",
       "season": 2026,
-      "games_scheduled": 6,
-      "regular_season_games_scheduled": 6,
-      "games_written": 6,
+      "games_scheduled": 15,
+      "regular_season_games_scheduled": 15,
+      "games_written": 15,
       "errors": [],
       "error_count": 0,
-      "out_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-05-28",
+      "out_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/raw/statsapi/feed_live/2026/2026-05-29",
       "pbp_source": "statsapi_feed_live"
     },
     "prior_day_card_settlement": {
       "status": "ok",
-      "date": "2026-05-28",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_28_locked_policy.json",
-      "settlement_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/settlements/daily_summary_2026_05_28_locked_policy_settlement.json",
+      "date": "2026-05-29",
+      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_locked_policy.json",
+      "settlement_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/settlements/daily_summary_2026_05_29_locked_policy_settlement.json",
       "selected_counts": {
         "totals": 0,
         "ml": 0,
@@ -135,22 +135,48 @@
       "all_unresolved_n": 0
     },
     "prior_day_live_lens": {
-      "status": "skipped",
-      "date": "2026-05-28",
+      "status": "ok",
+      "date": "2026-05-29",
       "sync_requested": true,
-      "sync_out_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/render_sync/live_lens_reports_2026_05_28.json",
-      "local_report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_05_28.json",
-      "local_registry_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_28.json",
+      "sync_out_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/render_sync/live_lens_reports_2026_05_29.json",
+      "local_report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_05_29.json",
+      "local_registry_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_29.json",
       "render_base_url": "",
       "reason": "live-lens sync requested but Render base URL or cron token is unavailable",
       "missing_credentials": [
         "live_lens_base_url",
         "live_lens_cron_token"
-      ]
+      ],
+      "used_local_report": true,
+      "source": "local_files",
+      "used_local_registry": true,
+      "registry_summary": {
+        "date": "2026-05-29",
+        "updatedAt": "2026-05-30T00:24:17-05:00",
+        "totalEntries": 0,
+        "uniqueGames": 0,
+        "uniqueOwners": 0,
+        "settledEntries": 0,
+        "resultCounts": {
+          "win": 0,
+          "loss": 0,
+          "push": 0,
+          "pending": 0
+        },
+        "byProp": {},
+        "bySelection": {},
+        "topStable": [],
+        "topEdges": []
+      },
+      "readout": {
+        "headline": "No prior-day live-lens activity found for 2026-05-29.",
+        "learnings": [],
+        "performance": []
+      }
     },
     "live_pitcher_corrections": {
       "status": "skipped",
-      "max_date": "2026-05-28",
+      "max_date": "2026-05-29",
       "artifacts": {},
       "render_base_url": "",
       "reason": "live pitcher correction refresh requested but Render base URL or cron token is unavailable",
@@ -161,18 +187,18 @@
     },
     "prior_day_eval_report": {
       "status": "warning",
-      "date": "2026-05-28",
+      "date": "2026-05-29",
       "batch_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-05-28.json",
+      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-05-29.json",
       "command": [
         "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2\\tools\\eval\\reconcile_daily_sim_artifacts.py",
         "--date",
-        "2026-05-28",
+        "2026-05-29",
         "--season",
         "2026",
         "--out",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\eval\\batches\\season_2026_ui_daily_live\\sim_vs_actual_2026-05-28.json",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\eval\\batches\\season_2026_ui_daily_live\\sim_vs_actual_2026-05-29.json",
         "--prop-lines-source",
         "auto",
         "--hitter-hr-prob-calibration",
@@ -191,83 +217,81 @@
     },
     "prior_day_top_props_artifact": {
       "status": "ok",
-      "date": "2026-05-28",
-      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_28.json",
+      "date": "2026-05-29",
+      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_29.json",
       "group_summaries": {
         "pitcher": {
           "found": true,
-          "candidateCount": 30,
-          "displayedCount": 30,
+          "candidateCount": 52,
+          "displayedCount": 52,
           "sectionCount": 5
         },
         "hitter": {
           "found": true,
-          "candidateCount": 406,
-          "displayedCount": 406,
+          "candidateCount": 1171,
+          "displayedCount": 1171,
           "sectionCount": 7
         }
       }
     },
     "current_day_oddsapi": {
-      "status": "warning",
-      "date": "2026-05-29",
+      "status": "ok",
+      "date": "2026-05-30",
       "mode": "live",
       "out_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi",
-      "game_lines_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_05_29.json",
-      "pitcher_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_29.json",
-      "hitter_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_29.json",
+      "game_lines_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_05_30.json",
+      "pitcher_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_05_30.json",
+      "hitter_props_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_05_30.json",
       "counts": {
         "game_lines": {
-          "events_matched": 1,
-          "games": 1,
-          "h2h_games": 1,
-          "totals_games": 1,
-          "spreads_games": 1
+          "events_matched": 15,
+          "games": 15,
+          "h2h_games": 15,
+          "totals_games": 15,
+          "spreads_games": 15
         },
         "pitcher_props": {
-          "players": 8,
+          "players": 30,
           "markets": {
-            "earned_runs": 6,
-            "hits_allowed": 8,
-            "outs": 8,
-            "strikeouts": 8,
-            "walks_allowed": 7
+            "earned_runs": 15,
+            "hits_allowed": 14,
+            "outs": 21,
+            "strikeouts": 30
           },
-          "events_matched": 13
+          "events_matched": 15
         },
         "hitter_props": {
-          "players": 4,
+          "players": 229,
           "markets": {
-            "batter_home_runs": 4
+            "batter_hits": 151,
+            "batter_hits_runs_rbis": 14,
+            "batter_home_runs": 212,
+            "batter_rbis": 15,
+            "batter_total_bases": 68
           },
-          "events_matched": 1
+          "events_matched": 15
         }
-      },
-      "warnings": [
-        "preserved existing game lines for 2026-05-29 because live refresh returned no matched events",
-        "preserved existing pitcher props for 2026-05-29 because live refresh returned no player props",
-        "preserved existing hitter props for 2026-05-29 because live refresh returned no player props"
-      ]
+      }
     },
     "current_day_overwrite_prep": {
       "status": "ok",
-      "date": "2026-05-29",
+      "date": "2026-05-30",
       "removed": [
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_profile_bundle.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_locked_policy.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_hr_targets.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-05-29",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-29",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_29.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladders_2026_05_29.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladder_audit_2026_05_29.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_manifest_2026_2026_05_29.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_day_2026_2026_05_29_retuned.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_betting_day_2026_2026_05_29_retuned.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_official_betting_day_2026_2026_05_29_retuned.json",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily_pitcher_props/snapshots/2026-05-29",
-        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily_hitter_props/snapshots/2026-05-29"
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_profile_bundle.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_locked_policy.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_hr_targets.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-05-30",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-30",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_30.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladders_2026_05_30.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladder_audit_2026_05_30.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_manifest_2026_2026_05_30.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_day_2026_2026_05_30_retuned.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_betting_day_2026_2026_05_30_retuned.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_official_betting_day_2026_2026_05_30_retuned.json",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily_pitcher_props/snapshots/2026-05-30",
+        "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily_hitter_props/snapshots/2026-05-30"
       ],
       "removed_count": 15
     },
@@ -277,7 +301,7 @@
         "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
         "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2\\tools\\daily_update_multi_profile.py",
         "--date",
-        "2026-05-29",
+        "2026-05-30",
         "--season",
         "2026",
         "--python-exe",
@@ -306,9 +330,9 @@
         "source": "default_fixed",
         "explicit_cli": false
       },
-      "summary_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29.json",
-      "profile_bundle_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_profile_bundle.json",
-      "locked_policy_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_locked_policy.json",
+      "summary_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30.json",
+      "profile_bundle_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_profile_bundle.json",
+      "locked_policy_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_locked_policy.json",
       "exit_code": 0,
       "summary_exists": true,
       "profile_bundle_exists": true,
@@ -722,12 +746,12 @@
         },
         "sparse_support_examples": []
       },
-      "hr_targets_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_hr_targets.json",
+      "hr_targets_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_hr_targets.json",
       "hr_targets_artifact_exists": true,
       "hr_targets_rows": 30,
-      "rfi_targets_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_29_rfi_targets.json",
+      "rfi_targets_artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_rfi_targets.json",
       "rfi_targets_artifact_exists": true,
-      "rfi_targets_rows": 2
+      "rfi_targets_rows": 0
     },
     "hr_target_history_reconcile": {
       "status": "ok",
@@ -751,27 +775,27 @@
     },
     "current_day_top_props_artifact": {
       "status": "ok",
-      "date": "2026-05-29",
-      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_29.json",
+      "date": "2026-05-30",
+      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_2026_05_30.json",
       "group_summaries": {
         "pitcher": {
           "found": true,
-          "candidateCount": 52,
-          "displayedCount": 52,
+          "candidateCount": 80,
+          "displayedCount": 80,
           "sectionCount": 5
         },
         "hitter": {
           "found": true,
-          "candidateCount": 1171,
-          "displayedCount": 1171,
+          "candidateCount": 460,
+          "displayedCount": 460,
           "sectionCount": 7
         }
       }
     },
     "current_day_ladders_artifact": {
       "status": "ok",
-      "date": "2026-05-29",
-      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladders_2026_05_29.json",
+      "date": "2026-05-30",
+      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladders_2026_05_30.json",
       "group_summaries": {
         "pitcher": {
           "strikeouts": {
@@ -866,37 +890,32 @@
     },
     "current_day_ladder_audit_artifact": {
       "status": "ok",
-      "date": "2026-05-29",
-      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladder_audit_2026_05_29.json",
+      "date": "2026-05-30",
+      "artifact_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/ladders/daily_ladder_audit_2026_05_30.json",
       "summary": {
         "cards": 15,
-        "badges": 46,
+        "badges": 65,
         "sources": {
-          "none": 46
+          "none": 65
         },
         "tones": {
-          "strong": 16,
-          "solid": 22,
-          "soft": 8
+          "solid": 30,
+          "soft": 14,
+          "strong": 21
         },
         "stats": {
           "hits_allowed": {
-            "badges": 12,
+            "badges": 14,
             "rungWins": 0,
             "rungLosses": 0
           },
           "outs": {
-            "badges": 12,
+            "badges": 21,
             "rungWins": 0,
             "rungLosses": 0
           },
           "strikeouts": {
-            "badges": 12,
-            "rungWins": 0,
-            "rungLosses": 0
-          },
-          "walks_allowed": {
-            "badges": 10,
+            "badges": 30,
             "rungWins": 0,
             "rungLosses": 0
           }
@@ -914,30 +933,30 @@
     },
     "current_day_season_frontend_artifacts": {
       "status": "ok",
-      "date": "2026-05-29",
+      "date": "2026-05-30",
       "dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend",
       "profile": "retuned",
       "artifacts": {
         "season_manifest": {
-          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_manifest_2026_2026_05_29.json",
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_manifest_2026_2026_05_30.json",
           "found": true,
           "error": null,
           "exists": true
         },
         "season_day": {
-          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_day_2026_2026_05_29_retuned.json",
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_day_2026_2026_05_30_retuned.json",
           "found": true,
           "error": null,
           "exists": true
         },
         "season_betting_day": {
-          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_betting_day_2026_2026_05_29_retuned.json",
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_betting_day_2026_2026_05_30_retuned.json",
           "found": true,
           "error": null,
           "exists": true
         },
         "season_official_betting_day": {
-          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_official_betting_day_2026_2026_05_29_retuned.json",
+          "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/season_frontend/season_official_betting_day_2026_2026_05_30_retuned.json",
           "found": true,
           "error": null,
           "exists": true
@@ -946,7 +965,7 @@
     },
     "next_day_forward_build": {
       "status": "ok",
-      "date": "2026-05-30",
+      "date": "2026-05-31",
       "season": 2026,
       "command": [
         "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
@@ -954,11 +973,11 @@
         "--workflow",
         "ui-daily",
         "--date",
-        "2026-05-30",
+        "2026-05-31",
         "--season",
         "2026",
         "--reconcile-date",
-        "2026-05-29",
+        "2026-05-30",
         "--refresh-prior-feed-live",
         "off",
         "--settle-prior-card",
@@ -988,25 +1007,25 @@
     },
     "current_day_roster_snapshot": {
       "status": "ok",
-      "snapshot_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-29",
-      "team_rosters_raw": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-29/team_rosters_raw.json",
-      "injuries_raw": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-29/injuries_raw.json",
-      "roster_events": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-29/roster_events.json",
+      "snapshot_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-30",
+      "team_rosters_raw": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-30/team_rosters_raw.json",
+      "injuries_raw": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-30/injuries_raw.json",
+      "roster_events": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-30/roster_events.json",
       "lineups_last_known": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/lineups_last_known_by_team.json"
     },
     "current_day_batting_lineups": {
       "status": "ok",
-      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-29/lineups.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-30/lineups.json",
       "games": 15,
       "summary": {
         "games": 15,
-        "projected_teams": 0,
+        "projected_teams": 30,
         "adjusted_teams": 0,
         "partial_teams": 0,
         "fallback_pool_teams": 0,
-        "confirmed_teams": 30,
-        "projected_only_teams": 0,
-        "confirmed_only_teams": 30,
+        "confirmed_teams": 0,
+        "projected_only_teams": 30,
+        "confirmed_only_teams": 0,
         "comparable_teams": 0,
         "exact_match_teams": 0,
         "true_mismatch_teams": 0
@@ -1017,12 +1036,12 @@
     },
     "current_day_probable_pitchers": {
       "status": "ok",
-      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-29/probables.json",
+      "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-05-30/probables.json",
       "games": 15
     },
     "render_frontend_validation": {
       "status": "skipped",
-      "date": "2026-05-29",
+      "date": "2026-05-30",
       "season": 2026,
       "reason": "validate_render_frontend=off"
     }
@@ -1031,13 +1050,13 @@
     "current-day official betting card day artifact has no selected rows yet"
   ],
   "warnings": [
-    "prior-day eval report refresh failed for 2026-05-28: exit 1; continuing without season manifest publish"
+    "prior-day eval report refresh failed for 2026-05-29: exit 1; continuing without season manifest publish"
   ],
   "validation_errors": [],
   "errors": [],
   "next_day": {
     "requested": true,
-    "date": "2026-05-30",
+    "date": "2026-05-31",
     "season": 2026
   },
   "git_push": {
@@ -1047,21 +1066,21 @@
     "phases": [
       {
         "phase": "prior_day",
-        "label": "prior-day reconciliation outputs for 2026-05-28",
+        "label": "prior-day reconciliation outputs for 2026-05-29",
         "requested": false,
         "status": "skipped",
         "reason": "git_push=off"
       },
       {
         "phase": "current_day",
-        "label": "current-day artifacts for 2026-05-29",
+        "label": "current-day artifacts for 2026-05-30",
         "requested": false,
         "status": "skipped",
         "reason": "git_push=off"
       },
       {
         "phase": "next_day",
-        "label": "next-day forward outputs for 2026-05-30",
+        "label": "next-day forward outputs for 2026-05-31",
         "requested": false,
         "status": "skipped",
         "reason": "git_push=off"

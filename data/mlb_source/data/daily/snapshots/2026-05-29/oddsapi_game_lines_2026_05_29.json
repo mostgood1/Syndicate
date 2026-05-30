@@ -1,7 +1,7 @@
 {
   "date": "2026-05-29",
   "mode": "live",
-  "retrieved_at": "2026-05-30T05:13:39.411786",
+  "retrieved_at": "2026-05-30T05:32:42.557530",
   "games": [
     {
       "event_id": "bc8152dee5f6a9c85e452cc78f0747e4",
@@ -11,19 +11,19 @@
       "bookmaker": "fanduel",
       "markets": {
         "h2h": {
-          "home_odds": "+102",
-          "away_odds": "-130"
+          "home_odds": "-215",
+          "away_odds": "+164"
         },
         "spreads": {
-          "home_line": 1.5,
-          "home_odds": "-490",
-          "away_line": -1.5,
-          "away_odds": "+320"
+          "home_line": -1.5,
+          "home_odds": "+450",
+          "away_line": 1.5,
+          "away_odds": "-800"
         },
         "totals": {
           "line": 13.5,
-          "over_odds": "-146",
-          "under_odds": "+110"
+          "over_odds": "+116",
+          "under_odds": "-154"
         }
       }
     }
