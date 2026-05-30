@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-05-30T10:51:15-05:00",
+    "generated_at": "2026-05-30T13:25:54-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -147,8 +147,8 @@
       "start_time": "1:10 PM",
       "official_date": "2026-05-30",
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "In Progress"
       },
       "away": {
         "id": 116,
@@ -235,7 +235,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 135,
@@ -322,7 +322,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 118,
@@ -409,7 +409,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 142,
@@ -496,7 +496,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 141,
@@ -583,7 +583,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 108,
@@ -670,7 +670,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 146,
@@ -757,7 +757,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 158,
@@ -844,7 +844,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 111,
@@ -1018,7 +1018,7 @@
       "official_date": "2026-05-30",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 144,
