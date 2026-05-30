@@ -136,12 +136,13 @@ function Invoke-Step {
         $pollIntervalMs = 15000
         while (-not $process.WaitForExit($pollIntervalMs)) {
             $elapsed = (Get-Date) - $process.StartTime
-            Write-Host ("    ... still running ({0:hh\\:mm\\:ss})" -f $elapsed) -ForegroundColor DarkGray
+            Write-Host ("    ... still running ({0}s)" -f [int]$elapsed.TotalSeconds) -ForegroundColor DarkGray
         }
 
         $LASTEXITCODE = $process.ExitCode
         if ($process.ExitCode -ne 0) {
-            throw "$Name failed with exit code $($process.ExitCode)"
+            $exitCodeText = if ($null -eq $process.ExitCode) { 'unknown' } else { [string]$process.ExitCode }
+            throw "$Name failed with exit code $exitCodeText"
         }
     }
     finally {
@@ -156,6 +157,61 @@ function Invoke-Step {
         }
         Pop-Location
     }
+}
+
+function Test-ProcessIdRunning {
+    param([int]$ProcessId)
+
+    if ($ProcessId -le 0) {
+        return $false
+    }
+
+    return [bool](Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+}
+
+function Clear-StaleMlbUiDailyLocks {
+    param(
+        [string]$MlbDataRoot,
+        [string]$DateValue,
+        [string]$SeasonValue
+    )
+
+    if ([string]::IsNullOrWhiteSpace($MlbDataRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($SeasonValue)) {
+        return 0
+    }
+
+    $lockDir = Join-Path $MlbDataRoot 'runtime\locks'
+    if (-not (Test-Path $lockDir)) {
+        return 0
+    }
+
+    $removedCount = 0
+    $pattern = "daily_update_ui-daily_{0}_{1}_*.lock" -f $SeasonValue, $DateValue
+    foreach ($lockFile in @(Get-ChildItem -Path $lockDir -File -Filter $pattern -ErrorAction SilentlyContinue)) {
+        $lockPid = $null
+        try {
+            $lockPayload = Get-Content -Path $lockFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if ($null -ne $lockPayload.pid) {
+                $lockPid = [int]$lockPayload.pid
+            }
+        }
+        catch {
+            $lockPid = $null
+        }
+
+        if ($null -ne $lockPid -and (Test-ProcessIdRunning -ProcessId $lockPid)) {
+            Write-Host ("    lock active (pid {0}) at {1}" -f $lockPid, $lockFile.FullName) -ForegroundColor DarkGray
+            continue
+        }
+
+        Remove-Item -Path $lockFile.FullName -Force -ErrorAction SilentlyContinue
+        if (-not (Test-Path $lockFile.FullName)) {
+            Write-Host ("    removed stale lock: {0}" -f $lockFile.Name) -ForegroundColor Yellow
+            $removedCount += 1
+        }
+    }
+
+    return $removedCount
 }
 
 function Test-PythonExecutable {
@@ -978,6 +1034,11 @@ try {
     if (-not $SkipSourceUpdates) {
         foreach ($step in $sourceSteps) {
             $startedAt = (Get-Date).ToString('o')
+            $isMlbVendoredStep = ($step.Sport -eq 'mlb' -and $step.Workflow -eq 'vendored_daily_update')
+            $mlbDataRootForStep = $null
+            if ($isMlbVendoredStep -and $step.EnvironmentOverrides -and $step.EnvironmentOverrides.ContainsKey('MLB_BETTING_DATA_ROOT')) {
+                $mlbDataRootForStep = [string]$step.EnvironmentOverrides.MLB_BETTING_DATA_ROOT
+            }
             $sportRun = [ordered]@{
                 sport = $step.Sport
                 workflow = $step.Workflow
@@ -992,17 +1053,38 @@ try {
                 mirrorManifestPath = (Get-MirrorManifestPath -Sport $step.Sport -DateValue $Date)
                 mirrorManifestExists = $false
             }
+
+            if (-not $DryRun -and $isMlbVendoredStep) {
+                $preRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
+                if ($preRemovedLocks -gt 0) {
+                    Write-Host ("    cleaned stale MLB ui-daily locks before run: {0}" -f $preRemovedLocks) -ForegroundColor Yellow
+                }
+            }
+
+            $stepSucceeded = $false
             try {
                 Invoke-Step -Name $step.Name -Command $step.Command -WorkingDirectory $step.WorkingDirectory -EnvironmentOverrides $step.EnvironmentOverrides
-                $sportRun.status = if ($DryRun) { 'dry_run' } else { 'ok' }
+                $stepSucceeded = $true
             }
             catch {
-                $sportRun.status = 'error'
-                $sportRun.error = $_.Exception.Message
-                $sportRun.completedAt = (Get-Date).ToString('o')
-                $runManifest.sportRuns += @([pscustomobject]$sportRun)
-                throw
+                if (-not $DryRun -and $isMlbVendoredStep) {
+                    $retryRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
+                    if ($retryRemovedLocks -gt 0) {
+                        Write-Host '    retrying MLB vendored daily update after stale-lock cleanup' -ForegroundColor Yellow
+                        Invoke-Step -Name $step.Name -Command $step.Command -WorkingDirectory $step.WorkingDirectory -EnvironmentOverrides $step.EnvironmentOverrides
+                        $stepSucceeded = $true
+                    }
+                }
+
+                if (-not $stepSucceeded) {
+                    $sportRun.status = 'error'
+                    $sportRun.error = $_.Exception.Message
+                    $sportRun.completedAt = (Get-Date).ToString('o')
+                    $runManifest.sportRuns += @([pscustomobject]$sportRun)
+                    throw
+                }
             }
+            $sportRun.status = if ($DryRun) { 'dry_run' } else { 'ok' }
             $sportRun.completedAt = (Get-Date).ToString('o')
             $runManifest.sportRuns += @([pscustomobject]$sportRun)
 
