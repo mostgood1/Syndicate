@@ -81,6 +81,72 @@ def _load_schedule(season: str) -> pd.DataFrame:
     for candidate in _schedule_file_candidates(season):
         if candidate.exists():
             return pd.read_csv(candidate)
+    games_path = paths.data_raw / "games_nba_api.csv"
+    if games_path.exists():
+        try:
+            games = pd.read_csv(games_path)
+            required_columns = {"date", "home_team", "visitor_team", "game_id"}
+            if games is not None and not games.empty and required_columns.issubset(set(games.columns)):
+                out = games.copy()
+                out = out[out["game_id"].astype(str).str.startswith("002")].copy()
+                if not out.empty:
+                    out["game_id"] = out["game_id"].astype(str)
+                    date_values = pd.to_datetime(out["date"], errors="coerce")
+                    out["date_est"] = date_values.dt.date.astype(str)
+                    out["season_year"] = date_values.dt.year.astype("Int64").map(lambda value: f"{int(value)}-{str(int(value) + 1)[-2:]}" if pd.notna(value) else None)
+                    out["game_label"] = "Regular Season"
+                    out["game_subtype"] = None
+                    out["game_status"] = None
+                    out["game_status_text"] = None
+                    out["date_utc"] = None
+                    out["time_utc"] = None
+                    out["datetime_utc"] = None
+                    out["time_est"] = None
+                    out["datetime_est"] = None
+                    out["home_team_id"] = None
+                    out["home_tricode"] = None
+                    out["home_city"] = None
+                    out["home_name"] = None
+                    out["away_team_id"] = None
+                    out["away_tricode"] = None
+                    out["away_city"] = None
+                    out["away_name"] = None
+                    out["arena_name"] = None
+                    out["arena_city"] = None
+                    out["arena_state"] = None
+                    out["broadcasters_national"] = None
+                    out = out[[
+                        "game_id",
+                        "season_year",
+                        "game_label",
+                        "game_subtype",
+                        "game_status",
+                        "game_status_text",
+                        "date_utc",
+                        "time_utc",
+                        "datetime_utc",
+                        "date_est",
+                        "time_est",
+                        "datetime_est",
+                        "home_team_id",
+                        "home_tricode",
+                        "home_city",
+                        "home_name",
+                        "away_team_id",
+                        "away_tricode",
+                        "away_city",
+                        "away_name",
+                        "arena_name",
+                        "arena_city",
+                        "arena_state",
+                        "broadcasters_national",
+                    ]]
+                    out_path = _schedule_file_candidates(season)[0]
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out.to_csv(out_path, index=False)
+                    return out
+        except Exception:
+            pass
     df = fetch_schedule_2025_26()
     out_path = _schedule_file_candidates(season)[0]
     out_path.parent.mkdir(parents=True, exist_ok=True)

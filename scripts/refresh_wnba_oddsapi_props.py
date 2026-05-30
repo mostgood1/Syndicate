@@ -1746,6 +1746,170 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
     return False, "player_logs missing and no local fetch fallback is available"
 
 
+def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: str, log_file: Path, heartbeat_cb: callable) -> tuple[bool, str | None]:
+    processed_root = source_root / "data" / "processed"
+    pred_path = processed_root / f"predictions_{date_str}.csv"
+    if pred_path.exists() and pred_path.is_file() and _count_csv_rows_quick(pred_path) > 0:
+        if _repair_predictions_slate_from_game_odds_if_needed(processed_root=processed_root, date_str=date_str, log_file=log_file):
+            return True, None
+
+    fallback_candidates = [
+        processed_root / f"games_predictions_npu_{date_str}.csv",
+        source_root / f"predictions_{date_str}.csv",
+        source_root / "data" / "processed" / f"games_predictions_npu_{date_str}.csv",
+    ]
+    for candidate in fallback_candidates:
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        try:
+            if candidate.resolve() != pred_path.resolve():
+                pred_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(candidate, pred_path)
+        except Exception:
+            pass
+        if pred_path.exists() and pred_path.is_file() and _count_csv_rows_quick(pred_path) > 0:
+            _repair_predictions_slate_from_game_odds_if_needed(processed_root=processed_root, date_str=date_str, log_file=log_file)
+            _append_log(log_file, f"Using existing game predictions artifact: {pred_path}")
+            return True, None
+
+    _append_log(log_file, f"Generating required game predictions artifact via source bootstrap: {pred_path}")
+    bootstrap_result = _ensure_source_game_inputs(
+        source_root=source_root,
+        package_name="wnba_betting",
+        date_str=date_str,
+        log_file=log_file,
+        heartbeat_cb=heartbeat_cb,
+    )
+    repo_pred_path = source_root / f"predictions_{date_str}.csv"
+    if (not pred_path.exists() or _count_csv_rows_quick(pred_path) <= 0) and repo_pred_path.exists() and repo_pred_path.is_file():
+        try:
+            pred_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(repo_pred_path, pred_path)
+        except Exception:
+            pass
+    _repair_predictions_slate_from_game_odds_if_needed(processed_root=processed_root, date_str=date_str, log_file=log_file)
+    if _count_csv_rows_quick(pred_path) <= 0:
+        return False, f"source bootstrap did not produce {pred_path.name} (rc={bootstrap_result.get('predict_date')})"
+    _append_log(log_file, f"Generated game predictions at {pred_path} (rows={_count_csv_rows_quick(pred_path)})")
+    return True, None
+
+
+def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, date_str: str, log_file: Path) -> bool:
+    import pandas as pd
+
+    pred_path = processed_root / f"predictions_{date_str}.csv"
+    game_odds_path = processed_root / f"game_odds_{date_str}.csv"
+    props_snapshot_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
+    if not pred_path.exists() or not pred_path.is_file() or _count_csv_rows_quick(pred_path) <= 0:
+        return False
+
+    try:
+        pred_df = pd.read_csv(pred_path)
+        odds_df = pd.read_csv(game_odds_path) if (game_odds_path.exists() and game_odds_path.is_file() and _count_csv_rows_quick(game_odds_path) > 0) else pd.DataFrame()
+        props_df = pd.read_csv(props_snapshot_path) if (props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0) else pd.DataFrame()
+    except Exception:
+        return True
+    if pred_df is None or pred_df.empty:
+        return True
+
+    def _norm_pair(home_val: object, away_val: object) -> tuple[str, str]:
+        return (str(home_val or "").strip().upper(), str(away_val or "").strip().upper())
+
+    if "date" in odds_df.columns and not odds_df.empty:
+        odds_df = odds_df.copy()
+        odds_df["date"] = pd.to_datetime(odds_df["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+        odds_df = odds_df[odds_df["date"] == str(date_str)].copy()
+    odds_pairs = {
+        _norm_pair(row.get("home_team"), row.get("visitor_team"))
+        for _, row in odds_df.iterrows()
+        if str(row.get("home_team") or "").strip() and str(row.get("visitor_team") or "").strip()
+    }
+
+    props_pairs = {
+        _norm_pair(row.get("home_team"), row.get("away_team"))
+        for _, row in props_df.iterrows()
+        if str(row.get("home_team") or "").strip() and str(row.get("away_team") or "").strip()
+    }
+
+    pred_work = pred_df.copy()
+    if "date" in pred_work.columns:
+        pred_work["date"] = pd.to_datetime(pred_work["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+        pred_work = pred_work[pred_work["date"] == str(date_str)].copy()
+    pred_pairs = {
+        _norm_pair(row.get("home_team"), row.get("visitor_team"))
+        for _, row in pred_work.iterrows()
+        if str(row.get("home_team") or "").strip() and str(row.get("visitor_team") or "").strip()
+    }
+    target_pairs = props_pairs or odds_pairs
+    if not target_pairs:
+        return True
+    if pred_pairs & target_pairs:
+        return True
+
+    # Rebuild a minimal predictions slate from local props snapshot/game odds when existing predictions are cross-league.
+    if not props_df.empty:
+        rebuild = props_df[[column for column in ["home_team", "away_team", "commence_time"] if column in props_df.columns]].copy()
+        rebuild = rebuild.rename(columns={"away_team": "visitor_team"})
+        rebuild["date"] = str(date_str)
+        rebuild = rebuild.drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
+        if not odds_df.empty:
+            odds_merge = odds_df[[column for column in [
+                "home_team", "visitor_team", "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker"
+            ] if column in odds_df.columns]].copy()
+            odds_merge = odds_merge.drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
+            rebuild = rebuild.merge(odds_merge, on=["home_team", "visitor_team"], how="left")
+    else:
+        rebuild = odds_df.copy()
+    if rebuild.empty:
+        return False
+    rebuild = rebuild[[column for column in [
+        "date", "home_team", "visitor_team", "commence_time",
+        "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker"
+    ] if column in rebuild.columns]].copy()
+    if "date" not in rebuild.columns:
+        rebuild["date"] = str(date_str)
+    for col in ("home_ml", "away_ml", "home_spread", "away_spread", "total"):
+        if col in rebuild.columns:
+            rebuild[col] = pd.to_numeric(rebuild[col], errors="coerce")
+
+    def _implied(odds: float | None) -> float | None:
+        try:
+            value = float(odds)
+        except Exception:
+            return None
+        if value == 0:
+            return None
+        if value > 0:
+            return 100.0 / (value + 100.0)
+        return (-value) / ((-value) + 100.0)
+
+    home_probs: list[float] = []
+    for _, row in rebuild.iterrows():
+        home_ml = row.get("home_ml") if "home_ml" in rebuild.columns else None
+        away_ml = row.get("away_ml") if "away_ml" in rebuild.columns else None
+        p_home = _implied(home_ml)
+        p_away = _implied(away_ml)
+        if p_home is not None and p_away is not None and float(p_home + p_away) > 0:
+            home_probs.append(float(p_home) / float(p_home + p_away))
+        else:
+            home_probs.append(0.5)
+    rebuild["home_win_prob"] = home_probs
+    rebuild["spread_margin"] = -pd.to_numeric(rebuild.get("home_spread"), errors="coerce")
+    rebuild["totals"] = pd.to_numeric(rebuild.get("total"), errors="coerce")
+
+    cols = [
+        "date", "home_team", "visitor_team", "home_win_prob", "spread_margin", "totals",
+        "commence_time", "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker",
+    ]
+    out_df = rebuild[[column for column in cols if column in rebuild.columns]].drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
+    if out_df.empty:
+        return False
+    pred_path.parent.mkdir(parents=True, exist_ok=True)
+    out_df.to_csv(pred_path, index=False)
+    _append_log(log_file, f"Rebuilt predictions slate from local game odds for {date_str}: {pred_path} (rows={len(out_df)})")
+    return _count_csv_rows_quick(pred_path) > 0
+
+
 def _predict_props_cli_args(*, source_root: Path, date_str: str, out_path: Path) -> list[str]:
     smart_sim_n_sims = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150))
     smart_sim_workers = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1))
@@ -1935,29 +2099,38 @@ def _run_refresh_via_cli(
         if not player_logs_ok:
             state["error"] = player_logs_error or f"player_logs missing before predict-props for {date_str}"
         else:
-            try:
-                _touch_progress()
-                _, _ = export_props_predictions_local(
-                    source_root=source_root,
-                    date_str=date_str,
-                    out_path=pred_fp,
-                    calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_CALIB_WINDOW", 7)),
-                    calibrate_player=_env_bool("REFRESH_PREDICT_PROPS_CALIBRATE_PLAYER", True),
-                    player_calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_CALIB_WINDOW", 30)),
-                    player_min_pairs=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_MIN_PAIRS", 6)),
-                    player_shrink_k=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_SHRINK_K", 8)),
-                    use_smart_sim=_env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True),
-                    smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150)),
-                    smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
-                    smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
-                    log_file=log_file,
-                    heartbeat_cb=_touch_progress,
-                    heartbeat_every_s=5.0,
-                )
-                _touch_progress()
-                rc_pred = 0
-            except Exception:
-                rc_pred = 1
+            game_predictions_ok, game_predictions_error = _ensure_game_predictions_for_props_refresh(
+                source_root=source_root,
+                date_str=date_str,
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+            )
+            if not game_predictions_ok:
+                state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
+            else:
+                try:
+                    _touch_progress()
+                    _, _ = export_props_predictions_local(
+                        source_root=source_root,
+                        date_str=date_str,
+                        out_path=pred_fp,
+                        calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_CALIB_WINDOW", 7)),
+                        calibrate_player=_env_bool("REFRESH_PREDICT_PROPS_CALIBRATE_PLAYER", True),
+                        player_calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_CALIB_WINDOW", 30)),
+                        player_min_pairs=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_MIN_PAIRS", 6)),
+                        player_shrink_k=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_SHRINK_K", 8)),
+                        use_smart_sim=_env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True),
+                        smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150)),
+                        smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
+                        smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
+                        log_file=log_file,
+                        heartbeat_cb=_touch_progress,
+                        heartbeat_every_s=5.0,
+                    )
+                    _touch_progress()
+                    rc_pred = 0
+                except Exception:
+                    rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
             existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
             existing_recs_rows = int(_count_csv_rows_quick(rec_fp))

@@ -1,7 +1,7 @@
 ﻿{
     "date":  "2026-05-30",
-    "generatedAt":  "2026-05-30T10:37:29.1873472-05:00",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_103728",
+    "generatedAt":  "2026-05-30T11:30:13.7892107-05:00",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_113013",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -26,139 +26,143 @@
                       },
     "sourceSteps":  [
                         {
-                            "sport":  "mlb",
+                            "sport":  "nba",
                             "workflow":  "vendored_daily_update",
-                            "name":  "MLB vendored daily update",
-                            "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2",
-                            "environmentOverrides":  {
-                                                         "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-                                                         "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
-                                                     },
-                            "runtimePolicy":  {
-                                                  "simsPerGame":  1000,
-                                                  "workers":  4
-                                              },
-                            "command":  [
-                                            "py",
-                                            "tools\\daily_update.py",
-                                            "--workflow",
-                                            "ui-daily",
-                                            "--date",
-                                            "2026-05-30",
-                                            "--season",
-                                            "2026",
-                                            "--sims",
-                                            "1000",
-                                            "--workers",
-                                            "4",
-                                            "--git-push",
-                                            "off",
-                                            "--validate-render-frontend",
-                                            "off",
-                                            "--build-next-day",
-                                            "on"
-                                        ]
-                        },
-                        {
-                            "sport":  "mlb",
-                            "workflow":  "syndicate_refresh",
-                            "name":  "MLB current-day live-lens refresh",
+                            "name":  "NBA vendored daily update",
                             "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
                             "environmentOverrides":  {
-                                                         "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-                                                         "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
                                                          "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
                                                      },
                             "runtimePolicy":  {
-                                                  "simsPerGame":  1000,
-                                                  "workers":  4
+                                                  "smartsimNSims":  1000,
+                                                  "smartsimWorkers":  4
                                               },
                             "command":  [
                                             "py",
-                                            "scripts\\refresh_mlb_oddsapi.py",
+                                            "scripts\\refresh_nba_oddsapi_props.py",
                                             "--date",
                                             "2026-05-30",
                                             "--source-root",
-                                            "data\\mlb_source\\source_artifacts",
+                                            "vendor\\nba_betting_repo",
                                             "--artifact-root",
-                                            "data\\mlb_source",
-                                            "--overwrite",
-                                            "off"
+                                            "data\\nba_source",
+                                            "--log-file",
+                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_113013\\nba_props_refresh.log",
+                                            "--force-refresh",
+                                            "--days-ahead",
+                                            "0",
+                                            "--do-edges",
+                                            "--do-export"
+                                        ]
+                        },
+                        {
+                            "sport":  "wnba",
+                            "workflow":  "vendored_daily_update",
+                            "name":  "WNBA vendored daily update",
+                            "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                            "environmentOverrides":  {
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                         "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
+                                                         "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                     },
+                            "runtimePolicy":  {
+                                                  "smartsimNSims":  1000,
+                                                  "smartsimWorkers":  4
+                                              },
+                            "command":  [
+                                            "py",
+                                            "scripts\\refresh_wnba_oddsapi_props.py",
+                                            "--date",
+                                            "2026-05-30",
+                                            "--source-root",
+                                            "vendor\\wnba_betting_repo",
+                                            "--artifact-root",
+                                            "data\\wnba_source",
+                                            "--log-file",
+                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_113013\\wnba_props_refresh.log",
+                                            "--force-refresh",
+                                            "--days-ahead",
+                                            "0",
+                                            "--do-edges",
+                                            "--do-export"
                                         ]
                         }
                     ],
     "sportRuns":  [
                       {
-                          "sport":  "mlb",
+                          "sport":  "nba",
                           "workflow":  "vendored_daily_update",
-                          "name":  "MLB vendored daily update",
-                          "startedAt":  "2026-05-30T10:37:29.1966685-05:00",
-                          "completedAt":  "2026-05-30T10:43:10.1013005-05:00",
-                          "status":  "ok",
-                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2",
-                          "environmentOverrides":  {
-                                                       "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-                                                       "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
-                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
-                                                   },
-                          "runtimePolicy":  {
-                                                "simsPerGame":  1000,
-                                                "workers":  4
-                                            },
-                          "command":  [
-                                          "py",
-                                          "tools\\daily_update.py",
-                                          "--workflow",
-                                          "ui-daily",
-                                          "--date",
-                                          "2026-05-30",
-                                          "--season",
-                                          "2026",
-                                          "--sims",
-                                          "1000",
-                                          "--workers",
-                                          "4",
-                                          "--git-push",
-                                          "off",
-                                          "--validate-render-frontend",
-                                          "off",
-                                          "--build-next-day",
-                                          "on"
-                                      ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-05-30.json",
-                          "mirrorManifestExists":  false
-                      },
-                      {
-                          "sport":  "mlb",
-                          "workflow":  "syndicate_refresh",
-                          "name":  "MLB current-day live-lens refresh",
-                          "startedAt":  "2026-05-30T10:43:10.1039177-05:00",
-                          "completedAt":  "2026-05-30T10:46:10.1208392-05:00",
+                          "name":  "NBA vendored daily update",
+                          "startedAt":  "2026-05-30T11:30:13.8074864-05:00",
+                          "completedAt":  "2026-05-30T11:32:22.8549167-05:00",
                           "status":  "ok",
                           "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
                           "environmentOverrides":  {
-                                                       "MLB_BETTING_DATA_ROOT":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data",
-                                                       "MLB_LIVE_LENS_DIR":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens",
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
                                                        "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
                                                    },
                           "runtimePolicy":  {
-                                                "simsPerGame":  1000,
-                                                "workers":  4
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  4
                                             },
                           "command":  [
                                           "py",
-                                          "scripts\\refresh_mlb_oddsapi.py",
+                                          "scripts\\refresh_nba_oddsapi_props.py",
                                           "--date",
                                           "2026-05-30",
                                           "--source-root",
-                                          "data\\mlb_source\\source_artifacts",
+                                          "vendor\\nba_betting_repo",
                                           "--artifact-root",
-                                          "data\\mlb_source",
-                                          "--overwrite",
-                                          "off"
+                                          "data\\nba_source",
+                                          "--log-file",
+                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_113013\\nba_props_refresh.log",
+                                          "--force-refresh",
+                                          "--days-ahead",
+                                          "0",
+                                          "--do-edges",
+                                          "--do-export"
                                       ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\manifests\\mirror_refresh_2026-05-30.json",
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\manifests\\mirror_refresh_2026-05-30.json",
+                          "mirrorManifestExists":  false
+                      },
+                      {
+                          "sport":  "wnba",
+                          "workflow":  "vendored_daily_update",
+                          "name":  "WNBA vendored daily update",
+                          "startedAt":  "2026-05-30T11:32:22.8569210-05:00",
+                          "completedAt":  "2026-05-30T11:33:45.7323072-05:00",
+                          "status":  "ok",
+                          "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                          "environmentOverrides":  {
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
+                                                       "REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS":  "4",
+                                                       "ODDS_API_KEY":  "77ae1c35140c82da1675af85dde36a44"
+                                                   },
+                          "runtimePolicy":  {
+                                                "smartsimNSims":  1000,
+                                                "smartsimWorkers":  4
+                                            },
+                          "command":  [
+                                          "py",
+                                          "scripts\\refresh_wnba_oddsapi_props.py",
+                                          "--date",
+                                          "2026-05-30",
+                                          "--source-root",
+                                          "vendor\\wnba_betting_repo",
+                                          "--artifact-root",
+                                          "data\\wnba_source",
+                                          "--log-file",
+                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_113013\\wnba_props_refresh.log",
+                                          "--force-refresh",
+                                          "--days-ahead",
+                                          "0",
+                                          "--do-edges",
+                                          "--do-export"
+                                      ],
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-05-30.json",
                           "mirrorManifestExists":  false
                       }
                   ],
@@ -168,10 +172,10 @@
     "skipped":  {
                     "sourceUpdates":  false,
                     "refreshGate":  true,
-                    "mlb":  false,
-                    "nba":  true,
+                    "mlb":  true,
+                    "nba":  false,
                     "nhl":  true,
-                    "wnba":  true,
+                    "wnba":  false,
                     "nfl":  true,
                     "ncaaf":  true,
                     "ncaab":  true
@@ -179,8 +183,8 @@
     "dryRun":  false,
     "refreshGate":  {
                         "requested":  false,
-                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_103728\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_103728\\migration\\refresh_and_gate_run.json",
+                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_113013\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_113013\\migration\\refresh_and_gate_run.json",
                         "status":  "skipped"
                     },
     "pushResults":  [

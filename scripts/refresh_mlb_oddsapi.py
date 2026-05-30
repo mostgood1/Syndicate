@@ -535,25 +535,41 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
 
 
 def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: str) -> dict[str, object]:
+    def _payload_is_usable(payload: dict[str, object] | None) -> bool:
+        if not isinstance(payload, dict):
+            return False
+        if payload.get("error"):
+            return False
+        performance = payload.get("performance")
+        if isinstance(performance, dict) and performance.get("degraded"):
+            return False
+        return True
+
     live_lens = None
+    errors: list[str] = []
     base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "RENDER_EXTERNAL_URL"))
     token = _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     if base_url and token:
         try:
             live_lens_payload = _fetch_live_lens_reports_payload(base_url=base_url, token=token, date_str=date_str, timeout_seconds=45)
-            live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
-        except (HTTPError, URLError, OSError, ValueError, RuntimeError):
-            live_lens = None
+            if _payload_is_usable(live_lens_payload):
+                live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
+            else:
+                errors.append("remote live-lens payload was degraded or empty")
+        except (HTTPError, URLError, OSError, ValueError, RuntimeError) as exc:
+            errors.append(f"remote live-lens fetch failed: {exc}")
     if live_lens is None:
         try:
             live_lens_payload = _build_local_live_lens_reports_payload(source_root=source_root, date_str=date_str)
-            live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
-        except Exception:
-            live_lens = None
+            if _payload_is_usable(live_lens_payload):
+                live_lens = _write_live_lens_reports_payload(source_root=source_root, date_str=date_str, payload=live_lens_payload, trigger=trigger)
+            else:
+                errors.append("local live-lens payload was degraded or empty")
+        except Exception as exc:
+            errors.append(f"local live-lens build failed: {exc}")
     if live_lens is None:
-        live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger=trigger)
-    if live_lens is None:
-        live_lens = _bootstrap_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger=trigger)
+        detail = "; ".join(errors) if errors else "unknown live-lens failure"
+        raise RuntimeError(f"MLB live-lens refresh failed without fallback: {detail}")
     return live_lens
 
 

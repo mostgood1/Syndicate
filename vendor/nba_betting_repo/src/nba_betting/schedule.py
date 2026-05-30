@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 import pandas as pd
+
+from .config import paths
 
 
 def team_last_game_dates(games: pd.DataFrame) -> dict[str, datetime]:
@@ -70,6 +73,96 @@ def _request_schedule_payload() -> dict[str, Any]:
     raise RuntimeError(f"Failed to fetch NBA schedule payload: {last_err}")
 
 
+def _local_schedule_candidates() -> list[Path]:
+    return [
+        paths.data_processed / "schedule_2025_26.csv",
+        paths.data_raw / "schedule_2025_26.csv",
+        paths.data_processed / "schedule_2025-26.csv",
+        paths.data_raw / "schedule_2025-26.csv",
+    ]
+
+
+def _load_local_schedule_fallback(season_year: str = "2025-26") -> pd.DataFrame:
+    for candidate in _local_schedule_candidates():
+        if candidate.exists():
+            df = pd.read_csv(candidate)
+            if not df.empty:
+                return df
+
+    games_path = paths.data_raw / "games_nba_api.csv"
+    if not games_path.exists():
+        raise FileNotFoundError("games_nba_api.csv not found for NBA schedule fallback")
+
+    games = pd.read_csv(games_path)
+    required_columns = {"date", "home_team", "visitor_team", "game_id"}
+    if games.empty or not required_columns.issubset(set(games.columns)):
+        raise RuntimeError("Local NBA schedule fallback did not find usable games data")
+
+    out = games.copy()
+    season_start = int(str(season_year).split("-", 1)[0])
+    season_end = season_start + 1
+    out["date"] = pd.to_datetime(out["date"], errors="coerce")
+    season_mask = out.get("season", pd.Series(dtype="object")).astype(str).eq(str(season_start))
+    date_mask = out["date"].dt.year.isin([season_start, season_end])
+    out = out[season_mask | date_mask].copy()
+    if out.empty:
+        raise RuntimeError(f"Local NBA schedule fallback did not find regular-season games for {season_year}")
+
+    out["game_id"] = out["game_id"].astype(str)
+    date_values = out["date"]
+    out["season_year"] = season_year
+    out["game_label"] = "Regular Season"
+    out["game_subtype"] = None
+    out["game_status"] = None
+    out["game_status_text"] = None
+    out["date_utc"] = None
+    out["time_utc"] = None
+    out["datetime_utc"] = None
+    out["date_est"] = date_values.dt.date.astype(str)
+    out["time_est"] = None
+    out["datetime_est"] = None
+    out["home_team_id"] = None
+    out["home_tricode"] = None
+    out["home_city"] = None
+    out["home_name"] = None
+    out["away_team_id"] = None
+    out["away_tricode"] = None
+    out["away_city"] = None
+    out["away_name"] = None
+    out["arena_name"] = None
+    out["arena_city"] = None
+    out["arena_state"] = None
+    out["broadcasters_national"] = None
+    out["date_utc"] = out["date_est"]
+    out = out[[
+        "game_id",
+        "season_year",
+        "game_label",
+        "game_subtype",
+        "game_status",
+        "game_status_text",
+        "date_utc",
+        "time_utc",
+        "datetime_utc",
+        "date_est",
+        "time_est",
+        "datetime_est",
+        "home_team_id",
+        "home_tricode",
+        "home_city",
+        "home_name",
+        "away_team_id",
+        "away_tricode",
+        "away_city",
+        "away_name",
+        "arena_name",
+        "arena_city",
+        "arena_state",
+        "broadcasters_national",
+    ]]
+    return out
+
+
 def fetch_schedule_2025_26() -> pd.DataFrame:
     """Fetch and normalize the 2025-26 NBA schedule from the public CDN feed.
 
@@ -86,10 +179,16 @@ def fetch_schedule_2025_26() -> pd.DataFrame:
     - arena_name, arena_city, arena_state
     - broadcasters_national (pipe-delimited)
     """
-    payload = _request_schedule_payload()
+    try:
+        payload = _request_schedule_payload()
+    except Exception:
+        return _load_local_schedule_fallback()
     ls = payload.get("leagueSchedule", {})
     season_year = ls.get("seasonYear") or "2025-26"
     game_dates = ls.get("gameDates", []) or []
+
+    if not game_dates:
+        return _load_local_schedule_fallback(season_year)
 
     rows: list[dict[str, Any]] = []
     for gd in game_dates:

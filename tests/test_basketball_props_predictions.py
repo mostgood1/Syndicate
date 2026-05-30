@@ -161,6 +161,46 @@ class BasketballPropsPredictionsTests(unittest.TestCase):
         self.assertEqual(predictions_module._to_tricode("boston"), "BOS")
         self.assertEqual(predictions_module._to_tricode("nyk"), "NYK")
 
+    def test_team_players_from_props_local_uses_home_away_roster_matching(self) -> None:
+        import pandas as pd
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            processed_root = root / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (processed_root / "rosters_2025-26.csv").write_text(
+                "PLAYER,TEAM_ABBREVIATION,PLAYER_ID\n"
+                "Shai Gilgeous-Alexander,OKC,1\n"
+                "Chet Holmgren,OKC,2\n"
+                "Victor Wembanyama,SAS,3\n",
+                encoding="utf-8",
+            )
+            props_df = pd.DataFrame(
+                [
+                    {"home_team": "Oklahoma City Thunder", "away_team": "San Antonio Spurs", "player_name": "Shai Gilgeous-Alexander"},
+                    {"home_team": "Oklahoma City Thunder", "away_team": "San Antonio Spurs", "player_name": "Chet Holmgren"},
+                    {"home_team": "Oklahoma City Thunder", "away_team": "San Antonio Spurs", "player_name": "Victor Wembanyama"},
+                ]
+            )
+
+            home_rows = smart_sim_module._team_players_from_props_local(
+                props_df=props_df,
+                team_tri="OKC",
+                opp_tri="SAS",
+                processed_root=processed_root,
+                date_str="2026-05-30",
+            )
+            away_rows = smart_sim_module._team_players_from_props_local(
+                props_df=props_df,
+                team_tri="SAS",
+                opp_tri="OKC",
+                processed_root=processed_root,
+                date_str="2026-05-30",
+            )
+
+            self.assertEqual(sorted(home_rows["player_name"].tolist()), ["Chet Holmgren", "Shai Gilgeous-Alexander"])
+            self.assertEqual(sorted(away_rows["player_name"].tolist()), ["Victor Wembanyama"])
+
     def test_export_props_predictions_local_invokes_local_smart_sim_helper(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

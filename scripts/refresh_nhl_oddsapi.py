@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 import subprocess
+import pandas as pd
 from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -136,8 +137,9 @@ def _source_python_executable(source_root: Path) -> str:
         Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python311-arm64" / "python.exe",
     ):
         if installed.exists():
+            return str(installed)
     candidate = source_root / ".venv" / "Scripts" / "python.exe"
-        "data/processed/recommendations_sim_{date}.csv",
+    if candidate.exists():
         return str(candidate)
     return sys.executable
 
@@ -312,6 +314,33 @@ def _required_artifacts_by_date(*, artifact_root: Path, date_values: list[str]) 
     return missing_by_date
 
 
+def _lineup_quality_issues(*, artifact_root: Path, date_str: str) -> list[str]:
+    lineups_path = artifact_root / "data" / "processed" / f"lineups_{date_str}.csv"
+    if not lineups_path.exists() or not lineups_path.is_file():
+        return [f"missing lineup snapshot: {lineups_path}"]
+    try:
+        df = pd.read_csv(lineups_path)
+    except Exception as exc:
+        return [f"unable to read lineup snapshot {lineups_path}: {exc}"]
+    if df is None or df.empty:
+        return [f"empty lineup snapshot: {lineups_path}"]
+    if "proj_toi" not in df.columns:
+        return [f"lineup snapshot missing proj_toi: {lineups_path}"]
+
+    issues: list[str] = []
+    skaters = df.copy()
+    if "position" in skaters.columns:
+        skaters = skaters[~skaters["position"].astype(str).str.upper().str.startswith("G")].copy()
+    toi = pd.to_numeric(skaters["proj_toi"], errors="coerce") if not skaters.empty else pd.Series(dtype=float)
+    confidence = pd.to_numeric(skaters["confidence"], errors="coerce") if "confidence" in skaters.columns and not skaters.empty else pd.Series(dtype=float)
+    if not skaters.empty:
+        uniform_placeholder_toi = toi.notna().all() and toi.nunique(dropna=True) == 1 and abs(float(toi.iloc[0]) - 15.0) < 1e-9
+        uniform_placeholder_confidence = confidence.notna().all() and confidence.nunique(dropna=True) == 1 and abs(float(confidence.iloc[0]) - 0.5) < 1e-9
+        if uniform_placeholder_toi and uniform_placeholder_confidence:
+            issues.append(f"placeholder skater TOI detected in {lineups_path}")
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh NHL OddsAPI snapshots through a Syndicate-owned runner.")
     parser.add_argument("--date", required=True)
@@ -366,6 +395,21 @@ def main() -> int:
                     "artifact_bundle_root": str(artifact_root),
                     "error": "missing_required_artifacts",
                     "missing_required_artifacts": missing_required,
+                },
+                indent=2,
+            )
+        )
+        return 1
+    lineup_quality_issues = _lineup_quality_issues(artifact_root=artifact_root, date_str=args.date)
+    if lineup_quality_issues:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "date": args.date,
+                    "artifact_bundle_root": str(artifact_root),
+                    "error": "placeholder_lineup_artifacts",
+                    "lineup_quality_issues": lineup_quality_issues,
                 },
                 indent=2,
             )

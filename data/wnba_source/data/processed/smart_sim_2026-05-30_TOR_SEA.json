@@ -1,0 +1,1948 @@
+{
+  "date": "2026-05-30",
+  "home": "TOR",
+  "away": "SEA",
+  "market_total": null,
+  "market_home_spread": null,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 19.7696625,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 19.7696625,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 19.7696625,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 19.7696625,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 20.5765875,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 20.5765875,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 20.5765875,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 20.5765875,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Marina Mabrey",
+        "player_id": 3904576,
+        "pts_mean": 16.585154838709677,
+        "reb_mean": 3.873941935483872,
+        "ast_mean": 4.415090322580645,
+        "threes_mean": 2.849664516129032,
+        "pra_mean": 24.8741870967742,
+        "stl_mean": 1.3523440860215057,
+        "blk_mean": 0.5071290322580646,
+        "tov_mean": 2.8737311827957,
+        "pts_sd": 4.146288709677419,
+        "reb_sd": 1.0,
+        "ast_sd": 1.1037725806451613,
+        "threes_sd": 1.0,
+        "pra_sd": 6.21854677419355,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Brittney Sykes",
+        "player_id": 2988756,
+        "pts_mean": 17.1064,
+        "reb_mean": 2.662640000000001,
+        "ast_mean": 4.95608,
+        "threes_mean": 1.1768,
+        "pra_mean": 24.72512,
+        "stl_mean": 1.4652000000000005,
+        "blk_mean": 0.3256,
+        "tov_mean": 2.930400000000001,
+        "pts_sd": 4.2766,
+        "reb_sd": 1.0,
+        "ast_sd": 1.23902,
+        "threes_sd": 1.0,
+        "pra_sd": 6.18128,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Kiki Rice",
+        "player_id": 4565505,
+        "pts_mean": 15.896403658536588,
+        "reb_mean": 4.723518292682927,
+        "ast_mean": 2.829310975609756,
+        "threes_mean": 1.1503865853658537,
+        "pra_mean": 23.449232926829275,
+        "stl_mean": 0.6921382113821138,
+        "blk_mean": 0.1730345528455284,
+        "tov_mean": 0.6921382113821138,
+        "pts_sd": 3.974100914634147,
+        "reb_sd": 1.1808795731707318,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.862308231707319,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Maddison Rocci",
+        "player_id": 5345503,
+        "pts_mean": 11.0,
+        "reb_mean": 2.0,
+        "ast_mean": 3.0,
+        "threes_mean": 0.0,
+        "pra_mean": 16.0,
+        "stl_mean": 0.308,
+        "blk_mean": 0.252,
+        "tov_mean": 0.84,
+        "pts_sd": 2.75,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Elizabeth Balogun",
+        "player_id": 4398589,
+        "pts_mean": 10.56,
+        "reb_mean": 1.72,
+        "ast_mean": 0.0,
+        "threes_mean": 1.5199999999999998,
+        "pra_mean": 12.28,
+        "stl_mean": 0.3299999999999999,
+        "blk_mean": 0.2699999999999999,
+        "tov_mean": 0.8999999999999999,
+        "pts_sd": 2.64,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.07,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Nyara Sabally",
+        "player_id": 4398768,
+        "pts_mean": 7.234208247422679,
+        "reb_mean": 3.43048350515464,
+        "ast_mean": 1.2388969072164946,
+        "threes_mean": 0.4086896907216494,
+        "pra_mean": 11.903588659793812,
+        "stl_mean": 0.8045979381443298,
+        "blk_mean": 1.2068969072164948,
+        "tov_mean": 0.8045979381443298,
+        "pts_sd": 1.8085520618556699,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.975897164948453,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Maria Conde",
+        "player_id": 3910470,
+        "pts_mean": 6.456324324324324,
+        "reb_mean": 3.719378378378378,
+        "ast_mean": 1.109256756756757,
+        "threes_mean": 1.2364729729729729,
+        "pra_mean": 11.28495945945946,
+        "stl_mean": 0.3186936936936937,
+        "blk_mean": 0.1593468468468468,
+        "tov_mean": 1.115427927927928,
+        "pts_sd": 1.614081081081081,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.821239864864865,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Laura Juskaite",
+        "player_id": 5345444,
+        "pts_mean": 6.166622950819672,
+        "reb_mean": 2.9407868852459016,
+        "ast_mean": 1.28327868852459,
+        "threes_mean": 0.6450491803278688,
+        "pra_mean": 10.390688524590164,
+        "stl_mean": 1.0340983606557377,
+        "blk_mean": 0.0,
+        "tov_mean": 1.5511475409836064,
+        "pts_sd": 1.541655737704918,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.597672131147541,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Kia Nurse",
+        "player_id": 3142327,
+        "pts_mean": 7.517117499999999,
+        "reb_mean": 1.9197575,
+        "ast_mean": 0.5936699999999999,
+        "threes_mean": 1.3633399999999998,
+        "pra_mean": 10.030544999999998,
+        "stl_mean": 0.3613916666666666,
+        "blk_mean": 0.0,
+        "tov_mean": 0.3613916666666666,
+        "pts_sd": 1.8792793749999996,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.5076362499999996,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Kristy Wallace",
+        "player_id": 3156318,
+        "pts_mean": 5.0,
+        "reb_mean": 2.0,
+        "ast_mean": 3.0,
+        "threes_mean": 1.0,
+        "pra_mean": 10.0,
+        "stl_mean": 0.374,
+        "blk_mean": 0.306,
+        "tov_mean": 1.02,
+        "pts_sd": 1.25,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.5,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Teonni Key",
+        "player_id": 4434020,
+        "pts_mean": 3.952064,
+        "reb_mean": 2.591712,
+        "ast_mean": 0.0983359999999999,
+        "threes_mean": 0.2206719999999999,
+        "pra_mean": 6.642112,
+        "stl_mean": 0.49168,
+        "blk_mean": 0.8194666666666667,
+        "tov_mean": 0.6555733333333332,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.660528,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Nikolina Milic",
+        "player_id": 4874475,
+        "pts_mean": 2.806574468085106,
+        "reb_mean": 1.4170297872340427,
+        "ast_mean": 0.3176765957446809,
+        "threes_mean": 0.0,
+        "pra_mean": 4.54128085106383,
+        "stl_mean": 0.0,
+        "blk_mean": 0.0,
+        "tov_mean": 0.9903191489361703,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.1353202127659574,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Lexi Held",
+        "player_id": 4399342,
+        "pts_mean": 2.219490566037736,
+        "reb_mean": 1.1437735849056605,
+        "ast_mean": 1.1317169811320755,
+        "threes_mean": 0.5998867924528302,
+        "pra_mean": 4.494981132075472,
+        "stl_mean": 0.0,
+        "blk_mean": 0.0,
+        "tov_mean": 0.3864779874213837,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.123745283018868,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Dara Mabrey",
+        "player_id": 4398736,
+        "pts_mean": 0.0,
+        "reb_mean": 3.0,
+        "ast_mean": 1.0,
+        "threes_mean": 0.0,
+        "pra_mean": 4.0,
+        "stl_mean": 0.308,
+        "blk_mean": 0.252,
+        "tov_mean": 0.84,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Mariella Fasoula",
+        "player_id": 3904479,
+        "pts_mean": 0.7999999999999999,
+        "reb_mean": 0.92,
+        "ast_mean": 0.1999999999999999,
+        "threes_mean": 0.0,
+        "pra_mean": 1.92,
+        "stl_mean": 0.1683,
+        "blk_mean": 0.1377,
+        "tov_mean": 0.459,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Julie Allemand",
+        "player_id": 4001679,
+        "pts_mean": 0.1,
+        "reb_mean": 0.02,
+        "ast_mean": 0.08,
+        "threes_mean": 0.02,
+        "pra_mean": 0.2,
+        "stl_mean": 0.3068999999999999,
+        "blk_mean": 0.2511,
+        "tov_mean": 0.837,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Temi Fagbenle",
+        "player_id": 2569044,
+        "pts_mean": 0.04,
+        "reb_mean": 0.02,
+        "ast_mean": 0.02,
+        "threes_mean": 0.0,
+        "pra_mean": 0.08,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Isabelle Harrison",
+        "player_id": 2566453,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Kitija Laksa",
+        "player_id": 3920741,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Charlise Dunn",
+        "player_id": 5107752,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "TOR",
+        "opponent": "SEA",
+        "player_name": "Saffron Shiels",
+        "player_id": 5345334,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "away": [
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Natisha Hiedeman",
+        "player_id": 3906753,
+        "pts_mean": 17.562402439024392,
+        "reb_mean": 1.3003024390243905,
+        "ast_mean": 4.695982926829268,
+        "threes_mean": 2.546453658536586,
+        "pra_mean": 23.558687804878048,
+        "stl_mean": 0.5076890243902441,
+        "blk_mean": 0.169229674796748,
+        "tov_mean": 1.861526422764228,
+        "pts_sd": 4.390600609756098,
+        "reb_sd": 1.0,
+        "ast_sd": 1.173995731707317,
+        "threes_sd": 1.0,
+        "pra_sd": 5.889671951219512,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Flau'jae Johnson",
+        "player_id": 4698736,
+        "pts_mean": 13.942596226415093,
+        "reb_mean": 5.742950943396226,
+        "ast_mean": 1.5707811320754717,
+        "threes_mean": 1.4045207547169811,
+        "pra_mean": 21.256328301886786,
+        "stl_mean": 1.1443459119496855,
+        "blk_mean": 1.7982578616352198,
+        "tov_mean": 2.125213836477987,
+        "pts_sd": 3.485649056603773,
+        "reb_sd": 1.4357377358490564,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.314082075471696,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Zia Cooke",
+        "player_id": 4432832,
+        "pts_mean": 12.19412909090909,
+        "reb_mean": 2.3072454545454546,
+        "ast_mean": 1.7221636363636366,
+        "threes_mean": 1.560130909090909,
+        "pra_mean": 16.22353818181818,
+        "stl_mean": 0.5050818181818182,
+        "blk_mean": 0.0,
+        "tov_mean": 2.0203272727272727,
+        "pts_sd": 3.0485322727272726,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.055884545454545,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Stefanie Dolson",
+        "player_id": 2529183,
+        "pts_mean": 10.416947368421052,
+        "reb_mean": 3.533631578947369,
+        "ast_mean": 1.9771052631578947,
+        "threes_mean": 1.1645526315789474,
+        "pra_mean": 15.927684210526316,
+        "stl_mean": 0.5085526315789474,
+        "blk_mean": 1.186622807017544,
+        "tov_mean": 1.3561403508771928,
+        "pts_sd": 2.604236842105263,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.981921052631579,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Jade Melbourne",
+        "player_id": 5017726,
+        "pts_mean": 7.228250322580646,
+        "reb_mean": 1.835432258064516,
+        "ast_mean": 4.841610322580645,
+        "threes_mean": 0.1926864516129032,
+        "pra_mean": 13.905292903225806,
+        "stl_mean": 1.2845763440860214,
+        "blk_mean": 0.3211440860215053,
+        "tov_mean": 2.4085806451612903,
+        "pts_sd": 1.8070625806451615,
+        "reb_sd": 1.0,
+        "ast_sd": 1.2104025806451613,
+        "threes_sd": 1.0,
+        "pra_sd": 3.4763232258064516,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Rennia Davis",
+        "player_id": 4280888,
+        "pts_mean": 6.239999999999999,
+        "reb_mean": 2.48,
+        "ast_mean": 0.7599999999999999,
+        "threes_mean": 0.0,
+        "pra_mean": 9.48,
+        "stl_mean": 0.2156,
+        "blk_mean": 0.1764,
+        "tov_mean": 0.588,
+        "pts_sd": 1.5599999999999998,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.37,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Mackenzie Holmes",
+        "player_id": 4433643,
+        "pts_mean": 4.229475000000001,
+        "reb_mean": 4.1294,
+        "ast_mean": 0.4949,
+        "threes_mean": 0.2194499999999999,
+        "pra_mean": 8.853775,
+        "stl_mean": 0.97725,
+        "blk_mean": 0.6515,
+        "tov_mean": 0.488625,
+        "pts_sd": 1.0573687500000002,
+        "reb_sd": 1.03235,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.21344375,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Awa Fam",
+        "player_id": 5345325,
+        "pts_mean": 7.199999999999999,
+        "reb_mean": 1.44,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 8.639999999999999,
+        "stl_mean": 0.3599199999999999,
+        "blk_mean": 0.2944799999999999,
+        "tov_mean": 0.9816,
+        "pts_sd": 1.7999999999999998,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.1599999999999997,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Jordan Horston",
+        "player_id": 4432830,
+        "pts_mean": 4.262691588785048,
+        "reb_mean": 3.11368785046729,
+        "ast_mean": 0.962007476635514,
+        "threes_mean": 0.3963345794392523,
+        "pra_mean": 8.338386915887853,
+        "stl_mean": 1.444461059190031,
+        "blk_mean": 0.1805576323987539,
+        "tov_mean": 1.444461059190031,
+        "pts_sd": 1.065672897196262,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.084596728971963,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Jaelyn Brown",
+        "player_id": 4066527,
+        "pts_mean": 6.48,
+        "reb_mean": 0.48,
+        "ast_mean": 0.24,
+        "threes_mean": 1.0,
+        "pra_mean": 7.200000000000001,
+        "stl_mean": 0.2639999999999999,
+        "blk_mean": 0.2159999999999999,
+        "tov_mean": 0.7199999999999999,
+        "pts_sd": 1.62,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.8000000000000003,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Lexie Brown",
+        "player_id": 3058892,
+        "pts_mean": 5.035030927835051,
+        "reb_mean": 0.9128659793814432,
+        "ast_mean": 0.7124329896907217,
+        "threes_mean": 0.9782927835051544,
+        "pra_mean": 6.660329896907217,
+        "stl_mean": 0.501910652920962,
+        "blk_mean": 0.1254776632302405,
+        "tov_mean": 0.6273883161512027,
+        "pts_sd": 1.2587577319587628,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.6650824742268042,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Katie Lou Samuelson",
+        "player_id": 3917453,
+        "pts_mean": 2.16,
+        "reb_mean": 1.44,
+        "ast_mean": 1.44,
+        "threes_mean": 0.72,
+        "pra_mean": 5.04,
+        "stl_mean": 0.323928,
+        "blk_mean": 0.265032,
+        "tov_mean": 0.88344,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.26,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Elle Ladine",
+        "player_id": 5105756,
+        "pts_mean": 2.52,
+        "reb_mean": 0.7599999999999999,
+        "ast_mean": 0.0,
+        "threes_mean": 0.7599999999999999,
+        "pra_mean": 3.28,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Jalyn Brown",
+        "player_id": 4858671,
+        "pts_mean": 0.0,
+        "reb_mean": 2.28,
+        "ast_mean": 0.7599999999999999,
+        "threes_mean": 0.0,
+        "pra_mean": 3.04,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Taylor Thierry",
+        "player_id": 4898400,
+        "pts_mean": 1.34,
+        "reb_mean": 1.2,
+        "ast_mean": 0.02,
+        "threes_mean": 0.44,
+        "pra_mean": 2.56,
+        "stl_mean": 0.1644499999999999,
+        "blk_mean": 0.1345499999999999,
+        "tov_mean": 0.4484999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Joyner Holmes",
+        "player_id": 4068161,
+        "pts_mean": 0.48,
+        "reb_mean": 1.2,
+        "ast_mean": 0.24,
+        "threes_mean": 0.0,
+        "pra_mean": 1.92,
+        "stl_mean": 0.2298999999999999,
+        "blk_mean": 0.1880999999999999,
+        "tov_mean": 0.6269999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Taina Mair",
+        "player_id": 5106222,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.72,
+        "threes_mean": 0.0,
+        "pra_mean": 0.72,
+        "stl_mean": 0.1374999999999999,
+        "blk_mean": 0.1124999999999999,
+        "tov_mean": 0.375,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Beatrice Mompremier",
+        "player_id": 3916517,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Ezi Magbegor",
+        "player_id": 4420318,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SEA",
+        "opponent": "TOR",
+        "player_name": "Dominique Malonga",
+        "player_id": 5220150,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.3146,
+        "blk_mean": 0.2574,
+        "tov_mean": 0.858,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 113.44036055393579,
+  "away_team_total_pts_mean": 101.29152296397038,
+  "excluded_player_keys_by_team": {
+    "TOR": [],
+    "SEA": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 79.5,
+    "away_pace": 79.5,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 150
+}

@@ -609,10 +609,16 @@ def _first_present_float_local(row, *columns: str, default: float = 0.0) -> floa
     return float(default)
 
 
-def _smart_sim_team_players_local(*, props_df, team_tri: str, opp_tri: str):
+def _smart_sim_team_players_local(*, props_df, team_tri: str, opp_tri: str, processed_root: Path | None = None, date_str: str | None = None):
     import pandas as pd
 
-    frame = _team_players_from_props_local(props_df=props_df, team_tri=team_tri, opp_tri=opp_tri)
+    frame = _team_players_from_props_local(
+        props_df=props_df,
+        team_tri=team_tri,
+        opp_tri=opp_tri,
+        processed_root=processed_root,
+        date_str=date_str,
+    )
     if frame is None or getattr(frame, "empty", True):
         return pd.DataFrame()
     out = frame.copy()
@@ -678,9 +684,9 @@ def _build_player_sim_rows_local(*, players_df, team_tri: str, opp_tri: str) -> 
     return rows
 
 
-def _simulate_smart_game_local(*, date_str: str, home_tri: str, away_tri: str, props_df=None, quarters=None, market_total=None, market_home_spread=None, cfg=None, excluded_player_keys_by_team=None, pregame_context=None, **_kwargs):
-    home_players_df = _smart_sim_team_players_local(props_df=props_df, team_tri=home_tri, opp_tri=away_tri)
-    away_players_df = _smart_sim_team_players_local(props_df=props_df, team_tri=away_tri, opp_tri=home_tri)
+def _simulate_smart_game_local(*, date_str: str, home_tri: str, away_tri: str, props_df=None, quarters=None, market_total=None, market_home_spread=None, cfg=None, excluded_player_keys_by_team=None, pregame_context=None, processed_root: Path | None = None, **_kwargs):
+    home_players_df = _smart_sim_team_players_local(props_df=props_df, team_tri=home_tri, opp_tri=away_tri, processed_root=processed_root, date_str=date_str)
+    away_players_df = _smart_sim_team_players_local(props_df=props_df, team_tri=away_tri, opp_tri=home_tri, processed_root=processed_root, date_str=date_str)
     home_players = _build_player_sim_rows_local(players_df=home_players_df, team_tri=home_tri, opp_tri=away_tri)
     away_players = _build_player_sim_rows_local(players_df=away_players_df, team_tri=away_tri, opp_tri=home_tri)
     return {
@@ -3464,11 +3470,13 @@ def _load_player_stat_calibration_local(*, processed_root: Path) -> dict[str, An
         return None
 
 
-def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str):
+def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, processed_root: Path | None = None, date_str: str | None = None):
     import pandas as pd
 
     df = props_df.copy() if isinstance(props_df, pd.DataFrame) else pd.DataFrame()
     if df is None or df.empty:
+        return pd.DataFrame()
+    if "player_name" not in df.columns:
         return pd.DataFrame()
     if "team" in df.columns:
         df["team"] = df["team"].astype(str).str.upper().str.strip()
@@ -3482,6 +3490,32 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str):
         team_only = df[df["team"] == team_u].copy()
     if ("team" in df.columns) and ("opponent" in df.columns):
         out = df[(df["team"] == team_u) & (df["opponent"] == opp_u)].copy()
+    elif {"home_team", "away_team"}.issubset(set(df.columns)):
+        tmp = df.copy()
+        tmp["home_tri"] = tmp["home_team"].astype(str).map(lambda value: str(_to_tricode_local(value) or str(value or "").strip().upper()).strip().upper())
+        tmp["away_tri"] = tmp["away_team"].astype(str).map(lambda value: str(_to_tricode_local(value) or str(value or "").strip().upper()).strip().upper())
+        matchup_mask = ((tmp["home_tri"] == team_u) & (tmp["away_tri"] == opp_u)) | ((tmp["home_tri"] == opp_u) & (tmp["away_tri"] == team_u))
+        tmp = tmp[matchup_mask].copy()
+        if tmp.empty:
+            return tmp
+
+        roster_names: set[str] = set()
+        if processed_root is not None and date_str:
+            roster_df = _team_players_from_processed_rosters_local(processed_root=processed_root, date_str=str(date_str), home_tri=team_u, away_tri=opp_u, team_tri=team_u)
+            if roster_df is not None and not roster_df.empty and "player_name" in roster_df.columns:
+                roster_names = {_norm_name_key(value) for value in roster_df.get("player_name", pd.Series(dtype=str)).astype(str).tolist() if str(value).strip()}
+        if roster_names:
+            tmp_unfiltered = tmp.copy()
+            player_keys = tmp["player_name"].astype(str).map(_norm_name_key)
+            tmp = tmp[player_keys.isin(roster_names)].copy()
+            if tmp.empty:
+                # Keep market-derived players when roster normalization removes every row.
+                tmp = tmp_unfiltered
+        if tmp.empty:
+            return tmp
+        tmp["team"] = team_u
+        tmp["opponent"] = opp_u
+        out = tmp.copy()
     try:
         if (not team_only.empty) and (out is not None) and (len(out) < 8):
             out = team_only
@@ -4008,6 +4042,7 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
                 "cfg": cfg,
                 "excluded_player_keys_by_team": excluded_game,
                 "pregame_context": pre_ctx,
+                "processed_root": out_path.parent,
             },
         )
 
@@ -4507,28 +4542,45 @@ def _apply_basic_slate_filter(*, preds, processed_root: Path, date_str: str):
     import pandas as pd
 
     go_path = processed_root / f"game_odds_{date_str}.csv"
-    if preds is None or getattr(preds, "empty", False) or "team" not in preds.columns or not go_path.exists():
+    pred_path = processed_root / f"predictions_{date_str}.csv"
+    props_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
+    if preds is None or getattr(preds, "empty", False) or "team" not in preds.columns:
         return preds
-    try:
-        game_odds = pd.read_csv(go_path)
-    except Exception:
-        return preds
-    if game_odds is None or game_odds.empty:
-        return preds
-    home_col = "home_team" if "home_team" in game_odds.columns else None
-    away_col = "visitor_team" if "visitor_team" in game_odds.columns else ("away_team" if "away_team" in game_odds.columns else None)
-    if not home_col or not away_col:
-        return preds
+
     slate_teams: set[str] = set()
     slate_tricodes: set[str] = set()
-    for _, row in game_odds.iterrows():
-        for column in (home_col, away_col):
-            team = str(row.get(column) or "").strip().upper()
-            if team:
-                slate_teams.add(team)
-                tri = _to_tricode_local(team)
-                if tri:
-                    slate_tricodes.add(str(tri).strip().upper())
+
+    def _add_team(value: object) -> None:
+        team = str(value or "").strip().upper()
+        if not team:
+            return
+        slate_teams.add(team)
+        tri = _to_tricode_local(team)
+        if tri:
+            slate_tricodes.add(str(tri).strip().upper())
+
+    def _load_pairs(path: Path, home_candidates: tuple[str, ...], away_candidates: tuple[str, ...]) -> None:
+        if not path.exists() or not path.is_file():
+            return
+        try:
+            frame = pd.read_csv(path)
+        except Exception:
+            return
+        if frame is None or frame.empty:
+            return
+        home_col = next((column for column in home_candidates if column in frame.columns), None)
+        away_col = next((column for column in away_candidates if column in frame.columns), None)
+        if not home_col or not away_col:
+            return
+        for _, row in frame.iterrows():
+            _add_team(row.get(home_col))
+            _add_team(row.get(away_col))
+
+    # Prefer repaired canonical predictions and current props snapshot over game_odds, which may be stale/cross-league.
+    _load_pairs(pred_path, ("home_team",), ("visitor_team", "away_team"))
+    _load_pairs(props_path, ("home_team",), ("away_team", "visitor_team"))
+    _load_pairs(go_path, ("home_team",), ("visitor_team", "away_team"))
+
     # Keep compatibility with either full names or tricodes in prediction rows.
     slate_all = set(slate_teams) | set(slate_tricodes)
     if not slate_all:

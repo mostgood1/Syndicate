@@ -1418,6 +1418,9 @@ def _ensure_source_game_inputs(
             heartbeat_cb=heartbeat_cb,
             timeout_s=20 * 60,
         )
+
+    _seed_game_odds_from_props_snapshot(source_root=source_root, date_str=date_str, log_file=log_file)
+    _seed_game_odds_from_raw_history(source_root=source_root, date_str=date_str, log_file=log_file)
     
     rc_predict_date = _run_source_predict_date(
         source_root=source_root,
@@ -1640,6 +1643,51 @@ def _ensure_player_logs_for_props_refresh(*, source_root: Path, date_str: str, l
     return False, "player_logs missing and no local fetch fallback is available"
 
 
+def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: str, log_file: Path, heartbeat_cb: callable) -> tuple[bool, str | None]:
+    processed_root = source_root / "data" / "processed"
+    pred_path = processed_root / f"predictions_{date_str}.csv"
+    if pred_path.exists() and pred_path.is_file() and _count_csv_rows_quick(pred_path) > 0:
+        return True, None
+
+    fallback_candidates = [
+        processed_root / f"games_predictions_npu_{date_str}.csv",
+        source_root / f"predictions_{date_str}.csv",
+        source_root / "data" / "processed" / f"games_predictions_npu_{date_str}.csv",
+    ]
+    for candidate in fallback_candidates:
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        try:
+            if candidate.resolve() != pred_path.resolve():
+                pred_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(candidate, pred_path)
+        except Exception:
+            pass
+        if pred_path.exists() and pred_path.is_file() and _count_csv_rows_quick(pred_path) > 0:
+            _append_log(log_file, f"Using existing game predictions artifact: {pred_path}")
+            return True, None
+
+    _append_log(log_file, f"Generating required game predictions artifact via source bootstrap: {pred_path}")
+    bootstrap_result = _ensure_source_game_inputs(
+        source_root=source_root,
+        package_name="nba_betting",
+        date_str=date_str,
+        log_file=log_file,
+        heartbeat_cb=heartbeat_cb,
+    )
+    repo_pred_path = source_root / f"predictions_{date_str}.csv"
+    if (not pred_path.exists() or _count_csv_rows_quick(pred_path) <= 0) and repo_pred_path.exists() and repo_pred_path.is_file():
+        try:
+            pred_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(repo_pred_path, pred_path)
+        except Exception:
+            pass
+    if _count_csv_rows_quick(pred_path) <= 0:
+        return False, f"source bootstrap did not produce {pred_path.name} (rc={bootstrap_result.get('predict_date')})"
+    _append_log(log_file, f"Generated game predictions at {pred_path} (rows={_count_csv_rows_quick(pred_path)})")
+    return True, None
+
+
 def _predict_props_cli_args(*, source_root: Path, date_str: str, out_path: Path) -> list[str]:
     smart_sim_n_sims = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150))
     smart_sim_workers = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1))
@@ -1835,29 +1883,38 @@ def _run_refresh_via_cli(
         elif not player_logs_ok:
             state["error"] = player_logs_error or f"player_logs missing before predict-props for {date_str}"
         else:
-            try:
-                _touch_progress()
-                _, _ = export_props_predictions_local(
-                    source_root=source_root,
-                    date_str=date_str,
-                    out_path=pred_fp,
-                    calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_CALIB_WINDOW", 7)),
-                    calibrate_player=_env_bool("REFRESH_PREDICT_PROPS_CALIBRATE_PLAYER", True),
-                    player_calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_CALIB_WINDOW", 30)),
-                    player_min_pairs=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_MIN_PAIRS", 6)),
-                    player_shrink_k=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_SHRINK_K", 8)),
-                    use_smart_sim=_env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True),
-                    smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150)),
-                    smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
-                    smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
-                    log_file=log_file,
-                    heartbeat_cb=_touch_progress,
-                    heartbeat_every_s=5.0,
-                )
-                _touch_progress()
-                rc_pred = 0
-            except Exception:
-                rc_pred = 1
+            game_predictions_ok, game_predictions_error = _ensure_game_predictions_for_props_refresh(
+                source_root=source_root,
+                date_str=date_str,
+                log_file=log_file,
+                heartbeat_cb=_touch_progress,
+            )
+            if not game_predictions_ok:
+                state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
+            else:
+                try:
+                    _touch_progress()
+                    _, _ = export_props_predictions_local(
+                        source_root=source_root,
+                        date_str=date_str,
+                        out_path=pred_fp,
+                        calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_CALIB_WINDOW", 7)),
+                        calibrate_player=_env_bool("REFRESH_PREDICT_PROPS_CALIBRATE_PLAYER", True),
+                        player_calib_window=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_CALIB_WINDOW", 30)),
+                        player_min_pairs=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_MIN_PAIRS", 6)),
+                        player_shrink_k=max(1, _env_int("REFRESH_PREDICT_PROPS_PLAYER_SHRINK_K", 8)),
+                        use_smart_sim=_env_bool("REFRESH_PREDICT_PROPS_USE_SMART_SIM", True),
+                        smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150)),
+                        smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
+                        smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
+                        log_file=log_file,
+                        heartbeat_cb=_touch_progress,
+                        heartbeat_every_s=5.0,
+                    )
+                    _touch_progress()
+                    rc_pred = 0
+                except Exception:
+                    rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
             existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
             existing_recs_rows = int(_count_csv_rows_quick(rec_fp))

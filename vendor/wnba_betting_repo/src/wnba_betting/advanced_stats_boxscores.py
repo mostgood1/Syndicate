@@ -42,9 +42,45 @@ def _season_key_from_game_id(game_id: str) -> str:
 
 
 def _iter_boxscore_files(boxscores_dir: Path) -> Iterable[Path]:
-    if not boxscores_dir.exists():
-        return []
-    return sorted(boxscores_dir.glob("boxscore_*.csv"))
+    candidates: list[Path] = []
+    if boxscores_dir.exists():
+        candidates.extend(sorted(boxscores_dir.glob("boxscore_*.csv")))
+        if candidates:
+            return candidates
+    if boxscores_dir.name == "boxscores":
+        candidates.extend(sorted(boxscores_dir.parent.glob("boxscores_*.csv")))
+    return candidates
+
+
+def _date_from_boxscore_filename(fp: Path) -> pd.Timestamp | None:
+    stem = fp.stem
+    prefix = "boxscores_"
+    if not stem.startswith(prefix):
+        return None
+    try:
+        return pd.to_datetime(stem.replace(prefix, "", 1), errors="coerce").normalize()
+    except Exception:
+        return None
+
+
+def _normalize_boxscore_frame(df: pd.DataFrame) -> pd.DataFrame:
+    column_aliases = {
+        "TEAM_ABBREVIATION": "teamTricode",
+        "PTS": "points",
+        "FGM": "fieldGoalsMade",
+        "FGA": "fieldGoalsAttempted",
+        "FG3M": "threePointersMade",
+        "FG3A": "threePointersAttempted",
+        "FTA": "freeThrowsAttempted",
+        "OREB": "reboundsOffensive",
+        "DREB": "reboundsDefensive",
+        "TOV": "turnovers",
+        "AST": "assists",
+    }
+    renamed = {src: dst for src, dst in column_aliases.items() if src in df.columns and dst not in df.columns}
+    if renamed:
+        df = df.rename(columns=renamed)
+    return df
 
 
 def _coerce_num(s: pd.Series) -> pd.Series:
@@ -122,10 +158,14 @@ def compute_team_advanced_stats_from_boxscores(
 
     for fp in _iter_boxscore_files(boxscores_dir):
         stem = fp.stem
-        if not stem.startswith("boxscore_"):
+        game_id = ""
+        game_dt = _date_from_boxscore_filename(fp)
+        if stem.startswith("boxscore_"):
+            game_id = stem.replace("boxscore_", "", 1)
+            if game_dt is None:
+                game_dt = gid_to_date.get(str(game_id))
+        elif not stem.startswith("boxscores_"):
             continue
-        game_id = stem.replace("boxscore_", "", 1)
-        game_dt = gid_to_date.get(str(game_id))
         if game_dt is not None:
             if season_year_from_date(game_dt.date()) != int(season):
                 continue
@@ -150,6 +190,7 @@ def compute_team_advanced_stats_from_boxscores(
         if df is None or df.empty:
             continue
 
+        df = _normalize_boxscore_frame(df)
         cols = set(df.columns)
         # Core required stats
         core_required = {
@@ -166,8 +207,11 @@ def compute_team_advanced_stats_from_boxscores(
         if not core_required.issubset(cols):
             continue
 
-        # Aggregate player stats -> team totals.
+        # Aggregate player stats -> team totals per game.
         want_cols = list(core_required)
+        game_col = "game_id" if "game_id" in df.columns else ("gameId" if "gameId" in df.columns else None)
+        if game_col is not None:
+            want_cols.append(game_col)
         if "threePointersAttempted" in cols:
             want_cols.append("threePointersAttempted")
         if "assists" in cols:
@@ -179,6 +223,11 @@ def compute_team_advanced_stats_from_boxscores(
             tmp = tmp[tmp["teamTricode"].isin(set(TEAM_TRICODES))].copy()
             if tmp.empty:
                 continue
+        if game_col is None:
+            tmp["__game_key"] = fp.stem
+            game_col = "__game_key"
+        else:
+            tmp[game_col] = tmp[game_col].astype(str).str.strip()
         for c in [
             "points",
             "fieldGoalsMade",
@@ -209,74 +258,75 @@ def compute_team_advanced_stats_from_boxscores(
         if "assists" in tmp.columns:
             group_cols.append("assists")
 
-        g = tmp.groupby("teamTricode", as_index=False)[group_cols].sum()
+        grouped = tmp.groupby([game_col, "teamTricode"], as_index=False)[group_cols].sum()
+        for _, per_game in grouped.groupby(game_col):
+            g = per_game.reset_index(drop=True)
+            if g is None or len(g) != 2:
+                continue
 
-        if g is None or len(g) != 2:
-            continue
+            t0 = g.iloc[0]
+            t1 = g.iloc[1]
+            team0 = str(t0["teamTricode"]).upper().strip()
+            team1 = str(t1["teamTricode"]).upper().strip()
+            if not team0 or not team1 or team0 == team1:
+                continue
 
-        t0 = g.iloc[0]
-        t1 = g.iloc[1]
-        team0 = str(t0["teamTricode"]).upper().strip()
-        team1 = str(t1["teamTricode"]).upper().strip()
-        if not team0 or not team1 or team0 == team1:
-            continue
-
-        poss0 = _possessions(
-            fga=float(t0["fieldGoalsAttempted"]),
-            fta=float(t0["freeThrowsAttempted"]),
-            oreb=float(t0["reboundsOffensive"]),
-            tov=float(t0["turnovers"]),
-        )
-        poss1 = _possessions(
-            fga=float(t1["fieldGoalsAttempted"]),
-            fta=float(t1["freeThrowsAttempted"]),
-            oreb=float(t1["reboundsOffensive"]),
-            tov=float(t1["turnovers"]),
-        )
-        pace_game = 0.5 * (poss0 + poss1)
-
-        team_games.append(
-            TeamGameTotals(
-                team=team0,
-                opp=team1,
-                pts_for=float(t0["points"]),
-                pts_against=float(t1["points"]),
-                fgm=float(t0["fieldGoalsMade"]),
+            poss0 = _possessions(
                 fga=float(t0["fieldGoalsAttempted"]),
-                tpm=float(t0["threePointersMade"]),
-                tpa=float(t0["threePointersAttempted"]) if "threePointersAttempted" in g.columns else float("nan"),
                 fta=float(t0["freeThrowsAttempted"]),
                 oreb=float(t0["reboundsOffensive"]),
-                dreb=float(t0["reboundsDefensive"]),
                 tov=float(t0["turnovers"]),
-                ast=float(t0["assists"]) if "assists" in g.columns else float("nan"),
-                opp_dreb=float(t1["reboundsDefensive"]),
-                poss_for=poss0,
-                poss_against=poss1,
-                pace_game=pace_game,
             )
-        )
-        team_games.append(
-            TeamGameTotals(
-                team=team1,
-                opp=team0,
-                pts_for=float(t1["points"]),
-                pts_against=float(t0["points"]),
-                fgm=float(t1["fieldGoalsMade"]),
+            poss1 = _possessions(
                 fga=float(t1["fieldGoalsAttempted"]),
-                tpm=float(t1["threePointersMade"]),
-                tpa=float(t1["threePointersAttempted"]) if "threePointersAttempted" in g.columns else float("nan"),
                 fta=float(t1["freeThrowsAttempted"]),
                 oreb=float(t1["reboundsOffensive"]),
-                dreb=float(t1["reboundsDefensive"]),
                 tov=float(t1["turnovers"]),
-                ast=float(t1["assists"]) if "assists" in g.columns else float("nan"),
-                opp_dreb=float(t0["reboundsDefensive"]),
-                poss_for=poss1,
-                poss_against=poss0,
-                pace_game=pace_game,
             )
-        )
+            pace_game = 0.5 * (poss0 + poss1)
+
+            team_games.append(
+                TeamGameTotals(
+                    team=team0,
+                    opp=team1,
+                    pts_for=float(t0["points"]),
+                    pts_against=float(t1["points"]),
+                    fgm=float(t0["fieldGoalsMade"]),
+                    fga=float(t0["fieldGoalsAttempted"]),
+                    tpm=float(t0["threePointersMade"]),
+                    tpa=float(t0["threePointersAttempted"]) if "threePointersAttempted" in g.columns else float("nan"),
+                    fta=float(t0["freeThrowsAttempted"]),
+                    oreb=float(t0["reboundsOffensive"]),
+                    dreb=float(t0["reboundsDefensive"]),
+                    tov=float(t0["turnovers"]),
+                    ast=float(t0["assists"]) if "assists" in g.columns else float("nan"),
+                    opp_dreb=float(t1["reboundsDefensive"]),
+                    poss_for=poss0,
+                    poss_against=poss1,
+                    pace_game=pace_game,
+                )
+            )
+            team_games.append(
+                TeamGameTotals(
+                    team=team1,
+                    opp=team0,
+                    pts_for=float(t1["points"]),
+                    pts_against=float(t0["points"]),
+                    fgm=float(t1["fieldGoalsMade"]),
+                    fga=float(t1["fieldGoalsAttempted"]),
+                    tpm=float(t1["threePointersMade"]),
+                    tpa=float(t1["threePointersAttempted"]) if "threePointersAttempted" in g.columns else float("nan"),
+                    fta=float(t1["freeThrowsAttempted"]),
+                    oreb=float(t1["reboundsOffensive"]),
+                    dreb=float(t1["reboundsDefensive"]),
+                    tov=float(t1["turnovers"]),
+                    ast=float(t1["assists"]) if "assists" in g.columns else float("nan"),
+                    opp_dreb=float(t0["reboundsDefensive"]),
+                    poss_for=poss1,
+                    poss_against=poss0,
+                    pace_game=pace_game,
+                )
+            )
 
     if not team_games:
         return pd.DataFrame()

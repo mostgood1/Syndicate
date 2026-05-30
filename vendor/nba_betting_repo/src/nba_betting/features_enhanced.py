@@ -14,6 +14,100 @@ from .config import paths
 from .scrapers import BasketballReferenceScraper, NBAInjuryDatabase
 
 
+_ADVANCED_STATS_COLUMNS = [
+    'pace',
+    'off_rtg',
+    'def_rtg',
+    'efg_pct',
+    'tov_pct',
+    'orb_pct',
+    'ft_rate',
+    'fg3a_rate',
+    'fg3_pct',
+    'ts_pct',
+    'ast_per_100',
+]
+
+
+def _infer_as_of_date(df: pd.DataFrame) -> str | None:
+    for col in ('date', 'game_date', 'GAME_DATE'):
+        if col not in df.columns:
+            continue
+        ts = pd.to_datetime(df[col], errors='coerce').dropna()
+        if not ts.empty:
+            return ts.max().normalize().strftime('%Y-%m-%d')
+    return None
+
+
+def _advanced_stats_quality_ok(stats_df: pd.DataFrame, required_teams: set[str]) -> bool:
+    if stats_df is None or stats_df.empty or 'team' not in stats_df.columns:
+        return False
+    teams = set(stats_df['team'].astype(str).str.upper().str.strip())
+    if required_teams and not required_teams.issubset(teams):
+        return False
+    varied_cols = 0
+    for col in ('pace', 'off_rtg', 'def_rtg', 'efg_pct'):
+        if col not in stats_df.columns:
+            continue
+        values = pd.to_numeric(stats_df[col], errors='coerce').dropna()
+        if values.nunique() > 1:
+            varied_cols += 1
+    return varied_cols >= 2
+
+
+def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
+    from .advanced_stats_boxscores import compute_team_advanced_stats_from_boxscores
+    from .advanced_stats_player_logs import compute_team_advanced_stats_from_player_logs
+
+    required_teams = set(pd.concat([df['home_team'], df['visitor_team']]).astype(str).str.upper().str.strip())
+    as_of = _infer_as_of_date(df)
+    stats_file = paths.data_processed / f"team_advanced_stats_{season}.csv"
+    stats_candidates: list[Path] = []
+    if as_of:
+        stats_candidates.append(paths.data_processed / f"team_advanced_stats_{season}_asof_{as_of.replace('-', '')}.csv")
+    stats_candidates.append(stats_file)
+    stats_candidates.extend(sorted(paths.data_processed.glob(f"team_advanced_stats_{season}_asof_*.csv"), reverse=True))
+
+    seen: set[Path] = set()
+    for candidate in stats_candidates:
+        if candidate in seen or not candidate.exists():
+            continue
+        seen.add(candidate)
+        try:
+            stats_df = pd.read_csv(candidate)
+        except Exception:
+            continue
+        if _advanced_stats_quality_ok(stats_df, required_teams):
+            print(f"Loaded advanced stats from {candidate}")
+            return stats_df
+        print(f"Rejecting advanced stats cache {candidate} as incomplete or flat")
+
+    for builder_name, builder in (
+        ('boxscores', compute_team_advanced_stats_from_boxscores),
+        ('player_logs', compute_team_advanced_stats_from_player_logs),
+    ):
+        try:
+            stats_df = builder(season=season, min_games=5, as_of=as_of)
+        except Exception as exc:
+            print(f"Failed to build advanced stats from {builder_name}: {exc}")
+            continue
+        if not _advanced_stats_quality_ok(stats_df, required_teams):
+            continue
+        stats_df = stats_df.copy()
+        stats_df['team'] = stats_df['team'].astype(str).str.upper().str.strip()
+        stats_df.to_csv(stats_file, index=False)
+        if as_of:
+            asof_file = paths.data_processed / f"team_advanced_stats_{season}_asof_{as_of.replace('-', '')}.csv"
+            stats_df.to_csv(asof_file, index=False)
+            print(f"Saved advanced stats to {asof_file}")
+        print(f"Saved advanced stats to {stats_file}")
+        return stats_df
+
+    raise RuntimeError(
+        f"Unable to materialize real advanced stats for season {season} from local boxscores or player logs"
+    )
+
+
 def add_advanced_stats_features(df: pd.DataFrame, season: int = 2025) -> pd.DataFrame:
     """
     Add pace, efficiency, and Four Factors features to games DataFrame.
@@ -25,24 +119,7 @@ def add_advanced_stats_features(df: pd.DataFrame, season: int = 2025) -> pd.Data
     Returns:
         DataFrame with additional advanced stats features
     """
-    # Try to load cached advanced stats
-    stats_file = paths.data_processed / f"team_advanced_stats_{season}.csv"
-    
-    if stats_file.exists():
-        stats_df = pd.read_csv(stats_file)
-        print(f"Loaded advanced stats from {stats_file}")
-    else:
-        # Fetch from Basketball Reference
-        print(f"Fetching advanced stats for season {season}...")
-        scraper = BasketballReferenceScraper()
-        stats_df = scraper.get_team_stats(season)
-        
-        if not stats_df.empty:
-            stats_df.to_csv(stats_file, index=False)
-            print(f"Saved advanced stats to {stats_file}")
-        else:
-            print("No advanced stats available, skipping...")
-            return df
+    stats_df = _materialize_advanced_stats(df, season)
     
     # Merge stats for home team
     df = df.merge(
@@ -53,20 +130,7 @@ def add_advanced_stats_features(df: pd.DataFrame, season: int = 2025) -> pd.Data
         suffixes=('', '_home_adv')
     )
     
-    adv_cols = [
-        'pace',
-        'off_rtg',
-        'def_rtg',
-        'efg_pct',
-        'tov_pct',
-        'orb_pct',
-        'ft_rate',
-        # Optional add-ons (present in some cached advanced-stats builds)
-        'fg3a_rate',
-        'fg3_pct',
-        'ts_pct',
-        'ast_per_100',
-    ]
+    adv_cols = list(_ADVANCED_STATS_COLUMNS)
 
     # Rename home team columns
     for col in adv_cols:
