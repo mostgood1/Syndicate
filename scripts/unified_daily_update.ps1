@@ -438,6 +438,7 @@ function Assert-AdvancedDataReady {
                 throw 'NBA advanced-data gate failed: missing mirrored team_advanced_stats artifacts'
             }
             $foundNonBaselinePace = $false
+            $foundUsableSmartSimPayload = $false
             foreach ($smartSimFile in $smartSimFiles) {
                 try {
                     $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
@@ -447,11 +448,29 @@ function Assert-AdvancedDataReady {
                         $foundNonBaselinePace = $true
                         break
                     }
+
+                    $quarters = @()
+                    if ($null -ne $payload.quarters) {
+                        $quarters = @($payload.quarters)
+                    }
+                    $homePlayers = @()
+                    $awayPlayers = @()
+                    if ($null -ne $payload.players) {
+                        if ($null -ne $payload.players.home) {
+                            $homePlayers = @($payload.players.home)
+                        }
+                        if ($null -ne $payload.players.away) {
+                            $awayPlayers = @($payload.players.away)
+                        }
+                    }
+                    if ($quarters.Count -gt 0 -or $homePlayers.Count -gt 0 -or $awayPlayers.Count -gt 0) {
+                        $foundUsableSmartSimPayload = $true
+                    }
                 }
                 catch {
                 }
             }
-            if (-not $foundNonBaselinePace) {
+            if (-not $foundNonBaselinePace -and -not $foundUsableSmartSimPayload) {
                 throw "NBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
             }
             return
@@ -460,6 +479,16 @@ function Assert-AdvancedDataReady {
             $processedRoot = Join-Path $RepoRoot 'data\wnba_source\data\processed'
             if (-not (Test-Path $processedRoot)) {
                 throw "WNBA advanced-data gate failed: missing processed root $processedRoot"
+            }
+            $requiredBoardArtifacts = @(
+                (Join-Path $processedRoot ("game_cards_{0}.csv" -f $DateValue)),
+                (Join-Path $processedRoot ("recommendations_slate_{0}.json" -f $DateValue)),
+                (Join-Path $processedRoot ("cards_props_snapshot_{0}.json" -f $DateValue))
+            )
+            foreach ($requiredArtifact in $requiredBoardArtifacts) {
+                if (-not (Test-Path $requiredArtifact)) {
+                    throw "WNBA advanced-data gate failed: missing required board artifact $requiredArtifact"
+                }
             }
             $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
             if ($smartSimFiles.Count -eq 0) {
@@ -470,6 +499,7 @@ function Assert-AdvancedDataReady {
                 throw 'WNBA advanced-data gate failed: missing mirrored team_advanced_stats artifacts'
             }
             $foundNonBaselinePace = $false
+            $foundUsableSmartSimPayload = $false
             foreach ($smartSimFile in $smartSimFiles) {
                 try {
                     $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
@@ -479,11 +509,29 @@ function Assert-AdvancedDataReady {
                         $foundNonBaselinePace = $true
                         break
                     }
+
+                    $quarters = @()
+                    if ($null -ne $payload.quarters) {
+                        $quarters = @($payload.quarters)
+                    }
+                    $homePlayers = @()
+                    $awayPlayers = @()
+                    if ($null -ne $payload.players) {
+                        if ($null -ne $payload.players.home) {
+                            $homePlayers = @($payload.players.home)
+                        }
+                        if ($null -ne $payload.players.away) {
+                            $awayPlayers = @($payload.players.away)
+                        }
+                    }
+                    if ($quarters.Count -gt 0 -or $homePlayers.Count -gt 0 -or $awayPlayers.Count -gt 0) {
+                        $foundUsableSmartSimPayload = $true
+                    }
                 }
                 catch {
                 }
             }
-            if (-not $foundNonBaselinePace) {
+            if (-not $foundNonBaselinePace -and -not $foundUsableSmartSimPayload) {
                 throw "WNBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
             }
             return

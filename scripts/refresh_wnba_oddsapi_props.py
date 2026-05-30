@@ -694,70 +694,115 @@ def _load_local_props_recommendations(*, processed_root: Path, date_str: str) ->
 def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
     rows, _, by_names = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
     recommendations_path = processed_root / f"recommendations_{date_str}.csv"
-    if not rows or not recommendations_path.exists() or not recommendations_path.is_file() or _count_csv_rows_quick(recommendations_path) <= 0:
+    if not rows:
         return 0, None
 
     grouped: dict[tuple[str, str], list[dict[str, object]]] = {}
-    with recommendations_path.open("r", encoding="utf-8", newline="") as handle:
-        for row in csv.DictReader(handle):
-            if not isinstance(row, dict):
-                continue
-            home_name = str(row.get("home") or "").strip()
-            away_name = str(row.get("away") or "").strip()
-            game_row = by_names.get((home_name.lower(), away_name.lower()))
-            if game_row is None:
-                continue
-            home_tri = str(game_row.get("home_tri") or "").strip().upper()
-            away_tri = str(game_row.get("away_tri") or "").strip().upper()
-            market = str(row.get("market") or "").strip().upper()
-            side = str(row.get("side") or "").strip() or market
-            line = _float_or_none(row.get("line"))
-            price = _float_or_none(row.get("price"))
-            ev = _float_or_none(row.get("ev"))
-            implied_prob = _float_or_none(row.get("implied_prob"))
-            edge = _float_or_none(row.get("edge"))
-            pred_margin = _float_or_none(row.get("pred_margin"))
-            pred_total = _float_or_none(row.get("pred_total"))
-            market_home_margin = _float_or_none(row.get("market_home_margin"))
-            ev_pct = (ev * 100.0) if ev is not None else None
-            win_prob = _clamp_probability((implied_prob or 0.5) + (ev or 0.0))
+    if recommendations_path.exists() and recommendations_path.is_file() and _count_csv_rows_quick(recommendations_path) > 0:
+        with recommendations_path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if not isinstance(row, dict):
+                    continue
+                home_name = str(row.get("home") or "").strip()
+                away_name = str(row.get("away") or "").strip()
+                game_row = by_names.get((home_name.lower(), away_name.lower()))
+                if game_row is None:
+                    continue
+                home_tri = str(game_row.get("home_tri") or "").strip().upper()
+                away_tri = str(game_row.get("away_tri") or "").strip().upper()
+                market = str(row.get("market") or "").strip().upper()
+                side = str(row.get("side") or "").strip() or market
+                line = _float_or_none(row.get("line"))
+                price = _float_or_none(row.get("price"))
+                ev = _float_or_none(row.get("ev"))
+                implied_prob = _float_or_none(row.get("implied_prob"))
+                edge = _float_or_none(row.get("edge"))
+                pred_margin = _float_or_none(row.get("pred_margin"))
+                pred_total = _float_or_none(row.get("pred_total"))
+                market_home_margin = _float_or_none(row.get("market_home_margin"))
+                ev_pct = (ev * 100.0) if ev is not None else None
+                win_prob = _clamp_probability((implied_prob or 0.5) + (ev or 0.0))
 
-            if market == "ATS":
-                side_is_home = side.lower() == home_name.lower()
-                signed_line = market_home_margin if market_home_margin is not None and side_is_home else (
-                    (-market_home_margin) if market_home_margin is not None else (-abs(line) if side_is_home and line is not None else abs(line) if line is not None else None)
+                if market == "ATS":
+                    side_is_home = side.lower() == home_name.lower()
+                    signed_line = market_home_margin if market_home_margin is not None and side_is_home else (
+                        (-market_home_margin) if market_home_margin is not None else (-abs(line) if side_is_home and line is not None else abs(line) if line is not None else None)
+                    )
+                    display_pick = f"{side} {_format_signed_line(signed_line)}".strip()
+                    summary = f"Model margin {_format_plain_line(pred_margin)} vs market {_format_signed_line(signed_line)}"
+                    team_label = side
+                else:
+                    display_pick = f"{side} {_format_plain_line(line)}".strip()
+                    summary = f"Model total {_format_plain_line(pred_total)} vs line {_format_plain_line(line)}"
+                    team_label = "Total"
+
+                grouped.setdefault((home_tri, away_tri), []).append(
+                    {
+                        "market": market,
+                        "team": team_label,
+                        "display_pick": display_pick,
+                        "selection": side,
+                        "price": price,
+                        "score": edge if edge is not None else ev_pct,
+                        "ev_pct": ev_pct,
+                        "win_prob": win_prob,
+                        "p_win": win_prob,
+                        "basketball_summary": summary,
+                        "top_play_reasons": [
+                            bit
+                            for bit in [
+                                f"Edge {_format_plain_line(edge)}" if edge is not None else "",
+                                f"EV {ev_pct:.1f}%" if ev_pct is not None else "",
+                            ]
+                            if bit
+                        ],
+                        "matchup": f"{away_tri} @ {home_tri}",
+                    }
                 )
-                display_pick = f"{side} {_format_signed_line(signed_line)}".strip()
-                summary = f"Model margin {_format_plain_line(pred_margin)} vs market {_format_signed_line(signed_line)}"
-                team_label = side
-            else:
-                display_pick = f"{side} {_format_plain_line(line)}".strip()
-                summary = f"Model total {_format_plain_line(pred_total)} vs line {_format_plain_line(line)}"
-                team_label = "Total"
 
-            grouped.setdefault((home_tri, away_tri), []).append(
-                {
-                    "market": market,
-                    "team": team_label,
-                    "display_pick": display_pick,
-                    "selection": side,
-                    "price": price,
-                    "score": edge if edge is not None else ev_pct,
-                    "ev_pct": ev_pct,
-                    "win_prob": win_prob,
-                    "p_win": win_prob,
-                    "basketball_summary": summary,
-                    "top_play_reasons": [
-                        bit
-                        for bit in [
-                            f"Edge {_format_plain_line(edge)}" if edge is not None else "",
-                            f"EV {ev_pct:.1f}%" if ev_pct is not None else "",
-                        ]
-                        if bit
-                    ],
-                    "matchup": f"{away_tri} @ {home_tri}",
-                }
-            )
+    _, by_team, _ = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
+    prop_rows = _load_local_props_recommendations(processed_root=processed_root, date_str=date_str)
+    per_game_prop_counts: dict[tuple[str, str], int] = {}
+    for row in prop_rows:
+        team_tri = str(row.get("team") or "").strip().upper()
+        game_meta = by_team.get(team_tri)
+        top_play = row.get("top_play") if isinstance(row.get("top_play"), dict) else {}
+        if game_meta is None or not top_play:
+            continue
+        home_tri = str(game_meta.get("home_tri") or "").strip().upper()
+        away_tri = str(game_meta.get("away_tri") or "").strip().upper()
+        game_key = (home_tri, away_tri)
+        if per_game_prop_counts.get(game_key, 0) >= 3:
+            continue
+
+        player_name = str(row.get("player") or "").strip()
+        stat = str(top_play.get("stat") or "").strip().lower()
+        line_value = _float_or_none(top_play.get("line"))
+        side = str(top_play.get("side") or "").strip().upper() or "OVER"
+        ev_pct = _float_or_none(top_play.get("ev_pct"))
+        win_prob = _clamp_probability(_float_or_none(top_play.get("p_win")) or _american_price_to_prob(top_play.get("price")) or 0.5)
+        selection = f"{side} {_format_plain_line(line_value)}".strip()
+        stat_label = stat.replace("_", " ").title() if stat else "Prop"
+        display_pick = f"{player_name} {selection}".strip()
+        summary = f"{stat_label} projection {_format_plain_line(_float_or_none(top_play.get('proj')))}"
+
+        grouped.setdefault(game_key, []).append(
+            {
+                "market": "PROPS",
+                "team": team_tri,
+                "display_pick": display_pick,
+                "selection": selection,
+                "price": _float_or_none(top_play.get("price")),
+                "score": ev_pct,
+                "ev_pct": ev_pct,
+                "win_prob": win_prob,
+                "p_win": win_prob,
+                "basketball_summary": summary,
+                "top_play_reasons": row.get("top_play_reasons") if isinstance(row.get("top_play_reasons"), list) else [],
+                "matchup": f"{away_tri} @ {home_tri}",
+            }
+        )
+        per_game_prop_counts[game_key] = int(per_game_prop_counts.get(game_key, 0) + 1)
 
     per_game: list[dict[str, object]] = []
     picks_count = 0
@@ -908,8 +953,88 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     ]
     raw_path = next((path for path in raw_candidates if path.exists() and path.is_file()), None)
     if raw_path is None:
-        _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
-        return 0, None
+        # Fallback to processed game_odds when raw team odds snapshots are unavailable.
+        game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
+        if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:
+            _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
+            return 0, None
+
+        allowed_matchups: set[tuple[str, str]] = set()
+        props_snapshot_path = source_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv"
+        if props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0:
+            try:
+                with props_snapshot_path.open("r", encoding="utf-8", newline="") as props_handle:
+                    props_reader = csv.DictReader(props_handle)
+                    for props_row in props_reader:
+                        if not isinstance(props_row, dict):
+                            continue
+                        props_home = str(props_row.get("home_team") or "").strip().casefold()
+                        props_away = str(props_row.get("away_team") or "").strip().casefold()
+                        if props_home and props_away:
+                            allowed_matchups.add((props_home, props_away))
+            except Exception:
+                allowed_matchups = set()
+
+        rows_out: list[dict[str, object]] = []
+        with game_odds_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for idx, row in enumerate(reader, start=1):
+                if not isinstance(row, dict):
+                    continue
+                home_name = str(row.get("home_team") or "").strip()
+                away_name = str(row.get("visitor_team") or row.get("away_team") or "").strip()
+                if not home_name or not away_name:
+                    continue
+                if allowed_matchups and (home_name.casefold(), away_name.casefold()) not in allowed_matchups:
+                    continue
+                rows_out.append(
+                    {
+                        "date": date_str,
+                        "game_id": str(row.get("game_id") or idx),
+                        "home_team": home_name,
+                        "visitor_team": away_name,
+                        "commence_time": str(row.get("commence_time") or "").strip(),
+                        "home_ml": _float_or_none(row.get("home_ml")),
+                        "away_ml": _float_or_none(row.get("away_ml")),
+                        "home_spread": _float_or_none(row.get("home_spread")),
+                        "away_spread": _float_or_none(row.get("away_spread")),
+                        "total": _float_or_none(row.get("total")),
+                        "bookmaker": str(row.get("bookmaker") or "oddsapi_consensus").strip() or "oddsapi_consensus",
+                        "home_tri": _to_tricode_local(home_name),
+                        "away_tri": _to_tricode_local(away_name),
+                    }
+                )
+
+        if not rows_out:
+            if out_path.exists() and out_path.is_file():
+                out_path.unlink()
+            _append_log(log_file, f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
+            return 0, None
+
+        header_order = [
+            "date",
+            "game_id",
+            "home_team",
+            "visitor_team",
+            "commence_time",
+            "home_ml",
+            "away_ml",
+            "home_spread",
+            "away_spread",
+            "total",
+            "bookmaker",
+            "home_tri",
+            "away_tri",
+        ]
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=header_order)
+            writer.writeheader()
+            for current in rows_out:
+                writer.writerow({field: current.get(field, "") for field in header_order})
+
+        _append_log(log_file, f"Built local game_cards from game_odds fallback: {out_path} (rows={len(rows_out)})")
+        return len(rows_out), out_path
 
     try:
         import pandas as pd
@@ -1409,14 +1534,51 @@ def _seed_game_odds_from_raw_history(*, source_root: Path, date_str: str, log_fi
 
 def _seed_game_odds_from_props_snapshot(*, source_root: Path, date_str: str, log_file: Path) -> bool:
     processed_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
-    if _path_has_meaningful_content(processed_path):
-        return True
-
     snapshot_candidates = (
         source_root / "data" / "processed" / f"oddsapi_player_props_{date_str}.csv",
         source_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv",
     )
     import pandas as pd
+
+    if _path_has_meaningful_content(processed_path):
+        try:
+            existing = pd.read_csv(processed_path)
+        except Exception:
+            existing = pd.DataFrame()
+
+        snapshot_matchups: set[tuple[str, str]] = set()
+        for candidate in snapshot_candidates:
+            if not candidate.exists() or not candidate.is_file():
+                continue
+            try:
+                candidate_frame = pd.read_csv(candidate)
+            except Exception:
+                continue
+            if candidate_frame.empty or not {"home_team", "away_team"}.issubset(candidate_frame.columns):
+                continue
+            for home_name, away_name in candidate_frame[["home_team", "away_team"]].dropna().drop_duplicates().itertuples(index=False):
+                home_text = str(home_name).strip().casefold()
+                away_text = str(away_name).strip().casefold()
+                if home_text and away_text:
+                    snapshot_matchups.add((home_text, away_text))
+            if snapshot_matchups:
+                break
+
+        existing_matchups: set[tuple[str, str]] = set()
+        if not existing.empty and {"home_team", "visitor_team"}.issubset(existing.columns):
+            for home_name, away_name in existing[["home_team", "visitor_team"]].dropna().drop_duplicates().itertuples(index=False):
+                home_text = str(home_name).strip().casefold()
+                away_text = str(away_name).strip().casefold()
+                if home_text and away_text:
+                    existing_matchups.add((home_text, away_text))
+
+        if snapshot_matchups and existing_matchups and existing_matchups.isdisjoint(snapshot_matchups):
+            _append_log(
+                log_file,
+                f"Replacing stale game_odds slate for {date_str}: existing matchups do not overlap props snapshot",
+            )
+        else:
+            return True
 
     for candidate in snapshot_candidates:
         if not candidate.exists() or not candidate.is_file():
