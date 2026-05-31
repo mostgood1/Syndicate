@@ -12,6 +12,7 @@ from typing import Optional
 
 from .config import paths
 from .league import LEAGUE
+from .league import season_year_from_date
 from .scrapers import BasketballReferenceScraper, NBAInjuryDatabase
 
 
@@ -107,6 +108,29 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
     raise RuntimeError(
         f"Unable to materialize real advanced stats for season {season} from local boxscores or player logs"
     )
+
+
+def _resolve_season_for_games(games: pd.DataFrame, season: int | None) -> int:
+    if season is not None:
+        try:
+            season_value = int(season)
+            if season_value > 0:
+                return season_value
+        except Exception:
+            pass
+
+    if isinstance(games, pd.DataFrame) and ("date" in games.columns):
+        try:
+            ts = pd.to_datetime(games["date"], errors="coerce").dropna()
+            if not ts.empty:
+                return int(season_year_from_date(ts.max().date()))
+        except Exception:
+            pass
+
+    try:
+        return int(season_year_from_date(datetime.now().date()))
+    except Exception:
+        return int(datetime.now().year)
 
 
 def add_advanced_stats_features(df: pd.DataFrame, season: int = 2025) -> pd.DataFrame:
@@ -270,7 +294,7 @@ def add_injury_features(df: pd.DataFrame) -> pd.DataFrame:
 def build_features_enhanced(games: pd.DataFrame, 
                            include_advanced_stats: bool = True,
                            include_injuries: bool = True,
-                           season: int = 2025) -> pd.DataFrame:
+                           season: int | None = None) -> pd.DataFrame:
     """
     Build enhanced features including base features + advanced stats + injuries.
     
@@ -314,8 +338,9 @@ def build_features_enhanced(games: pd.DataFrame,
     
     # Step 2: Add advanced statistics
     if include_advanced_stats:
+        resolved_season = _resolve_season_for_games(games, season)
         print("\n[2/3] Adding advanced statistics (pace, efficiency, Four Factors)...")
-        df = add_advanced_stats_features(df, season=season)
+        df = add_advanced_stats_features(df, season=resolved_season)
         adv_feature_count = len(df.columns) - base_feature_count
         print(f"Added {adv_feature_count} advanced stat features")
     else:

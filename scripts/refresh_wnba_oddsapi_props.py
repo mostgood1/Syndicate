@@ -501,6 +501,10 @@ def _source_worker_env(source_root: Path) -> dict[str, str]:
     env.setdefault("OPENBLAS_NUM_THREADS", "1")
     env.setdefault("MKL_NUM_THREADS", "1")
     env.setdefault("NUMEXPR_NUM_THREADS", "1")
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env.setdefault("NO_COLOR", "1")
+    env.setdefault("TERM", "dumb")
     return env
 
 
