@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-05-31T11:58:28-05:00",
+    "generated_at": "2026-05-31T12:14:44-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -234,8 +234,8 @@
       "start_time": "12:35 PM",
       "official_date": "2026-05-31",
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "away": {
         "id": 135,
@@ -252,6 +252,93 @@
       "starter_names": {
         "away": "Griffin Canning",
         "home": "Zack Littell"
+      },
+      "segments": {},
+      "pitcher_props": {},
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [],
+        "counts": {
+          "official": 0,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": false,
+          "hasOfficialRecommendations": false,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 824430,
+      "game_date": "2026-05-31T17:40:00Z",
+      "start_time": "12:40 PM",
+      "official_date": "2026-05-31",
+      "status": {
+        "abstract": "Live",
+        "detailed": "Warmup"
+      },
+      "away": {
+        "id": 111,
+        "abbr": "BOS",
+        "name": "Boston Red Sox",
+        "logo": "https://www.mlbstatic.com/team-logos/111.svg"
+      },
+      "home": {
+        "id": 114,
+        "abbr": "CLE",
+        "name": "Cleveland Guardians",
+        "logo": "https://www.mlbstatic.com/team-logos/114.svg"
+      },
+      "starter_names": {
+        "away": "Ranger Suarez",
+        "home": "Tanner Bibee"
       },
       "segments": {},
       "pitcher_props": {},
@@ -513,93 +600,6 @@
       "starter_names": {
         "away": "John King",
         "home": "Nolan McLean"
-      },
-      "segments": {},
-      "pitcher_props": {},
-      "betting": {
-        "markets": {
-          "totals": null,
-          "ml": null,
-          "pitcherProps": [],
-          "hitterProps": [],
-          "extraPitcherProps": [],
-          "extraHitterProps": []
-        },
-        "results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "playable_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "all_results": {
-          "combined": {
-            "n": 0,
-            "wins": 0,
-            "losses": 0,
-            "stake_u": 0.0,
-            "profit_u": 0.0,
-            "roi": null
-          }
-        },
-        "settled_rows": [],
-        "playable_settled_rows": [],
-        "all_settled_rows": [],
-        "unresolved_rows": [],
-        "playable_unresolved_rows": [],
-        "all_unresolved_rows": [],
-        "counts": {
-          "official": 0,
-          "playable": 0,
-          "pitcher": 0,
-          "hitter": 0,
-          "extra_pitcher": 0,
-          "extra_hitter": 0
-        },
-        "flags": {
-          "hasAnyRecommendations": false,
-          "hasOfficialRecommendations": false,
-          "hasPlayableCandidates": false
-        }
-      }
-    },
-    {
-      "game_pk": 824430,
-      "game_date": "2026-05-31T17:40:00Z",
-      "start_time": "12:40 PM",
-      "official_date": "2026-05-31",
-      "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
-      },
-      "away": {
-        "id": 111,
-        "abbr": "BOS",
-        "name": "Boston Red Sox",
-        "logo": "https://www.mlbstatic.com/team-logos/111.svg"
-      },
-      "home": {
-        "id": 114,
-        "abbr": "CLE",
-        "name": "Cleveland Guardians",
-        "logo": "https://www.mlbstatic.com/team-logos/114.svg"
-      },
-      "starter_names": {
-        "away": "Ranger Suarez",
-        "home": "Tanner Bibee"
       },
       "segments": {},
       "pitcher_props": {},
@@ -1105,7 +1105,7 @@
       "official_date": "2026-05-31",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 147,
@@ -1192,7 +1192,7 @@
       "official_date": "2026-05-31",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 109,
@@ -1279,7 +1279,7 @@
       "official_date": "2026-05-31",
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "away": {
         "id": 143,
