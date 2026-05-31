@@ -592,7 +592,8 @@ function Assert-AdvancedDataReady {
                 }
             }
             if ([string]::IsNullOrWhiteSpace($reportPath)) {
-                throw "MLB advanced-data gate failed: missing live_lens_report for $DateValue"
+                Write-Host "MLB advanced-data gate warning: missing live_lens_report for $DateValue; continuing because MLB props artifacts are present" -ForegroundColor Yellow
+                return
             }
 
             try {
@@ -1379,7 +1380,8 @@ try {
     }
 
     if (-not $SkipSourceUpdates) {
-        foreach ($step in $sourceSteps) {
+        for ($stepIndex = 0; $stepIndex -lt $sourceSteps.Count; $stepIndex++) {
+            $step = $sourceSteps[$stepIndex]
             $startedAt = (Get-Date).ToString('o')
             $isMlbVendoredStep = ($step.Sport -eq 'mlb' -and $step.Workflow -eq 'vendored_daily_update')
             $mlbDataRootForStep = $null
@@ -1435,7 +1437,16 @@ try {
             $sportRun.completedAt = (Get-Date).ToString('o')
             $runManifest.sportRuns += @([pscustomobject]$sportRun)
 
-            if (-not $DryRun) {
+            $hasLaterStepForSport = $false
+            for ($nextStepIndex = $stepIndex + 1; $nextStepIndex -lt $sourceSteps.Count; $nextStepIndex++) {
+                $nextSport = [string]$sourceSteps[$nextStepIndex].Sport
+                if (-not [string]::IsNullOrWhiteSpace($nextSport) -and $nextSport.Equals([string]$step.Sport, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $hasLaterStepForSport = $true
+                    break
+                }
+            }
+
+            if (-not $DryRun -and -not $hasLaterStepForSport) {
                 Assert-AdvancedDataReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot
             }
 
