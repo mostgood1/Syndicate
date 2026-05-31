@@ -232,7 +232,9 @@ def _assert_no_active_refresh_run() -> None:
         raise ValueError(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.")
     external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else {}
     queue_state = str(external_runner.get("queue_state") or "").strip().lower()
-    if state == "pending_external" or queue_state in {"queued", "running"}:
+    if state == "pending_external":
+        raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
+    if state == "running" and queue_state in {"queued", "running"}:
         raise ValueError("A refresh run is already queued for the external runner. Cancel it before starting a new run.")
 
 
