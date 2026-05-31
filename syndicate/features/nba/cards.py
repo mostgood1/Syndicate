@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 
 from syndicate.features.nba.sources import build_module_links
 from syndicate.features.nba.sources import format_moneyline
@@ -20,6 +23,127 @@ from syndicate.features.nba.sources import processed_path
 from syndicate.features.nba.sources import live_snapshot_path
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+
+
+def _remote_source_base_url() -> str:
+    for name in (
+        "NBA_BETTING_BASE_URL",
+        "WNBA_BETTING_BASE_URL",
+    ):
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            if "://" not in value:
+                return f"https://{value}".rstrip("/")
+            return value.rstrip("/")
+    return ""
+
+
+def _remote_source_auth_token() -> str:
+    for name in (
+        "NBA_BETTING_CRON_TOKEN",
+        "NBA_CRON_TOKEN",
+        "CRON_TOKEN",
+    ):
+        value = str(os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _remote_source_fallback_enabled() -> bool:
+    value = str(os.environ.get("NBA_LIVE_REMOTE_FALLBACK") or "").strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return bool(_remote_source_base_url())
+
+
+def _remote_fetch_json(endpoint: str, params: dict[str, str] | None = None) -> dict[str, Any] | None:
+    base_url = _remote_source_base_url()
+    if not base_url:
+        return None
+    query = urllib_parse.urlencode(params or {})
+    url = f"{base_url}{endpoint}{'?' + query if query else ''}"
+
+    headers = {"User-Agent": "Syndicate-NBA/1.0"}
+    token = _remote_source_auth_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    request = urllib_request.Request(url, headers=headers)
+    try:
+        with urllib_request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _remote_live_snapshot_payload(
+    kind: str,
+    *,
+    selected_date: str,
+    event_ids: list[str] | None = None,
+    include_period_totals: bool = False,
+) -> dict[str, Any] | None:
+    endpoint_map = {
+        "live_state": "/api/live_state",
+        "live_player_boxscore": "/api/live_player_boxscore",
+        "live_player_lens": "/api/live_player_lens",
+        "live_lines": "/api/live_lines",
+        "live_pbp_stats": "/api/live_pbp_stats",
+    }
+    endpoint = endpoint_map.get(str(kind or "").strip().lower())
+    if not endpoint:
+        return None
+    params: dict[str, str] = {}
+    date_value = str(selected_date or "").strip()
+    if date_value:
+        params["date"] = date_value
+    cleaned_event_ids = [str(item).strip() for item in (event_ids or []) if str(item).strip()]
+    if cleaned_event_ids:
+        params["event_ids"] = ",".join(dict.fromkeys(cleaned_event_ids))
+    if str(kind).strip().lower() == "live_lines":
+        params["include_period_totals"] = "1" if include_period_totals else "0"
+    payload = _remote_fetch_json(endpoint, params)
+    if not isinstance(payload, dict):
+        return None
+    if not isinstance(payload.get("games"), list):
+        return None
+    return payload
+
+
+def _remote_cards_payload(selected_date: str) -> dict[str, Any] | None:
+    date_value = str(selected_date or "").strip()
+    payload = _remote_fetch_json("/api/cards", {"date": date_value} if date_value else None)
+    if not isinstance(payload, dict):
+        return None
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    return {"payload": payload, "games": games}
+
+
+def _normalize_remote_card_game(game: dict[str, Any]) -> dict[str, Any]:
+    out = dict(game)
+    away_info = out.get("away") if isinstance(out.get("away"), dict) else {}
+    home_info = out.get("home") if isinstance(out.get("home"), dict) else {}
+    away_tri = str(out.get("away_tri") or out.get("away_name") or away_info.get("abbr") or "").strip().upper()
+    home_tri = str(out.get("home_tri") or out.get("home_name") or home_info.get("abbr") or "").strip().upper()
+    if away_tri:
+        out.setdefault("away_tri", away_tri)
+    if home_tri:
+        out.setdefault("home_tri", home_tri)
+    out.setdefault("away", {"abbr": away_tri, "name": away_tri, "logo": _nba_logo_url(away_tri)})
+    out.setdefault("home", {"abbr": home_tri, "name": home_tri, "logo": _nba_logo_url(home_tri)})
+    out.setdefault("away_name", away_tri)
+    out.setdefault("home_name", home_tri)
+    out.setdefault("away_logo", _nba_logo_url(away_tri))
+    out.setdefault("home_logo", _nba_logo_url(home_tri))
+    game_pk = str(out.get("gamePk") or out.get("game_id") or f"{away_tri}@{home_tri}").strip()
+    out["gamePk"] = game_pk
+    out.setdefault("game_id", game_pk)
+    out.setdefault("detail", str(out.get("detail") or out.get("status") or "").strip())
+    return out
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -735,6 +859,16 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     parsed_date = parse_iso_date(resolved_date)
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
     has_actionable_data = _games_have_actionable_data(games)
+    if _remote_source_fallback_enabled() and (not games or not has_actionable_data):
+        remote_cards = _remote_cards_payload(resolved_date)
+        remote_games = remote_cards.get("games") if isinstance(remote_cards, dict) and isinstance(remote_cards.get("games"), list) else []
+        normalized_remote_games = [_normalize_remote_card_game(game) for game in remote_games if isinstance(game, dict)]
+        if normalized_remote_games:
+            games = normalized_remote_games
+            source_title = "NBA remote source cards fallback"
+            cards_path = "remote:/api/cards"
+            recs_path = "remote:/api/cards"
+            has_actionable_data = _games_have_actionable_data(games)
     if not games:
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
@@ -874,6 +1008,11 @@ def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
 
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return _attach_odds_refresh_timestamp(remote_payload)
+
     context = build_cards_page_context(selected_date)
     games = context.get("games") if isinstance(context.get("games"), list) else []
     out_games = []
@@ -917,6 +1056,14 @@ def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str],
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_player_boxscore",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
@@ -930,6 +1077,14 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_player_lens",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
@@ -953,6 +1108,15 @@ def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int 
     local_payload = _filtered_local_live_snapshot_payload("live_lines", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_lines",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+            include_period_totals=bool(include_period_totals),
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
@@ -966,6 +1130,14 @@ def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: 
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", selected_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
+    if _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_pbp_stats",
+            selected_date=selected_date,
+            event_ids=normalized_event_ids,
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+            return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
