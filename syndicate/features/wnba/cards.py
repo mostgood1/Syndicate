@@ -26,6 +26,18 @@ from syndicate.features.wnba.sources import parse_iso_date
 from syndicate.features.wnba.sources import processed_path
 
 
+def _canonical_wnba_tri(team_tri: str) -> str:
+    value = str(team_tri or "").strip().upper()
+    return {
+        "LA": "LAS",
+        "LV": "LAS",
+        "LVA": "LAS",
+        "NY": "NYL",
+        "CONN": "CON",
+        "WAS": "WSH",
+    }.get(value, value)
+
+
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:
     try:
         with path.open("r", encoding="utf-8", newline="") as handle:
@@ -40,8 +52,8 @@ def _recommendation_index(summary: dict[str, Any] | None) -> dict[tuple[str, str
     for item in per_game:
         if not isinstance(item, dict):
             continue
-        away = str(item.get("away") or "").strip().upper()
-        home = str(item.get("home") or "").strip().upper()
+        away = _canonical_wnba_tri(str(item.get("away") or "").strip().upper())
+        home = _canonical_wnba_tri(str(item.get("home") or "").strip().upper())
         picks = item.get("picks") if isinstance(item.get("picks"), list) else []
         if away and home:
             index[(away, home)] = [pick for pick in picks if isinstance(pick, dict)]
@@ -55,8 +67,8 @@ def _artifact_games_index(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
     for game in games:
         if not isinstance(game, dict):
             continue
-        away = str(game.get("away_tri") or "").strip().upper()
-        home = str(game.get("home_tri") or "").strip().upper()
+        away = _canonical_wnba_tri(str(game.get("away_tri") or "").strip().upper())
+        home = _canonical_wnba_tri(str(game.get("home_tri") or "").strip().upper())
         if away and home:
             index[(away, home)] = game
     return index
@@ -69,8 +81,8 @@ def _raw_smart_sim_index(selected_date: str) -> dict[tuple[str, str], dict[str, 
         payload = load_json(path)
         if not isinstance(payload, dict):
             continue
-        away = str(payload.get("away") or "").strip().upper()
-        home = str(payload.get("home") or "").strip().upper()
+        away = _canonical_wnba_tri(str(payload.get("away") or "").strip().upper())
+        home = _canonical_wnba_tri(str(payload.get("home") or "").strip().upper())
         if away and home:
             index[(away, home)] = {"away_tri": away, "home_tri": home, "sim": payload}
     return index
@@ -635,8 +647,8 @@ def _source_game_from_row(
 ) -> dict[str, Any]:
     away_name = str(row.get("visitor_team") or "Away").strip() or "Away"
     home_name = str(row.get("home_team") or "Home").strip() or "Home"
-    away_tri = str(row.get("away_tri") or away_name[:3]).strip().upper() or "AWY"
-    home_tri = str(row.get("home_tri") or home_name[:3]).strip().upper() or "HOM"
+    away_tri = _canonical_wnba_tri(str(row.get("away_tri") or away_name[:3]).strip().upper()) or "AWY"
+    home_tri = _canonical_wnba_tri(str(row.get("home_tri") or home_name[:3]).strip().upper()) or "HOM"
     picks = rec_index.get((away_tri, home_tri), [])
     sim_game = sim_index.get((away_tri, home_tri))
     props_game = props_index.get((away_tri, home_tri)) if isinstance(props_index.get((away_tri, home_tri)), dict) else {}
@@ -709,8 +721,8 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
 
 
 def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: str) -> dict[str, Any]:
-    away_key = str(away_tri or "").strip().upper()
-    home_key = str(home_tri or "").strip().upper()
+    away_key = _canonical_wnba_tri(str(away_tri or "").strip().upper())
+    home_key = _canonical_wnba_tri(str(home_tri or "").strip().upper())
     bundle = _artifact_bundle(selected_date)
     sim_detail = bundle.get("sim", {}).get((away_key, home_key)) if isinstance(bundle.get("sim"), dict) else None
     if isinstance(sim_detail, dict):
@@ -748,8 +760,8 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
             item
             for item in (fallback.get("games") or [])
             if isinstance(item, dict)
-            and str(item.get("away_tri") or "").strip().upper() == away_key
-            and str(item.get("home_tri") or "").strip().upper() == home_key
+            and _canonical_wnba_tri(str(item.get("away_tri") or "").strip().upper()) == away_key
+            and _canonical_wnba_tri(str(item.get("home_tri") or "").strip().upper()) == home_key
         ),
         None,
     )
@@ -852,8 +864,8 @@ def _game_from_row(
 ) -> dict[str, Any]:
     away_name = str(row.get("visitor_team") or "Away").strip() or "Away"
     home_name = str(row.get("home_team") or "Home").strip() or "Home"
-    away_tri = str(row.get("away_tri") or away_name[:3]).strip().upper() or "AWY"
-    home_tri = str(row.get("home_tri") or home_name[:3]).strip().upper() or "HOM"
+    away_tri = _canonical_wnba_tri(str(row.get("away_tri") or away_name[:3]).strip().upper()) or "AWY"
+    home_tri = _canonical_wnba_tri(str(row.get("home_tri") or home_name[:3]).strip().upper()) or "HOM"
     picks = rec_index.get((away_tri, home_tri), [])
     sim_game = sim_index.get((away_tri, home_tri))
     props_game = props_index.get((away_tri, home_tri))
@@ -998,8 +1010,8 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
     for row in rows:
         if not isinstance(row, dict):
             continue
-        away_tri = str(row.get("away") or "").strip().upper()
-        home_tri = str(row.get("home") or "").strip().upper()
+        away_tri = _canonical_wnba_tri(str(row.get("away") or "").strip().upper())
+        home_tri = _canonical_wnba_tri(str(row.get("home") or "").strip().upper())
         if not away_tri or not home_tri:
             continue
         away_pts = _safe_float(row.get("away_pts"))
@@ -1065,8 +1077,8 @@ def _game_identity_key(game: dict[str, Any]) -> tuple[str, str, str]:
     if not isinstance(game, dict):
         return ("", "", "")
     event_id = str(game.get("event_id") or "").strip()
-    away_tri = str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
-    home_tri = str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+    away_tri = _canonical_wnba_tri(str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper())
+    home_tri = _canonical_wnba_tri(str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper())
     return (event_id, away_tri, home_tri)
 
 
