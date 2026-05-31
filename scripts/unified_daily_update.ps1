@@ -234,6 +234,44 @@ function Clear-StaleMlbUiDailyLocks {
     return $removedCount
 }
 
+function Get-ActiveMlbUiDailyLockCount {
+    param(
+        [string]$MlbDataRoot,
+        [string]$DateValue,
+        [string]$SeasonValue
+    )
+
+    if ([string]::IsNullOrWhiteSpace($MlbDataRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($SeasonValue)) {
+        return 0
+    }
+
+    $lockDir = Join-Path $MlbDataRoot 'runtime\locks'
+    if (-not (Test-Path $lockDir)) {
+        return 0
+    }
+
+    $activeCount = 0
+    $pattern = "daily_update_ui-daily_{0}_{1}_*.lock" -f $SeasonValue, $DateValue
+    foreach ($lockFile in @(Get-ChildItem -Path $lockDir -File -Filter $pattern -ErrorAction SilentlyContinue)) {
+        $lockPid = $null
+        try {
+            $lockPayload = Get-Content -Path $lockFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if ($null -ne $lockPayload.pid) {
+                $lockPid = [int]$lockPayload.pid
+            }
+        }
+        catch {
+            $lockPid = $null
+        }
+
+        if ($null -ne $lockPid -and (Test-ProcessIdRunning -ProcessId $lockPid)) {
+            $activeCount += 1
+        }
+    }
+
+    return $activeCount
+}
+
 function Test-PythonExecutable {
     param([string]$Executable)
 
@@ -1380,8 +1418,10 @@ try {
     }
 
     if (-not $SkipSourceUpdates) {
+        $skipSportsDueToLock = @{}
         for ($stepIndex = 0; $stepIndex -lt $sourceSteps.Count; $stepIndex++) {
             $step = $sourceSteps[$stepIndex]
+            $sportKey = [string]$step.Sport
             $startedAt = (Get-Date).ToString('o')
             $isMlbVendoredStep = ($step.Sport -eq 'mlb' -and $step.Workflow -eq 'vendored_daily_update')
             $mlbDataRootForStep = $null
@@ -1403,10 +1443,29 @@ try {
                 mirrorManifestExists = $false
             }
 
+            if (-not [string]::IsNullOrWhiteSpace($sportKey) -and $skipSportsDueToLock.ContainsKey($sportKey) -and $skipSportsDueToLock[$sportKey]) {
+                $sportRun.status = 'skipped_lock_active'
+                $sportRun.error = 'Skipped because an earlier step detected an active artifact lock for this sport.'
+                $sportRun.completedAt = (Get-Date).ToString('o')
+                $runManifest.sportRuns += @([pscustomobject]$sportRun)
+                continue
+            }
+
             if (-not $DryRun -and $isMlbVendoredStep) {
                 $preRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
                 if ($preRemovedLocks -gt 0) {
                     Write-Host ("    cleaned stale MLB ui-daily locks before run: {0}" -f $preRemovedLocks) -ForegroundColor Yellow
+                }
+
+                $activeLockCount = Get-ActiveMlbUiDailyLockCount -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
+                if ($activeLockCount -gt 0) {
+                    Write-Host ("    MLB ui-daily lock is active for {0} ({1} lock file(s)); skipping MLB steps for this run" -f $Date, $activeLockCount) -ForegroundColor Yellow
+                    $skipSportsDueToLock[$sportKey] = $true
+                    $sportRun.status = 'skipped_lock_active'
+                    $sportRun.error = "Another MLB ui-daily run is already active for $Date"
+                    $sportRun.completedAt = (Get-Date).ToString('o')
+                    $runManifest.sportRuns += @([pscustomobject]$sportRun)
+                    continue
                 }
             }
 
