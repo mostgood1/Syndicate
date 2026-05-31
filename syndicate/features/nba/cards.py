@@ -414,14 +414,148 @@ _local_live_state_payload.cache_clear = _local_live_state_payload_cached.cache_c
 _local_live_state_payload.cache_info = _local_live_state_payload_cached.cache_info  # type: ignore[attr-defined]
 
 
+def _parse_payload_timestamp(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _payload_has_live_progress(payload: dict[str, Any] | None) -> bool:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        status_id = int(_safe_float(game.get("status_id")) or 0)
+        if bool(game.get("in_progress")) or bool(game.get("final")) or status_id > 1:
+            return True
+    return False
+
+
+def _espn_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    date_value = str(selected_date or "").strip()
+    if not date_value:
+        return None
+    try:
+        date_compact = parse_iso_date(date_value).strftime("%Y%m%d")
+    except Exception:
+        return None
+    url = (
+        "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        f"?dates={date_compact}"
+    )
+    request = urllib_request.Request(url, headers={"User-Agent": "Syndicate-NBA/1.0"})
+    try:
+        with urllib_request.urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+    events = payload.get("events") if isinstance(payload, dict) and isinstance(payload.get("events"), list) else []
+    out_games: list[dict[str, Any]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        event_id = str(event.get("id") or "").strip() or None
+        competitions = event.get("competitions") if isinstance(event.get("competitions"), list) else []
+        competition = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
+        competitors = competition.get("competitors") if isinstance(competition.get("competitors"), list) else []
+        home_row = next((row for row in competitors if isinstance(row, dict) and str(row.get("homeAway") or "").lower() == "home"), None)
+        away_row = next((row for row in competitors if isinstance(row, dict) and str(row.get("homeAway") or "").lower() == "away"), None)
+        if not isinstance(home_row, dict) or not isinstance(away_row, dict):
+            continue
+        home_team = home_row.get("team") if isinstance(home_row.get("team"), dict) else {}
+        away_team = away_row.get("team") if isinstance(away_row.get("team"), dict) else {}
+        home_tri = str(home_team.get("abbreviation") or "").strip().upper()
+        away_tri = str(away_team.get("abbreviation") or "").strip().upper()
+        if not home_tri or not away_tri:
+            continue
+
+        status_block = competition.get("status") if isinstance(competition.get("status"), dict) else {}
+        status_type = status_block.get("type") if isinstance(status_block.get("type"), dict) else {}
+        state = str(status_type.get("state") or "").strip().lower()
+        final = bool(status_type.get("completed") or (state == "post"))
+        in_progress = bool((state == "in") and not final)
+        status_id = 3 if final else (2 if in_progress else 1)
+        status_text = str(
+            status_type.get("shortDetail")
+            or status_type.get("detail")
+            or status_type.get("description")
+            or ""
+        ).strip() or ("Final" if final else ("Live" if in_progress else "Scheduled"))
+
+        period_value = _safe_float(status_block.get("period"))
+        period = int(period_value) if period_value is not None else None
+        clock = str(status_block.get("displayClock") or status_block.get("clock") or "").strip()
+
+        away_pts = _safe_float(away_row.get("score"))
+        home_pts = _safe_float(home_row.get("score"))
+        out_games.append(
+            {
+                "game_id": f"{away_tri}@{home_tri}",
+                "event_id": event_id,
+                "home": home_tri,
+                "away": away_tri,
+                "home_pts": home_pts,
+                "away_pts": away_pts,
+                "status_id": status_id,
+                "status": status_text,
+                "period": period,
+                "clock": clock,
+                "in_progress": in_progress,
+                "final": final,
+                "periods": [],
+            }
+        )
+
+    return {
+        "date": date_value,
+        "games": out_games,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "source": "espn_live_fetch",
+        "ttl": 12,
+    }
+
+
+def _best_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    local_payload = _local_live_state_payload(selected_date)
+    parsed_selected_date = parse_iso_date(selected_date)
+    today = datetime.now(timezone.utc).date()
+    is_recent_day = parsed_selected_date in {today, (today - timedelta(days=1))}
+    local_timestamp = _parse_payload_timestamp((local_payload or {}).get("generated_at"))
+    local_stale = bool(local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20))
+
+    should_try_espn = bool(is_recent_day and (local_payload is None or local_stale or not _payload_has_live_progress(local_payload)))
+    if should_try_espn:
+        espn_payload = _espn_live_state_payload(selected_date)
+        if isinstance(espn_payload, dict):
+            if not isinstance(local_payload, dict):
+                return espn_payload
+            if _payload_has_live_progress(espn_payload) and not _payload_has_live_progress(local_payload):
+                return espn_payload
+            espn_timestamp = _parse_payload_timestamp(espn_payload.get("generated_at"))
+            if espn_timestamp and local_timestamp and espn_timestamp > local_timestamp:
+                return espn_payload
+    return local_payload
+
+
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
-    payload = _local_live_state_payload(selected_date)
+    payload = _best_live_state_payload(selected_date)
     source_path = None
     if isinstance(payload, dict):
-        try:
-            source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
-        except FileNotFoundError:
-            source_path = None
+        if str(payload.get("source") or "").strip().lower().startswith("espn"):
+            source_path = "espn_live_fetch"
+        else:
+            try:
+                source_path = str(live_snapshot_path(f"live_state_{selected_date}.jsonl"))
+            except FileNotFoundError:
+                source_path = None
     rows = payload.get("games") if isinstance((payload or {}).get("games"), list) else []
     games: list[dict[str, Any]] = []
     for row in rows:
@@ -482,6 +616,60 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
             }
         )
     return games, str(source_path or f"live_state_{selected_date}.jsonl")
+
+
+def _game_identity_key(game: dict[str, Any]) -> tuple[str, str, str]:
+    if not isinstance(game, dict):
+        return ("", "", "")
+    event_id = str(game.get("event_id") or "").strip()
+    away_tri = str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
+    home_tri = str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+    return (event_id, away_tri, home_tri)
+
+
+def _merge_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int, int]:
+    live_games, live_source_path = _games_from_live_state_fallback(selected_date)
+    if not live_games:
+        return games, None, 0, 0
+
+    live_by_key = {
+        _game_identity_key(game): game
+        for game in live_games
+        if isinstance(game, dict)
+    }
+    merged_games: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+    updated_count = 0
+
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        key = _game_identity_key(game)
+        seen_keys.add(key)
+        live_game = live_by_key.get(key)
+        if not isinstance(live_game, dict):
+            merged_games.append(game)
+            continue
+
+        merged = dict(game)
+        live_state_row = live_game.get("live_state") if isinstance(live_game.get("live_state"), dict) else {}
+        if live_state_row:
+            merged["live_state"] = dict(live_state_row)
+
+        live_status = str(live_game.get("status") or "").strip()
+        live_detail = str(live_game.get("detail") or live_status).strip()
+        if live_status:
+            merged["status"] = live_status
+            merged["detail"] = live_detail
+
+        updated_count += 1
+        merged_games.append(merged)
+
+    extras = [game for key, game in live_by_key.items() if key not in seen_keys]
+    if extras:
+        merged_games.extend(extras)
+
+    return merged_games, live_source_path, len(extras), updated_count
 
 
 @lru_cache(maxsize=256)
@@ -871,6 +1059,16 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     source_title = "NBA processed game cards"
     parsed_date = parse_iso_date(resolved_date)
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+    had_artifact_games = bool(games)
+    games, live_source_path, supplemented_count, updated_count = _merge_games_with_live_state(games, resolved_date)
+    if supplemented_count > 0 or updated_count > 0:
+        if had_artifact_games:
+            source_title = "NBA processed game cards + live scoreboard supplement"
+            cards_path = f"{cards_path} | {live_source_path}"
+        else:
+            source_title = "NBA live scoreboard fallback"
+            cards_path = str(live_source_path)
+            recs_path = str(live_source_path)
     has_actionable_data = _games_have_actionable_data(games)
 
     if not games:
@@ -894,6 +1092,16 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             parsed_date = parse_iso_date(resolved_date)
             games, cards_path, recs_path = _games_from_artifacts(resolved_date)
             source_title = "NBA processed game cards"
+            had_artifact_games = bool(games)
+            games, live_source_path, supplemented_count, updated_count = _merge_games_with_live_state(games, resolved_date)
+            if supplemented_count > 0 or updated_count > 0:
+                if had_artifact_games:
+                    source_title = "NBA processed game cards + live scoreboard supplement"
+                    cards_path = f"{cards_path} | {live_source_path}"
+                else:
+                    source_title = "NBA live scoreboard fallback"
+                    cards_path = str(live_source_path)
+                    recs_path = str(live_source_path)
             has_actionable_data = _games_have_actionable_data(games)
             if not games:
                 live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
@@ -1044,7 +1252,7 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
-    local_payload = _local_live_state_payload(selected_date)
+    local_payload = _best_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
 
