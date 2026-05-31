@@ -421,6 +421,18 @@
     }[raw] || raw;
   }
 
+  function canonicalTeamTri(tri) {
+    const value = normalizeLogoTri(tri);
+    return {
+      LA: 'LAS',
+      LV: 'LAS',
+      LVA: 'LAS',
+      NY: 'NYL',
+      CONN: 'CON',
+      WAS: 'WSH',
+    }[value] || value;
+  }
+
   function logoForTri(tri) {
     const key = normalizeLogoTri(tri);
     const assetKey = key === 'CON' ? 'CONN' : key;
@@ -452,8 +464,8 @@
   }
 
   function matchupKey(awayTri, homeTri) {
-    const away = String(awayTri || '').trim().toUpperCase();
-    const home = String(homeTri || '').trim().toUpperCase();
+    const away = canonicalTeamTri(awayTri);
+    const home = canonicalTeamTri(homeTri);
     return away && home ? `${away}@${home}` : '';
   }
 
@@ -555,8 +567,8 @@
     if (!game || hasLoadedSimDetail(game) || state.simDetailLoading.has(target)) {
       return;
     }
-    const away = String(game?.away_tri || '').trim().toUpperCase();
-    const home = String(game?.home_tri || '').trim().toUpperCase();
+    const away = canonicalTeamTri(game?.away_tri);
+    const home = canonicalTeamTri(game?.home_tri);
     const dateValue = String(state.payload?.date || state.date || '').trim();
     if (!away || !home || !dateValue) {
       return;
@@ -2820,8 +2832,8 @@
   }
 
   function stripCardTarget(item) {
-    const away = String(item?.away_tri || '').trim().toUpperCase();
-    const home = String(item?.home_tri || '').trim().toUpperCase();
+    const away = canonicalTeamTri(item?.away_tri);
+    const home = canonicalTeamTri(item?.home_tri);
     return away && home ? `${away}@${home}` : '';
   }
 
@@ -2830,10 +2842,10 @@
       return null;
     }
     const item = { ...rawItem };
-    item.away_tri = String(item.away_tri || '').trim().toUpperCase();
-    item.home_tri = String(item.home_tri || '').trim().toUpperCase();
-    item.team_tri = String(item.team_tri || '').trim().toUpperCase();
-    item.opponent_tri = String(item.opponent_tri || '').trim().toUpperCase();
+    item.away_tri = canonicalTeamTri(item.away_tri);
+    item.home_tri = canonicalTeamTri(item.home_tri);
+    item.team_tri = canonicalTeamTri(item.team_tri);
+    item.opponent_tri = canonicalTeamTri(item.opponent_tri);
     item.player = String(item.player || '').trim();
     item.market = String(item.market || '').trim().toLowerCase();
     item.side = String(item.side || item.ev_side || item.lean || '').trim().toUpperCase();
