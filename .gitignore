@@ -17,6 +17,7 @@ Thumbs.db
 # Timestamped run outputs are operational artifacts; keep rolling latest files tracked.
 reports/daily_update/*/*/
 !reports/daily_update/latest/
+reports/daily_update/latest/unified_daily_update_latest.json
 reports/migration_runs/**
 !reports/migration_runs/mirror_contract_smoke/
 reports/refresh_status/*/*/
