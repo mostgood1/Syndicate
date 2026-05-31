@@ -173,7 +173,11 @@ def _remote_source_auth_token() -> str:
 
 def _remote_source_fallback_enabled() -> bool:
     value = str(os.environ.get("WNBA_LIVE_REMOTE_FALLBACK") or "").strip().lower()
-    return value in {"1", "true", "yes", "on"}
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return bool(_remote_source_base_url())
 
 
 def _remote_live_snapshot_payload(
