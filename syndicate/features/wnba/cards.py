@@ -30,8 +30,8 @@ def _canonical_wnba_tri(team_tri: str) -> str:
     value = str(team_tri or "").strip().upper()
     return {
         "LA": "LAS",
-        "LV": "LAS",
-        "LVA": "LAS",
+        "LV": "LVA",
+        "LVA": "LVA",
         "NY": "NYL",
         "CONN": "CON",
         "WAS": "WSH",

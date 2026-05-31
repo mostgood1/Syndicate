@@ -12,7 +12,7 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
             {
                 "gamePk": "1",
                 "event_id": "",
-                "away_tri": "LAS",
+                "away_tri": "LA",
                 "home_tri": "WSH",
                 "status": "Scheduled",
                 "detail": "2026-05-31T00:00:00+00:00",
@@ -20,14 +20,14 @@ class WnbaCardsMergeAliasTests(unittest.TestCase):
         ]
         live_games = [
             {
-                "gamePk": "LVA@WSH",
+                "gamePk": "LAS@WSH",
                 "event_id": "",
-                "away_tri": "LVA",
+                "away_tri": "LAS",
                 "home_tri": "WSH",
                 "status": "Final",
                 "detail": "Final",
                 "live_state": {
-                    "away": "LVA",
+                    "away": "LAS",
                     "home": "WSH",
                     "status": "Final",
                     "final": True,
