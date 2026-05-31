@@ -1143,7 +1143,6 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     )
 
 
-@lru_cache(maxsize=64)
 def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
     try:
         path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
@@ -1169,7 +1168,6 @@ def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
     return None
 
 
-@lru_cache(maxsize=256)
 def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
     resolved_date = str(selected_date or "").strip()
     if not resolved_date:

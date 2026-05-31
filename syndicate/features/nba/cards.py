@@ -239,7 +239,6 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     }
 
 
-@lru_cache(maxsize=64)
 def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
     try:
         path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
@@ -335,7 +334,6 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
     return games, str(source_path or f"live_state_{selected_date}.jsonl")
 
 
-@lru_cache(maxsize=256)
 def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
     resolved_date = str(selected_date or "").strip()
     if not resolved_date:
