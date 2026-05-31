@@ -71,6 +71,10 @@ def _selected_date(season: int | None = None) -> str:
     return (request.args.get("date") or fallback).strip()
 
 
+def _allow_stored_date_fallback() -> bool:
+    return "date" not in request.args
+
+
 def _live_lens_query_string(season: int | None = None) -> str:
     query_items = list(parse_qsl(request.query_string.decode("utf-8") if request.query_string else "", keep_blank_values=True))
     if season is None:
@@ -139,7 +143,7 @@ def archive():
 @nba_bp.get("/cards")
 def cards():
     selected_date = _selected_date()
-    context = build_cards_page_context(selected_date)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
     client = (request.args.get("client") or "").strip().lower()
     if client == "board":
         return render_template("shared/game_cards_board.html", **context)
@@ -147,7 +151,7 @@ def cards():
 
 
 def _live_lens_cards_shell_context(selected_date: str, *, season: int | None = None, profile: str | None = None) -> dict[str, object]:
-    context = build_cards_page_context(selected_date)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
     normalized_profile = str(profile or "").strip().lower() or ("retuned" if season is not None else "")
     embed_mode = str(request.args.get("embed") or "").strip().lower()
     cards_base_path = f"/nba/season/{int(season)}/live-lens" if season is not None else "/nba/live-lens"
@@ -517,7 +521,7 @@ def game_detail(game_pk: str):
 @nba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
-    return jsonify(build_cards_api_payload(selected_date))
+    return jsonify(build_cards_api_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback()))
 
 
 @nba_bp.get("/api/archive")
@@ -709,7 +713,7 @@ def api_live_state():
     except Exception:
         ttl = 12
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_state_payload(selected_date, ttl=ttl))
+    return jsonify(build_live_state_payload(selected_date, ttl=ttl, allow_stored_date_fallback=_allow_stored_date_fallback()))
 
 
 @nba_bp.get("/api/live_player_boxscore")
@@ -726,7 +730,14 @@ def api_live_player_boxscore():
     except Exception:
         ttl = 20
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_player_boxscore_payload(selected_date, event_ids, ttl=ttl))
+    return jsonify(
+        build_live_player_boxscore_payload(
+            selected_date,
+            event_ids,
+            ttl=ttl,
+            allow_stored_date_fallback=_allow_stored_date_fallback(),
+        )
+    )
 
 @nba_bp.get("/api/live_player_lens")
 def api_live_player_lens():
@@ -742,7 +753,14 @@ def api_live_player_lens():
     except Exception:
         ttl = 20
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_player_lens_payload(selected_date, event_ids, ttl=ttl))
+    return jsonify(
+        build_live_player_lens_payload(
+            selected_date,
+            event_ids,
+            ttl=ttl,
+            allow_stored_date_fallback=_allow_stored_date_fallback(),
+        )
+    )
 
 @nba_bp.get("/api/live_lines")
 def api_live_lines():
@@ -759,7 +777,15 @@ def api_live_lines():
         ttl = 20
     ttl = max(1, min(300, ttl))
     include_period_totals = str(request.args.get("include_period_totals") or "").strip().lower() in {"1", "true", "yes", "on"}
-    return jsonify(build_live_lines_payload(selected_date, event_ids, ttl=ttl, include_period_totals=include_period_totals))
+    return jsonify(
+        build_live_lines_payload(
+            selected_date,
+            event_ids,
+            ttl=ttl,
+            include_period_totals=include_period_totals,
+            allow_stored_date_fallback=_allow_stored_date_fallback(),
+        )
+    )
 
 @nba_bp.get("/api/live_pbp_stats")
 def api_live_pbp_stats():
@@ -775,7 +801,14 @@ def api_live_pbp_stats():
     except Exception:
         ttl = 20
     ttl = max(1, min(300, ttl))
-    return jsonify(build_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl))
+    return jsonify(
+        build_live_pbp_stats_payload(
+            selected_date,
+            event_ids,
+            ttl=ttl,
+            allow_stored_date_fallback=_allow_stored_date_fallback(),
+        )
+    )
 
 @nba_bp.get("/api/live_lens_tuning")
 def api_live_lens_tuning():

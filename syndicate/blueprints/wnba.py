@@ -532,7 +532,14 @@ def api_live_player_boxscore():
         ttl = 20
     ttl = max(1, min(300, ttl))
     try:
-        return jsonify(build_live_player_boxscore_payload(selected_date, event_ids, ttl=ttl))
+        return jsonify(
+            build_live_player_boxscore_payload(
+                selected_date,
+                event_ids,
+                ttl=ttl,
+                allow_stored_date_fallback=_allow_stored_date_fallback(),
+            )
+        )
     except Exception:
         return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
@@ -552,7 +559,14 @@ def api_live_player_lens():
         ttl = 20
     ttl = max(1, min(300, ttl))
     try:
-        return jsonify(build_live_player_lens_payload(selected_date, event_ids, ttl=ttl))
+        return jsonify(
+            build_live_player_lens_payload(
+                selected_date,
+                event_ids,
+                ttl=ttl,
+                allow_stored_date_fallback=_allow_stored_date_fallback(),
+            )
+        )
     except Exception:
         return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
@@ -573,7 +587,15 @@ def api_live_lines():
     ttl = max(1, min(300, ttl))
     include_period_totals = str(request.args.get("include_period_totals") or "").strip().lower() in {"1", "true", "yes", "on"}
     try:
-        return jsonify(build_live_lines_payload(selected_date, event_ids, ttl=ttl, include_period_totals=include_period_totals))
+        return jsonify(
+            build_live_lines_payload(
+                selected_date,
+                event_ids,
+                ttl=ttl,
+                include_period_totals=include_period_totals,
+                allow_stored_date_fallback=_allow_stored_date_fallback(),
+            )
+        )
     except Exception:
         return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "include_period_totals": bool(include_period_totals), "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 
@@ -593,7 +615,14 @@ def api_live_pbp_stats():
         ttl = 20
     ttl = max(1, min(300, ttl))
     try:
-        return jsonify(build_live_pbp_stats_payload(selected_date, event_ids, ttl=ttl))
+        return jsonify(
+            build_live_pbp_stats_payload(
+                selected_date,
+                event_ids,
+                ttl=ttl,
+                allow_stored_date_fallback=_allow_stored_date_fallback(),
+            )
+        )
     except Exception:
         return jsonify({"ok": True, "ttl": int(ttl), "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
 

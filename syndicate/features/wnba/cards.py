@@ -186,7 +186,7 @@ def _remote_source_fallback_enabled() -> bool:
         return True
     if value in {"0", "false", "no", "off"}:
         return False
-    return bool(_remote_source_base_url())
+    return False
 
 
 def _remote_live_snapshot_payload(
@@ -1241,6 +1241,10 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
     return _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
 
 
+_local_live_snapshot_payload.cache_clear = _local_live_snapshot_payload_cached.cache_clear  # type: ignore[attr-defined]
+_local_live_snapshot_payload.cache_info = _local_live_snapshot_payload_cached.cache_info  # type: ignore[attr-defined]
+
+
 def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_ids: list[str]) -> dict[str, Any] | None:
     payload = _local_live_snapshot_payload(kind, selected_date)
     if not isinstance(payload, dict):
@@ -1552,22 +1556,30 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     })
 
 
-def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+def build_live_player_boxscore_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_player_boxscore",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(selected_date)
+    game_index = _game_index_by_event_id(resolved_date)
     fallback_games = [
         _fallback_live_player_boxscore_game(game)
         for event_id in normalized_event_ids
@@ -1578,35 +1590,47 @@ def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str],
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
-            "date": selected_date or None,
+            "date": resolved_date or None,
+            "requested_date": selected_date,
+            "lookahead_applied": bool(resolved_date != selected_date),
             "games": fallback_games,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         })
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date or None,
+        "date": resolved_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "games": [{"event_id": event_id, "players": []} for event_id in normalized_event_ids],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     })
 
 
-def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+def build_live_player_lens_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_player_lens", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_player_lens",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(selected_date)
+    game_index = _game_index_by_event_id(resolved_date)
     fallback_games = [
         _fallback_live_player_lens_game(game)
         for event_id in normalized_event_ids
@@ -1617,14 +1641,18 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
-            "date": selected_date or None,
+            "date": resolved_date or None,
+            "requested_date": selected_date,
+            "lookahead_applied": bool(resolved_date != selected_date),
             "games": fallback_games,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         })
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date or None,
+        "date": resolved_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "games": [
             {
                 "event_id": event_id,
@@ -1640,23 +1668,32 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
     })
 
 
-def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int = 20, include_period_totals: bool = False) -> dict[str, Any]:
+def build_live_lines_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    include_period_totals: bool = False,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_lines", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_lines",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
             include_period_totals=bool(include_period_totals),
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(selected_date)
+    game_index = _game_index_by_event_id(resolved_date)
     fallback_games = [
         _fallback_live_lines_game(game, include_period_totals=bool(include_period_totals))
         for event_id in normalized_event_ids
@@ -1667,7 +1704,9 @@ def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int 
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
-            "date": selected_date,
+            "date": resolved_date,
+            "requested_date": selected_date,
+            "lookahead_applied": bool(resolved_date != selected_date),
             "include_period_totals": bool(include_period_totals),
             "games": fallback_games,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -1675,29 +1714,39 @@ def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int 
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date,
+        "date": resolved_date,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "include_period_totals": bool(include_period_totals),
         "games": [{"event_id": event_id, "found": False} for event_id in normalized_event_ids],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     })
 
 
-def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+def build_live_pbp_stats_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_pbp_stats",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(selected_date)
+    game_index = _game_index_by_event_id(resolved_date)
     fallback_games = []
     for event_id in normalized_event_ids:
         game = game_index.get(event_id)
@@ -1721,14 +1770,18 @@ def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: 
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
-            "date": selected_date or None,
+            "date": resolved_date or None,
+            "requested_date": selected_date,
+            "lookahead_applied": bool(resolved_date != selected_date),
             "games": fallback_games,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         })
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date or None,
+        "date": resolved_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "games": [
             {
                 "event_id": event_id,

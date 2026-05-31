@@ -65,7 +65,7 @@ def _remote_source_fallback_enabled() -> bool:
         return True
     if value in {"0", "false", "no", "off"}:
         return False
-    return bool(_remote_source_base_url())
+    return False
 
 
 def _remote_fetch_json(endpoint: str, params: dict[str, str] | None = None) -> dict[str, Any] | None:
@@ -527,6 +527,10 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
     return _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
 
 
+_local_live_snapshot_payload.cache_clear = _local_live_snapshot_payload_cached.cache_clear  # type: ignore[attr-defined]
+_local_live_snapshot_payload.cache_info = _local_live_snapshot_payload_cached.cache_info  # type: ignore[attr-defined]
+
+
 def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_ids: list[str]) -> dict[str, Any] | None:
     payload = _local_live_snapshot_payload(kind, selected_date)
     if not isinstance(payload, dict):
@@ -861,13 +865,45 @@ def _next_available_actionable_cards_date(selected_date: str, *, max_days: int =
     return None
 
 
-def build_cards_page_context(selected_date: str) -> dict[str, Any]:
+def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     source_title = "NBA processed game cards"
     parsed_date = parse_iso_date(resolved_date)
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
     has_actionable_data = _games_have_actionable_data(games)
+
+    if not games:
+        live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
+        if live_games:
+            games = live_games
+            cards_path = live_source_path
+            recs_path = live_source_path
+            source_title = "NBA live scoreboard fallback"
+            has_actionable_data = _games_have_actionable_data(games)
+
+    # Prefer nearby local artifact-backed slates before any live/remote fallback.
+    if allow_stored_date_fallback and (not games or not has_actionable_data):
+        fallback_date = None
+        if games and not has_actionable_data:
+            fallback_date = _next_available_actionable_cards_date(resolved_date)
+        if not fallback_date:
+            fallback_date = _next_available_cards_date(resolved_date, max_ahead_days=30)
+        if isinstance(fallback_date, str) and fallback_date and fallback_date != resolved_date:
+            resolved_date = fallback_date
+            parsed_date = parse_iso_date(resolved_date)
+            games, cards_path, recs_path = _games_from_artifacts(resolved_date)
+            source_title = "NBA processed game cards"
+            has_actionable_data = _games_have_actionable_data(games)
+            if not games:
+                live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
+                if live_games:
+                    games = live_games
+                    cards_path = live_source_path
+                    recs_path = live_source_path
+                    source_title = "NBA live scoreboard fallback"
+                    has_actionable_data = _games_have_actionable_data(games)
+
     if _remote_source_fallback_enabled() and (not games or not has_actionable_data):
         remote_cards = _remote_cards_payload(resolved_date)
         remote_games = remote_cards.get("games") if isinstance(remote_cards, dict) and isinstance(remote_cards.get("games"), list) else []
@@ -878,13 +914,6 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
             cards_path = "remote:/api/cards"
             recs_path = "remote:/api/cards"
             has_actionable_data = _games_have_actionable_data(games)
-    if not games:
-        live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
-        if live_games:
-            games = live_games
-            cards_path = live_source_path
-            recs_path = live_source_path
-            source_title = "NBA live scoreboard fallback"
     has_games_on_slate = bool(games)
 
     parsed_date = parse_iso_date(resolved_date)
@@ -917,10 +946,10 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "empty_state": {
             "eyebrow": "NBA cards",
             "title": "No NBA games are scheduled for this date",
-            "body": "The requested NBA slate is empty, so the cards board does not fall back to a stored board from another date.",
+            "body": "No local processed or live artifacts were available for this date.",
             "list_items": [
                 f"Requested date: {requested_date}",
-                "Choose another NBA date from the date control if you want a different slate.",
+                "Choose another NBA date from the date control if you want a different stored slate.",
             ],
         } if not games else None,
         "header_stats": [
@@ -954,8 +983,10 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     return apply_game_board_contract(context, sport="nba", module="cards")
 
 
-def build_cards_api_payload(selected_date: str) -> dict[str, Any]:
-    return build_game_board_api_payload(build_cards_page_context(selected_date))
+def build_cards_api_payload(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+    return build_game_board_api_payload(
+        build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    )
 
 
 def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: str) -> dict[str, Any]:
@@ -1012,7 +1043,7 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
     }
 
 
-def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any]:
+def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     local_payload = _local_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
@@ -1022,7 +1053,8 @@ def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    context = build_cards_page_context(selected_date)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     games = context.get("games") if isinstance(context.get("games"), list) else []
     out_games = []
     for game in games:
@@ -1052,7 +1084,9 @@ def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any
         )
 
     return _attach_odds_refresh_timestamp({
-        "date": selected_date,
+        "date": resolved_date,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "ttl": int(ttl),
         "source": "syndicate_cards_fallback",
         "games": out_games,
@@ -1060,15 +1094,23 @@ def build_live_state_payload(selected_date: str, ttl: int = 12) -> dict[str, Any
     })
 
 
-def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+def build_live_player_boxscore_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_player_boxscore",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
@@ -1076,20 +1118,30 @@ def build_live_player_boxscore_payload(selected_date: str, event_ids: list[str],
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date or None,
+        "date": resolved_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "games": [{"event_id": event_id, "players": []} for event_id in normalized_event_ids],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     })
 
-def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+def build_live_player_lens_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_player_lens", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_player_lens",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
@@ -1097,7 +1149,9 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date or None,
+        "date": resolved_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "games": [
             {
                 "event_id": event_id,
@@ -1112,15 +1166,24 @@ def build_live_player_lens_payload(selected_date: str, event_ids: list[str], ttl
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     })
 
-def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int = 20, include_period_totals: bool = False) -> dict[str, Any]:
+def build_live_lines_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    include_period_totals: bool = False,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_lines", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_lines",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
             include_period_totals=bool(include_period_totals),
         )
@@ -1129,20 +1192,30 @@ def build_live_lines_payload(selected_date: str, event_ids: list[str], ttl: int 
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date,
+        "date": resolved_date,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "games": [{"event_id": event_id, "found": False} for event_id in normalized_event_ids],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     })
 
-def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: int = 20) -> dict[str, Any]:
+def build_live_pbp_stats_payload(
+    selected_date: str,
+    event_ids: list[str],
+    ttl: int = 20,
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", selected_date, normalized_event_ids)
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_pbp_stats",
-            selected_date=selected_date,
+            selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
@@ -1150,7 +1223,9 @@ def build_live_pbp_stats_payload(selected_date: str, event_ids: list[str], ttl: 
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
-        "date": selected_date or None,
+        "date": resolved_date or None,
+        "requested_date": selected_date,
+        "lookahead_applied": bool(resolved_date != selected_date),
         "games": [
             {
                 "event_id": event_id,
