@@ -18,7 +18,7 @@
   "registryLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_05_31.jsonl",
   "reportPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_05_31.json",
   "dailyRecapPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_05_31.json",
-  "entries": 1,
+  "entries": 2,
   "latestEntry": {
     "recordedAt": "2026-05-31T11:18:32-05:00",
     "date": "2026-05-31",
@@ -54,15 +54,15 @@
   },
   "firstObservationArchive": [],
   "rawArtifacts": {
-    "total_bytes": 229,
-    "total_bytes_text": "229 B",
+    "total_bytes": 365,
+    "total_bytes_text": "365 B",
     "files": {
       "log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_05_31.jsonl",
         "exists": true,
-        "bytes": 136,
-        "bytes_text": "136 B",
-        "modified_at": "2026-05-31T11:18:32-05:00"
+        "bytes": 272,
+        "bytes_text": "272 B",
+        "modified_at": "2026-05-31T11:34:34-05:00"
       },
       "observation_log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_05_31.jsonl",
@@ -90,7 +90,7 @@
         "exists": true,
         "bytes": 2,
         "bytes_text": "2 B",
-        "modified_at": "2026-05-31T11:18:32-05:00"
+        "modified_at": "2026-05-31T11:34:34-05:00"
       }
     }
   }

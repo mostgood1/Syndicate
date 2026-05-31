@@ -2,16 +2,16 @@
   "date": "2026-05-31",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-05-31T11:28:36.406353",
+  "generated_at": "2026-05-31T11:41:58.863947",
   "summary": {
     "games": 15,
-    "projected_teams": 12,
+    "projected_teams": 10,
     "adjusted_teams": 0,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
-    "confirmed_teams": 18,
-    "projected_only_teams": 12,
-    "confirmed_only_teams": 18,
+    "confirmed_teams": 20,
+    "projected_only_teams": 10,
+    "confirmed_only_teams": 20,
     "comparable_teams": 0,
     "exact_match_teams": 0,
     "true_mismatch_teams": 0
@@ -164,19 +164,19 @@
         "team_id": 134,
         "abbr": "PIT"
       },
-      "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
-      "away_projected_ids": [
-        621439,
-        686797,
-        663616,
-        605137,
-        665019,
+      "away_confirmed_ids": [
         668885,
-        605170,
+        686797,
+        665019,
+        605137,
+        663616,
+        606115,
         807712,
-        656484
+        656484,
+        656577
       ],
+      "home_confirmed_ids": [],
+      "away_projected_ids": [],
       "home_projected_ids": [
         804606,
         664040,
@@ -189,57 +189,9 @@
         680779
       ],
       "away_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          621439,
-          686797,
-          663616,
-          605137,
-          665019,
-          668885,
-          605170,
-          807712,
-          656484
-        ],
-        "ids": [
-          621439,
-          686797,
-          663616,
-          605137,
-          665019,
-          668885,
-          605170,
-          807712,
-          656484
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 19,
-        "raw_names": [
-          "Byron Buxton",
-          "Brooks Lee",
-          "Trevor Larnach",
-          "Josh Bell",
-          "Kody Clemens",
-          "Austin Martin",
-          "Victor Caratini",
-          "Luke Keaschall",
-          "Tristan Gray"
-        ],
-        "matched_names": [
-          "Byron Buxton",
-          "Brooks Lee",
-          "Trevor Larnach",
-          "Josh Bell",
-          "Kody Clemens",
-          "Austin Martin",
-          "Victor Caratini",
-          "Luke Keaschall",
-          "Tristan Gray"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "home_projected_validation": {
         "status": "ok",
@@ -294,15 +246,15 @@
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "confirmed_official_starting_lineups",
       "home_source": "projected_rotowire_default_vs_lhp",
-      "away_confidence": 0.66,
+      "away_confidence": 1.0,
       "home_confidence": 0.56,
       "away_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
@@ -852,7 +804,17 @@
         "team_id": 115,
         "abbr": "COL"
       },
-      "away_confirmed_ids": [],
+      "away_confirmed_ids": [
+        669477,
+        646240,
+        650333,
+        642715,
+        808982,
+        656305,
+        805811,
+        691740,
+        687551
+      ],
       "home_confirmed_ids": [
         650489,
         671289,
@@ -864,85 +826,27 @@
         690924,
         677060
       ],
-      "away_projected_ids": [
-        642715,
-        650333,
-        669477,
-        646240,
-        656305,
-        808982,
-        691740,
-        805811,
-        687551
-      ],
+      "away_projected_ids": [],
       "home_projected_ids": [],
       "away_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          642715,
-          650333,
-          669477,
-          646240,
-          656305,
-          808982,
-          691740,
-          805811,
-          687551
-        ],
-        "ids": [
-          642715,
-          650333,
-          669477,
-          646240,
-          656305,
-          808982,
-          691740,
-          805811,
-          687551
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 16,
-        "raw_names": [
-          "Willy Adames",
-          "Luis Arraez",
-          "Casey Schmitt",
-          "Rafael Devers",
-          "Matt Chapman",
-          "Jung Hoo Lee",
-          "Daniel Susac",
-          "Bryce Eldridge",
-          "Drew Gilbert"
-        ],
-        "matched_names": [
-          "Willy Adames",
-          "Luis Arraez",
-          "Casey Schmitt",
-          "Rafael Devers",
-          "Matt Chapman",
-          "Jung Hoo Lee",
-          "Daniel Susac",
-          "Bryce Eldridge",
-          "Drew Gilbert"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "home_projected_validation": {
         "status": "none",
         "raw_ids": [],
         "ids": []
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "confirmed_official_starting_lineups",
       "home_source": "confirmed_official_starting_lineups",
-      "away_confidence": 0.66,
+      "away_confidence": 1.0,
       "home_confidence": 1.0,
       "away_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
