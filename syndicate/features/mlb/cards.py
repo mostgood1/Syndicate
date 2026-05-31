@@ -1629,6 +1629,39 @@ def _tracked_game_lines_for_source_card(game: dict[str, Any], game_lines_index: 
     return dict(game_lines_index.get((away_name, home_name)) or {})
 
 
+def _markets_from_tracked_game_lines(tracked_lines: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(tracked_lines, dict) or not tracked_lines:
+        return {}
+    segments = tracked_lines.get("segments") if isinstance(tracked_lines.get("segments"), dict) else {}
+    full = segments.get("full") if isinstance(segments.get("full"), dict) else {}
+    source = full if full else tracked_lines
+
+    h2h = source.get("h2h") if isinstance(source.get("h2h"), dict) else {}
+    totals = source.get("totals") if isinstance(source.get("totals"), dict) else {}
+    spreads = source.get("spreads") if isinstance(source.get("spreads"), dict) else {}
+
+    market_map: dict[str, Any] = {}
+    if h2h:
+        market_map["ml"] = {
+            "away_odds": h2h.get("away_odds") or h2h.get("awayOdds"),
+            "home_odds": h2h.get("home_odds") or h2h.get("homeOdds"),
+        }
+    if totals:
+        market_map["totals"] = {
+            "line": totals.get("line"),
+            "over_odds": totals.get("over_odds") or totals.get("overOdds"),
+            "under_odds": totals.get("under_odds") or totals.get("underOdds"),
+        }
+    if spreads:
+        market_map["spreads"] = {
+            "home_line": spreads.get("home_line") if spreads.get("home_line") is not None else spreads.get("homeLine"),
+            "away_line": spreads.get("away_line") if spreads.get("away_line") is not None else spreads.get("awayLine"),
+            "home_odds": spreads.get("home_odds") or spreads.get("homeOdds"),
+            "away_odds": spreads.get("away_odds") or spreads.get("awayOdds"),
+        }
+    return market_map
+
+
 def _daily_sim_by_game(selected_date: str, game_pks: list[int]) -> dict[int, dict[str, Any]]:
     out: dict[int, dict[str, Any]] = {}
     for game_pk in game_pks:
@@ -1680,14 +1713,28 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     hitter_props_doc = load_json_file(hitter_props_path) if hitter_props_path else None
     ops_report_doc = load_json_file(ops_report_path) if ops_report_path else None
     game_lines_index = _tracked_game_lines_index(game_lines_doc)
-    games = [
-        {
-            **game,
-            "trackedGameLines": _tracked_game_lines_for_source_card(game, game_lines_index),
-        }
-        for game in games
-        if isinstance(game, dict)
-    ]
+    enriched_games: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        tracked_lines = _tracked_game_lines_for_source_card(game, game_lines_index)
+        merged_game = dict(game)
+        merged_game["trackedGameLines"] = tracked_lines
+
+        existing_markets = merged_game.get("markets") if isinstance(merged_game.get("markets"), dict) else {}
+        tracked_markets = _markets_from_tracked_game_lines(tracked_lines)
+        if tracked_markets:
+            merged_markets = dict(existing_markets)
+            for key in ("ml", "totals", "spreads"):
+                if isinstance(merged_markets.get(key), dict) and merged_markets.get(key):
+                    continue
+                candidate = tracked_markets.get(key)
+                if isinstance(candidate, dict) and candidate:
+                    merged_markets[key] = candidate
+            merged_game["markets"] = merged_markets
+
+        enriched_games.append(merged_game)
+    games = enriched_games
     top_rows = []
     for row in hr_rows:
         if not isinstance(row, dict):
