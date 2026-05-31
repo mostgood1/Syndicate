@@ -2,16 +2,16 @@
   "date": "2026-05-31",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-05-31T11:41:58.863947",
+  "generated_at": "2026-05-31T11:57:30.668657",
   "summary": {
     "games": 15,
-    "projected_teams": 10,
+    "projected_teams": 9,
     "adjusted_teams": 0,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
-    "confirmed_teams": 20,
-    "projected_only_teams": 10,
-    "confirmed_only_teams": 20,
+    "confirmed_teams": 21,
+    "projected_only_teams": 9,
+    "confirmed_only_teams": 21,
     "comparable_teams": 0,
     "exact_match_teams": 0,
     "true_mismatch_teams": 0
@@ -484,7 +484,17 @@
         "team_id": 121,
         "abbr": "NYM"
       },
-      "away_confirmed_ids": [],
+      "away_confirmed_ids": [
+        669364,
+        689414,
+        672640,
+        669065,
+        691594,
+        805300,
+        681393,
+        683357,
+        665923
+      ],
       "home_confirmed_ids": [
         701807,
         666182,
@@ -496,85 +506,27 @@
         543760,
         620443
       ],
-      "away_projected_ids": [
-        669364,
-        689414,
-        672640,
-        669065,
-        805300,
-        681393,
-        683357,
-        691788,
-        691594
-      ],
+      "away_projected_ids": [],
       "home_projected_ids": [],
       "away_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          669364,
-          689414,
-          672640,
-          669065,
-          805300,
-          681393,
-          683357,
-          691788,
-          691594
-        ],
-        "ids": [
-          669364,
-          689414,
-          672640,
-          669065,
-          805300,
-          681393,
-          683357,
-          691788,
-          691594
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 19,
-        "raw_names": [
-          "Xavier Edwards",
-          "Liam Hicks",
-          "Otto Lopez",
-          "Kyle Stowers",
-          "Jakob Marsee",
-          "Connor Norby",
-          "Owen Caissie",
-          "Joe Mack",
-          "Javier Sanoja"
-        ],
-        "matched_names": [
-          "Xavier Edwards",
-          "Liam Hicks",
-          "Otto Lopez",
-          "Kyle Stowers",
-          "Jakob Marsee",
-          "Connor Norby",
-          "Owen Caissie",
-          "Joe Mack",
-          "Javier Sanoja"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "home_projected_validation": {
         "status": "none",
         "raw_ids": [],
         "ids": []
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "confirmed_official_starting_lineups",
       "home_source": "confirmed_official_starting_lineups",
-      "away_confidence": 0.66,
+      "away_confidence": 1.0,
       "home_confidence": 1.0,
       "away_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
