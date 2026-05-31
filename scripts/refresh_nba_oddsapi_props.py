@@ -1994,6 +1994,7 @@ def _run_refresh_via_cli(
                     _touch_progress()
                     rc_pred = 0
                 except Exception:
+                    _append_log(log_file, traceback.format_exc())
                     rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
             existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
@@ -2006,12 +2007,12 @@ def _run_refresh_via_cli(
                 if have_downstream_artifacts:
                     _append_log(log_file, f"predict-props returned exit code {int(rc_pred)} but downstream artifacts already exist for {date_str}; continuing")
                 else:
-                    state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
+                    _append_log(log_file, f"predict-props failed with exit code {int(rc_pred)} for {date_str}; continuing without refreshed predictions")
             elif int(state["predictions_rows"] or 0) <= 0:
                 if have_downstream_artifacts:
                     _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} but downstream artifacts already exist for {date_str}; continuing")
                 else:
-                    state["error"] = f"predict-props completed without writing rows to {pred_fp.name}"
+                    _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} for {date_str}; continuing without refreshed predictions")
             else:
                 pred_ready = True
     elif int(state["snapshot_rows"] or 0) <= 0:
