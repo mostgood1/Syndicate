@@ -1082,12 +1082,31 @@ def _game_identity_key(game: dict[str, Any]) -> tuple[str, str, str]:
     return (event_id, away_tri, home_tri)
 
 
+def _game_matchup_key(game: dict[str, Any]) -> tuple[str, str]:
+    if not isinstance(game, dict):
+        return ("", "")
+    away_tri = _canonical_wnba_tri(str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper())
+    home_tri = _canonical_wnba_tri(str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper())
+    return (away_tri, home_tri)
+
+
 def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int]:
     live_games, live_source_path = _games_from_live_state_fallback(selected_date)
     if not live_games:
         return games, None, 0
     existing_keys = {_game_identity_key(game) for game in games if isinstance(game, dict)}
-    extras = [game for game in live_games if _game_identity_key(game) not in existing_keys]
+    existing_matchups = {_game_matchup_key(game) for game in games if isinstance(game, dict)}
+    extras: list[dict[str, Any]] = []
+    for game in live_games:
+        identity = _game_identity_key(game)
+        matchup = _game_matchup_key(game)
+        if identity in existing_keys:
+            continue
+        if matchup in existing_matchups:
+            continue
+        extras.append(game)
+        existing_keys.add(identity)
+        existing_matchups.add(matchup)
     if not extras:
         return games, live_source_path, 0
     return [*games, *extras], live_source_path, len(extras)
