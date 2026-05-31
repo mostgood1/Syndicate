@@ -350,6 +350,39 @@ function Get-BasketballScheduledGamesCheck {
     return [pscustomobject]$result
 }
 
+function Get-NhlScheduledGamesCheck {
+    param([string]$DateValue)
+
+    $result = [ordered]@{
+        known = $false
+        count = $null
+        source = 'nhle_schedule'
+        note = $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($DateValue)) {
+        return [pscustomobject]$result
+    }
+
+    try {
+        $url = "https://api-web.nhle.com/v1/schedule/$DateValue"
+        $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
+        $gameCount = 0
+        foreach ($week in @($payload.gameWeek)) {
+            if (-not $week) { continue }
+            if ([string]$week.date -ne $DateValue) { continue }
+            $gameCount += @($week.games).Count
+        }
+        $result.known = $true
+        $result.count = [int]$gameCount
+    }
+    catch {
+        $result.note = $_.Exception.Message
+    }
+
+    return [pscustomobject]$result
+}
+
 function Test-PythonExecutable {
     param([string]$Executable)
 
@@ -750,6 +783,11 @@ function Assert-AdvancedDataReady {
             return
         }
         'nhl' {
+            $scheduleCheck = Get-NhlScheduledGamesCheck -DateValue $DateValue
+            if ($scheduleCheck.known -and [int]$scheduleCheck.count -eq 0) {
+                Write-Host ("NHL advanced-data gate: no scheduled games for {0} ({1}); skipping artifact assertions" -f $DateValue, $scheduleCheck.source) -ForegroundColor DarkGray
+                return
+            }
             $processedRoot = Resolve-ExistingRoot @(
                 (Join-Path $RepoRoot 'data\nhl_source\data\processed'),
                 (Join-Path $RepoRoot 'data\nhl_source\source_artifacts\data\processed')
