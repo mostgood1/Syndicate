@@ -1,0 +1,134 @@
+{
+  "date": "2026-05-30",
+  "counts": {
+    "games": 2,
+    "picks": 6
+  },
+  "per_game": [
+    {
+      "home": "CON",
+      "away": "LAS",
+      "matchup": "LAS @ CON",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Erica Wheeler UNDER 12.5",
+          "selection": "UNDER 12.5",
+          "price": -113.0,
+          "score": 36.5366441139491,
+          "ev_pct": 36.5366441139491,
+          "win_prob": 0.5305164319248826,
+          "p_win": 0.5305164319248826,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 36.5%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "LAS @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Ariel Atkins UNDER 12.5",
+          "selection": "UNDER 12.5",
+          "price": -114.0,
+          "score": 29.225727207004592,
+          "ev_pct": 29.225727207004592,
+          "win_prob": 0.5327102803738317,
+          "p_win": 0.5327102803738317,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 29.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "LAS @ CON"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Dearica Hamby UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 122.0,
+          "score": 5.360294927771014,
+          "ev_pct": 5.360294927771014,
+          "win_prob": 0.45045045045045046,
+          "p_win": 0.45045045045045046,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 5.4%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "LAS @ CON"
+        }
+      ]
+    },
+    {
+      "home": "POR",
+      "away": "IND",
+      "matchup": "IND @ POR",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Caitlin Clark UNDER 14.5",
+          "selection": "UNDER 14.5",
+          "price": -136.0,
+          "score": 14.595659730908128,
+          "ev_pct": 14.595659730908128,
+          "win_prob": 0.576271186440678,
+          "p_win": 0.576271186440678,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 14.6%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "IND @ POR"
+        },
+        {
+          "market": "PROPS",
+          "team": "POR",
+          "display_pick": "Carla Leite OVER 3.5",
+          "selection": "OVER 3.5",
+          "price": -130.0,
+          "score": 9.653441541417235,
+          "ev_pct": 9.653441541417235,
+          "win_prob": 0.5652173913043478,
+          "p_win": 0.5652173913043478,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 9.7%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "IND @ POR"
+        },
+        {
+          "market": "PROPS",
+          "team": "IND",
+          "display_pick": "Aliyah Boston OVER 24.5",
+          "selection": "OVER 24.5",
+          "price": -108.0,
+          "score": 9.633507296668286,
+          "ev_pct": 9.633507296668286,
+          "win_prob": 0.5192307692307693,
+          "p_win": 0.5192307692307693,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 9.6%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "IND @ POR"
+        }
+      ]
+    }
+  ]
+}

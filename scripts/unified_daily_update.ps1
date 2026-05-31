@@ -1042,17 +1042,24 @@ function Invoke-GitPublish {
             }
         }
 
-        $statusLines = @(& git status --short)
-        if ($LASTEXITCODE -ne 0) {
-            throw "git status failed for $RepoPath with exit code $LASTEXITCODE"
-        }
-        if (-not $statusLines -or $statusLines.Count -eq 0) {
+        # Only attempt commit when there are staged changes.
+        & git diff --cached --quiet --exit-code
+        $stagedDiffExitCode = $LASTEXITCODE
+        if ($stagedDiffExitCode -eq 0) {
             $result.status = 'no_changes'
             return [pscustomobject]$result
         }
+        if ($stagedDiffExitCode -ne 1) {
+            throw "git diff --cached --quiet failed for $RepoPath with exit code $stagedDiffExitCode"
+        }
 
-        & git commit -m $CommitMessage
+        $commitOutput = @(& git commit -m $CommitMessage 2>&1)
         if ($LASTEXITCODE -ne 0) {
+            $commitText = ($commitOutput | Out-String)
+            if ($commitText -match '(?i)nothing to commit|no changes added to commit') {
+                $result.status = 'no_changes'
+                return [pscustomobject]$result
+            }
             throw "git commit failed for $RepoPath with exit code $LASTEXITCODE"
         }
 
