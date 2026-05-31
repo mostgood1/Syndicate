@@ -564,8 +564,6 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
         performance = report_payload.get("performance")
         if isinstance(performance, dict) and performance.get("degraded"):
             return False
-        if not isinstance(report_payload.get("games"), list):
-            return False
         return True
 
     live_lens = None

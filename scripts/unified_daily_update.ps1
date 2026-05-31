@@ -664,51 +664,60 @@ function Assert-AdvancedDataReady {
         }
         'mlb' {
             $dateSlug = $DateValue -replace '-', '_'
-            $mlbDataRoot = Resolve-ExistingRoot @(
-                (Join-Path $RepoRoot 'data\mlb_source\data'),
-                (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data')
-            )
-            $processedRoot = Resolve-ExistingRoot @(
-                (Join-Path $mlbDataRoot 'processed'),
+            $processedRoots = @(
                 (Join-Path $RepoRoot 'data\mlb_source\data\processed'),
                 (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\processed')
             )
-            $dailyRoot = Resolve-ExistingRoot @(
-                (Join-Path $mlbDataRoot 'daily'),
-                (Join-Path $RepoRoot 'data\mlb_source\data\daily'),
-                (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\daily')
+            $dailyTopPropsCandidates = @(
+                (Join-Path $RepoRoot ("data\mlb_source\data\daily\top_props\daily_top_props_{0}.json" -f $dateSlug)),
+                (Join-Path $RepoRoot ("data\mlb_source\source_artifacts\data\daily\top_props\daily_top_props_{0}.json" -f $dateSlug))
             )
-            $liveLensRoot = Resolve-ExistingRoot @(
-                (Join-Path $mlbDataRoot 'live_lens'),
+            $liveLensRoots = @(
                 (Join-Path $RepoRoot 'data\mlb_source\data\live_lens'),
                 (Join-Path $RepoRoot 'data\mlb_source\source_artifacts\data\live_lens')
             )
 
-            $legacyRequiredPaths = @(
-                (Join-Path $processedRoot ("props_predictions_{0}.csv" -f $DateValue)),
-                (Join-Path $processedRoot ("props_recommendations_{0}.csv" -f $DateValue)),
-                (Join-Path $processedRoot ("top_props_{0}.json" -f $DateValue))
-            )
-            $legacyArtifactsReady = $true
-            foreach ($legacyPath in $legacyRequiredPaths) {
-                if (-not (Test-Path $legacyPath)) {
-                    $legacyArtifactsReady = $false
+            $legacyArtifactsReady = $false
+            foreach ($candidateProcessedRoot in $processedRoots) {
+                $legacyRequiredPaths = @(
+                    (Join-Path $candidateProcessedRoot ("props_predictions_{0}.csv" -f $DateValue)),
+                    (Join-Path $candidateProcessedRoot ("props_recommendations_{0}.csv" -f $DateValue)),
+                    (Join-Path $candidateProcessedRoot ("top_props_{0}.json" -f $DateValue))
+                )
+                $allPresent = $true
+                foreach ($legacyPath in $legacyRequiredPaths) {
+                    if (-not (Test-Path $legacyPath)) {
+                        $allPresent = $false
+                        break
+                    }
+                }
+                if ($allPresent) {
+                    $legacyArtifactsReady = $true
                     break
                 }
             }
 
-            $dailyTopPropsPath = Join-Path $dailyRoot ("top_props\daily_top_props_{0}.json" -f $dateSlug)
-            $modernArtifactsReady = Test-Path $dailyTopPropsPath
+            $modernArtifactsReady = $false
+            foreach ($dailyTopPropsPath in $dailyTopPropsCandidates) {
+                if (Test-Path $dailyTopPropsPath) {
+                    $modernArtifactsReady = $true
+                    break
+                }
+            }
 
             if (-not $legacyArtifactsReady -and -not $modernArtifactsReady) {
                 throw "MLB advanced-data gate failed: missing both legacy processed props artifacts and daily top-props artifact for $DateValue"
             }
 
             $reportCandidates = @(
-                (Join-Path $processedRoot ("live_lens_report_{0}.json" -f $DateValue)),
-                (Join-Path $processedRoot ("live_lens_report_{0}.json" -f $dateSlug)),
-                (Join-Path $liveLensRoot ("live_lens_report_{0}.json" -f $DateValue)),
-                (Join-Path $liveLensRoot ("live_lens_report_{0}.json" -f $dateSlug))
+                (Join-Path $processedRoots[0] ("live_lens_report_{0}.json" -f $DateValue)),
+                (Join-Path $processedRoots[0] ("live_lens_report_{0}.json" -f $dateSlug)),
+                (Join-Path $processedRoots[1] ("live_lens_report_{0}.json" -f $DateValue)),
+                (Join-Path $processedRoots[1] ("live_lens_report_{0}.json" -f $dateSlug)),
+                (Join-Path $liveLensRoots[0] ("live_lens_report_{0}.json" -f $DateValue)),
+                (Join-Path $liveLensRoots[0] ("live_lens_report_{0}.json" -f $dateSlug)),
+                (Join-Path $liveLensRoots[1] ("live_lens_report_{0}.json" -f $DateValue)),
+                (Join-Path $liveLensRoots[1] ("live_lens_report_{0}.json" -f $dateSlug))
             )
             $reportPath = $null
             foreach ($candidate in $reportCandidates) {
