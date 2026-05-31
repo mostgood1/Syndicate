@@ -28,6 +28,22 @@ services:
         value: "true"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
         value: "true"
+      - key: SYNDICATE_NBA_SOURCE_APP_BASE_URL
+        sync: false
+      - key: SYNDICATE_WNBA_SOURCE_APP_BASE_URL
+        sync: false
+      - key: SYNDICATE_NBA_SOURCE_APP_TOKEN
+        sync: false
+      - key: SYNDICATE_WNBA_SOURCE_APP_TOKEN
+        sync: false
+      - key: NBA_BETTING_BASE_URL
+        sync: false
+      - key: WNBA_BETTING_BASE_URL
+        sync: false
+      - key: NBA_BETTING_CRON_TOKEN
+        sync: false
+      - key: WNBA_BETTING_CRON_TOKEN
+        sync: false
       - key: SYNDICATE_NHL_SOURCE_CLI_GENERATION
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
