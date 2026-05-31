@@ -148,6 +148,8 @@ def _round_half(value: float | None) -> float | None:
 
 def _remote_source_base_url() -> str:
     for name in (
+        "SYNDICATE_WNBA_SOURCE_APP_BASE_URL",
+        "SYNDICATE_SOURCE_APP_BASE_URL_WNBA",
         "WNBA_BETTING_BASE_URL",
         "NBA_BETTING_BASE_URL",
     ):
@@ -161,6 +163,8 @@ def _remote_source_base_url() -> str:
 
 def _remote_source_auth_token() -> str:
     for name in (
+        "SYNDICATE_WNBA_SOURCE_APP_TOKEN",
+        "SYNDICATE_SOURCE_APP_TOKEN_WNBA",
         "WNBA_BETTING_CRON_TOKEN",
         "WNBA_CRON_TOKEN",
         "CRON_TOKEN",
@@ -172,6 +176,11 @@ def _remote_source_auth_token() -> str:
 
 
 def _remote_source_fallback_enabled() -> bool:
+    source_flag = str(os.environ.get("SYNDICATE_WNBA_SOURCE_APP_FALLBACK") or "").strip().lower()
+    if source_flag in {"1", "true", "yes", "on"}:
+        return True
+    if source_flag in {"0", "false", "no", "off"}:
+        return False
     value = str(os.environ.get("WNBA_LIVE_REMOTE_FALLBACK") or "").strip().lower()
     if value in {"1", "true", "yes", "on"}:
         return True

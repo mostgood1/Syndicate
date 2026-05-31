@@ -27,6 +27,8 @@ from syndicate.features.shared.game_board_contract import build_game_board_api_p
 
 def _remote_source_base_url() -> str:
     for name in (
+        "SYNDICATE_NBA_SOURCE_APP_BASE_URL",
+        "SYNDICATE_SOURCE_APP_BASE_URL_NBA",
         "NBA_BETTING_BASE_URL",
         "WNBA_BETTING_BASE_URL",
     ):
@@ -40,6 +42,8 @@ def _remote_source_base_url() -> str:
 
 def _remote_source_auth_token() -> str:
     for name in (
+        "SYNDICATE_NBA_SOURCE_APP_TOKEN",
+        "SYNDICATE_SOURCE_APP_TOKEN_NBA",
         "NBA_BETTING_CRON_TOKEN",
         "NBA_CRON_TOKEN",
         "CRON_TOKEN",
@@ -51,6 +55,11 @@ def _remote_source_auth_token() -> str:
 
 
 def _remote_source_fallback_enabled() -> bool:
+    source_flag = str(os.environ.get("SYNDICATE_NBA_SOURCE_APP_FALLBACK") or "").strip().lower()
+    if source_flag in {"1", "true", "yes", "on"}:
+        return True
+    if source_flag in {"0", "false", "no", "off"}:
+        return False
     value = str(os.environ.get("NBA_LIVE_REMOTE_FALLBACK") or "").strip().lower()
     if value in {"1", "true", "yes", "on"}:
         return True
