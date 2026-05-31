@@ -336,6 +336,7 @@ def build_refresh_plan(
     execution_mode: str | None = None,
 ) -> dict[str, Any]:
     module = _refresh_script_module()
+    effective_skip_mirror = _effective_skip_mirror(skip_mirror=bool(skip_mirror), mirror_only=bool(mirror_only))
     args = argparse.Namespace(
         date=(date or _today_date()),
         sports=(sports or "all"),
@@ -345,7 +346,7 @@ def build_refresh_plan(
         markets=(markets or ""),
         season=season,
         week=week,
-        skip_mirror=bool(skip_mirror),
+        skip_mirror=bool(effective_skip_mirror),
         mirror_only=bool(mirror_only),
         execution_mode=str(execution_mode or "source").strip() or "source",
         continue_on_error=True,
@@ -415,6 +416,16 @@ def _coerce_slug_list(raw: str | None) -> str:
     return text or "all"
 
 
+def _effective_skip_mirror(*, skip_mirror: bool, mirror_only: bool) -> bool:
+    if mirror_only:
+        return False
+    if skip_mirror:
+        return True
+    # Render/web hosts are Linux and do not provide powershell.exe.
+    # Defaulting to skip mirror keeps odds refresh runnable from ops endpoints.
+    return os.name != "nt"
+
+
 def launch_refresh_run(
     *,
     date: str | None = None,
@@ -431,6 +442,7 @@ def launch_refresh_run(
     dry_run: bool = False,
 ) -> dict[str, Any]:
     selected_date = date or _today_date()
+    effective_skip_mirror = _effective_skip_mirror(skip_mirror=bool(skip_mirror), mirror_only=bool(mirror_only))
     run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     launch_mode = _resolve_launch_mode()
     current_reports_root = _reports_root()
@@ -474,7 +486,7 @@ def launch_refresh_run(
         refresh_command.extend(["--week", str(week)])
     execution_mode_text = str(execution_mode or "source").strip() or "source"
     refresh_command.extend(["--execution-mode", execution_mode_text])
-    if skip_mirror:
+    if effective_skip_mirror:
         refresh_command.append("--skip-mirror")
     if mirror_only:
         refresh_command.append("--mirror-only")
@@ -519,7 +531,7 @@ def launch_refresh_run(
         "oddsPhase": str(phase or "all").strip() or "all",
         "oddsSports": _coerce_slug_list(sports),
         "oddsRegions": str(regions or "us").strip() or "us",
-        "skipMirror": bool(skip_mirror),
+        "skipMirror": bool(effective_skip_mirror),
         "mirrorOnly": bool(mirror_only),
         "executionMode": execution_mode_text,
         "launchMode": launch_mode,
@@ -570,7 +582,7 @@ def launch_refresh_run(
             "refresh_status_dir": str(refresh_status_run_dir),
             "command": command,
             "dry_run": bool(dry_run),
-            "skip_mirror": bool(skip_mirror),
+            "skip_mirror": bool(effective_skip_mirror),
             "mirror_only": bool(mirror_only),
             "launch_mode": launch_mode,
             "launch_owner": "external_runner",
@@ -605,7 +617,7 @@ def launch_refresh_run(
         "refresh_status_dir": str(refresh_status_run_dir),
         "command": command,
         "dry_run": bool(dry_run),
-        "skip_mirror": bool(skip_mirror),
+        "skip_mirror": bool(effective_skip_mirror),
         "mirror_only": bool(mirror_only),
         "launch_mode": launch_mode,
         "launch_owner": "web_process",
