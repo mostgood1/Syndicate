@@ -1878,6 +1878,7 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
         if not isinstance(target, dict):
             continue
         reasons = [str(item).strip() for item in (target.get("reasons") or []) if str(item).strip()]
+        writeup = str(target.get("writeup") or target.get("summary") or "").strip()
         rows.append(
             {
                 "heading": _safe_text(target.get("team"), "HR target"),
@@ -1885,7 +1886,13 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
                 "value": _safe_text(target.get("probability"), "-"),
                 "matchup": _safe_text(target.get("matchup"), "-"),
                 "detail": reasons[0] if reasons else _safe_text(target.get("summary"), "No HR-target summary available."),
+                "writeup": writeup or _safe_text(target.get("summary"), "No HR-target summary available."),
                 "line": _safe_text(target.get("support"), "-"),
+                "team": _safe_text(target.get("team"), "-"),
+                "opponent": _safe_text(target.get("opponent"), "-"),
+                "headshot_url": str(target.get("headshot_url") or "").strip() or None,
+                "team_logo_url": str(target.get("team_logo_url") or "").strip() or None,
+                "opponent_logo_url": str(target.get("opponent_logo_url") or "").strip() or None,
                 "href": f"/mlb/hr-targets?date={context_label}",
             }
         )

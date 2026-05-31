@@ -270,6 +270,15 @@ def _mlb_logo_url(team_id: int | None) -> str | None:
     return f"https://www.mlbstatic.com/team-logos/{int(team_id)}.svg"
 
 
+def _mlb_headshot_url(player_id: int | None) -> str | None:
+    if not player_id:
+        return None
+    return (
+        "https://img.mlbstatic.com/mlb-photos/image/upload/"
+        f"w_180,q_auto:best/v1/people/{int(player_id)}/headshot/67/current"
+    )
+
+
 def _team_display(abbr: str, fallback_name: str | None = None) -> dict[str, Any]:
     team_abbr = str(abbr or "").strip().upper() or "UNK"
     lookup_abbr = _MLB_TEAM_ABBR_ALIASES.get(team_abbr, team_abbr)
@@ -489,22 +498,35 @@ def _hr_targets_shelf(selected_date: str) -> dict[str, Any] | None:
     for index, row in enumerate(rows[:4], start=1):
         if not isinstance(row, dict):
             continue
+        support_score = _safe_float(row.get("hr_support_raw_score"))
+        if support_score is None:
+            support_score = _safe_float(row.get("hr_support_score"))
+        batter_id = _safe_int(row.get("batter_id"))
+        team_id = _safe_int(row.get("team_id"))
+        opponent_team_id = _safe_int(row.get("opponent_team_id"))
+        reasons = [str(item).strip() for item in (row.get("hr_target_reasons") or []) if str(item).strip()]
+        writeup = str(row.get("hr_target_summary") or "").strip() or (" ".join(reasons[:2]) if reasons else "No summary available.")
         top_rows.append(
             {
                 "rank": f"#{index}",
                 "player_name": str(row.get("player_name") or "Unknown hitter").strip() or "Unknown hitter",
                 "team": str(row.get("team") or "-").strip() or "-",
+                "opponent": str(row.get("opponent") or "-").strip() or "-",
                 "matchup": str(row.get("matchup") or "-").strip() or "-",
                 "probability": _format_pct(row.get("p_hr_1plus")),
-                "support": _format_num(row.get("hr_support_score")),
-                "summary": str(row.get("hr_target_summary") or "No summary available.").strip() or "No summary available.",
+                "support": _format_num(support_score),
+                "summary": writeup,
                 "p_hr_1plus": row.get("p_hr_1plus"),
-                "support_score": row.get("hr_support_score"),
+                "support_score": support_score,
                 "support_label": str(row.get("hr_support_label") or "").strip(),
                 "pa_mean": row.get("pa_mean"),
                 "lineup_order": row.get("lineup_order"),
                 "opponent_pitcher_name": str(row.get("opponent_pitcher_name") or "").strip(),
-                "writeup": str(row.get("hr_target_summary") or row.get("matchup") or "").strip(),
+                "writeup": writeup,
+                "headshot_url": _mlb_headshot_url(batter_id),
+                "team_logo_url": _mlb_logo_url(team_id),
+                "opponent_logo_url": _mlb_logo_url(opponent_team_id),
+                "drivers": reasons[:3],
             }
         )
     if not top_rows:
@@ -1743,11 +1765,11 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             {
                 "playerName": str(row.get("player_name") or "").strip(),
                 "team": str(row.get("team") or "").strip(),
-                "opponent": str(row.get("matchup") or "").strip(),
+                "opponent": str(row.get("opponent") or "").strip(),
                 "matchup": str(row.get("matchup") or "").strip(),
                 "pHr1Plus": row.get("p_hr_1plus"),
                 "probability": str(row.get("probability") or "").strip(),
-                "supportLabel": str(row.get("support") or "").strip(),
+                "supportLabel": str(row.get("support_label") or "").strip(),
                 "supportScore": row.get("support_score"),
                 "supportScoreDisplay": str(row.get("support") or "").strip(),
                 "paMean": row.get("pa_mean"),
@@ -1755,6 +1777,14 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
                 "opponentPitcherName": str(row.get("opponent_pitcher_name") or "").strip(),
                 "writeup": str(row.get("writeup") or row.get("summary") or "").strip(),
                 "summary": str(row.get("summary") or "").strip(),
+                "headshotUrl": str(row.get("headshot_url") or "").strip() or None,
+                "teamLogoUrl": str(row.get("team_logo_url") or "").strip() or None,
+                "opponentLogoUrl": str(row.get("opponent_logo_url") or "").strip() or None,
+                "drivers": [
+                    {"label": "Reason", "display": str(item).strip()}
+                    for item in (row.get("drivers") or [])
+                    if str(item).strip()
+                ],
                 "detailHref": hr_targets.get("href") if hr_targets else None,
             }
         )
