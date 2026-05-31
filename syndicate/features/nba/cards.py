@@ -239,7 +239,8 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     }
 
 
-def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+@lru_cache(maxsize=64)
+def _local_live_state_payload_cached(selected_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
     try:
         path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
     except FileNotFoundError:
@@ -262,6 +263,22 @@ def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
         if isinstance(record, dict) and isinstance(record.get("games"), list):
             return record
     return None
+
+
+def _local_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    try:
+        path = live_snapshot_path(f"live_state_{selected_date}.jsonl")
+    except FileNotFoundError:
+        return _local_live_state_payload_cached(selected_date, None, None)
+    try:
+        stat = path.stat()
+    except Exception:
+        return _local_live_state_payload_cached(selected_date, None, None)
+    return _local_live_state_payload_cached(selected_date, int(stat.st_mtime_ns), int(stat.st_size))
+
+
+_local_live_state_payload.cache_clear = _local_live_state_payload_cached.cache_clear  # type: ignore[attr-defined]
+_local_live_state_payload.cache_info = _local_live_state_payload_cached.cache_info  # type: ignore[attr-defined]
 
 
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
@@ -334,8 +351,8 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
     return games, str(source_path or f"live_state_{selected_date}.jsonl")
 
 
-def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
-    resolved_date = str(selected_date or "").strip()
+@lru_cache(maxsize=256)
+def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
     if not resolved_date:
         return None
     try:
@@ -360,6 +377,21 @@ def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any
         if isinstance(record, dict) and isinstance(record.get("games"), list):
             return record
     return None
+
+
+def _local_live_snapshot_payload(kind: str, selected_date: str) -> dict[str, Any] | None:
+    resolved_date = str(selected_date or "").strip()
+    if not resolved_date:
+        return None
+    try:
+        path = live_snapshot_path(f"{kind}_{resolved_date}.jsonl")
+    except FileNotFoundError:
+        return _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
+    try:
+        stat = path.stat()
+    except Exception:
+        return _local_live_snapshot_payload_cached(kind, resolved_date, None, None)
+    return _local_live_snapshot_payload_cached(kind, resolved_date, int(stat.st_mtime_ns), int(stat.st_size))
 
 
 def _filtered_local_live_snapshot_payload(kind: str, selected_date: str, event_ids: list[str]) -> dict[str, Any] | None:
