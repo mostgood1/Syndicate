@@ -157,6 +157,9 @@ def _build_nba_payload(args: argparse.Namespace, *, env_key: str) -> dict[str, s
 
 
 def _local_source_artifact_root(slug: str) -> Path:
+    data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    if data_root:
+        return Path(data_root).expanduser().resolve() / f"{slug}_source"
     return REPO_ROOT / "data" / f"{slug}_source" / "source_artifacts"
 
 
