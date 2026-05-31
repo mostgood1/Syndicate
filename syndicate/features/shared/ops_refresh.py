@@ -416,6 +416,44 @@ def _coerce_slug_list(raw: str | None) -> str:
     return text or "all"
 
 
+def _active_sports_for_date(date_str: str) -> str:
+    """Return a comma-separated list of sports whose season overlaps *date_str*.
+
+    Season windows mirror those in scripts/daily_update_in_season.ps1.
+    """
+    try:
+        from datetime import date as _date
+        d = _date.fromisoformat(date_str)
+        month, day = d.month, d.day
+    except Exception:
+        return "all"
+
+    active: list[str] = []
+    # MLB: March – October
+    if 3 <= month <= 10:
+        active.append("mlb")
+    # NBA: October – June
+    if month >= 10 or month <= 6:
+        active.append("nba")
+    # NHL: October – June
+    if month >= 10 or month <= 6:
+        active.append("nhl")
+    # WNBA: May – October
+    if 5 <= month <= 10:
+        active.append("wnba")
+    # NFL: August – February
+    if month >= 8 or month <= 2:
+        active.append("nfl")
+    # NCAAF: Aug 15 – Dec, January
+    if (month == 8 and day >= 15) or (9 <= month <= 12) or month == 1:
+        active.append("ncaaf")
+    # NCAAB: November – April
+    if month >= 11 or month <= 4:
+        active.append("ncaab")
+
+    return ",".join(active) if active else "all"
+
+
 def _effective_skip_mirror(*, skip_mirror: bool, mirror_only: bool) -> bool:
     if mirror_only:
         return False
@@ -443,6 +481,8 @@ def launch_refresh_run(
 ) -> dict[str, Any]:
     selected_date = date or _today_date()
     effective_skip_mirror = _effective_skip_mirror(skip_mirror=bool(skip_mirror), mirror_only=bool(mirror_only))
+    # Default to in-season sports for the target date rather than running all sports.
+    effective_sports = _coerce_slug_list(sports) if sports else _active_sports_for_date(selected_date)
     run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     launch_mode = _resolve_launch_mode()
     current_reports_root = _reports_root()
@@ -467,7 +507,7 @@ def launch_refresh_run(
         "--date",
         selected_date,
         "--sports",
-        _coerce_slug_list(sports),
+        effective_sports,
         "--phase",
         str(phase or "all").strip() or "all",
         "--regions",
@@ -529,7 +569,7 @@ def launch_refresh_run(
         "jsonMode": True,
         "refreshOdds": True,
         "oddsPhase": str(phase or "all").strip() or "all",
-        "oddsSports": _coerce_slug_list(sports),
+        "oddsSports": effective_sports,
         "oddsRegions": str(regions or "us").strip() or "us",
         "skipMirror": bool(effective_skip_mirror),
         "mirrorOnly": bool(mirror_only),
@@ -556,7 +596,7 @@ def launch_refresh_run(
         "latestManifestPath": str(refresh_status_latest_path),
         "refreshOdds": True,
         "oddsPhase": str(phase or "all").strip() or "all",
-        "oddsSports": _coerce_slug_list(sports),
+        "oddsSports": effective_sports,
         "oddsRegions": str(regions or "us").strip() or "us",
         "runSummaryPath": str(refresh_and_gate_run_path),
         "oddsRefreshPath": str(odds_refresh_path),
