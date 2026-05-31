@@ -3108,10 +3108,12 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             payload = None
         return payload if isinstance(payload, dict) else None
 
-    if state_payload is None:
-        state_payload = _fetch_json(f"/api/live_state?date={date_str}")
-        if state_payload and _write_live_snapshot_payload(state_destination, state_payload):
-            copied["live_state_path"] = str(state_destination)
+    refreshed_state_payload = _fetch_json(f"/api/live_state?date={date_str}")
+    if refreshed_state_payload and _write_live_snapshot_payload(state_destination, refreshed_state_payload):
+        copied["live_state_path"] = str(state_destination)
+        state_payload = refreshed_state_payload
+    elif state_payload is None:
+        state_payload = refreshed_state_payload
 
     event_ids = [
         str(game.get("event_id") or "").strip()
@@ -3128,18 +3130,20 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             file_name=file_name,
             destination=destination,
         )
-        if existing:
-            if copied_key:
-                copied[copied_key] = existing
-            continue
         if not joined_event_ids:
+            if existing and copied_key:
+                copied[copied_key] = existing
             continue
         query = f"/api/{kind}?date={date_str}&event_ids={joined_event_ids}"
         if kind == "live_lines":
             query = f"{query}&include_period_totals=1"
         payload = _fetch_json(query)
-        if payload and _write_live_snapshot_payload(destination, payload) and copied_key:
-            copied[copied_key] = str(destination)
+        if payload and _write_live_snapshot_payload(destination, payload):
+            if copied_key:
+                copied[copied_key] = str(destination)
+            continue
+        if existing and copied_key:
+            copied[copied_key] = existing
 
     return copied
 
