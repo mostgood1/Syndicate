@@ -37,10 +37,6 @@ def _season_string(target_date: date) -> str:
     return f"{season_start}-{(season_start + 1) % 100:02d}"
 
 
-def _season_start_year(season: str) -> int:
-    return int(str(season).split("-", 1)[0])
-
-
 def _season_end_year(season: str) -> int:
     season_str = str(season).strip()
     if "-" not in season_str:
@@ -211,7 +207,7 @@ def run_playoff_transition(
         games,
         include_advanced_stats=True,
         include_injuries=True,
-        season=_season_start_year(window.season),
+        season=_season_end_year(window.season),
     )
     game_metrics = train_models_enhanced(features_df, use_enhanced_features=True)
 
