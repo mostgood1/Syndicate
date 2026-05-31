@@ -136,8 +136,8 @@ def _normalize_remote_card_game(game: dict[str, Any]) -> dict[str, Any]:
     out = dict(game)
     away_info = out.get("away") if isinstance(out.get("away"), dict) else {}
     home_info = out.get("home") if isinstance(out.get("home"), dict) else {}
-    away_tri = str(out.get("away_tri") or out.get("away_name") or away_info.get("abbr") or "").strip().upper()
-    home_tri = str(out.get("home_tri") or out.get("home_name") or home_info.get("abbr") or "").strip().upper()
+    away_tri = _canonical_nba_tri(str(out.get("away_tri") or out.get("away_name") or away_info.get("abbr") or "").strip().upper())
+    home_tri = _canonical_nba_tri(str(out.get("home_tri") or out.get("home_name") or home_info.get("abbr") or "").strip().upper())
     if away_tri:
         out.setdefault("away_tri", away_tri)
     if home_tri:
@@ -173,6 +173,19 @@ def _espn_logo_abbr(team_tri: str) -> str:
         "WAS": "WSH",
         "SAS": "SA",
         "PHX": "PHO",
+    }.get(value, value)
+
+
+def _canonical_nba_tri(team_tri: str) -> str:
+    value = str(team_tri or "").strip().upper()
+    return {
+        "GS": "GSW",
+        "NO": "NOP",
+        "NY": "NYK",
+        "UTAH": "UTA",
+        "WSH": "WAS",
+        "PHO": "PHX",
+        "SA": "SAS",
     }.get(value, value)
 
 
@@ -561,8 +574,8 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
     for row in rows:
         if not isinstance(row, dict):
             continue
-        away_tri = str(row.get("away") or "").strip().upper()
-        home_tri = str(row.get("home") or "").strip().upper()
+        away_tri = _canonical_nba_tri(str(row.get("away") or "").strip().upper())
+        home_tri = _canonical_nba_tri(str(row.get("home") or "").strip().upper())
         if not away_tri or not home_tri:
             continue
         away_pts = _safe_float(row.get("away_pts"))
@@ -622,8 +635,12 @@ def _game_identity_key(game: dict[str, Any]) -> tuple[str, str, str]:
     if not isinstance(game, dict):
         return ("", "", "")
     event_id = str(game.get("event_id") or "").strip()
-    away_tri = str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
-    home_tri = str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+    away_tri = _canonical_nba_tri(
+        str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
+    )
+    home_tri = _canonical_nba_tri(
+        str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+    )
     return (event_id, away_tri, home_tri)
 
 
