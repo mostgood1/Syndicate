@@ -1,0 +1,106 @@
+{
+  "date": "2026-05-31",
+  "counts": {
+    "games": 1,
+    "picks": 5
+  },
+  "per_game": [
+    {
+      "home": "GSV",
+      "away": "LVA",
+      "matchup": "LVA @ GSV",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "LVA",
+          "display_pick": "Chelsea Gray OVER 1.5",
+          "selection": "OVER 1.5",
+          "price": -120.0,
+          "score": 50.90326574911905,
+          "ev_pct": 50.90326574911905,
+          "win_prob": 0.5454545454545454,
+          "p_win": 0.5454545454545454,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 50.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "LVA @ GSV"
+        },
+        {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Gabby Williams UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 114.0,
+          "score": 10.871350947526714,
+          "ev_pct": 10.871350947526714,
+          "win_prob": 0.4672897196261682,
+          "p_win": 0.4672897196261682,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 10.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "LVA @ GSV"
+        },
+        {
+          "market": "PROPS",
+          "team": "LVA",
+          "display_pick": "A'ja Wilson UNDER 12.5",
+          "selection": "UNDER 12.5",
+          "price": -137.0,
+          "score": 6.870909901274874,
+          "ev_pct": 6.870909901274874,
+          "win_prob": 0.5780590717299579,
+          "p_win": 0.5780590717299579,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 6.9%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "LVA @ GSV"
+        },
+        {
+          "market": "ATS",
+          "team": "Las Vegas Aces",
+          "display_pick": "Las Vegas Aces -2.5",
+          "selection": "Las Vegas Aces",
+          "price": -110.0,
+          "score": 4.875,
+          "ev_pct": 4.875,
+          "win_prob": 0.57256,
+          "p_win": 0.57256,
+          "basketball_summary": "Model margin 2.4 vs market -2.5",
+          "top_play_reasons": [
+            "Edge 4.9",
+            "EV 4.9%"
+          ],
+          "matchup": "LVA @ GSV"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 168.0",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -2.985771,
+          "ev_pct": 2.9858,
+          "win_prob": 0.553668,
+          "p_win": 0.553668,
+          "basketball_summary": "Model total 165.0 vs line 168.0",
+          "top_play_reasons": [
+            "Edge -3.0",
+            "EV 3.0%"
+          ],
+          "matchup": "LVA @ GSV"
+        }
+      ]
+    }
+  ]
+}
