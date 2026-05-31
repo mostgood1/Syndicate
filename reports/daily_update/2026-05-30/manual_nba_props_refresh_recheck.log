@@ -1,0 +1,5 @@
+[2026-05-30T20:38:16] $ 'c:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-05-30 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-05-30.csv' --regions us
+ERROR: Missing ODDS_API_KEY; set in environment or pass --api-key
+[2026-05-30T20:38:17] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-05-30.csv (rows=2151)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-05-30T20:38:31] Built local game_cards from game_odds fallback: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_cards_2026-05-30.csv (rows=1)
