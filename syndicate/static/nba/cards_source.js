@@ -6011,7 +6011,9 @@
       }
       if (silent && state.payload && state.boardInitialized) {
         state.liveDataLoading = false;
-        showNote(error?.message || 'Failed to refresh slate.', 'warning');
+        if (!isRetryableApiError(error)) {
+          showNote(error?.message || 'Failed to refresh slate.', 'warning');
+        }
         return;
       }
       state.payload = null;
