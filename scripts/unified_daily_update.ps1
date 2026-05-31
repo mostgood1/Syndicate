@@ -272,6 +272,84 @@ function Get-ActiveMlbUiDailyLockCount {
     return $activeCount
 }
 
+function Wait-ForMlbUiDailyLockRelease {
+    param(
+        [string]$MlbDataRoot,
+        [string]$DateValue,
+        [string]$SeasonValue,
+        [int]$TimeoutSeconds = 3600,
+        [int]$PollSeconds = 20
+    )
+
+    if ([string]::IsNullOrWhiteSpace($MlbDataRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($SeasonValue)) {
+        return
+    }
+
+    $safeTimeout = [Math]::Max(1, [int]$TimeoutSeconds)
+    $safePoll = [Math]::Max(1, [int]$PollSeconds)
+    $deadline = (Get-Date).AddSeconds($safeTimeout)
+
+    while ($true) {
+        $activeCount = Get-ActiveMlbUiDailyLockCount -MlbDataRoot $MlbDataRoot -DateValue $DateValue -SeasonValue $SeasonValue
+        if ($activeCount -le 0) {
+            return
+        }
+
+        $remaining = [int][Math]::Floor(($deadline - (Get-Date)).TotalSeconds)
+        if ($remaining -le 0) {
+            throw "MLB ui-daily lock wait timed out for $DateValue after $safeTimeout seconds; another run is still active"
+        }
+
+        Write-Host ("    waiting for MLB ui-daily lock release for {0}; active locks={1}; remaining={2}s" -f $DateValue, $activeCount, $remaining) -ForegroundColor Yellow
+        Start-Sleep -Seconds ([Math]::Min($safePoll, $remaining))
+    }
+}
+
+function Get-BasketballScheduledGamesCheck {
+    param(
+        [string]$Sport,
+        [string]$DateValue
+    )
+
+    $result = [ordered]@{
+        known = $false
+        count = $null
+        source = $null
+        note = $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Sport) -or [string]::IsNullOrWhiteSpace($DateValue)) {
+        return [pscustomobject]$result
+    }
+
+    try {
+        $scoreboardDate = $DateValue.Replace('-', '')
+        switch ($Sport.Trim().ToLowerInvariant()) {
+            'nba' {
+                $url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=$scoreboardDate"
+                $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
+                $eventCount = if ($payload -and $payload.events) { [int]$payload.events.Count } else { 0 }
+                $result.known = $true
+                $result.source = 'espn_nba_scoreboard'
+                $result.count = $eventCount
+            }
+            'wnba' {
+                $url = "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=$scoreboardDate"
+                $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
+                $eventCount = if ($payload -and $payload.events) { [int]$payload.events.Count } else { 0 }
+                $result.known = $true
+                $result.source = 'espn_wnba_scoreboard'
+                $result.count = $eventCount
+            }
+        }
+    }
+    catch {
+        $result.note = $_.Exception.Message
+    }
+
+    return [pscustomobject]$result
+}
+
 function Test-PythonExecutable {
     param([string]$Executable)
 
@@ -453,6 +531,11 @@ function Assert-AdvancedDataReady {
     $sportSlug = $Sport.Trim().ToLowerInvariant()
     switch ($sportSlug) {
         'nba' {
+            $scheduleCheck = Get-BasketballScheduledGamesCheck -Sport 'nba' -DateValue $DateValue
+            if ($scheduleCheck.known -and [int]$scheduleCheck.count -eq 0) {
+                Write-Host ("NBA advanced-data gate: no scheduled games for {0} ({1}); skipping artifact assertions" -f $DateValue, $scheduleCheck.source) -ForegroundColor DarkGray
+                return
+            }
             $processedRoot = Join-Path $RepoRoot 'data\nba_source\data\processed'
             if (-not (Test-Path $processedRoot)) {
                 throw "NBA advanced-data gate failed: missing processed root $processedRoot"
@@ -514,6 +597,11 @@ function Assert-AdvancedDataReady {
             return
         }
         'wnba' {
+            $scheduleCheck = Get-BasketballScheduledGamesCheck -Sport 'wnba' -DateValue $DateValue
+            if ($scheduleCheck.known -and [int]$scheduleCheck.count -eq 0) {
+                Write-Host ("WNBA advanced-data gate: no scheduled games for {0} ({1}); skipping artifact assertions" -f $DateValue, $scheduleCheck.source) -ForegroundColor DarkGray
+                return
+            }
             $processedRoot = Join-Path $RepoRoot 'data\wnba_source\data\processed'
             if (-not (Test-Path $processedRoot)) {
                 throw "WNBA advanced-data gate failed: missing processed root $processedRoot"
@@ -1418,7 +1506,6 @@ try {
     }
 
     if (-not $SkipSourceUpdates) {
-        $skipSportsDueToLock = @{}
         for ($stepIndex = 0; $stepIndex -lt $sourceSteps.Count; $stepIndex++) {
             $step = $sourceSteps[$stepIndex]
             $sportKey = [string]$step.Sport
@@ -1443,30 +1530,12 @@ try {
                 mirrorManifestExists = $false
             }
 
-            if (-not [string]::IsNullOrWhiteSpace($sportKey) -and $skipSportsDueToLock.ContainsKey($sportKey) -and $skipSportsDueToLock[$sportKey]) {
-                $sportRun.status = 'skipped_lock_active'
-                $sportRun.error = 'Skipped because an earlier step detected an active artifact lock for this sport.'
-                $sportRun.completedAt = (Get-Date).ToString('o')
-                $runManifest.sportRuns += @([pscustomobject]$sportRun)
-                continue
-            }
-
             if (-not $DryRun -and $isMlbVendoredStep) {
                 $preRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
                 if ($preRemovedLocks -gt 0) {
                     Write-Host ("    cleaned stale MLB ui-daily locks before run: {0}" -f $preRemovedLocks) -ForegroundColor Yellow
                 }
-
-                $activeLockCount = Get-ActiveMlbUiDailyLockCount -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
-                if ($activeLockCount -gt 0) {
-                    Write-Host ("    MLB ui-daily lock is active for {0} ({1} lock file(s)); skipping MLB steps for this run" -f $Date, $activeLockCount) -ForegroundColor Yellow
-                    $skipSportsDueToLock[$sportKey] = $true
-                    $sportRun.status = 'skipped_lock_active'
-                    $sportRun.error = "Another MLB ui-daily run is already active for $Date"
-                    $sportRun.completedAt = (Get-Date).ToString('o')
-                    $runManifest.sportRuns += @([pscustomobject]$sportRun)
-                    continue
-                }
+                Wait-ForMlbUiDailyLockRelease -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
             }
 
             $stepSucceeded = $false
