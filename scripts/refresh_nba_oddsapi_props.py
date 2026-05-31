@@ -1970,7 +1970,7 @@ def _run_refresh_via_cli(
             )
             rc_pred = 1
             if not game_predictions_ok:
-                state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
+                _append_log(log_file, game_predictions_error or f"predictions missing before predict-props for {date_str}; continuing without refreshed predictions")
             else:
                 try:
                     _touch_progress()
@@ -3483,7 +3483,7 @@ def main() -> int:
         return 1
     if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:
         return 1
-    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and recs_rows <= 0:
+    if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and predictions_rows > 0 and recs_rows <= 0:
         return 1
     if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return 1
