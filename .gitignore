@@ -58,4 +58,4 @@ data/mlb_source/source_artifacts/data/daily/snapshots/*/injuries_raw.json
 data/mlb_source/source_artifacts/data/daily/snapshots/*/meta.json
 
 # Mirror refresh manifests are local operational status artifacts.
-data/mlb_source/manifests/mirror_refresh*.json
+data/*_source/manifests/mirror_refresh*.json
