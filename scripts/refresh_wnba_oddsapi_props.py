@@ -2119,8 +2119,9 @@ def _predict_props_cli_args(*, source_root: Path, date_str: str, out_path: Path)
         "--calibrate",
         "--calib-window",
         str(calib_window),
-        "--use-pure-onnx",
     ]
+    if _env_bool("REFRESH_PREDICT_PROPS_USE_PURE_ONNX", False):
+        args.append("--use-pure-onnx")
     if _env_bool("REFRESH_PREDICT_PROPS_CALIBRATE_PLAYER", True):
         args.extend([
             "--calibrate-player",

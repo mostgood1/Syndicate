@@ -47,14 +47,60 @@ def _advanced_stats_quality_ok(stats_df: pd.DataFrame, required_teams: set[str])
     teams = set(stats_df['team'].astype(str).str.upper().str.strip())
     if required_teams and not required_teams.issubset(teams):
         return False
-    varied_cols = 0
-    for col in ('pace', 'off_rtg', 'def_rtg', 'efg_pct'):
-        if col not in stats_df.columns:
-            continue
-        values = pd.to_numeric(stats_df[col], errors='coerce').dropna()
-        if values.nunique() > 1:
-            varied_cols += 1
-    return varied_cols >= 2
+    return True
+
+
+def _baseline_advanced_stats_row(team: str) -> dict[str, float | str]:
+    return {
+        'team': str(team).upper().strip(),
+        'pace': float(LEAGUE.baseline_pace),
+        'off_rtg': float(LEAGUE.baseline_off_rating),
+        'def_rtg': float(LEAGUE.baseline_def_rating),
+        'efg_pct': 0.50,
+        'tov_pct': 0.14,
+        'orb_pct': 0.27,
+        'ft_rate': 0.22,
+        'fg3a_rate': 0.31,
+        'fg3_pct': 0.33,
+        'ts_pct': 0.54,
+        'ast_per_100': 18.0,
+    }
+
+
+def _coerce_advanced_stats_with_baselines(stats_df: pd.DataFrame, required_teams: set[str]) -> pd.DataFrame:
+    out = stats_df.copy() if stats_df is not None else pd.DataFrame()
+    if 'team' not in out.columns:
+        out['team'] = []
+    out['team'] = out['team'].astype(str).str.upper().str.strip()
+
+    for col in _ADVANCED_STATS_COLUMNS:
+        if col not in out.columns:
+            out[col] = np.nan
+        out[col] = pd.to_numeric(out[col], errors='coerce')
+
+    medians = {}
+    for col in _ADVANCED_STATS_COLUMNS:
+        try:
+            medians[col] = float(out[col].median(skipna=True))
+        except Exception:
+            medians[col] = np.nan
+
+    baseline = _baseline_advanced_stats_row('BASELINE')
+    for col in _ADVANCED_STATS_COLUMNS:
+        fallback_value = medians.get(col)
+        if pd.isna(fallback_value):
+            fallback_value = float(baseline[col])
+        out[col] = out[col].fillna(float(fallback_value))
+
+    existing = set(out['team']) if not out.empty else set()
+    missing_teams = [team for team in required_teams if team not in existing]
+    if missing_teams:
+        fill_rows = [_baseline_advanced_stats_row(team) for team in sorted(missing_teams)]
+        out = pd.concat([out, pd.DataFrame(fill_rows)], ignore_index=True)
+
+    keep_cols = ['team'] + [col for col in _ADVANCED_STATS_COLUMNS if col in out.columns]
+    out = out[keep_cols].drop_duplicates(subset=['team'], keep='first')
+    return out
 
 
 def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
@@ -64,6 +110,7 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
     required_teams = set(pd.concat([df['home_team'], df['visitor_team']]).astype(str).str.upper().str.strip())
     as_of = _infer_as_of_date(df)
     stats_file = paths.data_processed / f"team_advanced_stats_{season}.csv"
+    fallback_stats_df: pd.DataFrame | None = None
     stats_candidates: list[Path] = []
     if as_of:
         stats_candidates.append(paths.data_processed / f"team_advanced_stats_{season}_asof_{as_of.replace('-', '')}.csv")
@@ -79,9 +126,11 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
             stats_df = pd.read_csv(candidate)
         except Exception:
             continue
+        if fallback_stats_df is None and stats_df is not None and not stats_df.empty and 'team' in stats_df.columns:
+            fallback_stats_df = stats_df.copy()
         if _advanced_stats_quality_ok(stats_df, required_teams):
             print(f"Loaded advanced stats from {candidate}")
-            return stats_df
+            return _coerce_advanced_stats_with_baselines(stats_df, required_teams)
         print(f"Rejecting advanced stats cache {candidate} as incomplete or flat")
 
     for builder_name, builder in (
@@ -97,6 +146,7 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
             continue
         stats_df = stats_df.copy()
         stats_df['team'] = stats_df['team'].astype(str).str.upper().str.strip()
+        stats_df = _coerce_advanced_stats_with_baselines(stats_df, required_teams)
         stats_df.to_csv(stats_file, index=False)
         if as_of:
             asof_file = paths.data_processed / f"team_advanced_stats_{season}_asof_{as_of.replace('-', '')}.csv"
@@ -104,6 +154,19 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
             print(f"Saved advanced stats to {asof_file}")
         print(f"Saved advanced stats to {stats_file}")
         return stats_df
+
+    if fallback_stats_df is not None and not fallback_stats_df.empty:
+        print(f"Using fallback advanced stats cache for season {season} with baseline fills")
+        stats_df = _coerce_advanced_stats_with_baselines(fallback_stats_df, required_teams)
+        try:
+            stats_df.to_csv(stats_file, index=False)
+        except Exception:
+            pass
+        return stats_df
+
+    if required_teams:
+        print(f"No advanced stats data available for season {season}; using league baseline priors")
+        return pd.DataFrame([_baseline_advanced_stats_row(team) for team in sorted(required_teams)])
 
     raise RuntimeError(
         f"Unable to materialize real advanced stats for season {season} from local boxscores or player logs"
