@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-31T11:55:09.980088",
+  "generated_at": "2026-05-31T12:11:18.810789",
   "date": "2026-05-31",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-31_b85891982dad.lock",
-    "pid": 24204,
-    "created_at": "2026-05-31T11:55:09.978256"
+    "pid": 10788,
+    "created_at": "2026-05-31T12:11:18.808763"
   },
   "seed": {
     "value": 1337,
@@ -251,25 +251,25 @@
           "spreads_games": 15
         },
         "pitcher_props": {
-          "players": 29,
+          "players": 28,
           "markets": {
             "earned_runs": 27,
             "hits_allowed": 28,
-            "outs": 29,
+            "outs": 28,
             "strikeouts": 28,
             "walks_allowed": 26
           },
           "events_matched": 15
         },
         "hitter_props": {
-          "players": 280,
+          "players": 277,
           "markets": {
-            "batter_hits": 274,
-            "batter_hits_runs_rbis": 271,
-            "batter_home_runs": 269,
-            "batter_rbis": 274,
-            "batter_runs_scored": 274,
-            "batter_total_bases": 262
+            "batter_hits": 270,
+            "batter_hits_runs_rbis": 272,
+            "batter_home_runs": 266,
+            "batter_rbis": 270,
+            "batter_runs_scored": 270,
+            "batter_total_bases": 259
           },
           "events_matched": 15
         }
@@ -788,8 +788,8 @@
         },
         "hitter": {
           "found": true,
-          "candidateCount": 1617,
-          "displayedCount": 1617,
+          "candidateCount": 1600,
+          "displayedCount": 1600,
           "sectionCount": 7
         }
       }
@@ -1026,18 +1026,18 @@
       "games": 15,
       "summary": {
         "games": 15,
-        "projected_teams": 9,
-        "adjusted_teams": 0,
+        "projected_teams": 6,
+        "adjusted_teams": 1,
         "partial_teams": 0,
         "fallback_pool_teams": 0,
-        "confirmed_teams": 21,
-        "projected_only_teams": 9,
-        "confirmed_only_teams": 21,
+        "confirmed_teams": 24,
+        "projected_only_teams": 6,
+        "confirmed_only_teams": 24,
         "comparable_teams": 0,
         "exact_match_teams": 0,
         "true_mismatch_teams": 0
       },
-      "adjusted_teams": 0,
+      "adjusted_teams": 1,
       "partial_teams": 0,
       "fallback_pool_teams": 0
     },
@@ -1054,7 +1054,8 @@
     }
   },
   "notes": [
-    "current-day official betting card day artifact has no selected rows yet"
+    "current-day official betting card day artifact has no selected rows yet",
+    "current-day lineup validation adjusted projected lineups for 1 team(s)"
   ],
   "warnings": [
     "prior-day eval report refresh failed for 2026-05-30: exit 1; continuing without season manifest publish"
