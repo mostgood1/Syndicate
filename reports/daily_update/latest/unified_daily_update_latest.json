@@ -1,7 +1,7 @@
 ﻿{
     "date":  "2026-05-30",
-    "generatedAt":  "2026-05-30T15:38:43.4006644-05:00",
-    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_153843",
+    "generatedAt":  "2026-05-30T23:05:17.5492710-05:00",
+    "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_230517",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
     "runtimePolicy":  {
                           "MLB":  {
@@ -26,9 +26,9 @@
                       },
     "sourceSteps":  [
                         {
-                            "sport":  "nba",
+                            "sport":  "wnba",
                             "workflow":  "vendored_daily_update",
-                            "name":  "NBA vendored daily update",
+                            "name":  "WNBA vendored daily update",
                             "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
                             "environmentOverrides":  {
                                                          "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS":  "1000",
@@ -41,15 +41,15 @@
                                               },
                             "command":  [
                                             "py",
-                                            "scripts\\refresh_nba_oddsapi_props.py",
+                                            "scripts\\refresh_wnba_oddsapi_props.py",
                                             "--date",
                                             "2026-05-30",
                                             "--source-root",
-                                            "vendor\\nba_betting_repo",
+                                            "vendor\\wnba_betting_repo",
                                             "--artifact-root",
-                                            "data\\nba_source",
+                                            "data\\wnba_source",
                                             "--log-file",
-                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_153843\\nba_props_refresh.log",
+                                            "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_230517\\wnba_props_refresh.log",
                                             "--force-refresh",
                                             "--days-ahead",
                                             "0",
@@ -60,11 +60,11 @@
                     ],
     "sportRuns":  [
                       {
-                          "sport":  "nba",
+                          "sport":  "wnba",
                           "workflow":  "vendored_daily_update",
-                          "name":  "NBA vendored daily update",
-                          "startedAt":  "2026-05-30T15:38:43.4086783-05:00",
-                          "completedAt":  "2026-05-30T15:39:07.0671348-05:00",
+                          "name":  "WNBA vendored daily update",
+                          "startedAt":  "2026-05-30T23:05:18.3232029-05:00",
+                          "completedAt":  "2026-05-30T23:06:01.2647611-05:00",
                           "status":  "ok",
                           "workingDirectory":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
                           "environmentOverrides":  {
@@ -78,35 +78,35 @@
                                             },
                           "command":  [
                                           "py",
-                                          "scripts\\refresh_nba_oddsapi_props.py",
+                                          "scripts\\refresh_wnba_oddsapi_props.py",
                                           "--date",
                                           "2026-05-30",
                                           "--source-root",
-                                          "vendor\\nba_betting_repo",
+                                          "vendor\\wnba_betting_repo",
                                           "--artifact-root",
-                                          "data\\nba_source",
+                                          "data\\wnba_source",
                                           "--log-file",
-                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_153843\\nba_props_refresh.log",
+                                          "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_230517\\wnba_props_refresh.log",
                                           "--force-refresh",
                                           "--days-ahead",
                                           "0",
                                           "--do-edges",
                                           "--do-export"
                                       ],
-                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\manifests\\mirror_refresh_2026-05-30.json",
+                          "mirrorManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\wnba_source\\manifests\\mirror_refresh_2026-05-30.json",
                           "mirrorManifestExists":  true
                       }
                   ],
-    "skipGitPush":  true,
+    "skipGitPush":  false,
     "gitRemote":  "origin",
     "commitMessagePrefix":  "daily update",
     "skipped":  {
                     "sourceUpdates":  false,
                     "refreshGate":  false,
                     "mlb":  true,
-                    "nba":  false,
+                    "nba":  true,
                     "nhl":  true,
-                    "wnba":  true,
+                    "wnba":  false,
                     "nfl":  true,
                     "ncaaf":  true,
                     "ncaab":  true
@@ -114,11 +114,37 @@
     "dryRun":  false,
     "refreshGate":  {
                         "requested":  true,
-                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_153843\\migration\\refresh_status_manifest.json",
-                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_153843\\migration\\refresh_and_gate_run.json",
+                        "manifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_230517\\migration\\refresh_status_manifest.json",
+                        "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-05-30\\20260530_230517\\migration\\refresh_and_gate_run.json",
                         "status":  "ok"
                     },
     "pushResults":  [
-
+                        {
+                            "name":  "Syndicate",
+                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                            "remote":  "origin",
+                            "branch":  "main",
+                            "commitMessage":  "daily update 2026-05-30 (pre-source publish)",
+                            "status":  "no_changes",
+                            "commit":  null
+                        },
+                        {
+                            "name":  "Syndicate",
+                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                            "remote":  "origin",
+                            "branch":  "main",
+                            "commitMessage":  "daily update 2026-05-30 [WNBA vendored daily update]",
+                            "status":  "pushed",
+                            "commit":  "3912e439a8282e294d82ea336ad5329a0543df83"
+                        },
+                        {
+                            "name":  "Syndicate",
+                            "repoPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+                            "remote":  "origin",
+                            "branch":  "main",
+                            "commitMessage":  "daily update 2026-05-30 (Syndicate mirror + gate)",
+                            "status":  "pushed",
+                            "commit":  "e58aeb23ff06b8ca886d3b02e15e916ccbe8c428"
+                        }
                     ]
 }
