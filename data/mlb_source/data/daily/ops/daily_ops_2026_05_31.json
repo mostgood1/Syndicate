@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-05-31T11:40:02.127576",
+  "generated_at": "2026-05-31T11:55:09.980088",
   "date": "2026-05-31",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-05-31_b85891982dad.lock",
-    "pid": 25304,
-    "created_at": "2026-05-31T11:40:02.126225"
+    "pid": 24204,
+    "created_at": "2026-05-31T11:55:09.978256"
   },
   "seed": {
     "value": 1337,
@@ -262,14 +262,14 @@
           "events_matched": 15
         },
         "hitter_props": {
-          "players": 281,
+          "players": 280,
           "markets": {
-            "batter_hits": 275,
+            "batter_hits": 274,
             "batter_hits_runs_rbis": 271,
-            "batter_home_runs": 270,
-            "batter_rbis": 275,
-            "batter_runs_scored": 273,
-            "batter_total_bases": 261
+            "batter_home_runs": 269,
+            "batter_rbis": 274,
+            "batter_runs_scored": 274,
+            "batter_total_bases": 262
           },
           "events_matched": 15
         }
@@ -788,8 +788,8 @@
         },
         "hitter": {
           "found": true,
-          "candidateCount": 1618,
-          "displayedCount": 1618,
+          "candidateCount": 1617,
+          "displayedCount": 1617,
           "sectionCount": 7
         }
       }
@@ -902,8 +902,8 @@
         },
         "tones": {
           "strong": 34,
-          "solid": 52,
-          "soft": 27
+          "solid": 51,
+          "soft": 28
         },
         "stats": {
           "hits_allowed": {
@@ -1026,13 +1026,13 @@
       "games": 15,
       "summary": {
         "games": 15,
-        "projected_teams": 10,
+        "projected_teams": 9,
         "adjusted_teams": 0,
         "partial_teams": 0,
         "fallback_pool_teams": 0,
-        "confirmed_teams": 20,
-        "projected_only_teams": 10,
-        "confirmed_only_teams": 20,
+        "confirmed_teams": 21,
+        "projected_only_teams": 9,
+        "confirmed_only_teams": 21,
         "comparable_teams": 0,
         "exact_match_teams": 0,
         "true_mismatch_teams": 0
