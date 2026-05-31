@@ -11,6 +11,7 @@ import numpy as np
 from typing import Optional
 
 from .config import paths
+from .teams import to_tricode
 from .scrapers import BasketballReferenceScraper, NBAInjuryDatabase
 
 
@@ -29,6 +30,13 @@ _ADVANCED_STATS_COLUMNS = [
 ]
 
 
+def _team_key(value: object) -> str:
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    return to_tricode(raw).upper().strip()
+
+
 def _infer_as_of_date(df: pd.DataFrame) -> str | None:
     for col in ('date', 'game_date', 'GAME_DATE'):
         if col not in df.columns:
@@ -42,8 +50,11 @@ def _infer_as_of_date(df: pd.DataFrame) -> str | None:
 def _advanced_stats_quality_ok(stats_df: pd.DataFrame, required_teams: set[str]) -> bool:
     if stats_df is None or stats_df.empty or 'team' not in stats_df.columns:
         return False
-    teams = set(stats_df['team'].astype(str).str.upper().str.strip())
-    if required_teams and not required_teams.issubset(teams):
+    teams = {_team_key(team) for team in stats_df['team'].astype(str)}
+    teams.discard('')
+    required = {_team_key(team) for team in required_teams}
+    required.discard('')
+    if required and not required.issubset(teams):
         return False
     varied_cols = 0
     for col in ('pace', 'off_rtg', 'def_rtg', 'efg_pct'):
@@ -59,7 +70,11 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
     from .advanced_stats_boxscores import compute_team_advanced_stats_from_boxscores
     from .advanced_stats_player_logs import compute_team_advanced_stats_from_player_logs
 
-    required_teams = set(pd.concat([df['home_team'], df['visitor_team']]).astype(str).str.upper().str.strip())
+    required_teams = {
+        _team_key(team)
+        for team in pd.concat([df['home_team'], df['visitor_team']]).astype(str)
+        if str(team or '').strip()
+    }
     as_of = _infer_as_of_date(df)
     stats_file = paths.data_processed / f"team_advanced_stats_{season}.csv"
     stats_candidates: list[Path] = []
@@ -94,7 +109,7 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
         if not _advanced_stats_quality_ok(stats_df, required_teams):
             continue
         stats_df = stats_df.copy()
-        stats_df['team'] = stats_df['team'].astype(str).str.upper().str.strip()
+        stats_df['team'] = stats_df['team'].astype(str).map(_team_key)
         stats_df.to_csv(stats_file, index=False)
         if as_of:
             asof_file = paths.data_processed / f"team_advanced_stats_{season}_asof_{as_of.replace('-', '')}.csv"
@@ -120,12 +135,17 @@ def add_advanced_stats_features(df: pd.DataFrame, season: int = 2025) -> pd.Data
         DataFrame with additional advanced stats features
     """
     stats_df = _materialize_advanced_stats(df, season)
+    stats_df = stats_df.copy()
+    stats_df['team_key'] = stats_df['team'].astype(str).map(_team_key)
+    df = df.copy()
+    df['home_team_key'] = df['home_team'].astype(str).map(_team_key)
+    df['visitor_team_key'] = df['visitor_team'].astype(str).map(_team_key)
     
     # Merge stats for home team
     df = df.merge(
         stats_df,
-        left_on='home_team',
-        right_on='team',
+        left_on='home_team_key',
+        right_on='team_key',
         how='left',
         suffixes=('', '_home_adv')
     )
@@ -139,14 +159,15 @@ def add_advanced_stats_features(df: pd.DataFrame, season: int = 2025) -> pd.Data
             df.drop(columns=[col], inplace=True)
     
     # Remove duplicate team column
-    if 'team' in df.columns:
-        df.drop(columns=['team'], inplace=True)
+    for join_col in ('team', 'team_key'):
+        if join_col in df.columns:
+            df.drop(columns=[join_col], inplace=True)
     
     # Merge stats for visitor team
     df = df.merge(
         stats_df,
-        left_on='visitor_team',
-        right_on='team',
+        left_on='visitor_team_key',
+        right_on='team_key',
         how='left',
         suffixes=('', '_visitor_adv')
     )
@@ -158,8 +179,13 @@ def add_advanced_stats_features(df: pd.DataFrame, season: int = 2025) -> pd.Data
             df.drop(columns=[col], inplace=True)
     
     # Remove duplicate team column
-    if 'team' in df.columns:
-        df.drop(columns=['team'], inplace=True)
+    for join_col in ('team', 'team_key'):
+        if join_col in df.columns:
+            df.drop(columns=[join_col], inplace=True)
+
+    for key_col in ('home_team_key', 'visitor_team_key'):
+        if key_col in df.columns:
+            df.drop(columns=[key_col], inplace=True)
     
     # Calculate differential features
     if 'home_pace' in df.columns and 'visitor_pace' in df.columns:
