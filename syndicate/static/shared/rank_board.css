@@ -12,6 +12,52 @@
   padding: 18px;
 }
 
+.rank-card__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.rank-card__headshot {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #d7deea;
+  background: #eef3fa;
+}
+
+.rank-card__identity-copy {
+  min-width: 0;
+}
+
+.rank-card__identity-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #3a4c66;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.rank-card__team-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.rank-card__vs {
+  color: #5f7087;
+  font-weight: 600;
+}
+
+.rank-card__identity-sub {
+  margin-top: 2px;
+  color: #5f7087;
+  font-size: 0.78rem;
+}
+
 .rank-card__header {
   display: flex;
   align-items: flex-start;

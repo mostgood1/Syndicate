@@ -1,4 +1,28 @@
 <article class="rank-card">
+  {% if card.headshot_url or card.team_logo_url or card.team or card.opponent %}
+    <div class="rank-card__identity">
+      {% if card.headshot_url %}
+        <img class="rank-card__headshot" src="{{ card.headshot_url }}" alt="{{ card.title }} headshot" loading="lazy" />
+      {% endif %}
+      <div class="rank-card__identity-copy">
+        <div class="rank-card__identity-line">
+          {% if card.team_logo_url %}
+            <img class="rank-card__team-logo" src="{{ card.team_logo_url }}" alt="{{ card.team or card.eyebrow }} logo" loading="lazy" />
+          {% endif %}
+          <span>{{ card.team or card.eyebrow or '-' }}</span>
+          {% if card.opponent %}
+            <span class="rank-card__vs">vs {{ card.opponent }}</span>
+          {% endif %}
+          {% if card.opponent_logo_url %}
+            <img class="rank-card__team-logo" src="{{ card.opponent_logo_url }}" alt="{{ card.opponent }} logo" loading="lazy" />
+          {% endif %}
+        </div>
+        {% if card.opponent_pitcher_name %}
+          <div class="rank-card__identity-sub">vs {{ card.opponent_pitcher_name }}</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
   <div class="rank-card__header">
     <div>
       {% if card.eyebrow %}<div class="section-label">{{ card.eyebrow }}</div>{% endif %}

@@ -557,6 +557,36 @@
       flex-wrap: wrap;
     }
 
+    .sport-compact-card__identity {
+      display: flex;
+      align-items: center;
+      gap: 0.58rem;
+    }
+
+    .sport-compact-card__identity-copy {
+      min-width: 0;
+      display: grid;
+      gap: 0.2rem;
+      flex: 1;
+    }
+
+    .sport-compact-card__headshot {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(132, 166, 196, 0.2);
+      background: rgba(255, 255, 255, 0.06);
+      flex: 0 0 auto;
+    }
+
+    .sport-compact-card__small-logo {
+      width: 14px;
+      height: 14px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
+
     .sport-compact-card__title {
       font-size: 1.02rem;
       font-weight: 700;
@@ -617,6 +647,10 @@
       font-size: 0.8rem;
       letter-spacing: 0.06em;
       text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 0.32rem;
+      flex-wrap: wrap;
     }
 
     .sport-compact-card__signal-box {

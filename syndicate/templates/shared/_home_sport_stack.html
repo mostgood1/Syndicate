@@ -74,12 +74,29 @@
             <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} HR targets">
               {% for item in sport.mlb_home.hr_targets_items %}
                 <article class="sport-compact-card">
-                  <div class="sport-compact-card__top">
-                    <div class="sport-compact-card__title">{{ item.name }}</div>
+                  <div class="sport-compact-card__identity">
+                    {% if item.headshot_url %}
+                      <img class="sport-compact-card__headshot" src="{{ item.headshot_url }}" alt="{{ item.name }} headshot" loading="lazy">
+                    {% endif %}
+                    <div class="sport-compact-card__identity-copy">
+                      <div class="sport-compact-card__title">{{ item.name }}</div>
+                      <div class="sport-compact-card__meta">
+                        {% if item.team_logo_url %}
+                          <img class="sport-compact-card__small-logo" src="{{ item.team_logo_url }}" alt="{{ item.team }} logo" loading="lazy">
+                        {% endif %}
+                        <span>{{ item.team }}</span>
+                        <span>vs {{ item.opponent }}</span>
+                        {% if item.opponent_logo_url %}
+                          <img class="sport-compact-card__small-logo" src="{{ item.opponent_logo_url }}" alt="{{ item.opponent }} logo" loading="lazy">
+                        {% endif %}
+                      </div>
+                    </div>
                     <div class="sport-compact-card__value">{{ item.value }}</div>
                   </div>
-                  <div class="sport-compact-card__meta">{{ item.matchup }}</div>
-                  <div class="sport-compact-card__summary">{{ item.detail }}</div>
+                  <div class="sport-compact-card__top">
+                    <div class="sport-compact-card__meta">{{ item.matchup }}</div>
+                  </div>
+                  <div class="sport-compact-card__summary">{{ item.writeup or item.detail }}</div>
                   <div class="sport-compact-card__chip-row">
                     <span class="sport-compact-card__chip">{{ item.heading }}</span>
                     <span class="sport-compact-card__chip">Support {{ item.line }}</span>
