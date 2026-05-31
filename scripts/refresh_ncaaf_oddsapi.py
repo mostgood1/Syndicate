@@ -115,8 +115,7 @@ def _copy_tree_if_exists(source: Path, destination: Path) -> bool:
     except Exception:
         pass
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        shutil.rmtree(destination)
+    # Merge copy instead of rmtree+copy to avoid Windows lock/permission races.
     _copy_tree_with_fallback(source, destination)
     return True
 
