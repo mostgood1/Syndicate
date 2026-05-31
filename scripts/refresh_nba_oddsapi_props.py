@@ -1968,10 +1968,10 @@ def _run_refresh_via_cli(
                 log_file=log_file,
                 heartbeat_cb=_touch_progress,
             )
+            rc_pred = 1
             if not game_predictions_ok:
                 state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
             else:
-                rc_pred = 1
                 try:
                     _touch_progress()
                     _, _ = export_props_predictions_local(
