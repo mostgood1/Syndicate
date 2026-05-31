@@ -7368,7 +7368,12 @@ def predict_games_npu_cmd(date_str: str, out_path: str | None, periods: bool, ca
                     games = pd.concat([raw_games, slate_df], ignore_index=True, sort=False)
                     # Build enhanced features (adds pace/ratings + injuries)
                     from .features_enhanced import build_features_enhanced
-                    feats2 = build_features_enhanced(games, include_advanced_stats=True, include_injuries=True, season=2025)
+                    feats2 = build_features_enhanced(
+                        games,
+                        include_advanced_stats=True,
+                        include_injuries=True,
+                        season=season_year_from_date(pd.to_datetime(date_str).date()),
+                    )
                     # Filter to target date
                     feats2["date"] = pd.to_datetime(feats2["date"]).dt.date
                     target_date = pd.to_datetime(date_str).date()
@@ -15319,7 +15324,12 @@ def backtest_period_calibration_cmd(start_date: str, end_date: str, weights: str
                     games = pd.concat([raw.copy(), slate_df], ignore_index=True, sort=False)
                     games['date'] = pd.to_datetime(games['date'])
                     from .features_enhanced import build_features_enhanced
-                    feats2 = build_features_enhanced(games, include_advanced_stats=True, include_injuries=True, season=2025)
+                    feats2 = build_features_enhanced(
+                        games,
+                        include_advanced_stats=True,
+                        include_injuries=True,
+                        season=season_year_from_date(pd.to_datetime(ds).date()),
+                    )
                     feats2['date'] = pd.to_datetime(feats2['date']).dt.date
                     features_df = feats2[feats2['date'] == d]
             except Exception:

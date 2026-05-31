@@ -1,0 +1,70 @@
+{
+  "date": "2026-05-31",
+  "season": 2026,
+  "generated_at": "2026-05-30T00:34:23.826627",
+  "tool": "tools/daily_update_multi_profile.py",
+  "locked": true,
+  "source_profile": "game_recos",
+  "source_sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-05-31",
+  "thresholds": {
+    "nrfi_min_prob": 0.55,
+    "nrfi_max_mean_runs": 0.8,
+    "yrfi_max_nrfi_prob": 0.5,
+    "yrfi_min_mean_runs": 0.95,
+    "yrfi_min_side_lead_prob": 0.24
+  },
+  "counts": {
+    "rows": 2,
+    "games": 2
+  },
+  "signals": [
+    {
+      "game_pk": 824354,
+      "date": "2026-05-31",
+      "away": "San Francisco Giants",
+      "home": "Colorado Rockies",
+      "away_abbr": "SF",
+      "home_abbr": "COL",
+      "away_team_id": 137,
+      "home_team_id": 115,
+      "starter_names": {
+        "away": "Robbie Ray",
+        "home": "Tanner Gordon"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.23 | side lead 26.2%",
+        "detail": "Season filter qualified: only 48.4% simulated NRFI, 1.23 expected first-inning runs, and one side reaches a 26.2% chance to be ahead after one.",
+        "nrfiProb": 0.484,
+        "yrfiProb": 0.516,
+        "meanTotalRuns": 1.23,
+        "maxSideLeadProb": 0.262
+      }
+    },
+    {
+      "game_pk": 824512,
+      "date": "2026-05-31",
+      "away": "Atlanta Braves",
+      "home": "Cincinnati Reds",
+      "away_abbr": "ATL",
+      "home_abbr": "CIN",
+      "away_team_id": 144,
+      "home_team_id": 113,
+      "starter_names": {
+        "away": "Spencer Strider",
+        "home": "Nick Lodolo"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.21 | side lead 26.1%",
+        "detail": "Season filter qualified: only 49.5% simulated NRFI, 1.21 expected first-inning runs, and one side reaches a 26.1% chance to be ahead after one.",
+        "nrfiProb": 0.495,
+        "yrfiProb": 0.505,
+        "meanTotalRuns": 1.205,
+        "maxSideLeadProb": 0.261
+      }
+    }
+  ]
+}
