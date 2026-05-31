@@ -5955,7 +5955,7 @@
       const payload = await fetchApiJson(
         `${cardsPayloadPath}?date=${encodeURIComponent(state.date)}${cardsQuerySuffix}`,
         'Failed to load game cards.',
-        { retries: silent ? 2 : 1 }
+        { retries: silent ? 2 : 4 }
       );
       if (epoch !== state.refreshEpoch) {
         return;
