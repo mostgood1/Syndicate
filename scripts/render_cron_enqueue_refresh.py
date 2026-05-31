@@ -27,21 +27,32 @@ def _coerce_base_url(explicit: str | None) -> str:
 
 
 def _build_payload(args: argparse.Namespace) -> dict[str, str]:
-    return {
+    payload = {
         "sports": args.sports,
         "phase": args.phase,
         "execution_mode": args.execution_mode,
         "regions": args.regions,
     }
+    if bool(getattr(args, "skip_mirror", False)):
+        payload["skip_mirror"] = True
+    if bool(getattr(args, "mirror_only", False)):
+        payload["mirror_only"] = True
+    date_value = str(getattr(args, "date", "") or "").strip()
+    if date_value:
+        payload["date"] = date_value
+    return payload
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Render cron helper: enqueue Syndicate odds refresh through web API.")
     parser.add_argument("--base-url", default="", help="Optional explicit Syndicate base URL, e.g. https://syndicate.onrender.com. If omitted, uses SYNDICATE_BASE_URL then SYNDICATE_WEB_HOST/SYNDICATE_WEB_PORT.")
     parser.add_argument("--sports", default="all")
+    parser.add_argument("--date", default="", help="Optional explicit refresh date (YYYY-MM-DD).")
     parser.add_argument("--phase", choices=("live", "pregame", "all"), default="all")
     parser.add_argument("--execution-mode", choices=("source", "ingest"), default="source")
     parser.add_argument("--regions", default="us")
+    parser.add_argument("--skip-mirror", action="store_true", help="Skip mirror refresh before odds refresh.")
+    parser.add_argument("--mirror-only", action="store_true", help="Only refresh mirrors and skip odds refresh.")
     parser.add_argument("--timeout-sec", type=float, default=180.0)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

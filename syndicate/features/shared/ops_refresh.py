@@ -12,6 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.refresh_state_store import list_refresh_status_manifest_paths
 from syndicate.features.shared.refresh_state_store import path_exists
 from syndicate.features.shared.refresh_state_store import path_size
@@ -26,7 +27,7 @@ REPORTS_ROOT = REPO_ROOT / "reports"
 
 
 def _today_date() -> str:
-    return datetime.now().strftime("%Y-%m-%d")
+    return central_today_iso()
 
 
 def _reports_root() -> Path:
