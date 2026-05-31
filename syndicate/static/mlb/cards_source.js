@@ -2884,8 +2884,7 @@
       warningBits.push(`Lineups partial ${lineupHealth.partialTeams}`);
     }
     if (Number(workflow.warningCount || 0) > 0) {
-      const warningPreview = String((workflow.warnings || [])[0] || "").trim();
-      warningBits.push(warningPreview || `Workflow warnings ${workflow.warningCount}`);
+      warningBits.push(`Workflow warnings ${workflow.warningCount}`);
     }
     if (Number(workflow.errorCount || 0) > 0) {
       warningBits.push(`Workflow errors ${workflow.errorCount}`);
