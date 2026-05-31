@@ -1061,6 +1061,26 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
     return games, str(source_path or f"live_state_{selected_date}.jsonl")
 
 
+def _game_identity_key(game: dict[str, Any]) -> tuple[str, str, str]:
+    if not isinstance(game, dict):
+        return ("", "", "")
+    event_id = str(game.get("event_id") or "").strip()
+    away_tri = str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
+    home_tri = str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+    return (event_id, away_tri, home_tri)
+
+
+def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int]:
+    live_games, live_source_path = _games_from_live_state_fallback(selected_date)
+    if not live_games:
+        return games, None, 0
+    existing_keys = {_game_identity_key(game) for game in games if isinstance(game, dict)}
+    extras = [game for game in live_games if _game_identity_key(game) not in existing_keys]
+    if not extras:
+        return games, live_source_path, 0
+    return [*games, *extras], live_source_path, len(extras)
+
+
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
@@ -1070,6 +1090,17 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
 
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
     source_title = "WNBA processed game cards"
+    had_artifact_games = bool(games)
+    games, live_source_path, supplemented_count = _supplement_games_with_live_state(games, resolved_date)
+    if supplemented_count > 0:
+        if had_artifact_games:
+            source_title = "WNBA processed game cards + live scoreboard supplement"
+            cards_path = f"{cards_path} | {live_source_path}"
+        else:
+            source_title = "WNBA live scoreboard fallback"
+            cards_path = str(live_source_path)
+            recs_path = str(live_source_path)
+
     if not games:
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
@@ -1083,6 +1114,16 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             resolved_date = fallback_date
             games, cards_path, recs_path = _games_from_artifacts(resolved_date)
             source_title = "WNBA processed game cards"
+            had_artifact_games = bool(games)
+            games, live_source_path, supplemented_count = _supplement_games_with_live_state(games, resolved_date)
+            if supplemented_count > 0:
+                if had_artifact_games:
+                    source_title = "WNBA processed game cards + live scoreboard supplement"
+                    cards_path = f"{cards_path} | {live_source_path}"
+                else:
+                    source_title = "WNBA live scoreboard fallback"
+                    cards_path = str(live_source_path)
+                    recs_path = str(live_source_path)
             if not games:
                 live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
                 if live_games:
