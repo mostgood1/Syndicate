@@ -3,37 +3,37 @@
   "home": "PHX",
   "away": "MIN",
   "market_total": 166.5,
-  "market_home_spread": 3.5,
+  "market_home_spread": 3.0,
   "quarters": [
     {
       "q": 1,
-      "home_pts_mu": 19.636211,
+      "home_pts_mu": 19.6943985,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 20.450836,
+      "away_pts_mu": 20.3926485,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 2,
-      "home_pts_mu": 19.636211,
+      "home_pts_mu": 19.6943985,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 20.450836,
+      "away_pts_mu": 20.3926485,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 3,
-      "home_pts_mu": 20.437689000000002,
+      "home_pts_mu": 20.498251500000002,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 21.285563999999997,
+      "away_pts_mu": 21.225001499999998,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 4,
-      "home_pts_mu": 20.437689000000002,
+      "home_pts_mu": 20.498251500000002,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 21.285563999999997,
+      "away_pts_mu": 21.225001499999998,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     }
@@ -2220,5 +2220,6 @@
     "home_b2b": false,
     "away_b2b": false
   },
-  "n_sims": 1000
+  "n_sims": 1000,
+  "game_id": 2
 }

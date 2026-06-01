@@ -4121,6 +4121,15 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
     normalize_team = _normalize_team_local
     compute_rest_for_matchups = _compute_rest_for_matchups_local
     LEAGUE = _league_for_code_local(league_code)
+    out_prefix_s = str(out_prefix or "smart_sim").strip() or "smart_sim"
+
+    if overwrite:
+        for stale_path in processed_root.glob(f"{out_prefix_s}_{date_str}_*.json"):
+            try:
+                if stale_path.is_file():
+                    stale_path.unlink()
+            except Exception:
+                continue
 
     pred_path = processed_root / f"predictions_{date_str}.csv"
     if not pred_path.exists():
@@ -4288,7 +4297,6 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
     pdf = pdf[(pdf["home_tri"].astype(str).str.len() == 3) & (pdf["away_tri"].astype(str).str.len() == 3)].copy()
     if pdf.empty:
         return {"date": date_str, "wrote": 0, "skipped": 0, "failures": 0, "reason": "no_valid_games"}
-    out_prefix_s = str(out_prefix or "smart_sim").strip() or "smart_sim"
     failure_path = processed_root / f"{out_prefix_s}_failures_{date_str}.csv"
     try:
         if failure_path.exists() and failure_path.is_file():
@@ -4392,6 +4400,11 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
         if not home_tri or not away_tri:
             continue
         out_path = processed_root / f"{out_prefix_s}_{date_str}_{home_tri}_{away_tri}.json"
+        if overwrite and out_path.exists():
+            try:
+                out_path.unlink()
+            except Exception:
+                pass
         if out_path.exists() and (not overwrite):
             if _smart_sim_file_has_players_local(out_path):
                 skipped += 1
@@ -4755,6 +4768,7 @@ def export_props_predictions_with_smart_sim_local(
     smart_sim_n_sims: int,
     smart_sim_pbp: bool,
     smart_sim_workers: int,
+    smart_sim_overwrite: bool = False,
 ) -> tuple[int, Path]:
     import pandas as pd
 
@@ -4781,7 +4795,7 @@ def export_props_predictions_with_smart_sim_local(
         n_sims=int(smart_sim_n_sims),
         seed=None,
         max_games=None,
-        overwrite=False,
+        overwrite=bool(smart_sim_overwrite),
         pbp=bool(smart_sim_pbp),
         workers=int(smart_sim_workers),
         roster_mode=roster_mode,

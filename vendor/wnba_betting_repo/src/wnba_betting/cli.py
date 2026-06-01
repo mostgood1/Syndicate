@@ -1290,6 +1290,15 @@ def _smart_sim_run_date(
         console.print(f"[red]Import error: {e}")
         raise SystemExit(1)
 
+    out_prefix_s = str(out_prefix or "smart_sim").strip() or "smart_sim"
+    if overwrite:
+        for stale_path in paths.data_processed.glob(f"{out_prefix_s}_{date_str}_*.json"):
+            try:
+                if stale_path.is_file():
+                    stale_path.unlink()
+            except Exception:
+                continue
+
     pred_path = paths.data_processed / f"predictions_{date_str}.csv"
     if not pred_path.exists():
         return {"date": date_str, "wrote": 0, "skipped": 0, "failures": 0, "reason": f"missing_predictions:{pred_path}"}
@@ -1633,6 +1642,11 @@ def _smart_sim_run_date(
             continue
 
         out_path = paths.data_processed / f"{out_prefix_s}_{date_str}_{home_tri}_{away_tri}.json"
+        if overwrite and out_path.exists():
+            try:
+                out_path.unlink()
+            except Exception:
+                pass
         if out_path.exists() and (not overwrite):
             skipped += 1
             continue

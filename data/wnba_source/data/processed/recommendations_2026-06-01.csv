@@ -1,5 +1,5 @@
 market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
 ATS,Dallas Wings,Dallas Wings,Seattle Storm,2026-06-01,0.24375,-110.0,0.52381,24.375,12.5,11.875,-12.5,,High
 TOTAL,Under,Dallas Wings,Seattle Storm,2026-06-01,0.036408,-110.0,0.52381,-3.640757,166.5,,,162.859243,Medium
-ATS,Minnesota Lynx,Phoenix Mercury,Minnesota Lynx,2026-06-01,0.06325,-110.0,0.52381,6.325,3.0,3.325,3.0,,High
+ATS,Minnesota Lynx,Phoenix Mercury,Minnesota Lynx,2026-06-01,0.0585,-110.0,0.52381,5.85,3.0,2.85,3.0,,High
 TOTAL,Under,Phoenix Mercury,Minnesota Lynx,2026-06-01,0.028794,-110.0,0.52381,-2.8794,166.5,,,163.6206,Medium
