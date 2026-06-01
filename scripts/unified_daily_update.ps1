@@ -995,6 +995,50 @@ function Get-ForcedPublishArtifactPaths {
         }
     }
 
+    function Add-DateGameBoxscoreCachePaths {
+        param(
+            [string]$GameCardsRelativePath,
+            [string]$BoxscoreRelativeRoot
+        )
+
+        if ([string]::IsNullOrWhiteSpace($GameCardsRelativePath) -or [string]::IsNullOrWhiteSpace($BoxscoreRelativeRoot)) {
+            return
+        }
+
+        $gameCardsFullPath = Join-Path $RepoPath $GameCardsRelativePath
+        if (-not (Test-Path $gameCardsFullPath)) {
+            return
+        }
+
+        try {
+            $gameRows = @(Import-Csv -Path $gameCardsFullPath)
+        }
+        catch {
+            return
+        }
+
+        foreach ($row in $gameRows) {
+            if (-not $row) {
+                continue
+            }
+
+            $gameId = [string]($row.game_id)
+            if ([string]::IsNullOrWhiteSpace($gameId)) {
+                $gameId = [string]($row.gameId)
+            }
+            if ([string]::IsNullOrWhiteSpace($gameId)) {
+                continue
+            }
+
+            $normalizedGameId = $gameId.Trim()
+            if ([string]::IsNullOrWhiteSpace($normalizedGameId)) {
+                continue
+            }
+
+            Add-PathIfPresent -RelativePath ($BoxscoreRelativeRoot.TrimEnd('/', '\') + "/boxscore_${normalizedGameId}.csv")
+        }
+    }
+
     if (-not $SkipMLB) {
         foreach ($relativePath in @(
             "data/mlb_source/data/daily/daily_summary_${dateSlug}.json",
@@ -1012,6 +1056,7 @@ function Get-ForcedPublishArtifactPaths {
             "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_hitter_props_${dateSlug}.json",
             "data/mlb_source/data/live_lens/live_lens_${dateSlug}.jsonl",
             "data/mlb_source/data/live_lens/live_lens_report_${dateSlug}.json",
+            "data/mlb_source/data/live_lens/recaps/live_lens_daily_recap_${dateSlug}.json",
             "data/mlb_source/data/live_lens/render_sync/live_lens_reports_${dateSlug}.json",
             "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${dateSlug}.json",
             "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${dateSlug}.jsonl",
@@ -1025,11 +1070,17 @@ function Get-ForcedPublishArtifactPaths {
         Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_day_*_${dateSlug}_*.json"
         Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_betting_day_*_${dateSlug}_*.json"
         Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_official_betting_day_*_${dateSlug}_*.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/season_eval_manifest.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/season_betting_cards_retuned_manifest.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/season_betting_cards_retuned_hrr_manifest.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/betting_day_payloads*/season_betting_day_*_${dateSlug}*.json"
+        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/betting_day_recaps*/season_betting_day_*_${dateSlug}*.json"
     }
 
     if (-not $SkipNBA) {
         foreach ($relativePath in @(
             "data/nba_source/data/processed/game_cards_${DateValue}.csv",
+            "data/nba_source/data/processed/game_odds_${DateValue}.csv",
             "data/nba_source/data/processed/recommendations_${DateValue}.csv",
             "data/nba_source/data/processed/recommendations_slate_${DateValue}.json",
             "data/nba_source/data/processed/cards_sim_detail_${DateValue}.json",
@@ -1059,15 +1110,18 @@ function Get-ForcedPublishArtifactPaths {
         }
 
         Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/smart_sim_${DateValue}_*.json"
+        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/team_advanced_stats_*.csv"
         Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_manifest_*_retuned_${DateValue}.json"
         Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_manifest_*_retuned.json"
         Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_day_*_retuned_${DateValue}.json"
         Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_day_*_retuned_${DateValue}_insights.json"
+        Add-DateGameBoxscoreCachePaths -GameCardsRelativePath "data/nba_source/data/processed/game_cards_${DateValue}.csv" -BoxscoreRelativeRoot 'data/nba_source/data/processed/boxscores'
     }
 
     if (-not $SkipWNBA) {
         foreach ($relativePath in @(
             "data/wnba_source/data/processed/game_cards_${DateValue}.csv",
+            "data/wnba_source/data/processed/game_odds_${DateValue}.csv",
             "data/wnba_source/data/processed/recommendations_${DateValue}.csv",
             "data/wnba_source/data/processed/recommendations_slate_${DateValue}.json",
             "data/wnba_source/data/processed/cards_sim_detail_${DateValue}.json",
@@ -1097,6 +1151,8 @@ function Get-ForcedPublishArtifactPaths {
         }
 
         Add-PathsByPattern -RelativePattern "data/wnba_source/data/processed/smart_sim_${DateValue}_*.json"
+        Add-PathsByPattern -RelativePattern "data/wnba_source/data/processed/team_advanced_stats_*.csv"
+        Add-DateGameBoxscoreCachePaths -GameCardsRelativePath "data/wnba_source/data/processed/game_cards_${DateValue}.csv" -BoxscoreRelativeRoot 'data/wnba_source/data/processed/boxscores'
     }
 
     if (-not $SkipNHL) {
@@ -1109,16 +1165,24 @@ function Get-ForcedPublishArtifactPaths {
             "data/nhl_source/data/processed/props_reconciliations_log.csv",
             "data/nhl_source/data/processed/recon_games_${DateValue}.csv",
             "data/nhl_source/data/processed/recon_props_${DateValue}.csv",
+            "data/nhl_source/data/processed/props_projections_all_${DateValue}.csv",
             "data/nhl_source/data/processed/props_boxscores_sim_${DateValue}.csv",
             "data/nhl_source/data/processed/props_boxscores_sim_hist_${DateValue}.csv",
+            "data/nhl_source/data/processed/props_boxscores_sim_samples_${DateValue}.csv",
             "data/nhl_source/data/processed/props_recommendations_${DateValue}.csv",
             "data/nhl_source/data/processed/roster_snapshot_${DateValue}.csv",
+            "data/nhl_source/data/processed/injuries_${DateValue}.csv",
             "data/nhl_source/data/processed/lineups_${DateValue}.csv",
             "data/nhl_source/data/processed/lineups_co_toi_${DateValue}.csv",
+            "data/nhl_source/data/processed/shifts_${DateValue}.csv",
+            "data/nhl_source/data/processed/co_toi_shifts_${DateValue}.csv",
+            "data/nhl_source/data/processed/starting_goalies_${DateValue}.csv",
             "data/nhl_source/data/processed/live_lens_projections_${DateValue}.jsonl",
             "data/nhl_source/data/processed/live_lens_signals_${DateValue}.jsonl",
+            "data/nhl_source/data/processed/live_lens_tuning_override.json",
             "data/nhl_source/data/live_lens/live_lens_projections_${DateValue}.jsonl",
             "data/nhl_source/data/live_lens/live_lens_signals_${DateValue}.jsonl",
+            "data/nhl_source/data/live_lens/live_lens_tuning_override.json",
             "data/nhl_source/data/odds/games/date=${DateValue}/scoreboard.csv",
             "data/nhl_source/data/odds/team/date=${DateValue}/oddsapi.csv",
             "data/nhl_source/data/odds/team/date=${DateValue}/oddsapi.parquet",

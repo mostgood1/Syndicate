@@ -6167,6 +6167,184 @@ def _compute_player_minutes_priors(date_str: str, days_back: int = 21) -> dict[t
         return {}
 
 
+def _connected_sim_team_position_lookup(date_str: str, team_tri: str) -> dict[tuple[str, str], str]:
+    lookup: dict[tuple[str, str], str] = {}
+    team_u = str(team_tri or "").strip().upper()
+    if not team_u:
+        return lookup
+
+    try:
+        roster = _season_betting_card_roster_positions(str(date_str or ""))
+        if isinstance(roster, pd.DataFrame) and not roster.empty:
+            team_rows = roster[roster.get("team").astype(str).str.upper().str.strip() == team_u].copy()
+            for _, row in team_rows.iterrows():
+                player_key = str(row.get("_pkey") or "").strip().upper()
+                position = str(row.get("position") or "").strip().upper()
+                if player_key and position:
+                    lookup[(team_u, player_key)] = position
+    except Exception:
+        pass
+
+    try:
+        boxscores_path = DATA_PROCESSED_DIR / f"boxscores_{str(date_str or '').strip()}.csv"
+        if boxscores_path.exists():
+            box = pd.read_csv(boxscores_path)
+            if isinstance(box, pd.DataFrame) and not box.empty:
+                cols = {str(c).upper(): c for c in box.columns}
+                team_col = cols.get("TEAM_ABBREVIATION") or cols.get("TEAM")
+                name_col = cols.get("PLAYER_NAME") or cols.get("PLAYER")
+                pos_col = cols.get("START_POSITION") or cols.get("POSITION")
+                min_col = cols.get("MIN") or cols.get("MINUTES")
+                if team_col and name_col and pos_col:
+                    team_box = box[box[team_col].astype(str).str.upper().str.strip() == team_u].copy()
+                    if min_col and min_col in team_box.columns:
+                        team_box["_min_float"] = team_box[min_col].map(_parse_minutes_to_float)
+                        team_box = team_box[team_box["_min_float"] > 0].copy()
+                    for _, row in team_box.iterrows():
+                        player_key = _norm_player_name(str(row.get(name_col) or ""))
+                        position = str(row.get(pos_col) or "").strip().upper()
+                        if player_key and position:
+                            lookup[(team_u, player_key)] = position
+    except Exception:
+        pass
+
+    return lookup
+
+
+def _connected_sim_active_roster_names(
+    date_str: str,
+    team_tri: str,
+    roster_names: list[str],
+    minutes_priors: dict[tuple[str, str], float],
+    *,
+    min_players: int = 8,
+    max_players: int = 11,
+) -> list[str]:
+    team_u = str(team_tri or "").strip().upper()
+    if not team_u:
+        return []
+
+    deduped_names: list[str] = []
+    seen_keys: set[str] = set()
+    for raw_name in roster_names or []:
+        display_name = str(raw_name or "").strip()
+        player_key = _norm_player_name(display_name)
+        if not display_name or not player_key or player_key in seen_keys:
+            continue
+        seen_keys.add(player_key)
+        deduped_names.append(display_name)
+
+    if not deduped_names:
+        return []
+
+    try:
+        boxscores_path = DATA_PROCESSED_DIR / f"boxscores_{str(date_str or '').strip()}.csv"
+        if boxscores_path.exists():
+            box = pd.read_csv(boxscores_path)
+            if isinstance(box, pd.DataFrame) and not box.empty:
+                cols = {str(c).upper(): c for c in box.columns}
+                team_col = cols.get("TEAM_ABBREVIATION") or cols.get("TEAM")
+                name_col = cols.get("PLAYER_NAME") or cols.get("PLAYER")
+                min_col = cols.get("MIN") or cols.get("MINUTES")
+                if team_col and name_col and min_col:
+                    team_box = box[box[team_col].astype(str).str.upper().str.strip() == team_u].copy()
+                    if not team_box.empty:
+                        team_box["_min_float"] = team_box[min_col].map(_parse_minutes_to_float)
+                        team_box = team_box[team_box["_min_float"] > 0].copy()
+                        if not team_box.empty:
+                            team_box["_pkey"] = team_box[name_col].astype(str).map(_norm_player_name)
+                            team_box = team_box.sort_values(["_min_float"], ascending=[False], kind="stable")
+                            team_box = team_box.drop_duplicates(subset=["_pkey"], keep="first")
+                            played_names = [str(name).strip() for name in team_box[name_col].tolist() if str(name or "").strip()]
+                            if len(played_names) >= min_players:
+                                return played_names
+    except Exception:
+        pass
+
+    expected_lookup: dict[str, float] = {}
+    try:
+        expected = _season_betting_card_expected_minutes_frame(str(date_str or ""))
+        if isinstance(expected, pd.DataFrame) and not expected.empty:
+            team_rows = expected[expected.get("team_tri").astype(str).str.upper().str.strip() == team_u].copy()
+            if not team_rows.empty and "player_name" in team_rows.columns:
+                value_col = "exp_min_mean" if "exp_min_mean" in team_rows.columns else None
+                if value_col is None:
+                    for candidate in ("expected_minutes", "expected_min", "proj_min", "exp_min"):
+                        if candidate in team_rows.columns:
+                            value_col = candidate
+                            break
+                if value_col:
+                    for _, row in team_rows.iterrows():
+                        player_key = _norm_player_name(str(row.get("player_name") or ""))
+                        exp_min = _safe_float(row.get(value_col))
+                        if player_key and exp_min is not None and exp_min > 0:
+                            expected_lookup[player_key] = float(exp_min)
+    except Exception:
+        pass
+
+    team_minutes_target = float(getattr(LEAGUE, "regulation_team_minutes", 240.0))
+    candidates: list[dict[str, object]] = []
+    for display_name in deduped_names:
+        player_key = _norm_player_name(display_name)
+        prior_min = _safe_float(minutes_priors.get((team_u, player_key)))
+        expected_min = expected_lookup.get(player_key)
+        signal_min = expected_min if expected_min is not None and expected_min > 0 else prior_min
+        candidates.append(
+            {
+                "display_name": display_name,
+                "player_key": player_key,
+                "expected_min": expected_min,
+                "prior_min": prior_min,
+                "signal_min": float(signal_min) if signal_min is not None and signal_min > 0 else 0.0,
+                "has_expected": bool(expected_min is not None and expected_min > 0),
+            }
+        )
+
+    candidates.sort(
+        key=lambda item: (
+            1 if item.get("has_expected") else 0,
+            float(item.get("signal_min") or 0.0),
+            float(item.get("prior_min") or 0.0),
+        ),
+        reverse=True,
+    )
+
+    selected: list[str] = []
+    selected_keys: set[str] = set()
+    cumulative_signal = 0.0
+    for item in candidates:
+        display_name = str(item.get("display_name") or "").strip()
+        player_key = str(item.get("player_key") or "").strip().upper()
+        signal_min = float(item.get("signal_min") or 0.0)
+        if not display_name or not player_key or player_key in selected_keys:
+            continue
+        if signal_min <= 0 and len(selected) >= min_players:
+            continue
+        selected.append(display_name)
+        selected_keys.add(player_key)
+        cumulative_signal += max(0.0, signal_min)
+        if len(selected) >= min_players:
+            if cumulative_signal >= (team_minutes_target * 0.97):
+                break
+            if len(selected) >= max_players and cumulative_signal >= (team_minutes_target * 0.90):
+                break
+
+    if len(selected) < min_players:
+        for item in candidates:
+            display_name = str(item.get("display_name") or "").strip()
+            player_key = str(item.get("player_key") or "").strip().upper()
+            if not display_name or not player_key or player_key in selected_keys:
+                continue
+            selected.append(display_name)
+            selected_keys.add(player_key)
+            if len(selected) >= min_players:
+                break
+
+    if selected:
+        return selected
+    return deduped_names[: max(min_players, min(max_players, len(deduped_names)))]
+
+
 def _compute_player_stat_priors(date_str: str, days_back: int = 21) -> dict[tuple[str, str], dict[str, float]]:
     """Return per-player priors for all major boxscore stats used by connected sim.
 
@@ -42786,6 +42964,32 @@ def api_sim_game_story():
         minutes_priors = _compute_player_minutes_priors(str(d), days_back=minutes_lookback_days)
         player_priors = _compute_player_stat_priors(str(d), days_back=player_priors_lookback_days)
 
+        home_roster = _connected_sim_active_roster_names(str(d), str(home_tri), home_roster, minutes_priors)
+        away_roster = _connected_sim_active_roster_names(str(d), str(away_tri), away_roster, minutes_priors)
+
+        roster_positions: dict[tuple[str, str], str] = {}
+        roster_positions.update(_connected_sim_team_position_lookup(str(d), str(home_tri)))
+        roster_positions.update(_connected_sim_team_position_lookup(str(d), str(away_tri)))
+
+        try:
+            if isinstance(props_df, pd.DataFrame) and not props_df.empty and "player_name" in props_df.columns and "team" in props_df.columns:
+                props_df = props_df.copy()
+                props_df["team"] = props_df["team"].astype(str).str.upper().str.strip()
+                mapped_positions = [
+                    roster_positions.get((str(team or "").strip().upper(), _norm_player_name(str(name or ""))))
+                    for team, name in zip(props_df.get("team"), props_df.get("player_name"))
+                ]
+                if "position" in props_df.columns:
+                    current_positions = props_df["position"].astype(str).str.strip().str.upper()
+                    props_df["position"] = [
+                        current if current else mapped
+                        for current, mapped in zip(current_positions.tolist(), mapped_positions)
+                    ]
+                else:
+                    props_df["position"] = mapped_positions
+        except Exception:
+            pass
+
         # Compute a UI-consistent blend line (matches web/app.js):
         # alpha*prediction_model_quarters + (1-alpha)*quarter_sim_means
         def _q_model(i: int) -> Optional[Dict[str, Any]]:
@@ -42910,6 +43114,7 @@ def api_sim_game_story():
             away_roster=away_roster,
             minutes_priors=minutes_priors,
             player_priors=player_priors,
+            roster_positions=roster_positions,
             n_samples=n,
             seed=seed_i,
             target_quarters=blend_quarters,
