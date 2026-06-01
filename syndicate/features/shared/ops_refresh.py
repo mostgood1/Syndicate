@@ -72,6 +72,15 @@ def _load_mirror_manifest_summaries_from_current_data_root() -> list[dict[str, A
 def _pid_is_running(pid: int | None) -> bool:
     if pid is None or pid <= 0:
         return False
+    if os.name != "nt":
+        stat_path = Path("/proc") / str(pid) / "stat"
+        if stat_path.exists():
+            try:
+                parts = stat_path.read_text(encoding="utf-8", errors="ignore").split()
+                if len(parts) >= 3 and str(parts[2]).strip().upper() == "Z":
+                    return False
+            except OSError:
+                pass
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
