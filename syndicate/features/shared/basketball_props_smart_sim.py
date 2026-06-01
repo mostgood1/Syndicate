@@ -649,7 +649,7 @@ def _build_player_sim_rows_local(*, players_df, team_tri: str, opp_tri: str) -> 
         tov_mean = _first_present_float_local(row, "mean_tov", "tov_mean", "pred_turnovers", "projected_turnovers", "turnovers", default=0.0)
         pra_mean = _first_present_float_local(row, "mean_pra", "pra_mean", default=(pts_mean + reb_mean + ast_mean))
         position = str(row.get("position") or "").strip() or None
-        minutes = _first_present_float_local(row, "minutes", "min", "mp", "min_played", "minutes_played", default=None)
+        minutes = _first_present_float_local(row, "minutes", "min", "mp", "min_played", "minutes_played", default=-999.0)
 
         def _sd_for(mean_value: float, key: str) -> float:
             return _first_present_float_local(row, f"sd_{key}", f"{key}_sd", default=max(1.0, abs(float(mean_value)) * 0.25))
@@ -682,7 +682,7 @@ def _build_player_sim_rows_local(*, players_df, team_tri: str, opp_tri: str) -> 
         }
         if position is not None:
             player_dict["position"] = position
-        if minutes is not None and minutes > 0:
+        if minutes > 0:
             player_dict["minutes"] = minutes
         rows.append(player_dict)
     rows.sort(key=lambda item: (float(item.get("pra_mean") or 0.0), float(item.get("pts_mean") or 0.0)), reverse=True)
