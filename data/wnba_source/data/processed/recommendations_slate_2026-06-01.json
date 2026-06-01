@@ -50,14 +50,14 @@
           "team": "SEA",
           "display_pick": "Jade Melbourne OVER 3.5",
           "selection": "OVER 3.5",
-          "price": -125.0,
-          "score": 6.26440408586908,
-          "ev_pct": 6.26440408586908,
-          "win_prob": 0.5555555555555556,
-          "p_win": 0.5555555555555556,
+          "price": -129.0,
+          "score": 5.971354589422978,
+          "ev_pct": 5.971354589422978,
+          "win_prob": 0.5633187772925764,
+          "p_win": 0.5633187772925764,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 6.3%",
+            "EV 6.0%",
             "Regular price range (-150 to +150)",
             "Consensus: 4 books aligned",
             "Best line available"
@@ -86,14 +86,14 @@
           "team": "DAL",
           "display_pick": "Jessica Shepard OVER 5.5",
           "selection": "OVER 5.5",
-          "price": 100.0,
-          "score": 2.166936477836301,
-          "ev_pct": 2.166936477836301,
-          "win_prob": 0.5,
-          "p_win": 0.5,
+          "price": 102.0,
+          "score": 2.3386058426146605,
+          "ev_pct": 2.3386058426146605,
+          "win_prob": 0.49504950495049505,
+          "p_win": 0.49504950495049505,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 2.2%",
+            "EV 2.3%",
             "Regular price range (-150 to +150)",
             "Consensus: 4 books aligned",
             "Best line available"
@@ -121,6 +121,7 @@
           "top_play_reasons": [
             "EV 73.8%",
             "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
             "Best line available"
           ],
           "matchup": "MIN @ PHX"
@@ -128,18 +129,17 @@
         {
           "market": "PROPS",
           "team": "MIN",
-          "display_pick": "Natasha Howard OVER 3.5",
-          "selection": "OVER 3.5",
-          "price": 124.0,
-          "score": 9.965545298795863,
-          "ev_pct": 9.965545298795863,
-          "win_prob": 0.44642857142857145,
-          "p_win": 0.44642857142857145,
+          "display_pick": "Natasha Howard OVER 19.5",
+          "selection": "OVER 19.5",
+          "price": -110.0,
+          "score": 9.877921537356437,
+          "ev_pct": 9.877921537356437,
+          "win_prob": 0.5238095238095238,
+          "p_win": 0.5238095238095238,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 10.0%",
+            "EV 9.9%",
             "Regular price range (-150 to +150)",
-            "Consensus: 4 books aligned",
             "Best line available"
           ],
           "matchup": "MIN @ PHX"
@@ -166,17 +166,17 @@
         {
           "market": "ATS",
           "team": "Minnesota Lynx",
-          "display_pick": "Minnesota Lynx -3.5",
+          "display_pick": "Minnesota Lynx -3.0",
           "selection": "Minnesota Lynx",
           "price": -110.0,
-          "score": 6.825,
-          "ev_pct": 6.825,
-          "win_prob": 0.59206,
-          "p_win": 0.59206,
-          "basketball_summary": "Model margin 3.3 vs market -3.5",
+          "score": 6.325,
+          "ev_pct": 6.325,
+          "win_prob": 0.58706,
+          "p_win": 0.58706,
+          "basketball_summary": "Model margin 3.3 vs market -3.0",
           "top_play_reasons": [
-            "Edge 6.8",
-            "EV 6.8%"
+            "Edge 6.3",
+            "EV 6.3%"
           ],
           "matchup": "MIN @ PHX"
         },
