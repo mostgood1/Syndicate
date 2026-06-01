@@ -7,6 +7,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -277,18 +278,34 @@ def cancel_latest_refresh_run() -> dict[str, Any]:
         updated = _update_latest_state(state="failed", canceled_at=_utc_now())
         return {"ok": False, "pid": pid, "state": updated.get("state"), "detail": "Recorded PID is not running."}
 
+    canceled = False
+    stderr_text = ""
     if os.name == "nt":
         result = subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
-        canceled = result.returncode == 0
         stderr_text = (result.stderr or "").strip()
+        canceled = result.returncode == 0 and not _pid_is_running(pid)
     else:
         try:
             os.kill(pid, signal.SIGTERM)
-            canceled = True
-            stderr_text = ""
         except OSError as exc:
-            canceled = False
             stderr_text = str(exc)
+
+        if _pid_is_running(pid):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError as exc:
+                if not stderr_text:
+                    stderr_text = str(exc)
+
+        deadline = time.time() + 2.0
+        while _pid_is_running(pid) and time.time() < deadline:
+            time.sleep(0.1)
+        canceled = not _pid_is_running(pid)
+        if canceled:
+            stderr_text = ""
+
+    if not canceled and not stderr_text:
+        stderr_text = "Refresh process is still running after cancel attempt."
 
     new_state = "canceled" if canceled else "failed"
     updated = _update_latest_state(state=new_state, exit_code=0 if canceled else 1, canceled_at=_utc_now())
