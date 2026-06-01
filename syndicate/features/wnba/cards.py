@@ -25,6 +25,7 @@ from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import parse_iso_date
 from syndicate.features.wnba.sources import processed_path
 from syndicate.features.wnba.sources import _source_roots as _wnba_source_roots
+from syndicate.features.shared.source_roots import repo_root_from as _repo_root_from
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -543,11 +544,14 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     paths = _artifact_paths(selected_date)
     rows = _load_csv_rows(paths["cards"])
     _debug_sources: list[str] = [f"primary:{paths['cards']}:rows={len(rows)}"]
-    # If the primary path returned no rows (e.g. disk has a header-only file that beat
-    # the full repo file on mtime), scan all source roots for a CSV with actual data.
+    # If the primary path returned no rows, scan all source roots plus the repo root
+    # explicitly. The repo-bundled data files are always the authoritative fallback.
     if not rows:
         csv_name = f"game_cards_{selected_date}.csv"
-        for root in _wnba_source_roots():
+        # Build candidate roots: all known source roots + repo-bundled data dir
+        repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
+        candidate_roots = list(_wnba_source_roots()) + [repo_data_root]
+        for root in candidate_roots:
             alt_path = root / "data" / "processed" / csv_name
             _debug_sources.append(f"alt:{alt_path}:eq={alt_path == paths['cards']}:exists={alt_path.exists()}")
             if alt_path != paths["cards"] and alt_path.exists():
