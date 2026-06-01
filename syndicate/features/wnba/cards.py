@@ -24,6 +24,7 @@ from syndicate.features.wnba.sources import live_snapshot_path
 from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import parse_iso_date
 from syndicate.features.wnba.sources import processed_path
+from syndicate.features.wnba.sources import _source_roots as _wnba_source_roots
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -541,6 +542,23 @@ def _artifact_paths(selected_date: str) -> dict[str, Path]:
 def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     paths = _artifact_paths(selected_date)
     rows = _load_csv_rows(paths["cards"])
+    # If the primary path returned no rows (e.g. disk has a header-only file that beat
+    # the full repo file on mtime), scan all source roots for a CSV with actual data.
+    if not rows:
+        csv_name = f"game_cards_{selected_date}.csv"
+        for root in _wnba_source_roots():
+            alt_path = root / "data" / "processed" / csv_name
+            if alt_path != paths["cards"] and alt_path.exists():
+                alt_rows = _load_csv_rows(alt_path)
+                if alt_rows:
+                    rows = alt_rows
+                    paths = {
+                        "cards": alt_path,
+                        "recommendations": root / "data" / "processed" / f"recommendations_slate_{selected_date}.json",
+                        "sim": root / "data" / "processed" / f"cards_sim_detail_{selected_date}.json",
+                        "props": root / "data" / "processed" / f"cards_props_snapshot_{selected_date}.json",
+                    }
+                    break
     rec_summary = load_json(paths["recommendations"])
     return {
         "paths": paths,
