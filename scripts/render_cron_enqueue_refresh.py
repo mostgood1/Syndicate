@@ -26,15 +26,14 @@ def _coerce_base_url(explicit: str | None) -> str:
     return f"http://{host}"
 
 
-def _build_payload(args: argparse.Namespace) -> dict[str, str]:
+def _build_payload(args: argparse.Namespace) -> dict[str, object]:
     payload = {
         "sports": args.sports,
         "phase": args.phase,
         "execution_mode": args.execution_mode,
         "regions": args.regions,
+        "skip_mirror": bool(getattr(args, "skip_mirror", False)),
     }
-    if bool(getattr(args, "skip_mirror", False)):
-        payload["skip_mirror"] = True
     if bool(getattr(args, "mirror_only", False)):
         payload["mirror_only"] = True
     date_value = str(getattr(args, "date", "") or "").strip()

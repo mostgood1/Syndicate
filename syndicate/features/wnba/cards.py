@@ -799,7 +799,7 @@ def _source_game_from_row(
     }
 
 
-def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     bundle = _artifact_bundle(resolved_date)
@@ -1318,7 +1318,7 @@ def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date
     return merged_games, live_source_path, len(extras), updated_count
 
 
-def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     parsed_date = parse_iso_date(resolved_date)
