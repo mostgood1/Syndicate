@@ -8,8 +8,8 @@
       "team": "PHX",
       "team_tricode": "PHX",
       "opponent": "MIN",
-      "score": 59.69277239647703,
-      "score_adj": 59.69277239647703,
+      "score": 58.12715698082529,
+      "score_adj": 58.12715698082529,
       "tier": "High",
       "model": {
         "pts": 13.088165624999998,
@@ -28,16 +28,16 @@
         "market": "threes",
         "side": "OVER",
         "line": 1.5,
-        "price": 100.0,
-        "edge": 0.29846386198238517,
-        "ev": 0.5969277239647703,
-        "ev_pct": 59.69277239647703,
+        "price": -102.0,
+        "edge": 0.2935133669328802,
+        "ev": 0.5812715698082529,
+        "ev_pct": 58.12715698082529,
         "book": "fanduel",
         "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 59.7%",
+        "EV 58.1%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
