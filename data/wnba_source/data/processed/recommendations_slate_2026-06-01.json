@@ -32,14 +32,14 @@
           "team": "DAL",
           "display_pick": "Azzi Fudd UNDER 17.5",
           "selection": "UNDER 17.5",
-          "price": -123.0,
-          "score": 9.200428664010285,
-          "ev_pct": 9.200428664010285,
-          "win_prob": 0.5515695067264574,
-          "p_win": 0.5515695067264574,
+          "price": -124.0,
+          "score": 9.087596215492965,
+          "ev_pct": 9.087596215492965,
+          "win_prob": 0.5535714285714286,
+          "p_win": 0.5535714285714286,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 9.2%",
+            "EV 9.1%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -50,11 +50,11 @@
           "team": "SEA",
           "display_pick": "Jade Melbourne OVER 3.5",
           "selection": "OVER 3.5",
-          "price": -129.0,
-          "score": 5.971354589422978,
-          "ev_pct": 5.971354589422978,
-          "win_prob": 0.5633187772925764,
-          "p_win": 0.5633187772925764,
+          "price": -128.0,
+          "score": 6.0428998766412665,
+          "ev_pct": 6.0428998766412665,
+          "win_prob": 0.5614035087719298,
+          "p_win": 0.5614035087719298,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
             "EV 6.0%",
@@ -86,14 +86,14 @@
           "team": "DAL",
           "display_pick": "Jessica Shepard OVER 5.5",
           "selection": "OVER 5.5",
-          "price": 106.0,
-          "score": 2.6819445721713797,
-          "ev_pct": 2.6819445721713797,
-          "win_prob": 0.4854368932038835,
-          "p_win": 0.4854368932038835,
+          "price": 105.0,
+          "score": 2.5961098897822055,
+          "ev_pct": 2.5961098897822055,
+          "win_prob": 0.4878048780487805,
+          "p_win": 0.4878048780487805,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 2.7%",
+            "EV 2.6%",
             "Regular price range (-150 to +150)",
             "Consensus: 4 books aligned",
             "Best line available"
@@ -109,38 +109,18 @@
       "picks": [
         {
           "market": "PROPS",
-          "team": "PHX",
-          "display_pick": "Monique Akoa Makani UNDER 1.5",
-          "selection": "UNDER 1.5",
-          "price": -125.0,
-          "score": 67.9747036473684,
-          "ev_pct": 67.9747036473684,
-          "win_prob": 0.5555555555555556,
-          "p_win": 0.5555555555555556,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 68.0%",
-            "Regular price range (-150 to +150)",
-            "Consensus: 3 books aligned",
-            "Best line available"
-          ],
-          "matchup": "MIN @ PHX"
-        },
-        {
-          "market": "PROPS",
           "team": "MIN",
           "display_pick": "Natasha Howard OVER 11.5",
           "selection": "OVER 11.5",
-          "price": 102.0,
-          "score": 11.467944927161133,
-          "ev_pct": 11.467944927161133,
-          "win_prob": 0.49504950495049505,
-          "p_win": 0.49504950495049505,
+          "price": 100.0,
+          "score": 11.136579135803103,
+          "ev_pct": 11.136579135803103,
+          "win_prob": 0.5,
+          "p_win": 0.5,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 11.5%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
+            "EV 11.1%",
+            "Regular price range (-150 to +150)"
           ],
           "matchup": "MIN @ PHX"
         },
@@ -157,6 +137,25 @@
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
             "EV 8.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "MIN @ PHX"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Olivia Miles UNDER 5.5",
+          "selection": "UNDER 5.5",
+          "price": 116.0,
+          "score": 7.660480703717754,
+          "ev_pct": 7.660480703717754,
+          "win_prob": 0.46296296296296297,
+          "p_win": 0.46296296296296297,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 7.7%",
             "Regular price range (-150 to +150)",
             "Consensus: 3 books aligned",
             "Best line available"

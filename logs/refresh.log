@@ -1,0 +1,2 @@
+[2026-06-01T19:50:25] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-06-01 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\data\raw\odds_wnba_player_props_2026-06-01.csv' --regions us
+ERROR: Missing ODDS_API_KEY; set in environment or pass --api-key

@@ -649,7 +649,7 @@ def _build_player_sim_rows_local(*, players_df, team_tri: str, opp_tri: str) -> 
         tov_mean = _first_present_float_local(row, "mean_tov", "tov_mean", "pred_turnovers", "projected_turnovers", "turnovers", default=0.0)
         pra_mean = _first_present_float_local(row, "mean_pra", "pra_mean", default=(pts_mean + reb_mean + ast_mean))
         position = str(row.get("position") or "").strip() or None
-        minutes = _first_present_float_local(row, "minutes", "min", "mp", "min_played", "minutes_played", default=-999.0)
+        minutes = _first_present_float_local(row, "pred_min", "minutes", "min", "mp", "min_played", "minutes_played", default=-999.0)
 
         def _sd_for(mean_value: float, key: str) -> float:
             return _first_present_float_local(row, f"sd_{key}", f"{key}_sd", default=max(1.0, abs(float(mean_value)) * 0.25))
@@ -1738,13 +1738,40 @@ def _team_players_from_processed_rosters_local(*, processed_root: Path, date_str
         tmp = tmp[tmp[tri_col] == team].copy()
         if tmp.empty:
             return pd.DataFrame()
+        
+        # Load active players from league_status if available
+        active_players = set()
+        try:
+            league_status_path = processed_root / f"league_status_{str(date_str).strip()}.csv"
+            if league_status_path.exists():
+                ldf = pd.read_csv(league_status_path)
+                if ldf is not None and not ldf.empty:
+                    cols_ls = {str(column).upper(): column for column in ldf.columns}
+                    name_col_ls = cols_ls.get("PLAYER_NAME") or cols_ls.get("PLAYER")
+                    team_col_ls = cols_ls.get("TEAM_ABBREVIATION") or cols_ls.get("TEAM")
+                    playing_col_ls = cols_ls.get("PLAYING_TODAY") or cols_ls.get("PLAYING")
+                    if name_col_ls and team_col_ls:
+                        tmp_ls = ldf.copy()
+                        tmp_ls[team_col_ls] = tmp_ls[team_col_ls].astype(str).str.upper().str.strip()
+                        tmp_ls = tmp_ls[tmp_ls[team_col_ls] == team].copy()
+                        if playing_col_ls and not tmp_ls.empty:
+                            pt = tmp_ls[playing_col_ls].astype(str).str.strip().str.lower()
+                            tmp_ls = tmp_ls[pt.isin({"1", "true", "t", "yes", "y"})].copy()
+                        active_players = {_norm_name_key(str(value).strip()) for value in tmp_ls[name_col_ls].astype(str).tolist() if str(value).strip()}
+        except Exception:
+            pass
+        
         out = pd.DataFrame({
             "player_id": pd.to_numeric(tmp[pid_col], errors="coerce") if pid_col else np.nan,
             "player_name": tmp[name_col].astype(str).str.strip(),
             "team": team,
             "opponent": opp,
             "position": tmp[pos_col].map(_normalize_position_local) if pos_col else "",
-            "playing_today": True,
+            "playing_today": pd.Series(
+                [_norm_name_key(str(pname).strip()) in active_players if active_players else True 
+                 for pname in tmp[name_col].astype(str)],
+                index=tmp.index
+            ),
         })
         out = out.dropna(subset=["player_name"]).copy()
         out = out[out["player_name"].astype(str).str.strip().ne("")].copy()
@@ -3504,24 +3531,6 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, pro
         if tmp.empty:
             return tmp
 
-        roster_names: set[str] = set()
-        if processed_root is not None and date_str:
-            roster_df = _team_players_from_processed_rosters_local(processed_root=processed_root, date_str=str(date_str), home_tri=team_u, away_tri=opp_u, team_tri=team_u)
-            if roster_df is not None and not roster_df.empty and "player_name" in roster_df.columns:
-                roster_names = {_norm_name_key(value) for value in roster_df.get("player_name", pd.Series(dtype=str)).astype(str).tolist() if str(value).strip()}
-            roster_names: set[str] = set()
-            roster_position_map: dict[str, str] = {}
-            if processed_root is not None and date_str:
-                roster_df = _team_players_from_processed_rosters_local(processed_root=processed_root, date_str=str(date_str), home_tri=team_u, away_tri=opp_u, team_tri=team_u)
-                if roster_df is not None and not roster_df.empty and "player_name" in roster_df.columns:
-                    roster_names = {_norm_name_key(value) for value in roster_df.get("player_name", pd.Series(dtype=str)).astype(str).tolist() if str(value).strip()}
-                    # Map player names to positions for merging
-                    if "position" in roster_df.columns:
-                        for idx, row in roster_df.iterrows():
-                            pname = str(row.get("player_name", "")).strip()
-                            pos = str(row.get("position", "")).strip()
-                            if pname:
-                                roster_position_map[_norm_name_key(pname)] = pos
         if roster_names:
             tmp_unfiltered = tmp.copy()
             player_keys = tmp["player_name"].astype(str).map(_norm_name_key)
@@ -3530,7 +3539,7 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, pro
                 # Keep market-derived players when roster normalization removes every row.
                 tmp = tmp_unfiltered
             # Merge position data from rosters
-            if roster_position_map and "player_name" not in tmp.columns is False:
+            if roster_position_map and "player_name" in tmp.columns:
                 tmp["position"] = tmp["player_name"].astype(str).map(lambda pname: roster_position_map.get(_norm_name_key(pname), ""))
                 # Clean up empty positions
                 tmp.loc[tmp["position"].eq(""), "position"] = None
@@ -3546,12 +3555,40 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, pro
         pass
     if (out is None or out.empty) and (not team_only.empty):
         out = team_only
+    # Merge position data from rosters (applies to all code paths)
+    if processed_root is not None and date_str and not out.empty and 'player_name' in out.columns:
+        try:
+            roster_df = _team_players_from_processed_rosters_local(processed_root=processed_root, date_str=str(date_str), home_tri=team_u, away_tri=opp_u, team_tri=team_u)
+            if roster_df is not None and not roster_df.empty and 'position' in roster_df.columns:
+                roster_position_map: dict[str, str] = {}
+                for idx, row in roster_df.iterrows():
+                    pname = str(row.get('player_name', '')).strip()
+                    pos = str(row.get('position', '')).strip()
+                    if pname:
+                        roster_position_map[_norm_name_key(pname)] = pos
+                if roster_position_map:
+                    out['position'] = out['player_name'].astype(str).map(lambda pname: roster_position_map.get(_norm_name_key(pname), ''))
+                    out.loc[out['position'].eq(''), 'position'] = None
+        except Exception:
+            pass
     if out.empty:
         return out
     if "playing_today" in out.columns:
         try:
             pt = out["playing_today"].astype(str).str.lower().str.strip()
             out = out[~pt.isin(["false", "0", "no", "n"])].copy()
+        except Exception:
+            pass
+    # Filter to only players with significant playing time (predicted minutes >= 10)
+    # This excludes bench players with minimal minutes (typically set to 8.0 or 0)
+    if "pred_min" in out.columns and len(out) > 12:  # Only apply filter if we have many players (likely full roster)
+        try:
+            pred_min = pd.to_numeric(out["pred_min"], errors="coerce").fillna(0)
+            out = out[pred_min >= 10.0].copy()
+            # If filter removed too many players, relax to pred_min > 0
+            if len(out) < 5:
+                pred_min = pd.to_numeric(out["pred_min"], errors="coerce").fillna(0)
+                out = out[pred_min > 0].copy()
         except Exception:
             pass
     if "player_name" in out.columns:
