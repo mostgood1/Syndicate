@@ -1573,25 +1573,21 @@ def _pregame_prop_rows_from_mlb_recommendations(
     limit: int = 18,
     fallback_href: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Extract MLB prop recommendations from locked policy and convert to prop rows."""
+    """Extract MLB prop recommendations and convert to prop rows."""
     try:
-        from syndicate.features.mlb.cards import _recommendations_by_game
-        from syndicate.features.mlb.sources import daily_artifact_path
-        from syndicate.utils.json import load_json_file
+        from syndicate.features.mlb.cards import _cards_recommendation_payload_by_game
 
-        locked_policy = load_json_file(daily_artifact_path(context_label, suffix="_locked_policy"))
-        if not isinstance(locked_policy, dict):
-            return []
-        
-        recos_by_game = _recommendations_by_game(locked_policy)
+        recos_by_game = _cards_recommendation_payload_by_game(context_label)
         rows: list[dict[str, Any]] = []
         
-        for game_pk, recos in recos_by_game.items():
-            if not isinstance(recos, dict):
+        for game_pk, game_data in recos_by_game.items():
+            if not isinstance(game_data, dict):
                 continue
             
+            markets = game_data.get("markets", {}) if isinstance(game_data.get("markets"), dict) else {}
+            
             # Add total recommendations
-            total_reco = recos.get("totals")
+            total_reco = markets.get("totals")
             if isinstance(total_reco, dict):
                 selection = str(total_reco.get("selection") or "").strip().upper()
                 line = _score_value(total_reco.get("market_line")) or str(total_reco.get("market_line") or "-")
@@ -1617,7 +1613,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     return rows[:limit]
             
             # Add moneyline recommendations
-            ml_reco = recos.get("ml")
+            ml_reco = markets.get("ml")
             if isinstance(ml_reco, dict):
                 selection = str(ml_reco.get("selection") or "").strip().upper()
                 edge = _numeric_value(ml_reco.get("edge"))
@@ -1641,64 +1637,66 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     return rows[:limit]
             
             # Add pitcher props
-            pitcher_props = recos.get("pitcher_props") or []
-            for prop in pitcher_props:
-                if not isinstance(prop, dict):
-                    continue
-                pitcher = str(prop.get("pitcher_name") or prop.get("player_name") or "Pitcher").strip()
-                prop_type = str(prop.get("prop") or "strikeouts").strip().title()
-                line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
-                selection = str(prop.get("selection") or "").strip().upper()
-                edge = _numeric_value(prop.get("edge"))
-                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
-                
-                rows.append({
-                    "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
-                    "heading": "Betting Card",
-                    "name": f"{pitcher} {prop_type}",
-                    "detail": f"{pitcher} {prop_type} {selection} {line}",
-                    "value": edge_text,
-                    "is_live": False,
-                    "market": f"Pitcher {prop_type}",
-                    "pick": selection,
-                    "line": line,
-                    "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
-                    "edge": edge_text,
-                    "confidence": _pct_text(prop.get("model_prob")),
-                    "href": fallback_href,
-                })
-                if len(rows) >= limit:
-                    return rows[:limit]
+            pitcher_props = markets.get("pitcherProps") or []
+            if isinstance(pitcher_props, list):
+                for prop in pitcher_props:
+                    if not isinstance(prop, dict):
+                        continue
+                    pitcher = str(prop.get("pitcher_name") or prop.get("player_name") or "Pitcher").strip()
+                    prop_type = str(prop.get("prop") or "strikeouts").strip().title()
+                    line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
+                    selection = str(prop.get("selection") or "").strip().upper()
+                    edge = _numeric_value(prop.get("edge"))
+                    edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                    
+                    rows.append({
+                        "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
+                        "heading": "Betting Card",
+                        "name": f"{pitcher} {prop_type}",
+                        "detail": f"{pitcher} {prop_type} {selection} {line}",
+                        "value": edge_text,
+                        "is_live": False,
+                        "market": f"Pitcher {prop_type}",
+                        "pick": selection,
+                        "line": line,
+                        "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
+                        "edge": edge_text,
+                        "confidence": _pct_text(prop.get("model_prob")),
+                        "href": fallback_href,
+                    })
+                    if len(rows) >= limit:
+                        return rows[:limit]
             
             # Add hitter props
-            hitter_props = recos.get("hitter_props") or []
-            for prop in hitter_props:
-                if not isinstance(prop, dict):
-                    continue
-                hitter = str(prop.get("player_name") or "Hitter").strip()
-                prop_type = str(prop.get("prop") or "hits").strip().title()
-                line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
-                selection = str(prop.get("selection") or "").strip().upper()
-                edge = _numeric_value(prop.get("edge"))
-                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
-                
-                rows.append({
-                    "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
-                    "heading": "Betting Card",
-                    "name": f"{hitter} {prop_type}",
-                    "detail": f"{hitter} {prop_type} {selection} {line}",
-                    "value": edge_text,
-                    "is_live": False,
-                    "market": f"Hitter {prop_type}",
-                    "pick": selection,
-                    "line": line,
-                    "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
-                    "edge": edge_text,
-                    "confidence": _pct_text(prop.get("model_prob")),
-                    "href": fallback_href,
-                })
-                if len(rows) >= limit:
-                    return rows[:limit]
+            hitter_props = markets.get("hitterProps") or []
+            if isinstance(hitter_props, list):
+                for prop in hitter_props:
+                    if not isinstance(prop, dict):
+                        continue
+                    hitter = str(prop.get("player_name") or "Hitter").strip()
+                    prop_type = str(prop.get("prop") or "hits").strip().title()
+                    line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
+                    selection = str(prop.get("selection") or "").strip().upper()
+                    edge = _numeric_value(prop.get("edge"))
+                    edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                    
+                    rows.append({
+                        "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
+                        "heading": "Betting Card",
+                        "name": f"{hitter} {prop_type}",
+                        "detail": f"{hitter} {prop_type} {selection} {line}",
+                        "value": edge_text,
+                        "is_live": False,
+                        "market": f"Hitter {prop_type}",
+                        "pick": selection,
+                        "line": line,
+                        "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
+                        "edge": edge_text,
+                        "confidence": _pct_text(prop.get("model_prob")),
+                        "href": fallback_href,
+                    })
+                    if len(rows) >= limit:
+                        return rows[:limit]
         
         return rows
     except Exception:
