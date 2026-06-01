@@ -239,7 +239,7 @@ def _nba_live_state_games(selected_date: str) -> list[dict[str, Any]]:
     try:
         from syndicate.features.nba.cards import build_live_state_payload
 
-        payload = build_live_state_payload(selected_date, ttl=12)
+        payload = build_live_state_payload(selected_date, ttl=12, allow_stored_date_fallback=False)
     except Exception:
         return []
     rows = payload.get("games") if isinstance(payload, dict) else []
