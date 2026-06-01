@@ -1060,7 +1060,9 @@ function Get-ForcedPublishArtifactPaths {
             "data/mlb_source/data/live_lens/render_sync/live_lens_reports_${dateSlug}.json",
             "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${dateSlug}.json",
             "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${dateSlug}.jsonl",
-            "data/mlb_source/data/live_lens/prop_registry/live_prop_observations_${dateSlug}.jsonl"
+            "data/mlb_source/data/live_lens/prop_registry/live_prop_observations_${dateSlug}.jsonl",
+            "data/mlb_source/data/tuning/live_prop_ranking/default.json",
+            "data/mlb_source/sim_engine/live_prop_ranking.py"
         )) {
             Add-PathIfPresent -RelativePath $relativePath
         }
