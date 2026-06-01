@@ -1277,7 +1277,7 @@ def _next_available_actionable_cards_date(selected_date: str, *, max_days: int =
     return None
 
 
-def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     resolved_date = requested_date
     source_title = "NBA processed game cards"
@@ -1415,7 +1415,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     return apply_game_board_contract(context, sport="nba", module="cards")
 
 
-def build_cards_api_payload(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+def build_cards_api_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
     return build_game_board_api_payload(
         build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     )
