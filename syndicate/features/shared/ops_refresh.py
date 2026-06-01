@@ -473,11 +473,7 @@ def _active_sports_for_date(date_str: str) -> str:
 def _effective_skip_mirror(*, skip_mirror: bool, mirror_only: bool) -> bool:
     if mirror_only:
         return False
-    if skip_mirror:
-        return True
-    # Render/web hosts are Linux and do not provide powershell.exe.
-    # Defaulting to skip mirror keeps odds refresh runnable from ops endpoints.
-    return os.name != "nt"
+    return bool(skip_mirror)
 
 
 def launch_refresh_run(

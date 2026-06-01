@@ -2149,7 +2149,7 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
         if slug == "nba":
             from syndicate.features.nba.cards import build_cards_page_context
 
-            payload = build_cards_page_context(context_label)
+            payload = build_cards_page_context(context_label, allow_stored_date_fallback=False)
             if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
                 return _nba_live_state_games(context_label) if is_active_today else []
             games = list(payload.get("games") or [])
@@ -2167,7 +2167,7 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
         if slug == "wnba":
             from syndicate.features.wnba.cards import build_cards_page_context
 
-            payload = build_cards_page_context(context_label)
+            payload = build_cards_page_context(context_label, allow_stored_date_fallback=False)
             if str(payload.get("requested_date") or context_label).strip() == str(context_label).strip() and str(payload.get("date") or context_label).strip() != str(context_label).strip():
                 return _wnba_live_state_games(context_label) if is_active_today else []
             games = list(payload.get("games") or [])
