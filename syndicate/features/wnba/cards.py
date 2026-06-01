@@ -1207,26 +1207,72 @@ def _game_matchup_key(game: dict[str, Any]) -> tuple[str, str]:
     return (away_tri, home_tri)
 
 
-def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int]:
+def _supplement_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int, int]:
     live_games, live_source_path = _games_from_live_state_fallback(selected_date)
     if not live_games:
-        return games, None, 0
-    existing_keys = {_game_identity_key(game) for game in games if isinstance(game, dict)}
-    existing_matchups = {_game_matchup_key(game) for game in games if isinstance(game, dict)}
-    extras: list[dict[str, Any]] = []
-    for game in live_games:
+        return games, None, 0, 0
+
+    live_by_identity = {
+        _game_identity_key(game): game
+        for game in live_games
+        if isinstance(game, dict)
+    }
+    live_by_matchup = {
+        _game_matchup_key(game): game
+        for game in live_games
+        if isinstance(game, dict)
+    }
+
+    merged_games: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+    seen_matchups: set[tuple[str, str]] = set()
+    updated_count = 0
+
+    for game in games:
+        if not isinstance(game, dict):
+            continue
         identity = _game_identity_key(game)
         matchup = _game_matchup_key(game)
-        if identity in existing_keys:
+        seen_keys.add(identity)
+        seen_matchups.add(matchup)
+
+        live_game = live_by_identity.get(identity)
+        if not isinstance(live_game, dict):
+            live_game = live_by_matchup.get(matchup)
+        if not isinstance(live_game, dict):
+            merged_games.append(game)
             continue
-        if matchup in existing_matchups:
-            continue
-        extras.append(game)
-        existing_keys.add(identity)
-        existing_matchups.add(matchup)
-    if not extras:
-        return games, live_source_path, 0
-    return [*games, *extras], live_source_path, len(extras)
+
+        merged = dict(game)
+        live_state_row = live_game.get("live_state") if isinstance(live_game.get("live_state"), dict) else {}
+        if live_state_row:
+            merged["live_state"] = dict(live_state_row)
+            away_pts = _safe_float(live_state_row.get("away_pts"))
+            home_pts = _safe_float(live_state_row.get("home_pts"))
+            if away_pts is not None and home_pts is not None:
+                away_team = merged.get("away") if isinstance(merged.get("away"), dict) else {}
+                home_team = merged.get("home") if isinstance(merged.get("home"), dict) else {}
+                merged["away"] = {**away_team, "score": away_pts}
+                merged["home"] = {**home_team, "score": home_pts}
+
+        live_status = str(live_game.get("status") or "").strip()
+        live_detail = str(live_game.get("detail") or live_status).strip()
+        if live_status:
+            merged["status"] = live_status
+            merged["detail"] = live_detail
+
+        updated_count += 1
+        merged_games.append(merged)
+
+    extras = [
+        game
+        for key, game in live_by_identity.items()
+        if key not in seen_keys and _game_matchup_key(game) not in seen_matchups
+    ]
+    if extras:
+        merged_games.extend(extras)
+
+    return merged_games, live_source_path, len(extras), updated_count
 
 
 def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
@@ -1239,8 +1285,8 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
     source_title = "WNBA processed game cards"
     had_artifact_games = bool(games)
-    games, live_source_path, supplemented_count = _supplement_games_with_live_state(games, resolved_date)
-    if supplemented_count > 0:
+    games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(games, resolved_date)
+    if supplemented_count > 0 or updated_count > 0:
         if had_artifact_games:
             source_title = "WNBA processed game cards + live scoreboard supplement"
             cards_path = f"{cards_path} | {live_source_path}"
@@ -1263,8 +1309,8 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             games, cards_path, recs_path = _games_from_artifacts(resolved_date)
             source_title = "WNBA processed game cards"
             had_artifact_games = bool(games)
-            games, live_source_path, supplemented_count = _supplement_games_with_live_state(games, resolved_date)
-            if supplemented_count > 0:
+            games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(games, resolved_date)
+            if supplemented_count > 0 or updated_count > 0:
                 if had_artifact_games:
                     source_title = "WNBA processed game cards + live scoreboard supplement"
                     cards_path = f"{cards_path} | {live_source_path}"
