@@ -24,18 +24,36 @@ from syndicate.features.wnba.sources import live_snapshot_path
 from syndicate.features.wnba.sources import market_label
 from syndicate.features.wnba.sources import parse_iso_date
 from syndicate.features.wnba.sources import processed_path
+from syndicate.features.shared.timezone import central_today_iso
 
 
 def _canonical_wnba_tri(team_tri: str) -> str:
     value = str(team_tri or "").strip().upper()
-    return {
+    compact = "".join(ch for ch in value if ch.isalnum())
+    mapped = {
         "LA": "LAS",
         "LV": "LVA",
         "LVA": "LVA",
+        "GS": "GSV",
+        "GSW": "GSV",
         "NY": "NYL",
         "CONN": "CON",
         "WAS": "WSH",
-    }.get(value, value)
+        "LASVEGASACES": "LVA",
+        "LOSANGELESSPARKS": "LAS",
+        "NEWYORKLIBERTY": "NYL",
+        "CONNECTICUTSUN": "CON",
+        "WASHINGTONMYSTICS": "WSH",
+        "INDIANAFEVER": "IND",
+        "MINNESOTALYNX": "MIN",
+        "SEATTLESTORM": "SEA",
+        "PHOENIXMERCURY": "PHX",
+        "DALLASWINGS": "DAL",
+        "ATLANTADREAM": "ATL",
+        "CHICAGOSKY": "CHI",
+        "GOLDENSTATEVALKYRIES": "GSV",
+    }
+    return mapped.get(value, mapped.get(compact, value))
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -1433,6 +1451,143 @@ _local_live_state_payload.cache_clear = _local_live_state_payload_cached.cache_c
 _local_live_state_payload.cache_info = _local_live_state_payload_cached.cache_info  # type: ignore[attr-defined]
 
 
+def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    iso_date = str(selected_date or "").strip()
+    parsed = parse_iso_date(iso_date)
+    compact_date = parsed.strftime("%Y%m%d")
+    url = (
+        "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
+        f"?dates={urllib_parse.quote(compact_date)}"
+    )
+    request_obj = urllib_request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json,text/plain,*/*",
+        },
+    )
+    try:
+        with urllib_request.urlopen(request_obj, timeout=6) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+
+    events = payload.get("events") if isinstance(payload, dict) else None
+    if not isinstance(events, list) or not events:
+        return None
+
+    games: list[dict[str, Any]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        event_id = str(event.get("id") or "").strip() or None
+        competitions = event.get("competitions") if isinstance(event.get("competitions"), list) else []
+        competition = competitions[0] if competitions and isinstance(competitions[0], dict) else {}
+        competitors = competition.get("competitors") if isinstance(competition.get("competitors"), list) else []
+        away_row = None
+        home_row = None
+        for row in competitors:
+            if not isinstance(row, dict):
+                continue
+            side = str(row.get("homeAway") or "").strip().lower()
+            if side == "away":
+                away_row = row
+            elif side == "home":
+                home_row = row
+        if not isinstance(away_row, dict) or not isinstance(home_row, dict):
+            continue
+
+        away_team = away_row.get("team") if isinstance(away_row.get("team"), dict) else {}
+        home_team = home_row.get("team") if isinstance(home_row.get("team"), dict) else {}
+        away_tri = _canonical_wnba_tri(
+            str(
+                away_team.get("abbreviation")
+                or away_team.get("shortDisplayName")
+                or away_team.get("displayName")
+                or away_team.get("name")
+                or ""
+            ).strip().upper()
+        )
+        home_tri = _canonical_wnba_tri(
+            str(
+                home_team.get("abbreviation")
+                or home_team.get("shortDisplayName")
+                or home_team.get("displayName")
+                or home_team.get("name")
+                or ""
+            ).strip().upper()
+        )
+        if not away_tri or not home_tri:
+            continue
+
+        away_pts = _safe_float(away_row.get("score"))
+        home_pts = _safe_float(home_row.get("score"))
+        status = event.get("status") if isinstance(event.get("status"), dict) else {}
+        status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
+        in_progress = str(status_type.get("state") or "").strip().lower() == "in"
+        final = bool(status_type.get("completed"))
+        period = int(_safe_float(status_type.get("period")) or 0) or None
+        clock = str(status_type.get("displayClock") or "").strip()
+        status_text = (
+            str(status_type.get("shortDetail") or "").strip()
+            or str(status_type.get("detail") or "").strip()
+            or str(status_type.get("description") or "").strip()
+            or "Scheduled"
+        )
+        normalized_status = _normalized_game_status(
+            status_text=status_text,
+            detail_text=status_text,
+            start_time_utc=competition.get("date") or event.get("date"),
+            in_progress=in_progress,
+            final=final,
+            away_pts=away_pts,
+            home_pts=home_pts,
+        )
+
+        away_lines = away_row.get("linescores") if isinstance(away_row.get("linescores"), list) else []
+        home_lines = home_row.get("linescores") if isinstance(home_row.get("linescores"), list) else []
+        periods: list[dict[str, Any]] = []
+        line_count = max(len(away_lines), len(home_lines))
+        for idx in range(line_count):
+            away_line = away_lines[idx] if idx < len(away_lines) and isinstance(away_lines[idx], dict) else {}
+            home_line = home_lines[idx] if idx < len(home_lines) and isinstance(home_lines[idx], dict) else {}
+            away_value = _safe_float(away_line.get("value"))
+            home_value = _safe_float(home_line.get("value"))
+            if away_value is None and home_value is None:
+                continue
+            periods.append({"period": idx + 1, "away": away_value, "home": home_value})
+
+        games.append(
+            {
+                "game_id": str(event_id or f"{away_tri}@{home_tri}"),
+                "event_id": event_id,
+                "home": home_tri,
+                "away": away_tri,
+                "home_tri": home_tri,
+                "away_tri": away_tri,
+                "home_pts": home_pts,
+                "away_pts": away_pts,
+                "status_id": None,
+                "status": normalized_status["detail"],
+                "period": period,
+                "clock": clock,
+                "in_progress": bool(normalized_status["in_progress"]),
+                "final": bool(normalized_status["final"]),
+                "periods": periods,
+            }
+        )
+
+    if not games:
+        return None
+    return {
+        "date": iso_date or parsed.isoformat(),
+        "ttl": 12,
+        "source": "espn_scoreboard_fallback",
+        "games": games,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+
+
 @lru_cache(maxsize=256)
 def _local_live_snapshot_payload_cached(kind: str, resolved_date: str, snapshot_mtime_ns: int | None, snapshot_size: int | None) -> dict[str, Any] | None:
     if not resolved_date:
@@ -1749,10 +1904,18 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
         return _attach_odds_refresh_timestamp(local_payload)
 
-    if _remote_source_fallback_enabled():
+    # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
+    # Keep remote snapshot fallback enabled for today's slate even if strict source-fallback
+    # mode is disabled, so cards can still show live/final states when local snapshots lag.
+    should_try_remote = _remote_source_fallback_enabled() or str(selected_date).strip() == central_today_iso()
+    if should_try_remote:
         remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
             return _attach_odds_refresh_timestamp(remote_payload)
+
+    public_payload = _public_scoreboard_live_state_payload(selected_date)
+    if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list):
+        return _attach_odds_refresh_timestamp(public_payload)
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     games = context.get("games") if isinstance(context.get("games"), list) else []
