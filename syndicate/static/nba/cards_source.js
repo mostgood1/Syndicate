@@ -524,6 +524,18 @@
     return Boolean(game?.sim?.players_loaded);
   }
 
+  function emptySimDetailGame() {
+    return {
+      sim: {
+        players_loaded: false,
+        players_summary: { away: 0, home: 0 },
+        players: { away: [], home: [] },
+        injuries: { away: [], home: [] },
+        missing_prop_players: { away: [], home: [] },
+      },
+    };
+  }
+
   function sameSlate(nextGames, currentGames) {
     const left = safeArray(currentGames);
     const right = safeArray(nextGames);
@@ -596,11 +608,13 @@
       const response = await fetch(`${apiBasePath}/cards/sim-detail?${params.toString()}`, { cache: 'no-store' });
       const payload = await readApiJson(response, 'Failed to load game sim details.');
       const detailGame = safeArray(payload?.games)[0] || null;
-      if (detailGame) {
-        state.simDetailCache.set(target, detailGame);
-        mergeSimDetail(target, detailGame);
-      }
+      const cachedDetail = detailGame || emptySimDetailGame();
+      state.simDetailCache.set(target, cachedDetail);
+      mergeSimDetail(target, cachedDetail);
     } catch (_error) {
+      const cachedDetail = emptySimDetailGame();
+      state.simDetailCache.set(target, cachedDetail);
+      mergeSimDetail(target, cachedDetail);
     } finally {
       state.simDetailLoading.delete(target);
       renderGameCardByTarget(target);
@@ -2041,15 +2055,21 @@
           const homeTri = String(game?.home_tri || '').trim().toUpperCase();
           const grouped = { away: [], home: [] };
           safeArray(entry?.players).forEach((row) => {
-            const teamTri = String(row?.team_tri || '').trim().toUpperCase();
+            const normalizedRow = {
+              ...row,
+              pos: row?.pos || row?.position || row?.player_position || null,
+              mp: row?.mp ?? row?.min ?? row?.minutes ?? null,
+              threes_made: row?.threes_made ?? row?.threes ?? null,
+            };
+            const teamTri = String(normalizedRow?.team_tri || '').trim().toUpperCase();
             if (teamTri === awayTri) {
-              grouped.away.push(row);
+              grouped.away.push(normalizedRow);
             } else if (teamTri === homeTri) {
-              grouped.home.push(row);
+              grouped.home.push(normalizedRow);
             }
           });
-          grouped.away.sort((left, right) => (Number(right?.mp || 0) - Number(left?.mp || 0)) || (Number(right?.pts || 0) - Number(left?.pts || 0)));
-          grouped.home.sort((left, right) => (Number(right?.mp || 0) - Number(left?.mp || 0)) || (Number(right?.pts || 0) - Number(left?.pts || 0)));
+          grouped.away.sort((left, right) => (Number(right?.mp || right?.min || 0) - Number(left?.mp || left?.min || 0)) || (Number(right?.pts || 0) - Number(left?.pts || 0)));
+          grouped.home.sort((left, right) => (Number(right?.mp || right?.min || 0) - Number(left?.mp || left?.min || 0)) || (Number(right?.pts || 0) - Number(left?.pts || 0)));
           nextLivePlayerBoxscores.set(matchup, grouped);
         });
       }
@@ -2955,7 +2975,7 @@
           if (!Number.isFinite(actual) || !Number.isFinite(simMu) || !Number.isFinite(line)) {
             return;
           }
-          const paceProj = estimatedLiveProjection(actual, Number(actualRow?.mp), Number(simRow?.min_mean), simMu);
+          const paceProj = estimatedLiveProjection(actual, Number(actualRow?.mp ?? actualRow?.min), Number(simRow?.min_mean), simMu);
           if (!Number.isFinite(paceProj)) {
             return;
           }
@@ -5084,11 +5104,12 @@
             <strong>${escapeHtml(player.player || 'Player')}</strong>
           </div>
         </td>
-        <td>${escapeHtml(fmtMinutesPlayed(player.mp))}</td>
+        <td>${escapeHtml(String(player.pos || player.position || player.player_position || '--'))}</td>
+        <td>${escapeHtml(fmtMinutesPlayed(player.mp ?? player.min))}</td>
         <td>${fmtInteger(player.pts)}</td>
         <td>${fmtInteger(player.reb)}</td>
         <td>${fmtInteger(player.ast)}</td>
-        <td>${fmtInteger(player.threes_made)}</td>
+        <td>${fmtInteger(player.threes_made ?? player.threes)}</td>
         <td>${fmtInteger((Number(player.pts) || 0) + (Number(player.reb) || 0) + (Number(player.ast) || 0))}</td>
       </tr>
     `).join('');
@@ -5105,6 +5126,7 @@
             <thead>
               <tr>
                 <th>Player</th>
+                <th>Pos</th>
                 <th>Min</th>
                 <th>Pts</th>
                 <th>Reb</th>
@@ -5207,16 +5229,25 @@
   function renderBoxScorePanel(game) {
     const detailLoaded = hasLoadedSimDetail(game);
     const detailLoading = state.simDetailLoading.has(cardId(game));
+    const detailResolved = state.simDetailCache.has(cardId(game));
     if (!detailLoaded) {
       const counts = game?.sim?.players_summary || {};
       const totalRows = Number(counts.away || 0) + Number(counts.home || 0);
+      const simRowsLabel = totalRows
+        ? `${totalRows} projected rows`
+        : (detailLoading ? 'Loading' : (detailResolved ? 'No rows' : 'On demand'));
+      const simStatusCopy = detailLoading
+        ? 'Loading per-player sim rows for this matchup.'
+        : (detailResolved
+          ? 'No per-player SmartSim rows were available for this matchup.'
+          : 'Per-player SmartSim rows load only when you open a game detail tab, so the main betting card stays fast.');
       return `
         <div class="cards-panel-card cards-box-panel">
           <div class="cards-box-head">
             <div class="cards-table-title"><strong>Sim box score</strong></div>
-            <span class="cards-chip">${escapeHtml(totalRows ? `${totalRows} projected rows` : 'On demand')}</span>
+            <span class="cards-chip">${escapeHtml(simRowsLabel)}</span>
           </div>
-          <div class="cards-callout-copy">${escapeHtml(detailLoading ? 'Loading per-player sim rows for this matchup.' : 'Per-player SmartSim rows load only when you open a game detail tab, so the main betting card stays fast.')}</div>
+          <div class="cards-callout-copy">${escapeHtml(simStatusCopy)}</div>
         </div>
       `;
     }
@@ -5708,7 +5739,7 @@
           <tbody>
             <tr>
               <td>${escapeHtml(actualRow.player || 'Player')}</td>
-              <td>${escapeHtml(fmtMinutesPlayed(actualRow.mp))}</td>
+              <td>${escapeHtml(fmtMinutesPlayed(actualRow.mp ?? actualRow.min))}</td>
               <td>${fmtInteger(actualRow.pts)}</td>
               <td>${fmtInteger(actualRow.reb)}</td>
               <td>${fmtInteger(actualRow.ast)}</td>
