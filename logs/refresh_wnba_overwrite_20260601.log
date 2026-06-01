@@ -1,0 +1,13 @@
+[2026-06-01T19:19:23] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-06-01 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-06-01.csv' --regions us
+ERROR: Missing ODDS_API_KEY; set in environment or pass --api-key
+[2026-06-01T19:19:23] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\oddsapi_player_props_2026-06-01.csv (rows=664)
+[2026-06-01T19:19:24] Generating required game predictions artifact via source bootstrap: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\predictions_2026-06-01.csv
+[2026-06-01T19:19:24] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-01T19:19:24] Seeded fallback game odds slate from props snapshot: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\game_odds_2026-06-01.csv (rows=2)
+[2026-06-01T19:19:24] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-06-01
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-01T19:19:24] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-06-01T19:19:24] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli daily-update --date 2026-06-01 --no-npu --no-git-push
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-01T19:19:24] predict-props returned exit code 1 but downstream artifacts already exist for 2026-06-01; continuing
