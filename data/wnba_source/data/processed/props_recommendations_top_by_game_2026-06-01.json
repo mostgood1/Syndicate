@@ -8,8 +8,8 @@
       "team": "PHX",
       "team_tricode": "PHX",
       "opponent": "MIN",
-      "score": 73.76693480762249,
-      "score_adj": 73.76693480762249,
+      "score": 67.9747036473684,
+      "score_adj": 67.9747036473684,
       "tier": "High",
       "model": {
         "pts": 0.0,
@@ -28,21 +28,64 @@
         "market": "threes",
         "side": "UNDER",
         "line": 1.5,
-        "price": -116.0,
-        "edge": 0.3961557610038985,
-        "ev": 0.7376693480762249,
-        "ev_pct": 73.76693480762249,
+        "price": -125.0,
+        "edge": 0.37763724248538,
+        "ev": 0.6797470364736841,
+        "ev_pct": 67.9747036473684,
         "book": "draftkings",
         "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 73.8%",
+        "EV 68.0%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 0.0 vs line 1.5 (-1.5)"
+    },
+    {
+      "game_key": "MIN@PHX",
+      "game_id": "2",
+      "player": "Kahleah Copper",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "MIN",
+      "score": 56.56577532094496,
+      "score_adj": 56.56577532094496,
+      "tier": "High",
+      "model": {
+        "pts": 20.557693464052285,
+        "reb": 3.2739222222222217,
+        "ast": 1.9372091503267967,
+        "threes": 0.9786045751633988,
+        "stl": 0.9717483660130718,
+        "blk": 0.0,
+        "tov": 2.9152450980392155,
+        "pra": 25.768824836601304,
+        "pr": 23.831615686274507,
+        "pa": 22.494902614379082,
+        "ra": 5.211131372549018
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 124.0,
+        "edge": 0.25252578268278997,
+        "ev": 0.5656577532094496,
+        "ev_pct": 56.56577532094496,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 56.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.0 vs line 1.5 (-0.5)"
     },
     {
       "game_key": "SEA@DAL",
@@ -51,8 +94,8 @@
       "team": "SEA",
       "team_tricode": "SEA",
       "opponent": "DAL",
-      "score": 51.543636007060826,
-      "score_adj": 51.543636007060826,
+      "score": 53.98277387937791,
+      "score_adj": 53.98277387937791,
       "tier": "High",
       "model": {
         "pts": 16.012678260869563,
@@ -71,16 +114,16 @@
         "market": "threes",
         "side": "OVER",
         "line": 1.5,
-        "price": -118.0,
-        "edge": 0.27899766279051275,
-        "ev": 0.5154363600706082,
-        "ev_pct": 51.543636007060826,
-        "book": "betrivers",
+        "price": -114.0,
+        "edge": 0.28757178608640577,
+        "ev": 0.5398277387937791,
+        "ev_pct": 53.98277387937791,
+        "book": "fanduel",
         "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 51.5%",
+        "EV 54.0%",
         "Regular price range (-150 to +150)",
         "Consensus: 4 books aligned",
         "Best line available"
@@ -94,8 +137,8 @@
       "team": "PHX",
       "team_tricode": "PHX",
       "opponent": "MIN",
-      "score": 44.7621473350178,
-      "score_adj": 44.7621473350178,
+      "score": 49.278026370619834,
+      "score_adj": 49.278026370619834,
       "tier": "High",
       "model": {
         "pts": 13.088165624999998,
@@ -114,16 +157,16 @@
         "market": "threes",
         "side": "OVER",
         "line": 1.5,
-        "price": -123.0,
-        "edge": 0.24689435525592773,
-        "ev": 0.447621473350178,
-        "ev_pct": 44.7621473350178,
-        "book": "draftkings",
-        "p_win": 0.9991909800766354,
+        "price": -115.0,
+        "edge": 0.26358014105215266,
+        "ev": 0.4927802637061983,
+        "ev_pct": 49.278026370619834,
+        "book": "williamhill_us",
+        "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 44.8%",
+        "EV 49.3%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
@@ -180,8 +223,8 @@
       "team": "DAL",
       "team_tricode": "DAL",
       "opponent": "SEA",
-      "score": 39.12027962559325,
-      "score_adj": 39.12027962559325,
+      "score": 37.49204684184285,
+      "score_adj": 37.49204684184285,
       "tier": "High",
       "model": {
         "pts": 14.633822385861562,
@@ -200,64 +243,21 @@
         "market": "threes",
         "side": "OVER",
         "line": 1.5,
-        "price": -139.0,
-        "edge": 0.22751961790616992,
-        "ev": 0.39120279625593246,
-        "ev_pct": 39.12027962559325,
+        "price": -143.0,
+        "edge": 0.22063220981002174,
+        "ev": 0.3749204684184285,
+        "ev_pct": 37.49204684184285,
         "book": "betrivers",
-        "p_win": 0.9727927544149283,
+        "p_win": 0.9633978346735725,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 39.1%",
+        "EV 37.5%",
         "Regular price range (-150 to +150)",
         "Consensus: 4 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 2.4 vs line 1.5 (+0.9)"
-    },
-    {
-      "game_key": "MIN@PHX",
-      "game_id": "2",
-      "player": "Kayla McBride",
-      "team": "MIN",
-      "team_tricode": "MIN",
-      "opponent": "PHX",
-      "score": 13.55386391954555,
-      "score_adj": 13.55386391954555,
-      "tier": "High",
-      "model": {
-        "pts": 13.795123232323231,
-        "reb": 5.222589898989899,
-        "ast": 2.2325777777777778,
-        "threes": 1.410630303030303,
-        "stl": 1.5516767676767675,
-        "blk": 0.3879191919191919,
-        "tov": 1.5516767676767675,
-        "pra": 21.250290909090907,
-        "pr": 19.01771313131313,
-        "pa": 16.02770101010101,
-        "ra": 7.455167676767676
-      },
-      "top_play": {
-        "market": "reb",
-        "side": "OVER",
-        "line": 3.5,
-        "price": 110.0,
-        "edge": 0.06454220914069309,
-        "ev": 0.1355386391954555,
-        "ev_pct": 13.55386391954555,
-        "book": "fanduel",
-        "p_win": 0.6117291153859317,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 13.6%",
-        "Regular price range (-150 to +150)",
-        "Consensus: 4 books aligned",
-        "Best line available"
-      ],
-      "basketball_summary": "model 5.2 vs line 3.5 (+1.7)"
     }
   ]
 }
