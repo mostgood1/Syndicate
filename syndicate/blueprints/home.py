@@ -2033,11 +2033,8 @@ def _load_home_prop_items(
 
                 live_games = list(build_live_lens_page_context(context_label).get("games") or [])
                 live_rows = _prop_rows_from_mlb_live_games(live_games)
-                # Only return live props if games are actually live; don't fall back to betting card
                 if live_rows:
                     return live_rows
-                return []  # No live games, so no live props
-            # For pregame (not active today), get player props from betting card
             mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context_label, season=season, week=week)
             if mlb_rows:
                 return mlb_rows
