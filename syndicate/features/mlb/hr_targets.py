@@ -9,13 +9,16 @@ from typing import Any
 
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.sources import daily_artifact_path
+from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import load_json_file
 
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_MLB_SOURCE_ROOT = _REPO_ROOT / "data" / "mlb_source"
-_STATCAST_FEATURES_PATH = _MLB_SOURCE_ROOT / "data" / "statcast" / "features" / "player_features_latest.json"
-_DAILY_SNAPSHOT_ROOT = _MLB_SOURCE_ROOT / "source_artifacts" / "data" / "daily" / "snapshots"
+def _statcast_features_path() -> Path:
+    return default_mlb_source_root() / "data" / "statcast" / "features" / "player_features_latest.json"
+
+
+def _daily_snapshot_root() -> Path:
+    return default_mlb_source_root() / "source_artifacts" / "data" / "daily" / "snapshots"
 
 
 @lru_cache(maxsize=512)
@@ -131,7 +134,7 @@ def _primary_pitch_type(pitch_mix: dict[str, Any]) -> tuple[str | None, float | 
 def _load_roster_game_payload(selected_date: str, game_pk: int | None) -> dict[str, Any]:
     if not selected_date or game_pk is None:
         return {}
-    snapshot_dir = _DAILY_SNAPSHOT_ROOT / selected_date
+    snapshot_dir = _daily_snapshot_root() / selected_date
     if not snapshot_dir.exists():
         return {}
     candidate_dirs = [snapshot_dir / "roster_objs", snapshot_dir]
@@ -206,7 +209,7 @@ def _pitch_mix_context(selected_date: str, row: dict[str, Any]) -> dict[str, Any
     if not pitcher_profile:
         return {}
 
-    statcast_payload = _load_json_path(str(_STATCAST_FEATURES_PATH))
+    statcast_payload = _load_json_path(str(_statcast_features_path()))
     batter_feature = {}
     pitcher_feature = {}
     if isinstance(statcast_payload.get("batters"), dict):

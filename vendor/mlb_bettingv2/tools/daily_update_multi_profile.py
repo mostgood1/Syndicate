@@ -4,6 +4,7 @@ import argparse
 from collections import Counter
 from functools import lru_cache
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,13 @@ from time import perf_counter
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 _ROOT = Path(__file__).resolve().parents[1]
+_TRACKED_DATA_DIR = (_ROOT / "data").resolve()
+_DATA_ROOT_DIR_ENV = str(
+    os.environ.get("MLB_BETTING_DATA_ROOT")
+    or os.environ.get("MLB_BETTING_DATA_ROOT_DIR")
+    or ""
+).strip()
+_DATA_DIR = (Path(_DATA_ROOT_DIR_ENV).resolve() if _DATA_ROOT_DIR_ENV else _TRACKED_DATA_DIR)
 
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
@@ -3732,7 +3740,7 @@ def _collect_game_recommendations(sim_dir: Path, game_lines_path: Path, policy: 
     if not game_lines_path.exists():
         return out
 
-    snapshots_dir = _ROOT / "data" / "daily" / "snapshots"
+    snapshots_dir = _DATA_DIR / "daily" / "snapshots"
     roster_cache: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}
 
     def _roster_for(sim_obj: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -4912,9 +4920,9 @@ def _build_locked_policy_card(
     pitcher_sim_dir = out_pitcher / "sims" / str(date)
     hitter_sim_dir = out_hitter / "sims" / str(date)
 
-    game_lines_path = _ROOT / "data" / "market" / "oddsapi" / f"oddsapi_game_lines_{token}.json"
-    pitcher_lines_path = _ROOT / "data" / "market" / "oddsapi" / f"oddsapi_pitcher_props_{token}.json"
-    hitter_lines_path = _ROOT / "data" / "market" / "oddsapi" / f"oddsapi_hitter_props_{token}.json"
+    game_lines_path = _DATA_DIR / "market" / "oddsapi" / f"oddsapi_game_lines_{token}.json"
+    pitcher_lines_path = _DATA_DIR / "market" / "oddsapi" / f"oddsapi_pitcher_props_{token}.json"
+    hitter_lines_path = _DATA_DIR / "market" / "oddsapi" / f"oddsapi_hitter_props_{token}.json"
     skipped_roles = {
         role_name
         for role_name, info in (profile_info or {}).items()
@@ -4973,7 +4981,7 @@ def _build_locked_policy_card(
         policy,
         so_prob_calibration,
         outs_prob_calibration,
-        _ROOT / "data" / "daily" / "snapshots" / str(date),
+        _DATA_DIR / "daily" / "snapshots" / str(date),
     )
     timings["collect_pitcher_candidates_s"] = _elapsed_seconds(stage_started_at)
     print(
@@ -4988,7 +4996,7 @@ def _build_locked_policy_card(
         policy,
         so_prob_calibration,
         outs_prob_calibration,
-        _ROOT / "data" / "daily" / "snapshots" / str(date),
+        _DATA_DIR / "daily" / "snapshots" / str(date),
         market_specs=SHADOW_PITCHER_MARKET_SPECS,
         stake_u=0.0,
     )
@@ -5014,7 +5022,7 @@ def _build_locked_policy_card(
         hitter_sim_dir,
         hitter_lines_path,
         policy,
-        _ROOT / "data" / "daily" / "snapshots" / str(date),
+        _DATA_DIR / "daily" / "snapshots" / str(date),
     )
     timings["collect_hitter_candidates_s"] = _elapsed_seconds(stage_started_at)
     print(
@@ -5027,7 +5035,7 @@ def _build_locked_policy_card(
         hitter_sim_dir,
         hitter_lines_path,
         policy,
-        _ROOT / "data" / "daily" / "snapshots" / str(date),
+        _DATA_DIR / "daily" / "snapshots" / str(date),
         market_specs=SHADOW_HITTER_MARKET_SPECS,
         stake_u=0.0,
     )
@@ -5692,8 +5700,8 @@ def main() -> int:
         manifest_path = _resolve_path(str(args.manifest_out))
     else:
         manifest_path = out_game / f"daily_summary_{token}_profile_bundle.json"
-    pitcher_lines_path = _ROOT / "data" / "market" / "oddsapi" / f"oddsapi_pitcher_props_{token}.json"
-    hitter_lines_path = _ROOT / "data" / "market" / "oddsapi" / f"oddsapi_hitter_props_{token}.json"
+    pitcher_lines_path = _DATA_DIR / "market" / "oddsapi" / f"oddsapi_pitcher_props_{token}.json"
+    hitter_lines_path = _DATA_DIR / "market" / "oddsapi" / f"oddsapi_hitter_props_{token}.json"
     hr_target_policy = _hr_target_policy_config(args.hr_target_policy_preset)
     pitcher_market_entries = _market_entries_n(pitcher_lines_path, root_key="pitcher_props")
     hitter_market_entries = _market_entries_n(hitter_lines_path, root_key="hitter_props")
