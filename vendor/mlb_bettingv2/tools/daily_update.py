@@ -2054,6 +2054,7 @@ def _build_prior_eval_command(
 ) -> List[str]:
     reconcile_mode = str(getattr(args, "prior_reconcile_mode", "artifact") or "artifact").strip().lower()
     if reconcile_mode == "artifact":
+        prior_sim_dir = (_DATA_DIR / "daily" / "sims" / str(prior_date)).resolve()
         return [
             str(Path(sys.executable).resolve()),
             str((_ROOT_DIR / "tools" / "eval" / "reconcile_daily_sim_artifacts.py").resolve()),
@@ -2061,6 +2062,8 @@ def _build_prior_eval_command(
             str(prior_date),
             "--season",
             str(int(prior_season)),
+            "--sim-dir",
+            str(prior_sim_dir),
             "--out",
             str(out_path),
             "--prop-lines-source",
