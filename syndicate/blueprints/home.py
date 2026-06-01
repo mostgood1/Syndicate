@@ -5,6 +5,7 @@ import csv
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from datetime import datetime
+from datetime import timedelta
 from datetime import timezone
 import os
 import re
@@ -214,6 +215,26 @@ def _scheduled_status_line(game: dict[str, Any], fallback: str) -> str:
     return fallback_text or "Board update pending"
 
 
+def _looks_terminal_status_text(text: str) -> bool:
+    lowered = str(text or "").strip().lower()
+    if not lowered:
+        return False
+    return any(
+        token in lowered
+        for token in (
+            "final",
+            "finished",
+            "complete",
+            "full time",
+            "ft",
+            "postponed",
+            "cancelled",
+            "canceled",
+            "suspended",
+        )
+    )
+
+
 def _nba_live_state_games(selected_date: str) -> list[dict[str, Any]]:
     try:
         from syndicate.features.nba.cards import build_live_state_payload
@@ -388,12 +409,24 @@ def _scoreboard_state(game: dict[str, Any]) -> dict[str, Any]:
         or game.get("summary")
         or "Board update pending"
     ).strip()
+
+    # If the game start is well in the past but source status is still a placeholder,
+    # force terminal handling so home cards do not remain stuck on "Scheduled".
+    scheduled_dt = _central_scheduled_datetime(game)
+    if not is_live and not is_final and scheduled_dt is not None and not _looks_terminal_status_text(raw_status_line):
+        now_central = datetime.now(CENTRAL_TIMEZONE)
+        if scheduled_dt <= now_central - timedelta(hours=3):
+            is_final = True
+
     status_badge = raw_status_badge
     status_line = raw_status_line
     if not is_live and not is_final:
         if raw_status_badge.lower() in {"processed artifact", "tracked", "stored slate lens"}:
             status_badge = "Scheduled"
         status_line = _scheduled_status_line(game, raw_status_line)
+    elif is_final and not _looks_terminal_status_text(raw_status_line):
+        status_badge = "Final"
+        status_line = "Final update pending"
     return {
         "away_label": away_label,
         "home_label": home_label,
