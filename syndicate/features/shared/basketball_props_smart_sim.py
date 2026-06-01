@@ -648,38 +648,43 @@ def _build_player_sim_rows_local(*, players_df, team_tri: str, opp_tri: str) -> 
         blk_mean = _first_present_float_local(row, "mean_blk", "blk_mean", "pred_blocks", "projected_blocks", "blocks", default=0.0)
         tov_mean = _first_present_float_local(row, "mean_tov", "tov_mean", "pred_turnovers", "projected_turnovers", "turnovers", default=0.0)
         pra_mean = _first_present_float_local(row, "mean_pra", "pra_mean", default=(pts_mean + reb_mean + ast_mean))
+        position = str(row.get("position") or "").strip() or None
+        minutes = _first_present_float_local(row, "minutes", "min", "mp", "min_played", "minutes_played", default=None)
 
         def _sd_for(mean_value: float, key: str) -> float:
             return _first_present_float_local(row, f"sd_{key}", f"{key}_sd", default=max(1.0, abs(float(mean_value)) * 0.25))
 
-        rows.append(
-            {
-                "team": str(team_tri or "").strip().upper(),
-                "opponent": str(opp_tri or "").strip().upper(),
-                "player_name": player_name,
-                "player_id": row.get("player_id"),
-                "pts_mean": pts_mean,
-                "reb_mean": reb_mean,
-                "ast_mean": ast_mean,
-                "threes_mean": threes_mean,
-                "pra_mean": pra_mean,
-                "stl_mean": stl_mean,
-                "blk_mean": blk_mean,
-                "tov_mean": tov_mean,
-                "pts_sd": _sd_for(pts_mean, "pts"),
-                "reb_sd": _sd_for(reb_mean, "reb"),
-                "ast_sd": _sd_for(ast_mean, "ast"),
-                "threes_sd": _sd_for(threes_mean, "threes"),
-                "pra_sd": _sd_for(pra_mean, "pra"),
-                "stl_sd": _sd_for(stl_mean, "stl"),
-                "blk_sd": _sd_for(blk_mean, "blk"),
-                "tov_sd": _sd_for(tov_mean, "tov"),
-                "q_pts": [0, 0, 0, 0],
-                "q_reb": [0, 0, 0, 0],
-                "q_ast": [0, 0, 0, 0],
-                "q_threes": [0, 0, 0, 0],
-            }
-        )
+        player_dict = {
+            "team": str(team_tri or "").strip().upper(),
+            "opponent": str(opp_tri or "").strip().upper(),
+            "player_name": player_name,
+            "player_id": row.get("player_id"),
+            "pts_mean": pts_mean,
+            "reb_mean": reb_mean,
+            "ast_mean": ast_mean,
+            "threes_mean": threes_mean,
+            "pra_mean": pra_mean,
+            "stl_mean": stl_mean,
+            "blk_mean": blk_mean,
+            "tov_mean": tov_mean,
+            "pts_sd": _sd_for(pts_mean, "pts"),
+            "reb_sd": _sd_for(reb_mean, "reb"),
+            "ast_sd": _sd_for(ast_mean, "ast"),
+            "threes_sd": _sd_for(threes_mean, "threes"),
+            "pra_sd": _sd_for(pra_mean, "pra"),
+            "stl_sd": _sd_for(stl_mean, "stl"),
+            "blk_sd": _sd_for(blk_mean, "blk"),
+            "tov_sd": _sd_for(tov_mean, "tov"),
+            "q_pts": [0, 0, 0, 0],
+            "q_reb": [0, 0, 0, 0],
+            "q_ast": [0, 0, 0, 0],
+            "q_threes": [0, 0, 0, 0],
+        }
+        if position is not None:
+            player_dict["position"] = position
+        if minutes is not None and minutes > 0:
+            player_dict["minutes"] = minutes
+        rows.append(player_dict)
     rows.sort(key=lambda item: (float(item.get("pra_mean") or 0.0), float(item.get("pts_mean") or 0.0)), reverse=True)
     return rows
 
