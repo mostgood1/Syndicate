@@ -20,6 +20,7 @@ from .statsapi import (
     fetch_active_roster,
     fetch_team_roster,
     fetch_person,
+    fetch_person_gamelog,
     fetch_person_season_hitting,
     fetch_person_season_pitching,
     fetch_person_home_away_splits,
@@ -1366,6 +1367,169 @@ def _apply_home_away_splits_to_batter(client: StatsApiClient, prof: BatterProfil
         return
 
 
+def _apply_venue_history_to_batter(client: StatsApiClient, prof: BatterProfile, season: int) -> None:
+    if prof.player.mlbam_id <= 0:
+        return
+    try:
+        rows = fetch_person_gamelog(client, prof.player.mlbam_id, season, group="hitting")
+        if not isinstance(rows, list) or not rows:
+            return
+
+        by_venue: Dict[int, Dict[str, float]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            team = row.get("team") if isinstance(row.get("team"), dict) else {}
+            opp = row.get("opponent") if isinstance(row.get("opponent"), dict) else {}
+            team_id = int(team.get("id") or 0) if team.get("id") is not None else 0
+            opp_id = int(opp.get("id") or 0) if opp.get("id") is not None else 0
+            is_home = row.get("isHome")
+            venue_team_id = team_id if bool(is_home) else opp_id
+            if venue_team_id <= 0:
+                continue
+
+            stat = row.get("stat") if isinstance(row.get("stat"), dict) else {}
+            pa = float(stat.get("plateAppearances") or 0.0)
+            if pa <= 0.0:
+                continue
+            so = float(stat.get("strikeOuts") or 0.0)
+            bb = float(stat.get("baseOnBalls") or 0.0)
+            hbp = float(stat.get("hitByPitch") or 0.0)
+            hr = float(stat.get("homeRuns") or 0.0)
+            hits = float(stat.get("hits") or 0.0)
+            inplay = max(pa - so - bb - hbp, 1.0)
+            inplay_hits = max(hits - hr, 0.0)
+
+            bucket = by_venue.setdefault(
+                int(venue_team_id),
+                {"pa": 0.0, "so": 0.0, "bb": 0.0, "hr": 0.0, "inplay": 0.0, "inplay_hits": 0.0},
+            )
+            bucket["pa"] += pa
+            bucket["so"] += so
+            bucket["bb"] += bb
+            bucket["hr"] += hr
+            bucket["inplay"] += inplay
+            bucket["inplay_hits"] += inplay_hits
+
+        hr_map: Dict[int, float] = {}
+        k_map: Dict[int, float] = {}
+        bb_map: Dict[int, float] = {}
+        inplay_map: Dict[int, float] = {}
+        history: Dict[int, Dict[str, float]] = {}
+        for venue_id, agg in by_venue.items():
+            pa = float(agg.get("pa") or 0.0)
+            if pa < 12.0:
+                continue
+            k_rate_s = _rate(float(agg.get("so") or 0.0), pa, prof.k_rate)
+            bb_rate_s = _rate(float(agg.get("bb") or 0.0), pa, prof.bb_rate)
+            hr_rate_s = _rate(float(agg.get("hr") or 0.0), pa, prof.hr_rate)
+            inplay_hit_s = _rate(float(agg.get("inplay_hits") or 0.0), float(agg.get("inplay") or 1.0), prof.inplay_hit_rate)
+            k_mult = _mult(k_rate_s, prof.k_rate)
+            bb_mult = _mult(bb_rate_s, prof.bb_rate)
+            hr_mult = _mult(hr_rate_s, prof.hr_rate, lo=0.6, hi=1.5)
+            inplay_mult = _mult(inplay_hit_s, prof.inplay_hit_rate)
+            k_map[int(venue_id)] = k_mult
+            bb_map[int(venue_id)] = bb_mult
+            hr_map[int(venue_id)] = hr_mult
+            inplay_map[int(venue_id)] = inplay_mult
+            history[int(venue_id)] = {
+                "pa": pa,
+                "k_mult": k_mult,
+                "bb_mult": bb_mult,
+                "hr_mult": hr_mult,
+                "inplay_mult": inplay_mult,
+            }
+
+        prof.vs_venue_k_mult = k_map
+        prof.vs_venue_bb_mult = bb_map
+        prof.vs_venue_hr_mult = hr_map
+        prof.vs_venue_inplay_mult = inplay_map
+        prof.vs_venue_history = history
+    except Exception:
+        return
+
+
+def _apply_venue_history_to_pitcher(client: StatsApiClient, prof: PitcherProfile, season: int) -> None:
+    if prof.player.mlbam_id <= 0:
+        return
+    try:
+        rows = fetch_person_gamelog(client, prof.player.mlbam_id, season, group="pitching")
+        if not isinstance(rows, list) or not rows:
+            return
+
+        by_venue: Dict[int, Dict[str, float]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            team = row.get("team") if isinstance(row.get("team"), dict) else {}
+            opp = row.get("opponent") if isinstance(row.get("opponent"), dict) else {}
+            team_id = int(team.get("id") or 0) if team.get("id") is not None else 0
+            opp_id = int(opp.get("id") or 0) if opp.get("id") is not None else 0
+            is_home = row.get("isHome")
+            venue_team_id = team_id if bool(is_home) else opp_id
+            if venue_team_id <= 0:
+                continue
+
+            stat = row.get("stat") if isinstance(row.get("stat"), dict) else {}
+            bf = float(stat.get("battersFaced") or 0.0)
+            if bf <= 0.0:
+                continue
+            so = float(stat.get("strikeOuts") or 0.0)
+            bb = float(stat.get("baseOnBalls") or 0.0)
+            hbp = float(stat.get("hitBatsmen") or 0.0)
+            hr = float(stat.get("homeRuns") or 0.0)
+            hits = float(stat.get("hits") or 0.0)
+            inplay = max(bf - so - bb - hbp, 1.0)
+
+            bucket = by_venue.setdefault(
+                int(venue_team_id),
+                {"bf": 0.0, "so": 0.0, "bb": 0.0, "hr": 0.0, "inplay": 0.0, "hits": 0.0},
+            )
+            bucket["bf"] += bf
+            bucket["so"] += so
+            bucket["bb"] += bb
+            bucket["hr"] += hr
+            bucket["inplay"] += inplay
+            bucket["hits"] += hits
+
+        hr_map: Dict[int, float] = {}
+        k_map: Dict[int, float] = {}
+        bb_map: Dict[int, float] = {}
+        inplay_map: Dict[int, float] = {}
+        history: Dict[int, Dict[str, float]] = {}
+        for venue_id, agg in by_venue.items():
+            bf = float(agg.get("bf") or 0.0)
+            if bf < 20.0:
+                continue
+            k_rate_s = _rate(float(agg.get("so") or 0.0), bf, prof.k_rate)
+            bb_rate_s = _rate(float(agg.get("bb") or 0.0), bf, prof.bb_rate)
+            hr_rate_s = _rate(float(agg.get("hr") or 0.0), bf, prof.hr_rate)
+            inplay_hit_s = _rate(float(agg.get("hits") or 0.0), float(agg.get("inplay") or 1.0), prof.inplay_hit_rate)
+            k_mult = _mult(k_rate_s, prof.k_rate)
+            bb_mult = _mult(bb_rate_s, prof.bb_rate)
+            hr_mult = _mult(hr_rate_s, prof.hr_rate, lo=0.6, hi=1.5)
+            inplay_mult = _mult(inplay_hit_s, prof.inplay_hit_rate)
+            k_map[int(venue_id)] = k_mult
+            bb_map[int(venue_id)] = bb_mult
+            hr_map[int(venue_id)] = hr_mult
+            inplay_map[int(venue_id)] = inplay_mult
+            history[int(venue_id)] = {
+                "bf": bf,
+                "k_mult": k_mult,
+                "bb_mult": bb_mult,
+                "hr_mult": hr_mult,
+                "inplay_mult": inplay_mult,
+            }
+
+        prof.vs_venue_k_mult = k_map
+        prof.vs_venue_bb_mult = bb_map
+        prof.vs_venue_hr_mult = hr_map
+        prof.vs_venue_inplay_mult = inplay_map
+        prof.vs_venue_history = history
+    except Exception:
+        return
+
+
 def build_team(team_id: int, name: str, abbr: str) -> Team:
     return Team(team_id=team_id, name=name, abbreviation=abbr)
 
@@ -2212,6 +2376,27 @@ def build_team_roster(
             out[str(k)] = float(1.0 + a * (m - 1.0))
         return out
 
+    def _shrink_intkey_mult_dict(d: Dict[int, float] | None, alpha: float) -> Dict[int, float]:
+        if not d:
+            return {}
+        a = _clamp01(alpha)
+        if a <= 0.0:
+            return {}
+        if a >= 1.0:
+            return dict(d)
+        out: Dict[int, float] = {}
+        for k, v in d.items():
+            if not isinstance(v, (int, float)):
+                continue
+            try:
+                kk = int(k)
+            except Exception:
+                continue
+            m = float(v)
+            m = float(max(0.4, min(1.6, m)))
+            out[kk] = float(1.0 + a * (m - 1.0))
+        return out
+
     # Apply platoon split multipliers (StatsAPI) to relevant players only.
     # This keeps API usage bounded while still affecting all batters and arms we may use.
     try:
@@ -2225,6 +2410,12 @@ def build_team_roster(
                 if float(batter_home_away_alpha) != 1.0:
                     b.venue_mult_home = _shrink_mult_dict(getattr(b, "venue_mult_home", None), float(batter_home_away_alpha))
                     b.venue_mult_away = _shrink_mult_dict(getattr(b, "venue_mult_away", None), float(batter_home_away_alpha))
+                _apply_venue_history_to_batter(client, b, season)
+                if float(batter_home_away_alpha) != 1.0:
+                    b.vs_venue_hr_mult = _shrink_intkey_mult_dict(getattr(b, "vs_venue_hr_mult", None), float(batter_home_away_alpha))
+                    b.vs_venue_k_mult = _shrink_intkey_mult_dict(getattr(b, "vs_venue_k_mult", None), float(batter_home_away_alpha))
+                    b.vs_venue_bb_mult = _shrink_intkey_mult_dict(getattr(b, "vs_venue_bb_mult", None), float(batter_home_away_alpha))
+                    b.vs_venue_inplay_mult = _shrink_intkey_mult_dict(getattr(b, "vs_venue_inplay_mult", None), float(batter_home_away_alpha))
         if bool(enable_pitcher_platoon):
             _apply_platoon_splits_to_pitcher(client, starter, season)
             if float(pitcher_platoon_alpha) != 1.0:
@@ -2234,6 +2425,12 @@ def build_team_roster(
             if float(pitcher_home_away_alpha) != 1.0:
                 starter.venue_mult_home = _shrink_mult_dict(getattr(starter, "venue_mult_home", None), float(pitcher_home_away_alpha))
                 starter.venue_mult_away = _shrink_mult_dict(getattr(starter, "venue_mult_away", None), float(pitcher_home_away_alpha))
+            _apply_venue_history_to_pitcher(client, starter, season)
+            if float(pitcher_home_away_alpha) != 1.0:
+                starter.vs_venue_hr_mult = _shrink_intkey_mult_dict(getattr(starter, "vs_venue_hr_mult", None), float(pitcher_home_away_alpha))
+                starter.vs_venue_k_mult = _shrink_intkey_mult_dict(getattr(starter, "vs_venue_k_mult", None), float(pitcher_home_away_alpha))
+                starter.vs_venue_bb_mult = _shrink_intkey_mult_dict(getattr(starter, "vs_venue_bb_mult", None), float(pitcher_home_away_alpha))
+                starter.vs_venue_inplay_mult = _shrink_intkey_mult_dict(getattr(starter, "vs_venue_inplay_mult", None), float(pitcher_home_away_alpha))
             for p in bullpen or []:
                 _apply_platoon_splits_to_pitcher(client, p, season)
                 if float(pitcher_platoon_alpha) != 1.0:
@@ -2243,6 +2440,12 @@ def build_team_roster(
                 if float(pitcher_home_away_alpha) != 1.0:
                     p.venue_mult_home = _shrink_mult_dict(getattr(p, "venue_mult_home", None), float(pitcher_home_away_alpha))
                     p.venue_mult_away = _shrink_mult_dict(getattr(p, "venue_mult_away", None), float(pitcher_home_away_alpha))
+                _apply_venue_history_to_pitcher(client, p, season)
+                if float(pitcher_home_away_alpha) != 1.0:
+                    p.vs_venue_hr_mult = _shrink_intkey_mult_dict(getattr(p, "vs_venue_hr_mult", None), float(pitcher_home_away_alpha))
+                    p.vs_venue_k_mult = _shrink_intkey_mult_dict(getattr(p, "vs_venue_k_mult", None), float(pitcher_home_away_alpha))
+                    p.vs_venue_bb_mult = _shrink_intkey_mult_dict(getattr(p, "vs_venue_bb_mult", None), float(pitcher_home_away_alpha))
+                    p.vs_venue_inplay_mult = _shrink_intkey_mult_dict(getattr(p, "vs_venue_inplay_mult", None), float(pitcher_home_away_alpha))
     except Exception:
         pass
 

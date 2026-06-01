@@ -158,6 +158,11 @@ def roster_to_dict(roster: TeamRoster) -> Dict[str, Any]:
             "platoon_mult_vs_rhp": {str(k): float(v) for k, v in (b.platoon_mult_vs_rhp or {}).items()},
             "venue_mult_home": {str(k): float(v) for k, v in (b.venue_mult_home or {}).items()},
             "venue_mult_away": {str(k): float(v) for k, v in (b.venue_mult_away or {}).items()},
+            "vs_venue_hr_mult": _ser_intkey_map(b.vs_venue_hr_mult),
+            "vs_venue_k_mult": _ser_intkey_map(b.vs_venue_k_mult),
+            "vs_venue_bb_mult": _ser_intkey_map(b.vs_venue_bb_mult),
+            "vs_venue_inplay_mult": _ser_intkey_map(b.vs_venue_inplay_mult),
+            "vs_venue_history": _ser_intkey_nested_map(b.vs_venue_history),
             "statcast_quality_mult": {str(k): float(v) for k, v in (b.statcast_quality_mult or {}).items()},
             "vs_pitcher_hr_mult": _ser_intkey_map(b.vs_pitcher_hr_mult),
             "vs_pitcher_k_mult": _ser_intkey_map(b.vs_pitcher_k_mult),
@@ -198,6 +203,11 @@ def roster_to_dict(roster: TeamRoster) -> Dict[str, Any]:
             "platoon_mult_vs_rhb": {str(k): float(v) for k, v in (p.platoon_mult_vs_rhb or {}).items()},
             "venue_mult_home": {str(k): float(v) for k, v in (p.venue_mult_home or {}).items()},
             "venue_mult_away": {str(k): float(v) for k, v in (p.venue_mult_away or {}).items()},
+            "vs_venue_hr_mult": _ser_intkey_map(p.vs_venue_hr_mult),
+            "vs_venue_k_mult": _ser_intkey_map(p.vs_venue_k_mult),
+            "vs_venue_bb_mult": _ser_intkey_map(p.vs_venue_bb_mult),
+            "vs_venue_inplay_mult": _ser_intkey_map(p.vs_venue_inplay_mult),
+            "vs_venue_history": _ser_intkey_nested_map(p.vs_venue_history),
             "statcast_quality_mult": {str(k): float(v) for k, v in (p.statcast_quality_mult or {}).items()},
             "bb_gb_rate": float(p.bb_gb_rate),
             "bb_fb_rate": float(p.bb_fb_rate),
@@ -269,6 +279,11 @@ def roster_from_dict(d: Dict[str, Any]) -> TeamRoster:
         prof.platoon_mult_vs_rhp = {str(k): float(v) for k, v in (b.get("platoon_mult_vs_rhp") or {}).items()}
         prof.venue_mult_home = {str(k): float(v) for k, v in (b.get("venue_mult_home") or {}).items()}
         prof.venue_mult_away = {str(k): float(v) for k, v in (b.get("venue_mult_away") or {}).items()}
+        prof.vs_venue_hr_mult = _de_intkey_map(b.get("vs_venue_hr_mult") or {})
+        prof.vs_venue_k_mult = _de_intkey_map(b.get("vs_venue_k_mult") or {})
+        prof.vs_venue_bb_mult = _de_intkey_map(b.get("vs_venue_bb_mult") or {})
+        prof.vs_venue_inplay_mult = _de_intkey_map(b.get("vs_venue_inplay_mult") or {})
+        prof.vs_venue_history = _de_intkey_nested_map(b.get("vs_venue_history") or {})
         prof.statcast_quality_mult = {str(k): float(v) for k, v in (b.get("statcast_quality_mult") or {}).items()}
         prof.vs_pitcher_hr_mult = _de_intkey_map(b.get("vs_pitcher_hr_mult") or {})
         prof.vs_pitcher_k_mult = _de_intkey_map(b.get("vs_pitcher_k_mult") or {})
@@ -321,6 +336,11 @@ def roster_from_dict(d: Dict[str, Any]) -> TeamRoster:
         prof.platoon_mult_vs_rhb = {str(k): float(v) for k, v in (p.get("platoon_mult_vs_rhb") or {}).items()}
         prof.venue_mult_home = {str(k): float(v) for k, v in (p.get("venue_mult_home") or {}).items()}
         prof.venue_mult_away = {str(k): float(v) for k, v in (p.get("venue_mult_away") or {}).items()}
+        prof.vs_venue_hr_mult = _de_intkey_map(p.get("vs_venue_hr_mult") or {})
+        prof.vs_venue_k_mult = _de_intkey_map(p.get("vs_venue_k_mult") or {})
+        prof.vs_venue_bb_mult = _de_intkey_map(p.get("vs_venue_bb_mult") or {})
+        prof.vs_venue_inplay_mult = _de_intkey_map(p.get("vs_venue_inplay_mult") or {})
+        prof.vs_venue_history = _de_intkey_nested_map(p.get("vs_venue_history") or {})
         prof.statcast_quality_mult = {str(k): float(v) for k, v in (p.get("statcast_quality_mult") or {}).items()}
         return prof
 

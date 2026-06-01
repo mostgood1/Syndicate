@@ -251,6 +251,14 @@ class BatterProfile:
     venue_mult_home: Dict[str, float] = field(default_factory=dict)
     venue_mult_away: Dict[str, float] = field(default_factory=dict)
 
+    # Venue-specific multipliers keyed by home-team id for the ballpark.
+    # For example, games in Fenway Park key to BOS team_id regardless of opponent.
+    vs_venue_hr_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_k_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_bb_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_inplay_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_history: Dict[int, Dict[str, float]] = field(default_factory=dict)
+
     # Statcast-derived quality multipliers applied to baseline rates.
     # Keys: "k", "bb", "hr", "inplay".
     statcast_quality_mult: Dict[str, float] = field(default_factory=dict)
@@ -313,6 +321,13 @@ class PitcherProfile:
     # Home/road split multipliers keyed by venue side.
     venue_mult_home: Dict[str, float] = field(default_factory=dict)
     venue_mult_away: Dict[str, float] = field(default_factory=dict)
+
+    # Venue-specific multipliers keyed by home-team id for the ballpark.
+    vs_venue_hr_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_k_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_bb_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_inplay_mult: Dict[int, float] = field(default_factory=dict)
+    vs_venue_history: Dict[int, Dict[str, float]] = field(default_factory=dict)
 
     # Statcast-derived quality multipliers applied to baseline rates.
     # Keys: "k", "bb", "hr", "inplay".
