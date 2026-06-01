@@ -867,6 +867,31 @@ def build_source_cards_sim_detail_payload(selected_date: str, away_tri: str, hom
             ],
         }
 
+    should_try_remote = _remote_source_fallback_enabled() or bool(_remote_source_base_url())
+    if should_try_remote and away_key and home_key:
+        params = {"away": away_key, "home": home_key}
+        date_value = str(selected_date or "").strip()
+        if date_value:
+            params["date"] = date_value
+        query = urllib_parse.urlencode(params)
+        url = f"{_remote_source_base_url()}/api/source/cards/sim-detail{'?' + query if query else ''}"
+        headers = {"User-Agent": "Syndicate-WNBA/1.0"}
+        token = _remote_source_auth_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        try:
+            request = urllib_request.Request(url, headers=headers)
+            with urllib_request.urlopen(request, timeout=5) as response:
+                remote_payload = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            remote_payload = None
+        remote_games = remote_payload.get("games") if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) else []
+        if remote_games:
+            out = dict(remote_payload)
+            out.setdefault("requested_date", selected_date)
+            out.setdefault("date", selected_date)
+            return out
+
     fallback = build_source_cards_payload(selected_date)
     game = next(
         (
