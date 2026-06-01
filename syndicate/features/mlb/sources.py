@@ -208,12 +208,6 @@ def raw_feed_live_path(selected_date: str, game_pk: int) -> Path | None:
         candidate = day_dir / f"{int(game_pk)}{suffix}"
         if candidate.exists() and candidate.is_file():
             return candidate
-    reconciled = _resolve_data_path_with_reconcile("raw", "statsapi", "feed_live", season, selected_date, f"{int(game_pk)}.json")
-    if reconciled.exists() and reconciled.is_file():
-        return reconciled
-    reconciled_gz = _resolve_data_path_with_reconcile("raw", "statsapi", "feed_live", season, selected_date, f"{int(game_pk)}.json.gz")
-    if reconciled_gz.exists() and reconciled_gz.is_file():
-        return reconciled_gz
     return None
 
 

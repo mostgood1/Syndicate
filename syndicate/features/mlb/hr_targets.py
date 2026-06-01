@@ -624,11 +624,12 @@ def build_hr_targets_page_context(selected_date: str) -> dict[str, Any]:
     daily_summary_path = daily_artifact_path(selected_date)
     daily_summary = load_json_file(daily_summary_path)
     summary_targets = _targets_from_summary(summary, selected_date=selected_date, limit=24) if summary else []
+    daily_targets = _targets_from_daily_summary(daily_summary, selected_date=selected_date, limit=24) if daily_summary else []
     if summary_targets:
-        # Prefer the dedicated HR-target artifact rows because they carry full sim-driven metrics.
-        targets = summary_targets[:24]
+        # Keep dedicated HR-target rows first, but backfill from daily summary when sparse.
+        targets = _merge_targets(summary_targets, daily_targets, limit=24)
     else:
-        targets = _targets_from_daily_summary(daily_summary, selected_date=selected_date, limit=24) if daily_summary else []
+        targets = daily_targets
     using_sample_data = False
 
     header_stats = [

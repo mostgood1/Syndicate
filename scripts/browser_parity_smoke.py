@@ -286,8 +286,9 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         board_loading_text="",
         scoreboard_selector="#cardsScoreboard",
         scoreboard_loading_text="",
-        extra_required_selectors=(".cards-control-card", ".cards-date-form", ".cards-nav-pill", ".feature-game-card", "#cardsHrTargets"),
-        extra_required_nonempty_selectors=("#cardsGrid .feature-game-card", ".cards-date-form", "#cardsHrTargets"),
+        empty_selector="#cardsGrid .hub-content-panel",
+        extra_required_selectors=(".cards-control-card", ".cards-date-form", ".cards-nav-pill"),
+        extra_required_nonempty_selectors=(".cards-date-form",),
     ),
     RouteSpec(
         name="NCAAB shared board",
@@ -359,8 +360,9 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
         board_selector='section[aria-label="Available NCAAF weeks"]',
         header_loading_text="",
         board_loading_text="",
+        empty_selector=".hub-content-panel",
         extra_required_selectors=(".hub-content-panel",),
-        extra_required_nonempty_selectors=(".hub-content-panel h3", 'section[aria-label="Available NCAAF weeks"] .sport-card h3'),
+        extra_required_nonempty_selectors=(".hub-content-panel h3",),
     ),
     RouteSpec(
         name="NCAAB hub",

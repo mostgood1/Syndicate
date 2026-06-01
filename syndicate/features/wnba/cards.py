@@ -2169,6 +2169,40 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
 
     public_payload = _public_scoreboard_live_state_payload(selected_date)
     if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and bool(public_payload.get("games")):
+        context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+        context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
+        games_by_matchup: dict[tuple[str, str], dict[str, Any]] = {}
+        for cards_game in context_games:
+            if not isinstance(cards_game, dict):
+                continue
+            away_tri = _canonical_wnba_tri(
+                str(
+                    cards_game.get("away_tri")
+                    or ((cards_game.get("away") or {}).get("abbr") if isinstance(cards_game.get("away"), dict) else "")
+                    or ""
+                ).strip().upper()
+            )
+            home_tri = _canonical_wnba_tri(
+                str(
+                    cards_game.get("home_tri")
+                    or ((cards_game.get("home") or {}).get("abbr") if isinstance(cards_game.get("home"), dict) else "")
+                    or ""
+                ).strip().upper()
+            )
+            if away_tri and home_tri:
+                games_by_matchup[(away_tri, home_tri)] = cards_game
+        for game in public_payload.get("games") or []:
+            if not isinstance(game, dict):
+                continue
+            away_tri = _canonical_wnba_tri(game.get("away"))
+            home_tri = _canonical_wnba_tri(game.get("home"))
+            cards_game = games_by_matchup.get((away_tri, home_tri)) if away_tri and home_tri else None
+            if not isinstance(cards_game, dict) and len(context_games) == 1 and isinstance(context_games[0], dict):
+                cards_game = context_games[0]
+            if isinstance(cards_game, dict):
+                event_id = str(cards_game.get("event_id") or "").strip()
+                if event_id:
+                    game["event_id"] = event_id
         return _attach_odds_refresh_timestamp(public_payload)
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
