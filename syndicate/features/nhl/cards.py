@@ -351,9 +351,45 @@ def _games_from_artifact(selected_date: str) -> tuple[list[dict[str, Any]], str]
     return games, str(source_path)
 
 
-def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, Any]], str]:
+def _scoreboard_rows_with_fallback(selected_date: str) -> tuple[list[dict[str, Any]], str]:
     path = scoreboard_snapshot_path(selected_date)
     rows = _load_csv_rows(path) if path.exists() else []
+    if rows:
+        return rows, str(path)
+
+    try:
+        from syndicate.local_nhl_odds import NhlWebClient
+
+        live_rows = NhlWebClient().scoreboard_day(selected_date)
+    except Exception:
+        live_rows = []
+
+    normalized: list[dict[str, Any]] = []
+    for row in live_rows:
+        if not isinstance(row, dict):
+            continue
+        normalized.append(
+            {
+                "gamePk": row.get("gamePk") or row.get("game_id"),
+                "away": row.get("away") or row.get("away_team"),
+                "home": row.get("home") or row.get("home_team"),
+                "away_abbr": row.get("away_abbr") or row.get("away_tri"),
+                "home_abbr": row.get("home_abbr") or row.get("home_tri"),
+                "away_goals": row.get("away_goals") or row.get("awayScore") or row.get("away_score"),
+                "home_goals": row.get("home_goals") or row.get("homeScore") or row.get("home_score"),
+                "gameState": row.get("gameState") or row.get("game_state") or row.get("state"),
+                "period": row.get("period") or row.get("web_period"),
+                "clock": row.get("clock") or row.get("web_clock"),
+                "gameDate": row.get("gameDate") or row.get("scheduled_start_utc") or row.get("start_time_utc"),
+            }
+        )
+    if normalized:
+        return normalized, "nhlweb_live_fetch"
+    return [], str(path)
+
+
+def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, Any]], str]:
+    rows, source_path = _scoreboard_rows_with_fallback(selected_date)
     games: list[dict[str, Any]] = []
     for idx, row in enumerate(rows, start=1):
         away_name = str(row.get("away") or "Away").strip() or "Away"
@@ -413,7 +449,7 @@ def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, 
                 "href_label": "Open NHL hub",
             }
         )
-    return games, str(path)
+    return games, source_path
 
 
 def _recommendation_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:

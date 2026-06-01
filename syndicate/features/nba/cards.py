@@ -179,7 +179,8 @@ def _espn_logo_abbr(team_tri: str) -> str:
 
 def _canonical_nba_tri(team_tri: str) -> str:
     value = str(team_tri or "").strip().upper()
-    return {
+    compact = "".join(ch for ch in value if ch.isalnum())
+    mapped = {
         "GS": "GSW",
         "NO": "NOP",
         "NY": "NYK",
@@ -187,7 +188,37 @@ def _canonical_nba_tri(team_tri: str) -> str:
         "WSH": "WAS",
         "PHO": "PHX",
         "SA": "SAS",
-    }.get(value, value)
+        "GOLDENSTATEWARRIORS": "GSW",
+        "NEWORLEANSPELICANS": "NOP",
+        "NEWYORKKNICKS": "NYK",
+        "WASHINGTONWIZARDS": "WAS",
+        "PHOENIXSUNS": "PHX",
+        "SANTONIOSPURS": "SAS",
+        "LOSANGELESLAKERS": "LAL",
+        "LOSANGELESCLIPPERS": "LAC",
+        "BROOKLYNNETS": "BKN",
+        "BOSTONCELTICS": "BOS",
+        "MILWAUKEEBUCKS": "MIL",
+        "PHILADELPHIA76ERS": "PHI",
+        "MIAMIHEAT": "MIA",
+        "ORLANDOMAGIC": "ORL",
+        "CHICAGOBULLS": "CHI",
+        "CLEVELANDCAVALIERS": "CLE",
+        "DETROITPISTONS": "DET",
+        "INDIANAPACERS": "IND",
+        "ATLANTAHAWKS": "ATL",
+        "CHARLOTTEHORNETS": "CHA",
+        "TORONTORAPTORS": "TOR",
+        "DALLASMAVERICKS": "DAL",
+        "DENVERNUGGETS": "DEN",
+        "HOUSTONROCKETS": "HOU",
+        "MEMPHISGRIZZLIES": "MEM",
+        "MINNESOTATIMBERWOLVES": "MIN",
+        "OKLAHOMACITYTHUNDER": "OKC",
+        "PORTLANDTRAILBLAZERS": "POR",
+        "SACRAMENTOKINGS": "SAC",
+    }
+    return mapped.get(value, mapped.get(compact, value))
 
 
 def _nba_logo_url(team_tri: str) -> str | None:
