@@ -1455,6 +1455,20 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
             ],
         }
 
+    should_try_remote = _remote_source_fallback_enabled() or bool(_remote_source_base_url())
+    if should_try_remote and away_key and home_key:
+        params = {"away": away_key, "home": home_key}
+        date_value = str(selected_date or "").strip()
+        if date_value:
+            params["date"] = date_value
+        remote_payload = _remote_fetch_json("/api/cards/sim-detail", params)
+        remote_games = remote_payload.get("games") if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) else []
+        if remote_games:
+            out = dict(remote_payload)
+            out.setdefault("requested_date", selected_date)
+            out.setdefault("date", selected_date)
+            return out
+
     context = build_cards_page_context(selected_date)
     games = context.get("games") if isinstance(context.get("games"), list) else []
     game = next(
