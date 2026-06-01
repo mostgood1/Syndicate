@@ -1573,7 +1573,11 @@ def _pregame_prop_rows_from_mlb_recommendations(
     limit: int = 18,
     fallback_href: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Extract MLB prop recommendations and convert to prop rows."""
+    """Extract MLB player prop recommendations and convert to prop rows.
+    
+    Only includes pitcher and hitter props (no totals/ML).
+    Formats with writeup and pills (line, sim mean, odds) similar to HR targets.
+    """
     try:
         from syndicate.features.mlb.cards import _cards_recommendation_payload_by_game
 
@@ -1586,56 +1590,6 @@ def _pregame_prop_rows_from_mlb_recommendations(
             
             markets = game_data.get("markets", {}) if isinstance(game_data.get("markets"), dict) else {}
             
-            # Add total recommendations
-            total_reco = markets.get("totals")
-            if isinstance(total_reco, dict):
-                selection = str(total_reco.get("selection") or "").strip().upper()
-                line = _score_value(total_reco.get("market_line")) or str(total_reco.get("market_line") or "-")
-                edge = _numeric_value(total_reco.get("edge"))
-                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
-                
-                rows.append({
-                    "matchup": str(total_reco.get("matchup") or f"Game {game_pk}").strip(),
-                    "heading": "Betting Card",
-                    "name": f"Total {selection}",
-                    "detail": f"Total {line} {selection}",
-                    "value": edge_text,
-                    "is_live": False,
-                    "market": "Totals",
-                    "pick": selection,
-                    "line": line,
-                    "odds": _prop_metric_text(total_reco.get("odds") or total_reco.get("price")),
-                    "edge": edge_text,
-                    "confidence": _pct_text(total_reco.get("model_prob")),
-                    "href": fallback_href,
-                })
-                if len(rows) >= limit:
-                    return rows[:limit]
-            
-            # Add moneyline recommendations
-            ml_reco = markets.get("ml")
-            if isinstance(ml_reco, dict):
-                selection = str(ml_reco.get("selection") or "").strip().upper()
-                edge = _numeric_value(ml_reco.get("edge"))
-                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
-                
-                rows.append({
-                    "matchup": str(ml_reco.get("matchup") or f"Game {game_pk}").strip(),
-                    "heading": "Betting Card",
-                    "name": f"ML {selection}",
-                    "detail": f"Moneyline {selection}",
-                    "value": edge_text,
-                    "is_live": False,
-                    "market": "Moneyline",
-                    "pick": selection,
-                    "odds": _prop_metric_text(ml_reco.get("odds") or ml_reco.get("price")),
-                    "edge": edge_text,
-                    "confidence": _pct_text(ml_reco.get("model_prob")),
-                    "href": fallback_href,
-                })
-                if len(rows) >= limit:
-                    return rows[:limit]
-            
             # Add pitcher props
             pitcher_props = markets.get("pitcherProps") or []
             if isinstance(pitcher_props, list):
@@ -1644,24 +1598,36 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         continue
                     pitcher = str(prop.get("pitcher_name") or prop.get("player_name") or "Pitcher").strip()
                     prop_type = str(prop.get("prop") or "strikeouts").strip().title()
-                    line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
+                    line_val = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
                     selection = str(prop.get("selection") or "").strip().upper()
                     edge = _numeric_value(prop.get("edge"))
                     edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                    model_prob = _numeric_value(prop.get("model_prob"))
+                    sim_mean_text = f"{model_prob * 100:.1f}%" if model_prob is not None else "-"
+                    odds_text = _prop_metric_text(prop.get("odds") or prop.get("price"))
+                    
+                    writeup = f"Recommended {selection} for {pitcher} {prop_type} at {line_val}. Model gives {sim_mean_text} win probability with {edge_text} edge."
+                    pills = [
+                        {"label": "Line", "value": line_val},
+                        {"label": "Sim", "value": sim_mean_text},
+                        {"label": "Odds", "value": odds_text},
+                    ]
                     
                     rows.append({
                         "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
                         "heading": "Betting Card",
                         "name": f"{pitcher} {prop_type}",
-                        "detail": f"{pitcher} {prop_type} {selection} {line}",
+                        "detail": f"{selection} {line_val}",
                         "value": edge_text,
                         "is_live": False,
                         "market": f"Pitcher {prop_type}",
                         "pick": selection,
-                        "line": line,
-                        "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
+                        "line": line_val,
+                        "odds": odds_text,
                         "edge": edge_text,
-                        "confidence": _pct_text(prop.get("model_prob")),
+                        "confidence": _pct_text(model_prob),
+                        "writeup": writeup,
+                        "pills": pills,
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
@@ -1675,24 +1641,36 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         continue
                     hitter = str(prop.get("player_name") or "Hitter").strip()
                     prop_type = str(prop.get("prop") or "hits").strip().title()
-                    line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
+                    line_val = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
                     selection = str(prop.get("selection") or "").strip().upper()
                     edge = _numeric_value(prop.get("edge"))
                     edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                    model_prob = _numeric_value(prop.get("model_prob"))
+                    sim_mean_text = f"{model_prob * 100:.1f}%" if model_prob is not None else "-"
+                    odds_text = _prop_metric_text(prop.get("odds") or prop.get("price"))
+                    
+                    writeup = f"Recommended {selection} for {hitter} {prop_type} at {line_val}. Model gives {sim_mean_text} win probability with {edge_text} edge."
+                    pills = [
+                        {"label": "Line", "value": line_val},
+                        {"label": "Sim", "value": sim_mean_text},
+                        {"label": "Odds", "value": odds_text},
+                    ]
                     
                     rows.append({
                         "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
                         "heading": "Betting Card",
                         "name": f"{hitter} {prop_type}",
-                        "detail": f"{hitter} {prop_type} {selection} {line}",
+                        "detail": f"{selection} {line_val}",
                         "value": edge_text,
                         "is_live": False,
                         "market": f"Hitter {prop_type}",
                         "pick": selection,
-                        "line": line,
-                        "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
+                        "line": line_val,
+                        "odds": odds_text,
                         "edge": edge_text,
-                        "confidence": _pct_text(prop.get("model_prob")),
+                        "confidence": _pct_text(model_prob),
+                        "writeup": writeup,
+                        "pills": pills,
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
@@ -2055,8 +2033,11 @@ def _load_home_prop_items(
 
                 live_games = list(build_live_lens_page_context(context_label).get("games") or [])
                 live_rows = _prop_rows_from_mlb_live_games(live_games)
+                # Only return live props if games are actually live; don't fall back to betting card
                 if live_rows:
                     return live_rows
+                return []  # No live games, so no live props
+            # For pregame (not active today), get player props from betting card
             mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context_label, season=season, week=week)
             if mlb_rows:
                 return mlb_rows
