@@ -3509,6 +3509,19 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, pro
             roster_df = _team_players_from_processed_rosters_local(processed_root=processed_root, date_str=str(date_str), home_tri=team_u, away_tri=opp_u, team_tri=team_u)
             if roster_df is not None and not roster_df.empty and "player_name" in roster_df.columns:
                 roster_names = {_norm_name_key(value) for value in roster_df.get("player_name", pd.Series(dtype=str)).astype(str).tolist() if str(value).strip()}
+            roster_names: set[str] = set()
+            roster_position_map: dict[str, str] = {}
+            if processed_root is not None and date_str:
+                roster_df = _team_players_from_processed_rosters_local(processed_root=processed_root, date_str=str(date_str), home_tri=team_u, away_tri=opp_u, team_tri=team_u)
+                if roster_df is not None and not roster_df.empty and "player_name" in roster_df.columns:
+                    roster_names = {_norm_name_key(value) for value in roster_df.get("player_name", pd.Series(dtype=str)).astype(str).tolist() if str(value).strip()}
+                    # Map player names to positions for merging
+                    if "position" in roster_df.columns:
+                        for idx, row in roster_df.iterrows():
+                            pname = str(row.get("player_name", "")).strip()
+                            pos = str(row.get("position", "")).strip()
+                            if pname:
+                                roster_position_map[_norm_name_key(pname)] = pos
         if roster_names:
             tmp_unfiltered = tmp.copy()
             player_keys = tmp["player_name"].astype(str).map(_norm_name_key)
@@ -3516,6 +3529,11 @@ def _team_players_from_props_local(*, props_df, team_tri: str, opp_tri: str, pro
             if tmp.empty:
                 # Keep market-derived players when roster normalization removes every row.
                 tmp = tmp_unfiltered
+            # Merge position data from rosters
+            if roster_position_map and "player_name" not in tmp.columns is False:
+                tmp["position"] = tmp["player_name"].astype(str).map(lambda pname: roster_position_map.get(_norm_name_key(pname), ""))
+                # Clean up empty positions
+                tmp.loc[tmp["position"].eq(""), "position"] = None
         if tmp.empty:
             return tmp
         tmp["team"] = team_u
