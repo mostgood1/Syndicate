@@ -635,7 +635,7 @@ def _logo_from_team_label(slug: str, team_label: str | None) -> str | None:
             from syndicate.features.mlb.cards import _mlb_logo_url
 
             meta = _MLB_TEAM_META_BY_ABBR.get(text.upper()) or {}
-            team_id = meta.get("team_id")
+            team_id = meta.get("team_id") if meta.get("team_id") is not None else meta.get("id")
             if team_id is None:
                 return None
             return _mlb_logo_url(int(team_id))
@@ -1676,6 +1676,8 @@ def _pregame_prop_rows_from_mlb_recommendations(
     """
     try:
         from syndicate.features.mlb.cards import _cards_recommendation_payload_by_game
+        from syndicate.features.mlb.cards import _mlb_headshot_url
+        from syndicate.features.mlb.cards import _mlb_logo_url
 
         recos_by_game = _cards_recommendation_payload_by_game(context_label)
         rows: list[dict[str, Any]] = []
@@ -1685,12 +1687,13 @@ def _pregame_prop_rows_from_mlb_recommendations(
                 continue
             
             markets = game_data.get("markets", {}) if isinstance(game_data.get("markets"), dict) else {}
-            away = game_data.get("away") if isinstance(game_data.get("away"), dict) else {}
-            home = game_data.get("home") if isinstance(game_data.get("home"), dict) else {}
-            away_label = str(away.get("abbr") or away.get("name") or "").strip() or None
-            home_label = str(home.get("abbr") or home.get("name") or "").strip() or None
-            away_logo = str(away.get("logo") or away.get("logo_url") or "").strip() or None
-            home_logo = str(home.get("logo") or home.get("logo_url") or "").strip() or None
+            matchup_data = game_data.get("matchup") if isinstance(game_data.get("matchup"), dict) else {}
+            away = game_data.get("away") if isinstance(game_data.get("away"), dict) else matchup_data.get("away") if isinstance(matchup_data.get("away"), dict) else {}
+            home = game_data.get("home") if isinstance(game_data.get("home"), dict) else matchup_data.get("home") if isinstance(matchup_data.get("home"), dict) else {}
+            away_label = str(away.get("abbr") or away.get("teamAbbr") or away.get("name") or away.get("teamName") or "").strip() or None
+            home_label = str(home.get("abbr") or home.get("teamAbbr") or home.get("name") or home.get("teamName") or "").strip() or None
+            away_logo = str(away.get("logo") or away.get("logo_url") or away.get("teamLogo") or "").strip() or None
+            home_logo = str(home.get("logo") or home.get("logo_url") or home.get("teamLogo") or "").strip() or None
             fallback_matchup = " @ ".join(part for part in [away_label, home_label] if part) or f"Game {game_pk}"
             
             # Add pitcher props
@@ -1703,11 +1706,26 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     prop_type = str(prop.get("prop") or "strikeouts").strip().title()
                     line_val = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
                     selection = str(prop.get("selection") or "").strip().upper()
+                    matchup_text = str(prop.get("matchup") or "").strip()
+                    if not matchup_text or re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE):
+                        matchup_text = fallback_matchup
                     edge = _numeric_value(prop.get("edge"))
                     edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
                     model_prob = _numeric_value(prop.get("model_prob"))
+                    if model_prob is None:
+                        model_prob = _numeric_value(prop.get("model_prob_over") if selection == "OVER" else prop.get("model_prob_under"))
                     sim_mean_text = f"{model_prob * 100:.1f}%" if model_prob is not None else "-"
                     odds_text = _prop_metric_text(prop.get("odds") or prop.get("price"))
+                    player_id = _int_or_none(prop.get("pitcher_id") or prop.get("player_id"))
+                    row_away_label = away_label or str(prop.get("away_abbr") or prop.get("away") or "").strip() or None
+                    row_home_label = home_label or str(prop.get("home_abbr") or prop.get("home") or "").strip() or None
+                    row_matchup = " @ ".join(part for part in [row_away_label, row_home_label] if part) or fallback_matchup
+                    row_away_logo = away_logo
+                    row_home_logo = home_logo
+                    if not row_away_logo:
+                        row_away_logo = _mlb_logo_url(_int_or_none(away.get("team_id") or away.get("teamId")))
+                    if not row_home_logo:
+                        row_home_logo = _mlb_logo_url(_int_or_none(home.get("team_id") or home.get("teamId")))
                     
                     writeup = f"Recommended {selection} for {pitcher} {prop_type} at {line_val}. Model gives {sim_mean_text} win probability with {edge_text} edge."
                     pills = [
@@ -1717,7 +1735,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     ]
                     
                     rows.append({
-                        "matchup": str(prop.get("matchup") or fallback_matchup).strip(),
+                        "matchup": row_matchup if re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE) else matchup_text,
                         "heading": "Betting Card",
                         "name": f"{pitcher} {prop_type}",
                         "detail": f"{selection} {line_val}",
@@ -1731,10 +1749,11 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "confidence": _pct_text(model_prob),
                         "writeup": writeup,
                         "pills": pills,
-                        "away_label": away_label,
-                        "home_label": home_label,
-                        "away_logo": away_logo,
-                        "home_logo": home_logo,
+                        "away_label": row_away_label,
+                        "home_label": row_home_label,
+                        "away_logo": row_away_logo,
+                        "home_logo": row_home_logo,
+                        "headshot_url": _mlb_headshot_url(player_id),
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
@@ -1750,11 +1769,36 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     prop_type = str(prop.get("prop") or "hits").strip().title()
                     line_val = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
                     selection = str(prop.get("selection") or "").strip().upper()
+                    matchup_text = str(prop.get("matchup") or "").strip()
+                    if not matchup_text or re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE):
+                        matchup_text = fallback_matchup
                     edge = _numeric_value(prop.get("edge"))
                     edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
                     model_prob = _numeric_value(prop.get("model_prob"))
+                    if model_prob is None:
+                        model_prob = _numeric_value(prop.get("model_prob_over") if selection == "OVER" else prop.get("model_prob_under"))
                     sim_mean_text = f"{model_prob * 100:.1f}%" if model_prob is not None else "-"
                     odds_text = _prop_metric_text(prop.get("odds") or prop.get("price"))
+                    player_id = _int_or_none(prop.get("batter_id") or prop.get("player_id"))
+                    row_away_label = away_label or str(prop.get("away_abbr") or prop.get("away") or "").strip() or None
+                    row_home_label = home_label or str(prop.get("home_abbr") or prop.get("home") or "").strip() or None
+                    row_matchup = " @ ".join(part for part in [row_away_label, row_home_label] if part) or fallback_matchup
+                    row_away_logo = away_logo
+                    row_home_logo = home_logo
+                    team_id = _int_or_none(prop.get("team_id"))
+                    opponent_team_id = _int_or_none(prop.get("opponent_team_id"))
+                    team_label = str(prop.get("team") or "").strip() or None
+                    opponent_label = str(prop.get("opponent") or "").strip() or None
+                    if team_label and opponent_label:
+                        if row_away_label is None and row_home_label is None:
+                            row_away_label = team_label
+                            row_home_label = opponent_label
+                        if row_away_label == opponent_label and row_home_label == team_label:
+                            row_away_logo = row_away_logo or _mlb_logo_url(opponent_team_id)
+                            row_home_logo = row_home_logo or _mlb_logo_url(team_id)
+                        else:
+                            row_away_logo = row_away_logo or _mlb_logo_url(team_id)
+                            row_home_logo = row_home_logo or _mlb_logo_url(opponent_team_id)
                     
                     writeup = f"Recommended {selection} for {hitter} {prop_type} at {line_val}. Model gives {sim_mean_text} win probability with {edge_text} edge."
                     pills = [
@@ -1764,7 +1808,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     ]
                     
                     rows.append({
-                        "matchup": str(prop.get("matchup") or fallback_matchup).strip(),
+                        "matchup": row_matchup if re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE) else matchup_text,
                         "heading": "Betting Card",
                         "name": f"{hitter} {prop_type}",
                         "detail": f"{selection} {line_val}",
@@ -1778,10 +1822,11 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "confidence": _pct_text(model_prob),
                         "writeup": writeup,
                         "pills": pills,
-                        "away_label": away_label,
-                        "home_label": home_label,
-                        "away_logo": away_logo,
-                        "home_logo": home_logo,
+                        "away_label": row_away_label,
+                        "home_label": row_home_label,
+                        "away_logo": row_away_logo,
+                        "home_logo": row_home_logo,
+                        "headshot_url": _mlb_headshot_url(player_id),
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
