@@ -1567,6 +1567,144 @@ def _betting_card_rank_cards(slug: str, *, context_label: str, season: int | Non
     return [], None, None
 
 
+def _pregame_prop_rows_from_mlb_recommendations(
+    context_label: str,
+    *,
+    limit: int = 18,
+    fallback_href: str | None = None,
+) -> list[dict[str, Any]]:
+    """Extract MLB prop recommendations from locked policy and convert to prop rows."""
+    try:
+        from syndicate.features.mlb.cards import _recommendations_by_game
+        from syndicate.features.mlb.sources import daily_artifact_path
+        from syndicate.utils.json import load_json_file
+
+        locked_policy = load_json_file(daily_artifact_path(context_label, suffix="_locked_policy"))
+        if not isinstance(locked_policy, dict):
+            return []
+        
+        recos_by_game = _recommendations_by_game(locked_policy)
+        rows: list[dict[str, Any]] = []
+        
+        for game_pk, recos in recos_by_game.items():
+            if not isinstance(recos, dict):
+                continue
+            
+            # Add total recommendations
+            total_reco = recos.get("totals")
+            if isinstance(total_reco, dict):
+                selection = str(total_reco.get("selection") or "").strip().upper()
+                line = _score_value(total_reco.get("market_line")) or str(total_reco.get("market_line") or "-")
+                edge = _numeric_value(total_reco.get("edge"))
+                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                
+                rows.append({
+                    "matchup": str(total_reco.get("matchup") or f"Game {game_pk}").strip(),
+                    "heading": "Betting Card",
+                    "name": f"Total {selection}",
+                    "detail": f"Total {line} {selection}",
+                    "value": edge_text,
+                    "is_live": False,
+                    "market": "Totals",
+                    "pick": selection,
+                    "line": line,
+                    "odds": _prop_metric_text(total_reco.get("odds") or total_reco.get("price")),
+                    "edge": edge_text,
+                    "confidence": _pct_text(total_reco.get("model_prob")),
+                    "href": fallback_href,
+                })
+                if len(rows) >= limit:
+                    return rows[:limit]
+            
+            # Add moneyline recommendations
+            ml_reco = recos.get("ml")
+            if isinstance(ml_reco, dict):
+                selection = str(ml_reco.get("selection") or "").strip().upper()
+                edge = _numeric_value(ml_reco.get("edge"))
+                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                
+                rows.append({
+                    "matchup": str(ml_reco.get("matchup") or f"Game {game_pk}").strip(),
+                    "heading": "Betting Card",
+                    "name": f"ML {selection}",
+                    "detail": f"Moneyline {selection}",
+                    "value": edge_text,
+                    "is_live": False,
+                    "market": "Moneyline",
+                    "pick": selection,
+                    "odds": _prop_metric_text(ml_reco.get("odds") or ml_reco.get("price")),
+                    "edge": edge_text,
+                    "confidence": _pct_text(ml_reco.get("model_prob")),
+                    "href": fallback_href,
+                })
+                if len(rows) >= limit:
+                    return rows[:limit]
+            
+            # Add pitcher props
+            pitcher_props = recos.get("pitcher_props") or []
+            for prop in pitcher_props:
+                if not isinstance(prop, dict):
+                    continue
+                pitcher = str(prop.get("pitcher_name") or prop.get("player_name") or "Pitcher").strip()
+                prop_type = str(prop.get("prop") or "strikeouts").strip().title()
+                line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
+                selection = str(prop.get("selection") or "").strip().upper()
+                edge = _numeric_value(prop.get("edge"))
+                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                
+                rows.append({
+                    "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
+                    "heading": "Betting Card",
+                    "name": f"{pitcher} {prop_type}",
+                    "detail": f"{pitcher} {prop_type} {selection} {line}",
+                    "value": edge_text,
+                    "is_live": False,
+                    "market": f"Pitcher {prop_type}",
+                    "pick": selection,
+                    "line": line,
+                    "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
+                    "edge": edge_text,
+                    "confidence": _pct_text(prop.get("model_prob")),
+                    "href": fallback_href,
+                })
+                if len(rows) >= limit:
+                    return rows[:limit]
+            
+            # Add hitter props
+            hitter_props = recos.get("hitter_props") or []
+            for prop in hitter_props:
+                if not isinstance(prop, dict):
+                    continue
+                hitter = str(prop.get("player_name") or "Hitter").strip()
+                prop_type = str(prop.get("prop") or "hits").strip().title()
+                line = _score_value(prop.get("market_line")) or str(prop.get("market_line") or "-")
+                selection = str(prop.get("selection") or "").strip().upper()
+                edge = _numeric_value(prop.get("edge"))
+                edge_text = f"{edge * 100:.1f}% EV" if edge is not None else "-"
+                
+                rows.append({
+                    "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
+                    "heading": "Betting Card",
+                    "name": f"{hitter} {prop_type}",
+                    "detail": f"{hitter} {prop_type} {selection} {line}",
+                    "value": edge_text,
+                    "is_live": False,
+                    "market": f"Hitter {prop_type}",
+                    "pick": selection,
+                    "line": line,
+                    "odds": _prop_metric_text(prop.get("odds") or prop.get("price")),
+                    "edge": edge_text,
+                    "confidence": _pct_text(prop.get("model_prob")),
+                    "href": fallback_href,
+                })
+                if len(rows) >= limit:
+                    return rows[:limit]
+        
+        return rows
+    except Exception:
+        return []
+
+
 def _pregame_prop_rows_from_betting_card(
     slug: str,
     *,
@@ -1575,6 +1713,12 @@ def _pregame_prop_rows_from_betting_card(
     week: int | None = None,
     limit: int = 18,
 ) -> list[dict[str, Any]]:
+    # For MLB, use recommendations from locked policy
+    if slug == "mlb":
+        fallback_href = f"/mlb/cards?date={context_label}"
+        return _pregame_prop_rows_from_mlb_recommendations(context_label, limit=limit, fallback_href=fallback_href)
+    
+    # For other sports, use rank_cards from betting card
     cards, route_path, resolved_date = _betting_card_rank_cards(slug, context_label=context_label, season=season, week=week)
     if not cards:
         return []
