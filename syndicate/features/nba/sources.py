@@ -34,21 +34,44 @@ def _artifact_roots() -> list[Path]:
     return expanded
 
 
+def _best_existing_path(candidates: list[Path]) -> Path | None:
+    existing: list[Path] = []
+    for candidate in candidates:
+        try:
+            if candidate.exists() and candidate.is_file():
+                existing.append(candidate)
+        except OSError:
+            continue
+    if not existing:
+        return None
+
+    def _score(path: Path) -> tuple[int, int, int]:
+        try:
+            stat = path.stat()
+            size = int(stat.st_size)
+            mtime = int(stat.st_mtime_ns)
+        except OSError:
+            return (0, 0, 0)
+        return (1 if size > 0 else 0, mtime, size)
+
+    return max(existing, key=_score)
+
+
 def processed_path(filename: str) -> Path:
     roots = _artifact_roots()
-    for root in roots:
-        candidate = (root / "data" / "processed" / filename).resolve()
-        if candidate.exists():
-            return candidate
+    candidates = [(root / "data" / "processed" / filename).resolve() for root in roots]
+    best = _best_existing_path(candidates)
+    if best is not None:
+        return best
     return (roots[0] / "data" / "processed" / filename).resolve()
 
 
 def live_snapshot_path(filename: str) -> Path:
     roots = _artifact_roots()
-    for root in roots:
-        candidate = (root / "data" / "processed" / "live_snapshots" / filename).resolve()
-        if candidate.exists():
-            return candidate
+    candidates = [(root / "data" / "processed" / "live_snapshots" / filename).resolve() for root in roots]
+    best = _best_existing_path(candidates)
+    if best is not None:
+        return best
     return (roots[0] / "data" / "processed" / "live_snapshots" / filename).resolve()
 
 
@@ -60,11 +83,13 @@ def _processed_candidate_path(filename: str, *, root: Path | None = None) -> Pat
 
 def _resolve_processed_candidates(filenames: list[str]) -> Path:
     roots = _artifact_roots()
+    candidates: list[Path] = []
     for root in roots:
         for filename in filenames:
-            candidate = (root / "data" / "processed" / filename).resolve()
-            if candidate.exists():
-                return candidate
+            candidates.append((root / "data" / "processed" / filename).resolve())
+    best = _best_existing_path(candidates)
+    if best is not None:
+        return best
     return _processed_candidate_path(filenames[0], root=roots[0] if roots else None)
 
 

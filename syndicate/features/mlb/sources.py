@@ -27,9 +27,14 @@ def _source_roots() -> list[Path]:
         roots.append((Path(data_root).resolve() / "mlb_source").resolve())
     roots.append((_repo_root() / "data" / "mlb_source").resolve())
 
+    expanded: list[Path] = []
+    for root in list(roots):
+        expanded.append(root)
+        expanded.append((root / "source_artifacts").resolve())
+
     deduped: list[Path] = []
     seen: set[Path] = set()
-    for root in roots:
+    for root in expanded:
         if root in seen:
             continue
         seen.add(root)

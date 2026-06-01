@@ -60,7 +60,7 @@ services:
     autoDeploy: true
     schedule: "*/5 * * * *"
     buildCommand: echo "cron build ready"
-    startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase live --execution-mode source --regions us --timeout-sec 180
+    startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase live --execution-mode source --regions us --include-mirror --timeout-sec 180
     envVars:
       - key: ADMIN_TOKEN
         fromService:
@@ -85,7 +85,7 @@ services:
     autoDeploy: true
     schedule: "*/15 * * * *"
     buildCommand: echo "cron build ready"
-    startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase pregame --execution-mode source --regions us --timeout-sec 180
+    startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase pregame --execution-mode source --regions us --include-mirror --timeout-sec 180
     envVars:
       - key: ADMIN_TOKEN
         fromService:

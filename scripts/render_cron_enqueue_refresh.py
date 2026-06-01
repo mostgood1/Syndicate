@@ -50,7 +50,7 @@ def main() -> int:
     parser.add_argument("--phase", choices=("live", "pregame", "all"), default="all")
     parser.add_argument("--execution-mode", choices=("source", "ingest"), default="source")
     parser.add_argument("--regions", default="us")
-    parser.add_argument("--skip-mirror", action="store_true", default=True, help="Skip mirror refresh before odds refresh.")
+    parser.add_argument("--skip-mirror", action="store_true", default=False, help="Skip mirror refresh before odds refresh.")
     parser.add_argument("--include-mirror", action="store_false", dest="skip_mirror", help="Include mirror refresh before odds refresh.")
     parser.add_argument("--mirror-only", action="store_true", help="Only refresh mirrors and skip odds refresh.")
     parser.add_argument("--timeout-sec", type=float, default=180.0)
