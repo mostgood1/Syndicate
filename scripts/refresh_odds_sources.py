@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -80,7 +81,16 @@ def _venv_python(source_root: Path) -> str:
 
 
 def _powershell() -> str:
-    return "powershell.exe"
+    override = str(os.environ.get("SYNDICATE_POWERSHELL_EXE") or "").strip()
+    if override:
+        return override
+    if os.name == "nt":
+        return "powershell.exe"
+    for candidate in ("pwsh", "powershell"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return "pwsh"
 
 
 def _merge_pythonpath(existing: str | None, extra: str) -> str:
@@ -645,6 +655,14 @@ def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mi
     )
 
 
+def _hosted_source_mode_writes_directly(*, spec: SportSpec, execution_mode: str, mirror_only: bool) -> bool:
+    if mirror_only or execution_mode != "source":
+        return False
+    if not str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip():
+        return False
+    return spec.slug in {"mlb", "nba", "nhl", "nfl", "wnba", "ncaaf"}
+
+
 def _filter_steps(steps: Sequence[RefreshStep], phase: str) -> list[RefreshStep]:
     if phase == "all":
         return list(steps)
@@ -725,15 +743,32 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                     return summary
 
         if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
-            mirror_result = _run_command(
-                _mirror_command(
-                    spec.mirror_script_name,
-                    date=args.date,
-                    sport=spec.slug,
-                    mirror_only=execution_mode == "ingest",
-                ),
-                dry_run=bool(args.dry_run),
-            )
+            if _hosted_source_mode_writes_directly(spec=spec, execution_mode=execution_mode, mirror_only=execution_mode == "ingest"):
+                timestamp = _utc_now()
+                mirror_result = {
+                    "name": spec.mirror_script_name.replace(".ps1", ""),
+                    "description": "Skipped mirror script because source mode already writes directly into SYNDICATE_DATA_ROOT.",
+                    "cwd": str(REPO_ROOT),
+                    "command": [],
+                    "return_code": 0,
+                    "started_at": timestamp,
+                    "finished_at": timestamp,
+                    "stdout": "",
+                    "stderr": "",
+                    "ok": True,
+                    "dry_run": bool(args.dry_run),
+                    "skipped": True,
+                }
+            else:
+                mirror_result = _run_command(
+                    _mirror_command(
+                        spec.mirror_script_name,
+                        date=args.date,
+                        sport=spec.slug,
+                        mirror_only=execution_mode == "ingest",
+                    ),
+                    dry_run=bool(args.dry_run),
+                )
             sport_result["mirror"] = mirror_result
             if isinstance(sport_result.get("ingestion"), dict):
                 sport_result["ingestion"]["step"] = mirror_result
