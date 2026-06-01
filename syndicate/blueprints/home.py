@@ -1114,6 +1114,79 @@ def _apply_nba_live_scores(games: list[dict[str, Any]], selected_date: str) -> l
     return enriched
 
 
+def _apply_wnba_live_scores(games: list[dict[str, Any]], selected_date: str) -> list[dict[str, Any]]:
+    try:
+        from syndicate.features.wnba.cards import build_live_state_payload
+    except Exception:
+        return games
+
+    payload = build_live_state_payload(selected_date, ttl=12, allow_stored_date_fallback=False)
+    rows = payload.get("games") if isinstance(payload, dict) else []
+    if not isinstance(rows, list) or not rows:
+        return games
+
+    keyed_live: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        away_key = str(row.get("away_tri") or row.get("away") or "").strip().upper()
+        home_key = str(row.get("home_tri") or row.get("home") or "").strip().upper()
+        if away_key and home_key:
+            keyed_live[(away_key, home_key)] = row
+
+    enriched: list[dict[str, Any]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        away_key = str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "")).strip().upper()
+        home_key = str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "")).strip().upper()
+        live_row = keyed_live.get((away_key, home_key)) if away_key and home_key else None
+        if not live_row:
+            enriched.append(game)
+            continue
+
+        updated = dict(game)
+        away = dict(game.get("away") or {}) if isinstance(game.get("away"), dict) else {}
+        home = dict(game.get("home") or {}) if isinstance(game.get("home"), dict) else {}
+        live_state = {
+            "away_pts": live_row.get("away_pts"),
+            "home_pts": live_row.get("home_pts"),
+            "in_progress": bool(live_row.get("in_progress")),
+            "final": bool(live_row.get("final")),
+            "status": str(live_row.get("status") or "").strip(),
+        }
+
+        live_away_pts = live_state.get("away_pts")
+        live_home_pts = live_state.get("home_pts")
+        if live_away_pts is not None:
+            away["score"] = live_away_pts
+        if live_home_pts is not None:
+            home["score"] = live_home_pts
+        updated["away"] = away
+        updated["home"] = home
+
+        status = dict(game.get("status") or {}) if isinstance(game.get("status"), dict) else {"abstract": str(game.get("status") or "").strip()}
+        if live_away_pts is not None:
+            status["away_score"] = live_away_pts
+        if live_home_pts is not None:
+            status["home_score"] = live_home_pts
+        status["is_live"] = bool(live_state.get("in_progress"))
+        status["in_progress"] = bool(live_state.get("in_progress"))
+        status["is_final"] = bool(live_state.get("final"))
+        status["final"] = bool(live_state.get("final"))
+        if live_state.get("in_progress"):
+            status["abstract"] = "Live"
+        elif live_state.get("final"):
+            status["abstract"] = "Final"
+        detail_text = str(live_state.get("status") or game.get("detail") or "").strip()
+        if detail_text:
+            status["detailed"] = detail_text
+        updated["status"] = status
+        updated["live_state"] = live_state
+        enriched.append(updated)
+    return enriched
+
+
 def _load_nhl_scoreboard_rows(selected_date: str) -> list[dict[str, Any]]:
     if selected_date == central_today_iso():
         try:
@@ -2100,7 +2173,7 @@ def _load_home_games(slug: str, *, context_label: str, season: int | None = None
             games = list(payload.get("games") or [])
             if is_active_today and not games:
                 games = _wnba_live_state_games(context_label)
-            return games
+            return _apply_wnba_live_scores(games, context_label) if is_active_today else games
         if slug == "ncaab":
             from syndicate.features.ncaab.cards import build_cards_page_context
 
