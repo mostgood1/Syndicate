@@ -1855,11 +1855,12 @@ def _fallback_live_player_boxscore_game(
                     "player": row.get("player_name"),
                     "player_id": row.get("player_id"),
                     "team_tri": team_tri,
+                    "pos": str(row.get("pos") or row.get("position") or row.get("player_position") or "").strip().upper() or None,
                     "mp": _safe_float(row.get("min_mean")),
                     "pts": _safe_float(row.get("pts_mean")),
                     "reb": _safe_float(row.get("reb_mean")),
                     "ast": _safe_float(row.get("ast_mean")),
-                    "threes": _safe_float(row.get("threes_mean")),
+                    "threes_made": _safe_float(row.get("threes_mean")),
                     "stl": _safe_float(row.get("stl_mean")),
                     "blk": _safe_float(row.get("blk_mean")),
                     "tov": _safe_float(row.get("tov_mean")),
@@ -1883,7 +1884,8 @@ def _fallback_live_player_boxscore_game(
                         "player": row.get("player_name"),
                         "player_id": row.get("player_id"),
                         "team_tri": team_tri,
-                        "min": _safe_float(row.get("min_mean")),
+                        "pos": str(row.get("pos") or row.get("position") or row.get("player_position") or "").strip().upper() or None,
+                        "mp": _safe_float(row.get("min_mean")),
                         "pts": _safe_float(row.get("pts_mean")),
                         "reb": _safe_float(row.get("reb_mean")),
                         "ast": _safe_float(row.get("ast_mean")),
@@ -1953,6 +1955,14 @@ def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str
                     player_name = str(athlete_info.get("displayName") or athlete_info.get("shortName") or "").strip()
                     if not player_name:
                         continue
+                    athlete_position = athlete_info.get("position") if isinstance(athlete_info.get("position"), dict) else {}
+                    raw_position = str(
+                        athlete_position.get("abbreviation")
+                        or athlete_position.get("displayName")
+                        or athlete_position.get("name")
+                        or athlete_row.get("position")
+                        or ""
+                    ).strip().upper()
                     stat_values = athlete_row.get("stats") if isinstance(athlete_row.get("stats"), list) else []
                     stat_map: dict[str, Any] = {}
                     for idx, key in enumerate(keys):
@@ -1962,13 +1972,27 @@ def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str
                             continue
                         stat_map[key] = stat_values[idx]
 
-                    minutes_value = stat_map.get("MIN")
-                    points = _safe_float(stat_map.get("PTS"))
-                    rebounds = _safe_float(stat_map.get("REB"))
-                    assists = _safe_float(stat_map.get("AST"))
-                    threes_made = _safe_float(stat_map.get("3PM") or stat_map.get("FG3M"))
+                    def _first_stat(*aliases: str) -> Any:
+                        for alias in aliases:
+                            key = str(alias or "").strip().upper()
+                            if key and key in stat_map:
+                                return stat_map.get(key)
+                        return None
+
+                    minutes_value = _first_stat("MIN", "MINUTES")
+                    points = _safe_float(_first_stat("PTS", "POINTS"))
+                    rebounds = _safe_float(_first_stat("REB", "REBOUNDS"))
+                    assists = _safe_float(_first_stat("AST", "ASSISTS"))
+                    threes_made = _safe_float(_first_stat("3PM", "FG3M"))
                     if threes_made is None:
-                        threes_text = str(stat_map.get("3PT") or stat_map.get("FG3") or "").strip()
+                        threes_text = str(
+                            _first_stat(
+                                "3PT",
+                                "FG3",
+                                "THREEPOINTFIELDGOALSMADE-THREEPOINTFIELDGOALSATTEMPTED",
+                            )
+                            or ""
+                        ).strip()
                         if threes_text:
                             first_part = threes_text.split("-", 1)[0].strip()
                             threes_made = _safe_float(first_part)
@@ -1984,7 +2008,8 @@ def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str
                         {
                             "player": player_name,
                             "team_tri": team_tri,
-                            "min": minutes_value,
+                            "pos": raw_position or None,
+                            "mp": minutes_value,
                             "pts": points,
                             "reb": rebounds,
                             "ast": assists,
