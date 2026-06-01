@@ -600,6 +600,97 @@ def _metric_value(metrics: list[dict[str, Any]], labels: list[str]) -> str | Non
     return None
 
 
+def _split_matchup_labels(value: Any) -> tuple[str | None, str | None]:
+    text = str(value or "").strip()
+    if not text:
+        return None, None
+    parts = re.split(r"\s+(?:@|vs\.?|v|at)\s+", text, maxsplit=1, flags=re.IGNORECASE)
+    if len(parts) != 2:
+        return None, None
+    away_label = parts[0].strip() or None
+    home_label = parts[1].strip() or None
+    return away_label, home_label
+
+
+def _logo_from_team_label(slug: str, team_label: str | None) -> str | None:
+    text = str(team_label or "").strip()
+    if not text:
+        return None
+    try:
+        if slug == "nba":
+            from syndicate.features.nba.cards import _nba_logo_url
+
+            return _nba_logo_url(text.upper())
+        if slug == "wnba":
+            from syndicate.features.wnba.cards import _source_logo_url
+
+            logo = _source_logo_url(text.upper())
+            return str(logo or "").strip() or None
+        if slug == "nhl":
+            from syndicate.features.nhl.sources import team_logo_url
+
+            return team_logo_url(text.upper())
+        if slug == "mlb":
+            from syndicate.features.mlb.cards import _MLB_TEAM_META_BY_ABBR
+            from syndicate.features.mlb.cards import _mlb_logo_url
+
+            meta = _MLB_TEAM_META_BY_ABBR.get(text.upper()) or {}
+            team_id = meta.get("team_id")
+            if team_id is None:
+                return None
+            return _mlb_logo_url(int(team_id))
+    except Exception:
+        return None
+    return None
+
+
+def _pill_value_text(value: Any) -> str | None:
+    text = _prop_metric_text(value)
+    if not text:
+        return None
+    match = re.search(r"([+-]?\d+(?:\.\d+)?%)", text)
+    if match:
+        return match.group(1)
+    return text
+
+
+def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str) -> list[dict[str, Any]]:
+    finalized: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        item = dict(row)
+        matchup = str(item.get("matchup") or "").strip()
+        away_label = str(item.get("away_label") or "").strip() or None
+        home_label = str(item.get("home_label") or "").strip() or None
+        parsed_away, parsed_home = _split_matchup_labels(matchup)
+        away_label = away_label or parsed_away
+        home_label = home_label or parsed_home
+        away_logo = str(item.get("away_logo") or "").strip() or None
+        home_logo = str(item.get("home_logo") or "").strip() or None
+        away_logo = away_logo or _logo_from_team_label(slug, away_label)
+        home_logo = home_logo or _logo_from_team_label(slug, home_label)
+        if not isinstance(item.get("pills"), list):
+            pills: list[dict[str, str]] = []
+            for label, raw_value in [
+                ("Line", item.get("line")),
+                ("Sim", item.get("confidence")),
+                ("Odds", item.get("odds")),
+            ]:
+                value = _pill_value_text(raw_value)
+                if value:
+                    pills.append({"label": label, "value": value})
+            item["pills"] = pills
+        if not item.get("writeup"):
+            item["writeup"] = _safe_text(item.get("detail") or item.get("summary"), "No prop summary available.")
+        item["away_label"] = away_label
+        item["home_label"] = home_label
+        item["away_logo"] = away_logo
+        item["home_logo"] = home_logo
+        finalized.append(item)
+    return finalized
+
+
 def _pct_number(value: Any) -> float | None:
     text = str(value or "").strip()
     if not text:
@@ -1380,6 +1471,7 @@ def _prop_item_from_rank_card(card: dict[str, Any], *, fallback_href: str | None
     metrics = card.get("metrics") if isinstance(card.get("metrics"), list) else []
     value = badge or _safe_text((((card.get("metrics") or [None])[0] or {}).get("value") if isinstance(card.get("metrics"), list) else None), "Top play")
     href = str(card.get("href") or fallback_href or "").strip() or None
+    away_label, home_label = _split_matchup_labels(meta if meta != "Props board" else title)
     return {
         "matchup": meta,
         "heading": _safe_text(heading_override or card.get("eyebrow"), "Props"),
@@ -1395,6 +1487,10 @@ def _prop_item_from_rank_card(card: dict[str, Any], *, fallback_href: str | None
         "odds": _metric_value(metrics, ["odds", "price"]),
         "edge": _metric_value(metrics, ["edge", "ev"]),
         "confidence": _metric_value(metrics, ["confidence", "win prob", "probability", "hit rate"]),
+        "away_label": away_label,
+        "home_label": home_label,
+        "away_logo": _safe_text(card.get("away_logo"), None),
+        "home_logo": _safe_text(card.get("home_logo"), None),
         "href": href,
     }
 
@@ -1589,6 +1685,13 @@ def _pregame_prop_rows_from_mlb_recommendations(
                 continue
             
             markets = game_data.get("markets", {}) if isinstance(game_data.get("markets"), dict) else {}
+            away = game_data.get("away") if isinstance(game_data.get("away"), dict) else {}
+            home = game_data.get("home") if isinstance(game_data.get("home"), dict) else {}
+            away_label = str(away.get("abbr") or away.get("name") or "").strip() or None
+            home_label = str(home.get("abbr") or home.get("name") or "").strip() or None
+            away_logo = str(away.get("logo") or away.get("logo_url") or "").strip() or None
+            home_logo = str(home.get("logo") or home.get("logo_url") or "").strip() or None
+            fallback_matchup = " @ ".join(part for part in [away_label, home_label] if part) or f"Game {game_pk}"
             
             # Add pitcher props
             pitcher_props = markets.get("pitcherProps") or []
@@ -1614,7 +1717,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     ]
                     
                     rows.append({
-                        "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
+                        "matchup": str(prop.get("matchup") or fallback_matchup).strip(),
                         "heading": "Betting Card",
                         "name": f"{pitcher} {prop_type}",
                         "detail": f"{selection} {line_val}",
@@ -1628,6 +1731,10 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "confidence": _pct_text(model_prob),
                         "writeup": writeup,
                         "pills": pills,
+                        "away_label": away_label,
+                        "home_label": home_label,
+                        "away_logo": away_logo,
+                        "home_logo": home_logo,
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
@@ -1657,7 +1764,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     ]
                     
                     rows.append({
-                        "matchup": str(prop.get("matchup") or f"Game {game_pk}").strip(),
+                        "matchup": str(prop.get("matchup") or fallback_matchup).strip(),
                         "heading": "Betting Card",
                         "name": f"{hitter} {prop_type}",
                         "detail": f"{selection} {line_val}",
@@ -1671,6 +1778,10 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "confidence": _pct_text(model_prob),
                         "writeup": writeup,
                         "pills": pills,
+                        "away_label": away_label,
+                        "home_label": home_label,
+                        "away_logo": away_logo,
+                        "home_logo": home_logo,
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
@@ -1755,6 +1866,10 @@ def _prop_rows_from_nhl_cards(cards: list[dict[str, Any]], *, fallback_href: str
                 "odds": _prop_metric_text(card.get("odds") if card.get("odds") is not None else card.get("price")),
                 "edge": _pct_text(card.get("edge") if card.get("edge") is not None else card.get("ev")),
                 "confidence": prob_text,
+                "away_label": team,
+                "home_label": opp,
+                "away_logo": str(card.get("team_logo") or "").strip() or None,
+                "home_logo": str(card.get("opp_logo") or "").strip() or None,
                 "href": fallback_href,
             }
         )
@@ -2602,13 +2717,16 @@ def _build_sport_overview(
     )
     home_games = _load_home_games(slug, context_label=context_label, season=season, week=selected_week, is_active_today=active_today) if active_today else []
     game_bar["items"] = game_items
-    props_bar["items"] = _load_home_prop_items(
+    props_bar["items"] = _finalize_home_prop_rows(
+        _load_home_prop_items(
         slug,
         context_label=context_label,
         home_games=home_games,
         season=season,
         week=selected_week,
         is_active_today=active_today,
+        ),
+        slug=slug,
     )
     if game_bar["items"]:
         overview_stats = [{"label": "Games", "value": str(game_count)}] + overview_stats[1:]
@@ -2650,22 +2768,28 @@ def _build_sport_overview(
             "hr_targets_items": _load_mlb_home_hr_target_items(context_label, limit=10),
             "pregame_props_href": _link_lookup(links, "Pitcher top props") or f"/mlb/pitcher-top-props?date={context_label}",
             "pregame_props_secondary_href": _link_lookup(links, "Hitter top props") or f"/mlb/hitter-top-props?date={context_label}",
-            "pregame_props_items": _load_home_prop_items(
-                "mlb",
-                context_label=context_label,
-                home_games=[],
-                season=season,
-                week=selected_week,
-                is_active_today=False,
+            "pregame_props_items": _finalize_home_prop_rows(
+                _load_home_prop_items(
+                    "mlb",
+                    context_label=context_label,
+                    home_games=[],
+                    season=season,
+                    week=selected_week,
+                    is_active_today=False,
+                ),
+                slug="mlb",
             ),
             "live_props_href": _link_lookup(links, "Live Lens") or f"/mlb/live-lens?date={context_label}",
-            "live_props_items": _load_home_prop_items(
-                "mlb",
-                context_label=context_label,
-                home_games=home_games,
-                season=season,
-                week=selected_week,
-                is_active_today=True,
+            "live_props_items": _finalize_home_prop_rows(
+                _load_home_prop_items(
+                    "mlb",
+                    context_label=context_label,
+                    home_games=home_games,
+                    season=season,
+                    week=selected_week,
+                    is_active_today=True,
+                ),
+                slug="mlb",
             ),
         }
     props_count = _dashboard_prop_count(overview)
