@@ -228,6 +228,19 @@ def _build_prop_rows(game: dict[str, Any]) -> list[dict[str, str]]:
                     "name": _safe_text(row.get("player") or row.get("display_pick"), "Prop"),
                     "detail": _safe_text(row.get("display_pick") or row.get("market"), ""),
                     "value": _safe_text(row.get("tier") or row.get("line") or row.get("price"), "-"),
+                    "pick": _safe_text(row.get("display_pick") or row.get("pick") or row.get("selection"), ""),
+                    "market": _safe_text(row.get("market") or row.get("market_label") or row.get("type_label"), ""),
+                    "line": row.get("line"),
+                    "market_line": row.get("market_line") or row.get("line"),
+                    "actual": row.get("actual") or row.get("actual_value") or row.get("actual_total"),
+                    "projected": row.get("projected") or row.get("projection") or row.get("model_mean"),
+                    "odds": row.get("price") or row.get("odds") or row.get("price_american"),
+                    "confidence": row.get("confidence") or row.get("prob") or row.get("win_prob"),
+                    "selection": row.get("selection") or row.get("side"),
+                    "live_total": row.get("live_total") or row.get("live_total_line"),
+                    "live_total_line": row.get("live_total_line") or row.get("live_line_total"),
+                    "outcome_state": row.get("outcome_state") or row.get("actual_result") or row.get("result"),
+                    "outcome_label": row.get("outcome_label"),
                 }
             )
             if len(rows) >= 8:

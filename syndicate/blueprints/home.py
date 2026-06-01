@@ -654,20 +654,24 @@ def _pill_value_text(value: Any) -> str | None:
     return text
 
 
-def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str) -> list[dict[str, Any]]:
+def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_label: str | None = None) -> list[dict[str, Any]]:
     finalized: list[dict[str, Any]] = []
+    actual_cache: dict[int, dict[str, Any] | None] = {}
     for row in rows:
         if not isinstance(row, dict):
             continue
         item = dict(row)
+        game_pk = _int_or_none(item.get("game_pk") or item.get("gamePk") or item.get("game_id"))
         matchup = str(item.get("matchup") or "").strip()
         away_label = str(item.get("away_label") or "").strip() or None
         home_label = str(item.get("home_label") or "").strip() or None
+        away_label = away_label or _safe_text(item.get("team"), None)
+        home_label = home_label or _safe_text(item.get("opponent"), None)
         parsed_away, parsed_home = _split_matchup_labels(matchup)
         away_label = away_label or parsed_away
         home_label = home_label or parsed_home
-        away_logo = str(item.get("away_logo") or "").strip() or None
-        home_logo = str(item.get("home_logo") or "").strip() or None
+        away_logo = str(item.get("away_logo") or item.get("team_logo_url") or "").strip() or None
+        home_logo = str(item.get("home_logo") or item.get("opponent_logo_url") or "").strip() or None
         away_logo = away_logo or _logo_from_team_label(slug, away_label)
         home_logo = home_logo or _logo_from_team_label(slug, home_label)
         if not isinstance(item.get("pills"), list):
@@ -687,6 +691,27 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str) -> list[d
         item["home_label"] = home_label
         item["away_logo"] = away_logo
         item["home_logo"] = home_logo
+
+        if slug == "mlb" and game_pk is not None and context_label:
+            actual_payload = _mlb_actual_payload_for_game(context_label, int(game_pk), actual_cache)
+            final_state = _mlb_actual_payload_is_final(actual_payload)
+            actual_value = _mlb_prop_actual_value(item, actual_payload)
+            selection = str(item.get("pick") or item.get("selection") or "").strip().lower()
+            line_value = _numeric_value(item.get("line") or item.get("market_line"))
+            state = _mlb_prop_result_state(
+                actual_value=actual_value,
+                line_value=line_value,
+                selection=selection,
+                final_state=final_state,
+                is_hr_target=str(item.get("heading") or "").strip().lower() == "hr targets",
+            )
+            if state:
+                item["outcome_state"] = state
+                item["outcome_label"] = _mlb_prop_result_label(state)
+            if actual_payload:
+                live_total = _mlb_live_total_text(actual_payload)
+                if live_total:
+                    item["live_total"] = live_total
         finalized.append(item)
     return finalized
 
@@ -731,6 +756,138 @@ def _int_or_none(value: Any) -> int | None:
         return int(value)
     except Exception:
         return None
+
+
+def _mlb_actual_payload_for_game(context_label: str, game_pk: int, cache: dict[int, dict[str, Any]]) -> dict[str, Any] | None:
+    if game_pk in cache:
+        return cache[game_pk]
+    try:
+        path = raw_feed_live_path(context_label, int(game_pk))
+        payload = load_json_or_gz_file(path)
+    except Exception:
+        payload = None
+    cache[game_pk] = payload if isinstance(payload, dict) else None
+    return cache[game_pk]
+
+
+def _mlb_actual_payload_is_final(actual_payload: dict[str, Any] | None) -> bool:
+    if not isinstance(actual_payload, dict):
+        return False
+    status = (actual_payload.get("gameData") or {}).get("status") if isinstance(actual_payload.get("gameData"), dict) else {}
+    abstract = str((status or {}).get("abstractGameState") or "").strip().lower()
+    detailed = str((status or {}).get("detailedState") or "").strip().lower()
+    return abstract == "final" or detailed in {"final", "game over", "completed"}
+
+
+def _mlb_name_key(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return re.sub(r"\s+", " ", text)
+
+
+def _mlb_prop_result_state(*, actual_value: float | None, line_value: float | None, selection: str, final_state: bool, is_hr_target: bool = False) -> str | None:
+    if actual_value is None:
+        return None
+    if is_hr_target:
+        if float(actual_value) >= 1.0:
+            return "hit"
+        return "miss" if final_state else None
+    if line_value is None:
+        return "hit" if float(actual_value) > 0.0 and final_state else None
+    pick = str(selection or "").strip().lower()
+    if pick == "over":
+        if float(actual_value) > float(line_value):
+            return "hit"
+        return "miss" if final_state and float(actual_value) < float(line_value) else None
+    if pick == "under":
+        if float(actual_value) < float(line_value):
+            return "hit"
+        return "miss" if final_state and float(actual_value) > float(line_value) else None
+    if final_state:
+        return "hit" if float(actual_value) > float(line_value) else "miss"
+    return None
+
+
+def _mlb_prop_result_label(state: str | None) -> str | None:
+    if state == "hit":
+        return "Hit"
+    if state == "miss":
+        return "Miss"
+    return None
+
+
+def _mlb_prop_actual_value(item: dict[str, Any], actual_payload: dict[str, Any] | None) -> float | None:
+    if not isinstance(item, dict) or not isinstance(actual_payload, dict):
+        return None
+    try:
+        from syndicate.features.mlb.cards import _actual_batting_context_by_name
+        from syndicate.features.mlb.cards import _actual_hitter_stat_value
+        from syndicate.features.mlb.cards import _actual_pitcher_stat_value
+    except Exception:
+        return None
+
+    batting_rows = _actual_batting_context_by_name(actual_payload)
+    pitching_rows = None
+    name = _mlb_name_key(item.get("name") or item.get("player_name") or item.get("playerName"))
+    if not name:
+        return None
+
+    market_text = " ".join(
+        str(value or "").lower()
+        for value in [item.get("market"), item.get("heading"), item.get("market_label"), item.get("detail")]
+    )
+    prop_key = None
+    pitcher_mode = False
+    if "outs" in market_text:
+        prop_key = "outs"
+        pitcher_mode = True
+    elif "strikeout" in market_text or market_text.startswith("k"):
+        prop_key = "strikeouts"
+        pitcher_mode = True
+    elif "hits allowed" in market_text:
+        prop_key = "hits_allowed"
+        pitcher_mode = True
+    elif "walk" in market_text:
+        prop_key = "walks_allowed"
+        pitcher_mode = True
+    elif "earned run" in market_text:
+        prop_key = "earned_runs"
+        pitcher_mode = True
+    elif "home run" in market_text or str(item.get("heading") or "").strip().lower() == "hr targets":
+        prop_key = "home_runs"
+    elif "total base" in market_text:
+        prop_key = "total_bases"
+    elif "run scored" in market_text:
+        prop_key = "runs_scored"
+    elif "rbi" in market_text:
+        prop_key = "rbis"
+    elif "hit" in market_text:
+        prop_key = "hits"
+
+    actual_row = batting_rows.get(name)
+    if actual_row and not pitcher_mode:
+        return _actual_hitter_stat_value(actual_row.get("stats") if isinstance(actual_row, dict) else None, prop_key or "hits")
+
+    try:
+        from syndicate.features.mlb.cards import _actual_pitching_context_by_name
+    except Exception:
+        return None
+    pitching_rows = _actual_pitching_context_by_name(actual_payload)
+    actual_row = pitching_rows.get(name)
+    if actual_row and pitcher_mode:
+        return _actual_pitcher_stat_value(actual_row.get("stats") if isinstance(actual_row, dict) else None, prop_key or "outs")
+    return None
+
+
+def _mlb_live_total_text(actual_payload: dict[str, Any] | None) -> str | None:
+    if not isinstance(actual_payload, dict):
+        return None
+    linescore = ((actual_payload.get("liveData") or {}).get("linescore")) if isinstance(actual_payload.get("liveData"), dict) else {}
+    teams = (linescore or {}).get("teams") if isinstance(linescore, dict) else {}
+    away_runs = _numeric_value(((teams or {}).get("away") or {}).get("runs"))
+    home_runs = _numeric_value(((teams or {}).get("home") or {}).get("runs"))
+    if away_runs is None or home_runs is None:
+        return None
+    return _score_value(float(away_runs) + float(home_runs))
 
 
 def _market_label_from_pick_text(text: str) -> str:
@@ -931,6 +1088,24 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
     confidence_value = _pct_number(confidence)
     edge_value = _pct_number(edge)
     score = float((confidence_value or 0.0) + (edge_value or 0.0) * 1.5 + (55.0 if live_flag else 20.0))
+    outcome_state = _safe_text(item.get("outcome_state"), None)
+    if not outcome_state:
+        actual_value = _numeric_value(item.get("actual"))
+        line_value = _numeric_value(item.get("line") or item.get("market_line"))
+        selection = str(item.get("pick") or item.get("selection") or "").strip().lower()
+        if actual_value is not None and line_value is not None:
+            if selection == "under":
+                outcome_state = "hit" if float(actual_value) < float(line_value) else "miss"
+            elif selection == "over":
+                outcome_state = "hit" if float(actual_value) > float(line_value) else "miss"
+            elif str(item.get("heading") or "").strip().lower() == "hr targets":
+                outcome_state = "hit" if float(actual_value) >= 1.0 else "miss"
+    outcome_label = _safe_text(item.get("outcome_label"), None)
+    if not outcome_label and outcome_state:
+        outcome_label = "Hit" if outcome_state == "hit" else "Miss" if outcome_state == "miss" else None
+    live_total = _safe_text(item.get("live_total"), None)
+    if not live_total:
+        live_total = _score_value(item.get("live_total_line") or item.get("live_line_total") or item.get("total_goals"))
     return {
         "sport": _safe_text(sport.get("name"), str(sport.get("slug") or "").upper()),
         "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
@@ -948,6 +1123,9 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         "detail": detail,
         "href": str(item.get("href") or sport.get("hub_href") or "").strip() or None,
         "is_live": live_flag,
+        "outcome_state": outcome_state,
+        "outcome_label": outcome_label,
+        "live_total": live_total,
         "score": score,
     }
 
@@ -1735,6 +1913,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                     ]
                     
                     rows.append({
+                        "game_pk": _int_or_none(game_pk),
                         "matchup": row_matchup if re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE) else matchup_text,
                         "heading": "Betting Card",
                         "name": f"{pitcher} {prop_type}",
@@ -1942,6 +2121,7 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
                 probability = _numeric_value(prop.get("modelProbOver"))
             value = f"{probability * 100:.1f}% win" if probability is not None else _safe_text(prop.get("odds"), "Live")
             row = {
+                "game_pk": _int_or_none(game.get("gamePk") or game.get("game_pk")),
                 "matchup": matchup,
                 "heading": "Live props",
                 "name": player,
@@ -2198,6 +2378,10 @@ def _load_home_prop_items(
             mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context_label, season=season, week=week)
             if mlb_rows:
                 return mlb_rows
+        if is_active_today and home_games:
+            live_rows = _compact_prop_rows(home_games)
+            if live_rows:
+                return live_rows
         if slug == "nhl":
             nhl_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
             if nhl_rows:
@@ -2267,6 +2451,7 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
         writeup = str(target.get("writeup") or target.get("summary") or "").strip()
         rows.append(
             {
+                "game_pk": _int_or_none(target.get("game_pk") or target.get("gamePk")),
                 "heading": _safe_text(target.get("team"), "HR target"),
                 "name": _safe_text(target.get("player_name"), "Unknown hitter"),
                 "value": _safe_text(target.get("probability"), "-"),
@@ -2408,6 +2593,18 @@ def _compact_prop_rows(games: list[dict[str, Any]], *, limit: int | None = None)
                     "name": name,
                     "detail": detail,
                     "value": value,
+                    "pick": _safe_text(row.get("pick"), ""),
+                    "market": _safe_text(row.get("market"), ""),
+                    "line": row.get("line"),
+                    "market_line": row.get("market_line") or row.get("line"),
+                    "actual": row.get("actual"),
+                    "projected": row.get("projected"),
+                    "odds": row.get("odds"),
+                    "confidence": row.get("confidence"),
+                    "selection": _safe_text(row.get("selection"), ""),
+                    "live_total": row.get("live_total") or row.get("live_total_line"),
+                    "outcome_state": _safe_text(row.get("outcome_state"), None),
+                    "outcome_label": _safe_text(row.get("outcome_label"), None),
                     "href": str(game.get("href") or "").strip() or None,
                 }
             )
@@ -2772,6 +2969,7 @@ def _build_sport_overview(
         is_active_today=active_today,
         ),
         slug=slug,
+        context_label=context_label,
     )
     if game_bar["items"]:
         overview_stats = [{"label": "Games", "value": str(game_count)}] + overview_stats[1:]
@@ -2810,7 +3008,11 @@ def _build_sport_overview(
             "betting_href": _link_lookup(links, "Betting Card"),
             "hub_href": hub_href,
             "hr_targets_href": _link_lookup(links, "HR targets") or f"/mlb/hr-targets?date={context_label}",
-            "hr_targets_items": _load_mlb_home_hr_target_items(context_label, limit=10),
+            "hr_targets_items": _finalize_home_prop_rows(
+                _load_mlb_home_hr_target_items(context_label, limit=10),
+                slug="mlb",
+                context_label=context_label,
+            ),
             "pregame_props_href": _link_lookup(links, "Pitcher top props") or f"/mlb/pitcher-top-props?date={context_label}",
             "pregame_props_secondary_href": _link_lookup(links, "Hitter top props") or f"/mlb/hitter-top-props?date={context_label}",
             "pregame_props_items": _finalize_home_prop_rows(
@@ -2823,6 +3025,7 @@ def _build_sport_overview(
                     is_active_today=False,
                 ),
                 slug="mlb",
+                context_label=context_label,
             ),
             "live_props_href": _link_lookup(links, "Live Lens") or f"/mlb/live-lens?date={context_label}",
             "live_props_items": _finalize_home_prop_rows(
@@ -2835,6 +3038,7 @@ def _build_sport_overview(
                     is_active_today=True,
                 ),
                 slug="mlb",
+                context_label=context_label,
             ),
         }
     props_count = _dashboard_prop_count(overview)
