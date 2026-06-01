@@ -4803,12 +4803,21 @@
   function renderBoxScorePanel(game) {
     const detailLoaded = hasLoadedSimDetail(game);
     const detailLoading = state.simDetailLoading.has(cardId(game));
+    const detailResolved = state.simDetailCache.has(cardId(game));
     const liveState = getLiveState(game);
     const liveBoxscore = getLivePlayerBoxscore(game) || { away: [], home: [] };
     const hasLiveActualRows = safeArray(liveBoxscore.away).length || safeArray(liveBoxscore.home).length;
     if (!detailLoaded) {
       const counts = game?.sim?.players_summary || {};
       const totalRows = Number(counts.away || 0) + Number(counts.home || 0);
+      const simRowsLabel = totalRows
+        ? `${totalRows} projected rows`
+        : (detailLoading ? 'Loading' : (detailResolved ? 'No rows' : 'Loading'));
+      const simStatusCopy = detailLoading
+        ? 'Loading per-player sim rows for this matchup.'
+        : (detailResolved
+          ? 'No per-player SmartSim rows were available for this matchup.'
+          : 'Per-player SmartSim rows are preloading in the background for this slate.');
       if (hasLiveActualRows || liveState?.in_progress || liveState?.final) {
         return `
           <div class="cards-box-grid">
@@ -4820,9 +4829,9 @@
               <div class="cards-panel-card cards-box-panel">
                 <div class="cards-box-head">
                   <div class="cards-table-title"><strong>Sim box score</strong></div>
-                  <span class="cards-chip">${escapeHtml(totalRows ? `${totalRows} projected rows` : 'Loading')}</span>
+                  <span class="cards-chip">${escapeHtml(simRowsLabel)}</span>
                 </div>
-                <div class="cards-callout-copy">${escapeHtml(detailLoading ? 'Loading per-player sim rows for this matchup.' : 'Per-player SmartSim rows are preloading in the background for this slate.')}</div>
+                <div class="cards-callout-copy">${escapeHtml(simStatusCopy)}</div>
               </div>
             </div>
           </div>
@@ -4832,9 +4841,9 @@
         <div class="cards-panel-card cards-box-panel">
           <div class="cards-box-head">
             <div class="cards-table-title"><strong>Sim box score</strong></div>
-            <span class="cards-chip">${escapeHtml(totalRows ? `${totalRows} projected rows` : 'Loading')}</span>
+            <span class="cards-chip">${escapeHtml(simRowsLabel)}</span>
           </div>
-          <div class="cards-callout-copy">${escapeHtml(detailLoading ? 'Loading per-player sim rows for this matchup.' : 'Per-player SmartSim rows are preloading in the background for this slate.')}</div>
+          <div class="cards-callout-copy">${escapeHtml(simStatusCopy)}</div>
         </div>
       `;
     }
