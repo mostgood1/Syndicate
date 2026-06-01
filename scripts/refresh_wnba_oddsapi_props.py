@@ -2338,12 +2338,12 @@ def _run_refresh_via_cli(
                 if have_downstream_artifacts:
                     _append_log(log_file, f"predict-props returned exit code {int(rc_pred)} but downstream artifacts already exist for {date_str}; continuing")
                 else:
-                    state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
+                    _append_log(log_file, f"predict-props failed with exit code {int(rc_pred)} for {date_str}; continuing with snapshot-only game card export")
             elif int(state["predictions_rows"] or 0) <= 0:
                 if have_downstream_artifacts:
                     _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} but downstream artifacts already exist for {date_str}; continuing")
                 else:
-                    state["error"] = f"predict-props completed without writing rows to {pred_fp.name}"
+                    _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} for {date_str}; continuing with snapshot-only game card export")
             else:
                 pred_ready = True
     elif int(state["snapshot_rows"] or 0) <= 0:
@@ -2415,6 +2415,9 @@ def _run_refresh_via_cli(
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
         if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0 and source_game_cards_rows > 0:
             state["rc_export"] = 0
+        elif int(rc_export) != 0 and not pred_ready and int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows > 0:
+            state["rc_export"] = 0
+            _append_log(log_file, f"export stage returned non-zero for {date_str} without refreshed props predictions; continuing with snapshot-only game cards")
         elif int(rc_export) != 0 and int(state["snapshot_rows"] or 0) <= 0 and source_game_cards_rows <= 0:
             state["rc_export"] = 0
             _append_log(log_file, f"export stage returned non-zero for {date_str} with no snapshot rows and no game cards; continuing")
