@@ -2,7 +2,7 @@
   "date": "2026-06-01",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-01T11:59:36.232192",
+  "generated_at": "2026-06-01T12:46:56.519968",
   "summary": {
     "games": 9,
     "projected_teams": 18,
@@ -371,12 +371,12 @@
       ],
       "home_projected_ids": [
         694362,
-        682829,
         668709,
         701398,
         553993,
         663993,
         668715,
+        695490,
         663886,
         670770
       ],
@@ -437,23 +437,23 @@
         "status": "ok",
         "raw_ids": [
           694362,
-          682829,
           668709,
           701398,
           553993,
           663993,
           668715,
+          695490,
           663886,
           670770
         ],
         "ids": [
           694362,
-          682829,
           668709,
           701398,
           553993,
           663993,
           668715,
+          695490,
           663886,
           670770
         ],
@@ -463,23 +463,23 @@
         "pool_size": 17,
         "raw_names": [
           "Blake Dunn",
-          "Elly De La Cruz",
           "JJ Bleday",
           "Sal Stewart",
           "Eugenio Suarez",
           "Nathaniel Lowe",
           "Spencer Steer",
+          "Edwin Arroyo",
           "Tyler Stephenson",
           "TJ Friedl"
         ],
         "matched_names": [
           "Blake Dunn",
-          "Elly De La Cruz",
           "JJ Bleday",
           "Sal Stewart",
           "Eugenio Su\u00e1rez",
           "Nathaniel Lowe",
           "Spencer Steer",
+          "Edwin Arroyo",
           "Tyler Stephenson",
           "TJ Friedl"
         ],
