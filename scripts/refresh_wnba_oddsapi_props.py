@@ -2631,6 +2631,7 @@ def _materialize_local_boxscore_cache_for_player_artifacts(*, processed_root: Pa
                 {
                     "personId": str(normalized.get("PLAYER_ID") or normalized.get("PERSONID") or "").strip(),
                     "teamTricode": team_tri,
+                    "position": str(normalized.get("START_POSITION") or normalized.get("POSITION") or "").strip(),
                     "minutes": str(normalized.get("MIN") or normalized.get("MINUTES") or "").strip(),
                     "points": str(normalized.get("PTS") or normalized.get("POINTS") or "").strip(),
                     "reboundsTotal": str(normalized.get("REB") or normalized.get("TREB") or normalized.get("REBOUNDSTOTAL") or "").strip(),
@@ -2662,6 +2663,7 @@ def _materialize_local_boxscore_cache_for_player_artifacts(*, processed_root: Pa
     fieldnames = [
         "personId",
         "teamTricode",
+        "position",
         "minutes",
         "points",
         "reboundsTotal",

@@ -878,6 +878,7 @@ def simulate_connected_game(
     away_roster: Optional[List[str]] = None,
     minutes_priors: Optional[Dict[Tuple[str, str], float]] = None,
     player_priors: Optional[Any] = None,
+    roster_positions: Optional[Dict[Tuple[str, str], str]] = None,
     minutes_lookback_days: int = 21,
     n_samples: int = 1500,
     seed: Optional[int] = None,
@@ -1516,6 +1517,7 @@ def simulate_connected_game(
         # In that case, fall back to a team-agnostic minutes prior by player key.
         try:
             pri = minutes_priors or {}
+            pos_lookup = roster_positions or {}
             team_u = str(team or "").strip().upper()
             explicit_roster = bool(roster)
             roster_names = [(_norm_player_key(x), _norm_name(x)) for x in (roster or []) if _norm_player_key(x)]
@@ -1602,6 +1604,18 @@ def simulate_connected_game(
                 except Exception:
                     pass
 
+            if (not out.empty) and ("player_name" in out.columns):
+                try:
+                    out = out.copy()
+                    mapped_positions = out["player_name"].map(lambda nm: pos_lookup.get((team_u, _norm_player_key(nm))))
+                    if "position" in out.columns:
+                        current_positions = out["position"].astype(str).str.strip().str.upper().replace({"": np.nan})
+                        out["position"] = current_positions.where(current_positions.notna(), mapped_positions)
+                    else:
+                        out["position"] = mapped_positions
+                except Exception:
+                    pass
+
             # Attach broader player priors (rates) if provided.
             try:
                 pp = None
@@ -1663,6 +1677,7 @@ def simulate_connected_game(
                         {
                             "player_name": disp,
                             "team": team_u,
+                            "position": pos_lookup.get((team_u, key_norm)),
                             # Provide a minutes signal so _attach_sim_minutes can normalize.
                             # Prefer roll-based minutes selection downstream, so seed roll mins too.
                             "pred_min": float(m),
@@ -1695,6 +1710,7 @@ def simulate_connected_game(
                             {
                                 "player_name": disp,
                                 "team": team_u,
+                                "position": pos_lookup.get((team_u, key_norm)),
                                 "pred_min": float(pri.get((team_u, key_norm), 8.0) or 8.0),
                                 "pred_pts": 0.0,
                                 "pred_reb": 0.0,
@@ -3085,6 +3101,8 @@ def simulate_connected_game(
                 {
                     "player_name": _norm_name(p.get("player_name")),
                     "min": float(mins[i]) if np.isfinite(mins[i]) else None,
+                    "minutes": float(mins[i]) if np.isfinite(mins[i]) else None,
+                    "position": (str(p.get("position") or "").strip().upper() or None),
                     "pts": float(pts_mu[i]) if i < len(pts_mu) and np.isfinite(pts_mu[i]) else None,
                     "reb": float(reb_mu[i]) if i < len(reb_mu) and np.isfinite(reb_mu[i]) else None,
                     "ast": float(ast_mu[i]) if i < len(ast_mu) and np.isfinite(ast_mu[i]) else None,
@@ -3750,6 +3768,8 @@ def simulate_connected_game(
                 {
                     "player_name": _norm_name(p.get("player_name")),
                     "min": float(mins[i]) if np.isfinite(mins[i]) else None,
+                    "minutes": float(mins[i]) if np.isfinite(mins[i]) else None,
+                    "position": (str(p.get("position") or "").strip().upper() or None),
                     "pts": int(pts_by_player[i]),
                     "reb": int(reb[i]),
                     "ast": int(ast[i]),
