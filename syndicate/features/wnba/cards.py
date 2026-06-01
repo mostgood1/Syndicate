@@ -542,14 +542,17 @@ def _artifact_paths(selected_date: str) -> dict[str, Path]:
 def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     paths = _artifact_paths(selected_date)
     rows = _load_csv_rows(paths["cards"])
+    _debug_sources: list[str] = [f"primary:{paths['cards']}:rows={len(rows)}"]
     # If the primary path returned no rows (e.g. disk has a header-only file that beat
     # the full repo file on mtime), scan all source roots for a CSV with actual data.
     if not rows:
         csv_name = f"game_cards_{selected_date}.csv"
         for root in _wnba_source_roots():
             alt_path = root / "data" / "processed" / csv_name
+            _debug_sources.append(f"alt:{alt_path}:eq={alt_path == paths['cards']}:exists={alt_path.exists()}")
             if alt_path != paths["cards"] and alt_path.exists():
                 alt_rows = _load_csv_rows(alt_path)
+                _debug_sources.append(f"alt_rows={len(alt_rows)}")
                 if alt_rows:
                     rows = alt_rows
                     paths = {
@@ -563,6 +566,7 @@ def _artifact_bundle(selected_date: str) -> dict[str, Any]:
     return {
         "paths": paths,
         "rows": rows,
+        "_debug_sources": _debug_sources,
         "recommendations": _recommendation_index(rec_summary),
         "sim": _merge_sim_indexes(_artifact_games_index(paths["sim"]), _raw_smart_sim_index(selected_date)),
         "props": _artifact_games_index(paths["props"]),
@@ -848,6 +852,7 @@ def build_source_cards_payload(selected_date: str, *, allow_stored_date_fallback
         "players_included": False,
         "pregame_portfolio": {"enabled": False, "selected": 0, "candidates": 0},
         "games": games,
+        "_debug": bundle.get("_debug_sources", []),
     }
 
 
