@@ -1,14 +1,14 @@
 {
   "tool": "tools/daily_update.py",
   "workflow": "ui-daily",
-  "generated_at": "2026-06-01T09:28:41.932537",
+  "generated_at": "2026-06-01T10:59:28.644773",
   "date": "2026-06-01",
   "season": 2026,
   "run_lock": {
     "status": "acquired",
     "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/runtime/locks/daily_update_ui-daily_2026_2026-06-01_b85891982dad.lock",
-    "pid": 31196,
-    "created_at": "2026-06-01T09:28:41.931343"
+    "pid": 30492,
+    "created_at": "2026-06-01T10:59:28.640745"
   },
   "seed": {
     "value": 1337,
@@ -253,20 +253,21 @@
           "players": 18,
           "markets": {
             "earned_runs": 18,
-            "hits_allowed": 17,
+            "hits_allowed": 15,
             "outs": 16,
-            "strikeouts": 16
+            "strikeouts": 16,
+            "walks_allowed": 4
           },
           "events_matched": 9
         },
         "hitter_props": {
-          "players": 172,
+          "players": 173,
           "markets": {
             "batter_hits": 167,
-            "batter_hits_runs_rbis": 170,
+            "batter_hits_runs_rbis": 171,
             "batter_home_runs": 164,
-            "batter_rbis": 167,
-            "batter_runs_scored": 167,
+            "batter_rbis": 166,
+            "batter_runs_scored": 166,
             "batter_total_bases": 164
           },
           "events_matched": 9
@@ -899,9 +900,9 @@
           "none": 46
         },
         "tones": {
-          "solid": 18,
-          "soft": 12,
-          "strong": 16
+          "solid": 20,
+          "strong": 16,
+          "soft": 10
         },
         "stats": {
           "hits_allowed": {
