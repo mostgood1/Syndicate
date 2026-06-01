@@ -1477,12 +1477,12 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     local_payload = _best_live_state_payload(selected_date)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
@@ -1541,7 +1541,7 @@ def build_live_player_boxscore_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -1549,7 +1549,7 @@ def build_live_player_boxscore_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
@@ -1572,7 +1572,7 @@ def build_live_player_lens_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -1580,7 +1580,7 @@ def build_live_player_lens_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
@@ -1614,7 +1614,7 @@ def build_live_lines_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -1623,7 +1623,7 @@ def build_live_lines_payload(
             event_ids=normalized_event_ids,
             include_period_totals=bool(include_period_totals),
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,
@@ -1646,7 +1646,7 @@ def build_live_pbp_stats_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -1654,7 +1654,7 @@ def build_live_pbp_stats_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
     return _attach_odds_refresh_timestamp({
         "ok": True,

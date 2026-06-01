@@ -1699,6 +1699,64 @@ def _game_index_by_event_id(selected_date: str) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _games_by_matchup(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
+    out: dict[tuple[str, str], dict[str, Any]] = {}
+    for game in _cards_games_for_live_fallback(selected_date):
+        if not isinstance(game, dict):
+            continue
+        away_tri = _canonical_wnba_tri(
+            str(
+                game.get("away_tri")
+                or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "")
+                or ""
+            ).strip().upper()
+        )
+        home_tri = _canonical_wnba_tri(
+            str(
+                game.get("home_tri")
+                or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "")
+                or ""
+            ).strip().upper()
+        )
+        if away_tri and home_tri:
+            out[(away_tri, home_tri)] = game
+    return out
+
+
+def _resolve_games_for_event_ids(selected_date: str, event_ids: list[str]) -> dict[str, dict[str, Any]]:
+    normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        return {}
+
+    by_event = _game_index_by_event_id(selected_date)
+    matchup_index = _games_by_matchup(selected_date)
+
+    unresolved = [event_id for event_id in normalized_event_ids if event_id not in by_event]
+    if unresolved:
+        live_payload = build_live_state_payload(selected_date, ttl=12, allow_stored_date_fallback=False)
+        live_rows = live_payload.get("games") if isinstance(live_payload, dict) else []
+        if isinstance(live_rows, list):
+            wanted = set(unresolved)
+            for row in live_rows:
+                if not isinstance(row, dict):
+                    continue
+                event_id = str(row.get("event_id") or "").strip()
+                if not event_id or event_id not in wanted or event_id in by_event:
+                    continue
+                away_tri = _canonical_wnba_tri(str(row.get("away_tri") or row.get("away") or "").strip().upper())
+                home_tri = _canonical_wnba_tri(str(row.get("home_tri") or row.get("home") or "").strip().upper())
+                game = matchup_index.get((away_tri, home_tri)) if away_tri and home_tri else None
+                if isinstance(game, dict):
+                    by_event[event_id] = game
+
+    return {
+        event_id: game
+        for event_id in normalized_event_ids
+        for game in [by_event.get(event_id)]
+        if isinstance(game, dict)
+    }
+
+
 def _player_sim_stat(player_row: dict[str, Any], market: str) -> float | None:
     key = str(market or "").strip().lower()
     pts = _safe_float(player_row.get("pts_mean"))
@@ -1776,7 +1834,12 @@ def _fallback_live_lines_game(game: dict[str, Any], *, include_period_totals: bo
     }
 
 
-def _fallback_live_player_boxscore_game(game: dict[str, Any]) -> dict[str, Any]:
+def _fallback_live_player_boxscore_game(
+    game: dict[str, Any],
+    *,
+    event_id: str | None = None,
+    selected_date: str | None = None,
+) -> dict[str, Any]:
     sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
     players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_tri = str(game.get("away_tri") or "").strip().upper()
@@ -1802,10 +1865,151 @@ def _fallback_live_player_boxscore_game(game: dict[str, Any]) -> dict[str, Any]:
                     "tov": _safe_float(row.get("tov_mean")),
                 }
             )
-    return {"event_id": game.get("event_id"), "players": out_players}
+
+    # If cards payload only has sim stubs, pull per-player rows from sim-detail payload.
+    if not out_players and selected_date and away_tri and home_tri:
+        detail_payload = build_source_cards_sim_detail_payload(selected_date, away_tri, home_tri)
+        detail_games = detail_payload.get("games") if isinstance(detail_payload, dict) else []
+        detail_game = detail_games[0] if isinstance(detail_games, list) and detail_games and isinstance(detail_games[0], dict) else {}
+        detail_sim = detail_game.get("sim") if isinstance(detail_game.get("sim"), dict) else {}
+        detail_players = detail_sim.get("players") if isinstance(detail_sim.get("players"), dict) else {}
+        for side_key, team_tri in (("away", away_tri), ("home", home_tri)):
+            side_rows = detail_players.get(side_key) if isinstance(detail_players.get(side_key), list) else []
+            for row in side_rows:
+                if not isinstance(row, dict):
+                    continue
+                out_players.append(
+                    {
+                        "player": row.get("player_name"),
+                        "player_id": row.get("player_id"),
+                        "team_tri": team_tri,
+                        "min": _safe_float(row.get("min_mean")),
+                        "pts": _safe_float(row.get("pts_mean")),
+                        "reb": _safe_float(row.get("reb_mean")),
+                        "ast": _safe_float(row.get("ast_mean")),
+                        "threes_made": _safe_float(row.get("threes_mean")),
+                        "stl": _safe_float(row.get("stl_mean")),
+                        "blk": _safe_float(row.get("blk_mean")),
+                        "tov": _safe_float(row.get("tov_mean")),
+                    }
+                )
+
+    return {"event_id": event_id or game.get("event_id"), "players": out_players}
 
 
-def _fallback_live_player_lens_game(game: dict[str, Any]) -> dict[str, Any]:
+def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str]) -> dict[str, Any] | None:
+    normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        return None
+
+    out_games: list[dict[str, Any]] = []
+    for event_id in normalized_event_ids:
+        request_url = (
+            "https://site.web.api.espn.com/apis/site/v2/sports/basketball/wnba/summary"
+            f"?event={urllib_parse.quote(event_id)}"
+        )
+        request_obj = urllib_request.Request(
+            request_url,
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json,text/plain,*/*",
+            },
+        )
+        try:
+            with urllib_request.urlopen(request_obj, timeout=6) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            continue
+
+        boxscore = payload.get("boxscore") if isinstance(payload, dict) else {}
+        team_blocks = boxscore.get("players") if isinstance(boxscore, dict) and isinstance(boxscore.get("players"), list) else []
+        players_out: list[dict[str, Any]] = []
+        for team_block in team_blocks:
+            if not isinstance(team_block, dict):
+                continue
+            team_info = team_block.get("team") if isinstance(team_block.get("team"), dict) else {}
+            team_tri = _canonical_wnba_tri(
+                str(
+                    team_info.get("abbreviation")
+                    or team_info.get("shortDisplayName")
+                    or team_info.get("displayName")
+                    or team_info.get("name")
+                    or ""
+                ).strip().upper()
+            )
+            if not team_tri:
+                continue
+
+            stat_groups = team_block.get("statistics") if isinstance(team_block.get("statistics"), list) else []
+            for group in stat_groups:
+                if not isinstance(group, dict):
+                    continue
+                keys = [str(key or "").strip().upper() for key in (group.get("keys") or [])]
+                athletes = group.get("athletes") if isinstance(group.get("athletes"), list) else []
+                for athlete_row in athletes:
+                    if not isinstance(athlete_row, dict):
+                        continue
+                    athlete_info = athlete_row.get("athlete") if isinstance(athlete_row.get("athlete"), dict) else {}
+                    player_name = str(athlete_info.get("displayName") or athlete_info.get("shortName") or "").strip()
+                    if not player_name:
+                        continue
+                    stat_values = athlete_row.get("stats") if isinstance(athlete_row.get("stats"), list) else []
+                    stat_map: dict[str, Any] = {}
+                    for idx, key in enumerate(keys):
+                        if not key:
+                            continue
+                        if idx >= len(stat_values):
+                            continue
+                        stat_map[key] = stat_values[idx]
+
+                    minutes_value = stat_map.get("MIN")
+                    points = _safe_float(stat_map.get("PTS"))
+                    rebounds = _safe_float(stat_map.get("REB"))
+                    assists = _safe_float(stat_map.get("AST"))
+                    threes_made = _safe_float(stat_map.get("3PM") or stat_map.get("FG3M"))
+                    if threes_made is None:
+                        threes_text = str(stat_map.get("3PT") or stat_map.get("FG3") or "").strip()
+                        if threes_text:
+                            first_part = threes_text.split("-", 1)[0].strip()
+                            threes_made = _safe_float(first_part)
+
+                    has_box_stats = any(
+                        value is not None
+                        for value in (points, rebounds, assists, threes_made)
+                    )
+                    if not has_box_stats and not str(minutes_value or "").strip():
+                        continue
+
+                    players_out.append(
+                        {
+                            "player": player_name,
+                            "team_tri": team_tri,
+                            "min": minutes_value,
+                            "pts": points,
+                            "reb": rebounds,
+                            "ast": assists,
+                            "threes_made": threes_made,
+                        }
+                    )
+
+        if players_out:
+            out_games.append({"event_id": event_id, "players": players_out})
+
+    if not out_games:
+        return None
+    return {
+        "ok": True,
+        "ttl": 20,
+        "date": selected_date,
+        "requested_date": selected_date,
+        "lookahead_applied": False,
+        "source": "espn_summary_boxscore_fallback",
+        "games": out_games,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+
+
+def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | None = None) -> dict[str, Any]:
     sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
     sim_players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_tri = str(game.get("away_tri") or "").strip().upper()
@@ -1890,7 +2094,7 @@ def _fallback_live_player_lens_game(game: dict[str, Any]) -> dict[str, Any]:
             )
 
     return {
-        "event_id": game.get("event_id"),
+        "event_id": event_id or game.get("event_id"),
         "game_id": game.get("gamePk"),
         "home": home_tri,
         "away": away_tri,
@@ -1901,7 +2105,7 @@ def _fallback_live_player_lens_game(game: dict[str, Any]) -> dict[str, Any]:
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     local_payload = _local_live_state_payload(selected_date)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
     # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
@@ -1910,11 +2114,11 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     should_try_remote = _remote_source_fallback_enabled() or str(selected_date).strip() == central_today_iso()
     if should_try_remote:
         remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
 
     public_payload = _public_scoreboard_live_state_payload(selected_date)
-    if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list):
+    if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and bool(public_payload.get("games")):
         return _attach_odds_refresh_timestamp(public_payload)
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
@@ -1973,7 +2177,7 @@ def build_live_player_boxscore_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
@@ -1982,12 +2186,16 @@ def build_live_player_boxscore_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(resolved_date)
+    public_payload = _public_live_player_boxscore_payload(resolved_date, normalized_event_ids)
+    if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and bool(public_payload.get("games")):
+        return _attach_odds_refresh_timestamp(public_payload)
+
+    game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
-        _fallback_live_player_boxscore_game(game)
+        _fallback_live_player_boxscore_game(game, event_id=event_id, selected_date=resolved_date)
         for event_id in normalized_event_ids
         for game in [game_index.get(event_id)]
         if isinstance(game, dict)
@@ -2024,7 +2232,7 @@ def build_live_player_lens_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
@@ -2033,12 +2241,12 @@ def build_live_player_lens_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(resolved_date)
+    game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
-        _fallback_live_player_lens_game(game)
+        _fallback_live_player_lens_game(game, event_id=event_id)
         for event_id in normalized_event_ids
         for game in [game_index.get(event_id)]
         if isinstance(game, dict)
@@ -2086,7 +2294,7 @@ def build_live_lines_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
@@ -2096,10 +2304,10 @@ def build_live_lines_payload(
             event_ids=normalized_event_ids,
             include_period_totals=bool(include_period_totals),
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(resolved_date)
+    game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
         _fallback_live_lines_game(game, include_period_totals=bool(include_period_totals))
         for event_id in normalized_event_ids
@@ -2140,7 +2348,7 @@ def build_live_pbp_stats_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_pbp_stats", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list):
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
@@ -2149,10 +2357,10 @@ def build_live_pbp_stats_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list):
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
 
-    game_index = _game_index_by_event_id(resolved_date)
+    game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = []
     for event_id in normalized_event_ids:
         game = game_index.get(event_id)
