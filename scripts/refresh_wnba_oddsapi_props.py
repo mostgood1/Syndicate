@@ -2212,6 +2212,7 @@ def _run_refresh_via_cli(
     do_edges: bool,
     do_export: bool,
     do_push: bool,
+    smart_sim_overwrite: bool,
     log_file: Path,
     started_at: str | None = None,
 ) -> dict[str, object]:
@@ -2317,6 +2318,7 @@ def _run_refresh_via_cli(
                         smart_sim_n_sims=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 150)),
                         smart_sim_pbp=_env_bool("REFRESH_PREDICT_PROPS_SMART_SIM_PBP", True),
                         smart_sim_workers=max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS", 1)),
+                        smart_sim_overwrite=bool(smart_sim_overwrite),
                         log_file=log_file,
                         heartbeat_cb=_touch_progress,
                         heartbeat_every_s=5.0,
@@ -3523,6 +3525,7 @@ def main() -> int:
                 do_edges=bool(args.do_edges),
                 do_export=bool(args.do_export),
                 do_push=bool(args.do_push),
+                smart_sim_overwrite=bool(args.force_refresh),
                 log_file=Path(args.log_file).resolve(),
                 started_at=started_at,
             )

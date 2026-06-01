@@ -379,6 +379,7 @@ def export_props_predictions_local(
     smart_sim_n_sims: int,
     smart_sim_pbp: bool,
     smart_sim_workers: int,
+    smart_sim_overwrite: bool = False,
     log_file: Path | None = None,
     heartbeat_cb: callable | None = None,
     heartbeat_every_s: float = 15.0,
@@ -418,6 +419,7 @@ def export_props_predictions_local(
                     smart_sim_n_sims=int(smart_sim_n_sims),
                     smart_sim_pbp=bool(smart_sim_pbp),
                     smart_sim_workers=int(smart_sim_workers),
+                    smart_sim_overwrite=bool(smart_sim_overwrite),
                 )
             else:
                 _export_props_predictions_without_smart_sim_local(

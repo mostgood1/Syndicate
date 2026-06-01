@@ -169,14 +169,14 @@
           "display_pick": "Minnesota Lynx -3.0",
           "selection": "Minnesota Lynx",
           "price": -110.0,
-          "score": 6.325,
-          "ev_pct": 6.325,
-          "win_prob": 0.58706,
-          "p_win": 0.58706,
-          "basketball_summary": "Model margin 3.3 vs market -3.0",
+          "score": 5.85,
+          "ev_pct": 5.8500000000000005,
+          "win_prob": 0.58231,
+          "p_win": 0.58231,
+          "basketball_summary": "Model margin 2.9 vs market -3.0",
           "top_play_reasons": [
-            "Edge 6.3",
-            "EV 6.3%"
+            "Edge 5.8",
+            "EV 5.9%"
           ],
           "matchup": "MIN @ PHX"
         },
