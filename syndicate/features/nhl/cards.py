@@ -3,7 +3,9 @@ from __future__ import annotations
 import csv
 import json
 import os
+from datetime import datetime
 from datetime import timedelta
+from datetime import timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -40,6 +42,99 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _parse_utc_datetime(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _looks_live_status_text(*values: Any) -> bool:
+    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
+    if not text:
+        return False
+    return any(token in text for token in ("live", "in progress", "1st", "2nd", "3rd", "ot", "so", "intermission"))
+
+
+def _looks_terminal_status_text(*values: Any) -> bool:
+    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
+    if not text:
+        return False
+    return any(
+        token in text
+        for token in (
+            "final",
+            "finished",
+            "complete",
+            "off",
+            "postponed",
+            "cancelled",
+            "canceled",
+            "suspended",
+        )
+    )
+
+
+def _normalized_game_status(
+    *,
+    status_text: Any,
+    detail_text: Any,
+    start_time_utc: Any,
+    in_progress: Any,
+    final: Any,
+    away_pts: Any = None,
+    home_pts: Any = None,
+) -> dict[str, Any]:
+    status_raw = str(status_text or "").strip()
+    detail_raw = str(detail_text or "").strip()
+    live = bool(in_progress)
+    is_final = bool(final)
+
+    if _looks_live_status_text(status_raw, detail_raw):
+        live = True
+    if _looks_terminal_status_text(status_raw, detail_raw):
+        is_final = True
+
+    if not live and not is_final:
+        start_dt = _parse_utc_datetime(start_time_utc)
+        if start_dt is not None and start_dt <= datetime.now(timezone.utc) - timedelta(hours=3):
+            is_final = True
+
+    if live:
+        is_final = False
+
+    away_val = _safe_float(away_pts)
+    home_val = _safe_float(home_pts)
+
+    if is_final:
+        status_label = "Final"
+    elif live:
+        status_label = "Live"
+    else:
+        status_label = "Scheduled"
+
+    if is_final:
+        detail = detail_raw if _looks_terminal_status_text(detail_raw) else "Final"
+    elif live:
+        detail = detail_raw or status_raw or "Live"
+    else:
+        detail = detail_raw or status_raw or "Scheduled"
+
+    return {
+        "status": status_label,
+        "detail": detail,
+        "in_progress": bool(live),
+        "final": bool(is_final),
+        "has_score": bool(away_val is not None and home_val is not None),
+    }
 
 
 def _public_schedule_fallback_enabled() -> bool:
@@ -102,6 +197,15 @@ def _game_from_row(row: dict[str, str], *, idx: int, selected_date: str) -> dict
     model_spread = format_num(row.get("model_spread"))
     game_id = str(idx)
     best_edges = _best_edges(row)
+    normalized_status = _normalized_game_status(
+        status_text=row.get("game_state") or row.get("status"),
+        detail_text=row.get("date_et") or row.get("scheduled_start_utc"),
+        start_time_utc=row.get("start_time_utc") or row.get("scheduled_start_utc") or row.get("date"),
+        in_progress=False,
+        final=False,
+        away_pts=proj_away_goals,
+        home_pts=proj_home_goals,
+    )
     return {
         "gamePk": game_id,
         "away_tri": away_abbr,
@@ -112,8 +216,8 @@ def _game_from_row(row: dict[str, str], *, idx: int, selected_date: str) -> dict
         "home_logo": team_logo_url(home_abbr),
         "away": {"abbr": away_abbr, "name": away_name, "logo": team_logo_url(away_abbr)},
         "home": {"abbr": home_abbr, "name": home_name, "logo": team_logo_url(home_abbr)},
-        "status": "Processed artifact",
-        "detail": str(row.get("date_et") or selected_date).strip() or selected_date,
+        "status": normalized_status["status"],
+        "detail": normalized_status["detail"],
         "summary": f"Projected total {model_total} | spread {model_spread}",
         "gameType": "NHL",
         "odds": {
@@ -259,7 +363,15 @@ def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, 
         away_goals = _safe_float(row.get("away_goals"))
         home_goals = _safe_float(row.get("home_goals"))
         game_state = str(row.get("gameState") or "").strip().upper()
-        detail = "Final" if game_state == "OFF" else (game_state or selected_date)
+        normalized_status = _normalized_game_status(
+            status_text=game_state,
+            detail_text=("Final" if game_state == "OFF" else game_state),
+            start_time_utc=row.get("gameDate") or row.get("startTimeUTC") or row.get("scheduled_start_utc"),
+            in_progress=False,
+            final=(game_state == "OFF"),
+            away_pts=away_goals,
+            home_pts=home_goals,
+        )
         summary = (
             f"Score {away_abbr} {format_num(away_goals)} - {format_num(home_goals)} {home_abbr}"
             if away_goals is not None and home_goals is not None
@@ -276,8 +388,8 @@ def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, 
                 "home_logo": team_logo_url(home_abbr),
                 "away": {"abbr": away_abbr, "name": away_name, "logo": team_logo_url(away_abbr)},
                 "home": {"abbr": home_abbr, "name": home_name, "logo": team_logo_url(home_abbr)},
-                "status": "Archived scoreboard",
-                "detail": detail,
+                "status": normalized_status["status"],
+                "detail": normalized_status["detail"],
                 "summary": summary,
                 "gameType": "NHL",
                 "metrics": [

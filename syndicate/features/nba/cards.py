@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
@@ -229,6 +230,132 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _parse_utc_datetime(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        pass
+
+    match = re.match(r"^\s*(\d{1,2})/(\d{1,2})\s*-\s*(\d{1,2}):(\d{2})\s*([AP]M)\s*([A-Z]{2,3})?\s*$", text.upper())
+    if not match:
+        return None
+    month = int(match.group(1))
+    day = int(match.group(2))
+    hour = int(match.group(3))
+    minute = int(match.group(4))
+    meridiem = match.group(5)
+    tz_code = (match.group(6) or "ET").upper()
+
+    if hour == 12:
+        hour = 0
+    if meridiem == "PM":
+        hour += 12
+
+    year = datetime.now(timezone.utc).year
+    try:
+        naive = datetime(year, month, day, hour, minute)
+    except Exception:
+        return None
+
+    offset_hours = {
+        "ET": -4,
+        "EDT": -4,
+        "EST": -5,
+        "CT": -5,
+        "CDT": -5,
+        "CST": -6,
+    }.get(tz_code, -4)
+    local_tz = timezone(timedelta(hours=offset_hours))
+    return naive.replace(tzinfo=local_tz).astimezone(timezone.utc)
+
+
+def _looks_live_status_text(*values: Any) -> bool:
+    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
+    if not text:
+        return False
+    return any(token in text for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
+
+
+def _looks_terminal_status_text(*values: Any) -> bool:
+    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
+    if not text:
+        return False
+    return any(
+        token in text
+        for token in (
+            "final",
+            "finished",
+            "complete",
+            "full time",
+            "ft",
+            "postponed",
+            "cancelled",
+            "canceled",
+            "suspended",
+        )
+    )
+
+
+def _normalized_game_status(
+    *,
+    status_text: Any,
+    detail_text: Any,
+    start_time_utc: Any,
+    in_progress: Any,
+    final: Any,
+    away_pts: Any = None,
+    home_pts: Any = None,
+) -> dict[str, Any]:
+    status_raw = str(status_text or "").strip()
+    detail_raw = str(detail_text or "").strip()
+    live = bool(in_progress)
+    is_final = bool(final)
+
+    if _looks_live_status_text(status_raw, detail_raw):
+        live = True
+    if _looks_terminal_status_text(status_raw, detail_raw):
+        is_final = True
+
+    if not live and not is_final:
+        start_dt = _parse_utc_datetime(start_time_utc)
+        if start_dt is not None and start_dt <= datetime.now(timezone.utc) - timedelta(hours=3):
+            is_final = True
+
+    if live:
+        is_final = False
+
+    away_val = _safe_float(away_pts)
+    home_val = _safe_float(home_pts)
+
+    if is_final:
+        status_label = "Final"
+    elif live:
+        status_label = "Live"
+    else:
+        status_label = "Scheduled"
+
+    if is_final:
+        detail = detail_raw if _looks_terminal_status_text(detail_raw) else "Final"
+    elif live:
+        detail = detail_raw or status_raw or "Live"
+    else:
+        detail = detail_raw or status_raw or "Scheduled"
+
+    return {
+        "status": status_label,
+        "detail": detail,
+        "in_progress": bool(live),
+        "final": bool(is_final),
+        "has_score": bool(away_val is not None and home_val is not None),
+    }
 
 
 def _implied_prob_from_american(value: Any) -> float | None:
@@ -582,9 +709,15 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
         home_pts = _safe_float(row.get("home_pts"))
         total_mean = (away_pts + home_pts) if away_pts is not None and home_pts is not None else None
         margin_mean = (home_pts - away_pts) if away_pts is not None and home_pts is not None else None
-        status_text = str(row.get("status") or "").strip()
-        in_progress = bool(row.get("in_progress"))
-        final = bool(row.get("final"))
+        normalized_status = _normalized_game_status(
+            status_text=row.get("status"),
+            detail_text=row.get("status"),
+            start_time_utc=row.get("commence_time") or row.get("start_time") or row.get("game_date") or row.get("status"),
+            in_progress=row.get("in_progress"),
+            final=row.get("final"),
+            away_pts=away_pts,
+            home_pts=home_pts,
+        )
         games.append(
             {
                 "gamePk": str(row.get("game_id") or f"{away_tri}@{home_tri}"),
@@ -598,13 +731,18 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 "home_logo": _nba_logo_url(home_tri),
                 "away": {"abbr": away_tri, "name": away_tri, "logo": _nba_logo_url(away_tri)},
                 "home": {"abbr": home_tri, "name": home_tri, "logo": _nba_logo_url(home_tri)},
-                "status": "Final" if final else ("Live" if in_progress else "Scheduled"),
-                "detail": status_text or ("Final" if final else ("Live" if in_progress else "Scheduled")),
+                "status": normalized_status["status"],
+                "detail": normalized_status["detail"],
                 "summary": "Live scoreboard fallback",
                 "gameType": "Live",
                 "betting": {},
                 "prop_recommendations": {"away": [], "home": []},
-                "live_state": dict(row),
+                "live_state": {
+                    **dict(row),
+                    "in_progress": bool(normalized_status["in_progress"]),
+                    "final": bool(normalized_status["final"]),
+                    "status": normalized_status["detail"],
+                },
                 "sim": {
                     "game_id": str(row.get("game_id") or f"{away_tri}@{home_tri}"),
                     "score": {
@@ -644,6 +782,18 @@ def _game_identity_key(game: dict[str, Any]) -> tuple[str, str, str]:
     return (event_id, away_tri, home_tri)
 
 
+def _game_matchup_key(game: dict[str, Any]) -> tuple[str, str]:
+    if not isinstance(game, dict):
+        return ("", "")
+    away_tri = _canonical_nba_tri(
+        str(game.get("away_tri") or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "") or "").strip().upper()
+    )
+    home_tri = _canonical_nba_tri(
+        str(game.get("home_tri") or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "") or "").strip().upper()
+    )
+    return (away_tri, home_tri)
+
+
 def _merge_games_with_live_state(games: list[dict[str, Any]], selected_date: str) -> tuple[list[dict[str, Any]], str | None, int, int]:
     live_games, live_source_path = _games_from_live_state_fallback(selected_date)
     if not live_games:
@@ -654,16 +804,26 @@ def _merge_games_with_live_state(games: list[dict[str, Any]], selected_date: str
         for game in live_games
         if isinstance(game, dict)
     }
+    live_by_matchup = {
+        _game_matchup_key(game): game
+        for game in live_games
+        if isinstance(game, dict)
+    }
     merged_games: list[dict[str, Any]] = []
     seen_keys: set[tuple[str, str, str]] = set()
+    seen_matchups: set[tuple[str, str]] = set()
     updated_count = 0
 
     for game in games:
         if not isinstance(game, dict):
             continue
         key = _game_identity_key(game)
+        matchup = _game_matchup_key(game)
         seen_keys.add(key)
+        seen_matchups.add(matchup)
         live_game = live_by_key.get(key)
+        if not isinstance(live_game, dict):
+            live_game = live_by_matchup.get(matchup)
         if not isinstance(live_game, dict):
             merged_games.append(game)
             continue
@@ -682,7 +842,11 @@ def _merge_games_with_live_state(games: list[dict[str, Any]], selected_date: str
         updated_count += 1
         merged_games.append(merged)
 
-    extras = [game for key, game in live_by_key.items() if key not in seen_keys]
+    extras = [
+        game
+        for key, game in live_by_key.items()
+        if key not in seen_keys and _game_matchup_key(game) not in seen_matchups
+    ]
     if extras:
         merged_games.extend(extras)
 
@@ -894,6 +1058,13 @@ def _game_from_row(
         "q3": periods_payload.get("q3") if isinstance(periods_payload.get("q3"), dict) else _default_segment(segment_total, segment_margin, p_home_win),
         "q4": periods_payload.get("q4") if isinstance(periods_payload.get("q4"), dict) else _default_segment(segment_total, segment_margin, p_home_win),
     }
+    normalized_status = _normalized_game_status(
+        status_text=row.get("status"),
+        detail_text=row.get("commence_time"),
+        start_time_utc=row.get("commence_time"),
+        in_progress=row.get("in_progress"),
+        final=row.get("final"),
+    )
     return {
         "gamePk": game_id,
         "event_id": row.get("event_id"),
@@ -905,8 +1076,8 @@ def _game_from_row(
         "home_logo": _nba_logo_url(home_tri),
         "away": {"abbr": away_tri, "name": away_name, "logo": _nba_logo_url(away_tri)},
         "home": {"abbr": home_tri, "name": home_name, "logo": _nba_logo_url(home_tri)},
-        "status": "Processed artifact",
-        "detail": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled",
+        "status": normalized_status["status"],
+        "detail": normalized_status["detail"],
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
         "gameType": "NBA",
         "odds": {
@@ -967,6 +1138,11 @@ def _game_from_row(
         "prop_recommendations": {
             "away": props_payload.get("away") if isinstance(props_payload.get("away"), list) else [],
             "home": props_payload.get("home") if isinstance(props_payload.get("home"), list) else [],
+        },
+        "live_state": {
+            "in_progress": bool(normalized_status["in_progress"]),
+            "final": bool(normalized_status["final"]),
+            "status": normalized_status["detail"],
         },
         "game_market_recommendations": [],
         "metrics": [
@@ -1285,11 +1461,15 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     for game in games:
         if not isinstance(game, dict):
             continue
-        status_text = str(game.get("status") or "").strip()
-        detail_text = str(game.get("detail") or "").strip()
-        status_lower = f"{status_text} {detail_text}".lower()
-        in_progress = any(token in status_lower for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
-        final = any(token in status_lower for token in ("final", "finished", "complete"))
+        normalized_status = _normalized_game_status(
+            status_text=game.get("status"),
+            detail_text=game.get("detail"),
+            start_time_utc=((game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None) or game.get("detail") or game.get("status"),
+            in_progress=((game.get("live_state") or {}).get("in_progress") if isinstance(game.get("live_state"), dict) else False),
+            final=((game.get("live_state") or {}).get("final") if isinstance(game.get("live_state"), dict) else False),
+            away_pts=((game.get("sim") or {}).get("score", {}).get("away_mean") if isinstance(game.get("sim"), dict) else None),
+            home_pts=((game.get("sim") or {}).get("score", {}).get("home_mean") if isinstance(game.get("sim"), dict) else None),
+        )
         out_games.append(
             {
                 "game_id": game.get("gamePk"),
@@ -1299,11 +1479,11 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                 "home_pts": None,
                 "away_pts": None,
                 "status_id": None,
-                "status": detail_text or status_text,
+                "status": normalized_status["detail"],
                 "period": None,
                 "clock": "",
-                "in_progress": bool(in_progress and not final),
-                "final": bool(final),
+                "in_progress": bool(normalized_status["in_progress"]),
+                "final": bool(normalized_status["final"]),
                 "periods": [],
             }
         )
