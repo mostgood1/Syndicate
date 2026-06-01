@@ -47,6 +47,49 @@
     {
       "game_key": "MIN@PHX",
       "game_id": "2",
+      "player": "Jovana Nogic",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "MIN",
+      "score": 58.12715698082529,
+      "score_adj": 58.12715698082529,
+      "tier": "High",
+      "model": {
+        "pts": 13.088165624999998,
+        "reb": 0.9780734375,
+        "ast": 1.78211015625,
+        "threes": 2.336146875,
+        "stl": 0.777859375,
+        "blk": 0.0,
+        "tov": 1.75018359375,
+        "pra": 15.848349218749998,
+        "pr": 14.0662390625,
+        "pa": 14.870275781249997,
+        "ra": 2.76018359375
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -102.0,
+        "edge": 0.2935133669328802,
+        "ev": 0.5812715698082529,
+        "ev_pct": 58.12715698082529,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 58.1%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.3 vs line 1.5 (+0.8)"
+    },
+    {
+      "game_key": "MIN@PHX",
+      "game_id": "2",
       "player": "Kahleah Copper",
       "team": "PHX",
       "team_tricode": "PHX",
@@ -82,7 +125,6 @@
       "top_play_reasons": [
         "EV 56.6%",
         "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 1.0 vs line 1.5 (-0.5)"
@@ -129,49 +171,6 @@
         "Best line available"
       ],
       "basketball_summary": "model 2.4 vs line 1.5 (+0.9)"
-    },
-    {
-      "game_key": "MIN@PHX",
-      "game_id": "2",
-      "player": "Jovana Nogic",
-      "team": "PHX",
-      "team_tricode": "PHX",
-      "opponent": "MIN",
-      "score": 49.278026370619834,
-      "score_adj": 49.278026370619834,
-      "tier": "High",
-      "model": {
-        "pts": 13.088165624999998,
-        "reb": 0.9780734375,
-        "ast": 1.78211015625,
-        "threes": 2.336146875,
-        "stl": 0.777859375,
-        "blk": 0.0,
-        "tov": 1.75018359375,
-        "pra": 15.848349218749998,
-        "pr": 14.0662390625,
-        "pa": 14.870275781249997,
-        "ra": 2.76018359375
-      },
-      "top_play": {
-        "market": "threes",
-        "side": "OVER",
-        "line": 1.5,
-        "price": -115.0,
-        "edge": 0.26358014105215266,
-        "ev": 0.4927802637061983,
-        "ev_pct": 49.278026370619834,
-        "book": "williamhill_us",
-        "p_win": 1.0,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 49.3%",
-        "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
-        "Best line available"
-      ],
-      "basketball_summary": "model 2.3 vs line 1.5 (+0.8)"
     },
     {
       "game_key": "SEA@DAL",
