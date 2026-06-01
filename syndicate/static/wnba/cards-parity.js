@@ -4756,7 +4756,7 @@
   }
 
   function renderBoxTableRows(players) {
-    const sorted = [...safeArray(players)].sort((a, b) => Number(b.min_mean || 0) - Number(a.min_mean || 0));
+    const sorted = [...safeArray(players)].sort((a, b) => Number(b.minutes || b.min_mean || 0) - Number(a.minutes || a.min_mean || 0));
     return sorted.map((player) => {
       return `
         <tr>
@@ -4766,7 +4766,7 @@
             </div>
           </td>
           <td>${escapeHtml(player.position || 'N/A')}</td>
-          <td>${fmtNumber(player.min_mean, 1)}</td>
+          <td>${fmtNumber(player.minutes ?? player.min_mean, 1)}</td>
           <td>${fmtNumber(player.pts_mean, 1)}</td>
           <td>${fmtNumber(player.reb_mean, 1)}</td>
           <td>${fmtNumber(player.ast_mean, 1)}</td>
@@ -4871,25 +4871,19 @@
         </div>
       `;
     }
-    // Only show actual box section if game is live or has live data
-    if (hasLiveActualRows || liveState?.in_progress || liveState?.final) {
-      return `
-        <div class="cards-box-grid">
-          <div class="cards-box-column cards-box-column--actual">
-            ${renderActualBoxSection(game.away_tri, game.away_name, liveBoxscore.away, liveState, game.away_logo)}
-            ${renderActualBoxSection(game.home_tri, game.home_name, liveBoxscore.home, liveState, game.home_logo)}
-          </div>
-          <div class="cards-box-column cards-box-column--sim">
-            ${renderBoxSection(game.away_tri, game.away_name, game?.sim?.players?.away || [], game?.sim?.injuries?.away || [], game?.sim?.missing_prop_players?.away || [], game.away_logo)}
-            ${renderBoxSection(game.home_tri, game.home_name, game?.sim?.players?.home || [], game?.sim?.injuries?.home || [], game?.sim?.missing_prop_players?.home || [], game.home_logo)}
-          </div>
-        </div>
-      `;
-    }
-    // For pre-game, only show sim box score
+    // Always show both live and sim columns when sim detail is loaded (matching solo app behavior)
+    // Live box shows "Awaiting tipoff" badge with empty rows for pre-game
     return `
-      ${renderBoxSection(game.away_tri, game.away_name, game?.sim?.players?.away || [], game?.sim?.injuries?.away || [], game?.sim?.missing_prop_players?.away || [], game.away_logo)}
-      ${renderBoxSection(game.home_tri, game.home_name, game?.sim?.players?.home || [], game?.sim?.injuries?.home || [], game?.sim?.missing_prop_players?.home || [], game.home_logo)}
+      <div class="cards-box-grid">
+        <div class="cards-box-column cards-box-column--actual">
+          ${renderActualBoxSection(game.away_tri, game.away_name, liveBoxscore.away, liveState, game.away_logo)}
+          ${renderActualBoxSection(game.home_tri, game.home_name, liveBoxscore.home, liveState, game.home_logo)}
+        </div>
+        <div class="cards-box-column cards-box-column--sim">
+          ${renderBoxSection(game.away_tri, game.away_name, game?.sim?.players?.away || [], game?.sim?.injuries?.away || [], game?.sim?.missing_prop_players?.away || [], game.away_logo)}
+          ${renderBoxSection(game.home_tri, game.home_name, game?.sim?.players?.home || [], game?.sim?.injuries?.home || [], game?.sim?.missing_prop_players?.home || [], game.home_logo)}
+        </div>
+      </div>
     `;
   }
 
