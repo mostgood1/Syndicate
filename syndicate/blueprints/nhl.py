@@ -66,13 +66,22 @@ def _query_string() -> str:
 
 def _load_scoreboard_rows(selected_date: str) -> list[dict[str, object]]:
     path = scoreboard_snapshot_path(selected_date)
-    if not path.exists():
-        return []
-    try:
-        with path.open("r", encoding="utf-8", newline="") as handle:
-            rows = list(csv.DictReader(handle))
-    except Exception:
-        return []
+    if path.exists():
+        try:
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+        except Exception:
+            rows = []
+    else:
+        rows = []
+
+    if not rows:
+        try:
+            from syndicate.local_nhl_odds import NhlWebClient
+
+            rows = NhlWebClient().scoreboard_day(selected_date)
+        except Exception:
+            rows = []
 
     out: list[dict[str, object]] = []
     for row in rows:
