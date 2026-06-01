@@ -197,6 +197,26 @@
                     {% for pill in item.pills or [] %}
                       <span class="sport-compact-card__chip">{{ pill.label }} {{ pill.value }}</span>
                     {% endfor %}
+                    {% if item.actual %}
+                      <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
+                    {% endif %}
+                    {% if item.live_projection %}
+                      <span class="sport-compact-card__chip">Live proj {{ item.live_projection }}</span>
+                    {% elif item.projected %}
+                      <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
+                    {% endif %}
+                    {% if item.line %}
+                      <span class="sport-compact-card__chip">Line {{ item.line }}</span>
+                    {% endif %}
+                    {% if item.odds %}
+                      <span class="sport-compact-card__chip">Odds {{ item.odds }}</span>
+                    {% endif %}
+                    {% if item.confidence %}
+                      <span class="sport-compact-card__chip">Sim {{ item.confidence }}</span>
+                    {% endif %}
+                    {% if item.game_state %}
+                      <span class="sport-compact-card__chip">{{ item.game_state }}</span>
+                    {% endif %}
                     {% if item.live_total %}
                       <span class="sport-compact-card__chip">Live total {{ item.live_total }}</span>
                     {% endif %}
@@ -264,6 +284,9 @@
                     </div>
                   {% endif %}
                   <div class="sport-compact-card__identity">
+                    {% if item.headshot_url %}
+                      <img class="sport-compact-card__headshot" src="{{ item.headshot_url }}" alt="{{ item.name }} headshot" loading="lazy">
+                    {% endif %}
                     <div class="sport-compact-card__identity-copy">
                       <div class="sport-compact-card__top">
                         <div class="sport-compact-card__title">{{ item.name }}</div>
@@ -277,11 +300,22 @@
                     {% if item.actual %}
                       <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
                     {% endif %}
-                    {% if item.projected %}
+                    {% if item.live_projection %}
+                      <span class="sport-compact-card__chip">Live proj {{ item.live_projection }}</span>
+                    {% elif item.projected %}
                       <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
                     {% endif %}
                     {% if item.line %}
                       <span class="sport-compact-card__chip">Line {{ item.line }}</span>
+                    {% endif %}
+                    {% if item.odds %}
+                      <span class="sport-compact-card__chip">Odds {{ item.odds }}</span>
+                    {% endif %}
+                    {% if item.confidence %}
+                      <span class="sport-compact-card__chip">Sim {{ item.confidence }}</span>
+                    {% endif %}
+                    {% if item.game_state %}
+                      <span class="sport-compact-card__chip">{{ item.game_state }}</span>
                     {% endif %}
                     {% if item.live_total %}
                       <span class="sport-compact-card__chip">Live total {{ item.live_total }}</span>
