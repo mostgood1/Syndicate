@@ -132,6 +132,101 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _parse_utc_datetime(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _looks_live_status_text(*values: Any) -> bool:
+    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
+    if not text:
+        return False
+    return any(token in text for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
+
+
+def _looks_terminal_status_text(*values: Any) -> bool:
+    text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
+    if not text:
+        return False
+    return any(
+        token in text
+        for token in (
+            "final",
+            "finished",
+            "complete",
+            "full time",
+            "ft",
+            "postponed",
+            "cancelled",
+            "canceled",
+            "suspended",
+        )
+    )
+
+
+def _normalized_game_status(
+    *,
+    status_text: Any,
+    detail_text: Any,
+    start_time_utc: Any,
+    in_progress: Any,
+    final: Any,
+    away_pts: Any = None,
+    home_pts: Any = None,
+) -> dict[str, Any]:
+    status_raw = str(status_text or "").strip()
+    detail_raw = str(detail_text or "").strip()
+    live = bool(in_progress)
+    is_final = bool(final)
+
+    if _looks_live_status_text(status_raw, detail_raw):
+        live = True
+    if _looks_terminal_status_text(status_raw, detail_raw):
+        is_final = True
+
+    if not live and not is_final:
+        start_dt = _parse_utc_datetime(start_time_utc)
+        if start_dt is not None and start_dt <= datetime.now(timezone.utc) - timedelta(hours=3):
+            # Upstream feeds can lag terminal flags; settle stale past-start rows as final.
+            is_final = True
+
+    if live:
+        is_final = False
+
+    away_val = _safe_float(away_pts)
+    home_val = _safe_float(home_pts)
+
+    if is_final:
+        status_label = "Final"
+    elif live:
+        status_label = "Live"
+    else:
+        status_label = "Scheduled"
+
+    if is_final:
+        detail = detail_raw if _looks_terminal_status_text(detail_raw) else "Final"
+    elif live:
+        detail = detail_raw or status_raw or "Live"
+    else:
+        detail = detail_raw or status_raw or "Scheduled"
+
+    return {
+        "status": status_label,
+        "detail": detail,
+        "in_progress": bool(live),
+        "final": bool(is_final),
+        "has_score": bool(away_val is not None and home_val is not None),
+    }
+
+
 def _implied_prob_from_american(price: float | None) -> float | None:
     value = _safe_float(price)
     if value is None or value == 0:
@@ -884,6 +979,13 @@ def _game_from_row(
     )
     prop_recommendations = dict((props_game or {}).get("prop_recommendations") or {"away": [], "home": []})
     game_market_recommendations = _source_game_market_recommendations(picks)
+    normalized_status = _normalized_game_status(
+        status_text=row.get("status"),
+        detail_text=row.get("commence_time"),
+        start_time_utc=row.get("commence_time"),
+        in_progress=row.get("in_progress"),
+        final=row.get("final"),
+    )
     return {
         "game_id": game_id,
         "gamePk": game_id,
@@ -896,8 +998,8 @@ def _game_from_row(
         "home_logo": _source_logo_url(home_tri),
         "away": {"abbr": away_tri, "name": away_name, "logo": _source_logo_url(away_tri)},
         "home": {"abbr": home_tri, "name": home_name, "logo": _source_logo_url(home_tri)},
-        "status": "Processed artifact",
-        "detail": str(row.get("commence_time") or "Scheduled").strip() or "Scheduled",
+        "status": normalized_status["status"],
+        "detail": normalized_status["detail"],
         "summary": f"{row.get('bookmaker') or 'Consensus'} market snapshot",
         "start_time": str(row.get("commence_time") or "").strip() or None,
         "odds": {"commence_time": str(row.get("commence_time") or "").strip() or None},
@@ -905,7 +1007,11 @@ def _game_from_row(
         "sim": sim_payload,
         "prop_recommendations": prop_recommendations,
         "game_market_recommendations": game_market_recommendations,
-        "live_state": None,
+        "live_state": {
+            "in_progress": bool(normalized_status["in_progress"]),
+            "final": bool(normalized_status["final"]),
+            "status": normalized_status["detail"],
+        },
         "warnings": [],
         "metrics": [
             {"label": "Away ML", "value": format_moneyline(row.get("away_ml"))},
@@ -1021,9 +1127,15 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
         if status_id <= 1 and (away_pts or 0.0) == 0.0 and (home_pts or 0.0) == 0.0:
             away_pts = None
             home_pts = None
-        status_text = str(row.get("status") or "").strip()
-        in_progress = bool(row.get("in_progress"))
-        final = bool(row.get("final"))
+        normalized_status = _normalized_game_status(
+            status_text=row.get("status"),
+            detail_text=row.get("status"),
+            start_time_utc=row.get("commence_time") or row.get("start_time") or row.get("game_date"),
+            in_progress=row.get("in_progress"),
+            final=row.get("final"),
+            away_pts=away_pts,
+            home_pts=home_pts,
+        )
         game_id = str(row.get("game_id") or f"{away_tri}@{home_tri}")
         sim_game = sim_index.get((away_tri, home_tri)) if isinstance(sim_index, dict) else None
         sim_payload = _source_sim_stub(game_id, sim_game if isinstance(sim_game, dict) else None, {})
@@ -1053,12 +1165,17 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 "home_logo": _source_logo_url(home_tri),
                 "away": {"abbr": away_tri, "name": away_tri, "logo": _source_logo_url(away_tri)},
                 "home": {"abbr": home_tri, "name": home_tri, "logo": _source_logo_url(home_tri)},
-                "status": "Final" if final else ("Live" if in_progress else "Scheduled"),
-                "detail": status_text or ("Final" if final else ("Live" if in_progress else "Scheduled")),
+                "status": normalized_status["status"],
+                "detail": normalized_status["detail"],
                 "summary": "Live scoreboard fallback",
                 "betting": betting,
                 "prop_recommendations": {"away": [], "home": []},
-                "live_state": dict(row),
+                "live_state": {
+                    **dict(row),
+                    "in_progress": bool(normalized_status["in_progress"]),
+                    "final": bool(normalized_status["final"]),
+                    "status": normalized_status["detail"],
+                },
                 "sim": {
                     **sim_payload,
                     "score": {
@@ -1349,15 +1466,19 @@ def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _status_from_game(game: dict[str, Any]) -> dict[str, Any]:
-    status_text = str(game.get("status") or "").strip()
-    detail_text = str(game.get("detail") or "").strip()
-    status_lower = f"{status_text} {detail_text}".lower()
-    in_progress = any(token in status_lower for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
-    final = any(token in status_lower for token in ("final", "finished", "complete"))
+    normalized = _normalized_game_status(
+        status_text=game.get("status"),
+        detail_text=game.get("detail"),
+        start_time_utc=game.get("start_time") or ((game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None),
+        in_progress=((game.get("live_state") or {}).get("in_progress") if isinstance(game.get("live_state"), dict) else False),
+        final=((game.get("live_state") or {}).get("final") if isinstance(game.get("live_state"), dict) else False),
+        away_pts=((game.get("away") or {}).get("score") if isinstance(game.get("away"), dict) else None),
+        home_pts=((game.get("home") or {}).get("score") if isinstance(game.get("home"), dict) else None),
+    )
     return {
-        "status": detail_text or status_text,
-        "in_progress": bool(in_progress and not final),
-        "final": bool(final),
+        "status": normalized["detail"],
+        "in_progress": bool(normalized["in_progress"]),
+        "final": bool(normalized["final"]),
         "period": None,
         "clock": "",
     }
@@ -1593,11 +1714,15 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
     for game in games:
         if not isinstance(game, dict):
             continue
-        status_text = str(game.get("status") or "").strip()
-        detail_text = str(game.get("detail") or "").strip()
-        status_lower = f"{status_text} {detail_text}".lower()
-        in_progress = any(token in status_lower for token in ("live", "in progress", "q1", "q2", "q3", "q4", "ot", "halftime"))
-        final = any(token in status_lower for token in ("final", "finished", "complete"))
+        normalized_status = _normalized_game_status(
+            status_text=game.get("status"),
+            detail_text=game.get("detail"),
+            start_time_utc=game.get("start_time") or ((game.get("odds") or {}).get("commence_time") if isinstance(game.get("odds"), dict) else None),
+            in_progress=((game.get("live_state") or {}).get("in_progress") if isinstance(game.get("live_state"), dict) else False),
+            final=((game.get("live_state") or {}).get("final") if isinstance(game.get("live_state"), dict) else False),
+            away_pts=((game.get("away") or {}).get("score") if isinstance(game.get("away"), dict) else None),
+            home_pts=((game.get("home") or {}).get("score") if isinstance(game.get("home"), dict) else None),
+        )
         away_info = game.get("away") if isinstance(game.get("away"), dict) else {}
         home_info = game.get("home") if isinstance(game.get("home"), dict) else {}
         sim_score = ((game.get("sim") or {}).get("score") or {}) if isinstance(game.get("sim"), dict) else {}
@@ -1607,14 +1732,14 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                 "event_id": game.get("event_id"),
                 "home": game.get("home_tri") or home_info.get("abbr"),
                 "away": game.get("away_tri") or away_info.get("abbr"),
-            "home_pts": _safe_float(sim_score.get("home_mean")),
-            "away_pts": _safe_float(sim_score.get("away_mean")),
+                "home_pts": _safe_float(sim_score.get("home_mean")),
+                "away_pts": _safe_float(sim_score.get("away_mean")),
                 "status_id": None,
-                "status": detail_text or status_text,
+                "status": normalized_status["detail"],
                 "period": None,
                 "clock": "",
-                "in_progress": bool(in_progress and not final),
-                "final": bool(final),
+                "in_progress": bool(normalized_status["in_progress"]),
+                "final": bool(normalized_status["final"]),
                 "periods": [],
             }
         )
