@@ -51,7 +51,9 @@ def _best_existing_path(candidates: list[Path]) -> Path | None:
             mtime = int(stat.st_mtime_ns)
         except OSError:
             return (0, 0, 0)
-        return (1 if size > 0 else 0, mtime, size)
+        # Prefer larger files (more complete data) over newer files.
+        # This prevents a header-only disk file from beating a full repo file.
+        return (1 if size > 0 else 0, size, mtime)
 
     return max(existing, key=_score)
 
