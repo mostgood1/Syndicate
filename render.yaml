@@ -12,6 +12,8 @@ services:
       mountPath: /opt/render/project/data
       sizeGB: 50
     envVars:
+      - key: TZ
+        value: America/Chicago
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: ADMIN_TOKEN
@@ -62,6 +64,8 @@ services:
     buildCommand: echo "cron build ready"
     startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase live --execution-mode source --regions us --include-mirror --timeout-sec 180
     envVars:
+      - key: TZ
+        value: America/Chicago
       - key: ADMIN_TOKEN
         fromService:
           name: syndicate
@@ -87,6 +91,8 @@ services:
     buildCommand: echo "cron build ready"
     startCommand: python scripts/render_cron_enqueue_refresh.py --sports mlb,nba,nhl,nfl,wnba,ncaab,ncaaf --phase pregame --execution-mode source --regions us --include-mirror --timeout-sec 180
     envVars:
+      - key: TZ
+        value: America/Chicago
       - key: ADMIN_TOKEN
         fromService:
           name: syndicate
@@ -112,6 +118,8 @@ services:
     buildCommand: echo "cron build ready"
     startCommand: python scripts/render_cron_enqueue_refresh.py --sports all --phase pregame --execution-mode source --regions us --include-mirror --timeout-sec 180
     envVars:
+      - key: TZ
+        value: America/Chicago
       - key: ADMIN_TOKEN
         fromService:
           name: syndicate

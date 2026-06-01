@@ -1,5 +1,5 @@
 param(
-    [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
+    [string]$Date,
     [string]$BaseUrl,
     [switch]$Json,
     [switch]$SkipTests,
@@ -21,6 +21,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Use Central Time for date calculations to match Syndicate's timezone
+if ([string]::IsNullOrWhiteSpace($Date)) {
+    $centralTZ = [TimeZoneInfo]::FindSystemTimeZoneById("Central Standard Time")
+    $Date = [TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow, $centralTZ).ToString('yyyy-MM-dd')
+}
 
 $target = Join-Path $PSScriptRoot 'scripts\daily_update_in_season.ps1'
 if (-not (Test-Path -LiteralPath $target)) {

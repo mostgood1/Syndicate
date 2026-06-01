@@ -1,5 +1,5 @@
 param(
-    [string]$Date = (Get-Date).ToString('yyyy-MM-dd'),
+    [string]$Date,
     [string]$SourceRepo = "",
     [string]$SourceArtifactRoot = "",
     [switch]$UseExistingMirrorArtifacts
@@ -8,7 +8,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($Date)) {
-    $Date = (Get-Date).ToString('yyyy-MM-dd')
+    $centralTZ = [TimeZoneInfo]::FindSystemTimeZoneById("Central Standard Time")
+    $Date = [TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow, $centralTZ).ToString('yyyy-MM-dd')
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
