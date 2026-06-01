@@ -1427,6 +1427,7 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
     bundle = _artifact_bundle(selected_date)
     sim_detail = bundle.get("sim", {}).get((home_key, away_key)) if isinstance(bundle.get("sim"), dict) else None
     if isinstance(sim_detail, dict):
+        sim_payload = sim_detail.get("sim") if isinstance(sim_detail.get("sim"), dict) else sim_detail
         return {
             "date": selected_date,
             "requested_date": selected_date,
@@ -1437,18 +1438,18 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
                     "away_tri": away_key,
                     "sim": {
                         "players_loaded": True,
-                        "players_summary": dict(sim_detail.get("players_summary") or {}),
+                        "players_summary": dict(sim_payload.get("players_summary") or sim_detail.get("players_summary") or {}),
                         "players": {
-                            "home": [dict(row) for row in (sim_detail.get("players", {}).get("home") or []) if isinstance(row, dict)],
-                            "away": [dict(row) for row in (sim_detail.get("players", {}).get("away") or []) if isinstance(row, dict)],
+                            "home": [dict(row) for row in ((sim_payload.get("players") or {}).get("home") or []) if isinstance(row, dict)],
+                            "away": [dict(row) for row in ((sim_payload.get("players") or {}).get("away") or []) if isinstance(row, dict)],
                         },
                         "missing_prop_players": {
-                            "home": [dict(row) for row in (sim_detail.get("missing_prop_players", {}).get("home") or []) if isinstance(row, dict)],
-                            "away": [dict(row) for row in (sim_detail.get("missing_prop_players", {}).get("away") or []) if isinstance(row, dict)],
+                            "home": [dict(row) for row in ((sim_payload.get("missing_prop_players") or {}).get("home") or []) if isinstance(row, dict)],
+                            "away": [dict(row) for row in ((sim_payload.get("missing_prop_players") or {}).get("away") or []) if isinstance(row, dict)],
                         },
                         "injuries": {
-                            "home": [dict(row) for row in (sim_detail.get("injuries", {}).get("home") or []) if isinstance(row, dict)],
-                            "away": [dict(row) for row in (sim_detail.get("injuries", {}).get("away") or []) if isinstance(row, dict)],
+                            "home": [dict(row) for row in ((sim_payload.get("injuries") or {}).get("home") or []) if isinstance(row, dict)],
+                            "away": [dict(row) for row in ((sim_payload.get("injuries") or {}).get("away") or []) if isinstance(row, dict)],
                         },
                     },
                 }
