@@ -2342,6 +2342,7 @@ def simulate_game(
         p_mults = getattr(pitcher_prof, "platoon_mult_vs_lhb", {}) if eff_bat == "L" else getattr(pitcher_prof, "platoon_mult_vs_rhb", {})
         batter_venue_mults = getattr(batter_prof, "venue_mult_home", {}) if batting_roster is home else getattr(batter_prof, "venue_mult_away", {})
         pitcher_venue_mults = getattr(pitcher_prof, "venue_mult_home", {}) if fielding_roster is home else getattr(pitcher_prof, "venue_mult_away", {})
+        venue_key = int(getattr(home.team, "team_id", 0) or 0)
 
         batter_shape_mults = _statcast_shape_rate_mults(batter_prof, role="batter")
         pitcher_shape_mults = _statcast_shape_rate_mults(pitcher_prof, role="pitcher")
@@ -2380,6 +2381,31 @@ def simulate_game(
                 if isinstance(mult, (int, float)):
                     batter_inplay = _clamp_rate(float(batter_inplay) * float(mult), 0.10, 0.45)
                     batter_xb_share = _clamp_rate(float(batter_xb_share) * float(_clamp(float(mult), 0.90, 1.12)) ** 0.20, 0.08, 0.55)
+
+            if venue_key > 0:
+                mm = getattr(batter_prof, "vs_venue_hr_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        batter_hr = _clamp_rate(float(batter_hr) * float(mult), 0.002, 0.12)
+                        batter_xb_share = _clamp_rate(float(batter_xb_share) * float(_clamp(float(mult), 0.90, 1.15)) ** 0.24, 0.08, 0.55)
+                mm = getattr(batter_prof, "vs_venue_k_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        batter_k = _clamp_rate(float(batter_k) * float(mult), 0.05, 0.55)
+                mm = getattr(batter_prof, "vs_venue_bb_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        batter_bb = _clamp_rate(float(batter_bb) * float(mult), 0.01, 0.22)
+                mm = getattr(batter_prof, "vs_venue_inplay_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        batter_inplay = _clamp_rate(float(batter_inplay) * float(mult), 0.10, 0.45)
+                        batter_xb_share = _clamp_rate(float(batter_xb_share) * float(_clamp(float(mult), 0.90, 1.12)) ** 0.16, 0.08, 0.55)
+
             h2h_pc_mult = 1.0
             mm = getattr(batter_prof, "vs_pitcher_bb_mult", None)
             if isinstance(mm, dict):
@@ -2405,6 +2431,31 @@ def simulate_game(
         base_pitcher_bb = float(prates.get("bb_rate", pitcher_prof.bb_rate)) * _mult_from_map(pitcher_venue_mults, "bb")
         base_pitcher_hr = float(prates.get("hr_rate", pitcher_prof.hr_rate)) * _mult_from_map(pitcher_venue_mults, "hr")
         base_pitcher_inplay = float(prates.get("inplay_hit_rate", pitcher_prof.inplay_hit_rate)) * _mult_from_map(pitcher_venue_mults, "inplay")
+
+        if venue_key > 0:
+            try:
+                mm = getattr(pitcher_prof, "vs_venue_k_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        base_pitcher_k = _clamp_rate(float(base_pitcher_k) * float(mult), 0.05, 0.60)
+                mm = getattr(pitcher_prof, "vs_venue_bb_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        base_pitcher_bb = _clamp_rate(float(base_pitcher_bb) * float(mult), 0.01, 0.25)
+                mm = getattr(pitcher_prof, "vs_venue_hr_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        base_pitcher_hr = _clamp_rate(float(base_pitcher_hr) * float(mult), 0.002, 0.14)
+                mm = getattr(pitcher_prof, "vs_venue_inplay_mult", None)
+                if isinstance(mm, dict):
+                    mult = mm.get(int(venue_key))
+                    if isinstance(mult, (int, float)):
+                        base_pitcher_inplay = _clamp_rate(float(base_pitcher_inplay) * float(mult), 0.10, 0.45)
+            except Exception:
+                pass
 
         pitcher_k = _clamp_rate(base_pitcher_k * _mult_from_map(p_mults, "k") * float(pitcher_shape_mults.get("k", 1.0)), 0.05, 0.60)
         pitcher_bb = _clamp_rate(base_pitcher_bb * _mult_from_map(p_mults, "bb") * float(pitcher_shape_mults.get("bb", 1.0)), 0.01, 0.25)
