@@ -1865,63 +1865,9 @@ def _fallback_live_player_boxscore_game(
     event_id: str | None = None,
     selected_date: str | None = None,
 ) -> dict[str, Any]:
-    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
-    players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
-    away_tri = str(game.get("away_tri") or "").strip().upper()
-    home_tri = str(game.get("home_tri") or "").strip().upper()
-    out_players: list[dict[str, Any]] = []
-    for side_key, team_tri in (("away", away_tri), ("home", home_tri)):
-        side_rows = players.get(side_key) if isinstance(players.get(side_key), list) else []
-        for row in side_rows:
-            if not isinstance(row, dict):
-                continue
-            out_players.append(
-                {
-                    "player": row.get("player_name"),
-                    "player_id": row.get("player_id"),
-                    "team_tri": team_tri,
-                    "pos": str(row.get("pos") or row.get("position") or row.get("player_position") or "").strip().upper() or None,
-                    "mp": _safe_float(row.get("min_mean")),
-                    "pts": _safe_float(row.get("pts_mean")),
-                    "reb": _safe_float(row.get("reb_mean")),
-                    "ast": _safe_float(row.get("ast_mean")),
-                    "threes_made": _safe_float(row.get("threes_mean")),
-                    "stl": _safe_float(row.get("stl_mean")),
-                    "blk": _safe_float(row.get("blk_mean")),
-                    "tov": _safe_float(row.get("tov_mean")),
-                }
-            )
-
-    # If cards payload only has sim stubs, pull per-player rows from sim-detail payload.
-    if not out_players and selected_date and away_tri and home_tri:
-        detail_payload = build_source_cards_sim_detail_payload(selected_date, away_tri, home_tri)
-        detail_games = detail_payload.get("games") if isinstance(detail_payload, dict) else []
-        detail_game = detail_games[0] if isinstance(detail_games, list) and detail_games and isinstance(detail_games[0], dict) else {}
-        detail_sim = detail_game.get("sim") if isinstance(detail_game.get("sim"), dict) else {}
-        detail_players = detail_sim.get("players") if isinstance(detail_sim.get("players"), dict) else {}
-        for side_key, team_tri in (("away", away_tri), ("home", home_tri)):
-            side_rows = detail_players.get(side_key) if isinstance(detail_players.get(side_key), list) else []
-            for row in side_rows:
-                if not isinstance(row, dict):
-                    continue
-                out_players.append(
-                    {
-                        "player": row.get("player_name"),
-                        "player_id": row.get("player_id"),
-                        "team_tri": team_tri,
-                        "pos": str(row.get("pos") or row.get("position") or row.get("player_position") or "").strip().upper() or None,
-                        "mp": _safe_float(row.get("min_mean")),
-                        "pts": _safe_float(row.get("pts_mean")),
-                        "reb": _safe_float(row.get("reb_mean")),
-                        "ast": _safe_float(row.get("ast_mean")),
-                        "threes_made": _safe_float(row.get("threes_mean")),
-                        "stl": _safe_float(row.get("stl_mean")),
-                        "blk": _safe_float(row.get("blk_mean")),
-                        "tov": _safe_float(row.get("tov_mean")),
-                    }
-                )
-
-    return {"event_id": event_id or game.get("event_id"), "players": out_players}
+    # Return empty players for pre-game games (fallback is only for games without live data)
+    # The sim players should only show in the sim box section, not the live box
+    return {"event_id": event_id or game.get("event_id"), "players": []}
 
 
 def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str]) -> dict[str, Any] | None:
