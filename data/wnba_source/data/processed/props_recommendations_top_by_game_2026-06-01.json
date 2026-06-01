@@ -1,0 +1,262 @@
+{
+  "date": "2026-06-01",
+  "data": [
+    {
+      "game_key": "MIN@PHX",
+      "game_id": "2",
+      "player": "Monique Akoa Makani",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "MIN",
+      "score": 61.93639730710353,
+      "score_adj": 61.93639730710353,
+      "tier": "High",
+      "model": {
+        "pts": 0.0,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.176,
+        "blk": 0.144,
+        "tov": 0.48,
+        "pra": 0.0,
+        "pr": 0.0,
+        "pa": 0.0,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -136.0,
+        "edge": 0.3569216116002576,
+        "ev": 0.6193639730710353,
+        "ev_pct": 61.93639730710353,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 61.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.0 vs line 1.5 (-1.5)"
+    },
+    {
+      "game_key": "SEA@DAL",
+      "game_id": "1",
+      "player": "Natisha Hiedeman",
+      "team": "SEA",
+      "team_tricode": "SEA",
+      "opponent": "DAL",
+      "score": 52.13778497595858,
+      "score_adj": 52.13778497595858,
+      "tier": "High",
+      "model": {
+        "pts": 16.012678260869563,
+        "reb": 1.2282202898550725,
+        "ast": 4.5781777777777775,
+        "threes": 2.416440579710145,
+        "stl": 0.3927149758454106,
+        "blk": 0.1963574879227053,
+        "tov": 1.3745024154589371,
+        "pra": 21.81907632850241,
+        "pr": 17.240898550724637,
+        "pa": 20.590856038647342,
+        "ra": 5.80639806763285
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -117.0,
+        "edge": 0.2811115595477951,
+        "ev": 0.5213778497595858,
+        "ev_pct": 52.13778497595858,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 52.1%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.4 vs line 1.5 (+0.9)"
+    },
+    {
+      "game_key": "SEA@DAL",
+      "game_id": "1",
+      "player": "Arike Ogunbowale",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "SEA",
+      "score": 39.12027962559325,
+      "score_adj": 39.12027962559325,
+      "tier": "High",
+      "model": {
+        "pts": 14.633822385861562,
+        "reb": 2.339818262150221,
+        "ast": 3.0095882179675995,
+        "threes": 2.374619734904271,
+        "stl": 0.8383271968581247,
+        "blk": 0.1676654393716249,
+        "tov": 1.5089889543446244,
+        "pra": 19.98322886597938,
+        "pr": 16.97364064801178,
+        "pa": 17.64341060382916,
+        "ra": 5.34940648011782
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -139.0,
+        "edge": 0.22751961790616992,
+        "ev": 0.39120279625593246,
+        "ev_pct": 39.12027962559325,
+        "book": "betrivers",
+        "p_win": 0.9727927544149283,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 39.1%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.4 vs line 1.5 (+0.9)"
+    },
+    {
+      "game_key": "SEA@DAL",
+      "game_id": "1",
+      "player": "Awa Fam",
+      "team": "SEA",
+      "team_tricode": "SEA",
+      "opponent": "DAL",
+      "score": 38.409090908867526,
+      "score_adj": 38.409090908867526,
+      "tier": "High",
+      "model": {
+        "pts": 3.6,
+        "reb": 0.72,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.2683999999999999,
+        "blk": 0.2195999999999999,
+        "tov": 0.732,
+        "pra": 4.32,
+        "pr": 4.32,
+        "pa": 3.6,
+        "ra": 0.72
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -110.0,
+        "edge": 0.20119047618930608,
+        "ev": 0.38409090908867527,
+        "ev_pct": 38.409090908867526,
+        "book": "fanduel",
+        "p_win": 0.9079004328981991,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 38.4%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.6 vs line 10.5 (-6.9)"
+    },
+    {
+      "game_key": "MIN@PHX",
+      "game_id": "2",
+      "player": "Jovana Nogic",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "MIN",
+      "score": 34.91285943840301,
+      "score_adj": 34.91285943840301,
+      "tier": "High",
+      "model": {
+        "pts": 13.088165624999998,
+        "reb": 0.9780734375,
+        "ast": 1.78211015625,
+        "threes": 2.336146875,
+        "stl": 0.777859375,
+        "blk": 0.0,
+        "tov": 1.75018359375,
+        "pra": 15.848349218749998,
+        "pr": 14.0662390625,
+        "pa": 14.870275781249997,
+        "ra": 2.76018359375
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -145.0,
+        "edge": 0.20662712728850763,
+        "ev": 0.3491285943840301,
+        "ev_pct": 34.91285943840301,
+        "book": "williamhill_us",
+        "p_win": 0.9409653290779076,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 34.9%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.3 vs line 1.5 (+0.8)"
+    },
+    {
+      "game_key": "MIN@PHX",
+      "game_id": "2",
+      "player": "Courtney Williams",
+      "team": "MIN",
+      "team_tricode": "MIN",
+      "opponent": "PHX",
+      "score": 13.868283187136099,
+      "score_adj": 13.868283187136099,
+      "tier": "High",
+      "model": {
+        "pts": 15.85091111111111,
+        "reb": 5.941162962962963,
+        "ast": 3.3182296296296294,
+        "threes": 1.8083703703703704,
+        "stl": 1.378654320987654,
+        "blk": 0.7878024691358024,
+        "tov": 1.1817037037037037,
+        "pra": 25.110303703703703,
+        "pr": 21.792074074074073,
+        "pa": 19.16914074074074,
+        "ra": 9.259392592592592
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -120.0,
+        "edge": 0.07564518102074236,
+        "ev": 0.138682831871361,
+        "ev_pct": 13.868283187136099,
+        "book": "fanduel",
+        "p_win": 0.6841373773259064,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 13.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.8 vs line 1.5 (+0.3)"
+    }
+  ]
+}
