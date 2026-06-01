@@ -1111,11 +1111,13 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
         "surface": heading,
         "name": _safe_text(item.get("name"), "Prop"),
+        "headshot_url": _safe_text(item.get("headshot_url") or item.get("photo"), None),
         "market": _safe_text(item.get("market"), heading),
         "pick": _safe_text(item.get("pick"), detail.split("|")[0].strip() if detail else heading),
         "matchup": _safe_text(item.get("matchup"), "-"),
         "actual": _safe_text(item.get("actual"), "-"),
         "projected": _safe_text(item.get("projected"), "-"),
+        "live_projection": _safe_text(item.get("live_projection"), "-"),
         "line": _safe_text(item.get("line"), "-"),
         "odds": _safe_text(item.get("odds"), "-"),
         "edge": edge,
@@ -1123,6 +1125,7 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         "detail": detail,
         "href": str(item.get("href") or sport.get("hub_href") or "").strip() or None,
         "is_live": live_flag,
+        "game_state": _safe_text(item.get("game_state"), None),
         "outcome_state": outcome_state,
         "outcome_label": outcome_label,
         "live_total": live_total,
@@ -1656,15 +1659,19 @@ def _prop_item_from_rank_card(card: dict[str, Any], *, fallback_href: str | None
         "name": title,
         "detail": detail,
         "value": value,
+        "photo": card.get("photo") or card.get("player_photo") or card.get("headshot_url"),
+        "headshot_url": card.get("headshot_url") or card.get("photo") or card.get("player_photo"),
         "is_live": False,
         "market": _metric_value(metrics, ["market", "stat"]),
         "pick": badge or _metric_value(metrics, ["pick", "lean", "selection", "side"]),
         "actual": _metric_value(metrics, ["actual"]),
         "projected": _metric_value(metrics, ["projected", "projection", "model", "mean", "median"]),
+        "live_projection": _metric_value(metrics, ["live projection", "live_proj"]),
         "line": _metric_value(metrics, ["line", "market line", "threshold"]),
         "odds": _metric_value(metrics, ["odds", "price"]),
         "edge": _metric_value(metrics, ["edge", "ev"]),
         "confidence": _metric_value(metrics, ["confidence", "win prob", "probability", "hit rate"]),
+        "game_state": _metric_value(metrics, ["game state", "state", "status"]),
         "away_label": away_label,
         "home_label": home_label,
         "away_logo": _safe_text(card.get("away_logo"), None),
@@ -2109,6 +2116,8 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
             continue
         matchup = _sport_matchup(game)
         href = str(game.get("href") or "").strip() or None
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
         live_props = game.get("liveProps") if isinstance(game.get("liveProps"), list) else []
         archived_props = game.get("archivedLiveProps") if isinstance(game.get("archivedLiveProps"), list) else []
         for prop in [value for value in [*live_props, *archived_props] if isinstance(value, dict)]:
@@ -2125,6 +2134,8 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
                 "matchup": matchup,
                 "heading": "Live props",
                 "name": player,
+                "photo": prop.get("headshotUrl") or prop.get("headshot_url") or prop.get("playerPhoto") or prop.get("photo"),
+                "headshot_url": prop.get("headshotUrl") or prop.get("headshot_url") or prop.get("playerPhoto") or prop.get("photo"),
                 "is_live": True,
                 "market": market,
                 "pick": selection,
@@ -2132,10 +2143,16 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
                 "value": value,
                 "actual": _prop_metric_text(prop.get("actual")),
                 "projected": _prop_metric_text(prop.get("liveProjection") if prop.get("liveProjection") is not None else prop.get("modelMean")),
+                "live_projection": _prop_metric_text(prop.get("liveProjection") if prop.get("liveProjection") is not None else prop.get("modelMean")),
                 "line": _prop_metric_text(prop.get("line")),
                 "odds": _prop_metric_text(prop.get("odds")),
                 "edge": _pct_text(prop.get("estimatedEdge") if prop.get("estimatedEdge") is not None else prop.get("ev")),
                 "confidence": _pct_text(probability),
+                "game_state": _safe_text(prop.get("status") or prop.get("gameState") or game.get("status"), None),
+                "away_label": _safe_text(away.get("abbr") or away.get("name"), None),
+                "home_label": _safe_text(home.get("abbr") or home.get("name"), None),
+                "away_logo": _safe_text(away.get("logo") or away.get("teamLogo"), None),
+                "home_logo": _safe_text(home.get("logo") or home.get("teamLogo"), None),
                 "href": href,
             }
             rank = (
@@ -2575,6 +2592,8 @@ def _compact_prop_rows(games: list[dict[str, Any]], *, limit: int | None = None)
         if not isinstance(game, dict):
             continue
         matchup = _sport_matchup(game)
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
         prop_rows = game.get("shared_prop_rows") if isinstance(game.get("shared_prop_rows"), list) else []
         for row in prop_rows:
             if not isinstance(row, dict):
@@ -2586,22 +2605,33 @@ def _compact_prop_rows(games: list[dict[str, Any]], *, limit: int | None = None)
             if key in seen:
                 continue
             seen.add(key)
+            live_heading = _safe_text(row.get("heading"), "Props")
+            if bool(game.get("shared_is_live")) or _is_liveish(game.get("status"), game.get("detail")):
+                live_heading = "Live props"
             rows.append(
                 {
                     "matchup": matchup,
-                    "heading": _safe_text(row.get("heading"), "Props"),
+                    "heading": live_heading,
                     "name": name,
                     "detail": detail,
                     "value": value,
+                    "photo": row.get("photo"),
+                    "headshot_url": row.get("headshot_url") or row.get("photo"),
+                    "away_label": _safe_text(away.get("abbr") or away.get("name"), None),
+                    "home_label": _safe_text(home.get("abbr") or home.get("name"), None),
+                    "away_logo": _team_logo(game, "away"),
+                    "home_logo": _team_logo(game, "home"),
                     "pick": _safe_text(row.get("pick"), ""),
                     "market": _safe_text(row.get("market"), ""),
                     "line": row.get("line"),
                     "market_line": row.get("market_line") or row.get("line"),
                     "actual": row.get("actual"),
                     "projected": row.get("projected"),
+                    "live_projection": row.get("live_projection"),
                     "odds": row.get("odds"),
                     "confidence": row.get("confidence"),
                     "selection": _safe_text(row.get("selection"), ""),
+                    "game_state": _safe_text(row.get("game_state"), None),
                     "live_total": row.get("live_total") or row.get("live_total_line"),
                     "outcome_state": _safe_text(row.get("outcome_state"), None),
                     "outcome_label": _safe_text(row.get("outcome_label"), None),
