@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 import requests
 
@@ -49,21 +48,18 @@ def main() -> int:
     base_url = _base_url()
     timeout = max(30, _env_int("MLB_CRON_REQUEST_TIMEOUT_SECONDS", 180))
     market_refresh_interval = max(0, _env_int("MLB_LIVE_LENS_MARKET_REFRESH_INTERVAL_MINUTES", 15))
-    now_utc = datetime.now(timezone.utc)
-    should_refresh_markets = bool(market_refresh_interval and (now_utc.minute % market_refresh_interval == 0))
 
     session = requests.Session()
     results: dict[str, dict] = {}
 
-    if should_refresh_markets:
-        results["markets"] = _request(
-            session,
-            "GET",
-            f"{base_url}/api/cron/refresh-oddsapi-markets",
-            token=token,
-            timeout=timeout,
-            params={"republish": "off", "overwrite": "on"},
-        )
+    results["markets"] = _request(
+        session,
+        "GET",
+        f"{base_url}/api/cron/refresh-oddsapi-markets",
+        token=token,
+        timeout=timeout,
+        params={"republish": "off", "overwrite": "on"},
+    )
 
     results["liveLensTick"] = _request(
         session,
@@ -86,7 +82,7 @@ def main() -> int:
         "ok": True,
         "baseUrl": base_url,
         "marketRefreshIntervalMinutes": market_refresh_interval,
-        "marketsTriggered": should_refresh_markets,
+        "marketsTriggered": True,
         "results": results,
     }, separators=(",", ":")))
     return 0

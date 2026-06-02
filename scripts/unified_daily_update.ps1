@@ -135,7 +135,7 @@ function Invoke-Step {
         # Run in the current terminal so command output is visible as it happens.
         $process = Start-Process -FilePath $resolvedCommand -ArgumentList $argumentList -WorkingDirectory $WorkingDirectory -NoNewWindow -PassThru
         Write-Host ("    pid: {0}" -f $process.Id) -ForegroundColor DarkGray
-        $pollIntervalMs = 15000
+        $pollIntervalMs = 30000
         while (-not $process.WaitForExit($pollIntervalMs)) {
             $elapsed = (Get-Date) - $process.StartTime
             Write-Host ("    ... still running ({0}s)" -f [int]$elapsed.TotalSeconds) -ForegroundColor DarkGray

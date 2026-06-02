@@ -22,11 +22,11 @@ def _default_latest_manifest_path() -> Path:
 
 
 def _default_poll_seconds() -> float:
-    raw_value = str(os.environ.get("SYNDICATE_REFRESH_WORKER_POLL_SECONDS") or "15").strip()
+    raw_value = str(os.environ.get("SYNDICATE_REFRESH_WORKER_POLL_SECONDS") or "30").strip()
     try:
         poll_seconds = float(raw_value)
     except ValueError:
-        poll_seconds = 15.0
+        poll_seconds = 30.0
     return max(1.0, poll_seconds)
 
 

@@ -33,7 +33,7 @@
   const filtersEl = document.getElementById('cardsFilters');
   const propsStripEl = document.getElementById('cardsPropsStrip');
   const note = document.getElementById('note');
-  const pollIntervalMs = 15000;
+  const pollIntervalMs = (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000;
   const API_BASE_PATH = '/wnba/api';
   const SOURCE_CARDS_API_BASE_PATH = `${API_BASE_PATH}/source/cards`;
   const CARDS_PAYLOAD_PATH = document.body?.dataset?.cardsPayloadPath || SOURCE_CARDS_API_BASE_PATH;
