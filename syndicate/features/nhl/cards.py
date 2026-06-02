@@ -674,6 +674,31 @@ def _prop_reason_summary(row: dict[str, Any]) -> str:
     return " ".join(bits)
 
 
+def _props_movement_from_recommendation(line_value: float | None, price_value: float | None) -> dict[str, dict[str, Any]]:
+    if line_value is None and price_value is None:
+        return {
+            "line": {"open": None, "prev": None, "cur": None, "d_open": None, "d_prev": None},
+            "price": {"open": None, "prev": None, "cur": None, "d_open": None, "d_prev": None},
+        }
+
+    return {
+        "line": {
+            "open": line_value,
+            "prev": line_value,
+            "cur": line_value,
+            "d_open": 0.0,
+            "d_prev": 0.0,
+        },
+        "price": {
+            "open": price_value,
+            "prev": price_value,
+            "cur": price_value,
+            "d_open": 0.0,
+            "d_prev": 0.0,
+        },
+    }
+
+
 def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[str, Any]:
     requested_date, resolved_date, lookahead_applied = _resolve_cards_date(selected_date)
     rows, source_path = _props_recommendation_rows(resolved_date)
@@ -686,6 +711,7 @@ def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[
     for row in rows:
         ev_value = _safe_float(row.get("ev"))
         price_value = _safe_float(row.get("price"))
+        line_value = _safe_float(row.get("line"))
         if ev_value is None or price_value is None:
             continue
         if ev_value < 0.02:
@@ -707,20 +733,17 @@ def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[
                 "book": str(row.get("book") or "").strip().lower() or None,
                 "ev": ev_value,
                 "prob": _safe_float(row.get("chosen_prob") or row.get("prob")),
-                "line": _safe_float(row.get("line")),
+                "line": line_value,
                 "price": price_value,
                 "drivers": str(row.get("edge_reasons") or "").strip() or None,
                 "reason_summary": _prop_reason_summary(row),
                 "reasons": _split_reason_tokens(row.get("edge_reasons")),
-                "movement": {
-                    "line": {"open": None, "prev": None, "cur": None, "d_open": None, "d_prev": None},
-                    "price": {"open": None, "prev": None, "cur": None, "d_open": None, "d_prev": None},
-                },
+                "movement": _props_movement_from_recommendation(line_value, price_value),
                 "has_snapshot": False,
                 "has_current_snapshot": False,
                 "has_movement": False,
                 "movement_score": 0.0,
-                "tracking_note": "Snapshot unavailable",
+                "tracking_note": "Current recommendation only",
             }
         )
 
