@@ -86,7 +86,26 @@ app = Flask(
 _ROOT_DIR = Path(__file__).resolve().parents[2]
 _TRACKED_DATA_DIR = _ROOT_DIR / "data"
 _DATA_ROOT_ENV = str(os.environ.get("MLB_BETTING_DATA_ROOT") or "").strip()
-_DATA_DIR = (Path(_DATA_ROOT_ENV).resolve() if _DATA_ROOT_ENV else _TRACKED_DATA_DIR.resolve())
+
+
+def _resolve_mlb_data_dir() -> Path:
+    if _DATA_ROOT_ENV:
+        return Path(_DATA_ROOT_ENV).resolve()
+
+    syndicate_data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    if syndicate_data_root:
+        rendered_root = Path(syndicate_data_root).resolve() / "mlb_source" / "source_artifacts" / "data"
+        if rendered_root.exists():
+            return rendered_root
+        bundled_root = Path(syndicate_data_root).resolve() / "mlb_source" / "data"
+        if bundled_root.exists():
+            return bundled_root
+        return rendered_root
+
+    return _TRACKED_DATA_DIR.resolve()
+
+
+_DATA_DIR = _resolve_mlb_data_dir()
 _DAILY_DIR = _DATA_DIR / "daily"
 _MARKET_DIR = _DATA_DIR / "market" / "oddsapi"
 _LIVE_LENS_DIR = Path(
@@ -363,7 +382,7 @@ _PAYLOAD_CACHE_MAX_ITEM_BYTES = _env_int("MLB_PAYLOAD_CACHE_MAX_ITEM_BYTES", 209
 _LIVE_LENS_LOOP_DEFAULT_INTERVAL_SECONDS = 30
 _LIVE_LENS_LOOP_MIN_INTERVAL_SECONDS = 5
 _LIVE_ODDSAPI_REFRESH_MIN_INTERVAL_SECONDS = 15
-_LIVE_LENS_REPORT_REFRESH_DEFAULT_INTERVAL_SECONDS = 120
+_LIVE_LENS_REPORT_REFRESH_DEFAULT_INTERVAL_SECONDS = 30
 _LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS = 180
 _BETTING_CARD_DEFAULT_DAILY_BUDGET_DOLLARS = _env_float("MLB_BETTING_CARD_DAILY_BUDGET_DOLLARS", 500.0, minimum=0.0)
 _LIVE_LENS_LOOP_THREAD: Optional[threading.Thread] = None

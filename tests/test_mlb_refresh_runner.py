@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import sys
 import tempfile
 import unittest
 from datetime import datetime
@@ -60,6 +62,44 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(len(odds_module.calls), 1)
         self.assertEqual(odds_module.calls[0]["date"], "2026-05-22")
         self.assertEqual(odds_module.calls[0]["regions"], "us,eu")
+
+    def test_live_lens_report_refresh_default_is_thirty_seconds(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with patch.dict(os.environ, {}, clear=True):
+                spec.loader.exec_module(module)
+
+            self.assertEqual(module._live_lens_report_refresh_interval_seconds(), 30)
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def test_live_lens_data_dir_prefers_render_disk_when_only_syndicate_root_is_set(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_data_dir", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            syndicate_root = Path(tmp_dir)
+            expected_root = syndicate_root / "mlb_source" / "source_artifacts" / "data"
+            expected_root.mkdir(parents=True, exist_ok=True)
+
+            try:
+                with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": str(syndicate_root)}, clear=True):
+                    spec.loader.exec_module(module)
+
+                self.assertEqual(module._DATA_DIR, expected_root.resolve())
+                self.assertEqual(module._LIVE_LENS_DIR, (expected_root / "live_lens").resolve())
+            finally:
+                sys.modules.pop(spec.name, None)
 
     def test_main_prefers_existing_source_artifacts_when_overwrite_off(self) -> None:
         module = self._load_module()

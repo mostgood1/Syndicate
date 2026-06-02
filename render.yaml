@@ -44,6 +44,20 @@ services:
         value: "5"
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "1"
+      - key: MLB_BETTING_DATA_ROOT
+        value: /opt/render/project/data/mlb_source/source_artifacts/data
+      - key: MLB_LIVE_LENS_DIR
+        value: /opt/render/project/data/mlb_source/source_artifacts/data/live_lens
+      - key: NBA_BETTING_DATA_ROOT
+        value: /opt/render/project/data/nba_source/source_artifacts/data
+      - key: NBA_LIVE_LENS_DIR
+        value: /opt/render/project/data/nba_source/source_artifacts/data/live_lens
+      - key: WNBA_BETTING_DATA_ROOT
+        value: /opt/render/project/data/wnba_source/source_artifacts/data
+      - key: WNBA_LIVE_LENS_DIR
+        value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
+      - key: NHL_LIVE_LENS_DIR
+        value: /opt/render/project/data/nhl_source/source_artifacts/data/live_lens
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "true"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
@@ -51,7 +65,7 @@ services:
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
-        value: "120"
+        value: "30"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "30"
 
