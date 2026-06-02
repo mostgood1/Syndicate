@@ -31,7 +31,7 @@ services:
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_NHL_SOURCE_CLI_GENERATION
-        value: "false"
+        value: "true"
       - key: WEB_CONCURRENCY
         value: "3"
       - key: GUNICORN_THREADS

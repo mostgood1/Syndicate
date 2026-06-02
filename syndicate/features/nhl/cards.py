@@ -137,11 +137,6 @@ def _normalized_game_status(
     }
 
 
-def _public_schedule_fallback_enabled() -> bool:
-    value = str(os.environ.get("NHL_PUBLIC_SCHEDULE_FALLBACK") or "").strip().lower()
-    return value in {"1", "true", "yes", "on"}
-
-
 def _pct_text(value: Any) -> str:
     number = _safe_float(value)
     return format_pct(number) if number is not None else "-"
@@ -351,107 +346,6 @@ def _games_from_artifact(selected_date: str) -> tuple[list[dict[str, Any]], str]
     return games, str(source_path)
 
 
-def _scoreboard_rows_with_fallback(selected_date: str) -> tuple[list[dict[str, Any]], str]:
-    path = scoreboard_snapshot_path(selected_date)
-    rows = _load_csv_rows(path) if path.exists() else []
-    if rows:
-        return rows, str(path)
-
-    try:
-        from syndicate.local_nhl_odds import NhlWebClient
-
-        live_rows = NhlWebClient().scoreboard_day(selected_date)
-    except Exception:
-        live_rows = []
-
-    normalized: list[dict[str, Any]] = []
-    for row in live_rows:
-        if not isinstance(row, dict):
-            continue
-        normalized.append(
-            {
-                "gamePk": row.get("gamePk") or row.get("game_id"),
-                "away": row.get("away") or row.get("away_team"),
-                "home": row.get("home") or row.get("home_team"),
-                "away_abbr": row.get("away_abbr") or row.get("away_tri"),
-                "home_abbr": row.get("home_abbr") or row.get("home_tri"),
-                "away_goals": row.get("away_goals") or row.get("awayScore") or row.get("away_score"),
-                "home_goals": row.get("home_goals") or row.get("homeScore") or row.get("home_score"),
-                "gameState": row.get("gameState") or row.get("game_state") or row.get("state"),
-                "period": row.get("period") or row.get("web_period"),
-                "clock": row.get("clock") or row.get("web_clock"),
-                "gameDate": row.get("gameDate") or row.get("scheduled_start_utc") or row.get("start_time_utc"),
-            }
-        )
-    if normalized:
-        return normalized, "nhlweb_live_fetch"
-    return [], str(path)
-
-
-def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, Any]], str]:
-    rows, source_path = _scoreboard_rows_with_fallback(selected_date)
-    games: list[dict[str, Any]] = []
-    for idx, row in enumerate(rows, start=1):
-        away_name = str(row.get("away") or "Away").strip() or "Away"
-        home_name = str(row.get("home") or "Home").strip() or "Home"
-        away_abbr = team_abbreviation(away_name)
-        home_abbr = team_abbreviation(home_name)
-        away_goals = _safe_float(row.get("away_goals"))
-        home_goals = _safe_float(row.get("home_goals"))
-        game_state = str(row.get("gameState") or "").strip().upper()
-        normalized_status = _normalized_game_status(
-            status_text=game_state,
-            detail_text=("Final" if game_state == "OFF" else game_state),
-            start_time_utc=row.get("gameDate") or row.get("startTimeUTC") or row.get("scheduled_start_utc"),
-            in_progress=False,
-            final=(game_state == "OFF"),
-            away_pts=away_goals,
-            home_pts=home_goals,
-        )
-        summary = (
-            f"Score {away_abbr} {format_num(away_goals)} - {format_num(home_goals)} {home_abbr}"
-            if away_goals is not None and home_goals is not None
-            else "Archived scoreboard snapshot"
-        )
-        games.append(
-            {
-                "gamePk": str(row.get("gamePk") or idx),
-                "away_tri": away_abbr,
-                "away_name": away_name,
-                "home_tri": home_abbr,
-                "home_name": home_name,
-                "away_logo": team_logo_url(away_abbr),
-                "home_logo": team_logo_url(home_abbr),
-                "away": {"abbr": away_abbr, "name": away_name, "logo": team_logo_url(away_abbr)},
-                "home": {"abbr": home_abbr, "name": home_name, "logo": team_logo_url(home_abbr)},
-                "status": normalized_status["status"],
-                "detail": normalized_status["detail"],
-                "summary": summary,
-                "gameType": "NHL",
-                "metrics": [
-                    {"label": "Away goals", "value": format_num(away_goals)},
-                    {"label": "Home goals", "value": format_num(home_goals)},
-                    {"label": "State", "value": game_state or "-"},
-                ],
-                "panels": [
-                    {
-                        "eyebrow": "Archived scoreboard",
-                        "title": "Saved game state",
-                        "body": "This NHL card is being reconstructed from the archived scoreboard snapshot because the processed predictions row was unavailable for this date.",
-                        "summary_stats": [
-                            {"label": away_abbr, "value": format_num(away_goals)},
-                            {"label": home_abbr, "value": format_num(home_goals)},
-                            {"label": "State", "value": game_state or "-"},
-                        ],
-                    }
-                ],
-                "href": "/nhl",
-                "href_label": "Open NHL hub",
-            }
-        )
-    return games, source_path
-
-
 def _recommendation_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
     path = recommendation_path(selected_date)
     rows = _load_csv_rows(path) if path.exists() else []
@@ -581,95 +475,6 @@ def _sim_goalie_names_by_game_team(selected_date: str) -> dict[tuple[str, str, s
         if current is None or candidate[0] > current[0] or (candidate[0] == current[0] and candidate[1] > current[1]):
             best[key] = candidate
     return {key: value[2] for key, value in best.items()}
-
-
-@lru_cache(maxsize=32)
-def _schedule_payload(selected_date: str) -> dict[str, Any]:
-    if not _public_schedule_fallback_enabled():
-        return {}
-    url = f"https://api-web.nhle.com/v1/schedule/{selected_date}"
-    try:
-        request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urlopen(request, timeout=3) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _next_scheduled_game_date_after_empty_slate(selected_date: str) -> str | None:
-    payload = _schedule_payload(selected_date)
-    game_week = payload.get("gameWeek") or []
-    selected_day_has_games = False
-    for week in game_week:
-        if str(week.get("date") or "") != selected_date:
-            continue
-        games = week.get("games") or []
-        if isinstance(games, list) and games:
-            selected_day_has_games = True
-            break
-        try:
-            selected_day_has_games = int(week.get("numberOfGames") or 0) > 0
-        except Exception:
-            selected_day_has_games = False
-        break
-
-    if selected_day_has_games:
-        return None
-
-    for week in game_week:
-        candidate_date = str(week.get("date") or "").strip()
-        if not candidate_date or candidate_date <= selected_date:
-            continue
-        games = week.get("games") or []
-        if isinstance(games, list) and games:
-            return candidate_date
-        try:
-            if int(week.get("numberOfGames") or 0) > 0:
-                return candidate_date
-        except Exception:
-            continue
-    return None
-
-
-@lru_cache(maxsize=32)
-def _schedule_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
-    payload = _schedule_payload(selected_date)
-    if not payload:
-        return {}
-
-    def _team_name(team: dict[str, Any]) -> str:
-        try:
-            place = team.get("placeName") or {}
-            common = team.get("commonName") or {}
-            place_name = place.get("default") if isinstance(place, dict) else str(place or "")
-            common_name = common.get("default") if isinstance(common, dict) else str(common or "")
-            return " ".join(f"{place_name} {common_name}".split())
-        except Exception:
-            return ""
-
-    out: dict[tuple[str, str], dict[str, Any]] = {}
-    for week in payload.get("gameWeek") or []:
-        if str(week.get("date") or "") != selected_date:
-            continue
-        for game in week.get("games") or []:
-            away_name = _team_name(game.get("awayTeam") or {})
-            home_name = _team_name(game.get("homeTeam") or {})
-            if not away_name or not home_name:
-                continue
-            venue = None
-            raw_venue = game.get("venue")
-            if isinstance(raw_venue, dict):
-                venue = raw_venue.get("default") or raw_venue.get("name")
-            elif isinstance(raw_venue, str):
-                venue = raw_venue
-            out[(away_name, home_name)] = {
-                "scheduled_start_utc": game.get("startTimeUTC") or None,
-                "venue": venue,
-                "game_state": game.get("gameState") or None,
-                "gamePk": game.get("id"),
-            }
-    return out
 
 
 def _sim_boxscore_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
@@ -935,17 +740,6 @@ def _prediction_dates_with_rows() -> list[str]:
 
 def _resolve_cards_date(selected_date: str | None) -> tuple[str, str, bool]:
     requested_date = str(selected_date or default_date()).strip() or default_date()
-    available_dates = _prediction_dates_with_rows()
-    if not available_dates:
-        next_scheduled_date = _next_scheduled_game_date_after_empty_slate(requested_date)
-        if next_scheduled_date:
-            return requested_date, next_scheduled_date, True
-        return requested_date, requested_date, False
-    if requested_date in available_dates:
-        return requested_date, requested_date, False
-    next_scheduled_date = _next_scheduled_game_date_after_empty_slate(requested_date)
-    if next_scheduled_date:
-        return requested_date, next_scheduled_date, True
     return requested_date, requested_date, False
 
 
@@ -956,27 +750,15 @@ def build_source_bundle_payload(selected_date: str | None) -> dict[str, Any]:
     props_rows, props_path = _props_recommendation_rows(resolved_date)
     empty_state = None
     if not prediction_rows:
-        if lookahead_applied:
-            empty_state = {
-                "eyebrow": "NHL cards",
-                "title": "Today has no NHL games; next game day is queued",
-                "body": "The requested date is an empty NHL slate, so the cards source advanced to the next scheduled game day. Saved prediction rows are not available for that next slate yet.",
-                "list_items": [
-                    f"Requested date: {requested_date}",
-                    f"Next scheduled game day: {resolved_date}",
-                    "No local saved rows were found for the requested date.",
-                ],
-            }
-        else:
-            empty_state = {
-                "eyebrow": "NHL cards",
-                "title": "No game cards were available for this date",
-                "body": "The source cards shell only renders saved NHL prediction rows for the selected slate, and none were available for this date.",
-                "list_items": [
-                    f"Requested date: {requested_date}",
-                    "Choose another stored NHL date from the date control.",
-                ],
-            }
+        empty_state = {
+            "eyebrow": "NHL cards",
+            "title": "No game cards were available for this date",
+            "body": "The source cards shell only renders saved NHL prediction rows for the selected slate, and none were available for this date.",
+            "list_items": [
+                f"Requested date: {requested_date}",
+                "Choose another stored NHL date from the date control.",
+            ],
+        }
     return {
         "ok": True,
         "date": resolved_date,
@@ -1013,10 +795,6 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
 
     games, source_path = _games_from_artifact(resolved_date)
     source_title = "NHL processed predictions"
-    if not games:
-        games, source_path = _games_from_scoreboard_snapshot(resolved_date)
-        if games:
-            source_title = "NHL archived scoreboard"
     using_sample_data = False
 
     scoreboard_items = [
@@ -1041,21 +819,18 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
         "source_title": source_title if games else "NHL cards unavailable",
         "empty_state": {
             "eyebrow": "NHL cards",
-            "title": "Today has no NHL games; next game day is queued" if lookahead_applied else "No game cards were available for this date",
-            "body": "The requested date is an empty NHL slate, so the board advanced to the next scheduled game day. Saved prediction or archived scoreboard rows are not available for that next slate yet." if lookahead_applied else "The cards board only renders saved NHL prediction or archived scoreboard rows, and none were available for the requested date.",
+            "title": "No game cards were available for this date",
+            "body": "The cards board only renders saved NHL prediction rows for the selected slate, and none were available for the requested date.",
             "list_items": [
                 f"Requested date: {requested_date}",
-                *( [f"Next scheduled game day: {resolved_date}", "No local saved rows were found for the requested date."] if lookahead_applied else ["Choose another stored NHL date from the date control."] ),
+                "Choose another stored NHL date from the date control.",
             ],
         } if not games else None,
         "show_source_summary": True,
         "header_stats": [
             {"label": "Games", "value": str(len(games))},
             {"label": "Source", "value": Path(source_path).name if games else "No data"},
-            *([
-                {"label": "Requested", "value": requested_date},
-                {"label": "Next game day", "value": resolved_date},
-            ] if lookahead_applied else []),
+            {"label": "Requested", "value": requested_date},
         ],
         "route_path": "/nhl/cards",
         "intro_title": "NHL Cards",
