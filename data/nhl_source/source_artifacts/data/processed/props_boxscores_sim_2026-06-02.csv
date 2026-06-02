@@ -1,0 +1,209 @@
+team,player_id,period,player,game_home,game_away,date,shots,goals,assists,points,blocks,saves,toi_sec,is_dressed
+Carolina Hurricanes,8478427,1,Sebastian Aho,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.846,0.11800000000000001,0.23700000000000002,0.35500000000000004,0.5730000000000001,0.0,428.0888888888867,1
+Carolina Hurricanes,8482093,1,Seth Jarvis,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9540000000000001,0.131,0.224,0.355,0.626,0.0,428.0888888888867,1
+Carolina Hurricanes,8477940,1,Nikolaj Ehlers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.078,0.166,0.241,0.40700000000000003,0.731,0.0,428.0888888888867,1
+Carolina Hurricanes,8480817,1,K'Andre Miller,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9440000000000001,0.148,0.23900000000000002,0.387,0.631,0.0,522.2222222222154,1
+Carolina Hurricanes,8478970,1,Jalen Chatfield,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.964,0.134,0.215,0.349,0.658,0.0,522.2222222222154,1
+Vegas Golden Knights,8477964,1,Ivan Barbashev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9380000000000001,0.159,0.191,0.35,0.617,0.0,403.1555555555554,1
+Vegas Golden Knights,8483890,1,Braeden Bowman,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.908,0.129,0.22,0.349,0.601,0.0,403.1555555555554,1
+Vegas Golden Knights,8484803,1,Trevor Connelly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.873,0.117,0.211,0.328,0.622,0.0,403.1555555555554,1
+Vegas Golden Knights,8478397,1,Rasmus Andersson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.922,0.133,0.254,0.387,0.656,0.0,493.5999999999932,1
+Vegas Golden Knights,8479639,1,Dylan Coghlan,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.842,0.131,0.211,0.34199999999999997,0.515,0.0,454.6666666666621,1
+Carolina Hurricanes,8475883,1,Frederik Andersen,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,10.64,1199.9999999999998,1
+Vegas Golden Knights,8479394,1,Carter Hart,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,10.629,1199.9999999999998,1
+Carolina Hurricanes,8482702,1,Logan Stankoven,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.603,0.083,0.128,0.21100000000000002,0.458,0.0,277.64444444444524,1
+Carolina Hurricanes,8482809,1,Jackson Blake,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.622,0.093,0.133,0.226,0.454,0.0,277.64444444444524,1
+Carolina Hurricanes,8475791,1,Taylor Hall,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.635,0.09,0.151,0.241,0.45,0.0,277.64444444444524,1
+Carolina Hurricanes,8476906,1,Shayne Gostisbehere,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.531,0.088,0.145,0.23299999999999998,0.38,0.0,299.9555555555588,1
+Carolina Hurricanes,8476422,1,Mike Reilly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.557,0.099,0.151,0.25,0.389,0.0,299.9555555555588,1
+Vegas Golden Knights,8476881,1,Tomas Hertl,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.608,0.1,0.14,0.24000000000000002,0.438,0.0,265.022222222221,1
+Vegas Golden Knights,8482125,1,Alexander Holtz,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.611,0.088,0.154,0.242,0.452,0.0,265.022222222221,1
+Vegas Golden Knights,8479353,1,Brett Howden,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.636,0.092,0.139,0.231,0.41000000000000003,0.0,265.022222222221,1
+Vegas Golden Knights,8477018,1,Ben Hutton,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.661,0.088,0.178,0.266,0.439,0.0,346.5333333333377,1
+Carolina Hurricanes,8476958,1,Jaccob Slavin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.628,0.084,0.156,0.24,0.483,0.0,377.82222222222435,1
+Carolina Hurricanes,8480336,1,Sean Walker,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.728,0.107,0.155,0.262,0.41100000000000003,0.0,377.82222222222435,1
+Vegas Golden Knights,8476448,1,William Karlsson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.617,0.1,0.138,0.23800000000000002,0.429,0.0,255.24444444444313,1
+Vegas Golden Knights,8478434,1,Keegan Kolesar,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.586,0.078,0.154,0.23199999999999998,0.419,0.0,255.24444444444313,1
+Vegas Golden Knights,8479550,1,Tanner Laczynski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5720000000000001,0.08700000000000001,0.14,0.22700000000000004,0.39,0.0,255.24444444444313,1
+Vegas Golden Knights,8479602,1,Jeremy Davies,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.6900000000000001,0.105,0.179,0.284,0.47000000000000003,0.0,359.8666666666703,1
+Vegas Golden Knights,8481604,1,Pavel Dorofeyev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.655,0.10400000000000001,0.16,0.264,0.41500000000000004,0.0,276.57777777777807,1
+Vegas Golden Knights,8475343,1,Nic Dowd,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.639,0.096,0.17200000000000001,0.268,0.417,0.0,276.57777777777807,1
+Vegas Golden Knights,8478403,1,Jack Eichel,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.636,0.101,0.166,0.267,0.47000000000000003,0.0,276.57777777777807,1
+Carolina Hurricanes,8473533,1,Jordan Staal,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5680000000000001,0.095,0.14300000000000002,0.23800000000000002,0.394,0.0,255.06666666666467,1
+Carolina Hurricanes,8475235,1,Nicolas Deslauriers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.622,0.094,0.14100000000000001,0.23500000000000001,0.391,0.0,255.06666666666467,1
+Carolina Hurricanes,8480829,1,Jesperi Kotkaniemi,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.59,0.085,0.138,0.22300000000000003,0.38,0.0,255.06666666666467,1
+Vegas Golden Knights,8478396,1,Noah Hanifin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.603,0.107,0.171,0.278,0.384,0.0,321.4666666666722,1
+Vegas Golden Knights,8481527,1,Kaedan Korczak,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.552,0.094,0.129,0.223,0.34800000000000003,0.0,306.40000000000475,1
+Carolina Hurricanes,8480830,1,Andrei Svechnikov,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.548,0.08700000000000001,0.134,0.22100000000000003,0.358,0.0,239.19999999999845,1
+Carolina Hurricanes,8476921,1,Jordan Martinook,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.514,0.085,0.145,0.22999999999999998,0.373,0.0,239.19999999999845,1
+Carolina Hurricanes,8476873,1,Mark Jankowski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5690000000000001,0.085,0.132,0.21700000000000003,0.352,0.0,239.19999999999845,1
+Carolina Hurricanes,8478427,2,Sebastian Aho,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.932,0.15,0.226,0.376,0.607,0.0,431.59999999999746,1
+Carolina Hurricanes,8482093,2,Seth Jarvis,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.99,0.134,0.241,0.375,0.654,0.0,431.59999999999746,1
+Carolina Hurricanes,8477940,2,Nikolaj Ehlers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.089,0.167,0.22,0.387,0.795,0.0,431.59999999999746,1
+Carolina Hurricanes,8480817,2,K'Andre Miller,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9590000000000001,0.15,0.271,0.42100000000000004,0.655,0.0,526.4444444444377,1
+Carolina Hurricanes,8478970,2,Jalen Chatfield,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.974,0.133,0.23800000000000002,0.371,0.651,0.0,526.4444444444377,1
+Vegas Golden Knights,8477964,2,Ivan Barbashev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9400000000000001,0.14300000000000002,0.246,0.389,0.666,0.0,406.66666666666623,1
+Vegas Golden Knights,8483890,2,Braeden Bowman,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.988,0.154,0.23600000000000002,0.39,0.672,0.0,406.66666666666623,1
+Vegas Golden Knights,8484803,2,Trevor Connelly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.0210000000000001,0.14100000000000001,0.258,0.399,0.652,0.0,406.66666666666623,1
+Vegas Golden Knights,8478397,2,Rasmus Andersson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.0110000000000001,0.168,0.247,0.41500000000000004,0.617,0.0,496.488888888882,1
+Vegas Golden Knights,8479639,2,Dylan Coghlan,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.874,0.14200000000000002,0.23800000000000002,0.38,0.495,0.0,458.48888888888393,1
+Carolina Hurricanes,8475883,2,Frederik Andersen,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,10.976,1199.9999999999998,1
+Vegas Golden Knights,8479394,2,Carter Hart,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,11.137,1199.9999999999998,1
+Carolina Hurricanes,8482702,2,Logan Stankoven,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.6950000000000001,0.121,0.159,0.28,0.432,0.0,276.8000000000004,1
+Carolina Hurricanes,8482809,2,Jackson Blake,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.666,0.096,0.16,0.256,0.445,0.0,276.8000000000004,1
+Carolina Hurricanes,8475791,2,Taylor Hall,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.666,0.094,0.16,0.254,0.429,0.0,276.8000000000004,1
+Vegas Golden Knights,8481604,2,Pavel Dorofeyev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.669,0.097,0.166,0.263,0.464,0.0,277.2000000000002,1
+Vegas Golden Knights,8475343,2,Nic Dowd,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.649,0.12,0.159,0.279,0.47700000000000004,0.0,277.2000000000002,1
+Vegas Golden Knights,8478403,2,Jack Eichel,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.655,0.101,0.152,0.253,0.452,0.0,277.2000000000002,1
+Carolina Hurricanes,8476958,2,Jaccob Slavin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.668,0.097,0.189,0.28600000000000003,0.457,0.0,374.08888888889163,1
+Carolina Hurricanes,8480336,2,Sean Walker,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.745,0.13,0.196,0.326,0.458,0.0,374.08888888889163,1
+Vegas Golden Knights,8479602,2,Jeremy Davies,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.672,0.10400000000000001,0.17300000000000001,0.277,0.47400000000000003,0.0,359.20000000000374,1
+Vegas Golden Knights,8478396,2,Noah Hanifin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.586,0.1,0.168,0.268,0.393,0.0,321.955555555561,1
+Carolina Hurricanes,8473533,2,Jordan Staal,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.592,0.092,0.14400000000000002,0.23600000000000002,0.397,0.0,255.37777777777603,1
+Carolina Hurricanes,8475235,2,Nicolas Deslauriers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.644,0.091,0.148,0.239,0.381,0.0,255.37777777777603,1
+Carolina Hurricanes,8480829,2,Jesperi Kotkaniemi,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.598,0.1,0.157,0.257,0.444,0.0,255.37777777777603,1
+Vegas Golden Knights,8476881,2,Tomas Hertl,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.631,0.089,0.17,0.259,0.42,0.0,263.51111111111004,1
+Vegas Golden Knights,8482125,2,Alexander Holtz,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.637,0.096,0.136,0.232,0.445,0.0,263.51111111111004,1
+Vegas Golden Knights,8479353,2,Brett Howden,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.633,0.108,0.14100000000000001,0.249,0.468,0.0,263.51111111111004,1
+Vegas Golden Knights,8477018,2,Ben Hutton,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.604,0.095,0.161,0.256,0.468,0.0,344.3111111111155,1
+Vegas Golden Knights,8481527,2,Kaedan Korczak,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.647,0.095,0.14,0.23500000000000001,0.357,0.0,305.60000000000457,1
+Carolina Hurricanes,8476906,2,Shayne Gostisbehere,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.549,0.074,0.15,0.22399999999999998,0.363,0.0,299.46666666666954,1
+Carolina Hurricanes,8476422,2,Mike Reilly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.624,0.093,0.131,0.224,0.44,0.0,299.46666666666954,1
+Carolina Hurricanes,8480830,2,Andrei Svechnikov,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5760000000000001,0.075,0.113,0.188,0.34600000000000003,0.0,236.22222222222072,1
+Carolina Hurricanes,8476921,2,Jordan Martinook,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5760000000000001,0.085,0.126,0.21100000000000002,0.388,0.0,236.22222222222072,1
+Carolina Hurricanes,8476873,2,Mark Jankowski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5680000000000001,0.092,0.14300000000000002,0.23500000000000001,0.405,0.0,236.22222222222072,1
+Vegas Golden Knights,8476448,2,William Karlsson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.613,0.085,0.158,0.243,0.432,0.0,252.62222222222053,1
+Vegas Golden Knights,8478434,2,Keegan Kolesar,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.6,0.098,0.137,0.23500000000000001,0.438,0.0,252.62222222222053,1
+Vegas Golden Knights,8479550,2,Tanner Laczynski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5760000000000001,0.094,0.159,0.253,0.42,0.0,252.62222222222053,1
+Carolina Hurricanes,8478427,3,Sebastian Aho,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.935,0.14,0.249,0.389,0.608,0.0,428.62222222221993,1
+Carolina Hurricanes,8482093,3,Seth Jarvis,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.0110000000000001,0.159,0.231,0.39,0.71,0.0,428.62222222221993,1
+Carolina Hurricanes,8477940,3,Nikolaj Ehlers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.047,0.149,0.27,0.41900000000000004,0.754,0.0,428.62222222221993,1
+Carolina Hurricanes,8480817,3,K'Andre Miller,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9580000000000001,0.155,0.274,0.42900000000000005,0.673,0.0,522.9777777777706,1
+Carolina Hurricanes,8478970,3,Jalen Chatfield,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.984,0.168,0.241,0.40900000000000003,0.673,0.0,522.9777777777706,1
+Vegas Golden Knights,8477964,3,Ivan Barbashev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.986,0.17,0.241,0.41100000000000003,0.663,0.0,401.60000000000014,1
+Vegas Golden Knights,8483890,3,Braeden Bowman,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.0070000000000001,0.158,0.27,0.42800000000000005,0.635,0.0,401.60000000000014,1
+Vegas Golden Knights,8484803,3,Trevor Connelly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9400000000000001,0.156,0.248,0.404,0.705,0.0,401.60000000000014,1
+Vegas Golden Knights,8478397,3,Rasmus Andersson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.9410000000000001,0.151,0.248,0.399,0.66,0.0,494.355555555549,1
+Vegas Golden Knights,8479639,3,Dylan Coghlan,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.868,0.149,0.248,0.397,0.525,0.0,455.15555555555113,1
+Carolina Hurricanes,8475883,3,Frederik Andersen,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,10.811,1199.9999999999998,1
+Vegas Golden Knights,8479394,3,Carter Hart,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,10.933,1199.9999999999998,1
+Carolina Hurricanes,8482702,3,Logan Stankoven,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.664,0.121,0.152,0.273,0.41200000000000003,0.0,278.9777777777788,1
+Carolina Hurricanes,8482809,3,Jackson Blake,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.666,0.094,0.193,0.28700000000000003,0.45,0.0,278.9777777777788,1
+Carolina Hurricanes,8475791,3,Taylor Hall,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.634,0.099,0.159,0.258,0.419,0.0,278.9777777777788,1
+Carolina Hurricanes,8476958,3,Jaccob Slavin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.681,0.101,0.178,0.279,0.459,0.0,376.48888888889127,1
+Carolina Hurricanes,8480336,3,Sean Walker,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.728,0.122,0.164,0.28600000000000003,0.484,0.0,376.48888888889127,1
+Vegas Golden Knights,8479602,3,Jeremy Davies,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.658,0.079,0.189,0.268,0.47900000000000004,0.0,360.00000000000387,1
+Vegas Golden Knights,8481604,3,Pavel Dorofeyev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.612,0.08700000000000001,0.15,0.237,0.465,0.0,278.1777777777787,1
+Vegas Golden Knights,8475343,3,Nic Dowd,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.618,0.09,0.16,0.25,0.447,0.0,278.1777777777787,1
+Vegas Golden Knights,8478403,3,Jack Eichel,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.656,0.112,0.154,0.266,0.461,0.0,278.1777777777787,1
+Vegas Golden Knights,8478396,3,Noah Hanifin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.639,0.099,0.168,0.267,0.383,0.0,320.5777777777831,1
+Carolina Hurricanes,8473533,3,Jordan Staal,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.637,0.081,0.14300000000000002,0.22400000000000003,0.37,0.0,254.97777777777597,1
+Carolina Hurricanes,8475235,3,Nicolas Deslauriers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.601,0.093,0.121,0.214,0.377,0.0,254.97777777777597,1
+Carolina Hurricanes,8480829,3,Jesperi Kotkaniemi,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.578,0.082,0.176,0.258,0.378,0.0,254.97777777777597,1
+Vegas Golden Knights,8476881,3,Tomas Hertl,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.624,0.095,0.14200000000000002,0.23700000000000002,0.464,0.0,266.0888888888877,1
+Vegas Golden Knights,8482125,3,Alexander Holtz,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.5650000000000001,0.088,0.171,0.259,0.442,0.0,266.0888888888877,1
+Vegas Golden Knights,8479353,3,Brett Howden,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.616,0.107,0.139,0.246,0.443,0.0,266.0888888888877,1
+Vegas Golden Knights,8477018,3,Ben Hutton,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.676,0.094,0.17200000000000001,0.266,0.491,0.0,345.64444444444865,1
+Vegas Golden Knights,8481527,3,Kaedan Korczak,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.625,0.108,0.151,0.259,0.367,0.0,305.55555555555975,1
+Carolina Hurricanes,8476906,3,Shayne Gostisbehere,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.539,0.073,0.15,0.22299999999999998,0.34500000000000003,0.0,300.53333333333654,1
+Carolina Hurricanes,8476422,3,Mike Reilly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.639,0.123,0.131,0.254,0.443,0.0,300.53333333333654,1
+Carolina Hurricanes,8480830,3,Andrei Svechnikov,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.523,0.089,0.129,0.218,0.372,0.0,237.4222222222204,1
+Carolina Hurricanes,8476921,3,Jordan Martinook,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.536,0.088,0.163,0.251,0.362,0.0,237.4222222222204,1
+Carolina Hurricanes,8476873,3,Mark Jankowski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.593,0.084,0.127,0.21100000000000002,0.424,0.0,237.4222222222204,1
+Vegas Golden Knights,8476448,3,William Karlsson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.643,0.117,0.147,0.264,0.397,0.0,254.13333333333196,1
+Vegas Golden Knights,8478434,3,Keegan Kolesar,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.58,0.099,0.148,0.247,0.422,0.0,254.13333333333196,1
+Vegas Golden Knights,8479550,3,Tanner Laczynski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.608,0.092,0.16,0.252,0.458,0.0,254.13333333333196,1
+Carolina Hurricanes,8478427,4,Sebastian Aho,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.035,0.004,0.01,0.014,0.036000000000000004,0.0,14.3625,1
+Carolina Hurricanes,8482093,4,Seth Jarvis,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.053,0.008,0.007,0.015,0.048,0.0,14.3625,1
+Carolina Hurricanes,8480817,4,K'Andre Miller,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.043000000000000003,0.001,0.024,0.025,0.053,0.0,18.3,1
+Vegas Golden Knights,8477964,4,Ivan Barbashev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.062,0.011,0.019,0.03,0.029,0.0,14.137500000000001,1
+Vegas Golden Knights,8483890,4,Braeden Bowman,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.047,0.012,0.015,0.027,0.033,0.0,14.137500000000001,1
+Vegas Golden Knights,8478397,4,Rasmus Andersson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.07,0.014,0.024,0.038,0.032,0.0,18.0,1
+Carolina Hurricanes,8475883,4,Frederik Andersen,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.45,48.0,1
+Vegas Golden Knights,8479394,4,Carter Hart,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.437,48.0,1
+Carolina Hurricanes,8482702,4,Logan Stankoven,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.046,0.009000000000000001,0.008,0.017,0.038,0.0,13.0875,1
+Carolina Hurricanes,8482809,4,Jackson Blake,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.044,0.005,0.013000000000000001,0.018000000000000002,0.031,0.0,13.0875,1
+Carolina Hurricanes,8475791,4,Taylor Hall,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.009000000000000001,0.002,0.002,0.004,0.007,0.0,2.625,1
+Carolina Hurricanes,8476958,4,Jaccob Slavin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.045,0.006,0.012,0.018000000000000002,0.035,0.0,16.2,1
+Carolina Hurricanes,8480336,4,Sean Walker,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.012,0.002,0.0,0.002,0.001,0.0,3.9375,1
+Vegas Golden Knights,8481604,4,Pavel Dorofeyev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.05,0.007,0.011,0.018,0.04,0.0,13.0875,1
+Vegas Golden Knights,8475343,4,Nic Dowd,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.05,0.008,0.011,0.019,0.032,0.0,13.0875,1
+Vegas Golden Knights,8478403,4,Jack Eichel,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.005,0.001,0.002,0.003,0.009000000000000001,0.0,2.625,1
+Vegas Golden Knights,8479602,4,Jeremy Davies,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.053,0.007,0.012,0.019,0.035,0.0,15.75,1
+Carolina Hurricanes,8473533,4,Jordan Staal,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.043000000000000003,0.007,0.006,0.013000000000000001,0.035,0.0,11.6625,1
+Carolina Hurricanes,8475235,4,Nicolas Deslauriers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.043000000000000003,0.006,0.013000000000000001,0.019000000000000003,0.026000000000000002,0.0,11.6625,1
+Carolina Hurricanes,8476906,4,Shayne Gostisbehere,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.042,0.007,0.007,0.014,0.024,0.0,13.5,1
+Vegas Golden Knights,8476881,4,Tomas Hertl,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.048,0.007,0.009000000000000001,0.016,0.032,0.0,11.7375,1
+Vegas Golden Knights,8482125,4,Alexander Holtz,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.044,0.005,0.01,0.015,0.027,0.0,11.7375,1
+Vegas Golden Knights,8477018,4,Ben Hutton,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.035,0.005,0.014,0.019,0.03,0.0,14.25,1
+Carolina Hurricanes,8480830,4,Andrei Svechnikov,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.031,0.005,0.007,0.012,0.015,0.0,8.887500000000001,1
+Carolina Hurricanes,8476921,4,Jordan Martinook,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.024,0.007,0.004,0.011,0.022,0.0,8.887500000000001,1
+Vegas Golden Knights,8476448,4,William Karlsson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.033,0.009000000000000001,0.005,0.014000000000000002,0.014,0.0,9.0375,1
+Vegas Golden Knights,8478434,4,Keegan Kolesar,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.028,0.002,0.011,0.013,0.019,0.0,9.0375,1
+Carolina Hurricanes,8480829,4,Jesperi Kotkaniemi,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.007,0.003,0.003,0.006,0.0,0.0,2.9250000000000003,1
+Carolina Hurricanes,8478970,4,Jalen Chatfield,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.011,0.002,0.003,0.005,0.002,0.0,3.75,1
+Vegas Golden Knights,8479550,4,Tanner Laczynski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.008,0.001,0.002,0.003,0.004,0.0,2.4,1
+Carolina Hurricanes,8476422,4,Mike Reilly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.012,0.003,0.003,0.006,0.003,0.0,3.0375,1
+Carolina Hurricanes,8477940,4,Nikolaj Ehlers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.008,0.0,0.001,0.001,0.003,0.0,2.9250000000000003,1
+Vegas Golden Knights,8479353,4,Brett Howden,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.003,0.0,0.0,0.0,0.009000000000000001,0.0,3.0,1
+Carolina Hurricanes,8476873,4,Mark Jankowski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.006,0.0,0.003,0.003,0.001,0.0,2.25,1
+Vegas Golden Knights,8484803,4,Trevor Connelly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.003,0.0,0.003,0.003,0.008,0.0,2.7,1
+Carolina Hurricanes,8478427,0,Sebastian Aho,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.748,0.41200000000000003,0.722,1.134,1.824,0.0,1302.6736111111147,1
+Carolina Hurricanes,8482093,0,Seth Jarvis,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,3.008,0.432,0.7030000000000001,1.135,2.0380000000000003,0.0,1302.6736111111147,1
+Carolina Hurricanes,8477940,0,Nikolaj Ehlers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,3.222,0.482,0.732,1.214,2.283,0.0,1291.236111111115,1
+Carolina Hurricanes,8480817,0,K'Andre Miller,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.904,0.454,0.808,1.262,2.012,0.0,1589.9444444444412,1
+Carolina Hurricanes,8478970,0,Jalen Chatfield,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.9330000000000003,0.437,0.6970000000000001,1.1340000000000001,1.984,0.0,1575.3944444444414,1
+Vegas Golden Knights,8477964,0,Ivan Barbashev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.926,0.483,0.6970000000000001,1.1800000000000002,1.975,0.0,1225.5597222222232,1
+Vegas Golden Knights,8483890,0,Braeden Bowman,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.95,0.453,0.741,1.194,1.941,0.0,1225.5597222222232,1
+Vegas Golden Knights,8484803,0,Trevor Connelly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.837,0.41400000000000003,0.72,1.134,1.987,0.0,1214.1222222222232,1
+Vegas Golden Knights,8478397,0,Rasmus Andersson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.944,0.466,0.773,1.239,1.965,0.0,1502.4444444444407,1
+Vegas Golden Knights,8479639,0,Dylan Coghlan,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.584,0.422,0.6970000000000001,1.119,1.5350000000000001,0.0,1368.3111111111132,1
+Carolina Hurricanes,8475883,0,Frederik Andersen,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,32.877,3647.9999999999995,1
+Vegas Golden Knights,8479394,0,Carter Hart,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,33.136,3647.9999999999995,1
+Carolina Hurricanes,8482702,0,Logan Stankoven,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.008,0.334,0.447,0.781,1.34,0.0,846.5097222222245,1
+Carolina Hurricanes,8482809,0,Jackson Blake,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.998,0.28800000000000003,0.499,0.787,1.3800000000000001,0.0,846.5097222222245,1
+Carolina Hurricanes,8475791,0,Taylor Hall,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.944,0.28500000000000003,0.47200000000000003,0.7570000000000001,1.305,0.0,836.0472222222245,1
+Carolina Hurricanes,8476906,0,Shayne Gostisbehere,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.661,0.242,0.452,0.694,1.112,0.0,913.4555555555648,1
+Carolina Hurricanes,8476422,0,Mike Reilly,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.832,0.318,0.41600000000000004,0.734,1.2750000000000001,0.0,902.9930555555649,1
+Vegas Golden Knights,8476881,0,Tomas Hertl,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.911,0.291,0.461,0.752,1.354,0.0,806.3597222222207,1
+Vegas Golden Knights,8482125,0,Alexander Holtz,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.857,0.277,0.47100000000000003,0.748,1.366,0.0,806.3597222222207,1
+Vegas Golden Knights,8479353,0,Brett Howden,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.8880000000000001,0.307,0.419,0.726,1.33,0.0,797.6222222222208,1
+Vegas Golden Knights,8477018,0,Ben Hutton,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.976,0.28200000000000003,0.525,0.807,1.428,0.0,1050.7388888889018,1
+Carolina Hurricanes,8476958,0,Jaccob Slavin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.0220000000000002,0.28800000000000003,0.535,0.8230000000000001,1.434,0.0,1144.6000000000072,1
+Carolina Hurricanes,8480336,0,Sean Walker,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.213,0.361,0.515,0.876,1.354,0.0,1132.3375000000074,1
+Vegas Golden Knights,8476448,0,William Karlsson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.9060000000000001,0.311,0.448,0.759,1.272,0.0,771.0374999999993,1
+Vegas Golden Knights,8478434,0,Keegan Kolesar,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.794,0.277,0.45,0.7270000000000001,1.298,0.0,771.0374999999993,1
+Vegas Golden Knights,8479550,0,Tanner Laczynski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.764,0.274,0.461,0.7350000000000001,1.272,0.0,764.3999999999995,1
+Vegas Golden Knights,8479602,0,Jeremy Davies,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,2.073,0.295,0.553,0.8480000000000001,1.458,0.0,1094.816666666678,1
+Vegas Golden Knights,8481604,0,Pavel Dorofeyev,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.986,0.295,0.487,0.782,1.3840000000000001,0.0,845.0430555555572,1
+Vegas Golden Knights,8475343,0,Nic Dowd,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.956,0.314,0.502,0.8160000000000001,1.373,0.0,845.0430555555572,1
+Vegas Golden Knights,8478403,0,Jack Eichel,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.952,0.315,0.47400000000000003,0.789,1.3920000000000001,0.0,834.5805555555572,1
+Carolina Hurricanes,8473533,0,Jordan Staal,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.84,0.275,0.436,0.7110000000000001,1.196,0.0,777.0847222222209,1
+Carolina Hurricanes,8475235,0,Nicolas Deslauriers,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.9100000000000001,0.28400000000000003,0.423,0.7070000000000001,1.175,0.0,777.0847222222209,1
+Carolina Hurricanes,8480829,0,Jesperi Kotkaniemi,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.7730000000000001,0.27,0.47400000000000003,0.744,1.202,0.0,768.3472222222213,1
+Vegas Golden Knights,8478396,0,Noah Hanifin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.828,0.306,0.507,0.813,1.16,0.0,964.0000000000164,1
+Vegas Golden Knights,8481527,0,Kaedan Korczak,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.824,0.297,0.42,0.717,1.072,0.0,917.5555555555691,1
+Carolina Hurricanes,8480830,0,Andrei Svechnikov,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.678,0.256,0.383,0.639,1.091,0.0,721.7319444444452,1
+Carolina Hurricanes,8476921,0,Jordan Martinook,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.6500000000000001,0.265,0.438,0.7030000000000001,1.145,0.0,721.7319444444452,1
+Carolina Hurricanes,8476873,0,Mark Jankowski,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,1.736,0.261,0.405,0.666,1.182,0.0,715.0944444444453,1
+Carolina Hurricanes,8477478,0,William Carrier,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Carolina Hurricanes,8480762,0,Eric Robinson,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Carolina Hurricanes,8482100,0,Alexander Nikishin,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Carolina Hurricanes,8483548,0,Brandon Bussi,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Carolina Hurricanes,8481611,0,Pyotr Kochetkov,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8481534,0,Raphael Lavoie,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8478483,0,Mitch Marner,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8480007,0,Jonas Rondbjerg,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8476438,0,Brandon Saad,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8476925,0,Colton Sissons,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8482062,0,Cole Smith,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8475191,0,Reilly Smith,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8475913,0,Mark Stone,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8485251,0,Kai Uchacz,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8478468,0,Jeremy Lauzon,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8475188,0,Brayden McNabb,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8477034,0,Jaycob Megna,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8477447,0,Shea Theodore,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8478499,0,Adin Hill,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8482761,0,Carl Lindbom,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
+Vegas Golden Knights,8481033,0,Akira Schmid,Carolina Hurricanes,Vegas Golden Knights,2026-06-02,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0
