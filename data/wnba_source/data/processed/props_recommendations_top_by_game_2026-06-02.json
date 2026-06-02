@@ -211,8 +211,7 @@
       "top_play_reasons": [
         "EV 43.5%",
         "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
-        "Best line available"
+        "Consensus: 3 books aligned"
       ],
       "basketball_summary": "model 6.4 vs line 11.5 (-5.1)"
     },
@@ -266,8 +265,8 @@
       "team": "ATL",
       "team_tricode": "ATL",
       "opponent": "CON",
-      "score": 35.54235801284409,
-      "score_adj": 35.54235801284409,
+      "score": 39.62847561013052,
+      "score_adj": 39.62847561013052,
       "tier": "High",
       "model": {
         "pts": 4.633857066666667,
@@ -286,16 +285,16 @@
         "market": "pts",
         "side": "UNDER",
         "line": 9.5,
-        "price": -115.0,
-        "edge": 0.1901102870454452,
-        "ev": 0.3554235801284409,
-        "ev_pct": 35.54235801284409,
+        "price": -108.0,
+        "edge": 0.20576323874490843,
+        "ev": 0.3962847561013052,
+        "ev_pct": 39.62847561013052,
         "book": "fanduel",
-        "p_win": 0.8903073010586734,
+        "p_win": 0.9155155253320745,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 35.5%",
+        "EV 39.6%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
@@ -352,8 +351,8 @@
       "team": "CON",
       "team_tricode": "CON",
       "opponent": "ATL",
-      "score": 32.059464242747794,
-      "score_adj": 32.059464242747794,
+      "score": 32.60557070310156,
+      "score_adj": 32.60557070310156,
       "tier": "High",
       "model": {
         "pts": 0.0,
@@ -372,16 +371,16 @@
         "market": "pts",
         "side": "UNDER",
         "line": 12.5,
-        "price": -114.0,
-        "edge": 0.17078406185389017,
-        "ev": 0.3205946424274779,
-        "ev_pct": 32.059464242747794,
+        "price": -113.0,
+        "edge": 0.17297791030283927,
+        "ev": 0.3260557070310156,
+        "ev_pct": 32.60557070310156,
         "book": "fanduel",
-        "p_win": 0.8533049228013097,
+        "p_win": 0.8565721389558982,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 32.1%",
+        "EV 32.6%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
