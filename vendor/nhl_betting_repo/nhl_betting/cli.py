@@ -12360,6 +12360,18 @@ def props_project_all(
                 roster_df = tmp.copy()
         except Exception:
             roster_df = pd.DataFrame()
+        try:
+            preferred_roster = _load_nhl_projection_roster(date, slate_abbrs, include_goalies=True)
+            if preferred_roster is not None and not preferred_roster.empty:
+                roster_df = preferred_roster
+        except Exception:
+            pass
+    try:
+        preferred_roster = _load_nhl_projection_roster(date, slate_abbrs, include_goalies=include_goalies)
+        if preferred_roster is not None and not preferred_roster.empty:
+            roster_df = preferred_roster
+    except Exception:
+        pass
     # Fast path: derive roster from canonical lines if present (avoids slow Stats API calls)
     if roster_df.empty:
         try:
@@ -12529,6 +12541,30 @@ def props_project_all(
         save_df(out, out_path)
         print(f"Wrote {out_path} with 0 rows")
         return
+
+    goalie_names: set[str] = set()
+    try:
+        def _normalize_goalie_name(value: Any) -> str:
+            try:
+                text = str(value or "").strip()
+                return " ".join(text.split())
+            except Exception:
+                return str(value or "").strip()
+
+        for source_file in (PROC_DIR / f"lineups_{date}.csv", PROC_DIR / f"roster_snapshot_{date}.csv"):
+            if not source_file.exists() or getattr(source_file.stat(), "st_size", 0) == 0:
+                continue
+            source_df = pd.read_csv(source_file)
+            if source_df is None or source_df.empty or "position" not in source_df.columns:
+                continue
+            name_col = next((col for col in ("full_name", "player", "player_name", "display_name") if col in source_df.columns), None)
+            if not name_col:
+                continue
+            goalie_series = source_df[source_df["position"].astype(str).str.upper().eq("G")][name_col].astype(str).map(_normalize_goalie_name)
+            goalie_names.update([name for name in goalie_series.tolist() if name])
+    except Exception:
+        goalie_names = set()
+
     # Normalize player display strings to avoid dict-string artifacts and stray whitespace
     import ast as _ast
     def _norm_player(s):
@@ -12657,6 +12693,8 @@ def props_project_all(
     for _, r in roster_df.iterrows():
         player = _norm_player(r.get('player'))
         pos = str(r.get('position') or '').upper()
+        if player in goalie_names:
+            pos = 'G'
         team = r.get('team')
         if not player:
             continue
@@ -12918,6 +12956,67 @@ def recompute_ev(
             return float(x)
         except Exception:
             return None
+
+
+    def _load_nhl_projection_roster(date: str, slate_abbrs: set[str], *, include_goalies: bool = True) -> pd.DataFrame:
+        sources = [
+            ("lineups", PROC_DIR / f"lineups_{date}.csv"),
+            ("roster_snapshot", PROC_DIR / f"roster_snapshot_{date}.csv"),
+            ("roster", PROC_DIR / f"roster_{date}.csv"),
+            ("roster_master", PROC_DIR / "roster_master.csv"),
+        ]
+
+        def _normalize_position(value: Any) -> str:
+            text = str(value or "").strip().upper()
+            if text.startswith("G"):
+                return "G"
+            if text.startswith("D"):
+                return "D"
+            if text:
+                return "F"
+            return ""
+
+        for source_name, path in sources:
+            if not path.exists() or getattr(path.stat(), "st_size", 0) == 0:
+                continue
+            try:
+                source_df = pd.read_csv(path)
+            except Exception:
+                continue
+            if source_df is None or source_df.empty:
+                continue
+            name_col = next((col for col in ("full_name", "player", "player_name", "display_name") if col in source_df.columns), None)
+            team_col = next((col for col in ("team", "team_abbr") if col in source_df.columns), None)
+            pos_col = "position" if "position" in source_df.columns else None
+            if not name_col or not team_col:
+                continue
+            rows: list[dict[str, Any]] = []
+            for _, rr in source_df.iterrows():
+                player_name = str(rr.get(name_col) or "").strip()
+                if not player_name:
+                    continue
+                team_abbr = str(rr.get(team_col) or "").strip().upper()
+                if slate_abbrs and team_abbr and team_abbr not in slate_abbrs:
+                    continue
+                position = _normalize_position(rr.get(pos_col)) if pos_col else ""
+                if source_name in {"lineups", "roster_snapshot"} and position == "":
+                    continue
+                if not include_goalies and position == "G":
+                    continue
+                rows.append(
+                    {
+                        "player_id": rr.get("player_id"),
+                        "player": player_name,
+                        "position": position or "F",
+                        "team": team_abbr,
+                        "proj_toi": _safe_float(rr.get("proj_toi")),
+                        "roster_source": source_name,
+                    }
+                )
+            roster_df = pd.DataFrame(rows).drop_duplicates(subset=["player", "team"], keep="first")
+            if not roster_df.empty:
+                return roster_df
+        return pd.DataFrame(columns=["player_id", "player", "position", "team", "proj_toi", "roster_source"])
     for idx, r in df.iterrows():
         # Moneyline EV
         if ml_h_src and ml_a_src and pd.notna(r.get(ml_h_src)) and pd.notna(r.get(ml_a_src)):
