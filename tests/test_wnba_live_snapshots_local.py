@@ -151,6 +151,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 "source_path": "wnba_cards.json",
                 "games": [
                     {
+                        "event_id": "evt-2",
                         "away": {"abbr": "SEA", "score": 46},
                         "home": {"abbr": "DAL", "score": 70},
                         "status": "Live",
@@ -179,6 +180,9 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                     }
                 ],
             },
+        ), patch(
+            "syndicate.features.wnba.live_lens.build_live_lines_payload",
+            return_value={"games": [{"event_id": "evt-2", "total": 169.5}]},
         ):
             from syndicate.features.wnba.live_lens import build_live_lens_page_context
 
@@ -189,12 +193,48 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         metric_text = " ".join(f"{row.get('label')} {row.get('value')}" for row in metrics if isinstance(row, dict))
 
         self.assertIn("Total pts 116", card.get("summary"))
-        self.assertIn("Live line 166.5", card.get("summary"))
+        self.assertIn("Live line 169.5", card.get("summary"))
         self.assertIn("Total pts 116", metric_text)
-        self.assertIn("Live line 166.5", metric_text)
+        self.assertIn("Live line 169.5", metric_text)
         self.assertIn("Market snapshot: Consensus lines", card.get("list_items")[0])
         self.assertIn("Away ML +180", " ".join(card.get("list_items")))
         self.assertIn("Alysha Clark | Over 1.5 3PM", " ".join(card.get("list_items")))
+
+    def test_live_lens_card_surface_does_not_fallback_to_cards_total(self) -> None:
+        with patch(
+            "syndicate.features.wnba.live_lens.build_cards_page_context",
+            return_value={
+                "date": "2026-05-21",
+                "source_path": "wnba_cards.json",
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "away": {"abbr": "SEA", "score": 46},
+                        "home": {"abbr": "DAL", "score": 70},
+                        "status": "Live",
+                        "detail": "3:27 - 4th",
+                        "summary": "Live scoring pace is tracking toward the under.",
+                        "betting": {"total": 166.5},
+                        "panels": [],
+                        "shared_prop_rows": [],
+                        "shared_top_play_rows": [],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.live_lens.build_live_lines_payload",
+            return_value={"games": []},
+        ):
+            from syndicate.features.wnba.live_lens import build_live_lens_page_context
+
+            context = build_live_lens_page_context("2026-05-21")
+
+        card = (context.get("rank_cards") or [{}])[0]
+        metrics = card.get("metrics") or []
+        metric_labels = " ".join(str(row.get("label")) for row in metrics if isinstance(row, dict))
+
+        self.assertNotIn("Live line", card.get("summary"))
+        self.assertNotIn("Live line", metric_labels)
 
     def test_live_player_lens_payload_hydrates_actuals_from_boxscore(self) -> None:
         with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}):

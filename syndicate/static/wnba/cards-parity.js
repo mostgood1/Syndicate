@@ -670,7 +670,7 @@
     if (!status.in_progress) {
       return 0;
     }
-    const period = resolveLivePeriodNumber(status);
+    const period = Number(status.period);
     const clockMinutes = parseClockToMinutes(status.clock);
     if (!Number.isFinite(period)) {
       return null;
@@ -682,33 +682,6 @@
     const overtimePeriod = period - 5;
     const remaining = Number.isFinite(clockMinutes) ? clampNumber(clockMinutes, 0, 5) : 0;
     return 48 + (overtimePeriod * 5) + (5 - remaining);
-  }
-
-  function resolveLivePeriodNumber(status) {
-    if (!status) {
-      return null;
-    }
-    const direct = Number(status.period);
-    if (Number.isFinite(direct) && direct > 0) {
-      return direct;
-    }
-    const text = String(status.status || '').trim().toLowerCase();
-    const match = text.match(/(\d{1,2})(?:st|nd|rd|th)/);
-    if (match) {
-      const parsed = Number(match[1]);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        return parsed;
-      }
-    }
-    const periods = safeArray(status.periods);
-    if (status.in_progress && periods.length) {
-      const latest = Number(periods[periods.length - 1]?.period);
-      if (Number.isFinite(latest) && latest > 0) {
-        return latest;
-      }
-      return periods.length;
-    }
-    return null;
   }
 
   function impliedProbFromAmerican(value) {
@@ -1045,7 +1018,7 @@
     const awayMl = Number(liveLines?.lines?.away_ml);
     const totalGate = Number(thresholds.adjustments?.game_total?.min_elapsed_min);
     const recentWindow = pbpStats?.pbp_recent || {};
-    const currentPeriod = resolveLivePeriodNumber(liveState);
+    const currentPeriod = Number(liveState?.period);
     const periodTotals = liveLines?.lines?.period_totals || {};
     const currentQuarterKey = Number.isFinite(currentPeriod) && currentPeriod >= 1 && currentPeriod <= 4
       ? `q${Math.floor(currentPeriod)}`
@@ -1088,7 +1061,6 @@
     const lensHalfMinutesElapsed = useUpcomingHalf ? 0 : currentHalfMinutesElapsed;
     const lensHalfMinutesRemaining = useUpcomingHalf ? 24 : currentHalfMinutesRemaining;
     const pregameContext = game?.sim?.context || {};
-    const simPeriods = game?.sim?.periods || {};
 
     function bucketForTeam(source, teamTri, sideKey) {
       const buckets = source && typeof source === 'object' ? source : {};
@@ -1280,7 +1252,7 @@
 
     let halfSignal = null;
     if (liveState.in_progress && lensHalfKey) {
-      const halfLine = Number(periodTotals?.[lensHalfKey] ?? simPeriodMean(game, lensHalfKey));
+      const halfLine = Number(periodTotals?.[lensHalfKey]);
       const halfActual = useUpcomingHalf ? 0 : halfTotalSoFar(liveState, currentTotal);
       const halfSim = simPeriodMean(game, lensHalfKey);
       const halfMinutesElapsed = lensHalfMinutesElapsed;
@@ -1326,7 +1298,7 @@
 
     let quarterSignal = null;
     if (liveState.in_progress && lensQuarterKey) {
-      const quarterLine = Number(periodTotals?.[lensQuarterKey] ?? simPeriodMean(game, lensQuarterKey));
+      const quarterLine = Number(periodTotals?.[lensQuarterKey]);
       const quarterActual = useUpcomingQuarter
         ? 0
         : currentQuarterTotal(liveState, currentTotal, lensQuarterKey);
@@ -1375,12 +1347,11 @@
     let halfAtsSignal = null;
     let halfMlSignal = null;
     if (liveState.in_progress && lensHalfKey) {
-      const halfSimMargin = simPeriodMargin(game, lensHalfKey);
-      const halfSpread = Number(liveLines?.lines?.period_spreads?.[lensHalfKey] ?? (Number.isFinite(halfSimMargin) ? -halfSimMargin : null));
+      const halfSpread = Number(liveLines?.lines?.period_spreads?.[lensHalfKey]);
       const actualHalfMargin = Number.isFinite(currentMargin)
         ? (useUpcomingHalf ? 0 : (lensHalfKey === 'h2' ? currentMargin - completedMarginBeforePeriod(liveState, 3) : currentMargin))
         : null;
-      const simHalfMargin = halfSimMargin;
+      const simHalfMargin = simPeriodMargin(game, lensHalfKey);
       const halfMinutesElapsed = lensHalfMinutesElapsed;
       const halfMinutesRemaining = lensHalfMinutesRemaining;
       if (Number.isFinite(actualHalfMargin) && Number.isFinite(halfMinutesElapsed) && Number(halfMinutesRemaining) > 0) {
@@ -1462,10 +1433,9 @@
     let quarterAtsSignal = null;
     let quarterMlSignal = null;
     if (liveState.in_progress && lensQuarterKey) {
-      const quarterSimMargin = simPeriodMargin(game, lensQuarterKey);
-      const quarterSpread = Number(liveLines?.lines?.period_spreads?.[lensQuarterKey] ?? (Number.isFinite(quarterSimMargin) ? -quarterSimMargin : null));
+      const quarterSpread = Number(liveLines?.lines?.period_spreads?.[lensQuarterKey]);
       const actualQuarterMargin = useUpcomingQuarter ? 0 : currentQuarterMargin(liveState, currentMargin, lensQuarterKey);
-      const simQuarterMargin = quarterSimMargin;
+      const simQuarterMargin = simPeriodMargin(game, lensQuarterKey);
       const quarterMinutesElapsed = lensQuarterMinutesElapsed;
       const quarterMinutesRemaining = lensQuarterMinutesRemaining;
       if (Number.isFinite(actualQuarterMargin) && Number.isFinite(quarterMinutesElapsed) && Number(quarterMinutesRemaining) > 0) {
@@ -1757,7 +1727,7 @@
           ),
           fetchApiJson(`${API_BASE_PATH}/live_lens_tuning?ttl=300`, 'Failed to load live lens tuning.', { retries: 1 }),
           fetchApiJson(
-            `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
+            `${API_BASE_PATH}/live_player_boxscore?event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live player boxscore.',
             { retries: silent ? 2 : 1 }
           ),
@@ -1766,8 +1736,8 @@
         liveBoxscorePayload = boxscorePayload || null;
         const globalOddsRefreshedAt = linesPayload?.odds_refreshed_at || linesPayload?.generated_at || null;
 
-        safeArray(linesPayload?.games).forEach((item, index) => {
-          const eventId = String(item?.event_id || eventIds[index] || '').trim();
+        safeArray(linesPayload?.games).forEach((item) => {
+          const eventId = String(item?.event_id || '').trim();
           if (eventId) {
             liveLinesMap.set(eventId, item);
             oddsRefreshedByEvent.set(eventId, item?.odds_refreshed_at || item?.generated_at || globalOddsRefreshedAt || null);
@@ -3043,41 +3013,18 @@
     }
   }
 
-  function transformLiveStripPayload(payload, dateValue, boxscorePayload = null) {
-    const boxscoresByEvent = new Map();
-    const boxscoreGames = safeArray(boxscorePayload?.games);
-    boxscoreGames.forEach((entry) => {
-      const eventId = String(entry?.event_id || '').trim();
-      if (eventId) {
-        boxscoresByEvent.set(eventId, entry);
-      }
-    });
+  function transformLiveStripPayload(payload, dateValue) {
     const items = [];
     const payloadOddsRefreshedAt = payload?.odds_refreshed_at || payload?.generated_at || null;
-    safeArray(payload?.games).forEach((game, index) => {
+    safeArray(payload?.games).forEach((game) => {
       const status = game?.status || {};
       const gameOddsRefreshedAt = game?.odds_refreshed_at || game?.generated_at || payloadOddsRefreshedAt || null;
-      const boxscoreEntry = boxscoresByEvent.get(String(game?.event_id || '').trim()) || boxscoreGames[index] || null;
-      const boxscoreRefreshedAt = boxscoreEntry?.generated_at || boxscoreEntry?.updated_at || gameOddsRefreshedAt || payloadOddsRefreshedAt || null;
-      const actualRowsByPlayer = new Map();
-      safeArray(boxscoreEntry?.players).forEach((actualRow) => {
-        const teamTri = String(actualRow?.team_tri || '').trim().toUpperCase();
-        const playerKey = normalizePlayerKey(actualRow?.player);
-        if (teamTri && playerKey) {
-          actualRowsByPlayer.set(`${teamTri}::${playerKey}`, actualRow);
-        }
-      });
       const gameItems = safeArray(game?.rows)
         .filter((row) => row && row.player && row.team_tri)
         .filter((row) => row.line_source && row.line_source !== 'model')
         .filter((row) => row.pace_proj != null || row.sim_mu_adjusted != null || row.sim_mu != null || row.ev_side || row.lean)
         .map((row) => {
           try {
-            const actualRow = actualRowsByPlayer.get(`${String(row?.team_tri || '').trim().toUpperCase()}::${normalizePlayerKey(row?.player)}`) || null;
-            const actualFromBoxscore = actualStatValue(actualRow, row?.stat);
-            const actualValue = Number.isFinite(Number(actualFromBoxscore))
-              ? actualFromBoxscore
-              : (Number.isFinite(Number(row?.actual)) ? Number(row.actual) : null);
             return {
               away_tri: game?.away,
               home_tri: game?.home,
@@ -3104,9 +3051,9 @@
               recommendation_priority_score: row?.recommendation_priority_score,
               live_rank_probability: row?.live_rank_probability,
               klass: row?.klass,
-              line_source: boxscoreEntry ? 'live_boxscore' : row?.line_source,
+              line_source: row?.line_source,
               status_label: status?.final ? 'Final' : (status?.in_progress ? `Q${status?.period || '-'} ${status?.clock || ''}`.trim() : 'Live'),
-              actual: actualValue,
+              actual: row?.actual,
               pace_proj: row?.pace_proj,
               pace_vs_line: row?.pace_vs_line,
               strength: row?.strength,
@@ -3127,9 +3074,9 @@
               lens_shape_weight: row?.lens_shape_weight ?? game?.lens_shape_weight,
               line_live: row?.line_live,
               line_pregame: row?.line_pregame,
-              first_seen_at: row?.first_seen_at || boxscoreRefreshedAt,
-              last_seen_at: row?.last_seen_at || boxscoreRefreshedAt,
-              odds_refreshed_at: row?.odds_refreshed_at || gameOddsRefreshedAt || boxscoreRefreshedAt,
+              first_seen_at: row?.first_seen_at,
+              last_seen_at: row?.last_seen_at,
+              odds_refreshed_at: row?.odds_refreshed_at || gameOddsRefreshedAt,
               seen_observations: row?.seen_observations,
               pregame_team_total_ratio: row?.pregame_team_total_ratio,
               pregame_game_total_ratio: row?.pregame_game_total_ratio,
@@ -3160,14 +3107,6 @@
     const silent = Boolean(options?.silent);
     const epoch = Number(options?.epoch) || 0;
     const games = safeArray(options?.games || state.payload?.games);
-    const gameEventIdsByMatchup = new Map();
-    games.forEach((game) => {
-      const key = matchupKey(game?.away_tri || game?.away, game?.home_tri || game?.home);
-      const eventId = String(game?.event_id || '').trim();
-      if (key && eventId) {
-        gameEventIdsByMatchup.set(key, eventId);
-      }
-    });
     const previousPropsStripPayload = state.propsStripPayload;
     if (propsStripEl && (!silent || !state.propsStripPayload)) {
       setPropsStripLoading();
@@ -3193,15 +3132,8 @@
         }
         state.liveStates = mergedLiveStates;
         eventIds = safeArray(liveStatePayload?.games)
-          .filter((game) => Boolean(game?.in_progress) && !Boolean(game?.final))
-          .map((game) => {
-            const directEventId = String(game?.event_id || '').trim();
-            if (directEventId) {
-              return directEventId;
-            }
-            const matchup = matchupKey(game?.away, game?.home);
-            return matchup ? String(gameEventIdsByMatchup.get(matchup) || '').trim() : '';
-          })
+          .filter((game) => Boolean(game?.in_progress) && !Boolean(game?.final) && Boolean(game?.event_id))
+          .map((game) => String(game?.event_id || '').trim())
           .filter(Boolean);
       } catch (_error) {
         liveStatePayload = null;
@@ -3209,27 +3141,19 @@
       }
 
       if (eventIds.length) {
-        await fetchApiJson(
-          `${API_BASE_PATH}/live_lines?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}&include_period_totals=1`,
-          'Failed to load live lines.',
-          { retries: silent ? 2 : 1 }
-        );
-
-        const [payload, boxscorePayload] = await Promise.all([
-          fetchApiJson(
+        const payload = await fetchApiJson(
           `${API_BASE_PATH}/live_player_lens?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
           'Failed to load live player props.',
           { retries: silent ? 2 : 1 }
-          ),
-          fetchApiJson(
+        );
+        let transformed = transformLiveStripPayload(payload, dateValue);
+
+        if ((!safeArray(transformed?.items).length) && games.length && liveStatePayload) {
+          const boxscorePayload = await fetchApiJson(
             `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live player boxscore.',
             { retries: silent ? 2 : 1 }
-          ),
-        ]);
-        let transformed = transformLiveStripPayload(payload, dateValue, boxscorePayload);
-
-        if ((!safeArray(transformed?.items).length) && games.length && liveStatePayload) {
+          );
           transformed = buildLiveBoxscoreSimFallback(boxscorePayload, games, liveStatePayload, dateValue);
         }
 
@@ -4391,9 +4315,7 @@
         .filter((market) => Number.isFinite(Number(market?.edgeValue)))
         .sort((left, right) => Number(right.edgeValue) - Number(left.edgeValue))[0] || null;
       const modelProb = Number.isFinite(Number(row.modelHomeWinProb)) ? Number(row.modelHomeWinProb) : null;
-      const baselineProb = row.baselineHomeWinProb == null || row.baselineHomeWinProb === ''
-        ? null
-        : (Number.isFinite(Number(row.baselineHomeWinProb)) ? Number(row.baselineHomeWinProb) : null);
+      const baselineProb = Number.isFinite(Number(row.baselineHomeWinProb)) ? Number(row.baselineHomeWinProb) : null;
       const refreshedText = row?.oddsRefreshedAt ? `Odds refreshed ${formatTimestampShort(row.oddsRefreshedAt)}` : '';
       return `
         <div class="cards-prop-overview-card cards-live-lens-card">
@@ -5354,9 +5276,7 @@
   function renderLensDetailPairs(selected, simRow, matchedLiveRow) {
     const metricValue = simStatMean(simRow, selected.market);
     const simValue = Number(metricValue ?? selected.simMu);
-    const actualValue = Number.isFinite(Number(matchedLiveRow?.actual))
-      ? Number(matchedLiveRow.actual)
-      : (Number.isFinite(Number(selected.actual)) ? Number(selected.actual) : null);
+    const actualValue = Number.isFinite(Number(selected.actual)) ? Number(selected.actual) : null;
     const projectedValue = Number.isFinite(Number(matchedLiveRow?.liveProjection)) ? Number(matchedLiveRow.liveProjection) : (Number.isFinite(simValue) ? simValue : null);
     const edgeValue = Number.isFinite(Number(selected.edge))
       ? Number(selected.edge)
@@ -5378,7 +5298,7 @@
       { label: 'Opened at', value: matchedLiveRow && Number.isFinite(Number(matchedLiveRow.price)) ? fmtAmerican(matchedLiveRow.price) : `${fmtAmerican(selected.price)} ${selected.book || ''}`.trim() },
       { label: 'Line', value: `${selected.side} ${fmtNumber(selected.line, 1)}` },
       { label: 'Live edge', value: Number.isFinite(Number(matchedLiveRow?.liveEdge)) ? fmtSigned(matchedLiveRow.liveEdge, 1) : '-' },
-      { label: 'Odds', value: matchedLiveRow && Number.isFinite(Number(matchedLiveRow.price)) ? `${fmtAmerican(matchedLiveRow.price)} ${selected.book || ''}`.trim() : `${fmtAmerican(selected.price)} ${selected.book || ''}`.trim() },
+      { label: 'Odds', value: `${fmtAmerican(selected.price)} ${selected.book || ''}`.trim() },
       { label: 'Edge', value: Number.isFinite(edgeValue) ? fmtSigned(edgeValue, 1) : '-' },
       { label: 'Model', value: modelLabel },
     ];
