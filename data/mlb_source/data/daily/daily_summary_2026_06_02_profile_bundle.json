@@ -1,7 +1,7 @@
 {
   "date": "2026-06-02",
   "season": 2026,
-  "generated_at": "2026-06-02T14:08:19.200739",
+  "generated_at": "2026-06-02T16:28:38.056239",
   "tool": "tools/daily_update_multi_profile.py",
   "daily_update_tool": "tools\\daily_update.py",
   "python_exe": "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
@@ -33,7 +33,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 758.187,
+      "duration_s": 158.886,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -44,7 +44,7 @@
       "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-06-02",
       "extra_args": [],
       "exit_code": 0,
-      "duration_s": 150.926,
+      "duration_s": 112.827,
       "skipped": false
     },
     "hitter_props_recos": {
@@ -64,7 +64,7 @@
         "24"
       ],
       "exit_code": 0,
-      "duration_s": 111.067,
+      "duration_s": 103.859,
       "skipped": false
     }
   },
@@ -97,17 +97,17 @@
       "totals": 0,
       "ml": 1,
       "pitcher_props": 1,
-      "hitter_props": 11,
+      "hitter_props": 10,
       "hitter_home_runs": 0,
       "hitter_hits": 4,
       "hitter_hits_runs_rbis": 0,
       "hitter_total_bases": 6,
-      "hitter_runs": 1,
+      "hitter_runs": 0,
       "hitter_rbis": 0
     },
     "shadow_counts": {
       "pitcher_props": {
-        "raw_candidates_n": 41,
+        "raw_candidates_n": 44,
         "selected_n": 8,
         "cap": 8,
         "stake_u": 0.0,
@@ -116,7 +116,7 @@
           "hits_allowed",
           "walks_allowed"
         ],
-        "playable_support_removed_n": 27,
+        "playable_support_removed_n": 29,
         "recommendations": [
           {
             "date": "2026-06-02",
@@ -136,19 +136,19 @@
             "team_side": "home",
             "prop": "hits_allowed",
             "selection": "over",
-            "edge": 0.3345274459804053,
+            "edge": 0.3410184372256365,
             "market_line": 5.5,
-            "model_prob_over": 0.764,
-            "market_prob_over": 0.4294725540195947,
-            "market_prob_under": 0.5705274459804054,
+            "model_prob_over": 0.78,
+            "market_prob_over": 0.4389815627743635,
+            "market_prob_under": 0.5610184372256365,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4294725540195947,
-            "selected_side_market_prob": 0.4294725540195947,
-            "selected_side_model_prob": 0.764,
-            "mean_support": 2.1900000000000004,
-            "hits_mean": 7.69,
+            "market_no_vig_prob_over": 0.4389815627743635,
+            "selected_side_market_prob": 0.4389815627743635,
+            "selected_side_model_prob": 0.78,
+            "mean_support": 2.3,
+            "hits_mean": 7.8,
             "market_alternates": [],
-            "odds": "+118",
+            "odds": "+113",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -169,9 +169,9 @@
               ]
             },
             "reasons": [
-              "The model lands on the over side in 76.4% of sims, while the market is pricing it closer to 42.9%. Across his last 5 starts, he has averaged 6 hits allowed. He mixes four-seam fastball, changeup, and slider often enough that hitters have to cover multiple looks. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 78.0% of sims, while the market is pricing it closer to 43.9%. Across his last 5 starts, he has averaged 6 hits allowed. He mixes four-seam fastball, changeup, and slider often enough that hitters have to cover multiple looks. The model baseline sits around 7.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 76.4% of sims, while the market is pricing it closer to 42.9%. Across his last 5 starts, he has averaged 6 hits allowed. He mixes four-seam fastball, changeup, and slider often enough that hitters have to cover multiple looks. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 78.0% of sims, while the market is pricing it closer to 43.9%. Across his last 5 starts, he has averaged 6 hits allowed. He mixes four-seam fastball, changeup, and slider often enough that hitters have to cover multiple looks. The model baseline sits around 7.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume.",
             "rank": 1,
             "shadow_only": true
           },
@@ -193,19 +193,19 @@
             "team_side": "home",
             "prop": "hits_allowed",
             "selection": "over",
-            "edge": 0.22089450470854688,
+            "edge": 0.2039255225198705,
             "market_line": 4.5,
-            "model_prob_over": 0.756,
-            "market_prob_over": 0.5351054952914531,
-            "market_prob_under": 0.46489450470854693,
+            "model_prob_over": 0.755,
+            "market_prob_over": 0.5510744774801295,
+            "market_prob_under": 0.44892552251987045,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5351054952914531,
-            "selected_side_market_prob": 0.5351054952914531,
-            "selected_side_model_prob": 0.756,
-            "mean_support": 1.9530000000000003,
-            "hits_mean": 6.453,
+            "market_no_vig_prob_over": 0.5510744774801295,
+            "selected_side_market_prob": 0.5510744774801295,
+            "selected_side_model_prob": 0.755,
+            "mean_support": 2.0549999999999997,
+            "hits_mean": 6.555,
             "market_alternates": [],
-            "odds": "-134",
+            "odds": "-144",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -226,67 +226,10 @@
               ]
             },
             "reasons": [
-              "The model lands on the over side in 75.6% of sims, while the market is pricing it closer to 53.5%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.5 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against BAL gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 75.5% of sims, while the market is pricing it closer to 55.1%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.6 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against BAL gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 75.6% of sims, while the market is pricing it closer to 53.5%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.5 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against BAL gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 75.5% of sims, while the market is pricing it closer to 55.1%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.6 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against BAL gives him a fair shot to reach full workload volume.",
             "rank": 2,
-            "shadow_only": true
-          },
-          {
-            "date": "2026-06-02",
-            "game_pk": 823460,
-            "away": "San Diego Padres",
-            "home": "Philadelphia Phillies",
-            "away_abbr": "SD",
-            "home_abbr": "PHI",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 605400,
-            "pitcher_name": "Aaron Nola",
-            "team": "PHI",
-            "team_side": "home",
-            "prop": "hits_allowed",
-            "selection": "over",
-            "edge": 0.25147867298578197,
-            "market_line": 5.5,
-            "model_prob_over": 0.742,
-            "market_prob_over": 0.490521327014218,
-            "market_prob_under": 0.5094786729857821,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.490521327014218,
-            "selected_side_market_prob": 0.490521327014218,
-            "selected_side_model_prob": 0.742,
-            "mean_support": 2.1769999999999996,
-            "hits_mean": 7.677,
-            "market_alternates": [],
-            "odds": "-115",
-            "stake_u": 0.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 5.6 hits allowed.",
-              "He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:hits allowed",
-              "subject": "Aaron Nola",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 5.6 hits allowed.",
-                "He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 74.2% of sims, while the market is pricing it closer to 49.1%. Across his last 5 starts, he has averaged 5.6 hits allowed. He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against SD gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 74.2% of sims, while the market is pricing it closer to 49.1%. Across his last 5 starts, he has averaged 5.6 hits allowed. He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against SD gives him a fair shot to reach full workload volume.",
-            "rank": 3,
             "shadow_only": true
           },
           {
@@ -307,26 +250,26 @@
             "team_side": "away",
             "prop": "hits_allowed",
             "selection": "over",
-            "edge": 0.3182154150197628,
+            "edge": 0.3251377365417348,
             "market_line": 5.5,
-            "model_prob_over": 0.732,
-            "market_prob_over": 0.4137845849802372,
-            "market_prob_under": 0.5862154150197628,
+            "model_prob_over": 0.754,
+            "market_prob_over": 0.4288622634582652,
+            "market_prob_under": 0.5711377365417348,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4137845849802372,
-            "selected_side_market_prob": 0.4137845849802372,
-            "selected_side_model_prob": 0.732,
-            "mean_support": 2.0069999999999997,
-            "hits_mean": 7.507,
+            "market_no_vig_prob_over": 0.4288622634582652,
+            "selected_side_market_prob": 0.4288622634582652,
+            "selected_side_model_prob": 0.754,
+            "mean_support": 2.2140000000000004,
+            "hits_mean": 7.714,
             "market_alternates": [
               {
                 "line": 4.5,
-                "over_odds": "-160",
-                "under_odds": "+120",
+                "over_odds": "-155",
+                "under_odds": "+115",
                 "_src": "oddsapi"
               }
             ],
-            "odds": "+126",
+            "odds": "+118",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -347,9 +290,66 @@
               ]
             },
             "reasons": [
-              "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 41.4%. Across his last 5 starts, he has averaged 5.6 hits allowed. He leans heavily on his four-seam fastball, with slider and knuckle-curve working as the main support. The model baseline sits around 7.5 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against TB gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 75.4% of sims, while the market is pricing it closer to 42.9%. Across his last 5 starts, he has averaged 5.6 hits allowed. He leans heavily on his four-seam fastball, with slider and knuckle-curve working as the main support. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against TB gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 41.4%. Across his last 5 starts, he has averaged 5.6 hits allowed. He leans heavily on his four-seam fastball, with slider and knuckle-curve working as the main support. The model baseline sits around 7.5 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against TB gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 75.4% of sims, while the market is pricing it closer to 42.9%. Across his last 5 starts, he has averaged 5.6 hits allowed. He leans heavily on his four-seam fastball, with slider and knuckle-curve working as the main support. The model baseline sits around 7.7 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against TB gives him a fair shot to reach full workload volume.",
+            "rank": 3,
+            "shadow_only": true
+          },
+          {
+            "date": "2026-06-02",
+            "game_pk": 823460,
+            "away": "San Diego Padres",
+            "home": "Philadelphia Phillies",
+            "away_abbr": "SD",
+            "home_abbr": "PHI",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 605400,
+            "pitcher_name": "Aaron Nola",
+            "team": "PHI",
+            "team_side": "home",
+            "prop": "hits_allowed",
+            "selection": "over",
+            "edge": 0.30256950672645744,
+            "market_line": 5.5,
+            "model_prob_over": 0.751,
+            "market_prob_over": 0.44843049327354256,
+            "market_prob_under": 0.5515695067264573,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.44843049327354256,
+            "selected_side_market_prob": 0.44843049327354256,
+            "selected_side_model_prob": 0.751,
+            "mean_support": 2.008,
+            "hits_mean": 7.508,
+            "market_alternates": [],
+            "odds": "+105",
+            "stake_u": 0.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 5.6 hits allowed.",
+              "He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:hits allowed",
+              "subject": "Aaron Nola",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 5.6 hits allowed.",
+                "He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 75.1% of sims, while the market is pricing it closer to 44.8%. Across his last 5 starts, he has averaged 5.6 hits allowed. He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 7.5 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against SD gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 75.1% of sims, while the market is pricing it closer to 44.8%. Across his last 5 starts, he has averaged 5.6 hits allowed. He mixes knuckle-curve, four-seam fastball, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 7.5 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against SD gives him a fair shot to reach full workload volume.",
             "rank": 4,
             "shadow_only": true
           },
@@ -371,19 +371,19 @@
             "team_side": "home",
             "prop": "hits_allowed",
             "selection": "over",
-            "edge": 0.2593663681444748,
+            "edge": 0.2619604963050816,
             "market_line": 5.5,
             "model_prob_over": 0.709,
-            "market_prob_over": 0.4496336318555252,
-            "market_prob_under": 0.5503663681444749,
+            "market_prob_over": 0.44703950369491835,
+            "market_prob_under": 0.5529604963050816,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4496336318555252,
-            "selected_side_market_prob": 0.4496336318555252,
+            "market_no_vig_prob_over": 0.44703950369491835,
+            "selected_side_market_prob": 0.44703950369491835,
             "selected_side_model_prob": 0.709,
             "mean_support": 1.7009999999999996,
             "hits_mean": 7.201,
             "market_alternates": [],
-            "odds": "+108",
+            "odds": "+109",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -404,9 +404,9 @@
               ]
             },
             "reasons": [
-              "The model lands on the over side in 70.9% of sims, while the market is pricing it closer to 45.0%. Across his last 3 starts, he has averaged 5.3 hits allowed. He leans heavily on his four-seam fastball, with slider and changeup working as the main support. The model baseline sits around 7.2 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against COL gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 70.9% of sims, while the market is pricing it closer to 44.7%. Across his last 3 starts, he has averaged 5.3 hits allowed. He leans heavily on his four-seam fastball, with slider and changeup working as the main support. The model baseline sits around 7.2 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against COL gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 70.9% of sims, while the market is pricing it closer to 45.0%. Across his last 3 starts, he has averaged 5.3 hits allowed. He leans heavily on his four-seam fastball, with slider and changeup working as the main support. The model baseline sits around 7.2 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against COL gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 70.9% of sims, while the market is pricing it closer to 44.7%. Across his last 3 starts, he has averaged 5.3 hits allowed. He leans heavily on his four-seam fastball, with slider and changeup working as the main support. The model baseline sits around 7.2 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against COL gives him a fair shot to reach full workload volume.",
             "rank": 5,
             "shadow_only": true
           },
@@ -428,19 +428,19 @@
             "team_side": "away",
             "prop": "hits_allowed",
             "selection": "over",
-            "edge": 0.2174615384615386,
+            "edge": 0.21956950672645748,
             "market_line": 5.5,
-            "model_prob_over": 0.679,
-            "market_prob_over": 0.46153846153846145,
-            "market_prob_under": 0.5384615384615384,
+            "model_prob_over": 0.668,
+            "market_prob_over": 0.44843049327354256,
+            "market_prob_under": 0.5515695067264573,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.46153846153846145,
-            "selected_side_market_prob": 0.46153846153846145,
-            "selected_side_model_prob": 0.679,
-            "mean_support": 1.3789999999999996,
-            "hits_mean": 6.879,
+            "market_no_vig_prob_over": 0.44843049327354256,
+            "selected_side_market_prob": 0.44843049327354256,
+            "selected_side_model_prob": 0.668,
+            "mean_support": 1.4020000000000001,
+            "hits_mean": 6.902,
             "market_alternates": [],
-            "odds": "+100",
+            "odds": "+105",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -461,48 +461,48 @@
               ]
             },
             "reasons": [
-              "The model lands on the over side in 67.9% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 6.4 hits allowed. He leans heavily on his four-seam fastball, with splitter and slider working as the main support. The model baseline sits around 6.9 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against ATL gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 66.8% of sims, while the market is pricing it closer to 44.8%. Across his last 5 starts, he has averaged 6.4 hits allowed. He leans heavily on his four-seam fastball, with splitter and slider working as the main support. The model baseline sits around 6.9 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against ATL gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 67.9% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 6.4 hits allowed. He leans heavily on his four-seam fastball, with splitter and slider working as the main support. The model baseline sits around 6.9 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against ATL gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 66.8% of sims, while the market is pricing it closer to 44.8%. Across his last 5 starts, he has averaged 6.4 hits allowed. He leans heavily on his four-seam fastball, with splitter and slider working as the main support. The model baseline sits around 6.9 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against ATL gives him a fair shot to reach full workload volume.",
             "rank": 6,
             "shadow_only": true
           },
           {
             "date": "2026-06-02",
-            "game_pk": 823460,
-            "away": "San Diego Padres",
-            "home": "Philadelphia Phillies",
-            "away_abbr": "SD",
-            "home_abbr": "PHI",
+            "game_pk": 824026,
+            "away": "Colorado Rockies",
+            "home": "Los Angeles Angels",
+            "away_abbr": "COL",
+            "home_abbr": "LAA",
             "double_header": "N",
             "game_number": 1,
             "event_id": null,
             "commence_time": null,
             "market": "pitcher_props",
-            "pitcher_id": 681190,
-            "pitcher_name": "Randy V\u00e1squez",
-            "team": "SD",
+            "pitcher_id": 608372,
+            "pitcher_name": "Tomoyuki Sugano",
+            "team": "COL",
             "team_side": "away",
             "prop": "hits_allowed",
             "selection": "over",
-            "edge": 0.1711214574898785,
+            "edge": 0.10620136260408775,
             "market_line": 5.5,
-            "model_prob_over": 0.661,
-            "market_prob_over": 0.48987854251012153,
-            "market_prob_under": 0.5101214574898786,
+            "model_prob_over": 0.652,
+            "market_prob_over": 0.5457986373959123,
+            "market_prob_under": 0.45420136260408783,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.48987854251012153,
-            "selected_side_market_prob": 0.48987854251012153,
-            "selected_side_model_prob": 0.661,
-            "mean_support": 1.258,
-            "hits_mean": 6.758,
+            "market_no_vig_prob_over": 0.5457986373959123,
+            "selected_side_market_prob": 0.5457986373959123,
+            "selected_side_model_prob": 0.652,
+            "mean_support": 1.2919999999999998,
+            "hits_mean": 6.792,
             "market_alternates": [],
-            "odds": "-110",
+            "odds": "-140",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
               "Across his last 5 starts, he has averaged 5.8 hits allowed.",
-              "He mixes four-seam fastball, cutter, and sinker often enough that hitters have to cover multiple looks."
+              "He mixes four-seam fastball, splitter, and sinker often enough that hitters have to cover multiple looks."
             ],
             "explanation_diagnostic": {
               "status": "supported",
@@ -511,16 +511,16 @@
               "baseball_reasons_n": 2,
               "reason_sentences_n": 5,
               "market": "pitcher_props:hits allowed",
-              "subject": "Randy V\u00e1squez",
+              "subject": "Tomoyuki Sugano",
               "supporting_reasons": [
                 "Across his last 5 starts, he has averaged 5.8 hits allowed.",
-                "He mixes four-seam fastball, cutter, and sinker often enough that hitters have to cover multiple looks."
+                "He mixes four-seam fastball, splitter, and sinker often enough that hitters have to cover multiple looks."
               ]
             },
             "reasons": [
-              "The model lands on the over side in 66.1% of sims, while the market is pricing it closer to 49.0%. Across his last 5 starts, he has averaged 5.8 hits allowed. He mixes four-seam fastball, cutter, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against PHI gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 65.2% of sims, while the market is pricing it closer to 54.6%. Across his last 5 starts, he has averaged 5.8 hits allowed. He mixes four-seam fastball, splitter, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against LAA gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 66.1% of sims, while the market is pricing it closer to 49.0%. Across his last 5 starts, he has averaged 5.8 hits allowed. He mixes four-seam fastball, cutter, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against PHI gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 65.2% of sims, while the market is pricing it closer to 54.6%. Across his last 5 starts, he has averaged 5.8 hits allowed. He mixes four-seam fastball, splitter, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against LAA gives him a fair shot to reach full workload volume.",
             "rank": 7,
             "shadow_only": true
           },
@@ -542,19 +542,19 @@
             "team_side": "home",
             "prop": "walks_allowed",
             "selection": "over",
-            "edge": 0.18211805360228234,
+            "edge": 0.1848848167539267,
             "market_line": 1.5,
-            "model_prob_over": 0.656,
-            "market_prob_over": 0.4738819463977177,
-            "market_prob_under": 0.5261180536022823,
+            "model_prob_over": 0.643,
+            "market_prob_over": 0.4581151832460733,
+            "market_prob_under": 0.5418848167539267,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4738819463977177,
-            "selected_side_market_prob": 0.4738819463977177,
-            "selected_side_model_prob": 0.656,
-            "mean_support": 0.6709999999999998,
-            "walks_mean": 2.171,
+            "market_no_vig_prob_over": 0.4581151832460733,
+            "selected_side_market_prob": 0.4581151832460733,
+            "selected_side_model_prob": 0.643,
+            "mean_support": 0.6560000000000001,
+            "walks_mean": 2.156,
             "market_alternates": [],
-            "odds": "-103",
+            "odds": "+104",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -575,9 +575,9 @@
               ]
             },
             "reasons": [
-              "The model lands on the over side in 65.6% of sims, while the market is pricing it closer to 47.4%. Across his last 5 starts, he has averaged 2.2 walks allowed. He leans heavily on his sinker, with changeup and slider working as the main support. The model baseline sits around 2.2 walks allowed against a line of 1.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 64.3% of sims, while the market is pricing it closer to 45.8%. Across his last 5 starts, he has averaged 2.2 walks allowed. He leans heavily on his sinker, with changeup and slider working as the main support. The model baseline sits around 2.2 walks allowed against a line of 1.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 65.6% of sims, while the market is pricing it closer to 47.4%. Across his last 5 starts, he has averaged 2.2 walks allowed. He leans heavily on his sinker, with changeup and slider working as the main support. The model baseline sits around 2.2 walks allowed against a line of 1.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 64.3% of sims, while the market is pricing it closer to 45.8%. Across his last 5 starts, he has averaged 2.2 walks allowed. He leans heavily on his sinker, with changeup and slider working as the main support. The model baseline sits around 2.2 walks allowed against a line of 1.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
             "rank": 8,
             "shadow_only": true
           }
@@ -598,16 +598,17 @@
     },
     "warnings": [
       "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet.",
-      "Removed 9 sparse-support official recommendation(s) before final publish"
+      "Removed 9 sparse-support official recommendation(s) before final publish",
+      "Official card could not fully replace 1 sparse-support recommendation slot(s) with support-qualified alternatives"
     ],
     "explanation_diagnostics": {
-      "selected_rows_n": 13,
+      "selected_rows_n": 12,
       "sparse_support_n": 0,
       "sparse_support_rate": 0.0,
       "support_min_reasons": 2,
       "status_counts": {
         "strong": 4,
-        "supported": 9,
+        "supported": 8,
         "thin": 0,
         "none": 0
       },
@@ -660,8 +661,8 @@
           "selected_n": 4,
           "sparse_support_n": 0,
           "status_counts": {
-            "strong": 1,
-            "supported": 3,
+            "strong": 2,
+            "supported": 2,
             "thin": 0,
             "none": 0
           },
@@ -682,19 +683,19 @@
           "selected_n": 6,
           "sparse_support_n": 0,
           "status_counts": {
-            "strong": 2,
-            "supported": 4,
+            "strong": 1,
+            "supported": 5,
             "thin": 0,
             "none": 0
           },
           "examples": []
         },
         "hitter_runs": {
-          "selected_n": 1,
+          "selected_n": 0,
           "sparse_support_n": 0,
           "status_counts": {
             "strong": 0,
-            "supported": 1,
+            "supported": 0,
             "thin": 0,
             "none": 0
           },
@@ -716,13 +717,13 @@
     },
     "audit_track": {
       "official_card_explanation_support": {
-        "selected_rows_n": 13,
+        "selected_rows_n": 12,
         "sparse_support_n": 0,
         "sparse_support_rate": 0.0,
         "support_min_reasons": 2,
         "status_counts": {
           "strong": 4,
-          "supported": 9,
+          "supported": 8,
           "thin": 0,
           "none": 0
         },
@@ -775,8 +776,8 @@
             "selected_n": 4,
             "sparse_support_n": 0,
             "status_counts": {
-              "strong": 1,
-              "supported": 3,
+              "strong": 2,
+              "supported": 2,
               "thin": 0,
               "none": 0
             },
@@ -797,19 +798,19 @@
             "selected_n": 6,
             "sparse_support_n": 0,
             "status_counts": {
-              "strong": 2,
-              "supported": 4,
+              "strong": 1,
+              "supported": 5,
               "thin": 0,
               "none": 0
             },
             "examples": []
           },
           "hitter_runs": {
-            "selected_n": 1,
+            "selected_n": 0,
             "sparse_support_n": 0,
             "status_counts": {
               "strong": 0,
-              "supported": 1,
+              "supported": 0,
               "thin": 0,
               "none": 0
             },
@@ -832,8 +833,8 @@
       "selected_support_policy": {
         "support_min_reasons": 2,
         "removed_sparse_support_n": 9,
-        "replacement_added_n": 10,
-        "selection_shortfall_n": 0,
+        "replacement_added_n": 9,
+        "selection_shortfall_n": 1,
         "markets": {
           "totals": {
             "market": "totals",
@@ -859,7 +860,7 @@
                 "selection": "home",
                 "market": "ml",
                 "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the home side in 64.6% of sims, while the market is pricing it closer to 57.2%. Across his last 5 starts, Steven Matz has allowed about 2.8 earned runs per outing. TB wins this matchup in about 64.6% of model runs."
+                "reason_summary": "The model lands on the home side in 65.7% of sims, while the market is pricing it closer to 57.2%. Across his last 5 starts, Steven Matz has allowed about 2.8 earned runs per outing. TB wins this matchup in about 65.7% of model runs."
               }
             ]
           },
@@ -877,11 +878,18 @@
             "market": "hitter_props",
             "support_min_reasons": 2,
             "baseline_selected_n": 11,
-            "final_selected_n": 11,
+            "final_selected_n": 10,
             "removed_sparse_support_n": 8,
-            "replacement_added_n": 9,
-            "selection_shortfall_n": 0,
+            "replacement_added_n": 8,
+            "selection_shortfall_n": 1,
             "removed_examples": [
+              {
+                "subject": "Kevin Alc\u00e1ntara",
+                "selection": "over",
+                "market": "hitter_total_bases",
+                "baseball_reasons_n": 0,
+                "reason_summary": "The model lands on the over side in 80.7% of sims, while the market is pricing it closer to 51.0%. The model baseline comes in around 1.6 batter total bases against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.4 plate appearances."
+              },
               {
                 "subject": "Jared Young",
                 "selection": "over",
@@ -890,32 +898,25 @@
                 "reason_summary": "The model lands on the over side in 75.2% of sims, while the market is pricing it closer to 50.7%. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 4 spot, which points to about 4.8 plate appearances."
               },
               {
-                "subject": "Jonah Cox",
+                "subject": "Hunter Feduccia",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 72.9% of sims, while the market is pricing it closer to 44.3%. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.3 plate appearances."
-              },
-              {
-                "subject": "Rafael Devers",
-                "selection": "over",
-                "market": "hitter_hits",
-                "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the over side in 72.9% of sims, while the market is pricing it closer to 51.3%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 2 spot, which points to about 5.1 plate appearances."
+                "reason_summary": "The model lands on the over side in 74.4% of sims, while the market is pricing it closer to 51.2%. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.3 plate appearances."
               },
               {
                 "subject": "Taylor Trammell",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the over side in 71.9% of sims, while the market is pricing it closer to 54.3%. Over his last 10 games, he has recorded a hit in 9 of 10 games. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 4 spot, which points to about 4.6 plate appearances."
+                "reason_summary": "The model lands on the over side in 74.4% of sims, while the market is pricing it closer to 54.3%. Over his last 10 games, he has recorded a hit in 9 of 10 games. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances."
               },
               {
-                "subject": "A.J. Ewing",
+                "subject": "Jonah Cox",
                 "selection": "over",
                 "market": "hitter_total_bases",
-                "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the over side in 71.7% of sims, while the market is pricing it closer to 53.8%. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
+                "baseball_reasons_n": 0,
+                "reason_summary": "The model lands on the over side in 71.8% of sims, while the market is pricing it closer to 48.0%. The model baseline comes in around 1.8 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.2 plate appearances."
               }
             ]
           },
@@ -934,8 +935,8 @@
             "support_min_reasons": 2,
             "baseline_selected_n": 4,
             "final_selected_n": 4,
-            "removed_sparse_support_n": 4,
-            "replacement_added_n": 4,
+            "removed_sparse_support_n": 3,
+            "replacement_added_n": 3,
             "selection_shortfall_n": 0,
             "removed_examples": [
               {
@@ -946,25 +947,18 @@
                 "reason_summary": "The model lands on the over side in 75.2% of sims, while the market is pricing it closer to 50.7%. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 4 spot, which points to about 4.8 plate appearances."
               },
               {
-                "subject": "Jonah Cox",
+                "subject": "Hunter Feduccia",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 72.9% of sims, while the market is pricing it closer to 44.3%. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.3 plate appearances."
-              },
-              {
-                "subject": "Rafael Devers",
-                "selection": "over",
-                "market": "hitter_hits",
-                "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the over side in 72.9% of sims, while the market is pricing it closer to 51.3%. Over his last 10 games, he has recorded a hit in 6 of 10 games. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 2 spot, which points to about 5.1 plate appearances."
+                "reason_summary": "The model lands on the over side in 74.4% of sims, while the market is pricing it closer to 51.2%. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.3 plate appearances."
               },
               {
                 "subject": "Taylor Trammell",
                 "selection": "over",
                 "market": "hitter_hits",
                 "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the over side in 71.9% of sims, while the market is pricing it closer to 54.3%. Over his last 10 games, he has recorded a hit in 9 of 10 games. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 4 spot, which points to about 4.6 plate appearances."
+                "reason_summary": "The model lands on the over side in 74.4% of sims, while the market is pricing it closer to 54.3%. Over his last 10 games, he has recorded a hit in 9 of 10 games. The model baseline comes in around 1.2 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances."
               }
             ]
           },
@@ -988,6 +982,20 @@
             "selection_shortfall_n": 0,
             "removed_examples": [
               {
+                "subject": "Kevin Alc\u00e1ntara",
+                "selection": "over",
+                "market": "hitter_total_bases",
+                "baseball_reasons_n": 0,
+                "reason_summary": "The model lands on the over side in 80.7% of sims, while the market is pricing it closer to 51.0%. The model baseline comes in around 1.6 batter total bases against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.4 plate appearances."
+              },
+              {
+                "subject": "Jonah Cox",
+                "selection": "over",
+                "market": "hitter_total_bases",
+                "baseball_reasons_n": 0,
+                "reason_summary": "The model lands on the over side in 71.8% of sims, while the market is pricing it closer to 48.0%. The model baseline comes in around 1.8 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.2 plate appearances."
+              },
+              {
                 "subject": "A.J. Ewing",
                 "selection": "over",
                 "market": "hitter_total_bases",
@@ -995,25 +1003,11 @@
                 "reason_summary": "The model lands on the over side in 71.7% of sims, while the market is pricing it closer to 53.8%. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
               },
               {
-                "subject": "Hunter Feduccia",
+                "subject": "Alex Jackson",
                 "selection": "over",
                 "market": "hitter_total_bases",
                 "baseball_reasons_n": 0,
-                "reason_summary": "The model lands on the over side in 70.6% of sims, while the market is pricing it closer to 46.5%. The model baseline comes in around 1.4 batter total bases against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.2 plate appearances."
-              },
-              {
-                "subject": "Daniel Susac",
-                "selection": "over",
-                "market": "hitter_total_bases",
-                "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the over side in 69.5% of sims, while the market is pricing it closer to 52.5%. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.6 batter total bases against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.4 plate appearances."
-              },
-              {
-                "subject": "Jorge Mateo",
-                "selection": "over",
-                "market": "hitter_total_bases",
-                "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the over side in 67.7% of sims, while the market is pricing it closer to 55.3%. Over his last 10 games, he has recorded at least one total base in 6 of 10 games. The model baseline comes in around 1.4 batter total bases against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.0 plate appearances."
+                "reason_summary": "The model lands on the over side in 68.7% of sims, while the market is pricing it closer to 45.1%. The model baseline comes in around 1.5 batter total bases against a line of 0.5. He is projected to hit in the 9 spot, which points to about 4.0 plate appearances."
               }
             ]
           },
@@ -1021,11 +1015,19 @@
             "market": "hitter_runs",
             "support_min_reasons": 2,
             "baseline_selected_n": 1,
-            "final_selected_n": 1,
-            "removed_sparse_support_n": 0,
+            "final_selected_n": 0,
+            "removed_sparse_support_n": 1,
             "replacement_added_n": 0,
-            "selection_shortfall_n": 0,
-            "removed_examples": []
+            "selection_shortfall_n": 1,
+            "removed_examples": [
+              {
+                "subject": "Mike Trout",
+                "selection": "under",
+                "market": "hitter_runs",
+                "baseball_reasons_n": 0,
+                "reason_summary": "The model lands on the under side in 60.7% of sims, while the market is pricing it closer to 44.8%. The model baseline comes in around 0.5 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
+              }
+            ]
           },
           "hitter_rbis": {
             "market": "hitter_rbis",
@@ -1045,8 +1047,8 @@
         "markets": {
           "pitcher_props": {
             "market": "pitcher_props",
-            "evaluated_n": 11,
-            "kept_n": 11,
+            "evaluated_n": 17,
+            "kept_n": 17,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
@@ -1059,8 +1061,8 @@
           },
           "hitter_hits": {
             "market": "hitter_hits",
-            "evaluated_n": 11,
-            "kept_n": 11,
+            "evaluated_n": 13,
+            "kept_n": 13,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
@@ -1073,15 +1075,15 @@
           },
           "hitter_total_bases": {
             "market": "hitter_total_bases",
-            "evaluated_n": 15,
-            "kept_n": 15,
+            "evaluated_n": 8,
+            "kept_n": 8,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
           "hitter_runs": {
             "market": "hitter_runs",
-            "evaluated_n": 3,
-            "kept_n": 3,
+            "evaluated_n": 0,
+            "kept_n": 0,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
@@ -1097,44 +1099,44 @@
       "shadow_support_policy": {
         "pitcher_props": {
           "market": "shadow_pitcher_props",
-          "evaluated_n": 41,
-          "kept_n": 14,
-          "removed_sparse_support_n": 27,
+          "evaluated_n": 44,
+          "kept_n": 15,
+          "removed_sparse_support_n": 29,
           "removed_examples": [
             {
               "subject": "Steven Matz",
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 1,
-              "reason_summary": "The model lands on the over side in 75.8% of sims, while the market is pricing it closer to 50.9%. He leans heavily on his sinker, with changeup and slider working as the main support. The model baseline sits around 6.4 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 73.8% of sims, while the market is pricing it closer to 52.9%. He leans heavily on his sinker, with changeup and slider working as the main support. The model baseline sits around 6.2 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Gage Jump",
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 1,
-              "reason_summary": "The model lands on the over side in 86.4% of sims, while the market is pricing it closer to 46.8%. He leans heavily on his four-seam fastball, with slider and secondary mix working as the main support. The model baseline sits around 7.6 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against CHC gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 87.1% of sims, while the market is pricing it closer to 44.7%. He leans heavily on his four-seam fastball, with slider and secondary mix working as the main support. The model baseline sits around 7.8 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against CHC gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Jameson Taillon",
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 1,
-              "reason_summary": "The model lands on the over side in 73.9% of sims, while the market is pricing it closer to 41.7%. He mixes four-seam fastball, cutter, and secondary mix often enough that hitters have to cover multiple looks. The model baseline sits around 7.6 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against ATH gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 74.0% of sims, while the market is pricing it closer to 42.5%. He mixes four-seam fastball, cutter, and secondary mix often enough that hitters have to cover multiple looks. The model baseline sits around 7.5 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against ATH gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Jameson Taillon",
               "selection": "over",
               "market": "pitcher_props:walks allowed",
               "baseball_reasons_n": 1,
-              "reason_summary": "The model lands on the over side in 63.5% of sims, while the market is pricing it closer to 53.8%. He mixes four-seam fastball, cutter, and secondary mix often enough that hitters have to cover multiple looks. The model baseline sits around 2.1 walks allowed against a line of 1.5. If he stays on his normal starter path, the matchup against ATH gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 64.5% of sims, while the market is pricing it closer to 54.7%. He mixes four-seam fastball, cutter, and secondary mix often enough that hitters have to cover multiple looks. The model baseline sits around 2.1 walks allowed against a line of 1.5. If he stays on his normal starter path, the matchup against ATH gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Bubba Chandler",
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 1,
-              "reason_summary": "The model lands on the over side in 76.6% of sims, while the market is pricing it closer to 46.2%. He leans heavily on his four-seam fastball, with changeup and slider working as the main support. The model baseline sits around 6.6 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against HOU gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 76.0% of sims, while the market is pricing it closer to 43.9%. He leans heavily on his four-seam fastball, with changeup and slider working as the main support. The model baseline sits around 6.5 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against HOU gives him a fair shot to reach full workload volume."
             }
           ]
         },
@@ -1165,12 +1167,12 @@
   },
   "timings": {
     "profiles": {
-      "game_recos": 758.187,
-      "pitcher_props_recos": 150.926,
-      "hitter_props_recos": 111.067
+      "game_recos": 158.886,
+      "pitcher_props_recos": 112.827,
+      "hitter_props_recos": 103.859
     },
-    "locked_policy_s": 2.382,
-    "total_s": 1023.202
+    "locked_policy_s": 6.867,
+    "total_s": 383.053
   },
   "failures": [],
   "failures_n": 0
