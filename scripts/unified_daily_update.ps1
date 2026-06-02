@@ -1209,6 +1209,43 @@ function Get-ForcedPublishArtifactPaths {
         )) {
             Add-PathIfPresent -RelativePath $relativePath
         }
+
+        foreach ($relativePath in @(
+            "data/nhl_source/source_artifacts/data/processed/predictions_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/predictions_sim_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/recommendations_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/recommendations_sim_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/reconciliations_log.csv",
+            "data/nhl_source/source_artifacts/data/processed/props_reconciliations_log.csv",
+            "data/nhl_source/source_artifacts/data/processed/recon_games_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/recon_props_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/props_projections_all_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/props_boxscores_sim_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/props_boxscores_sim_hist_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/props_boxscores_sim_samples_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/props_recommendations_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/roster_snapshot_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/injuries_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/lineups_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/lineups_co_toi_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/shifts_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/co_toi_shifts_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/starting_goalies_${DateValue}.csv",
+            "data/nhl_source/source_artifacts/data/processed/smart_sim_${DateValue}_bundle.json",
+            "data/nhl_source/source_artifacts/data/processed/live_lens_projections_${DateValue}.jsonl",
+            "data/nhl_source/source_artifacts/data/processed/live_lens_signals_${DateValue}.jsonl",
+            "data/nhl_source/source_artifacts/data/processed/live_lens_tuning_override.json",
+            "data/nhl_source/source_artifacts/data/live_lens/live_lens_projections_${DateValue}.jsonl",
+            "data/nhl_source/source_artifacts/data/live_lens/live_lens_signals_${DateValue}.jsonl",
+            "data/nhl_source/source_artifacts/data/live_lens/live_lens_tuning_override.json",
+            "data/nhl_source/source_artifacts/data/odds/games/date=${DateValue}/scoreboard.csv",
+            "data/nhl_source/source_artifacts/data/odds/team/date=${DateValue}/oddsapi.csv",
+            "data/nhl_source/source_artifacts/data/odds/team/date=${DateValue}/oddsapi.parquet",
+            "data/nhl_source/source_artifacts/data/props/player_props_lines/date=${DateValue}/oddsapi.csv",
+            "data/nhl_source/source_artifacts/data/props/player_props_lines/date=${DateValue}/oddsapi.parquet"
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
     }
 
     if (-not $SkipNCAAB) {
