@@ -343,6 +343,8 @@ def _lineup_quality_issues(*, artifact_root: Path, date_str: str) -> list[str]:
 
 def _source_cli_generation_enabled() -> bool:
     value = str(os.environ.get("SYNDICATE_NHL_SOURCE_CLI_GENERATION") or "").strip().lower()
+    if not value:
+        return True
     return value in {"1", "true", "yes", "on"}
 
 

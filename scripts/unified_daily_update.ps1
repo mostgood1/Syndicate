@@ -790,27 +790,40 @@ function Assert-AdvancedDataReady {
                 Write-Host ("NHL advanced-data gate: no scheduled games for {0} ({1}); skipping artifact assertions" -f $DateValue, $scheduleCheck.source) -ForegroundColor DarkGray
                 return
             }
-            $processedRoot = Resolve-ExistingRoot @(
+            $processedRootCandidates = @(
                 (Join-Path $RepoRoot 'data\nhl_source\data\processed'),
                 (Join-Path $RepoRoot 'data\nhl_source\source_artifacts\data\processed')
             )
-            if (-not (Test-Path $processedRoot)) {
-                throw "NHL advanced-data gate failed: missing processed root $processedRoot"
+            $processedRoot = $null
+            foreach ($candidateRoot in $processedRootCandidates) {
+                if (-not (Test-Path $candidateRoot)) {
+                    continue
+                }
+
+                $candidateRequiredPaths = @(
+                    (Join-Path $candidateRoot ("lineups_{0}.csv" -f $DateValue)),
+                    (Join-Path $candidateRoot ("lineups_co_toi_{0}.csv" -f $DateValue)),
+                    (Join-Path $candidateRoot ("shifts_{0}.csv" -f $DateValue)),
+                    (Join-Path $candidateRoot ("props_predictions_{0}.csv" -f $DateValue)),
+                    (Join-Path $candidateRoot ("props_recommendations_{0}.csv" -f $DateValue))
+                )
+                $allCandidateArtifactsPresent = $true
+                foreach ($candidateRequiredPath in $candidateRequiredPaths) {
+                    if (-not (Test-Path $candidateRequiredPath)) {
+                        $allCandidateArtifactsPresent = $false
+                        break
+                    }
+                }
+                if ($allCandidateArtifactsPresent) {
+                    $processedRoot = $candidateRoot
+                    break
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace($processedRoot)) {
+                throw ("NHL advanced-data gate failed: missing required artifacts in any processed root: {0}" -f ($processedRootCandidates -join '; '))
             }
 
             $lineupsPath = Join-Path $processedRoot ("lineups_{0}.csv" -f $DateValue)
-            $requiredPaths = @(
-                $lineupsPath,
-                (Join-Path $processedRoot ("lineups_co_toi_{0}.csv" -f $DateValue)),
-                (Join-Path $processedRoot ("shifts_{0}.csv" -f $DateValue)),
-                (Join-Path $processedRoot ("props_predictions_{0}.csv" -f $DateValue)),
-                (Join-Path $processedRoot ("props_recommendations_{0}.csv" -f $DateValue))
-            )
-            foreach ($requiredPath in $requiredPaths) {
-                if (-not (Test-Path $requiredPath)) {
-                    throw "NHL advanced-data gate failed: missing required artifact $requiredPath"
-                }
-            }
 
             $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
             if ($smartSimFiles.Count -eq 0) {
