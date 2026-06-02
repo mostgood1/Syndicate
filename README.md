@@ -93,8 +93,8 @@ Hosted state overrides:
 
 Blueprint defaults:
 
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=external_runner` on the web service.
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` for both the web service and the worker.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=detached_subprocess` on the web service.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on the web service.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) leaves `SYNDICATE_DATA_ROOT` unset, so public mirrored artifacts still come from the repo-backed `data/` tree unless you deliberately introduce a separate hosted artifact strategy.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) intentionally does not hardcode any `SYNDICATE_ARTIFACT_ROOT_*` values. Published bundle locations are deployment-specific, so set the matching artifact-root overrides on both the web service and the worker when you want hosted ingest to pull from neutral artifact bundles instead of the repo-backed `data/` tree.
