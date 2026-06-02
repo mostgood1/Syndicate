@@ -510,6 +510,24 @@ def _sim_hist_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
     return rows, str(path)
 
 
+def _schedule_rows_by_game(selected_date: str) -> dict[tuple[str, str], dict[str, str]]:
+    path = scoreboard_snapshot_path(selected_date)
+    rows = _load_csv_rows(path) if path.exists() else []
+    out: dict[tuple[str, str], dict[str, str]] = {}
+    for row in rows:
+        away_name = str(row.get("away") or row.get("away_team") or "").strip()
+        home_name = str(row.get("home") or row.get("home_team") or "").strip()
+        if away_name and home_name:
+            out[(away_name, home_name)] = row
+    return out
+
+
+def _sim_hist_rows(selected_date: str) -> tuple[list[dict[str, str]], str]:
+    path = processed_path(f"props_boxscores_sim_hist_{selected_date}.csv")
+    rows = _load_csv_rows(path) if path.exists() else []
+    return rows, str(path)
+
+
 def build_sim_boxscores_payload(selected_date: str | None) -> dict[str, Any]:
     requested_date, resolved_date, lookahead_applied = _resolve_cards_date(selected_date)
     rows, source_path = _sim_boxscore_rows(resolved_date)
