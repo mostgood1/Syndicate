@@ -101,6 +101,46 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             finally:
                 sys.modules.pop(spec.name, None)
 
+    def test_live_lens_reports_payload_overrides_stale_report_metadata(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_reports", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(os.environ, {}, clear=True):
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                module._DATA_DIR = runtime_root
+                module._LIVE_LENS_DIR = runtime_root / "live_lens"
+                expected_data_root = module._relative_path_str(runtime_root)
+                expected_live_lens_dir = module._relative_path_str(runtime_root / "live_lens")
+                module._local_timestamp_text = lambda: "2026-06-01T21:00:00-05:00"
+                module._load_json_file = lambda path: {
+                    "generatedAt": "1999-01-01T00:00:00-05:00",
+                    "dataRoot": "C:/stale/data",
+                    "liveLensDir": "C:/stale/data/live_lens",
+                    "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                }
+                module._live_prop_registry_summary = lambda d: {}
+                module._load_live_prop_first_observation_archive = lambda d: []
+                module._live_lens_optimization_regime = lambda d: "baseline"
+                module._live_lens_log_path = lambda d: runtime_root / f"live_lens_{d}.jsonl"
+                module._live_prop_observation_log_path = lambda d: runtime_root / "prop_registry" / f"live_prop_observations_{d}.jsonl"
+                module._live_prop_registry_path = lambda d: runtime_root / "prop_registry" / f"live_prop_registry_{d}.json"
+                module._live_prop_registry_log_path = lambda d: runtime_root / "prop_registry" / f"live_prop_registry_{d}.jsonl"
+                module._live_lens_daily_recap_path = lambda d: runtime_root / "recaps" / f"live_lens_daily_recap_{d}.json"
+
+                payload = module._live_lens_reports_payload("2026-06-01")
+
+            self.assertEqual(payload["latestReport"]["generatedAt"], "2026-06-01T21:00:00-05:00")
+            self.assertEqual(payload["latestReport"]["dataRoot"], expected_data_root)
+            self.assertEqual(payload["latestReport"]["liveLensDir"], expected_live_lens_dir)
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_main_prefers_existing_source_artifacts_when_overwrite_off(self) -> None:
         module = self._load_module()
 

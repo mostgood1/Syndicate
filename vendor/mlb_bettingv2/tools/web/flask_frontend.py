@@ -17112,6 +17112,13 @@ def _live_lens_reports_payload(d: str, *, include_archive: bool = False) -> Dict
     registry_log_path = _live_prop_registry_log_path(d)
     recap_path = _live_lens_daily_recap_path(d)
     latest_report = _load_json_file(_live_lens_report_path(d)) or {}
+    runtime_metadata = {
+        "generatedAt": _local_timestamp_text(),
+        "dataRoot": _relative_path_str(_DATA_DIR),
+        "liveLensDir": _relative_path_str(_LIVE_LENS_DIR),
+    }
+    if isinstance(latest_report, dict) and latest_report:
+        latest_report = {**latest_report, **runtime_metadata}
     registry_summary = _live_prop_registry_summary(d)
     first_observation_archive: List[Dict[str, Any]] = _load_live_prop_first_observation_archive(d) if include_archive else []
     if not latest_report:
