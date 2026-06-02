@@ -5234,6 +5234,12 @@ def _v1_odds_payload(
                 away = str(r.get("away") or "")
                 if not home or not away:
                     continue
+                game_state = str(r.get("gameState") or r.get("game_state") or "")
+                reg3_draw = _i(r.get("reg3_draw"))
+                reg3_draw_book = r.get("reg3_draw_book")
+                if not _is_live_state(game_state):
+                    reg3_draw = 0
+                    reg3_draw_book = None
                 games.append({
                     "date": d,
                     "home": home,
@@ -5260,10 +5266,10 @@ def _v1_odds_payload(
                     },
                     "reg_3way": {
                         "home": _i(r.get("reg3_home")),
-                        "draw": _i(r.get("reg3_draw")),
+                        "draw": reg3_draw,
                         "away": _i(r.get("reg3_away")),
                         "home_book": r.get("reg3_home_book"),
-                        "draw_book": r.get("reg3_draw_book"),
+                        "draw_book": reg3_draw_book,
                         "away_book": r.get("reg3_away_book"),
                     },
                     "period_totals": {
@@ -11459,7 +11465,7 @@ async def v1_live_lens_combined(
                                     "p_win_calibrated": guidance.get("p_win_calibrated"),
                                     "p_win_prob_source": guidance.get("p_win_prob_source"),
                                     "p_win_market_blend_weight": guidance.get("p_win_market_blend_weight"),
-                                    "p_tie_reg": guidance.get("p_tie_reg"),
+                                    "p_tie_reg": 0.0 if not _is_live_state(str(gg.get("gameState") or "")) else guidance.get("p_tie_reg"),
                                     "late_state_mode": guidance.get("late_state_mode"),
                                     "projection_driver_tags": guidance.get("projection_driver_tags"),
                                     "pp_team": guidance.get("pp_team"),
