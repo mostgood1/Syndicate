@@ -1737,7 +1737,7 @@
         const globalOddsRefreshedAt = linesPayload?.odds_refreshed_at || linesPayload?.generated_at || null;
 
         safeArray(linesPayload?.games).forEach((item) => {
-          const eventId = String(item?.event_id || '').trim();
+          const eventId = String(item?.event_id || eventIds[index] || '').trim();
           if (eventId) {
             liveLinesMap.set(eventId, item);
             oddsRefreshedByEvent.set(eventId, item?.odds_refreshed_at || item?.generated_at || globalOddsRefreshedAt || null);
@@ -3014,17 +3014,36 @@
   }
 
   function transformLiveStripPayload(payload, dateValue) {
+  function transformLiveStripPayload(payload, dateValue, boxscorePayload = null) {
+    const boxscoresByEvent = new Map();
+    safeArray(boxscorePayload?.games).forEach((entry) => {
+      const eventId = String(entry?.event_id || '').trim();
+      if (eventId) {
+        boxscoresByEvent.set(eventId, entry);
+      }
+    });
     const items = [];
     const payloadOddsRefreshedAt = payload?.odds_refreshed_at || payload?.generated_at || null;
     safeArray(payload?.games).forEach((game) => {
       const status = game?.status || {};
       const gameOddsRefreshedAt = game?.odds_refreshed_at || game?.generated_at || payloadOddsRefreshedAt || null;
+      const boxscoreEntry = boxscoresByEvent.get(String(game?.event_id || '').trim()) || null;
+      const actualRowsByPlayer = new Map();
+      safeArray(boxscoreEntry?.players).forEach((actualRow) => {
+        const teamTri = String(actualRow?.team_tri || '').trim().toUpperCase();
+        const playerKey = normalizePlayerKey(actualRow?.player);
+        if (teamTri && playerKey) {
+          actualRowsByPlayer.set(`${teamTri}::${playerKey}`, actualRow);
+        }
+      });
       const gameItems = safeArray(game?.rows)
         .filter((row) => row && row.player && row.team_tri)
         .filter((row) => row.line_source && row.line_source !== 'model')
         .filter((row) => row.pace_proj != null || row.sim_mu_adjusted != null || row.sim_mu != null || row.ev_side || row.lean)
         .map((row) => {
           try {
+            const actualRow = actualRowsByPlayer.get(`${String(row?.team_tri || '').trim().toUpperCase()}::${normalizePlayerKey(row?.player)}`) || null;
+            const actualValue = row?.actual != null ? row.actual : actualStatValue(actualRow, row?.stat);
             return {
               away_tri: game?.away,
               home_tri: game?.home,
@@ -3147,19 +3166,21 @@
           { retries: silent ? 2 : 1 }
         );
 
-        const payload = await fetchApiJson(
+        const [payload, boxscorePayload] = await Promise.all([
+          fetchApiJson(
           `${API_BASE_PATH}/live_player_lens?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
           'Failed to load live player props.',
           { retries: silent ? 2 : 1 }
-        );
-        let transformed = transformLiveStripPayload(payload, dateValue);
-
-        if ((!safeArray(transformed?.items).length) && games.length && liveStatePayload) {
-          const boxscorePayload = await fetchApiJson(
+          ),
+          fetchApiJson(
             `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live player boxscore.',
             { retries: silent ? 2 : 1 }
-          );
+          ),
+        ]);
+        let transformed = transformLiveStripPayload(payload, dateValue, boxscorePayload);
+
+        if ((!safeArray(transformed?.items).length) && games.length && liveStatePayload) {
           transformed = buildLiveBoxscoreSimFallback(boxscorePayload, games, liveStatePayload, dateValue);
         }
 
