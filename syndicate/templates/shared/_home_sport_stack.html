@@ -193,30 +193,30 @@
                   </div>
                   <div class="sport-compact-card__summary">{{ item.writeup or item.detail }}</div>
                   <div class="sport-compact-card__chip-row">
-                    {% if item.actual %}
+                    {% if item.actual not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
                     {% endif %}
-                    {% if item.live_projection %}
+                    {% if item.live_projection not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Live proj {{ item.live_projection }}</span>
-                    {% elif item.projected %}
+                    {% elif item.projected not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
                     {% endif %}
-                    {% if item.line %}
+                    {% if item.line not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Line {{ item.line }}</span>
                     {% endif %}
-                    {% if item.odds %}
+                    {% if item.odds not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Odds {{ item.odds }}</span>
                     {% endif %}
-                    {% if item.confidence %}
+                    {% if item.confidence not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Sim {{ item.confidence }}</span>
                     {% endif %}
-                    {% if item.game_state %}
+                    {% if item.game_state not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">{{ item.game_state }}</span>
                     {% endif %}
-                    {% if item.live_total %}
+                    {% if item.live_total not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Live total {{ item.live_total }}</span>
                     {% endif %}
-                    {% if item.outcome_label %}
+                    {% if item.outcome_label not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">{{ item.outcome_label }}</span>
                     {% endif %}
                   </div>
@@ -292,30 +292,30 @@
                   </div>
                   <div class="sport-compact-card__summary">{{ item.detail }}</div>
                   <div class="sport-compact-card__chip-row">
-                    {% if item.actual %}
+                    {% if item.actual not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
                     {% endif %}
-                    {% if item.live_projection %}
+                    {% if item.live_projection not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Live proj {{ item.live_projection }}</span>
-                    {% elif item.projected %}
+                    {% elif item.projected not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
                     {% endif %}
-                    {% if item.line %}
+                    {% if item.line not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Line {{ item.line }}</span>
                     {% endif %}
-                    {% if item.odds %}
+                    {% if item.odds not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Odds {{ item.odds }}</span>
                     {% endif %}
-                    {% if item.confidence %}
+                    {% if item.confidence not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Sim {{ item.confidence }}</span>
                     {% endif %}
-                    {% if item.game_state %}
+                    {% if item.game_state not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">{{ item.game_state }}</span>
                     {% endif %}
-                    {% if item.live_total %}
+                    {% if item.live_total not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">Live total {{ item.live_total }}</span>
                     {% endif %}
-                    {% if item.outcome_label %}
+                    {% if item.outcome_label not in [none, '', '-'] %}
                       <span class="sport-compact-card__chip">{{ item.outcome_label }}</span>
                     {% endif %}
                   </div>

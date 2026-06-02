@@ -118,6 +118,53 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual((((payload.get("games") or [{}])[0]).get("pbp_recent") or {}).get("points_total"), 14)
 
+    def test_live_player_lens_payload_hydrates_actuals_from_boxscore(self) -> None:
+        with patch("syndicate.features.nba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}):
+            with patch(
+                "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+                return_value={
+                    "ok": True,
+                    "date": "2026-05-21",
+                    "games": [
+                        {
+                            "event_id": "evt-2",
+                            "rows": [
+                                {
+                                    "player": "Jayson Tatum",
+                                    "team_tri": "BOS",
+                                    "stat": "pts",
+                                    "line_live": 18.5,
+                                    "sim_mu": 22.0,
+                                    "sim_mu_adjusted": 22.0,
+                                    "price": -115,
+                                    "win_prob": 0.61,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            ):
+                with patch(
+                    "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+                    return_value={
+                        "games": [
+                            {
+                                "event_id": "evt-2",
+                                "players": [
+                                    {"team_tri": "BOS", "player": "Jayson Tatum", "pts": 20, "reb": 5, "ast": 3, "mp": 24}
+                                ],
+                            }
+                        ]
+                    },
+                ):
+                    payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("actual"), 20)
+        self.assertIsNotNone(row.get("live_projection"))
+        self.assertIsNotNone(row.get("live_edge"))
+        self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
+
 
 if __name__ == "__main__":
     unittest.main()

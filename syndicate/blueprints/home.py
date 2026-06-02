@@ -1103,7 +1103,7 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
     outcome_label = _safe_text(item.get("outcome_label"), None)
     if not outcome_label and outcome_state:
         outcome_label = "Hit" if outcome_state == "hit" else "Miss" if outcome_state == "miss" else None
-    live_total = _safe_text(item.get("live_total"), None)
+    live_total = _prop_metric_text(item.get("live_total"))
     if not live_total:
         live_total = _score_value(item.get("live_total_line") or item.get("live_line_total") or item.get("total_goals"))
     return {
@@ -1115,11 +1115,11 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         "market": _safe_text(item.get("market"), heading),
         "pick": _safe_text(item.get("pick"), detail.split("|")[0].strip() if detail else heading),
         "matchup": _safe_text(item.get("matchup"), "-"),
-        "actual": _safe_text(item.get("actual"), "-"),
-        "projected": _safe_text(item.get("projected"), "-"),
-        "live_projection": _safe_text(item.get("live_projection"), "-"),
-        "line": _safe_text(item.get("line"), "-"),
-        "odds": _safe_text(item.get("odds"), "-"),
+        "actual": _prop_metric_text(item.get("actual")) or "-",
+        "projected": _prop_metric_text(item.get("projected")) or "-",
+        "live_projection": _prop_metric_text(item.get("live_projection")) or "-",
+        "line": _prop_metric_text(item.get("line")) or "-",
+        "odds": _prop_metric_text(item.get("odds")) or "-",
         "edge": edge,
         "confidence": confidence,
         "detail": detail,
@@ -2205,7 +2205,12 @@ def _prop_rows_from_nba_live_lens(games: list[dict[str, Any]], *, fallback_href:
         probability = _pct_text(row.get("win_prob") or row.get("live_rank_probability"))
         ev_pct = _pct_text(row.get("ev"))
         value = probability or (f"EV {ev_pct}" if ev_pct else _safe_text(row.get("klass"), "Watch"))
-        projected = _prop_metric_text(row.get("sim_mu_adjusted") if row.get("sim_mu_adjusted") is not None else row.get("sim_mu"))
+        projected = _prop_metric_text(row.get("sim_mu") if row.get("sim_mu") is not None else row.get("sim_mu_adjusted"))
+        live_projection = _prop_metric_text(
+            row.get("live_projection")
+            if row.get("live_projection") is not None
+            else (row.get("liveProjection") if row.get("liveProjection") is not None else row.get("sim_mu_adjusted") if row.get("sim_mu_adjusted") is not None else row.get("sim_mu"))
+        )
         rows.append(
             {
                 "matchup": str(row.get("__matchup") or "").strip() or _sport_matchup(game),
@@ -2218,14 +2223,18 @@ def _prop_rows_from_nba_live_lens(games: list[dict[str, Any]], *, fallback_href:
                 "value": value,
                 "actual": _prop_metric_text(row.get("actual")),
                 "projected": projected,
-                "live_projection": projected,
+                "live_projection": live_projection,
                 "line": _prop_metric_text(row.get("line_live") if row.get("line_live") is not None else row.get("line")),
                 "odds": _prop_metric_text(
                     row.get("odds_live")
                     if row.get("odds_live") is not None
                     else (row.get("price") if row.get("price") is not None else row.get("odds"))
                 ),
-                "edge": _pct_text(row.get("ev") if row.get("ev") is not None else row.get("edge")),
+                "edge": _pct_text(
+                    row.get("live_edge")
+                    if row.get("live_edge") is not None
+                    else (row.get("liveEdge") if row.get("liveEdge") is not None else row.get("ev") if row.get("ev") is not None else row.get("edge"))
+                ),
                 "confidence": probability,
                 "game_state": _safe_text(status_bits[-1] if status_bits else row.get("status_label") or "Live", None),
                 "href": fallback_href or (str(game.get("href") or "").strip() or None),
