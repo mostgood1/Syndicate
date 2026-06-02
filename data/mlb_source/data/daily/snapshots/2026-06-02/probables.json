@@ -2,7 +2,7 @@
   "date": "2026-06-02",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-02T12:03:27.747901",
+  "generated_at": "2026-06-02T14:03:54.168536",
   "games": [
     {
       "idx": 0,
@@ -208,7 +208,7 @@
         "abbr": "WSH"
       },
       "away_probable_id": 669199,
-      "home_probable_id": 571945,
+      "home_probable_id": 663992,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
@@ -233,8 +233,8 @@
       },
       "home_validation": {
         "status": "ok",
-        "selected_id": 571945,
-        "selected_name": "Miles Mikolas",
+        "selected_id": 663992,
+        "selected_name": "Richard Lovelady",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -255,9 +255,9 @@
         "away_schedule_name": "Lake Bachar",
         "home_schedule_name": "Miles Mikolas",
         "away_feed_id": 669199,
-        "home_feed_id": 571945,
+        "home_feed_id": 663992,
         "away_feed_name": "Lake Bachar",
-        "home_feed_name": "Miles Mikolas"
+        "home_feed_name": "Richard Lovelady"
       }
     },
     {

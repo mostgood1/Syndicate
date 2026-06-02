@@ -2,16 +2,16 @@
   "date": "2026-06-02",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-02T12:03:27.744054",
+  "generated_at": "2026-06-02T14:03:54.165588",
   "summary": {
     "games": 15,
-    "projected_teams": 30,
+    "projected_teams": 27,
     "adjusted_teams": 1,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
-    "confirmed_teams": 0,
-    "projected_only_teams": 30,
-    "confirmed_only_teams": 0,
+    "confirmed_teams": 3,
+    "projected_only_teams": 27,
+    "confirmed_only_teams": 3,
     "comparable_teams": 0,
     "exact_match_teams": 0,
     "true_mismatch_teams": 0
@@ -359,7 +359,17 @@
         "abbr": "BOS"
       },
       "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
+      "home_confirmed_ids": [
+        680776,
+        678882,
+        677800,
+        575929,
+        807799,
+        681508,
+        643396,
+        691785,
+        702332
+      ],
       "away_projected_ids": [
         621493,
         683002,
@@ -371,17 +381,7 @@
         642215,
         677942
       ],
-      "home_projected_ids": [
-        680776,
-        678882,
-        677800,
-        575929,
-        807799,
-        681508,
-        686765,
-        691785,
-        643396
-      ],
+      "home_projected_ids": [],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
@@ -436,62 +436,14 @@
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          680776,
-          678882,
-          677800,
-          575929,
-          807799,
-          681508,
-          686765,
-          691785,
-          643396
-        ],
-        "ids": [
-          680776,
-          678882,
-          677800,
-          575929,
-          807799,
-          681508,
-          686765,
-          691785,
-          643396
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 17,
-        "raw_names": [
-          "Jarren Duran",
-          "Ceddanne Rafaela",
-          "Wilyer Abreu",
-          "Willson Contreras",
-          "Masataka Yoshida",
-          "Mickey Gasper",
-          "Nick Sogard",
-          "Marcelo Mayer",
-          "Isiah Kiner-Falefa"
-        ],
-        "matched_names": [
-          "Jarren Duran",
-          "Ceddanne Rafaela",
-          "Wilyer Abreu",
-          "Willson Contreras",
-          "Masataka Yoshida",
-          "Mickey Gasper",
-          "Nick Sogard",
-          "Marcelo Mayer",
-          "Isiah Kiner-Falefa"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "away_source": "projected_rotowire_default_vs_lhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "home_source": "confirmed_feed_live",
       "away_confidence": 0.66,
-      "home_confidence": 0.66,
+      "home_confidence": 1.0,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -502,10 +454,10 @@
         "extra_in_projection": []
       },
       "home_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
@@ -523,139 +475,91 @@
         "abbr": "WSH"
       },
       "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
-      "away_projected_ids": [
-        689414,
-        672640,
-        669065,
-        669364,
-        691594,
-        683357,
-        805300,
-        691788,
-        681393
-      ],
-      "home_projected_ids": [
+      "home_confirmed_ids": [
         695578,
         671277,
         678554,
         682928,
-        686611,
         695734,
-        696285,
-        660688,
-        683083
+        686611,
+        678391,
+        686452,
+        696285
       ],
+      "away_projected_ids": [
+        669364,
+        672640,
+        681715,
+        666624,
+        665923,
+        669065,
+        681393,
+        691594,
+        689414
+      ],
+      "home_projected_ids": [],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
-          689414,
-          672640,
-          669065,
           669364,
+          672640,
+          681715,
+          666624,
+          665923,
+          669065,
+          681393,
           691594,
-          683357,
-          805300,
-          691788,
-          681393
+          689414
         ],
         "ids": [
-          689414,
-          672640,
-          669065,
           669364,
+          672640,
+          681715,
+          666624,
+          665923,
+          669065,
+          681393,
           691594,
-          683357,
-          805300,
-          691788,
-          681393
+          689414
         ],
         "missing_ids": [],
         "backfilled_ids": [],
         "pool_source": "active+40Man",
         "pool_size": 19,
         "raw_names": [
-          "Liam Hicks",
-          "Otto Lopez",
-          "Kyle Stowers",
           "Xavier Edwards",
+          "Otto Lopez",
+          "Heriberto Hernandez",
+          "Christopher Morel",
+          "Esteury Ruiz",
+          "Kyle Stowers",
+          "Connor Norby",
           "Javier Sanoja",
-          "Owen Caissie",
-          "Jakob Marsee",
-          "Joe Mack",
-          "Connor Norby"
+          "Liam Hicks"
         ],
         "matched_names": [
-          "Liam Hicks",
-          "Otto Lopez",
-          "Kyle Stowers",
           "Xavier Edwards",
+          "Otto Lopez",
+          "Heriberto Hern\u00e1ndez",
+          "Christopher Morel",
+          "Esteury Ruiz",
+          "Kyle Stowers",
+          "Connor Norby",
           "Javier Sanoja",
-          "Owen Caissie",
-          "Jakob Marsee",
-          "Joe Mack",
-          "Connor Norby"
+          "Liam Hicks"
         ],
         "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          695578,
-          671277,
-          678554,
-          682928,
-          686611,
-          695734,
-          696285,
-          660688,
-          683083
-        ],
-        "ids": [
-          695578,
-          671277,
-          678554,
-          682928,
-          686611,
-          695734,
-          696285,
-          660688,
-          683083
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 19,
-        "raw_names": [
-          "James Wood",
-          "Luis Garcia",
-          "Curtis Mead",
-          "CJ Abrams",
-          "Dylan Crews",
-          "Daylen Lile",
-          "Jacob Young",
-          "Keibert Ruiz",
-          "Nasim Nunez"
-        ],
-        "matched_names": [
-          "James Wood",
-          "Luis Garc\u00eda Jr.",
-          "Curtis Mead",
-          "CJ Abrams",
-          "Dylan Crews",
-          "Daylen Lile",
-          "Jacob Young",
-          "Keibert Ruiz",
-          "Nasim Nu\u00f1ez"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_rhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
-      "away_source": "projected_rotowire_default_vs_rhp",
-      "home_source": "projected_rotowire_default_vs_rhp",
+      "away_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "confirmed_feed_live",
       "away_confidence": 0.66,
-      "home_confidence": 0.66,
+      "home_confidence": 1.0,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -666,10 +570,10 @@
         "extra_in_projection": []
       },
       "home_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
@@ -704,10 +608,10 @@
         700250,
         592450,
         641355,
-        676609,
+        642708,
         663757,
+        676609,
         683011,
-        680474,
         669224
       ],
       "away_projected_validation": {
@@ -770,10 +674,10 @@
           700250,
           592450,
           641355,
-          676609,
+          642708,
           663757,
+          676609,
           683011,
-          680474,
           669224
         ],
         "ids": [
@@ -781,10 +685,10 @@
           700250,
           592450,
           641355,
-          676609,
+          642708,
           663757,
+          676609,
           683011,
-          680474,
           669224
         ],
         "missing_ids": [],
@@ -796,10 +700,10 @@
           "Ben Rice",
           "Aaron Judge",
           "Cody Bellinger",
-          "Jose Caballero",
+          "Amed Rosario",
           "Trent Grisham",
+          "Jose Caballero",
           "Anthony Volpe",
-          "Max Schuemann",
           "Austin Wells"
         ],
         "matched_names": [
@@ -807,10 +711,10 @@
           "Ben Rice",
           "Aaron Judge",
           "Cody Bellinger",
-          "Jos\u00e9 Caballero",
+          "Amed Rosario",
           "Trent Grisham",
+          "Jos\u00e9 Caballero",
           "Anthony Volpe",
-          "Max Schuemann",
           "Austin Wells"
         ],
         "missing_name_labels": [],
@@ -851,7 +755,17 @@
         "abbr": "CIN"
       },
       "away_confirmed_ids": [],
-      "home_confirmed_ids": [],
+      "home_confirmed_ids": [
+        667472,
+        668709,
+        701398,
+        553993,
+        668715,
+        663886,
+        694362,
+        695490,
+        680574
+      ],
       "away_projected_ids": [
         677951,
         521692,
@@ -863,17 +777,7 @@
         695600,
         686475
       ],
-      "home_projected_ids": [
-        694362,
-        701398,
-        668715,
-        553993,
-        667472,
-        695490,
-        668709,
-        663886,
-        680574
-      ],
+      "home_projected_ids": [],
       "away_projected_validation": {
         "status": "ok",
         "raw_ids": [
@@ -928,62 +832,14 @@
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
-        "status": "ok",
-        "raw_ids": [
-          694362,
-          701398,
-          668715,
-          553993,
-          667472,
-          695490,
-          668709,
-          663886,
-          680574
-        ],
-        "ids": [
-          694362,
-          701398,
-          668715,
-          553993,
-          667472,
-          695490,
-          668709,
-          663886,
-          680574
-        ],
-        "missing_ids": [],
-        "backfilled_ids": [],
-        "pool_source": "active+40Man",
-        "pool_size": 16,
-        "raw_names": [
-          "Blake Dunn",
-          "Sal Stewart",
-          "Spencer Steer",
-          "Eugenio Suarez",
-          "Dane Myers",
-          "Edwin Arroyo",
-          "JJ Bleday",
-          "Tyler Stephenson",
-          "Matt McLain"
-        ],
-        "matched_names": [
-          "Blake Dunn",
-          "Sal Stewart",
-          "Spencer Steer",
-          "Eugenio Su\u00e1rez",
-          "Dane Myers",
-          "Edwin Arroyo",
-          "JJ Bleday",
-          "Tyler Stephenson",
-          "Matt McLain"
-        ],
-        "missing_name_labels": [],
-        "mapping_source": "projected_rotowire_default_vs_lhp"
+        "status": "none",
+        "raw_ids": [],
+        "ids": []
       },
       "away_source": "projected_rotowire_default_vs_lhp",
-      "home_source": "projected_rotowire_default_vs_lhp",
+      "home_source": "confirmed_feed_live",
       "away_confidence": 0.66,
-      "home_confidence": 0.66,
+      "home_confidence": 1.0,
       "away_comparison": {
         "status": "projected_only",
         "is_true_mismatch": false,
@@ -994,10 +850,10 @@
         "extra_in_projection": []
       },
       "home_comparison": {
-        "status": "projected_only",
+        "status": "confirmed_only",
         "is_true_mismatch": false,
-        "confirmed_count": 0,
-        "projected_count": 9,
+        "confirmed_count": 9,
+        "projected_count": 0,
         "overlap_count": 0,
         "missing_from_projection": [],
         "extra_in_projection": []
