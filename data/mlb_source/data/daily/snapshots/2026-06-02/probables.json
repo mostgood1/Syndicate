@@ -2,7 +2,7 @@
   "date": "2026-06-02",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-02T14:03:54.168536",
+  "generated_at": "2026-06-02T16:24:53.858865",
   "games": [
     {
       "idx": 0,
@@ -251,9 +251,9 @@
       },
       "raw": {
         "away_schedule_id": 669199,
-        "home_schedule_id": 571945,
+        "home_schedule_id": 663992,
         "away_schedule_name": "Lake Bachar",
-        "home_schedule_name": "Miles Mikolas",
+        "home_schedule_name": "Richard Lovelady",
         "away_feed_id": 669199,
         "home_feed_id": 663992,
         "away_feed_name": "Lake Bachar",
