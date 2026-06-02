@@ -65,9 +65,12 @@ def pitcher_rows_from_summary(summary: dict[str, Any], *, limit: int = 12) -> tu
     for row in rows[:limit]:
         if not isinstance(row, dict):
             continue
+        reasons = row.get("matchupReasons") if isinstance(row.get("matchupReasons"), list) else []
+        matchup_summary = str(row.get("matchupSummary") or "").strip()
+        fallback_summary = f"{row.get('pitcherName')} projects for {format_num(row.get('mean'))} {prop_label.lower()} against {row.get('opponent')}."
         out.append(
             {
-                "title": str(row.get("pitcherName") or "Unknown pitcher").strip() or "Unknown pitcher",
+                "title": str(row.get("pitcherName") or row.get("playerName") or "Unknown pitcher").strip() or "Unknown pitcher",
                 "eyebrow": str(row.get("team") or "").strip() or "-",
                 "badge": f"{format_num(row.get('marketLine'))} {prop_label[0]}" if row.get("marketLine") is not None else prop_label,
                 "meta": str(row.get("matchup") or "").strip() or "-",
@@ -77,8 +80,8 @@ def pitcher_rows_from_summary(summary: dict[str, Any], *, limit: int = 12) -> tu
                     {"label": "Mode", "value": format_num(row.get("mode"))},
                     {"label": "Sim count", "value": str(row.get("simCount") or "-")},
                 ],
-                "summary": f"{row.get('pitcherName')} projects for {format_num(row.get('mean'))} {prop_label.lower()} against {row.get('opponent')}.",
-                "list_items": [
+                "summary": matchup_summary or fallback_summary,
+                "list_items": reasons[:4] if reasons else [
                     f"Market line: {format_num(row.get('marketLine'))}",
                     f"Over probability: {format_pct(row.get('overLineProb'))}",
                     f"Most likely outcome: {format_num(row.get('mode'))}",

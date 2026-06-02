@@ -179,6 +179,23 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                         "detail": "Q4 02:11",
                         "summary": "Live scoring pace is tracking toward the over.",
                         "betting": {"total": 221.5},
+                        "panels": [
+                            {
+                                "eyebrow": "Market snapshot",
+                                "title": "Consensus lines",
+                                "body": "Spread NYK -2.5 | total 221.5.",
+                                "summary_stats": [
+                                    {"label": "Away ML", "value": "+105"},
+                                    {"label": "Home ML", "value": "-125"},
+                                ],
+                            },
+                            {
+                                "eyebrow": "Top recommendations",
+                                "title": "Per-game playable looks",
+                                "body": "Top picks are pulled from the processed NBA recommendation slate artifact.",
+                                "items": ["Jayson Tatum | Over 28.5 PTS", "Jalen Brunson | Under 6.5 AST"],
+                            },
+                        ],
                         "shared_prop_rows": [],
                         "shared_top_play_rows": [],
                     }
@@ -197,6 +214,9 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertIn("Live line 221.5", card.get("summary"))
         self.assertIn("Total pts 206", metric_text)
         self.assertIn("Live line 221.5", metric_text)
+        self.assertIn("Market snapshot: Consensus lines", card.get("list_items")[0])
+        self.assertIn("Away ML +105", " ".join(card.get("list_items")))
+        self.assertIn("Jayson Tatum | Over 28.5 PTS", " ".join(card.get("list_items")))
 
 
 if __name__ == "__main__":

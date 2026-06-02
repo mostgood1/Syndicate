@@ -40,7 +40,66 @@ def _metric_rows(game: dict[str, Any], *, limit: int = 4) -> list[dict[str, str]
     return rows
 
 
-def _signal_items(game: dict[str, Any], *, limit: int = 4) -> list[str]:
+def _signal_items(game: dict[str, Any], *, limit: int = 6) -> list[str]:
+    panels = game.get("panels") if isinstance(game.get("panels"), list) else []
+    panel_items: list[str] = []
+    for panel in panels:
+        if not isinstance(panel, dict):
+            continue
+        eyebrow = _safe_text(panel.get("eyebrow"), "").strip()
+        title = _safe_text(panel.get("title"), "").strip()
+        body = _safe_text(panel.get("body"), "").strip()
+        summary_stats = panel.get("summary_stats") if isinstance(panel.get("summary_stats"), list) else []
+        items = panel.get("items") if isinstance(panel.get("items"), list) else []
+        table_groups = panel.get("table_groups") if isinstance(panel.get("table_groups"), list) else []
+
+        if eyebrow or title or body:
+            head = f"{eyebrow}: {title}" if eyebrow and title else title or eyebrow
+            if body:
+                panel_items.append(f"{head} | {body}" if head else body)
+            elif head:
+                panel_items.append(head)
+
+        for stat in summary_stats[:2]:
+            if not isinstance(stat, dict):
+                continue
+            label = _safe_text(stat.get("label"), "Stat")
+            value = _safe_text(stat.get("value"), "-")
+            panel_items.append(f"{label} {value}")
+
+        for item in items[:2]:
+            cleaned = _safe_text(item, "").strip()
+            if cleaned:
+                panel_items.append(cleaned)
+
+        for group in table_groups[:1]:
+            if not isinstance(group, dict):
+                continue
+            rows = group.get("rows") if isinstance(group.get("rows"), list) else []
+            for row in rows[:1]:
+                if not isinstance(row, dict):
+                    continue
+                row_title = _safe_text(row.get("title") or row.get("name") or row.get("player"), "")
+                row_detail = _safe_text(row.get("detail") or row.get("summary") or row.get("meta"), "")
+                if row_title and row_detail:
+                    panel_items.append(f"{row_title} | {row_detail}")
+                elif row_title:
+                    panel_items.append(row_title)
+                elif row_detail:
+                    panel_items.append(row_detail)
+
+    if panel_items:
+        seen_panel_items: set[str] = set()
+        deduped_panel_items: list[str] = []
+        for item in panel_items:
+            cleaned = str(item or "").strip()
+            if not cleaned or cleaned in seen_panel_items:
+                continue
+            seen_panel_items.add(cleaned)
+            deduped_panel_items.append(cleaned)
+        if deduped_panel_items:
+            return deduped_panel_items[:limit]
+
     rows = game.get("shared_top_play_rows") if isinstance(game.get("shared_top_play_rows"), list) else []
     items: list[str] = []
     for row in rows[:limit]:
