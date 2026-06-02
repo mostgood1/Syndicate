@@ -3781,6 +3781,7 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
         "current_day_roster_snapshot",
         "current_day_batting_lineups",
         "current_day_probable_pitchers",
+        "current_day_top_props_artifact",
     ):
         stage_status = str(((report.get("stages") or {}).get(stage_name) or {}).get("status") or "")
         if stage_status == "missing":
