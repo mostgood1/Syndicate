@@ -18,7 +18,7 @@
   "registryLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_06_02.jsonl",
   "reportPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_06_02.json",
   "dailyRecapPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_06_02.json",
-  "entries": 3,
+  "entries": 4,
   "latestEntry": {
     "recordedAt": "2026-06-02T07:59:14-05:00",
     "date": "2026-06-02",
@@ -28,7 +28,7 @@
     "degraded": false
   },
   "latestReport": {
-    "generatedAt": "2026-06-02T11:22:27-05:00",
+    "generatedAt": "2026-06-02T11:48:33-05:00",
     "dataRoot": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data",
     "liveLensDir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens"
   },
@@ -58,15 +58,15 @@
   },
   "firstObservationArchive": [],
   "rawArtifacts": {
-    "total_bytes": 764,
-    "total_bytes_text": "764 B",
+    "total_bytes": 900,
+    "total_bytes_text": "900 B",
     "files": {
       "log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_02.jsonl",
         "exists": true,
-        "bytes": 408,
-        "bytes_text": "408 B",
-        "modified_at": "2026-06-02T10:41:41-05:00"
+        "bytes": 544,
+        "bytes_text": "544 B",
+        "modified_at": "2026-06-02T11:22:27-05:00"
       },
       "observation_log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_06_02.jsonl",
@@ -94,7 +94,7 @@
         "exists": true,
         "bytes": 265,
         "bytes_text": "265 B",
-        "modified_at": "2026-06-02T10:41:41-05:00"
+        "modified_at": "2026-06-02T11:22:27-05:00"
       }
     }
   }

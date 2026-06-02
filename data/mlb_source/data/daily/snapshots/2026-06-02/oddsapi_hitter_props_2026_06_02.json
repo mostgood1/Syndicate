@@ -1,7 +1,7 @@
 {
   "date": "2026-06-02",
   "mode": "live",
-  "retrieved_at": "2026-06-02T16:12:10.306258",
+  "retrieved_at": "2026-06-02T16:38:32.925853",
   "hitter_props": {
     "dillon dingler": {
       "batter_hits": {
@@ -1321,13 +1321,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+575",
+        "over_odds": "+625",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+575",
+            "over_odds": "+625",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -1518,31 +1518,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+625",
+        "over_odds": "+700",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+625",
+            "over_odds": "+700",
             "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      }
-    },
-    "nick fortes": {
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "+124",
-        "under_odds": "-170",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "+124",
-            "under_odds": "-170",
             "_src": "oddsapi"
           }
         ],
@@ -1838,6 +1821,23 @@
         "alternates": []
       }
     },
+    "nick fortes": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "+130",
+        "under_odds": "-165",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+130",
+            "under_odds": "-165",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
     "jackson merrill": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
@@ -2055,14 +2055,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+111",
-        "under_odds": "-148",
+        "over_odds": "+113",
+        "under_odds": "-150",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+111",
-            "under_odds": "-148",
+            "over_odds": "+113",
+            "under_odds": "-150",
             "_src": "oddsapi"
           }
         ],
@@ -2205,14 +2205,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+142",
-        "under_odds": "-199",
+        "over_odds": "+147",
+        "under_odds": "-205",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+142",
-            "under_odds": "-199",
+            "over_odds": "+147",
+            "under_odds": "-205",
             "_src": "oddsapi"
           }
         ],
@@ -2736,6 +2736,34 @@
         ],
         "alternates": []
       },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+163",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-190",
+            "under_odds": "+139",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+163",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-190",
+            "under_odds": "+139",
+            "_src": "oddsapi"
+          }
+        ]
+      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-192",
@@ -2780,34 +2808,6 @@
           }
         ],
         "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+163",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+163",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
-            "_src": "oddsapi"
-          }
-        ]
       }
     },
     "j.t. realmuto": {
@@ -2834,8 +2834,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+140",
+            "over_odds": "-180",
+            "under_odds": "+135",
             "_src": "oddsapi"
           },
           {
@@ -2848,8 +2848,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+140",
+            "over_odds": "-180",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ]
@@ -2993,14 +2993,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+131",
-        "under_odds": "-183",
+        "over_odds": "+127",
+        "under_odds": "-177",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+131",
-            "under_odds": "-183",
+            "over_odds": "+127",
+            "under_odds": "-177",
             "_src": "oddsapi"
           }
         ],
@@ -3387,14 +3387,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+172",
-        "under_odds": "-243",
+        "over_odds": "+164",
+        "under_odds": "-231",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+172",
-            "under_odds": "-243",
+            "over_odds": "+164",
+            "under_odds": "-231",
             "_src": "oddsapi"
           }
         ],
@@ -3528,13 +3528,13 @@
     "miguel andujar": {
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+700",
+        "over_odds": "+625",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+700",
+            "over_odds": "+625",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -3558,14 +3558,14 @@
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+106",
-        "under_odds": "-141",
+        "over_odds": "+102",
+        "under_odds": "-136",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+106",
-            "under_odds": "-141",
+            "over_odds": "+102",
+            "under_odds": "-136",
             "_src": "oddsapi"
           }
         ],
@@ -3573,14 +3573,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+241",
-        "under_odds": "-349",
+        "over_odds": "+229",
+        "under_odds": "-330",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+241",
-            "under_odds": "-349",
+            "over_odds": "+229",
+            "under_odds": "-330",
             "_src": "oddsapi"
           }
         ],
@@ -3588,14 +3588,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+156",
-        "under_odds": "-219",
+        "over_odds": "+151",
+        "under_odds": "-211",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+156",
-            "under_odds": "-219",
+            "over_odds": "+151",
+            "under_odds": "-211",
             "_src": "oddsapi"
           }
         ],
@@ -3757,14 +3757,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-238",
-        "under_odds": "+176",
+        "over_odds": "-248",
+        "under_odds": "+183",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-238",
-            "under_odds": "+176",
+            "over_odds": "-248",
+            "under_odds": "+183",
             "_src": "oddsapi"
           }
         ],
@@ -3772,14 +3772,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+207",
-        "under_odds": "-297",
+        "over_odds": "+199",
+        "under_odds": "-283",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+207",
-            "under_odds": "-297",
+            "over_odds": "+199",
+            "under_odds": "-283",
             "_src": "oddsapi"
           }
         ],
@@ -4140,14 +4140,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+165",
-        "under_odds": "-233",
+        "over_odds": "+160",
+        "under_odds": "-225",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+165",
-            "under_odds": "-233",
+            "over_odds": "+160",
+            "under_odds": "-225",
             "_src": "oddsapi"
           }
         ],
@@ -4155,14 +4155,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+111",
-        "under_odds": "-154",
+        "over_odds": "+105",
+        "under_odds": "-145",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+111",
-            "under_odds": "-154",
+            "over_odds": "+105",
+            "under_odds": "-145",
             "_src": "oddsapi"
           }
         ],
@@ -4187,13 +4187,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+400",
+        "over_odds": "+425",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+400",
+            "over_odds": "+425",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -4232,14 +4232,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+159",
-        "under_odds": "-223",
+        "over_odds": "+153",
+        "under_odds": "-214",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+159",
-            "under_odds": "-223",
+            "over_odds": "+153",
+            "under_odds": "-214",
             "_src": "oddsapi"
           }
         ],
@@ -4247,14 +4247,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "-101",
-        "under_odds": "-136",
+        "over_odds": "-105",
+        "under_odds": "-132",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-101",
-            "under_odds": "-136",
+            "over_odds": "-105",
+            "under_odds": "-132",
             "_src": "oddsapi"
           }
         ],
@@ -4324,14 +4324,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+200",
-        "under_odds": "-286",
+        "over_odds": "+190",
+        "under_odds": "-270",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+200",
-            "under_odds": "-286",
+            "over_odds": "+190",
+            "under_odds": "-270",
             "_src": "oddsapi"
           }
         ],
@@ -4339,14 +4339,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+110",
-        "under_odds": "-152",
+        "over_odds": "+104",
+        "under_odds": "-144",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+110",
-            "under_odds": "-152",
+            "over_odds": "+104",
+            "under_odds": "-144",
             "_src": "oddsapi"
           }
         ],
@@ -4401,13 +4401,13 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-252",
+        "over_odds": "-250",
         "under_odds": "+185",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-252",
+            "over_odds": "-250",
             "under_odds": "+185",
             "_src": "oddsapi"
           }
@@ -4416,14 +4416,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+182",
-        "under_odds": "-257",
+        "over_odds": "+176",
+        "under_odds": "-248",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+182",
-            "under_odds": "-257",
+            "over_odds": "+176",
+            "under_odds": "-248",
             "_src": "oddsapi"
           }
         ],
@@ -4508,14 +4508,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+186",
-        "under_odds": "-263",
+        "over_odds": "+192",
+        "under_odds": "-272",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+186",
-            "under_odds": "-263",
+            "over_odds": "+192",
+            "under_odds": "-272",
             "_src": "oddsapi"
           }
         ],
@@ -4600,14 +4600,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+152",
-        "under_odds": "-214",
+        "over_odds": "+147",
+        "under_odds": "-206",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+152",
-            "under_odds": "-214",
+            "over_odds": "+147",
+            "under_odds": "-206",
             "_src": "oddsapi"
           }
         ],
@@ -4718,14 +4718,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+208",
-        "under_odds": "-297",
+        "over_odds": "+197",
+        "under_odds": "-280",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+208",
-            "under_odds": "-297",
+            "over_odds": "+197",
+            "under_odds": "-280",
             "_src": "oddsapi"
           }
         ],
@@ -4795,14 +4795,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+223",
-        "under_odds": "-321",
+        "over_odds": "+216",
+        "under_odds": "-311",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+223",
-            "under_odds": "-321",
+            "over_odds": "+216",
+            "under_odds": "-311",
             "_src": "oddsapi"
           }
         ],
@@ -4872,14 +4872,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-180",
-        "under_odds": "+135",
+        "over_odds": "-175",
+        "under_odds": "+131",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-180",
-            "under_odds": "+135",
+            "over_odds": "-175",
+            "under_odds": "+131",
             "_src": "oddsapi"
           }
         ],
@@ -4887,14 +4887,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+215",
-        "under_odds": "-308",
+        "over_odds": "+208",
+        "under_odds": "-298",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+215",
-            "under_odds": "-308",
+            "over_odds": "+208",
+            "under_odds": "-298",
             "_src": "oddsapi"
           }
         ],
@@ -5067,13 +5067,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+500",
+        "over_odds": "+525",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+500",
+            "over_odds": "+525",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -5110,14 +5110,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-142",
-        "under_odds": "+107",
+        "over_odds": "-148",
+        "under_odds": "+112",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-142",
-            "under_odds": "+107",
+            "over_odds": "-148",
+            "under_odds": "+112",
             "_src": "oddsapi"
           }
         ],
@@ -5307,14 +5307,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-162",
-        "under_odds": "+121",
+        "over_odds": "-168",
+        "under_odds": "+126",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-162",
-            "under_odds": "+121",
+            "over_odds": "-168",
+            "under_odds": "+126",
             "_src": "oddsapi"
           }
         ],
@@ -5431,14 +5431,14 @@
     "dylan crews": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-185",
-        "under_odds": "+140",
+        "over_odds": "-180",
+        "under_odds": "+135",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+140",
+            "over_odds": "-180",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ],
@@ -5462,13 +5462,13 @@
       "batter_rbis": {
         "line": 0.5,
         "over_odds": "+180",
-        "under_odds": "-255",
+        "under_odds": "-265",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+180",
-            "under_odds": "-255",
+            "under_odds": "-265",
             "_src": "oddsapi"
           }
         ],
@@ -5566,14 +5566,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+201",
-        "under_odds": "-287",
+        "over_odds": "+194",
+        "under_odds": "-276",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+201",
-            "under_odds": "-287",
+            "over_odds": "+194",
+            "under_odds": "-276",
             "_src": "oddsapi"
           }
         ],
@@ -5581,14 +5581,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+147",
-        "under_odds": "-206",
+        "over_odds": "+141",
+        "under_odds": "-196",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+147",
-            "under_odds": "-206",
+            "over_odds": "+141",
+            "under_odds": "-196",
             "_src": "oddsapi"
           }
         ],
@@ -5628,14 +5628,14 @@
     "owen caissie": {
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+190",
-        "under_odds": "-280",
+        "over_odds": "+180",
+        "under_odds": "-265",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+190",
-            "under_odds": "-280",
+            "over_odds": "+180",
+            "under_odds": "-265",
             "_src": "oddsapi"
           }
         ],
@@ -5644,13 +5644,13 @@
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-162",
-        "under_odds": "+104",
+        "under_odds": "+126",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "-162",
-            "under_odds": "+104",
+            "under_odds": "+126",
             "_src": "oddsapi"
           }
         ],
@@ -5679,8 +5679,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-154",
-            "under_odds": "+115",
+            "over_odds": "-162",
+            "under_odds": "+121",
             "_src": "oddsapi"
           },
           {
@@ -5693,22 +5693,22 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-154",
-            "under_odds": "+115",
+            "over_odds": "-162",
+            "under_odds": "+121",
             "_src": "oddsapi"
           }
         ]
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+129",
-        "under_odds": "-172",
+        "over_odds": "+108",
+        "under_odds": "-144",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+129",
-            "under_odds": "-172",
+            "over_odds": "+108",
+            "under_odds": "-144",
             "_src": "oddsapi"
           }
         ],
@@ -5716,14 +5716,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+163",
-        "under_odds": "-229",
+        "over_odds": "+144",
+        "under_odds": "-201",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+163",
-            "under_odds": "-229",
+            "over_odds": "+144",
+            "under_odds": "-201",
             "_src": "oddsapi"
           }
         ],
@@ -5821,14 +5821,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+149",
-        "under_odds": "-209",
+        "over_odds": "+159",
+        "under_odds": "-223",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+149",
-            "under_odds": "-209",
+            "over_odds": "+159",
+            "under_odds": "-223",
             "_src": "oddsapi"
           }
         ],
@@ -5839,13 +5839,13 @@
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-250",
-        "under_odds": "+180",
+        "under_odds": "+185",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "-250",
-            "under_odds": "+180",
+            "under_odds": "+185",
             "_src": "oddsapi"
           },
           {
@@ -5989,13 +5989,13 @@
       "batter_total_bases": {
         "line": 1.5,
         "over_odds": "+150",
-        "under_odds": "-189",
+        "under_odds": "-181",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
             "over_odds": "+150",
-            "under_odds": "-189",
+            "under_odds": "-181",
             "_src": "oddsapi"
           }
         ],
@@ -6081,13 +6081,13 @@
       "batter_total_bases": {
         "line": 1.5,
         "over_odds": "+112",
-        "under_odds": "-150",
+        "under_odds": "-145",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
             "over_odds": "+112",
-            "under_odds": "-150",
+            "under_odds": "-145",
             "_src": "oddsapi"
           }
         ],
@@ -6110,14 +6110,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+125",
-        "under_odds": "-174",
+        "over_odds": "+121",
+        "under_odds": "-168",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+125",
-            "under_odds": "-174",
+            "over_odds": "+121",
+            "under_odds": "-168",
             "_src": "oddsapi"
           }
         ],
@@ -6570,14 +6570,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+108",
-        "under_odds": "-150",
+        "over_odds": "+112",
+        "under_odds": "-155",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+108",
-            "under_odds": "-150",
+            "over_odds": "+112",
+            "under_odds": "-155",
             "_src": "oddsapi"
           }
         ],
@@ -6767,14 +6767,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+125",
-        "under_odds": "-174",
+        "over_odds": "+130",
+        "under_odds": "-180",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+125",
-            "under_odds": "-174",
+            "over_odds": "+130",
+            "under_odds": "-180",
             "_src": "oddsapi"
           }
         ],
@@ -6785,13 +6785,13 @@
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-245",
-        "under_odds": "+189",
+        "under_odds": "+196",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "-245",
-            "under_odds": "+189",
+            "under_odds": "+196",
             "_src": "oddsapi"
           }
         ],
@@ -6815,13 +6815,13 @@
       "batter_rbis": {
         "line": 0.5,
         "over_odds": "+180",
-        "under_odds": "-290",
+        "under_odds": "-280",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+180",
-            "under_odds": "-290",
+            "under_odds": "-280",
             "_src": "oddsapi"
           }
         ],
@@ -6830,13 +6830,13 @@
       "batter_total_bases": {
         "line": 1.5,
         "over_odds": "+148",
-        "under_odds": "-168",
+        "under_odds": "-163",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
             "over_odds": "+148",
-            "under_odds": "-168",
+            "under_odds": "-163",
             "_src": "oddsapi"
           }
         ],
@@ -6844,14 +6844,14 @@
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "-124",
-        "under_odds": "-107",
+        "over_odds": "-129",
+        "under_odds": "-103",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-124",
-            "under_odds": "-107",
+            "over_odds": "-129",
+            "under_odds": "-103",
             "_src": "oddsapi"
           }
         ],
@@ -6906,14 +6906,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+216",
-        "under_odds": "-310",
+        "over_odds": "+226",
+        "under_odds": "-326",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+216",
-            "under_odds": "-310",
+            "over_odds": "+226",
+            "under_odds": "-326",
             "_src": "oddsapi"
           }
         ],
@@ -6998,14 +6998,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+155",
-        "under_odds": "-218",
+        "over_odds": "+150",
+        "under_odds": "-210",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+155",
-            "under_odds": "-218",
+            "over_odds": "+150",
+            "under_odds": "-210",
             "_src": "oddsapi"
           }
         ],
@@ -7028,14 +7028,14 @@
       },
       "batter_total_bases": {
         "line": 0.5,
-        "over_odds": "-135",
-        "under_odds": "+100",
+        "over_odds": "-170",
+        "under_odds": "+125",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-135",
-            "under_odds": "+100",
+            "over_odds": "-170",
+            "under_odds": "+125",
             "_src": "oddsapi"
           }
         ],
@@ -7075,14 +7075,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+245",
-        "under_odds": "-356",
+        "over_odds": "+255",
+        "under_odds": "-373",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+245",
-            "under_odds": "-356",
+            "over_odds": "+255",
+            "under_odds": "-373",
             "_src": "oddsapi"
           }
         ],
@@ -7293,8 +7293,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-175",
-            "under_odds": "+130",
+            "over_odds": "-185",
+            "under_odds": "+135",
             "_src": "oddsapi"
           },
           {
@@ -7307,8 +7307,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-175",
-            "under_odds": "+130",
+            "over_odds": "-185",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ]
@@ -7542,34 +7542,6 @@
         ],
         "alternates": []
       },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+180",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-190",
-            "under_odds": "+141",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+180",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-190",
-            "under_odds": "+141",
-            "_src": "oddsapi"
-          }
-        ]
-      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-180",
@@ -7614,6 +7586,34 @@
           }
         ],
         "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+180",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-200",
+            "under_odds": "+145",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+180",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-200",
+            "under_odds": "+145",
+            "_src": "oddsapi"
+          }
+        ]
       }
     },
     "aaron judge": {
@@ -7833,14 +7833,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+135",
-        "under_odds": "-180",
+        "over_odds": "+136",
+        "under_odds": "-182",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+135",
-            "under_odds": "-180",
+            "over_odds": "+136",
+            "under_odds": "-182",
             "_src": "oddsapi"
           }
         ],
@@ -7983,13 +7983,13 @@
       },
       "batter_total_bases": {
         "line": 0.5,
-        "over_odds": "-125",
+        "over_odds": "-130",
         "under_odds": "-105",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-125",
+            "over_odds": "-130",
             "under_odds": "-105",
             "_src": "oddsapi"
           }
@@ -8302,18 +8302,46 @@
     "anthony volpe": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-140",
-        "under_odds": "+105",
+        "over_odds": "-130",
+        "under_odds": "+100",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-140",
-            "under_odds": "+105",
+            "over_odds": "-130",
+            "under_odds": "+100",
             "_src": "oddsapi"
           }
         ],
         "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+190",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-125",
+            "under_odds": "-105",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+190",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-125",
+            "under_odds": "-105",
+            "_src": "oddsapi"
+          }
+        ]
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
@@ -8344,34 +8372,6 @@
           }
         ],
         "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+190",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-129",
-            "under_odds": "-104",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+190",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-129",
-            "under_odds": "-104",
-            "_src": "oddsapi"
-          }
-        ]
       },
       "batter_rbis": {
         "line": 0.5,
@@ -8540,34 +8540,6 @@
         ],
         "alternates": []
       },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+200",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-136",
-            "under_odds": "+102",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+200",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-136",
-            "under_odds": "+102",
-            "_src": "oddsapi"
-          }
-        ]
-      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-132",
@@ -8612,6 +8584,34 @@
           }
         ],
         "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+200",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-150",
+            "under_odds": "+110",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+200",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-150",
+            "under_odds": "+110",
+            "_src": "oddsapi"
+          }
+        ]
       }
     },
     "austin wells": {
@@ -8739,14 +8739,14 @@
       },
       "batter_total_bases": {
         "line": 0.5,
-        "over_odds": "-109",
-        "under_odds": "-122",
+        "over_odds": "-112",
+        "under_odds": "-120",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-109",
-            "under_odds": "-122",
+            "over_odds": "-112",
+            "under_odds": "-120",
             "_src": "oddsapi"
           }
         ],
@@ -8908,13 +8908,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+425",
+        "over_odds": "+475",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+425",
+            "over_odds": "+475",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -9000,13 +9000,13 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+360",
+        "over_odds": "+350",
         "under_odds": "-550",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+360",
+            "over_odds": "+350",
             "under_odds": "-550",
             "_src": "oddsapi"
           }
@@ -9047,14 +9047,14 @@
     "lane thomas": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-170",
-        "under_odds": "+130",
+        "over_odds": "-180",
+        "under_odds": "+135",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-170",
-            "under_odds": "+130",
+            "over_odds": "-180",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ],
@@ -9107,14 +9107,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "-104",
-        "under_odds": "-132",
+        "over_odds": "+101",
+        "under_odds": "-140",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-104",
-            "under_odds": "-132",
+            "over_odds": "+101",
+            "under_odds": "-140",
             "_src": "oddsapi"
           }
         ],
@@ -9139,14 +9139,14 @@
     "matt mclain": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "-125",
-        "under_odds": "-115",
+        "over_odds": "-130",
+        "under_odds": "-110",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-125",
-            "under_odds": "-115",
+            "over_odds": "-130",
+            "under_odds": "-110",
             "_src": "oddsapi"
           }
         ],
@@ -9214,14 +9214,14 @@
       },
       "batter_total_bases": {
         "line": 0.5,
-        "over_odds": "-185",
-        "under_odds": "+135",
+        "over_odds": "-175",
+        "under_odds": "+130",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+135",
+            "over_odds": "-175",
+            "under_odds": "+130",
             "_src": "oddsapi"
           }
         ],
@@ -9231,14 +9231,14 @@
     "bobby witt jr.": {
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+100",
-        "under_odds": "-140",
+        "over_odds": "+110",
+        "under_odds": "-155",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+100",
-            "under_odds": "-140",
+            "over_odds": "+110",
+            "under_odds": "-155",
             "_src": "oddsapi"
           }
         ],
@@ -9246,14 +9246,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "-150",
-        "under_odds": "+115",
+        "over_odds": "-145",
+        "under_odds": "+110",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-150",
-            "under_odds": "+115",
+            "over_odds": "-145",
+            "under_odds": "+110",
             "_src": "oddsapi"
           }
         ],
@@ -9276,14 +9276,14 @@
       },
       "batter_hits": {
         "line": 1.5,
-        "over_odds": "+121",
-        "under_odds": "-162",
+        "over_odds": "+133",
+        "under_odds": "-178",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+121",
-            "under_odds": "-162",
+            "over_odds": "+133",
+            "under_odds": "-178",
             "_src": "oddsapi"
           }
         ],
@@ -9291,14 +9291,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "-146",
-        "under_odds": "+106",
+        "over_odds": "-133",
+        "under_odds": "-104",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-146",
-            "under_odds": "+106",
+            "over_odds": "-133",
+            "under_odds": "-104",
             "_src": "oddsapi"
           }
         ],
@@ -9338,14 +9338,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-234",
-        "under_odds": "+173",
+        "over_odds": "-241",
+        "under_odds": "+178",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-234",
-            "under_odds": "+173",
+            "over_odds": "-241",
+            "under_odds": "+178",
             "_src": "oddsapi"
           }
         ],
@@ -9608,14 +9608,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+102",
-        "under_odds": "-135",
+        "over_odds": "-101",
+        "under_odds": "-131",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+102",
-            "under_odds": "-135",
+            "over_odds": "-101",
+            "under_odds": "-131",
             "_src": "oddsapi"
           }
         ],
@@ -9852,14 +9852,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-243",
-        "under_odds": "+180",
+        "over_odds": "-234",
+        "under_odds": "+174",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-243",
-            "under_odds": "+180",
+            "over_odds": "-234",
+            "under_odds": "+174",
             "_src": "oddsapi"
           }
         ],
@@ -9867,14 +9867,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+161",
-        "under_odds": "-227",
+        "over_odds": "+168",
+        "under_odds": "-236",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+161",
-            "under_odds": "-227",
+            "over_odds": "+168",
+            "under_odds": "-236",
             "_src": "oddsapi"
           }
         ],
@@ -9944,14 +9944,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+186",
-        "under_odds": "-264",
+        "over_odds": "+193",
+        "under_odds": "-274",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+186",
-            "under_odds": "-264",
+            "over_odds": "+193",
+            "under_odds": "-274",
             "_src": "oddsapi"
           }
         ],
@@ -10276,13 +10276,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+575",
+        "over_odds": "+625",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+575",
+            "over_odds": "+625",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -10291,8 +10291,8 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+141",
-        "under_odds": "-190",
+        "over_odds": "+160",
+        "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
@@ -10303,8 +10303,8 @@
           },
           {
             "line": 1.5,
-            "over_odds": "+141",
-            "under_odds": "-190",
+            "over_odds": "+160",
+            "under_odds": null,
             "_src": "oddsapi"
           }
         ],
@@ -10321,14 +10321,14 @@
     "nick loftin": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-173",
-        "under_odds": "+130",
+        "over_odds": "-182",
+        "under_odds": "+136",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-173",
-            "under_odds": "+130",
+            "over_odds": "-182",
+            "under_odds": "+136",
             "_src": "oddsapi"
           }
         ],
@@ -10336,14 +10336,14 @@
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+113",
-        "under_odds": "-151",
+        "over_odds": "+110",
+        "under_odds": "-146",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+113",
-            "under_odds": "-151",
+            "over_odds": "+110",
+            "under_odds": "-146",
             "_src": "oddsapi"
           }
         ],
@@ -10351,14 +10351,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+236",
-        "under_odds": "-342",
+        "over_odds": "+226",
+        "under_odds": "-326",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+236",
-            "under_odds": "-342",
+            "over_odds": "+226",
+            "under_odds": "-326",
             "_src": "oddsapi"
           }
         ],
@@ -10426,14 +10426,14 @@
     "jac caglianone": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-155",
-        "under_odds": "+116",
+        "over_odds": "-161",
+        "under_odds": "+121",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-155",
-            "under_odds": "+116",
+            "over_odds": "-161",
+            "under_odds": "+121",
             "_src": "oddsapi"
           }
         ],
@@ -10623,14 +10623,14 @@
     "tyler tolbert": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-125",
-        "under_odds": "-106",
+        "over_odds": "-130",
+        "under_odds": "-102",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-125",
-            "under_odds": "-106",
+            "over_odds": "-130",
+            "under_odds": "-102",
             "_src": "oddsapi"
           }
         ],
@@ -11016,8 +11016,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+135",
+            "over_odds": "-190",
+            "under_odds": "+140",
             "_src": "oddsapi"
           },
           {
@@ -11030,8 +11030,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+135",
+            "over_odds": "-190",
+            "under_odds": "+140",
             "_src": "oddsapi"
           }
         ]
@@ -11325,14 +11325,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-242",
-        "under_odds": "+179",
+        "over_odds": "-251",
+        "under_odds": "+185",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-242",
-            "under_odds": "+179",
+            "over_odds": "-251",
+            "under_odds": "+185",
             "_src": "oddsapi"
           }
         ],
@@ -11387,13 +11387,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+375",
+        "over_odds": "+350",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+375",
+            "over_odds": "+350",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -11734,14 +11734,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+162",
-        "under_odds": "-227",
+        "over_odds": "+154",
+        "under_odds": "-216",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+162",
-            "under_odds": "-227",
+            "over_odds": "+154",
+            "under_odds": "-216",
             "_src": "oddsapi"
           }
         ],
@@ -11781,13 +11781,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+500",
+        "over_odds": "+475",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+500",
+            "over_odds": "+475",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -11811,14 +11811,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+204",
-        "under_odds": "-292",
+        "over_odds": "+195",
+        "under_odds": "-278",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+204",
-            "under_odds": "-292",
+            "over_odds": "+195",
+            "under_odds": "-278",
             "_src": "oddsapi"
           }
         ],
@@ -12254,13 +12254,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+850",
+        "over_odds": "+750",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+850",
+            "over_odds": "+750",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -12468,14 +12468,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+216",
-        "under_odds": "-309",
+        "over_odds": "+207",
+        "under_odds": "-297",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+216",
-            "under_odds": "-309",
+            "over_odds": "+207",
+            "under_odds": "-297",
             "_src": "oddsapi"
           }
         ],
@@ -12483,14 +12483,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+161",
-        "under_odds": "-226",
+        "over_odds": "+155",
+        "under_odds": "-218",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+161",
-            "under_odds": "-226",
+            "over_odds": "+155",
+            "under_odds": "-218",
             "_src": "oddsapi"
           }
         ],
@@ -12667,14 +12667,14 @@
     "austin martin": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-170",
-        "under_odds": "+130",
+        "over_odds": "-180",
+        "under_odds": "+135",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-170",
-            "under_odds": "+130",
+            "over_odds": "-180",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ],
@@ -12682,14 +12682,14 @@
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+113",
-        "under_odds": "-150",
+        "over_odds": "+111",
+        "under_odds": "-148",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+113",
-            "under_odds": "-150",
+            "over_odds": "+111",
+            "under_odds": "-148",
             "_src": "oddsapi"
           }
         ],
@@ -12697,13 +12697,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+1300",
+        "over_odds": "+1100",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+1300",
+            "over_odds": "+1100",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -12718,8 +12718,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-164",
-            "under_odds": "+123",
+            "over_odds": "-176",
+            "under_odds": "+131",
             "_src": "oddsapi"
           },
           {
@@ -12732,22 +12732,22 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-164",
-            "under_odds": "+123",
+            "over_odds": "-176",
+            "under_odds": "+131",
             "_src": "oddsapi"
           }
         ]
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+272",
-        "under_odds": "-399",
+        "over_odds": "+253",
+        "under_odds": "-369",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+272",
-            "under_odds": "-399",
+            "over_odds": "+253",
+            "under_odds": "-369",
             "_src": "oddsapi"
           }
         ],
@@ -12755,14 +12755,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+175",
-        "under_odds": "-247",
+        "over_odds": "+161",
+        "under_odds": "-226",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+175",
-            "under_odds": "-247",
+            "over_odds": "+161",
+            "under_odds": "-226",
             "_src": "oddsapi"
           }
         ],
@@ -12860,14 +12860,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+149",
-        "under_odds": "-208",
+        "over_odds": "+141",
+        "under_odds": "-196",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+149",
-            "under_odds": "-208",
+            "over_odds": "+141",
+            "under_odds": "-196",
             "_src": "oddsapi"
           }
         ],
@@ -12982,14 +12982,14 @@
     "luke keaschall": {
       "batter_total_bases": {
         "line": 0.5,
-        "over_odds": "-160",
-        "under_odds": "+120",
+        "over_odds": "-150",
+        "under_odds": "+115",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-160",
-            "under_odds": "+120",
+            "over_odds": "-150",
+            "under_odds": "+115",
             "_src": "oddsapi"
           }
         ],
@@ -13618,14 +13618,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-204",
-        "under_odds": "+152",
+        "over_odds": "-197",
+        "under_odds": "+147",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-204",
-            "under_odds": "+152",
+            "over_odds": "-197",
+            "under_odds": "+147",
             "_src": "oddsapi"
           }
         ],
@@ -13633,14 +13633,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+180",
-        "under_odds": "-255",
+        "over_odds": "+187",
+        "under_odds": "-265",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+180",
-            "under_odds": "-255",
+            "over_odds": "+187",
+            "under_odds": "-265",
             "_src": "oddsapi"
           }
         ],
@@ -13648,14 +13648,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+123",
-        "under_odds": "-171",
+        "over_odds": "+125",
+        "under_odds": "-173",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+123",
-            "under_odds": "-171",
+            "over_odds": "+125",
+            "under_odds": "-173",
             "_src": "oddsapi"
           }
         ],
@@ -14361,13 +14361,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+850",
+        "over_odds": "+950",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+850",
+            "over_odds": "+950",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -14481,13 +14481,13 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+210",
+        "over_odds": "+220",
         "under_odds": "-300",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+210",
+            "over_odds": "+220",
             "under_odds": "-300",
             "_src": "oddsapi"
           }
@@ -14513,14 +14513,14 @@
     "jacob gonzalez": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-140",
-        "under_odds": "+105",
+        "over_odds": "-150",
+        "under_odds": "+110",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-140",
-            "under_odds": "+105",
+            "over_odds": "-150",
+            "under_odds": "+110",
             "_src": "oddsapi"
           }
         ],
@@ -14558,14 +14558,14 @@
       },
       "batter_total_bases": {
         "line": 0.5,
-        "over_odds": "-140",
-        "under_odds": "+105",
+        "over_odds": "-150",
+        "under_odds": "+110",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-140",
-            "under_odds": "+105",
+            "over_odds": "-150",
+            "under_odds": "+110",
             "_src": "oddsapi"
           }
         ],
@@ -14575,14 +14575,14 @@
     "christian yelich": {
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-235",
-        "under_odds": "+175",
+        "over_odds": "-230",
+        "under_odds": "+170",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-235",
-            "under_odds": "+175",
+            "over_odds": "-230",
+            "under_odds": "+170",
             "_src": "oddsapi"
           }
         ],
@@ -14620,13 +14620,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+625",
+        "over_odds": "+575",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+625",
+            "over_odds": "+575",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -14650,14 +14650,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "-115",
-        "under_odds": "-120",
+        "over_odds": "-112",
+        "under_odds": "-123",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-115",
-            "under_odds": "-120",
+            "over_odds": "-112",
+            "under_odds": "-123",
             "_src": "oddsapi"
           }
         ],
@@ -14667,14 +14667,14 @@
     "sal frelick": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "-105",
-        "under_odds": "-135",
+        "over_odds": "-110",
+        "under_odds": "-130",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-105",
-            "under_odds": "-135",
+            "over_odds": "-110",
+            "under_odds": "-130",
             "_src": "oddsapi"
           }
         ],
@@ -14772,14 +14772,14 @@
     "jackson chourio": {
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+150",
-        "under_odds": "-215",
+        "over_odds": "+160",
+        "under_odds": "-230",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+150",
-            "under_odds": "-215",
+            "over_odds": "+160",
+            "under_odds": "-230",
             "_src": "oddsapi"
           }
         ],
@@ -14802,13 +14802,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+500",
+        "over_odds": "+475",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+500",
+            "over_odds": "+475",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -14817,14 +14817,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+112",
-        "under_odds": "-150",
+        "over_odds": "+110",
+        "under_odds": "-148",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+112",
-            "under_odds": "-150",
+            "over_odds": "+110",
+            "under_odds": "-148",
             "_src": "oddsapi"
           }
         ],
@@ -14844,16 +14844,16 @@
           },
           {
             "line": 1.5,
-            "over_odds": "+195",
-            "under_odds": "-266",
+            "over_odds": "+188",
+            "under_odds": "-255",
             "_src": "oddsapi"
           }
         ],
         "alternates": [
           {
             "line": 1.5,
-            "over_odds": "+195",
-            "under_odds": "-266",
+            "over_odds": "+188",
+            "under_odds": "-255",
             "_src": "oddsapi"
           }
         ]
@@ -14883,8 +14883,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-173",
-            "under_odds": "+129",
+            "over_odds": "-165",
+            "under_odds": "+130",
             "_src": "oddsapi"
           },
           {
@@ -14897,8 +14897,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-173",
-            "under_odds": "+129",
+            "over_odds": "-165",
+            "under_odds": "+130",
             "_src": "oddsapi"
           }
         ]
@@ -15055,14 +15055,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+354",
-        "under_odds": "-537",
+        "over_odds": "+343",
+        "under_odds": "-518",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+354",
-            "under_odds": "-537",
+            "over_odds": "+343",
+            "under_odds": "-518",
             "_src": "oddsapi"
           }
         ],
@@ -15070,14 +15070,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+219",
-        "under_odds": "-314",
+        "over_odds": "+227",
+        "under_odds": "-327",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+219",
-            "under_odds": "-314",
+            "over_odds": "+227",
+            "under_odds": "-327",
             "_src": "oddsapi"
           }
         ],
@@ -15145,14 +15145,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-135",
-        "under_odds": "+102",
+        "over_odds": "-122",
+        "under_odds": "-109",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-135",
-            "under_odds": "+102",
+            "over_odds": "-122",
+            "under_odds": "-109",
             "_src": "oddsapi"
           }
         ],
@@ -15160,14 +15160,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+307",
-        "under_odds": "-457",
+        "over_odds": "+323",
+        "under_odds": "-485",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+307",
-            "under_odds": "-457",
+            "over_odds": "+323",
+            "under_odds": "-485",
             "_src": "oddsapi"
           }
         ],
@@ -15175,14 +15175,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+197",
-        "under_odds": "-280",
+        "over_odds": "+211",
+        "under_odds": "-301",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+197",
-            "under_odds": "-280",
+            "over_odds": "+211",
+            "under_odds": "-301",
             "_src": "oddsapi"
           }
         ],
@@ -15327,42 +15327,42 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+125",
-        "under_odds": "-170",
+        "over_odds": "+119",
+        "under_odds": "-159",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-200",
-            "under_odds": "+145",
+            "over_odds": "-225",
+            "under_odds": "+165",
             "_src": "oddsapi"
           },
           {
             "line": 1.5,
-            "over_odds": "+125",
-            "under_odds": "-170",
+            "over_odds": "+119",
+            "under_odds": "-159",
             "_src": "oddsapi"
           }
         ],
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-200",
-            "under_odds": "+145",
+            "over_odds": "-225",
+            "under_odds": "+165",
             "_src": "oddsapi"
           }
         ]
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-259",
-        "under_odds": "+191",
+        "over_odds": "-277",
+        "under_odds": "+203",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-259",
-            "under_odds": "+191",
+            "over_odds": "-277",
+            "under_odds": "+203",
             "_src": "oddsapi"
           }
         ],
@@ -15370,14 +15370,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+172",
-        "under_odds": "-243",
+        "over_odds": "+165",
+        "under_odds": "-233",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+172",
-            "under_odds": "-243",
+            "over_odds": "+165",
+            "under_odds": "-233",
             "_src": "oddsapi"
           }
         ],
@@ -15417,13 +15417,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+575",
+        "over_odds": "+525",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+575",
+            "over_odds": "+525",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -15447,14 +15447,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-276",
-        "under_odds": "+202",
+        "over_odds": "-263",
+        "under_odds": "+194",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-276",
-            "under_odds": "+202",
+            "over_odds": "-263",
+            "under_odds": "+194",
             "_src": "oddsapi"
           }
         ],
@@ -15494,14 +15494,14 @@
     "jake bauers": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "-107",
-        "under_odds": "-125",
+        "over_odds": "-113",
+        "under_odds": "-120",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-107",
-            "under_odds": "-125",
+            "over_odds": "-113",
+            "under_odds": "-120",
             "_src": "oddsapi"
           }
         ],
@@ -15524,14 +15524,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-185",
-        "under_odds": "+138",
+        "over_odds": "-177",
+        "under_odds": "+133",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+138",
+            "over_odds": "-177",
+            "under_odds": "+133",
             "_src": "oddsapi"
           }
         ],
@@ -15539,14 +15539,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+146",
-        "under_odds": "-204",
+        "over_odds": "+152",
+        "under_odds": "-213",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+146",
-            "under_odds": "-204",
+            "over_odds": "+152",
+            "under_odds": "-213",
             "_src": "oddsapi"
           }
         ],
@@ -15554,14 +15554,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+100",
-        "under_odds": "-138",
+        "over_odds": "+107",
+        "under_odds": "-148",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+100",
-            "under_odds": "-138",
+            "over_odds": "+107",
+            "under_odds": "-148",
             "_src": "oddsapi"
           }
         ],
@@ -15627,34 +15627,6 @@
         ],
         "alternates": []
       },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+205",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-130",
-            "under_odds": "-103",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+205",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-130",
-            "under_odds": "-103",
-            "_src": "oddsapi"
-          }
-        ]
-      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-141",
@@ -15672,14 +15644,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+209",
-        "under_odds": "-298",
+        "over_odds": "+220",
+        "under_odds": "-316",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+209",
-            "under_odds": "-298",
+            "over_odds": "+220",
+            "under_odds": "-316",
             "_src": "oddsapi"
           }
         ],
@@ -15699,6 +15671,34 @@
           }
         ],
         "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+205",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-120",
+            "under_odds": "-110",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+205",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-120",
+            "under_odds": "-110",
+            "_src": "oddsapi"
+          }
+        ]
       }
     },
     "victor bericoto": {
@@ -15721,18 +15721,31 @@
     "jung hoo lee": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+129",
-        "under_odds": "-173",
+        "over_odds": "+126",
+        "under_odds": "-170",
         "_src": "oddsapi",
         "lanes": [
           {
+            "line": 0.5,
+            "over_odds": "-191",
+            "under_odds": "+143",
+            "_src": "oddsapi"
+          },
+          {
             "line": 1.5,
-            "over_odds": "+129",
-            "under_odds": "-173",
+            "over_odds": "+126",
+            "under_odds": "-170",
             "_src": "oddsapi"
           }
         ],
-        "alternates": []
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-191",
+            "under_odds": "+143",
+            "_src": "oddsapi"
+          }
+        ]
       },
       "batter_home_runs": {
         "line": 0.5,
@@ -15751,14 +15764,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-166",
-        "under_odds": "+124",
+        "over_odds": "-159",
+        "under_odds": "+120",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-166",
-            "under_odds": "+124",
+            "over_odds": "-159",
+            "under_odds": "+120",
             "_src": "oddsapi"
           }
         ],
@@ -15766,14 +15779,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+309",
-        "under_odds": "-461",
+        "over_odds": "+321",
+        "under_odds": "-481",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+309",
-            "under_odds": "-461",
+            "over_odds": "+321",
+            "under_odds": "-481",
             "_src": "oddsapi"
           }
         ],
@@ -15854,6 +15867,34 @@
         ],
         "alternates": []
       },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+155",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-173",
+            "under_odds": "+129",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+155",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-173",
+            "under_odds": "+129",
+            "_src": "oddsapi"
+          }
+        ]
+      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-167",
@@ -15898,34 +15939,6 @@
           }
         ],
         "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+155",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+135",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+155",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+135",
-            "_src": "oddsapi"
-          }
-        ]
       }
     },
     "daniel susac": {
@@ -15976,14 +15989,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-120",
-        "under_odds": "-111",
+        "over_odds": "-115",
+        "under_odds": "-115",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-120",
-            "under_odds": "-111",
+            "over_odds": "-115",
+            "under_odds": "-115",
             "_src": "oddsapi"
           }
         ],
@@ -16053,14 +16066,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-135",
-        "under_odds": "+102",
+        "over_odds": "-130",
+        "under_odds": "-102",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-135",
-            "under_odds": "+102",
+            "over_odds": "-130",
+            "under_odds": "-102",
             "_src": "oddsapi"
           }
         ],
@@ -16083,14 +16096,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+223",
-        "under_odds": "-320",
+        "over_odds": "+230",
+        "under_odds": "-332",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+223",
-            "under_odds": "-320",
+            "over_odds": "+230",
+            "under_odds": "-332",
             "_src": "oddsapi"
           }
         ],
@@ -16125,17 +16138,94 @@
         ]
       }
     },
-    "david hamilton": {
+    "joey ortiz": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+127",
-        "under_odds": "-170",
+        "over_odds": "+131",
+        "under_odds": "-176",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+127",
-            "under_odds": "-170",
+            "over_odds": "+131",
+            "under_odds": "-176",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-155",
+        "under_odds": "+115",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-155",
+            "under_odds": "+115",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+210",
+        "under_odds": "-295",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+210",
+            "under_odds": "-295",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_runs_scored": {
+        "line": 0.5,
+        "over_odds": "+155",
+        "under_odds": "-210",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+155",
+            "under_odds": "-210",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-155",
+        "under_odds": "+115",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-155",
+            "under_odds": "+115",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "david hamilton": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "+121",
+        "under_odds": "-162",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+121",
+            "under_odds": "-162",
             "_src": "oddsapi"
           }
         ],
@@ -16173,14 +16263,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-132",
-        "under_odds": "+100",
+        "over_odds": "-137",
+        "under_odds": "+103",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-132",
-            "under_odds": "+100",
+            "over_odds": "-137",
+            "under_odds": "+103",
             "_src": "oddsapi"
           }
         ],
@@ -16297,13 +16387,13 @@
     "luis rengifo": {
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+750",
+        "over_odds": "+850",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+750",
+            "over_odds": "+850",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -16342,14 +16432,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+192",
-        "under_odds": "-273",
+        "over_odds": "+199",
+        "under_odds": "-283",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+192",
-            "under_odds": "-273",
+            "over_odds": "+199",
+            "under_odds": "-283",
             "_src": "oddsapi"
           }
         ],
@@ -16365,83 +16455,6 @@
             "line": 0.5,
             "over_odds": "+137",
             "under_odds": "-191",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      }
-    },
-    "joey ortiz": {
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-155",
-        "under_odds": "+115",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-155",
-            "under_odds": "+115",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "+135",
-        "under_odds": "-185",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "+135",
-            "under_odds": "-185",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_rbis": {
-        "line": 0.5,
-        "over_odds": "+210",
-        "under_odds": "-295",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+210",
-            "under_odds": "-295",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_runs_scored": {
-        "line": 0.5,
-        "over_odds": "+155",
-        "under_odds": "-210",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+155",
-            "under_odds": "-210",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 0.5,
-        "over_odds": "-155",
-        "under_odds": "+115",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-155",
-            "under_odds": "+115",
             "_src": "oddsapi"
           }
         ],
@@ -16618,14 +16631,14 @@
     "josh jung": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "-130",
-        "under_odds": "-110",
+        "over_odds": "-140",
+        "under_odds": "+100",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-130",
-            "under_odds": "-110",
+            "over_odds": "-140",
+            "under_odds": "+100",
             "_src": "oddsapi"
           }
         ],
@@ -16980,14 +16993,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+245",
-        "under_odds": "-356",
+        "over_odds": "+228",
+        "under_odds": "-329",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+245",
-            "under_odds": "-356",
+            "over_odds": "+228",
+            "under_odds": "-329",
             "_src": "oddsapi"
           }
         ],
@@ -16995,14 +17008,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+126",
-        "under_odds": "-175",
+        "over_odds": "+122",
+        "under_odds": "-169",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+126",
-            "under_odds": "-175",
+            "over_odds": "+122",
+            "under_odds": "-169",
             "_src": "oddsapi"
           }
         ],
@@ -17179,14 +17192,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+151",
-        "under_odds": "-212",
+        "over_odds": "+146",
+        "under_odds": "-205",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+151",
-            "under_odds": "-212",
+            "over_odds": "+146",
+            "under_odds": "-205",
             "_src": "oddsapi"
           }
         ],
@@ -17339,7 +17352,7 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-175",
+            "over_odds": "-185",
             "under_odds": "+135",
             "_src": "oddsapi"
           },
@@ -17353,7 +17366,7 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-175",
+            "over_odds": "-185",
             "under_odds": "+135",
             "_src": "oddsapi"
           }
@@ -17483,14 +17496,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+281",
-        "under_odds": "-413",
+        "over_odds": "+271",
+        "under_odds": "-398",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+281",
-            "under_odds": "-413",
+            "over_odds": "+271",
+            "under_odds": "-398",
             "_src": "oddsapi"
           }
         ],
@@ -17498,14 +17511,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+203",
-        "under_odds": "-290",
+        "over_odds": "+195",
+        "under_odds": "-278",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+203",
-            "under_odds": "-290",
+            "over_odds": "+195",
+            "under_odds": "-278",
             "_src": "oddsapi"
           }
         ],
@@ -17980,14 +17993,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-119",
-        "under_odds": "-111",
+        "over_odds": "-123",
+        "under_odds": "-108",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-119",
-            "under_odds": "-111",
+            "over_odds": "-123",
+            "under_odds": "-108",
             "_src": "oddsapi"
           }
         ],
@@ -18102,14 +18115,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+181",
-        "under_odds": "-257",
+        "over_odds": "+176",
+        "under_odds": "-248",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+181",
-            "under_odds": "-257",
+            "over_odds": "+176",
+            "under_odds": "-248",
             "_src": "oddsapi"
           }
         ],
@@ -18224,21 +18237,6 @@
         ],
         "alternates": []
       },
-      "batter_total_bases": {
-        "line": 0.5,
-        "over_odds": "-141",
-        "under_odds": "+106",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-141",
-            "under_odds": "+106",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-163",
@@ -18284,14 +18282,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+263",
-        "under_odds": "-384",
+        "over_odds": "+271",
+        "under_odds": "-397",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+263",
-            "under_odds": "-384",
+            "over_odds": "+271",
+            "under_odds": "-397",
             "_src": "oddsapi"
           }
         ],
@@ -18307,6 +18305,21 @@
             "line": 0.5,
             "over_odds": "+189",
             "under_odds": "-268",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-125",
+        "under_odds": "-105",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-125",
+            "under_odds": "-105",
             "_src": "oddsapi"
           }
         ],
@@ -18331,14 +18344,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+320",
-        "under_odds": null,
+        "over_odds": "+350",
+        "under_odds": "-500",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+320",
-            "under_odds": null,
+            "over_odds": "+350",
+            "under_odds": "-500",
             "_src": "oddsapi"
           }
         ],
@@ -18361,14 +18374,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-185",
-        "under_odds": "+138",
+        "over_odds": "-179",
+        "under_odds": "+134",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+138",
+            "over_odds": "-179",
+            "under_odds": "+134",
             "_src": "oddsapi"
           }
         ],
@@ -18376,14 +18389,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+180",
-        "under_odds": "-255",
+        "over_odds": "+186",
+        "under_odds": "-263",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+180",
-            "under_odds": "-255",
+            "over_odds": "+186",
+            "under_odds": "-263",
             "_src": "oddsapi"
           }
         ],
@@ -18423,14 +18436,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+370",
-        "under_odds": null,
+        "over_odds": "+350",
+        "under_odds": "-500",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+370",
-            "under_odds": null,
+            "over_odds": "+350",
+            "under_odds": "-500",
             "_src": "oddsapi"
           }
         ],
@@ -18453,14 +18466,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-188",
-        "under_odds": "+140",
+        "over_odds": "-182",
+        "under_odds": "+136",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-188",
-            "under_odds": "+140",
+            "over_odds": "-182",
+            "under_odds": "+136",
             "_src": "oddsapi"
           }
         ],
@@ -18468,14 +18481,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+173",
-        "under_odds": "-245",
+        "over_odds": "+179",
+        "under_odds": "-254",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+173",
-            "under_odds": "-245",
+            "over_odds": "+179",
+            "under_odds": "-254",
             "_src": "oddsapi"
           }
         ],
@@ -18483,14 +18496,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+142",
-        "under_odds": "-198",
+        "over_odds": "+141",
+        "under_odds": "-196",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+142",
-            "under_odds": "-198",
+            "over_odds": "+141",
+            "under_odds": "-196",
             "_src": "oddsapi"
           }
         ],
@@ -18545,14 +18558,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-210",
-        "under_odds": "+156",
+        "over_odds": "-203",
+        "under_odds": "+151",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-210",
-            "under_odds": "+156",
+            "over_odds": "-203",
+            "under_odds": "+151",
             "_src": "oddsapi"
           }
         ],
@@ -18560,14 +18573,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+237",
-        "under_odds": "-342",
+        "over_odds": "+245",
+        "under_odds": "-356",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+237",
-            "under_odds": "-342",
+            "over_odds": "+245",
+            "under_odds": "-356",
             "_src": "oddsapi"
           }
         ],
@@ -18607,14 +18620,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+525",
-        "under_odds": null,
+        "over_odds": "+550",
+        "under_odds": "-900",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+525",
-            "under_odds": null,
+            "over_odds": "+550",
+            "under_odds": "-900",
             "_src": "oddsapi"
           }
         ],
@@ -18650,14 +18663,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-189",
-        "under_odds": "+141",
+        "over_odds": "-182",
+        "under_odds": "+137",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-189",
-            "under_odds": "+141",
+            "over_odds": "-182",
+            "under_odds": "+137",
             "_src": "oddsapi"
           }
         ],
@@ -18742,14 +18755,14 @@
       },
       "batter_hits": {
         "line": 1.5,
-        "over_odds": "+178",
-        "under_odds": "-241",
+        "over_odds": "+186",
+        "under_odds": "-253",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+178",
-            "under_odds": "-241",
+            "over_odds": "+186",
+            "under_odds": "-253",
             "_src": "oddsapi"
           }
         ],
@@ -18802,16 +18815,31 @@
         ],
         "alternates": []
       },
-      "batter_hits": {
+      "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "-165",
-        "under_odds": "+125",
+        "over_odds": "+600",
+        "under_odds": "-1200",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
+            "over_odds": "+600",
+            "under_odds": "-1200",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-170",
+        "under_odds": "+130",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-170",
+            "under_odds": "+130",
             "_src": "oddsapi"
           }
         ],
@@ -18819,29 +18847,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+190",
-        "under_odds": "-280",
+        "over_odds": "+180",
+        "under_odds": "-265",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+190",
-            "under_odds": "-280",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_home_runs": {
-        "line": 0.5,
-        "over_odds": "+625",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+625",
-            "under_odds": null,
+            "over_odds": "+180",
+            "under_odds": "-265",
             "_src": "oddsapi"
           }
         ],
@@ -18849,14 +18862,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+133",
-        "under_odds": "-184",
+        "over_odds": "+137",
+        "under_odds": "-191",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+133",
-            "under_odds": "-184",
+            "over_odds": "+137",
+            "under_odds": "-191",
             "_src": "oddsapi"
           }
         ],
@@ -18910,13 +18923,13 @@
       "batter_home_runs": {
         "line": 0.5,
         "over_odds": "+700",
-        "under_odds": null,
+        "under_odds": "-1400",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+700",
-            "under_odds": null,
+            "under_odds": "-1400",
             "_src": "oddsapi"
           }
         ],
@@ -18990,6 +19003,203 @@
             "line": 0.5,
             "over_odds": "+123",
             "under_odds": "-171",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "brent rooker": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+500",
+        "under_odds": "-800",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+500",
+            "under_odds": "-800",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "+102",
+        "under_odds": "-136",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+102",
+            "under_odds": "-136",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-180",
+        "under_odds": "+135",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-180",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+186",
+        "under_odds": "-264",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+186",
+            "under_odds": "-264",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_runs_scored": {
+        "line": 0.5,
+        "over_odds": "+140",
+        "under_odds": "-196",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+140",
+            "under_odds": "-196",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+175",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-185",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+175",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-185",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          }
+        ]
+      }
+    },
+    "seiya suzuki": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+500",
+        "under_odds": "-800",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+500",
+            "under_odds": "-800",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-112",
+        "under_odds": "-120",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-112",
+            "under_odds": "-120",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+143",
+        "under_odds": "-193",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "+143",
+            "under_odds": "-193",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-188",
+        "under_odds": "+141",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-188",
+            "under_odds": "+141",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+178",
+        "under_odds": "-252",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+178",
+            "under_odds": "-252",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_runs_scored": {
+        "line": 0.5,
+        "over_odds": "+126",
+        "under_odds": "-175",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+126",
+            "under_odds": "-175",
             "_src": "oddsapi"
           }
         ],
@@ -19110,8 +19320,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
+            "over_odds": "-180",
+            "under_odds": "+135",
             "_src": "oddsapi"
           },
           {
@@ -19124,8 +19334,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
+            "over_odds": "-180",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ]
@@ -19224,13 +19434,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+850",
+        "over_odds": "+750",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+850",
+            "over_odds": "+750",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -19239,14 +19449,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-175",
-        "under_odds": "+131",
+        "over_odds": "-183",
+        "under_odds": "+137",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-175",
-            "under_odds": "+131",
+            "over_odds": "-183",
+            "under_odds": "+137",
             "_src": "oddsapi"
           }
         ],
@@ -19254,14 +19464,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+267",
-        "under_odds": "-391",
+        "over_odds": "+248",
+        "under_odds": "-360",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+267",
-            "under_odds": "-391",
+            "over_odds": "+248",
+            "under_odds": "-360",
             "_src": "oddsapi"
           }
         ],
@@ -19269,14 +19479,14 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+188",
-        "under_odds": "-266",
+        "over_odds": "+183",
+        "under_odds": "-259",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+188",
-            "under_odds": "-266",
+            "over_odds": "+183",
+            "under_odds": "-259",
             "_src": "oddsapi"
           }
         ],
@@ -19387,14 +19597,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+231",
-        "under_odds": "-334",
+        "over_odds": "+242",
+        "under_odds": "-351",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+231",
-            "under_odds": "-334",
+            "over_odds": "+242",
+            "under_odds": "-351",
             "_src": "oddsapi"
           }
         ],
@@ -19419,14 +19629,14 @@
     "dansby swanson": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+122",
-        "under_odds": "-164",
+        "over_odds": "+125",
+        "under_odds": "-170",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+122",
-            "under_odds": "-164",
+            "over_odds": "+125",
+            "under_odds": "-170",
             "_src": "oddsapi"
           }
         ],
@@ -19526,13 +19736,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+1100",
+        "over_odds": "+1300",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+1100",
+            "over_odds": "+1300",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -19556,14 +19766,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-144",
-        "under_odds": "+108",
+        "over_odds": "-139",
+        "under_odds": "+105",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-144",
-            "under_odds": "+108",
+            "over_odds": "-139",
+            "under_odds": "+105",
             "_src": "oddsapi"
           }
         ],
@@ -19571,14 +19781,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+323",
-        "under_odds": "-484",
+        "over_odds": "+333",
+        "under_odds": "-502",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+323",
-            "under_odds": "-484",
+            "over_odds": "+333",
+            "under_odds": "-502",
             "_src": "oddsapi"
           }
         ],
@@ -19633,14 +19843,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-131",
-        "under_odds": "-101",
+        "over_odds": "-134",
+        "under_odds": "+101",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-131",
-            "under_odds": "-101",
+            "over_odds": "-134",
+            "under_odds": "+101",
             "_src": "oddsapi"
           }
         ],
@@ -19648,14 +19858,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+259",
-        "under_odds": "-379",
+        "over_odds": "+251",
+        "under_odds": "-365",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+259",
-            "under_odds": "-379",
+            "over_odds": "+251",
+            "under_odds": "-365",
             "_src": "oddsapi"
           }
         ],
@@ -19692,203 +19902,6 @@
         "alternates": []
       }
     },
-    "brent rooker": {
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "+107",
-        "under_odds": "-141",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "+107",
-            "under_odds": "-141",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_home_runs": {
-        "line": 0.5,
-        "over_odds": "+425",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+425",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+175",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-176",
-            "under_odds": "+132",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+175",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-176",
-            "under_odds": "+132",
-            "_src": "oddsapi"
-          }
-        ]
-      },
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-168",
-        "under_odds": "+126",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-168",
-            "under_odds": "+126",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_rbis": {
-        "line": 0.5,
-        "over_odds": "+201",
-        "under_odds": "-286",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+201",
-            "under_odds": "-286",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_runs_scored": {
-        "line": 0.5,
-        "over_odds": "+150",
-        "under_odds": "-210",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+150",
-            "under_odds": "-210",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      }
-    },
-    "seiya suzuki": {
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "-112",
-        "under_odds": "-120",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "-112",
-            "under_odds": "-120",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_home_runs": {
-        "line": 0.5,
-        "over_odds": "+500",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+500",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+143",
-        "under_odds": "-193",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "+143",
-            "under_odds": "-193",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-188",
-        "under_odds": "+141",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-188",
-            "under_odds": "+141",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_rbis": {
-        "line": 0.5,
-        "over_odds": "+178",
-        "under_odds": "-252",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+178",
-            "under_odds": "-252",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_runs_scored": {
-        "line": 0.5,
-        "over_odds": "+126",
-        "under_odds": "-175",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+126",
-            "under_odds": "-175",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      }
-    },
     "jeff mcneil": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
@@ -19898,8 +19911,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-181",
-            "under_odds": "+135",
+            "over_odds": "-190",
+            "under_odds": "+142",
             "_src": "oddsapi"
           },
           {
@@ -19912,8 +19925,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-181",
-            "under_odds": "+135",
+            "over_odds": "-190",
+            "under_odds": "+142",
             "_src": "oddsapi"
           }
         ]
@@ -19963,14 +19976,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-145",
-        "under_odds": "+110",
+        "over_odds": "-156",
+        "under_odds": "+118",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-145",
-            "under_odds": "+110",
+            "over_odds": "-156",
+            "under_odds": "+118",
             "_src": "oddsapi"
           }
         ],
@@ -20040,14 +20053,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-136",
-        "under_odds": "+103",
+        "over_odds": "-131",
+        "under_odds": "-101",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-136",
-            "under_odds": "+103",
+            "over_odds": "-131",
+            "under_odds": "-101",
             "_src": "oddsapi"
           }
         ],
@@ -20055,7 +20068,7 @@
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+135",
+        "over_odds": "+130",
         "under_odds": "-175",
         "_src": "oddsapi",
         "lanes": [
@@ -20067,7 +20080,7 @@
           },
           {
             "line": 1.5,
-            "over_odds": "+135",
+            "over_odds": "+130",
             "under_odds": "-175",
             "_src": "oddsapi"
           }
@@ -20151,8 +20164,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-155",
-            "under_odds": "+115",
+            "over_odds": "-165",
+            "under_odds": "+125",
             "_src": "oddsapi"
           },
           {
@@ -20165,8 +20178,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-155",
-            "under_odds": "+115",
+            "over_odds": "-165",
+            "under_odds": "+125",
             "_src": "oddsapi"
           }
         ]
@@ -20862,8 +20875,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-136",
-            "under_odds": "+102",
+            "over_odds": "-143",
+            "under_odds": "+108",
             "_src": "oddsapi"
           },
           {
@@ -20876,8 +20889,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-136",
-            "under_odds": "+102",
+            "over_odds": "-143",
+            "under_odds": "+108",
             "_src": "oddsapi"
           }
         ]
@@ -21104,6 +21117,111 @@
             "line": 0.5,
             "over_odds": "+143",
             "under_odds": "-200",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "christian vazquez": {
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "+126",
+        "under_odds": "-170",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-175",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+126",
+            "under_odds": "-170",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-175",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          }
+        ]
+      },
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+850",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+850",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 0.5,
+        "over_odds": "-129",
+        "under_odds": "-104",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-129",
+            "under_odds": "-104",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-143",
+        "under_odds": "+108",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-143",
+            "under_odds": "+108",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+263",
+        "under_odds": "-385",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+263",
+            "under_odds": "-385",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_runs_scored": {
+        "line": 0.5,
+        "over_odds": "+174",
+        "under_odds": "-246",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+174",
+            "under_odds": "-246",
             "_src": "oddsapi"
           }
         ],
@@ -21674,13 +21792,13 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+500",
+        "over_odds": "+475",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+500",
+            "over_odds": "+475",
             "under_odds": null,
             "_src": "oddsapi"
           }
@@ -21851,111 +21969,6 @@
         ]
       }
     },
-    "christian vazquez": {
-      "batter_home_runs": {
-        "line": 0.5,
-        "over_odds": "+850",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+850",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 0.5,
-        "over_odds": "-129",
-        "under_odds": "-104",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-129",
-            "under_odds": "-104",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-143",
-        "under_odds": "+108",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-143",
-            "under_odds": "+108",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "+132",
-        "under_odds": "-176",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-175",
-            "under_odds": "+135",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+132",
-            "under_odds": "-176",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-175",
-            "under_odds": "+135",
-            "_src": "oddsapi"
-          }
-        ]
-      },
-      "batter_rbis": {
-        "line": 0.5,
-        "over_odds": "+263",
-        "under_odds": "-385",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+263",
-            "under_odds": "-385",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_runs_scored": {
-        "line": 0.5,
-        "over_odds": "+174",
-        "under_odds": "-246",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+174",
-            "under_odds": "-246",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      }
-    },
     "jake mangum": {
       "batter_home_runs": {
         "line": 0.5,
@@ -22082,13 +22095,13 @@
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-220",
-        "under_odds": "+160",
+        "under_odds": "+165",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "-220",
-            "under_odds": "+160",
+            "under_odds": "+165",
             "_src": "oddsapi"
           },
           {
@@ -22156,14 +22169,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+330",
-        "under_odds": null,
+        "over_odds": "+400",
+        "under_odds": "-600",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+330",
-            "under_odds": null,
+            "over_odds": "+400",
+            "under_odds": "-600",
             "_src": "oddsapi"
           }
         ],
@@ -22261,14 +22274,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+525",
-        "under_odds": null,
+        "over_odds": "+550",
+        "under_odds": "-900",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+525",
-            "under_odds": null,
+            "over_odds": "+550",
+            "under_odds": "-900",
             "_src": "oddsapi"
           }
         ],
@@ -22345,7 +22358,7 @@
           {
             "line": 0.5,
             "over_odds": "-175",
-            "under_odds": "+130",
+            "under_odds": "+135",
             "_src": "oddsapi"
           },
           {
@@ -22359,7 +22372,7 @@
           {
             "line": 0.5,
             "over_odds": "-175",
-            "under_odds": "+130",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ]
@@ -22411,13 +22424,13 @@
       },
       "batter_runs_scored": {
         "line": 0.5,
-        "over_odds": "+195",
+        "over_odds": "+200",
         "under_odds": "-275",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+195",
+            "over_odds": "+200",
             "under_odds": "-275",
             "_src": "oddsapi"
           }
@@ -22544,33 +22557,20 @@
             "over_odds": "-160",
             "under_odds": "+120",
             "_src": "oddsapi"
-          },
-          {
-            "line": 2.5,
-            "over_odds": "+120",
-            "under_odds": "-160",
-            "_src": "oddsapi"
           }
         ],
-        "alternates": [
-          {
-            "line": 2.5,
-            "over_odds": "+120",
-            "under_odds": "-160",
-            "_src": "oddsapi"
-          }
-        ]
+        "alternates": []
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+245",
-        "under_odds": null,
+        "over_odds": "+300",
+        "under_odds": "-400",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+245",
-            "under_odds": null,
+            "over_odds": "+300",
+            "under_odds": "-400",
             "_src": "oddsapi"
           }
         ],
@@ -22608,14 +22608,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+145",
-        "under_odds": "-203",
+        "over_odds": "+139",
+        "under_odds": "-193",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+145",
-            "under_odds": "-203",
+            "over_odds": "+139",
+            "under_odds": "-193",
             "_src": "oddsapi"
           }
         ],
@@ -22834,6 +22834,111 @@
         "alternates": []
       }
     },
+    "jorge soler": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+400",
+        "under_odds": "-600",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+400",
+            "under_odds": "-600",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-125",
+        "under_odds": "-106",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-125",
+            "under_odds": "-106",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+126",
+        "under_odds": "-170",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-185",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+126",
+            "under_odds": "-170",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-185",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          }
+        ]
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-226",
+        "under_odds": "+167",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-226",
+            "under_odds": "+167",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+147",
+        "under_odds": "-206",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+147",
+            "under_odds": "-206",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_runs_scored": {
+        "line": 0.5,
+        "over_odds": "+106",
+        "under_odds": "-146",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+106",
+            "under_odds": "-146",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
     "logan o'hoppe": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
@@ -23034,6 +23139,34 @@
         ],
         "alternates": []
       },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+142",
+        "under_odds": "-193",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-160",
+            "under_odds": "+120",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+142",
+            "under_odds": "-193",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-160",
+            "under_odds": "+120",
+            "_src": "oddsapi"
+          }
+        ]
+      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-204",
@@ -23078,61 +23211,33 @@
           }
         ],
         "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+143",
-        "under_odds": "-192",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-160",
-            "under_odds": "+120",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+143",
-            "under_odds": "-192",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-160",
-            "under_odds": "+120",
-            "_src": "oddsapi"
-          }
-        ]
       }
     },
     "sterlin thompson": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "+134",
-        "under_odds": "-179",
+        "over_odds": "+135",
+        "under_odds": "-181",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-164",
-            "under_odds": "+123",
+            "over_odds": "-173",
+            "under_odds": "+129",
             "_src": "oddsapi"
           },
           {
             "line": 1.5,
-            "over_odds": "+134",
-            "under_odds": "-179",
+            "over_odds": "+135",
+            "under_odds": "-181",
             "_src": "oddsapi"
           }
         ],
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-164",
-            "under_odds": "+123",
+            "over_odds": "-173",
+            "under_odds": "+129",
             "_src": "oddsapi"
           }
         ]
@@ -23213,111 +23318,6 @@
         "alternates": []
       }
     },
-    "jorge soler": {
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "-125",
-        "under_odds": "-106",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "-125",
-            "under_odds": "-106",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_home_runs": {
-        "line": 0.5,
-        "over_odds": "+370",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+370",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+126",
-        "under_odds": "-170",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+135",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+126",
-            "under_odds": "-170",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-185",
-            "under_odds": "+135",
-            "_src": "oddsapi"
-          }
-        ]
-      },
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-226",
-        "under_odds": "+167",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-226",
-            "under_odds": "+167",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_rbis": {
-        "line": 0.5,
-        "over_odds": "+147",
-        "under_odds": "-206",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+147",
-            "under_odds": "-206",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_runs_scored": {
-        "line": 0.5,
-        "over_odds": "+106",
-        "under_odds": "-146",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+106",
-            "under_odds": "-146",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      }
-    },
     "wade meckler": {
       "batter_hits_runs_rbis": {
         "line": 1.5,
@@ -23356,13 +23356,26 @@
         "_src": "oddsapi",
         "lanes": [
           {
+            "line": 0.5,
+            "over_odds": "-210",
+            "under_odds": "+155",
+            "_src": "oddsapi"
+          },
+          {
             "line": 1.5,
             "over_odds": "+139",
             "under_odds": "-190",
             "_src": "oddsapi"
           }
         ],
-        "alternates": []
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-210",
+            "under_odds": "+155",
+            "_src": "oddsapi"
+          }
+        ]
       },
       "batter_hits": {
         "line": 0.5,
@@ -23441,16 +23454,44 @@
         ],
         "alternates": []
       },
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-198",
-        "under_odds": "+148",
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+175",
+        "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-198",
-            "under_odds": "+148",
+            "over_odds": "-190",
+            "under_odds": "+139",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+175",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-190",
+            "under_odds": "+139",
+            "_src": "oddsapi"
+          }
+        ]
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-186",
+        "under_odds": "+139",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-186",
+            "under_odds": "+139",
             "_src": "oddsapi"
           }
         ],
@@ -23458,14 +23499,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+224",
-        "under_odds": "-323",
+        "over_odds": "+232",
+        "under_odds": "-335",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+224",
-            "under_odds": "-323",
+            "over_odds": "+232",
+            "under_odds": "-335",
             "_src": "oddsapi"
           }
         ],
@@ -23485,34 +23526,6 @@
           }
         ],
         "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+170",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+170",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
-            "_src": "oddsapi"
-          }
-        ]
       }
     },
     "oswald peraza": {
@@ -23591,14 +23604,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+203",
-        "under_odds": "-290",
+        "over_odds": "+210",
+        "under_odds": "-300",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+203",
-            "under_odds": "-290",
+            "over_odds": "+210",
+            "under_odds": "-300",
             "_src": "oddsapi"
           }
         ],
@@ -23822,46 +23835,18 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+700",
+        "over_odds": "+750",
         "under_odds": null,
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+700",
+            "over_odds": "+750",
             "under_odds": null,
             "_src": "oddsapi"
           }
         ],
         "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+180",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-154",
-            "under_odds": "+115",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+180",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-154",
-            "under_odds": "+115",
-            "_src": "oddsapi"
-          }
-        ]
       },
       "batter_hits": {
         "line": 0.5,
@@ -23907,6 +23892,34 @@
           }
         ],
         "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+175",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-155",
+            "under_odds": "+115",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+175",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-155",
+            "under_odds": "+115",
+            "_src": "oddsapi"
+          }
+        ]
       }
     },
     "shohei ohtani": {
@@ -23927,14 +23940,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+290",
-        "under_odds": null,
+        "over_odds": "+300",
+        "under_odds": "-400",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+290",
-            "under_odds": null,
+            "over_odds": "+300",
+            "under_odds": "-400",
             "_src": "oddsapi"
           }
         ],
@@ -23969,7 +23982,7 @@
           },
           {
             "line": 1.5,
-            "over_odds": "+188",
+            "over_odds": "+190",
             "under_odds": "-275",
             "_src": "oddsapi"
           }
@@ -23977,7 +23990,7 @@
         "alternates": [
           {
             "line": 1.5,
-            "over_odds": "+188",
+            "over_odds": "+190",
             "under_odds": "-275",
             "_src": "oddsapi"
           }
@@ -24047,14 +24060,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+128",
-        "under_odds": "-173",
+        "over_odds": "+135",
+        "under_odds": "-182",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+128",
-            "under_odds": "-173",
+            "over_odds": "+135",
+            "under_odds": "-182",
             "_src": "oddsapi"
           }
         ],
@@ -24077,14 +24090,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+176",
-        "under_odds": "-248",
+        "over_odds": "+181",
+        "under_odds": "-257",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+176",
-            "under_odds": "-248",
+            "over_odds": "+181",
+            "under_odds": "-257",
             "_src": "oddsapi"
           }
         ],
@@ -24124,14 +24137,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+575",
-        "under_odds": null,
+        "over_odds": "+600",
+        "under_odds": "-1000",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+575",
-            "under_odds": null,
+            "over_odds": "+600",
+            "under_odds": "-1000",
             "_src": "oddsapi"
           }
         ],
@@ -24229,14 +24242,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+525",
-        "under_odds": null,
+        "over_odds": "+600",
+        "under_odds": "-1000",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+525",
-            "under_odds": null,
+            "over_odds": "+600",
+            "under_odds": "-1000",
             "_src": "oddsapi"
           }
         ],
@@ -24259,14 +24272,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-239",
-        "under_odds": "+177",
+        "over_odds": "-262",
+        "under_odds": "+193",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-239",
-            "under_odds": "+177",
+            "over_odds": "-262",
+            "under_odds": "+193",
             "_src": "oddsapi"
           }
         ],
@@ -24321,14 +24334,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+425",
-        "under_odds": null,
+        "over_odds": "+450",
+        "under_odds": "-650",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+425",
-            "under_odds": null,
+            "over_odds": "+450",
+            "under_odds": "-650",
             "_src": "oddsapi"
           }
         ],
@@ -24413,14 +24426,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+320",
-        "under_odds": null,
+        "over_odds": "+350",
+        "under_odds": "-500",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+320",
-            "under_odds": null,
+            "over_odds": "+350",
+            "under_odds": "-500",
             "_src": "oddsapi"
           }
         ],
@@ -24428,14 +24441,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "-120",
-        "under_odds": "-112",
+        "over_odds": "-125",
+        "under_odds": "-107",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-120",
-            "under_odds": "-112",
+            "over_odds": "-125",
+            "under_odds": "-107",
             "_src": "oddsapi"
           }
         ],
@@ -24598,13 +24611,13 @@
       "batter_home_runs": {
         "line": 0.5,
         "over_odds": "+500",
-        "under_odds": null,
+        "under_odds": "-800",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+500",
-            "under_odds": null,
+            "under_odds": "-800",
             "_src": "oddsapi"
           }
         ],
@@ -24627,14 +24640,14 @@
       },
       "batter_hits": {
         "line": 0.5,
-        "over_odds": "-205",
-        "under_odds": "+152",
+        "over_odds": "-216",
+        "under_odds": "+161",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-205",
-            "under_odds": "+152",
+            "over_odds": "-216",
+            "under_odds": "+161",
             "_src": "oddsapi"
           }
         ],
@@ -24665,6 +24678,216 @@
             "line": 0.5,
             "over_odds": "+128",
             "under_odds": "-179",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "max muncy": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+450",
+        "under_odds": "-650",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+450",
+            "under_odds": "-650",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-112",
+        "under_odds": "-120",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-112",
+            "under_odds": "-120",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+129",
+        "under_odds": "-173",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-160",
+            "under_odds": "+120",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+129",
+            "under_odds": "-173",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-160",
+            "under_odds": "+120",
+            "_src": "oddsapi"
+          }
+        ]
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-180",
+        "under_odds": "+135",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-180",
+            "under_odds": "+135",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+154",
+        "under_odds": "-216",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+154",
+            "under_odds": "-216",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_runs_scored": {
+        "line": 0.5,
+        "over_odds": "+108",
+        "under_odds": "-149",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+108",
+            "under_odds": "-149",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      }
+    },
+    "will smith": {
+      "batter_home_runs": {
+        "line": 0.5,
+        "over_odds": "+600",
+        "under_odds": "-1000",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+600",
+            "under_odds": "-1000",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_hits_runs_rbis": {
+        "line": 1.5,
+        "over_odds": "-120",
+        "under_odds": "-112",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 1.5,
+            "over_odds": "-120",
+            "under_odds": "-112",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+122",
+        "under_odds": "-164",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-190",
+            "under_odds": "+140",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+122",
+            "under_odds": "-164",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-190",
+            "under_odds": "+140",
+            "_src": "oddsapi"
+          }
+        ]
+      },
+      "batter_hits": {
+        "line": 0.5,
+        "over_odds": "-207",
+        "under_odds": "+154",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-207",
+            "under_odds": "+154",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_rbis": {
+        "line": 0.5,
+        "over_odds": "+168",
+        "under_odds": "-237",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+168",
+            "under_odds": "-237",
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": []
+      },
+      "batter_runs_scored": {
+        "line": 0.5,
+        "over_odds": "+133",
+        "under_odds": "-185",
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "+133",
+            "under_odds": "-185",
             "_src": "oddsapi"
           }
         ],
@@ -24807,6 +25030,34 @@
         ],
         "alternates": []
       },
+      "batter_total_bases": {
+        "line": 1.5,
+        "over_odds": "+160",
+        "under_odds": null,
+        "_src": "oddsapi",
+        "lanes": [
+          {
+            "line": 0.5,
+            "over_odds": "-176",
+            "under_odds": "+132",
+            "_src": "oddsapi"
+          },
+          {
+            "line": 1.5,
+            "over_odds": "+160",
+            "under_odds": null,
+            "_src": "oddsapi"
+          }
+        ],
+        "alternates": [
+          {
+            "line": 0.5,
+            "over_odds": "-176",
+            "under_odds": "+132",
+            "_src": "oddsapi"
+          }
+        ]
+      },
       "batter_hits": {
         "line": 0.5,
         "over_odds": "-189",
@@ -24824,14 +25075,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+219",
-        "under_odds": "-314",
+        "over_odds": "+211",
+        "under_odds": "-302",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+219",
-            "under_odds": "-314",
+            "over_odds": "+211",
+            "under_odds": "-302",
             "_src": "oddsapi"
           }
         ],
@@ -24847,139 +25098,6 @@
             "line": 0.5,
             "over_odds": "+129",
             "under_odds": "-179",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+160",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+160",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-165",
-            "under_odds": "+125",
-            "_src": "oddsapi"
-          }
-        ]
-      }
-    },
-    "max muncy": {
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "-112",
-        "under_odds": "-120",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "-112",
-            "under_odds": "-120",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_home_runs": {
-        "line": 0.5,
-        "over_odds": "+400",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+400",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+129",
-        "under_odds": "-173",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-160",
-            "under_odds": "+120",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+129",
-            "under_odds": "-173",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-160",
-            "under_odds": "+120",
-            "_src": "oddsapi"
-          }
-        ]
-      },
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-180",
-        "under_odds": "+135",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-180",
-            "under_odds": "+135",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_rbis": {
-        "line": 0.5,
-        "over_odds": "+154",
-        "under_odds": "-216",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+154",
-            "under_odds": "-216",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_runs_scored": {
-        "line": 0.5,
-        "over_odds": "+108",
-        "under_odds": "-149",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+108",
-            "under_odds": "-149",
             "_src": "oddsapi"
           }
         ],
@@ -25263,14 +25381,14 @@
       },
       "batter_rbis": {
         "line": 0.5,
-        "over_odds": "+258",
-        "under_odds": "-377",
+        "over_odds": "+268",
+        "under_odds": "-393",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+258",
-            "under_odds": "-377",
+            "over_odds": "+268",
+            "under_odds": "-393",
             "_src": "oddsapi"
           }
         ],
@@ -25286,111 +25404,6 @@
             "line": 0.5,
             "over_odds": "+153",
             "under_odds": "-214",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      }
-    },
-    "will smith": {
-      "batter_hits_runs_rbis": {
-        "line": 1.5,
-        "over_odds": "-120",
-        "under_odds": "-112",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 1.5,
-            "over_odds": "-120",
-            "under_odds": "-112",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_home_runs": {
-        "line": 0.5,
-        "over_odds": "+575",
-        "under_odds": null,
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+575",
-            "under_odds": null,
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_total_bases": {
-        "line": 1.5,
-        "over_odds": "+125",
-        "under_odds": "-170",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-190",
-            "under_odds": "+140",
-            "_src": "oddsapi"
-          },
-          {
-            "line": 1.5,
-            "over_odds": "+125",
-            "under_odds": "-170",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": [
-          {
-            "line": 0.5,
-            "over_odds": "-190",
-            "under_odds": "+140",
-            "_src": "oddsapi"
-          }
-        ]
-      },
-      "batter_hits": {
-        "line": 0.5,
-        "over_odds": "-207",
-        "under_odds": "+154",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "-207",
-            "under_odds": "+154",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_rbis": {
-        "line": 0.5,
-        "over_odds": "+163",
-        "under_odds": "-229",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+163",
-            "under_odds": "-229",
-            "_src": "oddsapi"
-          }
-        ],
-        "alternates": []
-      },
-      "batter_runs_scored": {
-        "line": 0.5,
-        "over_odds": "+133",
-        "under_odds": "-185",
-        "_src": "oddsapi",
-        "lanes": [
-          {
-            "line": 0.5,
-            "over_odds": "+133",
-            "under_odds": "-185",
             "_src": "oddsapi"
           }
         ],
@@ -25614,14 +25627,14 @@
       },
       "batter_total_bases": {
         "line": 1.5,
-        "over_odds": "+131",
-        "under_odds": "-176",
+        "over_odds": "+134",
+        "under_odds": "-179",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "+131",
-            "under_odds": "-176",
+            "over_odds": "+134",
+            "under_odds": "-179",
             "_src": "oddsapi"
           }
         ],
@@ -25764,14 +25777,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+625",
-        "under_odds": null,
+        "over_odds": "+575",
+        "under_odds": "-1000",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+625",
-            "under_odds": null,
+            "over_odds": "+575",
+            "under_odds": "-1000",
             "_src": "oddsapi"
           }
         ],
@@ -25870,13 +25883,13 @@
       "batter_home_runs": {
         "line": 0.5,
         "over_odds": "+390",
-        "under_odds": null,
+        "under_odds": "-600",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+390",
-            "under_odds": null,
+            "under_odds": "-600",
             "_src": "oddsapi"
           }
         ],
@@ -25962,13 +25975,13 @@
       "batter_home_runs": {
         "line": 0.5,
         "over_odds": "+290",
-        "under_odds": null,
+        "under_odds": "-400",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+290",
-            "under_odds": null,
+            "under_odds": "-400",
             "_src": "oddsapi"
           }
         ],
@@ -25993,14 +26006,14 @@
       },
       "batter_hits_runs_rbis": {
         "line": 1.5,
-        "over_odds": "-105",
-        "under_odds": "-126",
+        "over_odds": "-101",
+        "under_odds": "-132",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 1.5,
-            "over_odds": "-105",
-            "under_odds": "-126",
+            "over_odds": "-101",
+            "under_odds": "-132",
             "_src": "oddsapi"
           }
         ],
@@ -26249,13 +26262,13 @@
       "batter_home_runs": {
         "line": 0.5,
         "over_odds": "+500",
-        "under_odds": null,
+        "under_odds": "-800",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+500",
-            "under_odds": null,
+            "under_odds": "-800",
             "_src": "oddsapi"
           }
         ],
@@ -26374,8 +26387,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-170",
-            "under_odds": "+126",
+            "over_odds": "-182",
+            "under_odds": "+135",
             "_src": "oddsapi"
           },
           {
@@ -26388,8 +26401,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-170",
-            "under_odds": "+126",
+            "over_odds": "-182",
+            "under_odds": "+135",
             "_src": "oddsapi"
           }
         ]
@@ -27088,14 +27101,14 @@
       },
       "batter_home_runs": {
         "line": 0.5,
-        "over_odds": "+700",
-        "under_odds": null,
+        "over_odds": "+625",
+        "under_odds": "-1000",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "+700",
-            "under_odds": null,
+            "over_odds": "+625",
+            "under_odds": "-1000",
             "_src": "oddsapi"
           }
         ],
@@ -27207,13 +27220,13 @@
       "batter_home_runs": {
         "line": 0.5,
         "over_odds": "+475",
-        "under_odds": null,
+        "under_odds": "-800",
         "_src": "oddsapi",
         "lanes": [
           {
             "line": 0.5,
             "over_odds": "+475",
-            "under_odds": null,
+            "under_odds": "-800",
             "_src": "oddsapi"
           }
         ],
@@ -27407,8 +27420,8 @@
         "lanes": [
           {
             "line": 0.5,
-            "over_odds": "-135",
-            "under_odds": "+100",
+            "over_odds": "-130",
+            "under_odds": "-103",
             "_src": "oddsapi"
           },
           {
@@ -27421,8 +27434,8 @@
         "alternates": [
           {
             "line": 0.5,
-            "over_odds": "-135",
-            "under_odds": "+100",
+            "over_odds": "-130",
+            "under_odds": "-103",
             "_src": "oddsapi"
           }
         ]
