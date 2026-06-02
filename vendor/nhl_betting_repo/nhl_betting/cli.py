@@ -13221,21 +13221,34 @@ def props_watch(
             ):
                 """Build expected lineups per team using external source when available; fallback to TOI-based inference."""
                 d = date or ymd(today_utc())
+                client = NHLWebClient()
+                games = client.schedule_day(d)
+                active_games = [g for g in games if str(getattr(g, "gameState", "") or "").upper() not in {"FUT", "PRE"}]
+                if not active_games:
+                    print(f"Skipping lineup-update for {d}: only future NHL games detected")
+                    return
+                active_team_abbrs = []
+                seen_abbrs = set()
+                for g in active_games:
+                    for team_name in (g.home, g.away):
+                        abbr = str((get_team_assets(team_name) or {}).get("abbr") or "").upper()
+                        if abbr and abbr not in seen_abbrs:
+                            seen_abbrs.add(abbr)
+                            active_team_abbrs.append(abbr)
                 frames = []
-                # Use aliased team abbrevs from roster module
-                for ab in TEAM_ABBRS:
+                for ab in active_team_abbrs:
                     try:
                         snap = None
                         if prefer_source and prefer_source.lower() == "dailyfaceoff":
                             try:
                                 from .data.lineups import build_lineup_snapshot_from_source
-                                snap_src = build_lineup_snapshot_from_source(ab, d)
+                                snap_src = build_lineup_snapshot_from_source(ab, d, processed_dir=PROC_DIR)
                                 if snap_src is not None and not snap_src.empty:
                                     snap = snap_src
                             except Exception as e_src:
                                 print({"team": ab, "source": prefer_source, "error": str(e_src)})
                         if snap is None or snap.empty:
-                            snap = build_lineup_snapshot(ab)
+                            snap = build_lineup_snapshot(ab, date=d, processed_dir=PROC_DIR)
                         snap["team"] = ab
                         frames.append(snap)
                     except Exception as e:
@@ -18316,19 +18329,33 @@ if __name__ == "__main__":
             )
 
         d = date or ymd(today_utc())
+        client = NHLWebClient()
+        games = client.schedule_day(d)
+        active_games = [g for g in games if str(getattr(g, "gameState", "") or "").upper() not in {"FUT", "PRE"}]
+        if not active_games:
+            print(f"Skipping lineup-update for {d}: only future NHL games detected")
+            return
+        active_team_abbrs = []
+        seen_abbrs = set()
+        for g in active_games:
+            for team_name in (g.home, g.away):
+                abbr = str((get_team_assets(team_name) or {}).get("abbr") or "").upper()
+                if abbr and abbr not in seen_abbrs:
+                    seen_abbrs.add(abbr)
+                    active_team_abbrs.append(abbr)
         frames = []
-        for ab in TEAM_ABBRS:
+        for ab in active_team_abbrs:
             try:
                 snap = None
                 if prefer_source and str(prefer_source).lower() == "dailyfaceoff":
                     try:
-                        snap_src = build_lineup_snapshot_from_source(ab, d)
+                        snap_src = build_lineup_snapshot_from_source(ab, d, processed_dir=PROC_DIR)
                         if snap_src is not None and not snap_src.empty:
                             snap = snap_src
                     except Exception as e_src:
                         print({"team": ab, "source": prefer_source, "error": str(e_src)})
                 if snap is None or snap.empty:
-                    snap = build_lineup_snapshot(ab)
+                    snap = build_lineup_snapshot(ab, date=d, processed_dir=PROC_DIR)
                 snap["team"] = ab
                 frames.append(snap)
             except Exception as e:

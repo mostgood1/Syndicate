@@ -370,13 +370,25 @@ function Get-NhlScheduledGamesCheck {
         $url = "https://api-web.nhle.com/v1/schedule/$DateValue"
         $payload = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 20
         $gameCount = 0
+        $totalGames = 0
         foreach ($week in @($payload.gameWeek)) {
             if (-not $week) { continue }
             if ([string]$week.date -ne $DateValue) { continue }
-            $gameCount += @($week.games).Count
+            foreach ($game in @($week.games)) {
+                if (-not $game) { continue }
+                $totalGames += 1
+                $state = [string]$game.gameState
+                if ($state -and ($state.ToUpperInvariant() -in @('FUT', 'PRE'))) {
+                    continue
+                }
+                $gameCount += 1
+            }
         }
         $result.known = $true
         $result.count = [int]$gameCount
+        if ($totalGames -gt 0 -and $gameCount -eq 0) {
+            $result.note = 'all scheduled games are future/pregame'
+        }
     }
     catch {
         $result.note = $_.Exception.Message
