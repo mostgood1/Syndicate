@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
 
 
@@ -86,7 +85,6 @@ def rewrite_source_live_page_html(content: str) -> str:
     return rewritten
 
 
-@lru_cache(maxsize=8)
 def build_source_cards_script() -> str | None:
     content = source_web_text("cards-parity.js")
     if content is None:
@@ -94,7 +92,6 @@ def build_source_cards_script() -> str | None:
     return rewrite_source_cards_script(content)
 
 
-@lru_cache(maxsize=8)
 def build_source_cards_styles() -> str | None:
     content = source_web_text("cards-parity.css")
     if content is None:
@@ -102,6 +99,5 @@ def build_source_cards_styles() -> str | None:
     return rewrite_source_cards_styles(content)
 
 
-@lru_cache(maxsize=8)
 def build_source_base_styles() -> str | None:
     return source_web_text("styles.css")
