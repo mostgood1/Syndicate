@@ -17029,6 +17029,16 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
     return payload
 
 
+def _normalize_live_lens_report_metadata(payload: Any) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    out = dict(payload)
+    out["generatedAt"] = _local_timestamp_text()
+    out["dataRoot"] = _relative_path_str(_DATA_DIR)
+    out["liveLensDir"] = _relative_path_str(_LIVE_LENS_DIR)
+    return out
+
+
 def _live_lens_unavailable_payload(d: str, *, error: str, detail: Optional[str] = None) -> Dict[str, Any]:
     return {
         "date": str(d),
@@ -17111,14 +17121,7 @@ def _live_lens_reports_payload(d: str, *, include_archive: bool = False) -> Dict
     registry_path = _live_prop_registry_path(d)
     registry_log_path = _live_prop_registry_log_path(d)
     recap_path = _live_lens_daily_recap_path(d)
-    latest_report = _load_json_file(_live_lens_report_path(d)) or {}
-    runtime_metadata = {
-        "generatedAt": _local_timestamp_text(),
-        "dataRoot": _relative_path_str(_DATA_DIR),
-        "liveLensDir": _relative_path_str(_LIVE_LENS_DIR),
-    }
-    if isinstance(latest_report, dict) and latest_report:
-        latest_report = {**latest_report, **runtime_metadata}
+    latest_report = _normalize_live_lens_report_metadata(_load_json_file(_live_lens_report_path(d)) or {})
     registry_summary = _live_prop_registry_summary(d)
     first_observation_archive: List[Dict[str, Any]] = _load_live_prop_first_observation_archive(d) if include_archive else []
     if not latest_report:
@@ -17665,14 +17668,14 @@ def api_live_lens() -> Response:
     if not _is_historical_date(d) and loop_enabled:
         serve_report_max_age_seconds = float(_live_lens_report_max_age_seconds())
     if not loop_enabled and isinstance(report_payload, dict) and report_payload:
-        return _jsonify_app_build(report_payload, no_store=True)
+        return _jsonify_app_build(_normalize_live_lens_report_metadata(report_payload), no_store=True)
     if (
         not persist
         and report_age_seconds is not None
         and report_age_seconds <= float(serve_report_max_age_seconds)
     ):
         if isinstance(report_payload, dict) and report_payload:
-            return _jsonify_app_build(report_payload, no_store=True)
+            return _jsonify_app_build(_normalize_live_lens_report_metadata(report_payload), no_store=True)
     if not loop_enabled:
         payload = _live_lens_unavailable_payload(
             d,
