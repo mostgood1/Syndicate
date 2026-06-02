@@ -12,6 +12,7 @@ from syndicate.features.nhl.market_accuracy import build_market_accuracy_payload
 from syndicate.features.nhl.betting_recap import build_betting_recap_payload as build_nhl_betting_recap
 from syndicate.features.nhl.player_props_reconciliation import build_player_props_reconciliation_payload as build_nhl_props_reconciliation
 from syndicate.features.nhl.props_lines import build_props_lines_payload as build_nhl_props_lines
+from syndicate.features.mlb.cards import _normalize_live_name as normalize_mlb_live_name
 from syndicate.features.mlb.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload as build_mlb_daily_accuracy
 from syndicate.features.nba.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload as build_nba_daily_accuracy
 from syndicate.features.wnba.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload as build_wnba_daily_accuracy
@@ -147,6 +148,65 @@ def _write_mlb_feed_live_artifact(root: Path, date_str: str) -> None:
 
 
 class LocalDailyAccuracyTests(unittest.TestCase):
+    def test_mlb_live_name_normalization_strips_accents(self) -> None:
+        self.assertEqual(normalize_mlb_live_name("José Siri"), "jose siri")
+        self.assertEqual(normalize_mlb_live_name("Andrés Giménez"), "andres gimenez")
+
+    def test_mlb_daily_accuracy_matches_accented_feed_names_for_total_bases(self) -> None:
+        build_mlb_daily_accuracy.cache_clear()
+        with TemporaryDirectory() as tmp_dir:
+            artifact_root = Path(tmp_dir)
+            registry_payload = {
+                "date": "2026-05-16",
+                "updatedAt": "2026-05-16T20:49:39-05:00",
+                "entries": {
+                    "1|jose siri|hitter_props|total_bases|over|0.500": {
+                        "key": "1|jose siri|hitter_props|total_bases|over|0.500",
+                        "date": "2026-05-16",
+                        "gamePk": 1,
+                        "owner": "Jose Siri",
+                        "market": "hitter_props",
+                        "prop": "total_bases",
+                        "selection": "over",
+                        "marketLine": 0.5,
+                        "firstSeenAt": "2026-05-16T19:00:00-05:00",
+                        "firstSeenSnapshot": {"selection": "over", "marketLine": 0.5, "actual": 0.0},
+                        "lastSeenAt": "2026-05-16T22:00:00-05:00",
+                        "lastSeenSnapshot": {"selection": "over", "marketLine": 0.5, "actual": 0.0},
+                    }
+                },
+            }
+            (artifact_root / "live_prop_registry_2026_05_16.json").write_text(json.dumps(registry_payload), encoding="utf-8")
+            feed_payload = {
+                "liveData": {
+                    "boxscore": {
+                        "teams": {
+                            "away": {
+                                "players": {
+                                    "ID101": {
+                                        "person": {"id": 101, "fullName": "José Siri"},
+                                        "stats": {"batting": {"hits": 1, "runs": 1, "rbi": 1, "totalBases": 4, "homeRuns": 1}},
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            (artifact_root / "1.json").write_text(json.dumps(feed_payload), encoding="utf-8")
+            with patch(
+                "syndicate.features.mlb.live_lens_daily_accuracy.live_prop_registry_path",
+                side_effect=lambda selected_date: artifact_root / f"live_prop_registry_{selected_date.replace('-', '_')}.json",
+            ), patch(
+                "syndicate.features.mlb.live_lens_daily_accuracy.raw_feed_live_path",
+                side_effect=lambda selected_date, game_pk: artifact_root / f"{int(game_pk)}.json",
+            ):
+                payload = build_mlb_daily_accuracy("date=2026-05-16")
+
+        rows = (((payload or {}).get("days") or [])[0].get("by_stat") or [])
+        tb_group = next((group for group in rows if group.get("key") == "total_bases"), {})
+        self.assertEqual(tb_group.get("wins"), 1)
+
     def test_mlb_daily_accuracy_prefers_feed_live_actuals_over_registry_snapshots(self) -> None:
         build_mlb_daily_accuracy.cache_clear()
         with TemporaryDirectory() as tmp_dir:
