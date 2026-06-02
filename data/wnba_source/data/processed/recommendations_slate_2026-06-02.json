@@ -15,16 +15,35 @@
           "team": "LVA",
           "display_pick": "Chelsea Gray OVER 1.5",
           "selection": "OVER 1.5",
-          "price": -109.0,
-          "score": 46.27463161121055,
-          "ev_pct": 46.27463161121055,
-          "win_prob": 0.5215311004784688,
-          "p_win": 0.5215311004784688,
+          "price": -110.0,
+          "score": 45.63837832016569,
+          "ev_pct": 45.63837832016569,
+          "win_prob": 0.5238095238095238,
+          "p_win": 0.5238095238095238,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 46.3%",
+            "EV 45.6%",
             "Regular price range (-150 to +150)",
             "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "LVA @ LAS"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Erica Wheeler UNDER 11.5",
+          "selection": "UNDER 11.5",
+          "price": -102.0,
+          "score": 43.518187403073206,
+          "ev_pct": 43.518187403073206,
+          "win_prob": 0.504950495049505,
+          "p_win": 0.504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 43.5%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
             "Best line available"
           ],
           "matchup": "LVA @ LAS"
@@ -43,24 +62,6 @@
           "top_play_reasons": [
             "Edge 14.6",
             "EV 14.6%"
-          ],
-          "matchup": "LVA @ LAS"
-        },
-        {
-          "market": "PROPS",
-          "team": "LAS",
-          "display_pick": "Dearica Hamby OVER 24.5",
-          "selection": "OVER 24.5",
-          "price": -112.0,
-          "score": 9.053089920995983,
-          "ev_pct": 9.053089920995983,
-          "win_prob": 0.5283018867924528,
-          "p_win": 0.5283018867924528,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 9.1%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
           ],
           "matchup": "LVA @ LAS"
         },
@@ -88,14 +89,14 @@
           "display_pick": "Under 174.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -2.528357,
-          "ev_pct": 2.5284,
-          "win_prob": 0.549094,
-          "p_win": 0.549094,
-          "basketball_summary": "Model total 172.0 vs line 174.5",
+          "score": -3.578357,
+          "ev_pct": 3.5784000000000002,
+          "win_prob": 0.559594,
+          "p_win": 0.559594,
+          "basketball_summary": "Model total 170.9 vs line 174.5",
           "top_play_reasons": [
-            "Edge -2.5",
-            "EV 2.5%"
+            "Edge -3.6",
+            "EV 3.6%"
           ],
           "matchup": "LVA @ LAS"
         }
@@ -126,6 +127,24 @@
           "matchup": "POR @ GSV"
         },
         {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Gabby Williams UNDER 7.5",
+          "selection": "UNDER 7.5",
+          "price": 109.0,
+          "score": 23.327140297826,
+          "ev_pct": 23.327140297826,
+          "win_prob": 0.4784688995215311,
+          "p_win": 0.4784688995215311,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 23.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "POR @ GSV"
+        },
+        {
           "market": "ATS",
           "team": "Golden State Valkyries",
           "display_pick": "Golden State Valkyries -9.0",
@@ -139,24 +158,6 @@
           "top_play_reasons": [
             "Edge 17.6",
             "EV 17.5%"
-          ],
-          "matchup": "POR @ GSV"
-        },
-        {
-          "market": "PROPS",
-          "team": "GSV",
-          "display_pick": "Gabby Williams UNDER 18.5",
-          "selection": "UNDER 18.5",
-          "price": -105.0,
-          "score": 16.99635629817211,
-          "ev_pct": 16.99635629817211,
-          "win_prob": 0.5121951219512195,
-          "p_win": 0.5121951219512195,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 17.0%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
           ],
           "matchup": "POR @ GSV"
         },
@@ -182,17 +183,17 @@
         {
           "market": "TOTAL",
           "team": "Total",
-          "display_pick": "Under 160.5",
+          "display_pick": "Under 158.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -1.757843,
-          "ev_pct": 1.7578,
-          "win_prob": 0.541388,
-          "p_win": 0.541388,
-          "basketball_summary": "Model total 158.7 vs line 160.5",
+          "score": -0.107843,
+          "ev_pct": 0.10779999999999999,
+          "win_prob": 0.524888,
+          "p_win": 0.524888,
+          "basketball_summary": "Model total 158.4 vs line 158.5",
           "top_play_reasons": [
-            "Edge -1.8",
-            "EV 1.8%"
+            "Edge -0.1",
+            "EV 0.1%"
           ],
           "matchup": "POR @ GSV"
         }
@@ -206,35 +207,16 @@
         {
           "market": "PROPS",
           "team": "CHI",
-          "display_pick": "Azura Stevens UNDER 7.5",
-          "selection": "UNDER 7.5",
-          "price": -111.0,
-          "score": 37.815305567501355,
-          "ev_pct": 37.815305567501355,
-          "win_prob": 0.5260663507109005,
-          "p_win": 0.5260663507109005,
+          "display_pick": "Azura Stevens UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "price": -122.0,
+          "score": 31.92622948110766,
+          "ev_pct": 31.92622948110766,
+          "win_prob": 0.5495495495495496,
+          "p_win": 0.5495495495495496,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 37.8%",
-            "Regular price range (-150 to +150)",
-            "Consensus: 3 books aligned",
-            "Best line available"
-          ],
-          "matchup": "CHI @ WSH"
-        },
-        {
-          "market": "PROPS",
-          "team": "WSH",
-          "display_pick": "Georgia Amoore UNDER 13.5",
-          "selection": "UNDER 13.5",
-          "price": -126.0,
-          "score": 7.327653962451519,
-          "ev_pct": 7.327653962451519,
-          "win_prob": 0.5575221238938053,
-          "p_win": 0.5575221238938053,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 7.3%",
+            "EV 31.9%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -259,19 +241,37 @@
           "matchup": "CHI @ WSH"
         },
         {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Georgia Amoore UNDER 13.5",
+          "selection": "UNDER 13.5",
+          "price": -131.0,
+          "score": 6.8323548007536985,
+          "ev_pct": 6.8323548007536985,
+          "win_prob": 0.5670995670995671,
+          "p_win": 0.5670995670995671,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 6.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "CHI @ WSH"
+        },
+        {
           "market": "ATS",
           "team": "Chicago Sky",
           "display_pick": "Chicago Sky -1.5",
           "selection": "Chicago Sky",
           "price": -110.0,
-          "score": 0.55,
-          "ev_pct": 0.5499999999999999,
-          "win_prob": 0.52931,
-          "p_win": 0.52931,
-          "basketball_summary": "Model margin -0.9 vs market -1.5",
+          "score": 2.925,
+          "ev_pct": 2.9250000000000003,
+          "win_prob": 0.55306,
+          "p_win": 0.55306,
+          "basketball_summary": "Model margin 1.4 vs market -1.5",
           "top_play_reasons": [
-            "Edge 0.6",
-            "EV 0.5%"
+            "Edge 2.9",
+            "EV 2.9%"
           ],
           "matchup": "CHI @ WSH"
         },
@@ -321,17 +321,17 @@
         {
           "market": "ATS",
           "team": "Atlanta Dream",
-          "display_pick": "Atlanta Dream -14.0",
+          "display_pick": "Atlanta Dream -13.5",
           "selection": "Atlanta Dream",
           "price": -110.0,
-          "score": 26.825,
-          "ev_pct": 26.825,
-          "win_prob": 0.79206,
-          "p_win": 0.79206,
-          "basketball_summary": "Model margin 12.8 vs market -14.0",
+          "score": 26.325,
+          "ev_pct": 26.325,
+          "win_prob": 0.78706,
+          "p_win": 0.78706,
+          "basketball_summary": "Model margin 12.8 vs market -13.5",
           "top_play_reasons": [
-            "Edge 26.8",
-            "EV 26.8%"
+            "Edge 26.3",
+            "EV 26.3%"
           ],
           "matchup": "CON @ ATL"
         },
@@ -378,14 +378,14 @@
           "display_pick": "Under 160.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -1.607687,
-          "ev_pct": 1.6077000000000001,
-          "win_prob": 0.539887,
-          "p_win": 0.539887,
-          "basketball_summary": "Model total 158.9 vs line 160.5",
+          "score": -0.907688,
+          "ev_pct": 0.9077,
+          "win_prob": 0.532887,
+          "p_win": 0.532887,
+          "basketball_summary": "Model total 159.6 vs line 160.5",
           "top_play_reasons": [
-            "Edge -1.6",
-            "EV 1.6%"
+            "Edge -0.9",
+            "EV 0.9%"
           ],
           "matchup": "CON @ ATL"
         }

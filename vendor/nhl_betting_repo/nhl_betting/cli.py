@@ -1,4 +1,5 @@
 import json
+import os
 
 # CRITICAL: Import onnxruntime and torch BEFORE numpy/pandas to avoid DLL conflicts
 # NumPy's MKL DLLs interfere with ONNX Runtime's pybind11 state initialization
@@ -13221,41 +13222,30 @@ def props_watch(
             ):
                 """Build expected lineups per team using external source when available; fallback to TOI-based inference."""
                 d = date or ymd(today_utc())
-                client = NHLWebClient()
-                games = client.schedule_day(d)
-                active_games = [g for g in games if str(getattr(g, "gameState", "") or "").upper() not in {"FUT", "PRE"}]
-                if not active_games:
-                    print(f"Skipping lineup-update for {d}: only future NHL games detected")
-                    return
-                active_team_abbrs = []
-                seen_abbrs = set()
-                for g in active_games:
-                    for team_name in (g.home, g.away):
-                        abbr = str((get_team_assets(team_name) or {}).get("abbr") or "").upper()
-                        if abbr and abbr not in seen_abbrs:
-                            seen_abbrs.add(abbr)
-                            active_team_abbrs.append(abbr)
-                frames = []
-                for ab in active_team_abbrs:
-                    try:
-                        snap = None
-                        if prefer_source and prefer_source.lower() == "dailyfaceoff":
-                            try:
-                                from .data.lineups import build_lineup_snapshot_from_source
-                                snap_src = build_lineup_snapshot_from_source(ab, d, processed_dir=PROC_DIR)
-                                if snap_src is not None and not snap_src.empty:
-                                    snap = snap_src
-                            except Exception as e_src:
-                                print({"team": ab, "source": prefer_source, "error": str(e_src)})
-                        if snap is None or snap.empty:
-                            snap = build_lineup_snapshot(ab, date=d, processed_dir=PROC_DIR)
-                        snap["team"] = ab
-                        frames.append(snap)
-                    except Exception as e:
-                        print({"team": ab, "error": str(e)})
-                out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["player_id","full_name","position","line_slot","pp_unit","pk_unit","proj_toi","confidence","team"])
-                out_path = PROC_DIR / f"lineups_{d}.csv"
-                save_df(out, out_path)
+                import subprocess, sys
+                code = (
+                    "from nhl_betting.data.lineups import build_lineup_snapshot_bundle\n"
+                    "from nhl_betting.data.rosters import TEAM_ABBRS\n"
+                    "from nhl_betting.utils.io import PROC_DIR, save_df\n"
+                    "print(f'team_abbrs={len(TEAM_ABBRS)}')\n"
+                    f"out = build_lineup_snapshot_bundle({d!r}, processed_dir=PROC_DIR, team_abbrs=TEAM_ABBRS, prefer_source={prefer_source!r}, debug=True)\n"
+                    f"out_path = PROC_DIR / f'lineups_{d}.csv'\n"
+                    "save_df(out, out_path)\n"
+                    "print(f'Saved lineup snapshot to {out_path} ({len(out)} rows)')\n"
+                )
+                artifact_data_root = Path(__file__).resolve().parents[3] / "data" / "nhl_source" / "source_artifacts" / "data"
+                artifact_proc_dir = artifact_data_root / "processed"
+                env = dict(os.environ)
+                env["NHL_DATA_DIR"] = str(artifact_data_root)
+                result = subprocess.run([sys.executable, "-c", code], cwd=str(Path(__file__).resolve().parent.parent), capture_output=True, text=True, env=env)
+                if result.stdout:
+                    print(result.stdout, end="")
+                if result.stderr:
+                    print(result.stderr, end="", file=sys.stderr)
+                if result.returncode != 0:
+                    raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"lineup-update subprocess failed with exit code {result.returncode}")
+                out_path = artifact_proc_dir / f"lineups_{d}.csv"
+                out = pd.read_csv(out_path) if out_path.exists() else pd.DataFrame(columns=["player_id","full_name","position","line_slot","pp_unit","pk_unit","proj_toi","confidence","team"])
                 print(f"Saved lineup snapshot to {out_path} ({len(out)} rows)")
                 # Also write starting goalies snapshot (best-effort)
                 try:
@@ -13293,7 +13283,7 @@ def props_watch(
                                     })
                             if starters:
                                 df_g = pd.DataFrame(starters, columns=["team","goalie","status","confidence","source"])
-                    out_g = PROC_DIR / f"starting_goalies_{d}.csv"
+                    out_g = artifact_proc_dir / f"starting_goalies_{d}.csv"
                     save_df(df_g, out_g)
                     print(f"Saved starting goalies snapshot to {out_g} ({len(df_g)} rows)")
                 except Exception as e_g:
@@ -18329,50 +18319,41 @@ if __name__ == "__main__":
             )
 
         d = date or ymd(today_utc())
-        client = NHLWebClient()
-        games = client.schedule_day(d)
-        active_games = [g for g in games if str(getattr(g, "gameState", "") or "").upper() not in {"FUT", "PRE"}]
-        if not active_games:
-            print(f"Skipping lineup-update for {d}: only future NHL games detected")
-            return
-        active_team_abbrs = []
-        seen_abbrs = set()
-        for g in active_games:
-            for team_name in (g.home, g.away):
-                abbr = str((get_team_assets(team_name) or {}).get("abbr") or "").upper()
-                if abbr and abbr not in seen_abbrs:
-                    seen_abbrs.add(abbr)
-                    active_team_abbrs.append(abbr)
-        frames = []
-        for ab in active_team_abbrs:
-            try:
-                snap = None
-                if prefer_source and str(prefer_source).lower() == "dailyfaceoff":
-                    try:
-                        snap_src = build_lineup_snapshot_from_source(ab, d, processed_dir=PROC_DIR)
-                        if snap_src is not None and not snap_src.empty:
-                            snap = snap_src
-                    except Exception as e_src:
-                        print({"team": ab, "source": prefer_source, "error": str(e_src)})
-                if snap is None or snap.empty:
-                    snap = build_lineup_snapshot(ab, date=d, processed_dir=PROC_DIR)
-                snap["team"] = ab
-                frames.append(snap)
-            except Exception as e:
-                print({"team": ab, "error": str(e)})
-        out = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["player_id","full_name","position","line_slot","pp_unit","pk_unit","proj_toi","confidence","team"])
+        import subprocess, sys
+        code = (
+            "from nhl_betting.data.lineups import build_lineup_snapshot_bundle\n"
+            "from nhl_betting.data.rosters import TEAM_ABBRS\n"
+            "from nhl_betting.utils.io import PROC_DIR, save_df\n"
+            "print(f'team_abbrs={len(TEAM_ABBRS)}')\n"
+            f"out = build_lineup_snapshot_bundle({d!r}, processed_dir=PROC_DIR, team_abbrs=TEAM_ABBRS, prefer_source={prefer_source!r}, debug=True)\n"
+            f"out_path = PROC_DIR / f'lineups_{d}.csv'\n"
+            "save_df(out, out_path)\n"
+            "print(f'Saved lineup snapshot to {out_path} ({len(out)} rows)')\n"
+        )
+        artifact_data_root = Path(__file__).resolve().parents[3] / "data" / "nhl_source" / "source_artifacts" / "data"
+        artifact_proc_dir = artifact_data_root / "processed"
+        env = dict(os.environ)
+        env["NHL_DATA_DIR"] = str(artifact_data_root)
+        result = subprocess.run([sys.executable, "-c", code], cwd=str(Path(__file__).resolve().parent.parent), capture_output=True, text=True, env=env)
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"lineup-update subprocess failed with exit code {result.returncode}")
+        out_path = artifact_proc_dir / f"lineups_{d}.csv"
+        out = pd.read_csv(out_path) if out_path.exists() else pd.DataFrame(columns=["player_id","full_name","position","line_slot","pp_unit","pk_unit","proj_toi","confidence","team"])
         if _is_placeholder_lineup_snapshot(out):
             raise RuntimeError(
                 f"lineup-update generated placeholder TOI/confidence profile for {d}; real lineup/shift inputs are required"
             )
-        out_path = PROC_DIR / f"lineups_{d}.csv"
-        save_df(out, out_path)
+        out_path = artifact_proc_dir / f"lineups_{d}.csv"
         print(f"Saved lineup snapshot to {out_path} ({len(out)} rows)")
 
         try:
             # Build co-TOI pairs from lineups and save alongside
             co = build_co_toi_from_lineups(out)
-            co_path = PROC_DIR / f"lineups_co_toi_{d}.csv"
+            co_path = artifact_proc_dir / f"lineups_co_toi_{d}.csv"
             save_df(co, co_path)
             print(f"Saved co-TOI snapshot to {co_path} ({len(co)} rows)")
         except Exception as e:
@@ -18410,7 +18391,7 @@ if __name__ == "__main__":
                             })
                     if starters:
                         df_g = pd.DataFrame(starters, columns=["team","goalie","status","confidence","source"])
-            out_g = PROC_DIR / f"starting_goalies_{d}.csv"
+            out_g = artifact_proc_dir / f"starting_goalies_{d}.csv"
             save_df(df_g, out_g)
             print(f"Saved starting goalies snapshot to {out_g} ({len(df_g)} rows)")
         except Exception as e_g:

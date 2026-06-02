@@ -31,6 +31,7 @@ PROCESSED_FILES = (
     "props_boxscores_sim_{date}.csv",
     "props_boxscores_sim_hist_{date}.csv",
     "props_boxscores_sim_samples_{date}.csv",
+    "props_predictions_{date}.csv",
     "props_recommendations_{date}.csv",
     "roster_snapshot_{date}.csv",
     "injuries_{date}.csv",
@@ -55,6 +56,7 @@ REQUIRED_ARTIFACTS = (
     "data/processed/props_boxscores_sim_{date}.csv",
     "data/processed/props_boxscores_sim_hist_{date}.csv",
     "data/processed/props_recommendations_{date}.csv",
+    "data/processed/props_predictions_{date}.csv",
     "data/processed/roster_snapshot_{date}.csv",
     "data/processed/lineups_{date}.csv",
     "data/odds/games/date={date}/scoreboard.csv",
@@ -253,6 +255,15 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
             if _copy_if_exists(source, destination):
                 copied.setdefault("processed_files", []).append(str(destination))
                 break
+
+    predictions_destination = processed_root / f"props_predictions_{date_str}.csv"
+    if not predictions_destination.exists():
+        prediction_sources: list[Path] = []
+        for candidate_root in source_roots:
+            prediction_sources.append(candidate_root / "data" / "processed" / f"props_predictions_{date_str}.csv")
+            prediction_sources.append(candidate_root / "data" / "processed" / f"props_projections_all_{date_str}.csv")
+        if _copy_first_existing(sources=prediction_sources, destination=predictions_destination):
+            copied.setdefault("processed_files", []).append(str(predictions_destination))
 
     for template in LIVE_LENS_FILES:
         filename = template.format(date=date_str)
