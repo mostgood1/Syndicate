@@ -6,14 +6,6 @@ from pathlib import Path
 
 
 def _copy_file_if_needed(src: Path, dst: Path) -> None:
-    if dst.exists():
-        try:
-            src_stat = src.stat()
-            dst_stat = dst.stat()
-            if src_stat.st_size == dst_stat.st_size and src_stat.st_mtime_ns == dst_stat.st_mtime_ns:
-                return
-        except OSError:
-            pass
     shutil.copy2(src, dst)
 
 
