@@ -27,34 +27,20 @@ def default_nhl_source_root() -> Path:
     return _source_roots()[0]
 
 
-def _best_existing_path(candidates: list[Path]) -> Path | None:
-    existing: list[Path] = []
+def _first_existing_path(candidates: list[Path]) -> Path | None:
     for candidate in candidates:
         try:
             if candidate.exists() and candidate.is_file():
-                existing.append(candidate)
+                return candidate
         except OSError:
             continue
-
-    if not existing:
-        return None
-
-    def _score(path: Path) -> tuple[int, int, int]:
-        try:
-            stat = path.stat()
-            size = int(stat.st_size)
-            mtime = int(stat.st_mtime_ns)
-        except OSError:
-            return (0, 0, 0)
-        return (1 if size > 0 else 0, size, mtime)
-
-    return max(existing, key=_score)
+    return None
 
 
 def _resolve_processed_path(*parts: str) -> Path:
     roots = _source_roots()
-    candidates = [(root / "data" / "processed" / Path(*parts)).resolve() for root in roots]
-    best = _best_existing_path(candidates)
+    candidates = [(root / "data" / "processed" / Path(*parts)).resolve() for root in reversed(roots)]
+    best = _first_existing_path(candidates)
     if best is not None:
         return best
     return candidates[0]
@@ -68,9 +54,9 @@ def scoreboard_snapshot_path(date_str: str) -> Path:
     roots = _source_roots()
     candidates = [
         (root / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv").resolve()
-        for root in roots
+        for root in reversed(roots)
     ]
-    best = _best_existing_path(candidates)
+    best = _first_existing_path(candidates)
     if best is not None:
         return best
     return candidates[0]
@@ -80,9 +66,9 @@ def props_lines_snapshot_path(date_str: str) -> Path:
     roots = _source_roots()
     candidates = [
         (root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").resolve()
-        for root in roots
+        for root in reversed(roots)
     ]
-    best = _best_existing_path(candidates)
+    best = _first_existing_path(candidates)
     if best is not None:
         return best
     return candidates[0]
