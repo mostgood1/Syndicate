@@ -46,6 +46,7 @@ from syndicate.features.nba.sources import default_date_for_season as default_nb
 from syndicate.features.nba.sources import processed_path as nba_processed_path
 from syndicate.features.wnba.sources import default_date_for_season as default_wnba_date_for_season
 from syndicate.features.nhl.cards import build_source_bundle_payload as build_nhl_source_bundle_payload
+from syndicate.features.nhl.cards import build_props_cards_payload as build_nhl_props_cards_payload
 from syndicate.features.nfl.cards import build_cards_page_context as build_nfl_cards_page_context
 from syndicate.features.nfl.game_detail import build_game_detail_page_context as build_nfl_game_detail_page_context
 from syndicate.features.nfl.picks import build_picks_page_context as build_nfl_picks_page_context
@@ -1379,6 +1380,37 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(payload.get("source_title"), "NHL cards unavailable")
         self.assertEqual((payload.get("empty_state") or {}).get("title"), "No game cards were available for this date")
         self.assertEqual((((payload.get("data") or {}).get("games") or {}).get("predictions") or {}).get("rows"), [])
+
+    def test_nhl_props_cards_use_recommendation_values_when_snapshots_are_missing(self) -> None:
+        props_rows = [
+            {
+                "player": "Alexander Nikishin",
+                "team": "CAR",
+                "opp": "VGK",
+                "market": "points",
+                "side": "over",
+                "book": "pinnacle",
+                "ev": "1.16",
+                "chosen_prob": "0.503",
+                "line": "0.5",
+                "price": "+329",
+                "edge_reasons": "model edge · role edge",
+            }
+        ]
+
+        with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-05-17", "2026-05-17", False)):
+            with patch("syndicate.features.nhl.cards._props_recommendation_rows", return_value=(props_rows, "props.csv")):
+                payload = build_nhl_props_cards_payload("2026-05-17", top=12)
+
+        card = (payload.get("cards") or [{}])[0]
+        movement = card.get("movement") or {}
+
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(card.get("tracking_note"), "Current recommendation only")
+        self.assertEqual((movement.get("line") or {}).get("cur"), 0.5)
+        self.assertEqual((movement.get("line") or {}).get("open"), 0.5)
+        self.assertEqual((movement.get("price") or {}).get("cur"), 329.0)
+        self.assertEqual((movement.get("price") or {}).get("prev"), 329.0)
 
     def test_nhl_cards_missing_requested_date_does_not_fall_back_to_previous_slate(self) -> None:
         with patch("syndicate.features.nhl.cards._prediction_dates_with_rows", return_value=["2026-05-27"]):
