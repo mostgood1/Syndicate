@@ -3141,6 +3141,12 @@
       }
 
       if (eventIds.length) {
+        await fetchApiJson(
+          `${API_BASE_PATH}/live_lines?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}&include_period_totals=1`,
+          'Failed to load live lines.',
+          { retries: silent ? 2 : 1 }
+        );
+
         const payload = await fetchApiJson(
           `${API_BASE_PATH}/live_player_lens?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
           'Failed to load live player props.',

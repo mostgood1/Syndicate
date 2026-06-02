@@ -2231,7 +2231,8 @@ def build_live_player_boxscore_payload(
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
-    if _remote_source_fallback_enabled():
+    should_try_remote = _remote_source_fallback_enabled() or str(resolved_date).strip() == central_today_iso()
+    if should_try_remote:
         remote_payload = _remote_live_snapshot_payload(
             "live_player_boxscore",
             selected_date=resolved_date,
@@ -2286,7 +2287,8 @@ def build_live_player_lens_payload(
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
-    if _remote_source_fallback_enabled():
+    should_try_remote = _remote_source_fallback_enabled() or str(resolved_date).strip() == central_today_iso()
+    if should_try_remote:
         remote_payload = _remote_live_snapshot_payload(
             "live_player_lens",
             selected_date=resolved_date,
@@ -2348,7 +2350,8 @@ def build_live_lines_payload(
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
-    if _remote_source_fallback_enabled():
+    should_try_remote = _remote_source_fallback_enabled() or str(resolved_date).strip() == central_today_iso()
+    if should_try_remote:
         remote_payload = _remote_live_snapshot_payload(
             "live_lines",
             selected_date=resolved_date,
@@ -2402,7 +2405,8 @@ def build_live_pbp_stats_payload(
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
 
-    if _remote_source_fallback_enabled():
+    should_try_remote = _remote_source_fallback_enabled() or str(resolved_date).strip() == central_today_iso()
+    if should_try_remote:
         remote_payload = _remote_live_snapshot_payload(
             "live_pbp_stats",
             selected_date=resolved_date,
