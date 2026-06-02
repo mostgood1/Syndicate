@@ -147,6 +147,14 @@ def _live_lens_artifacts_dir() -> Path:
     return DATA_PROCESSED_DIR
 
 
+def _live_lens_runtime_metadata() -> dict[str, str]:
+    return {
+        "generatedAt": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "dataRoot": str(DATA_DIR),
+        "liveLensDir": str(_live_lens_artifacts_dir()),
+    }
+
+
 def _env_int_clamped(name: str, default: int, lo: int, hi: int) -> int:
     try:
         raw = str(os.environ.get(name, str(default))).strip()
@@ -43684,6 +43692,7 @@ def api_cron_live_lens_reports():
 
         return jsonify(
             {
+                **_live_lens_runtime_metadata(),
                 "date": ds,
                 "start_date": start_dt.isoformat(),
                 "rollup_days": int(rollup_days),
