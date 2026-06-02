@@ -17095,6 +17095,13 @@ def _live_lens_reports_payload(d: str, *, include_archive: bool = False) -> Dict
     latest_report = _load_json_file(_live_lens_report_path(d)) or {}
     registry_summary = _live_prop_registry_summary(d)
     first_observation_archive: List[Dict[str, Any]] = _load_live_prop_first_observation_archive(d) if include_archive else []
+    if not latest_report:
+        try:
+            generated_report = _live_lens_payload(d, persist=False, refresh_markets=False)
+        except Exception:
+            generated_report = {}
+        if isinstance(generated_report, dict) and generated_report:
+            latest_report = generated_report
     entries = 0
     latest_entry: Optional[Dict[str, Any]] = None
     if log_path.exists() and log_path.is_file():
@@ -17111,28 +17118,6 @@ def _live_lens_reports_payload(d: str, *, include_archive: bool = False) -> Dict
                         continue
         except Exception:
             pass
-    if not latest_report and _live_prop_registry_summary_is_empty(registry_summary) and recap_path.exists():
-        recap_payload = _load_json_file(recap_path) or {}
-        if isinstance(recap_payload, dict) and recap_payload:
-            return {
-                "ok": True,
-                "date": str(d),
-                "optimizationRegime": recap_payload.get("optimizationRegime") or _live_lens_optimization_regime(d),
-                "logPath": recap_payload.get("logPath") or _relative_path_str(log_path),
-                "propObservationLogPath": recap_payload.get("propObservationLogPath") or _relative_path_str(observation_log_path),
-                "registryPath": recap_payload.get("registryPath") or _relative_path_str(registry_path),
-                "registryLogPath": recap_payload.get("registryLogPath") or _relative_path_str(registry_log_path),
-                "reportPath": recap_payload.get("reportPath") or _relative_path_str(_live_lens_report_path(d)),
-                "dailyRecapPath": _relative_path_str(recap_path),
-                "entries": int(recap_payload.get("entries") or 0),
-                "latestEntry": recap_payload.get("latestEntry") if isinstance(recap_payload.get("latestEntry"), dict) else None,
-                "latestReport": recap_payload.get("latestReport") if isinstance(recap_payload.get("latestReport"), dict) else {},
-                "registrySummary": recap_payload.get("registrySummary") if isinstance(recap_payload.get("registrySummary"), dict) else {},
-                "summary": recap_payload.get("summary") if isinstance(recap_payload.get("summary"), dict) else {},
-                "firstObservationArchive": list(recap_payload.get("firstObservationArchive") or []) if include_archive else [],
-                "rawArtifacts": recap_payload.get("rawArtifacts") if isinstance(recap_payload.get("rawArtifacts"), dict) else {},
-                "source": "daily_recap",
-            }
     summary_counts = (latest_report.get("counts") or {}) if isinstance(latest_report.get("counts"), dict) else {}
     summary_performance = (latest_report.get("performance") or {}) if isinstance(latest_report.get("performance"), dict) else {}
     files = {

@@ -2164,7 +2164,12 @@ def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str
     }
 
 
-def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | None = None) -> dict[str, Any]:
+def _fallback_live_player_lens_game(
+    game: dict[str, Any],
+    *,
+    event_id: str | None = None,
+    actual_rows_by_player: dict[tuple[str, str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
     sim_players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
     away_tri = str(game.get("away_tri") or "").strip().upper()
@@ -2192,12 +2197,21 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
             if not player_name or not market or line_value is None:
                 continue
             side_value = str(pick.get("side") or pick.get("selection") or "").strip().upper()
-            sim_row = player_lookup.get((team_tri, player_name.upper()), {})
+            player_key = _normalize_player_key(player_name)
+            sim_row = player_lookup.get((team_tri, player_key), {})
             sim_mu = _player_sim_stat(sim_row if isinstance(sim_row, dict) else {}, market)
             if sim_mu is None:
                 sim_mu = line_value
             pace_proj = sim_mu
             pace_vs_line = None if pace_proj is None else round(pace_proj - line_value, 3)
+            actual_row = actual_rows_by_player.get((team_tri, player_key)) if actual_rows_by_player else None
+            actual_value = _actual_stat_value(actual_row if isinstance(actual_row, dict) else {}, market)
+            live_projection = _estimated_live_projection(
+                actual_value,
+                _safe_float((actual_row or {}).get("mp") or (actual_row or {}).get("min")),
+                None,
+                sim_mu,
+            )
             ev_value = _safe_float(pick.get("ev_pct"))
             price_over = _safe_float(pick.get("price_over"))
             price_under = _safe_float(pick.get("price_under"))
@@ -2222,7 +2236,7 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
                     "player_id": sim_row.get("player_id") if isinstance(sim_row, dict) else None,
                     "player_photo": None,
                     "team_tri": team_tri,
-                    "event_id": game.get("event_id"),
+                    "event_id": event_id or game.get("event_id"),
                     "stat": market,
                     "line": line_value,
                     "line_live": line_value,
@@ -2236,13 +2250,18 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
                     "win_prob": _safe_float(pick.get("p_win")),
                     "recommendation_priority_score": ev_value,
                     "klass": klass,
-                    "actual": None,
+                    "actual": actual_value,
                     "pace_proj": pace_proj,
                     "pace_vs_line": pace_vs_line,
                     "sim_mu": sim_mu,
                     "sim_mu_adjusted": sim_mu,
                     "sim_vs_line": None if sim_mu is None else round(sim_mu - line_value, 3),
                     "sim_vs_line_adjusted": None if sim_mu is None else round(sim_mu - line_value, 3),
+                    "live_projection": live_projection,
+                    "liveProjection": live_projection,
+                    "live_edge": None if live_projection is None else round(live_projection - line_value, 3),
+                    "liveEdge": None if live_projection is None else round(live_projection - line_value, 3),
+                    "line_source": "boxscore_sim_fallback",
                     "status_label": "Live",
                     "opponent_tri": opp_tri,
                 }
@@ -2421,6 +2440,17 @@ def build_live_player_lens_payload(
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
+    boxscore_payload = build_live_player_boxscore_payload(
+        resolved_date,
+        normalized_event_ids,
+        ttl=20,
+        allow_stored_date_fallback=allow_stored_date_fallback,
+    )
+    actual_rows_by_event = {
+        str(game.get("event_id") or "").strip(): _boxscore_rows_by_player(game)
+        for game in (boxscore_payload.get("games") if isinstance(boxscore_payload.get("games"), list) else [])
+        if isinstance(game, dict)
+    }
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(
@@ -2451,7 +2481,11 @@ def build_live_player_lens_payload(
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
-        _fallback_live_player_lens_game(game, event_id=event_id)
+        _fallback_live_player_lens_game(
+            game,
+            event_id=event_id,
+            actual_rows_by_player=actual_rows_by_event.get(event_id) or {},
+        )
         for event_id in normalized_event_ids
         for game in [game_index.get(event_id)]
         if isinstance(game, dict)

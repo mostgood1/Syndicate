@@ -190,6 +190,60 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertIsNotNone(row.get("live_edge"))
         self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
 
+    def test_live_player_lens_payload_fallback_hydrates_actuals_from_boxscore(self) -> None:
+        with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}):
+            with patch("syndicate.features.wnba.cards._filtered_local_live_snapshot_payload", return_value=None):
+                with patch(
+                    "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+                    return_value={
+                        "evt-2": {
+                            "event_id": "evt-2",
+                            "away_tri": "NYL",
+                            "home_tri": "LAS",
+                            "sim": {
+                                "players": {
+                                    "away": [{"player_name": "Breanna Stewart", "pts_mean": 21, "reb_mean": 7, "ast_mean": 4}],
+                                    "home": [],
+                                }
+                            },
+                            "prop_recommendations": {
+                                "away": [
+                                    {
+                                        "player": "Breanna Stewart",
+                                        "market": "pts",
+                                        "line": 17.5,
+                                        "side": "OVER",
+                                        "price": -112,
+                                        "ev_pct": 12.0,
+                                        "p_win": 0.64,
+                                    }
+                                ],
+                                "home": [],
+                            },
+                        }
+                    },
+                ):
+                    with patch(
+                        "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+                        return_value={
+                            "games": [
+                                {
+                                    "event_id": "evt-2",
+                                    "players": [
+                                        {"team_tri": "NYL", "player": "Breanna Stewart", "pts": 19, "reb": 6, "ast": 4, "mp": 23}
+                                    ],
+                                }
+                            ]
+                        },
+                    ):
+                        payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("actual"), 19)
+        self.assertIsNotNone(row.get("live_projection"))
+        self.assertIsNotNone(row.get("live_edge"))
+        self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
+
 
 if __name__ == "__main__":
     unittest.main()
