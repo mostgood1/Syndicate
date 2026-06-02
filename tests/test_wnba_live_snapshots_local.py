@@ -143,6 +143,39 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("game_id") for game in payload.get("games") or []], ["42"])
         self.assertTrue(((payload.get("games") or [{}])[0]).get("in_progress"))
 
+    def test_live_lens_card_surface_shows_total_points_and_live_line(self) -> None:
+        with patch(
+            "syndicate.features.wnba.live_lens.build_cards_page_context",
+            return_value={
+                "date": "2026-05-21",
+                "source_path": "wnba_cards.json",
+                "games": [
+                    {
+                        "away": {"abbr": "SEA", "score": 46},
+                        "home": {"abbr": "DAL", "score": 70},
+                        "status": "Live",
+                        "detail": "3:27 - 4th",
+                        "summary": "Live scoring pace is tracking toward the under.",
+                        "betting": {"total": 166.5},
+                        "shared_prop_rows": [],
+                        "shared_top_play_rows": [],
+                    }
+                ],
+            },
+        ):
+            from syndicate.features.wnba.live_lens import build_live_lens_page_context
+
+            context = build_live_lens_page_context("2026-05-21")
+
+        card = (context.get("rank_cards") or [{}])[0]
+        metrics = card.get("metrics") or []
+        metric_text = " ".join(f"{row.get('label')} {row.get('value')}" for row in metrics if isinstance(row, dict))
+
+        self.assertIn("Total pts 116", card.get("summary"))
+        self.assertIn("Live line 166.5", card.get("summary"))
+        self.assertIn("Total pts 116", metric_text)
+        self.assertIn("Live line 166.5", metric_text)
+
     def test_live_player_lens_payload_hydrates_actuals_from_boxscore(self) -> None:
         with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}):
             with patch(
