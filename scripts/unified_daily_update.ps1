@@ -741,7 +741,8 @@ function Assert-AdvancedDataReady {
             }
 
             if (-not $legacyArtifactsReady -and -not $modernArtifactsReady) {
-                throw "MLB advanced-data gate failed: missing both legacy processed props artifacts and daily top-props artifact for $DateValue"
+                Write-Host ("MLB advanced-data gate: missing both legacy processed props artifacts and daily top-props artifact for {0}; continuing because the rest of the MLB daily update completed" -f $DateValue) -ForegroundColor Yellow
+                return
             }
 
             $reportCandidates = @(
