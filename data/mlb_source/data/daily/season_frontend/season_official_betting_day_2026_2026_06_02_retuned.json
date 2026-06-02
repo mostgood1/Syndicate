@@ -3816,14 +3816,14 @@
               "prop": "batter_runs_scored",
               "prop_market_key": "batter_runs_scored",
               "selection": "over",
-              "edge": 0.14206219042377544,
+              "edge": 0.1482034564021995,
               "market_line": 0.5,
               "model_prob_over": 0.431,
-              "market_prob_over": 0.28893780957622456,
-              "market_prob_under": 0.7110621904237754,
+              "market_prob_over": 0.2827965435978005,
+              "market_prob_under": 0.7172034564021995,
               "market_prob_mode": "no_vig_two_way",
-              "market_no_vig_prob_over": 0.28893780957622456,
-              "selected_side_market_prob": 0.28893780957622456,
+              "market_no_vig_prob_over": 0.2827965435978005,
+              "selected_side_market_prob": 0.2827965435978005,
               "selected_side_model_prob": 0.431,
               "mean_support": 0.05300000000000005,
               "r_mean": 0.553,
@@ -3831,7 +3831,7 @@
               "ab_mean": 4.201,
               "lineup_order": 5,
               "market_alternates": [],
-              "odds": "+223",
+              "odds": "+230",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -3852,9 +3852,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.9%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
+                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.3%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.9%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances.",
+              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.3%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances.",
               "rank": 2,
               "recommendation_tier": "candidate"
             },
@@ -3919,14 +3919,14 @@
               "prop": "batter_runs_scored",
               "prop_market_key": "batter_runs_scored",
               "selection": "over",
-              "edge": 0.11643541051093925,
+              "edge": 0.11245271191060235,
               "market_line": 0.5,
               "model_prob_over": 0.431,
-              "market_prob_over": 0.31456458948906074,
-              "market_prob_under": 0.6854354105109391,
+              "market_prob_over": 0.31854728808939764,
+              "market_prob_under": 0.6814527119106023,
               "market_prob_mode": "no_vig_two_way",
-              "market_no_vig_prob_over": 0.31456458948906074,
-              "selected_side_market_prob": 0.31456458948906074,
+              "market_no_vig_prob_over": 0.31854728808939764,
+              "selected_side_market_prob": 0.31854728808939764,
               "selected_side_model_prob": 0.431,
               "mean_support": 0.062000000000000055,
               "r_mean": 0.562,
@@ -3934,7 +3934,7 @@
               "ab_mean": 4.058,
               "lineup_order": 6,
               "market_alternates": [],
-              "odds": "+196",
+              "odds": "+192",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -3957,9 +3957,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.5%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
+                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.9%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.5%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
+              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.9%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
               "rank": 3,
               "recommendation_tier": "candidate"
             },
@@ -4134,14 +4134,14 @@
               "prop": "batter_total_bases",
               "prop_market_key": "batter_total_bases",
               "selection": "over",
-              "edge": 0.15996969696969698,
+              "edge": 0.16888235294117648,
               "market_line": 1.5,
               "model_prob_over": 0.463,
-              "market_prob_over": 0.30303030303030304,
+              "market_prob_over": 0.29411764705882354,
               "market_prob_under": null,
               "market_prob_mode": "single_side_implied",
               "market_no_vig_prob_over": null,
-              "selected_side_market_prob": 0.30303030303030304,
+              "selected_side_market_prob": 0.29411764705882354,
               "selected_side_model_prob": 0.463,
               "mean_support": 0.17500000000000004,
               "tb_mean": 1.675,
@@ -4156,7 +4156,7 @@
                   "_src": "oddsapi"
                 }
               ],
-              "odds": "+230",
+              "odds": "+240",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -4177,9 +4177,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 30.3%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
+                "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 29.4%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 30.3%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances.",
+              "reason_summary": "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 29.4%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances.",
               "rank": 9,
               "recommendation_tier": "candidate"
             },
@@ -4244,14 +4244,14 @@
               "prop": "batter_total_bases",
               "prop_market_key": "batter_total_bases",
               "selection": "over",
-              "edge": 0.10230769230769227,
+              "edge": 0.11149253731343284,
               "market_line": 1.5,
               "model_prob_over": 0.41,
-              "market_prob_over": 0.3076923076923077,
+              "market_prob_over": 0.29850746268656714,
               "market_prob_under": null,
               "market_prob_mode": "single_side_implied",
               "market_no_vig_prob_over": null,
-              "selected_side_market_prob": 0.3076923076923077,
+              "selected_side_market_prob": 0.29850746268656714,
               "selected_side_model_prob": 0.41,
               "mean_support": 0.04299999999999993,
               "tb_mean": 1.543,
@@ -4266,7 +4266,7 @@
                   "_src": "oddsapi"
                 }
               ],
-              "odds": "+225",
+              "odds": "+235",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -4289,9 +4289,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 30.8%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
+                "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 29.9%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 30.8%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
+              "reason_summary": "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 29.9%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
               "rank": 14,
               "recommendation_tier": "candidate"
             }
@@ -5835,8 +5835,8 @@
               "market_alternates": [
                 {
                   "line": 0.5,
-                  "over_odds": "-180",
-                  "under_odds": "+135",
+                  "over_odds": "-160",
+                  "under_odds": "+120",
                   "_src": "oddsapi"
                 }
               ],

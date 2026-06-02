@@ -7,7 +7,7 @@
   "meta": {
     "sims_per_game": null,
     "season": 2026,
-    "generated_at": "2026-06-02T11:44:59-05:00",
+    "generated_at": "2026-06-02T12:08:13-05:00",
     "use_raw": null,
     "jobs": null,
     "skipped_games": 0
@@ -87,27 +87,27 @@
       "totals": 0,
       "ml": 0,
       "pitcher_props": 16,
-      "hitter_props": 37,
+      "hitter_props": 36,
       "hitter_home_runs": 0,
-      "hitter_hits": 11,
+      "hitter_hits": 10,
       "hitter_strikeouts": 0,
       "hitter_total_bases": 14,
       "hitter_runs": 3,
       "hitter_rbis": 9,
-      "combined": 53
+      "combined": 52
     },
     "all_selected_counts": {
       "totals": 0,
       "ml": 1,
       "pitcher_props": 17,
-      "hitter_props": 48,
+      "hitter_props": 47,
       "hitter_home_runs": 0,
-      "hitter_hits": 15,
+      "hitter_hits": 14,
       "hitter_strikeouts": 0,
       "hitter_total_bases": 20,
       "hitter_runs": 4,
       "hitter_rbis": 9,
-      "combined": 66
+      "combined": 65
     },
     "results": {
       "combined": {
@@ -4259,113 +4259,7 @@
               "recommendation_tier": "candidate"
             }
           ],
-          "extraHitterProps": [
-            {
-              "date": "2026-06-02",
-              "game_pk": 823700,
-              "away": "Chicago White Sox",
-              "home": "Minnesota Twins",
-              "away_abbr": "CWS",
-              "home_abbr": "MIN",
-              "double_header": "N",
-              "game_number": 1,
-              "event_id": null,
-              "commence_time": null,
-              "batter_id": 807712,
-              "batter_hand": "R",
-              "opponent_pitcher_id": 663436,
-              "opponent_pitcher_hand": "R",
-              "opponent_pitcher_name": "Davis Martin",
-              "opponent": "CWS",
-              "opponent_team_id": 145,
-              "lineup_source": "projected_rotowire_default_vs_rhp",
-              "lineup_confidence": 0.66,
-              "lineup_status": "projected",
-              "batter_k_rate": 0.15312396557431313,
-              "batter_bb_rate": 0.08022178086726249,
-              "batter_hr_rate": 0.0037280701754385964,
-              "batter_inplay_hit_rate": 0.2937456997385441,
-              "batter_xb_hit_share": 0.22448979591836735,
-              "pitcher_k_rate": 0.27601940474629605,
-              "pitcher_bb_rate": 0.052488527599318206,
-              "pitcher_hr_rate": 0.010730300249114987,
-              "pitcher_inplay_hit_rate": 0.3025898617511521,
-              "pitcher_availability_mult": 1.0,
-              "pitcher_stamina_pitches": 94.0,
-              "pitcher_platoon_k_mult": 1.0423986165530912,
-              "pitcher_platoon_bb_mult": 1.0164043380427363,
-              "pitcher_platoon_hr_mult": 0.9117722561270948,
-              "pitcher_platoon_inplay_mult": 1.1612511637331102,
-              "batter_platoon_k_mult": 1.0134291763561425,
-              "batter_platoon_bb_mult": 0.9877249723904417,
-              "batter_platoon_hr_mult": 1.275,
-              "batter_platoon_inplay_mult": 0.947088805878728,
-              "opponent_primary_pitch_type": "FF",
-              "weather_source": "statsapi_live_feed",
-              "weather_wind_direction": "unknown",
-              "weather_hr_mult": 1.0,
-              "weather_inplay_hit_mult": 1.0,
-              "weather_xb_share_mult": 1.0,
-              "park_source": "statsapi_live_feed",
-              "venue_id": 3312,
-              "venue_name": "Target Field",
-              "roof_type": "Open",
-              "park_hr_mult": 1.026,
-              "park_inplay_hit_mult": 0.9896,
-              "park_xb_share_mult": 0.987,
-              "market": "hitter_hits",
-              "market_label": "Hitter Hits",
-              "market_group": "hitter_props",
-              "player_name": "Luke Keaschall",
-              "team": "MIN",
-              "prop": "batter_hits",
-              "prop_market_key": "batter_hits",
-              "selection": "over",
-              "edge": 0.03064193018698025,
-              "market_line": 0.5,
-              "model_prob_over": 0.591,
-              "market_prob_over": 0.5603580698130197,
-              "market_prob_under": 0.4396419301869802,
-              "market_prob_mode": "no_vig_two_way",
-              "market_no_vig_prob_over": 0.5603580698130197,
-              "selected_side_market_prob": 0.5603580698130197,
-              "selected_side_model_prob": 0.591,
-              "mean_support": 0.30200000000000005,
-              "h_mean": 0.802,
-              "pa_mean": 4.052,
-              "ab_mean": 3.56,
-              "lineup_order": 8,
-              "market_alternates": [],
-              "odds": "-149",
-              "stake_u": 0.5,
-              "sim_sample_size": 1000,
-              "baseball_reasons": [
-                "Against CWS, he has recorded a hit in 12 of 13 games.",
-                "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
-                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-              ],
-              "explanation_diagnostic": {
-                "status": "strong",
-                "flag_sparse_support": false,
-                "support_min_reasons": 2,
-                "baseball_reasons_n": 3,
-                "reason_sentences_n": 6,
-                "market": "hitter_hits",
-                "subject": "Luke Keaschall",
-                "supporting_reasons": [
-                  "Against CWS, he has recorded a hit in 12 of 13 games.",
-                  "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
-                  "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-                ]
-              },
-              "reasons": [
-                "The model lands on the over side in 59.1% of sims, while the market is pricing it closer to 56.0%. Against CWS, he has recorded a hit in 12 of 13 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.1 plate appearances."
-              ],
-              "reason_summary": "The model lands on the over side in 59.1% of sims, while the market is pricing it closer to 56.0%. Against CWS, he has recorded a hit in 12 of 13 games. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 8 spot, which points to about 4.1 plate appearances.",
-              "rank": 11,
-              "recommendation_tier": "candidate"
-            }
-          ]
+          "extraHitterProps": []
         },
         "results": {
           "combined": {
@@ -4423,17 +4317,6 @@
             "market_line": 5.5,
             "reason": "game not final",
             "recommendation_tier": "candidate"
-          },
-          {
-            "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_02_locked_policy.json",
-            "date": "2026-06-02",
-            "game_pk": 823700,
-            "market": "hitter_hits",
-            "player_name": "Luke Keaschall",
-            "selection": "over",
-            "market_line": 0.5,
-            "reason": "game not final",
-            "recommendation_tier": "candidate"
           }
         ],
         "all_unresolved_rows": [
@@ -4458,26 +4341,15 @@
             "market_line": 5.5,
             "reason": "game not final",
             "recommendation_tier": "candidate"
-          },
-          {
-            "path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_02_locked_policy.json",
-            "date": "2026-06-02",
-            "game_pk": 823700,
-            "market": "hitter_hits",
-            "player_name": "Luke Keaschall",
-            "selection": "over",
-            "market_line": 0.5,
-            "reason": "game not final",
-            "recommendation_tier": "candidate"
           }
         ],
         "counts": {
           "official": 0,
-          "playable": 3,
+          "playable": 2,
           "pitcher": 0,
           "hitter": 0,
           "extra_pitcher": 2,
-          "extra_hitter": 1
+          "extra_hitter": 0
         },
         "flags": {
           "hasAnyRecommendations": true,
@@ -5009,14 +4881,14 @@
               "prop": "batter_runs_scored",
               "prop_market_key": "batter_runs_scored",
               "selection": "over",
-              "edge": 0.14206219042377544,
+              "edge": 0.1482034564021995,
               "market_line": 0.5,
               "model_prob_over": 0.431,
-              "market_prob_over": 0.28893780957622456,
-              "market_prob_under": 0.7110621904237754,
+              "market_prob_over": 0.2827965435978005,
+              "market_prob_under": 0.7172034564021995,
               "market_prob_mode": "no_vig_two_way",
-              "market_no_vig_prob_over": 0.28893780957622456,
-              "selected_side_market_prob": 0.28893780957622456,
+              "market_no_vig_prob_over": 0.2827965435978005,
+              "selected_side_market_prob": 0.2827965435978005,
               "selected_side_model_prob": 0.431,
               "mean_support": 0.05300000000000005,
               "r_mean": 0.553,
@@ -5024,7 +4896,7 @@
               "ab_mean": 4.201,
               "lineup_order": 5,
               "market_alternates": [],
-              "odds": "+223",
+              "odds": "+230",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -5045,9 +4917,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.9%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
+                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.3%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.9%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances.",
+              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 28.3%. Over his last 10 games, he has scored in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.7 plate appearances.",
               "rank": 2,
               "recommendation_tier": "candidate"
             },
@@ -5112,14 +4984,14 @@
               "prop": "batter_runs_scored",
               "prop_market_key": "batter_runs_scored",
               "selection": "over",
-              "edge": 0.11643541051093925,
+              "edge": 0.11245271191060235,
               "market_line": 0.5,
               "model_prob_over": 0.431,
-              "market_prob_over": 0.31456458948906074,
-              "market_prob_under": 0.6854354105109391,
+              "market_prob_over": 0.31854728808939764,
+              "market_prob_under": 0.6814527119106023,
               "market_prob_mode": "no_vig_two_way",
-              "market_no_vig_prob_over": 0.31456458948906074,
-              "selected_side_market_prob": 0.31456458948906074,
+              "market_no_vig_prob_over": 0.31854728808939764,
+              "selected_side_market_prob": 0.31854728808939764,
               "selected_side_model_prob": 0.431,
               "mean_support": 0.062000000000000055,
               "r_mean": 0.562,
@@ -5127,7 +4999,7 @@
               "ab_mean": 4.058,
               "lineup_order": 6,
               "market_alternates": [],
-              "odds": "+196",
+              "odds": "+192",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -5150,9 +5022,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.5%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
+                "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.9%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.5%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
+              "reason_summary": "The model lands on the over side in 43.1% of sims, while the market is pricing it closer to 31.9%. Against MIL, he has scored in 5 of 7 games. Over his last 10 games, he has scored in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.6 batter runs scored against a line of 0.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
               "rank": 3,
               "recommendation_tier": "candidate"
             },
@@ -5327,14 +5199,14 @@
               "prop": "batter_total_bases",
               "prop_market_key": "batter_total_bases",
               "selection": "over",
-              "edge": 0.15996969696969698,
+              "edge": 0.16888235294117648,
               "market_line": 1.5,
               "model_prob_over": 0.463,
-              "market_prob_over": 0.30303030303030304,
+              "market_prob_over": 0.29411764705882354,
               "market_prob_under": null,
               "market_prob_mode": "single_side_implied",
               "market_no_vig_prob_over": null,
-              "selected_side_market_prob": 0.30303030303030304,
+              "selected_side_market_prob": 0.29411764705882354,
               "selected_side_model_prob": 0.463,
               "mean_support": 0.17500000000000004,
               "tb_mean": 1.675,
@@ -5349,7 +5221,7 @@
                   "_src": "oddsapi"
                 }
               ],
-              "odds": "+230",
+              "odds": "+240",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -5370,9 +5242,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 30.3%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
+                "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 29.4%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 30.3%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances.",
+              "reason_summary": "The model lands on the over side in 46.3% of sims, while the market is pricing it closer to 29.4%. Over his last 10 games, he has cleared 1.5 total bases in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 7 spot, which points to about 4.5 plate appearances.",
               "rank": 9,
               "recommendation_tier": "candidate"
             },
@@ -5437,14 +5309,14 @@
               "prop": "batter_total_bases",
               "prop_market_key": "batter_total_bases",
               "selection": "over",
-              "edge": 0.10230769230769227,
+              "edge": 0.11149253731343284,
               "market_line": 1.5,
               "model_prob_over": 0.41,
-              "market_prob_over": 0.3076923076923077,
+              "market_prob_over": 0.29850746268656714,
               "market_prob_under": null,
               "market_prob_mode": "single_side_implied",
               "market_no_vig_prob_over": null,
-              "selected_side_market_prob": 0.3076923076923077,
+              "selected_side_market_prob": 0.29850746268656714,
               "selected_side_model_prob": 0.41,
               "mean_support": 0.04299999999999993,
               "tb_mean": 1.543,
@@ -5459,7 +5331,7 @@
                   "_src": "oddsapi"
                 }
               ],
-              "odds": "+225",
+              "odds": "+235",
               "stake_u": 0.5,
               "sim_sample_size": 1000,
               "baseball_reasons": [
@@ -5482,9 +5354,9 @@
                 ]
               },
               "reasons": [
-                "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 30.8%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
+                "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 29.9%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances."
               ],
-              "reason_summary": "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 30.8%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
+              "reason_summary": "The model lands on the over side in 41.0% of sims, while the market is pricing it closer to 29.9%. Against MIL, he has cleared 1.5 total bases in 4 of 7 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 6 spot, which points to about 4.6 plate appearances.",
               "rank": 14,
               "recommendation_tier": "candidate"
             }
@@ -7347,8 +7219,8 @@
               "market_alternates": [
                 {
                   "line": 0.5,
-                  "over_odds": "-180",
-                  "under_odds": "+135",
+                  "over_odds": "-160",
+                  "under_odds": "+120",
                   "_src": "oddsapi"
                 }
               ],

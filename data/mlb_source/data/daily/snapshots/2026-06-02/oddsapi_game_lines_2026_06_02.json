@@ -1,7 +1,7 @@
 {
   "date": "2026-06-02",
   "mode": "live",
-  "retrieved_at": "2026-06-02T16:38:28.273560",
+  "retrieved_at": "2026-06-02T17:01:24.043587",
   "games": [
     {
       "event_id": "507ec1a59ca1a2aa1386a2dbe2fbfa7b",
@@ -211,8 +211,8 @@
           },
           "first7": {
             "h2h": {
-              "home_odds": "-145",
-              "away_odds": "+114"
+              "home_odds": "-154",
+              "away_odds": "+120"
             },
             "spreads": {
               "home_line": -0.5,
@@ -468,9 +468,9 @@
         },
         "spreads": {
           "home_line": -1.5,
-          "home_odds": "-115",
+          "home_odds": "-117",
           "away_line": 1.5,
-          "away_odds": "-105"
+          "away_odds": "-103"
         },
         "totals": {
           "line": 7.5,
@@ -485,9 +485,9 @@
             },
             "spreads": {
               "home_line": -1.5,
-              "home_odds": "-115",
+              "home_odds": "-117",
               "away_line": 1.5,
-              "away_odds": "-105"
+              "away_odds": "-103"
             },
             "totals": {
               "line": 7.5,
@@ -499,7 +499,7 @@
             "h2h": {
               "home_odds": "+200",
               "away_odds": "+450",
-              "draw_odds": "-140",
+              "draw_odds": "-135",
               "is_3_way": true
             },
             "spreads": {
@@ -550,8 +550,8 @@
           },
           "first7": {
             "h2h": {
-              "home_odds": "-270",
-              "away_odds": "+200"
+              "home_odds": "-260",
+              "away_odds": "+195"
             },
             "spreads": {
               "home_line": -1.5,
@@ -920,14 +920,14 @@
         },
         "spreads": {
           "home_line": -1.5,
-          "home_odds": "-119",
+          "home_odds": "-122",
           "away_line": 1.5,
-          "away_odds": "-102"
+          "away_odds": "+101"
         },
         "totals": {
-          "line": 7.0,
-          "over_odds": "-125",
-          "under_odds": "+104"
+          "line": 7.5,
+          "over_odds": "+104",
+          "under_odds": "-125"
         },
         "segments": {
           "full": {
@@ -937,39 +937,39 @@
             },
             "spreads": {
               "home_line": -1.5,
-              "home_odds": "-119",
+              "home_odds": "-122",
               "away_line": 1.5,
-              "away_odds": "-102"
+              "away_odds": "+101"
             },
             "totals": {
-              "line": 7.0,
-              "over_odds": "-125",
-              "under_odds": "+104"
+              "line": 7.5,
+              "over_odds": "+104",
+              "under_odds": "-125"
             }
           },
           "first1": {
             "h2h": {
               "home_odds": "+235",
-              "away_odds": "+500",
-              "draw_odds": "-170",
+              "away_odds": "+475",
+              "draw_odds": "-165",
               "is_3_way": true
             },
             "spreads": {
               "home_line": -0.5,
-              "home_odds": "+225",
+              "home_odds": "+230",
               "away_line": 0.5,
-              "away_odds": "-310"
+              "away_odds": "-320"
             },
             "totals": {
               "line": 0.5,
-              "over_odds": "+115",
-              "under_odds": "-150"
+              "over_odds": "+110",
+              "under_odds": "-145"
             }
           },
           "first3": {
             "h2h": {
-              "home_odds": "-220",
-              "away_odds": "+170"
+              "home_odds": "-215",
+              "away_odds": "+165"
             },
             "spreads": {
               "home_line": -0.5,
@@ -979,8 +979,8 @@
             },
             "totals": {
               "line": 2.5,
-              "over_odds": "+124",
-              "under_odds": "-160"
+              "over_odds": "+114",
+              "under_odds": "-145"
             }
           },
           "first5": {
@@ -990,14 +990,14 @@
             },
             "spreads": {
               "home_line": -0.5,
-              "home_odds": "-145",
+              "home_odds": "-140",
               "away_line": 0.5,
-              "away_odds": "+114"
+              "away_odds": "+110"
             },
             "totals": {
               "line": 3.5,
-              "over_odds": "-135",
-              "under_odds": "+105"
+              "over_odds": "-145",
+              "under_odds": "+114"
             }
           },
           "first7": {
@@ -1007,14 +1007,14 @@
             },
             "spreads": {
               "home_line": -1.5,
-              "home_odds": "-115",
+              "home_odds": "-110",
               "away_line": 1.5,
-              "away_odds": "-115"
+              "away_odds": "-120"
             },
             "totals": {
               "line": 5.5,
-              "over_odds": "-125",
-              "under_odds": "-105"
+              "over_odds": "-130",
+              "under_odds": "+100"
             }
           }
         }
@@ -1069,7 +1069,7 @@
             },
             "spreads": {
               "home_line": -0.5,
-              "home_odds": "+300",
+              "home_odds": "+295",
               "away_line": 0.5,
               "away_odds": "-450"
             },
@@ -1120,9 +1120,9 @@
             },
             "spreads": {
               "home_line": 0.5,
-              "home_odds": "-140",
+              "home_odds": "-145",
               "away_line": -0.5,
-              "away_odds": "+110"
+              "away_odds": "+114"
             },
             "totals": {
               "line": 5.5,
@@ -1146,7 +1146,7 @@
         },
         "spreads": {
           "home_line": -1.5,
-          "home_odds": "+162",
+          "home_odds": "+163",
           "away_line": 1.5,
           "away_odds": "-198"
         },
@@ -1163,7 +1163,7 @@
             },
             "spreads": {
               "home_line": -1.5,
-              "home_odds": "+162",
+              "home_odds": "+163",
               "away_line": 1.5,
               "away_odds": "-198"
             },
@@ -1259,9 +1259,9 @@
         },
         "spreads": {
           "home_line": 1.5,
-          "home_odds": "-175",
+          "home_odds": "-176",
           "away_line": -1.5,
-          "away_odds": "+144"
+          "away_odds": "+145"
         },
         "totals": {
           "line": 9.0,
@@ -1276,9 +1276,9 @@
             },
             "spreads": {
               "home_line": 1.5,
-              "home_odds": "-175",
+              "home_odds": "-176",
               "away_line": -1.5,
-              "away_odds": "+144"
+              "away_odds": "+145"
             },
             "totals": {
               "line": 9.0,
@@ -1288,16 +1288,16 @@
           },
           "first1": {
             "h2h": {
-              "home_odds": "+250",
-              "away_odds": "+280",
+              "home_odds": "+245",
+              "away_odds": "+290",
               "draw_odds": "-120",
               "is_3_way": true
             },
             "spreads": {
               "home_line": -0.5,
-              "home_odds": "+240",
+              "home_odds": "+235",
               "away_line": 0.5,
-              "away_odds": "-340"
+              "away_odds": "-330"
             },
             "totals": {
               "line": 0.5,
@@ -1307,14 +1307,14 @@
           },
           "first3": {
             "h2h": {
-              "home_odds": "-120",
-              "away_odds": "-110"
+              "home_odds": "-125",
+              "away_odds": "-105"
             },
             "spreads": {
               "home_line": -0.5,
-              "home_odds": "+140",
+              "home_odds": "+135",
               "away_line": 0.5,
-              "away_odds": "-180"
+              "away_odds": "-175"
             },
             "totals": {
               "line": 2.5,
@@ -1324,8 +1324,8 @@
           },
           "first5": {
             "h2h": {
-              "home_odds": "-110",
-              "away_odds": "-120"
+              "home_odds": "-115",
+              "away_odds": "-115"
             },
             "spreads": {
               "home_line": 0.5,
@@ -1561,8 +1561,8 @@
             },
             "totals": {
               "line": 5.5,
-              "over_odds": "+105",
-              "under_odds": "-135"
+              "over_odds": "+100",
+              "under_odds": "-130"
             }
           },
           "first7": {
