@@ -1066,5 +1066,6 @@
     "home_b2b": false,
     "away_b2b": false
   },
-  "n_sims": 1000
+  "n_sims": 1000,
+  "game_id": 4
 }
