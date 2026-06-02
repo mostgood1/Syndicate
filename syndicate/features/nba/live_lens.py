@@ -16,6 +16,15 @@ def _safe_text(value: Any, fallback: str = "-") -> str:
     return text or fallback
 
 
+def _safe_number(value: Any) -> float | None:
+    try:
+        if value is None or str(value).strip() == "":
+            return None
+        return float(value)
+    except Exception:
+        return None
+
+
 def _metric_rows(game: dict[str, Any], *, limit: int = 4) -> list[dict[str, str]]:
     metrics = game.get("metrics") if isinstance(game.get("metrics"), list) else []
     rows: list[dict[str, str]] = []
@@ -60,9 +69,23 @@ def _rank_card(game: dict[str, Any], selected_date: str) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
     top_rows = game.get("shared_top_play_rows") if isinstance(game.get("shared_top_play_rows"), list) else []
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    away_score = _safe_number(away.get("score"))
+    home_score = _safe_number(home.get("score"))
+    current_total = (away_score + home_score) if away_score is not None and home_score is not None else None
+    live_total = _safe_number(betting.get("total"))
     badge = _safe_text((((top_rows or [None])[0] or {}).get("value") if top_rows else None), "Watch")
     href = str(game.get("href") or f"/nba/cards?date={selected_date}").strip()
     metrics = _metric_rows(game)
+    if current_total is not None:
+        metrics = [{"label": "Total pts", "value": str(int(round(current_total)))}] + metrics
+    if live_total is not None:
+        metrics = [{"label": "Live line", "value": f"{live_total:.1f}"}] + metrics
+    summary = _safe_text(game.get("summary"), "NBA live lens row.")
+    if current_total is not None and live_total is not None:
+        summary = f"Total pts {int(round(current_total))} vs Live line {live_total:.1f}. {summary}"
+    elif current_total is not None:
+        summary = f"Total pts {int(round(current_total))}. {summary}"
     return {
         "title": f"{_safe_text(away.get('abbr'), 'AWY')} @ {_safe_text(home.get('abbr'), 'HOM')}",
         "eyebrow": _safe_text(game.get("status") or game.get("status_badge"), "Live Lens"),
@@ -71,7 +94,7 @@ def _rank_card(game: dict[str, Any], selected_date: str) -> dict[str, Any]:
         "away_logo": str(away.get("logo") or game.get("away_logo") or "").strip() or None,
         "home_logo": str(home.get("logo") or game.get("home_logo") or "").strip() or None,
         "metrics": metrics,
-        "summary": _safe_text(game.get("summary"), "NBA live lens row."),
+        "summary": summary,
         "list_items": _signal_items(game),
         "href": href,
         "href_label": _safe_text(game.get("href_label"), "Open NBA game"),

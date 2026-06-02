@@ -165,6 +165,39 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertIsNotNone(row.get("live_edge"))
         self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
 
+    def test_live_lens_card_surface_shows_total_points_and_live_line(self) -> None:
+        with patch(
+            "syndicate.features.nba.live_lens.build_cards_page_context",
+            return_value={
+                "date": "2026-05-21",
+                "source_path": "nba_cards.json",
+                "games": [
+                    {
+                        "away": {"abbr": "BOS", "score": 104},
+                        "home": {"abbr": "NYK", "score": 102},
+                        "status": "Live",
+                        "detail": "Q4 02:11",
+                        "summary": "Live scoring pace is tracking toward the over.",
+                        "betting": {"total": 221.5},
+                        "shared_prop_rows": [],
+                        "shared_top_play_rows": [],
+                    }
+                ],
+            },
+        ):
+            from syndicate.features.nba.live_lens import build_live_lens_page_context
+
+            context = build_live_lens_page_context("2026-05-21")
+
+        card = (context.get("rank_cards") or [{}])[0]
+        metrics = card.get("metrics") or []
+        metric_text = " ".join(f"{row.get('label')} {row.get('value')}" for row in metrics if isinstance(row, dict))
+
+        self.assertIn("Total pts 206", card.get("summary"))
+        self.assertIn("Live line 221.5", card.get("summary"))
+        self.assertIn("Total pts 206", metric_text)
+        self.assertIn("Live line 221.5", metric_text)
+
 
 if __name__ == "__main__":
     unittest.main()
