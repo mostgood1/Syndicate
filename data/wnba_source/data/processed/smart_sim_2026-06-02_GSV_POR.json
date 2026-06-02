@@ -2,38 +2,38 @@
   "date": "2026-06-02",
   "home": "GSV",
   "away": "POR",
-  "market_total": 160.5,
+  "market_total": 158.5,
   "market_home_spread": -9.0,
   "quarters": [
     {
       "q": 1,
-      "home_pts_mu": 20.45041425,
+      "home_pts_mu": 20.27891425,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 18.355664249999997,
+      "away_pts_mu": 18.18416425,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 2,
-      "home_pts_mu": 20.45041425,
+      "home_pts_mu": 20.27891425,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 18.355664249999997,
+      "away_pts_mu": 18.18416425,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 3,
-      "home_pts_mu": 21.285125035714287,
+      "home_pts_mu": 21.106625035714288,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 19.104875035714286,
+      "away_pts_mu": 18.926375035714283,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 4,
-      "home_pts_mu": 21.285125035714287,
+      "home_pts_mu": 21.106625035714288,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 19.104875035714286,
+      "away_pts_mu": 18.926375035714283,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     }

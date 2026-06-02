@@ -43,8 +43,7 @@
           "top_play_reasons": [
             "EV 43.5%",
             "Regular price range (-150 to +150)",
-            "Consensus: 3 books aligned",
-            "Best line available"
+            "Consensus: 3 books aligned"
           ],
           "matchup": "LVA @ LAS"
         },
@@ -70,14 +69,14 @@
           "team": "LVA",
           "display_pick": "A'ja Wilson UNDER 12.5",
           "selection": "UNDER 12.5",
-          "price": -122.0,
-          "score": 5.081877327026129,
-          "ev_pct": 5.081877327026129,
-          "win_prob": 0.5495495495495496,
-          "p_win": 0.5495495495495496,
+          "price": -126.0,
+          "score": 4.694606093978393,
+          "ev_pct": 4.694606093978393,
+          "win_prob": 0.5575221238938053,
+          "p_win": 0.5575221238938053,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 5.1%",
+            "EV 4.7%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -186,14 +185,14 @@
           "display_pick": "Under 158.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -0.107843,
-          "ev_pct": 0.10779999999999999,
-          "win_prob": 0.524888,
-          "p_win": 0.524888,
-          "basketball_summary": "Model total 158.4 vs line 158.5",
+          "score": -1.507843,
+          "ev_pct": 1.5078,
+          "win_prob": 0.538888,
+          "p_win": 0.538888,
+          "basketball_summary": "Model total 157.0 vs line 158.5",
           "top_play_reasons": [
-            "Edge -0.1",
-            "EV 0.1%"
+            "Edge -1.5",
+            "EV 1.5%"
           ],
           "matchup": "POR @ GSV"
         }
@@ -304,14 +303,14 @@
           "team": "CON",
           "display_pick": "Le\u00efla Lacan UNDER 12.5",
           "selection": "UNDER 12.5",
-          "price": -114.0,
-          "score": 32.059464242747794,
-          "ev_pct": 32.059464242747794,
-          "win_prob": 0.5327102803738317,
-          "p_win": 0.5327102803738317,
+          "price": -113.0,
+          "score": 32.60557070310156,
+          "ev_pct": 32.60557070310156,
+          "win_prob": 0.5305164319248826,
+          "p_win": 0.5305164319248826,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 32.1%",
+            "EV 32.6%",
             "Regular price range (-150 to +150)",
             "Consensus: 3 books aligned",
             "Best line available"
@@ -321,17 +320,17 @@
         {
           "market": "ATS",
           "team": "Atlanta Dream",
-          "display_pick": "Atlanta Dream -13.5",
+          "display_pick": "Atlanta Dream -14.0",
           "selection": "Atlanta Dream",
           "price": -110.0,
-          "score": 26.325,
-          "ev_pct": 26.325,
-          "win_prob": 0.78706,
-          "p_win": 0.78706,
-          "basketball_summary": "Model margin 12.8 vs market -13.5",
+          "score": 26.825,
+          "ev_pct": 26.825,
+          "win_prob": 0.79206,
+          "p_win": 0.79206,
+          "basketball_summary": "Model margin 12.8 vs market -14.0",
           "top_play_reasons": [
-            "Edge 26.3",
-            "EV 26.3%"
+            "Edge 26.8",
+            "EV 26.8%"
           ],
           "matchup": "CON @ ATL"
         },
@@ -356,16 +355,16 @@
         {
           "market": "PROPS",
           "team": "ATL",
-          "display_pick": "Rhyne Howard UNDER 4.5",
-          "selection": "UNDER 4.5",
-          "price": -118.0,
-          "score": 7.607977442209274,
-          "ev_pct": 7.607977442209274,
-          "win_prob": 0.5412844036697247,
-          "p_win": 0.5412844036697247,
+          "display_pick": "Rhyne Howard OVER 3.5",
+          "selection": "OVER 3.5",
+          "price": -136.0,
+          "score": 7.338529708132901,
+          "ev_pct": 7.338529708132901,
+          "win_prob": 0.576271186440678,
+          "p_win": 0.576271186440678,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 7.6%",
+            "EV 7.3%",
             "Regular price range (-150 to +150)",
             "Consensus: 3 books aligned",
             "Best line available"
@@ -375,17 +374,17 @@
         {
           "market": "TOTAL",
           "team": "Total",
-          "display_pick": "Under 160.5",
+          "display_pick": "Under 161.0",
           "selection": "Under",
           "price": -110.0,
-          "score": -0.907688,
-          "ev_pct": 0.9077,
-          "win_prob": 0.532887,
-          "p_win": 0.532887,
-          "basketball_summary": "Model total 159.6 vs line 160.5",
+          "score": -1.407688,
+          "ev_pct": 1.4077,
+          "win_prob": 0.537887,
+          "p_win": 0.537887,
+          "basketball_summary": "Model total 159.6 vs line 161.0",
           "top_play_reasons": [
-            "Edge -0.9",
-            "EV 0.9%"
+            "Edge -1.4",
+            "EV 1.4%"
           ],
           "matchup": "CON @ ATL"
         }
