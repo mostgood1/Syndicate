@@ -6,6 +6,7 @@ from typing import Any
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.wnba.cards import build_cards_page_context
+from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.sources import build_module_links
 
 
@@ -21,6 +22,38 @@ def _safe_number(value: Any) -> float | None:
         return float(value)
     except Exception:
         return None
+
+
+def _live_line_value(game: dict[str, Any]) -> float | None:
+    if not isinstance(game, dict):
+        return None
+    if game.get("total") is not None:
+        return _safe_number(game.get("total"))
+    lines = game.get("lines") if isinstance(game.get("lines"), dict) else {}
+    if lines.get("total") is not None:
+        return _safe_number(lines.get("total"))
+    return None
+
+
+def _live_line_map(selected_date: str, games: list[dict[str, Any]]) -> dict[str, float]:
+    event_ids = [
+        str(game.get("event_id") or "").strip()
+        for game in games
+        if isinstance(game, dict) and str(game.get("event_id") or "").strip()
+    ]
+    if not event_ids:
+        return {}
+    payload = build_live_lines_payload(selected_date, event_ids)
+    live_games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    out: dict[str, float] = {}
+    for live_game in live_games:
+        if not isinstance(live_game, dict):
+            continue
+        event_id = str(live_game.get("event_id") or "").strip()
+        line_value = _live_line_value(live_game)
+        if event_id and line_value is not None:
+            out[event_id] = line_value
+    return out
 
 
 def _metric_rows(game: dict[str, Any], *, limit: int = 4) -> list[dict[str, str]]:
@@ -120,7 +153,7 @@ def _signal_items(game: dict[str, Any], *, limit: int = 6) -> list[str]:
     return items or ["No live lens signals were stored for this matchup."]
 
 
-def _rank_card(game: dict[str, Any], selected_date: str) -> dict[str, Any]:
+def _rank_card(game: dict[str, Any], selected_date: str, *, live_line: float | None = None) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
     top_rows = game.get("shared_top_play_rows") if isinstance(game.get("shared_top_play_rows"), list) else []
@@ -128,7 +161,7 @@ def _rank_card(game: dict[str, Any], selected_date: str) -> dict[str, Any]:
     away_score = _safe_number(away.get("score"))
     home_score = _safe_number(home.get("score"))
     current_total = (away_score + home_score) if away_score is not None and home_score is not None else None
-    live_total = _safe_number(betting.get("total"))
+    live_total = _safe_number(live_line)
     badge = _safe_text((((top_rows or [None])[0] or {}).get("value") if top_rows else None), "Watch")
     href = str(game.get("href") or f"/wnba/cards?date={selected_date}").strip()
     metrics = _metric_rows(game)
@@ -158,8 +191,9 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
     cards_context = build_cards_page_context(selected_date)
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
     games = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
+    live_line_by_event_id = _live_line_map(resolved_date, games)
     rank_cards = [
-        _rank_card(game, resolved_date)
+        _rank_card(game, resolved_date, live_line=live_line_by_event_id.get(str(game.get("event_id") or "").strip()))
         for game in games
         if isinstance(game, dict)
     ]

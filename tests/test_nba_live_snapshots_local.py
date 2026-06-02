@@ -173,6 +173,7 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                 "source_path": "nba_cards.json",
                 "games": [
                     {
+                        "event_id": "evt-2",
                         "away": {"abbr": "BOS", "score": 104},
                         "home": {"abbr": "NYK", "score": 102},
                         "status": "Live",
@@ -201,6 +202,9 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                     }
                 ],
             },
+        ), patch(
+            "syndicate.features.nba.live_lens.build_live_lines_payload",
+            return_value={"games": [{"event_id": "evt-2", "total": 224.5}]},
         ):
             from syndicate.features.nba.live_lens import build_live_lens_page_context
 
@@ -211,12 +215,48 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         metric_text = " ".join(f"{row.get('label')} {row.get('value')}" for row in metrics if isinstance(row, dict))
 
         self.assertIn("Total pts 206", card.get("summary"))
-        self.assertIn("Live line 221.5", card.get("summary"))
+        self.assertIn("Live line 224.5", card.get("summary"))
         self.assertIn("Total pts 206", metric_text)
-        self.assertIn("Live line 221.5", metric_text)
+        self.assertIn("Live line 224.5", metric_text)
         self.assertIn("Market snapshot: Consensus lines", card.get("list_items")[0])
         self.assertIn("Away ML +105", " ".join(card.get("list_items")))
         self.assertIn("Jayson Tatum | Over 28.5 PTS", " ".join(card.get("list_items")))
+
+    def test_live_lens_card_surface_does_not_fallback_to_cards_total(self) -> None:
+        with patch(
+            "syndicate.features.nba.live_lens.build_cards_page_context",
+            return_value={
+                "date": "2026-05-21",
+                "source_path": "nba_cards.json",
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "away": {"abbr": "BOS", "score": 104},
+                        "home": {"abbr": "NYK", "score": 102},
+                        "status": "Live",
+                        "detail": "Q4 02:11",
+                        "summary": "Live scoring pace is tracking toward the over.",
+                        "betting": {"total": 221.5},
+                        "panels": [],
+                        "shared_prop_rows": [],
+                        "shared_top_play_rows": [],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.nba.live_lens.build_live_lines_payload",
+            return_value={"games": []},
+        ):
+            from syndicate.features.nba.live_lens import build_live_lens_page_context
+
+            context = build_live_lens_page_context("2026-05-21")
+
+        card = (context.get("rank_cards") or [{}])[0]
+        metrics = card.get("metrics") or []
+        metric_labels = " ".join(str(row.get("label")) for row in metrics if isinstance(row, dict))
+
+        self.assertNotIn("Live line", card.get("summary"))
+        self.assertNotIn("Live line", metric_labels)
 
 
 if __name__ == "__main__":
