@@ -6817,6 +6817,24 @@ async def v1_props_cards(
                     if _num(v) is not None
                 )
                 has_meaningful_movement = movement_score > 1e-9
+                if not has_any_snapshot:
+                    line_movement = _diff(_num(rr.get("line")), _num(rr.get("line")), _num(rr.get("line")))
+                    price_movement = _diff(_num(rr.get("price")), _num(rr.get("price")), _num(rr.get("price")))
+                    has_any_snapshot = True
+                    has_current_snapshot = True
+                    has_meaningful_movement = False
+                else:
+                    fallback_line = _num(rr.get("line"))
+                    fallback_price = _num(rr.get("price"))
+                    for mv, fallback in ((line_movement, fallback_line), (price_movement, fallback_price)):
+                        if fallback is None:
+                            continue
+                        if mv.get("open") is None:
+                            mv["open"] = fallback
+                        if mv.get("prev") is None:
+                            mv["prev"] = fallback
+                        if mv.get("cur") is None:
+                            mv["cur"] = fallback
                 if has_current_snapshot and has_meaningful_movement:
                     tracking_note = "Tracked live movement"
                 elif has_current_snapshot:
