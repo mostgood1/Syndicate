@@ -5,6 +5,7 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 from functools import lru_cache
+import unicodedata
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
@@ -24,7 +25,10 @@ def _safe_float(value: Any) -> float | None:
 
 
 def _normalize_live_name(value: Any) -> str:
-    return " ".join(str(value or "").strip().lower().split())
+    text = " ".join(str(value or "").strip().lower().split())
+    normalized = unicodedata.normalize("NFKD", text)
+    stripped = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return stripped
 
 
 def _parse_iso_date(value: str | None) -> date | None:

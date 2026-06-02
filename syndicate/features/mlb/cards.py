@@ -9,6 +9,7 @@ from math import exp
 from pathlib import Path
 import re
 import sys
+import unicodedata
 from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -1972,7 +1973,9 @@ _LIVE_HITTER_MARKET_KEYS: dict[str, tuple[str, str]] = {
 
 
 def _normalize_live_name(value: Any) -> str:
-    return " ".join(str(value or "").strip().lower().split())
+    text = " ".join(str(value or "").strip().lower().split())
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
 
 
 def _market_name_variants(name: Any) -> list[str]:
