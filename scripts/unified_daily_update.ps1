@@ -1194,6 +1194,7 @@ function Get-ForcedPublishArtifactPaths {
             "data/nhl_source/data/processed/shifts_${DateValue}.csv",
             "data/nhl_source/data/processed/co_toi_shifts_${DateValue}.csv",
             "data/nhl_source/data/processed/starting_goalies_${DateValue}.csv",
+            "data/nhl_source/data/processed/smart_sim_${DateValue}_bundle.json",
             "data/nhl_source/data/processed/live_lens_projections_${DateValue}.jsonl",
             "data/nhl_source/data/processed/live_lens_signals_${DateValue}.jsonl",
             "data/nhl_source/data/processed/live_lens_tuning_override.json",

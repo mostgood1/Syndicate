@@ -188,7 +188,8 @@ $files = @(
     "lineups_co_toi_$Date.csv",
     "shifts_$Date.csv",
     "co_toi_shifts_$Date.csv",
-    "starting_goalies_$Date.csv"
+    "starting_goalies_$Date.csv",
+    "smart_sim_${Date}_bundle.json"
 )
 
 foreach ($name in $files) {
