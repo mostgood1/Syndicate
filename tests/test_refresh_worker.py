@@ -80,6 +80,13 @@ class RefreshWorkerTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             mocked_run.assert_not_called()
 
+    def test_default_poll_seconds_is_thirty(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with patch.dict(module.os.environ, {}, clear=True):
+            self.assertEqual(module._default_poll_seconds(), 30.0)
+
 
 if __name__ == "__main__":
     unittest.main()
