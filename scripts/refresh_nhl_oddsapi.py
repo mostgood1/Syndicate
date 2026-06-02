@@ -306,6 +306,20 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
     return copied
 
 
+def _write_smart_sim_bundle(*, artifact_root: Path, date_str: str, copied: dict[str, object]) -> Path:
+    processed_root = artifact_root / "data" / "processed"
+    processed_root.mkdir(parents=True, exist_ok=True)
+    bundle_path = processed_root / f"smart_sim_{date_str}_bundle.json"
+    bundle = {
+        "date": date_str,
+        "sport": "nhl",
+        "processed_root": str(processed_root),
+        "artifact_bundle_files": copied,
+    }
+    bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True), encoding="utf-8")
+    return bundle_path
+
+
 def _missing_required_artifacts(*, artifact_root: Path, date_str: str) -> list[str]:
     missing: list[str] = []
     for template in REQUIRED_ARTIFACTS:
@@ -405,6 +419,8 @@ def main() -> int:
         return 1
 
     copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
+    smart_sim_bundle_path = _write_smart_sim_bundle(artifact_root=artifact_root, date_str=args.date, copied=copied)
+    copied.setdefault("smart_sim_files", []).append(str(smart_sim_bundle_path))
     missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
     if missing_required:
         print(
