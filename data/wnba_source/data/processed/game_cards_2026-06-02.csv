@@ -1,5 +1,5 @@
 date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
-2026-06-02,1,Los Angeles Sparks,Las Vegas Aces,2026-06-03T02:10:00Z,259.47796267256155,-259.47796267256155,7.5,-7.5,175.5,oddsapi_consensus,LAS,LVA
-2026-06-02,2,Golden State Valkyries,Portland Fire,2026-06-03T02:00:00Z,-308.4350229348343,308.43502293483436,-9.0,9.0,158.5,oddsapi_consensus,GSV,POR
-2026-06-02,3,Washington Mystics,Chicago Sky,2026-06-02T23:30:00Z,121.52481420969711,-121.52481420969711,2.0,-2.0,160.5,oddsapi_consensus,WSH,CHI
-2026-06-02,4,Atlanta Dream,Connecticut Sun,2026-06-02T23:30:00Z,-749.0933393325375,749.0933393325371,-14.0,14.0,161.0,oddsapi_consensus,ATL,CON
+2026-06-02,1,Los Angeles Sparks,Las Vegas Aces,2026-06-03T02:10:00Z,261.37373265452607,-261.37373265452607,7.5,-7.5,174.5,oddsapi_consensus,LAS,LVA
+2026-06-02,2,Golden State Valkyries,Portland Fire,2026-06-03T02:00:00Z,-306.4342809531867,306.4342809531867,-9.0,9.0,158.5,oddsapi_consensus,GSV,POR
+2026-06-02,3,Washington Mystics,Chicago Sky,2026-06-02T23:30:00Z,122.38718812644858,-122.38718812644858,2.0,-2.0,160.5,oddsapi_consensus,WSH,CHI
+2026-06-02,4,Atlanta Dream,Connecticut Sun,2026-06-02T23:30:00Z,-763.1600096282137,763.1600096282132,-14.0,14.0,160.5,oddsapi_consensus,ATL,CON

@@ -39,7 +39,6 @@
       "top_play_reasons": [
         "EV 103.9%",
         "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 0.1 vs line 1.5 (-1.4)"
@@ -51,8 +50,8 @@
       "team": "GSV",
       "team_tricode": "GSV",
       "opponent": "POR",
-      "score": 62.40740089952569,
-      "score_adj": 62.40740089952569,
+      "score": 63.91117313007685,
+      "score_adj": 63.91117313007685,
       "tier": "High",
       "model": {
         "pts": 14.766471666666664,
@@ -71,16 +70,16 @@
         "market": "threes",
         "side": "OVER",
         "line": 1.5,
-        "price": 116.0,
-        "edge": 0.28892315231261895,
-        "ev": 0.6240740089952569,
-        "ev_pct": 62.40740089952569,
-        "book": "williamhill_us",
+        "price": 118.0,
+        "edge": 0.29317051894530666,
+        "ev": 0.6391117313007685,
+        "ev_pct": 63.91117313007685,
+        "book": "fanduel",
         "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 62.4%",
+        "EV 63.9%",
         "Regular price range (-150 to +150)",
         "Consensus: 4 books aligned",
         "Best line available"
@@ -94,8 +93,8 @@
       "team": "GSV",
       "team_tricode": "GSV",
       "opponent": "POR",
-      "score": 52.47751290105555,
-      "score_adj": 52.47751290105555,
+      "score": 51.31178268009947,
+      "score_adj": 51.31178268009947,
       "tier": "High",
       "model": {
         "pts": 2.2666666666666666,
@@ -114,64 +113,21 @@
         "market": "threes",
         "side": "UNDER",
         "line": 1.5,
-        "price": -118.0,
-        "edge": 0.2840525927671814,
-        "ev": 0.5247751290105555,
-        "ev_pct": 52.47751290105555,
-        "book": "fanduel",
+        "price": -120.0,
+        "edge": 0.27988245098236075,
+        "ev": 0.5131178268009947,
+        "ev_pct": 51.31178268009947,
+        "book": "draftkings",
         "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 52.5%",
+        "EV 51.3%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 0.3 vs line 1.5 (-1.2)"
-    },
-    {
-      "game_key": "LVA@LAS",
-      "game_id": "1",
-      "player": "Ariel Atkins",
-      "team": "LAS",
-      "team_tricode": "LAS",
-      "opponent": "LVA",
-      "score": 45.91587585495931,
-      "score_adj": 45.91587585495931,
-      "tier": "High",
-      "model": {
-        "pts": 8.179135238095238,
-        "reb": 2.2371171428571426,
-        "ast": 2.498636666666666,
-        "threes": 1.2807447619047618,
-        "stl": 1.7237738095238095,
-        "blk": 0.3447547619047618,
-        "tov": 2.068528571428572,
-        "pra": 12.914889047619049,
-        "pr": 10.41625238095238,
-        "pa": 10.677771904761904,
-        "ra": 4.735753809523809
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 11.5,
-        "price": 108.0,
-        "edge": 0.22074940314884278,
-        "ev": 0.4591587585495931,
-        "ev_pct": 45.91587585495931,
-        "book": "williamhill_us",
-        "p_win": 0.9399279893188239,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 45.9%",
-        "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
-        "Best line available"
-      ],
-      "basketball_summary": "model 8.2 vs line 11.5 (-3.3)"
     },
     {
       "game_key": "LVA@LAS",
@@ -217,14 +173,57 @@
       "basketball_summary": "model 2.2 vs line 1.5 (+0.7)"
     },
     {
+      "game_key": "LVA@LAS",
+      "game_id": "1",
+      "player": "Erica Wheeler",
+      "team": "LAS",
+      "team_tricode": "LAS",
+      "opponent": "LVA",
+      "score": 43.518187403073206,
+      "score_adj": 43.518187403073206,
+      "tier": "High",
+      "model": {
+        "pts": 6.384716666666667,
+        "reb": 2.8868166666666664,
+        "ast": 5.570066666666666,
+        "threes": 1.0510833333333331,
+        "stl": 1.2021666666666664,
+        "blk": 0.2003611111111111,
+        "tov": 2.003611111111111,
+        "pra": 14.8416,
+        "pr": 9.271533333333334,
+        "pa": 11.954783333333332,
+        "ra": 8.456883333333332
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 11.5,
+        "price": -102.0,
+        "edge": 0.21974530272838944,
+        "ev": 0.43518187403073205,
+        "ev_pct": 43.518187403073206,
+        "book": "williamhill_us",
+        "p_win": 0.940132369080237,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 43.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 6.4 vs line 11.5 (-5.1)"
+    },
+    {
       "game_key": "CHI@WSH",
       "game_id": "3",
       "player": "Michaela Onyenwere",
       "team": "WSH",
       "team_tricode": "WSH",
       "opponent": "CHI",
-      "score": 40.25700931699473,
-      "score_adj": 40.25700931699473,
+      "score": 42.21153843233747,
+      "score_adj": 42.21153843233747,
       "tier": "High",
       "model": {
         "pts": 2.325,
@@ -243,16 +242,16 @@
         "market": "pts",
         "side": "UNDER",
         "line": 8.5,
-        "price": -107.0,
-        "edge": 0.20809178729074573,
-        "ev": 0.4025700931699473,
-        "ev_pct": 40.25700931699473,
-        "book": "draftkings",
-        "p_win": 0.9194783057303337,
+        "price": -104.0,
+        "edge": 0.21519607828250475,
+        "ev": 0.4221153843233747,
+        "ev_pct": 42.21153843233747,
+        "book": "fanduel",
+        "p_win": 0.9319193058920021,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 40.3%",
+        "EV 42.2%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
@@ -389,6 +388,49 @@
       "basketball_summary": "model 0.0 vs line 12.5 (-12.5)"
     },
     {
+      "game_key": "CON@ATL",
+      "game_id": "4",
+      "player": "Brittney Griner",
+      "team": "CON",
+      "team_tricode": "CON",
+      "opponent": "ATL",
+      "score": 31.926229508196503,
+      "score_adj": 31.926229508196503,
+      "tier": "High",
+      "model": {
+        "pts": 4.231111111111111,
+        "reb": 1.4277777777777778,
+        "ast": 0.8799999999999999,
+        "threes": 0.0444444444444444,
+        "stl": 0.3223,
+        "blk": 0.2636999999999999,
+        "tov": 0.8789999999999999,
+        "pra": 6.538888888888889,
+        "pr": 5.658888888888889,
+        "pa": 5.111111111111111,
+        "ra": 2.307777777777778
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 12.5,
+        "price": -122.0,
+        "edge": 0.17545045045044916,
+        "ev": 0.319262295081965,
+        "ev_pct": 31.926229508196503,
+        "book": "fanduel",
+        "p_win": 0.8688118446315146,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 31.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 4.2 vs line 12.5 (-8.3)"
+    },
+    {
       "game_key": "CHI@WSH",
       "game_id": "3",
       "player": "Azura Stevens",
@@ -431,57 +473,14 @@
       "basketball_summary": "model 2.3 vs line 8.5 (-6.2)"
     },
     {
-      "game_key": "CON@ATL",
-      "game_id": "4",
-      "player": "Aneesah Morrow",
-      "team": "CON",
-      "team_tricode": "CON",
-      "opponent": "ATL",
-      "score": 31.691711605529903,
-      "score_adj": 31.691711605529903,
-      "tier": "High",
-      "model": {
-        "pts": 8.981590909090908,
-        "reb": 7.94449494949495,
-        "ast": 1.0854040404040404,
-        "threes": 0.6427020202020202,
-        "stl": 0.7724242424242426,
-        "blk": 0.1931060606060606,
-        "tov": 1.931060606060606,
-        "pra": 18.011489898989897,
-        "pr": 16.926085858585857,
-        "pa": 10.066994949494948,
-        "ra": 9.02989898989899
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 12.5,
-        "price": -113.0,
-        "edge": 0.16812973762558114,
-        "ev": 0.31691711605529904,
-        "ev_pct": 31.691711605529903,
-        "book": "draftkings",
-        "p_win": 0.8474335479801817,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 31.7%",
-        "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
-        "Best line available"
-      ],
-      "basketball_summary": "model 9.0 vs line 12.5 (-3.5)"
-    },
-    {
       "game_key": "CHI@WSH",
       "game_id": "3",
       "player": "Shakira Austin",
       "team": "WSH",
       "team_tricode": "WSH",
       "opponent": "CHI",
-      "score": 14.988069950806215,
-      "score_adj": 14.988069950806215,
+      "score": 15.634262647361187,
+      "score_adj": 15.634262647361187,
       "tier": "High",
       "model": {
         "pts": 14.049941947565545,
@@ -500,16 +499,16 @@
         "market": "pr",
         "side": "UNDER",
         "line": 24.5,
-        "price": -112.0,
-        "edge": 0.07918225634388187,
-        "ev": 0.14988069950806215,
-        "ev_pct": 14.988069950806215,
+        "price": -108.0,
+        "edge": 0.08117790220745225,
+        "ev": 0.15634262647361186,
+        "ev_pct": 15.634262647361187,
         "book": "fanduel",
-        "p_win": 0.678182586300515,
+        "p_win": 0.6755733957043811,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 15.0%",
+        "EV 15.6%",
         "Regular price range (-150 to +150)",
         "Best line available"
       ],
