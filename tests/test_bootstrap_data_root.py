@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -49,6 +50,26 @@ class BootstrapDataRootTests(unittest.TestCase):
             module._sync_tree(src_root, dst_root)
 
             self.assertEqual(dest_file.read_text(encoding="utf-8"), '{"games": 12}\n')
+
+    def test_sync_tree_overwrites_same_size_stale_files(self) -> None:
+        module = _load_module()
+        with tempfile.TemporaryDirectory() as src_dir, tempfile.TemporaryDirectory() as dst_dir:
+            src_root = Path(src_dir)
+            dst_root = Path(dst_dir)
+            relative_path = Path("nhl_source") / "data" / "processed" / "predictions_2026-06-02.csv"
+            source_file = src_root / relative_path
+            dest_file = dst_root / relative_path
+            source_file.parent.mkdir(parents=True, exist_ok=True)
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            source_file.write_text("aaaa\n", encoding="utf-8")
+            dest_file.write_text("bbbb\n", encoding="utf-8")
+            stamp = 1_725_000_000.0
+            os.utime(source_file, (stamp, stamp))
+            os.utime(dest_file, (stamp, stamp))
+
+            module._sync_tree(src_root, dst_root)
+
+            self.assertEqual(dest_file.read_text(encoding="utf-8"), "aaaa\n")
 
 
 if __name__ == "__main__":
