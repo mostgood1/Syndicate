@@ -365,6 +365,167 @@
   font-weight: 700;
 }
 
+.sport-compact-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px 11px 11px;
+  border: 1px solid rgba(132, 166, 196, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(10, 21, 34, 0.96), rgba(8, 18, 30, 0.9));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.sport-compact-card--hit {
+  border-color: rgba(154, 243, 222, 0.38);
+  box-shadow: 0 0 0 1px rgba(154, 243, 222, 0.14), 0 10px 28px rgba(18, 104, 88, 0.18);
+}
+
+.sport-compact-card--miss {
+  border-color: rgba(255, 133, 133, 0.34);
+  box-shadow: 0 0 0 1px rgba(255, 133, 133, 0.1), 0 10px 28px rgba(128, 37, 37, 0.16);
+}
+
+.sport-compact-card--hit .sport-compact-card__badge,
+.sport-compact-card--hit .sport-compact-card__value,
+.sport-compact-card--hit .sport-compact-card__title,
+.sport-compact-card--hit .sport-compact-card__chip:last-child {
+  color: #9af3de;
+}
+
+.sport-compact-card--miss .sport-compact-card__badge,
+.sport-compact-card--miss .sport-compact-card__value,
+.sport-compact-card--miss .sport-compact-card__title,
+.sport-compact-card--miss .sport-compact-card__chip:last-child {
+  color: #ff9d9d;
+}
+
+.sport-compact-card__scoreboard,
+.sport-compact-card__identity,
+.sport-compact-card__statusline,
+.sport-compact-card__teams,
+.sport-compact-card__team-row,
+.sport-compact-card__team-name,
+.sport-compact-card__top,
+.sport-compact-card__chip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sport-compact-card__scoreboard,
+.sport-compact-card__identity {
+  justify-content: space-between;
+}
+
+.sport-compact-card__statusline,
+.sport-compact-card__top,
+.sport-compact-card__chip-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.sport-compact-card__teams {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.sport-compact-card__team-name {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cards-text);
+}
+
+.sport-compact-card__team-logo,
+.sport-compact-card__headshot {
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+
+.sport-compact-card__team-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+}
+
+.sport-compact-card__headshot {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(132, 166, 196, 0.14);
+}
+
+.sport-compact-card__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(132, 166, 196, 0.2);
+  background: rgba(8, 18, 30, 0.92);
+  color: var(--cards-text-dim);
+}
+
+.sport-compact-card__clock,
+.sport-compact-card__meta,
+.sport-compact-card__summary {
+  color: var(--cards-text-soft);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.sport-compact-card__title,
+.sport-compact-card__value {
+  color: var(--cards-text);
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+}
+
+.sport-compact-card__title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sport-compact-card__value {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sport-compact-card__chip-row {
+  gap: 6px;
+}
+
+.sport-compact-card__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(132, 166, 196, 0.18);
+  background: rgba(8, 18, 30, 0.88);
+  color: var(--cards-text-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sport-compact-card__link {
+  color: var(--cards-accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sport-compact-card__link:hover,
+.sport-compact-card__link:focus-visible {
+  text-decoration: underline;
+}
+
 .cards-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

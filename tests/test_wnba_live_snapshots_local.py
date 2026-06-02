@@ -134,7 +134,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                     }
                 ]
             },
-        ):
+        ), patch("syndicate.features.wnba.cards._public_scoreboard_live_state_payload", return_value=None):
             _local_live_state_payload.cache_clear()
             payload = build_live_state_payload("2026-05-21", ttl=12)
             _local_live_state_payload.cache_clear()
@@ -142,6 +142,53 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(payload.get("source"), "syndicate_cards_fallback")
         self.assertEqual([game.get("game_id") for game in payload.get("games") or []], ["42"])
         self.assertTrue(((payload.get("games") or [{}])[0]).get("in_progress"))
+
+    def test_live_player_lens_payload_hydrates_actuals_from_boxscore(self) -> None:
+        with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}):
+            with patch(
+                "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+                return_value={
+                    "ok": True,
+                    "date": "2026-05-21",
+                    "games": [
+                        {
+                            "event_id": "evt-2",
+                            "rows": [
+                                {
+                                    "player": "Breanna Stewart",
+                                    "team_tri": "NYL",
+                                    "stat": "pts",
+                                    "line_live": 17.5,
+                                    "sim_mu": 21.0,
+                                    "sim_mu_adjusted": 21.0,
+                                    "price": -112,
+                                    "win_prob": 0.64,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            ):
+                with patch(
+                    "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+                    return_value={
+                        "games": [
+                            {
+                                "event_id": "evt-2",
+                                "players": [
+                                    {"team_tri": "NYL", "player": "Breanna Stewart", "pts": 19, "reb": 6, "ast": 4, "mp": 23}
+                                ],
+                            }
+                        ]
+                    },
+                ):
+                    payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("actual"), 19)
+        self.assertIsNotNone(row.get("live_projection"))
+        self.assertIsNotNone(row.get("live_edge"))
+        self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
 
 
 if __name__ == "__main__":
