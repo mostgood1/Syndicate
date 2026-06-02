@@ -664,6 +664,40 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(away_badges[1].get("label"), "O up to 19")
         self.assertEqual(games[0]["probable"]["away"].get("ladderBadges"), away_badges)
 
+    def test_mlb_pitcher_ladder_rows_preserve_matchup_copy_like_hitter_rows(self) -> None:
+        from syndicate.features.mlb.ladders_common import pitcher_rows_from_summary
+
+        summary = {
+            "groups": {
+                "pitcher": {
+                    "strikeouts": {
+                        "propLabel": "Strikeouts",
+                        "rows": [
+                            {
+                                "pitcherName": "Luis Severino",
+                                "team": "NYY",
+                                "marketLine": 5.5,
+                                "matchup": "NYY @ BOS",
+                                "mean": 6.4,
+                                "overLineProb": 0.61,
+                                "mode": 6,
+                                "simCount": 128,
+                                "matchupSummary": "Projected lineup baseline K rate is elevated.",
+                                "matchupReasons": ["Pitch-type matchup favors whiff pressure.", "The lineup is contact-light."]
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+
+        rows, prop_label = pitcher_rows_from_summary(summary)
+
+        self.assertEqual(prop_label, "Strikeouts")
+        self.assertEqual(rows[0].get("summary"), "Projected lineup baseline K rate is elevated.")
+        self.assertEqual(rows[0].get("list_items"), ["Pitch-type matchup favors whiff pressure.", "The lineup is contact-light."])
+        self.assertEqual(rows[0].get("title"), "Luis Severino")
+
     def test_mlb_pregame_badges_require_current_pitcher_market(self) -> None:
         from syndicate.features.mlb.cards import _attach_cards_pregame_starter_ladder_badges
 

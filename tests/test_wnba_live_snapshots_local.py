@@ -157,6 +157,23 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                         "detail": "3:27 - 4th",
                         "summary": "Live scoring pace is tracking toward the under.",
                         "betting": {"total": 166.5},
+                        "panels": [
+                            {
+                                "eyebrow": "Market snapshot",
+                                "title": "Consensus lines",
+                                "body": "Spread DAL -4.5 | total 166.5.",
+                                "summary_stats": [
+                                    {"label": "Away ML", "value": "+180"},
+                                    {"label": "Home ML", "value": "-220"},
+                                ],
+                            },
+                            {
+                                "eyebrow": "Top recommendations",
+                                "title": "Per-game playable looks",
+                                "body": "Top picks are pulled from the processed WNBA recommendation slate artifact.",
+                                "items": ["Alysha Clark | Over 1.5 3PM", "Natisha Hiedeman | Under 10.5 PTS"],
+                            },
+                        ],
                         "shared_prop_rows": [],
                         "shared_top_play_rows": [],
                     }
@@ -175,6 +192,9 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertIn("Live line 166.5", card.get("summary"))
         self.assertIn("Total pts 116", metric_text)
         self.assertIn("Live line 166.5", metric_text)
+        self.assertIn("Market snapshot: Consensus lines", card.get("list_items")[0])
+        self.assertIn("Away ML +180", " ".join(card.get("list_items")))
+        self.assertIn("Alysha Clark | Over 1.5 3PM", " ".join(card.get("list_items")))
 
     def test_live_player_lens_payload_hydrates_actuals_from_boxscore(self) -> None:
         with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}):
