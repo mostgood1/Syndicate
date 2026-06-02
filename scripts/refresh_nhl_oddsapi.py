@@ -50,6 +50,7 @@ LIVE_LENS_FILES = (
 
 
 REQUIRED_ARTIFACTS = (
+    "data/processed/predictions_{date}.csv",
     "data/processed/predictions_sim_{date}.csv",
     "data/processed/recommendations_sim_{date}.csv",
     "data/processed/props_projections_all_{date}.csv",
@@ -255,6 +256,15 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
             if _copy_if_exists(source, destination):
                 copied.setdefault("processed_files", []).append(str(destination))
                 break
+
+    predictions_destination = processed_root / f"predictions_{date_str}.csv"
+    if not predictions_destination.exists():
+        prediction_sources: list[Path] = []
+        for candidate_root in source_roots:
+            prediction_sources.append(candidate_root / "data" / "processed" / f"predictions_{date_str}.csv")
+            prediction_sources.append(candidate_root / "data" / "processed" / f"predictions_sim_{date_str}.csv")
+        if _copy_first_existing(sources=prediction_sources, destination=predictions_destination):
+            copied.setdefault("processed_files", []).append(str(predictions_destination))
 
     predictions_destination = processed_root / f"props_predictions_{date_str}.csv"
     if not predictions_destination.exists():
