@@ -2314,26 +2314,55 @@ class HomeBoardTests(unittest.TestCase):
         )
         self.assertTrue(context.get("generatedAt"))
 
-    def test_mlb_live_lens_zero_game_report_falls_back_to_cards(self) -> None:
-        with patch(
-            "syndicate.features.mlb.live_lens.load_json_file",
-            return_value={"generatedAt": "2026-05-20T14:58:42-05:00", "counts": {"games": 0, "live": 0, "final": 0, "props": 0}, "games": []},
+    def test_mlb_live_lens_reports_payload_synthesizes_from_live_builder(self) -> None:
+        with patch("vendor.mlb_bettingv2.tools.web.flask_frontend._load_json_file", return_value={}), patch(
+            "vendor.mlb_bettingv2.tools.web.flask_frontend._live_prop_registry_summary",
+            return_value={"topStable": [], "topEdges": []},
         ), patch(
-            "syndicate.features.mlb.live_lens.build_cards_page_context",
+            "vendor.mlb_bettingv2.tools.web.flask_frontend._live_lens_payload",
             return_value={
-                "games": [{"gamePk": 1, "away": {"abbr": "AWY"}, "home": {"abbr": "HOM"}, "status": "Live"}],
-                "scoreboard_items": [{"target_id": "game-1"}],
-                "source_path": "daily_summary_2026_05_20.json",
+                "date": "2026-06-01",
+                "generatedAt": "2026-06-01T20:45:00-05:00",
+                "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 2, "archivedLiveProps": 0},
+                "performance": {"marketsRefreshed": True, "degraded": False},
+                "games": [{"gamePk": 1, "status": {"abstract": "Live", "detailed": "In Progress"}}],
             },
         ):
-            from syndicate.features.mlb.live_lens import build_live_lens_page_context as build_mlb_live_lens_page_context
+            from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_reports_payload
 
-            context = build_mlb_live_lens_page_context("2026-05-20")
+            payload = _live_lens_reports_payload("2026-06-01")
 
-        self.assertEqual(len(context.get("games") or []), 1)
-        self.assertEqual(context.get("scoreboard_items"), [{"target_id": "game-1"}])
-        self.assertEqual(context.get("source_title"), "MLB cards fallback lens")
-        self.assertIsNone(context.get("empty_state"))
+        self.assertEqual(payload.get("latestReport", {}).get("counts", {}).get("games"), 1)
+        self.assertEqual(payload.get("latestReport", {}).get("games", [{}])[0].get("gamePk"), 1)
+        self.assertNotEqual(payload.get("latestReport"), {})
+
+    def test_nfl_live_lens_empty_week_does_not_inject_fake_rank_card(self) -> None:
+        with patch(
+            "syndicate.features.nfl.live_lens.build_cards_page_context",
+            return_value={"control_value": "1", "date": "2026", "games": [], "source_path": "missing_nfl_cards.csv"},
+        ), patch("syndicate.features.nfl.live_lens.available_weeks", return_value=[]):
+            from syndicate.features.nfl.live_lens import build_live_lens_page_context as build_nfl_live_lens_page_context
+
+            context = build_nfl_live_lens_page_context(1, season=2026)
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NFL live lens unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "NFL live lens")
+
+    def test_ncaaf_live_lens_empty_week_does_not_inject_fake_rank_card(self) -> None:
+        with patch(
+            "syndicate.features.ncaaf.live_lens.build_cards_page_context",
+            return_value={"control_value": "1", "date": "2026", "games": [], "source_path": "missing_ncaaf_cards.csv"},
+        ), patch("syndicate.features.ncaaf.live_lens.available_weeks", return_value=[]):
+            from syndicate.features.ncaaf.live_lens import build_live_lens_page_context as build_ncaaf_live_lens_page_context
+
+            context = build_ncaaf_live_lens_page_context(1)
+
+        self.assertEqual(context.get("rank_cards"), [])
+        self.assertFalse(context.get("using_sample_data"))
+        self.assertEqual(context.get("source_title"), "NCAAF live lens unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "NCAAF live lens")
 
     def test_mlb_live_lens_game_rows_preserve_structured_status(self) -> None:
         report = {
