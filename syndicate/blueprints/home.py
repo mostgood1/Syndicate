@@ -2205,6 +2205,7 @@ def _prop_rows_from_nba_live_lens(games: list[dict[str, Any]], *, fallback_href:
         probability = _pct_text(row.get("win_prob") or row.get("live_rank_probability"))
         ev_pct = _pct_text(row.get("ev"))
         value = probability or (f"EV {ev_pct}" if ev_pct else _safe_text(row.get("klass"), "Watch"))
+        projected = _prop_metric_text(row.get("sim_mu_adjusted") if row.get("sim_mu_adjusted") is not None else row.get("sim_mu"))
         rows.append(
             {
                 "matchup": str(row.get("__matchup") or "").strip() or _sport_matchup(game),
@@ -2216,11 +2217,17 @@ def _prop_rows_from_nba_live_lens(games: list[dict[str, Any]], *, fallback_href:
                 "detail": f"{side} {line} {market} | {_safe_text(row.get('basketball_summary') or row.get('shape_summary'), 'Live prop signal')}",
                 "value": value,
                 "actual": _prop_metric_text(row.get("actual")),
-                "projected": _prop_metric_text(row.get("sim_mu_adjusted") if row.get("sim_mu_adjusted") is not None else row.get("sim_mu")),
+                "projected": projected,
+                "live_projection": projected,
                 "line": _prop_metric_text(row.get("line_live") if row.get("line_live") is not None else row.get("line")),
-                "odds": _prop_metric_text(row.get("odds_live") if row.get("odds_live") is not None else row.get("odds")),
+                "odds": _prop_metric_text(
+                    row.get("odds_live")
+                    if row.get("odds_live") is not None
+                    else (row.get("price") if row.get("price") is not None else row.get("odds"))
+                ),
                 "edge": _pct_text(row.get("ev") if row.get("ev") is not None else row.get("edge")),
                 "confidence": probability,
+                "game_state": _safe_text(status_bits[-1] if status_bits else row.get("status_label") or "Live", None),
                 "href": fallback_href or (str(game.get("href") or "").strip() or None),
             }
         )
@@ -2426,6 +2433,22 @@ def _load_home_prop_items(
             if csv_rows:
                 return csv_rows
         if slug == "wnba":
+            if is_active_today:
+                from syndicate.features.wnba.cards import build_live_player_lens_payload
+                from syndicate.features.wnba.cards import build_live_state_payload
+
+                live_state = build_live_state_payload(context_label, ttl=12)
+                event_ids = [
+                    str((game or {}).get("event_id") or "").strip()
+                    for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
+                    if str((game or {}).get("event_id") or "").strip()
+                ]
+                if event_ids:
+                    payload = build_live_player_lens_payload(context_label, event_ids, ttl=20)
+                    rows = _prop_rows_from_nba_live_lens(list(payload.get("games") or []), fallback_href=f"/wnba/live-lens?date={context_label}")
+                    if rows:
+                        return rows
+
             from syndicate.features.wnba.props import build_props_page_context
 
             context = build_props_page_context(context_label)
