@@ -85,17 +85,17 @@
         {
           "market": "TOTAL",
           "team": "Total",
-          "display_pick": "Under 174.5",
+          "display_pick": "Under 175.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -3.578357,
-          "ev_pct": 3.5784000000000002,
-          "win_prob": 0.559594,
-          "p_win": 0.559594,
-          "basketball_summary": "Model total 170.9 vs line 174.5",
+          "score": -4.578357,
+          "ev_pct": 4.5784,
+          "win_prob": 0.569594,
+          "p_win": 0.569594,
+          "basketball_summary": "Model total 170.9 vs line 175.5",
           "top_play_reasons": [
-            "Edge -3.6",
-            "EV 3.6%"
+            "Edge -4.6",
+            "EV 4.6%"
           ],
           "matchup": "LVA @ LAS"
         }
@@ -260,17 +260,17 @@
         {
           "market": "ATS",
           "team": "Chicago Sky",
-          "display_pick": "Chicago Sky -1.5",
+          "display_pick": "Chicago Sky -2.0",
           "selection": "Chicago Sky",
           "price": -110.0,
-          "score": 2.925,
-          "ev_pct": 2.9250000000000003,
-          "win_prob": 0.55306,
-          "p_win": 0.55306,
-          "basketball_summary": "Model margin 1.4 vs market -1.5",
+          "score": 3.425,
+          "ev_pct": 3.4250000000000003,
+          "win_prob": 0.55806,
+          "p_win": 0.55806,
+          "basketball_summary": "Model margin 1.4 vs market -2.0",
           "top_play_reasons": [
-            "Edge 2.9",
-            "EV 2.9%"
+            "Edge 3.4",
+            "EV 3.4%"
           ],
           "matchup": "CHI @ WSH"
         },
@@ -303,14 +303,14 @@
           "team": "CON",
           "display_pick": "Le\u00efla Lacan UNDER 12.5",
           "selection": "UNDER 12.5",
-          "price": -113.0,
-          "score": 32.60557070310156,
-          "ev_pct": 32.60557070310156,
-          "win_prob": 0.5305164319248826,
-          "p_win": 0.5305164319248826,
+          "price": -114.0,
+          "score": 32.059464242747794,
+          "ev_pct": 32.059464242747794,
+          "win_prob": 0.5327102803738317,
+          "p_win": 0.5327102803738317,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 32.6%",
+            "EV 32.1%",
             "Regular price range (-150 to +150)",
             "Consensus: 3 books aligned",
             "Best line available"
@@ -323,14 +323,14 @@
           "display_pick": "Atlanta Dream -14.0",
           "selection": "Atlanta Dream",
           "price": -110.0,
-          "score": 26.825,
-          "ev_pct": 26.825,
-          "win_prob": 0.79206,
-          "p_win": 0.79206,
-          "basketball_summary": "Model margin 12.8 vs market -14.0",
+          "score": 27.3,
+          "ev_pct": 27.3,
+          "win_prob": 0.79681,
+          "p_win": 0.79681,
+          "basketball_summary": "Model margin 13.3 vs market -14.0",
           "top_play_reasons": [
-            "Edge 26.8",
-            "EV 26.8%"
+            "Edge 27.3",
+            "EV 27.3%"
           ],
           "matchup": "CON @ ATL"
         },
@@ -339,14 +339,14 @@
           "team": "ATL",
           "display_pick": "Jordin Canada OVER 9.5",
           "selection": "OVER 9.5",
-          "price": 102.0,
-          "score": 19.11174611192147,
-          "ev_pct": 19.11174611192147,
-          "win_prob": 0.49504950495049505,
-          "p_win": 0.49504950495049505,
+          "price": 100.0,
+          "score": 18.70469912071433,
+          "ev_pct": 18.70469912071433,
+          "win_prob": 0.5,
+          "p_win": 0.5,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 19.1%",
+            "EV 18.7%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -377,14 +377,14 @@
           "display_pick": "Under 161.0",
           "selection": "Under",
           "price": -110.0,
-          "score": -1.407688,
-          "ev_pct": 1.4077,
-          "win_prob": 0.537887,
-          "p_win": 0.537887,
-          "basketball_summary": "Model total 159.6 vs line 161.0",
+          "score": -1.057688,
+          "ev_pct": 1.0576999999999999,
+          "win_prob": 0.534387,
+          "p_win": 0.534387,
+          "basketball_summary": "Model total 159.9 vs line 161.0",
           "top_play_reasons": [
-            "Edge -1.4",
-            "EV 1.4%"
+            "Edge -1.1",
+            "EV 1.1%"
           ],
           "matchup": "CON @ ATL"
         }
