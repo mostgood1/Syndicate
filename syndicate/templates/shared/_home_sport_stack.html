@@ -118,7 +118,6 @@
                   </div>
                   <div class="sport-compact-card__summary">{{ item.writeup or item.detail }}</div>
                   <div class="sport-compact-card__chip-row">
-                    <span class="sport-compact-card__chip">{{ item.heading }}</span>
                     <span class="sport-compact-card__chip">Support {{ item.line }}</span>
                     {% if item.outcome_label %}
                       <span class="sport-compact-card__chip">{{ item.outcome_label }}</span>
@@ -194,9 +193,6 @@
                   </div>
                   <div class="sport-compact-card__summary">{{ item.writeup or item.detail }}</div>
                   <div class="sport-compact-card__chip-row">
-                    {% for pill in item.pills or [] %}
-                      <span class="sport-compact-card__chip">{{ pill.label }} {{ pill.value }}</span>
-                    {% endfor %}
                     {% if item.actual %}
                       <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
                     {% endif %}
@@ -223,7 +219,6 @@
                     {% if item.outcome_label %}
                       <span class="sport-compact-card__chip">{{ item.outcome_label }}</span>
                     {% endif %}
-                    <span class="sport-compact-card__chip">{{ item.heading }}</span>
                   </div>
                   {% if item.href %}
                     <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>
@@ -324,9 +319,231 @@
                       <span class="sport-compact-card__chip">{{ item.outcome_label }}</span>
                     {% endif %}
                   </div>
-                  <div class="sport-compact-card__signal-box sport-compact-card__signal-box--props">
-                    <span>{{ item.heading }}</span>
-                    <span>{{ item.matchup }}</span>
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No live prop rows were available for this slate.</p>
+          {% endif %}
+        </section>
+      </div>
+    </article>
+    {% elif sport.slug == 'wnba' %}
+    <article class="sport-stack-card" id="{{ sport.home_anchor }}">
+      <div class="sport-stack-card__header">
+        <div class="sport-stack-card__identity">
+          <div class="section-label">/{{ sport.slug }}</div>
+          <h3>{{ sport.name }}</h3>
+          <div class="sport-stack-card__statusline">
+            {% if sport.status %}
+              <span class="status-pill">{{ sport.status }}</span>
+            {% endif %}
+            <span class="sport-board-chip">{{ sport.context_label }}</span>
+            {% if sport.phase %}
+              <span class="sport-board-chip">{{ sport.phase }}</span>
+            {% endif %}
+            {% if sport.active_today %}
+              <span class="sport-board-chip">Live slate</span>
+            {% endif %}
+            <span class="sport-board-chip">{{ sport.freshness_label }}</span>
+            <span class="sport-board-chip">Data {{ sport.data_health }}</span>
+          </div>
+        </div>
+        <div class="sport-stack-card__stats" aria-label="{{ sport.name }} overview stats">
+          <div class="sport-stack-stat">
+            <div class="sport-stack-stat__label">Games</div>
+            <div class="sport-stack-stat__value">{{ sport.games_count }}</div>
+          </div>
+          <div class="sport-stack-stat">
+            <div class="sport-stack-stat__label">Props</div>
+            <div class="sport-stack-stat__value">{{ sport.props_count }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sport-rails">
+        <section class="sport-scroll-row sport-scroll-row--props" aria-label="{{ sport.name }} pregame props rail">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <h4 class="sport-scroll-row__headline">Pregame props</h4>
+            </div>
+            <div class="sport-scroll-row__links" aria-label="{{ sport.name }} pregame prop links">
+              <a class="cards-nav-pill" href="{{ sport.wnba_home.pregame_props_href }}">{{ sport.wnba_home.pregame_props_label }}</a>
+              <a class="cards-nav-pill" href="{{ sport.wnba_home.pregame_props_secondary_href }}">{{ sport.wnba_home.pregame_props_secondary_label }}</a>
+            </div>
+          </div>
+
+          {% if sport.wnba_home.pregame_props_items %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} pregame props">
+              {% for item in sport.wnba_home.pregame_props_items %}
+                <article class="sport-compact-card{% if item.outcome_state == 'hit' %} sport-compact-card--hit{% elif item.outcome_state == 'miss' %} sport-compact-card--miss{% endif %}">
+                  {% if item.away_label or item.home_label %}
+                    <div class="sport-compact-card__scoreboard">
+                      <div class="sport-compact-card__statusline">
+                        <span class="sport-compact-card__badge{% if item.outcome_state == 'hit' %} sport-compact-card__badge--hit{% elif item.outcome_state == 'miss' %} sport-compact-card__badge--miss{% endif %}">{{ item.heading }}</span>
+                        <span class="sport-compact-card__clock">{{ item.matchup }}</span>
+                      </div>
+                      <div class="sport-compact-card__teams">
+                        {% if item.away_label %}
+                          <div class="sport-compact-card__team-row">
+                            <div class="sport-compact-card__team-name">
+                              {% if item.away_logo %}
+                                <img class="sport-compact-card__team-logo" src="{{ item.away_logo }}" alt="{{ item.away_label }} logo" loading="lazy">
+                              {% endif %}
+                              <span>{{ item.away_label }}</span>
+                            </div>
+                          </div>
+                        {% endif %}
+                        {% if item.home_label %}
+                          <div class="sport-compact-card__team-row">
+                            <div class="sport-compact-card__team-name">
+                              {% if item.home_logo %}
+                                <img class="sport-compact-card__team-logo" src="{{ item.home_logo }}" alt="{{ item.home_label }} logo" loading="lazy">
+                              {% endif %}
+                              <span>{{ item.home_label }}</span>
+                            </div>
+                          </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endif %}
+                  <div class="sport-compact-card__identity">
+                    {% if item.headshot_url %}
+                      <img class="sport-compact-card__headshot" src="{{ item.headshot_url }}" alt="{{ item.name }} headshot" loading="lazy">
+                    {% endif %}
+                    <div class="sport-compact-card__identity-copy">
+                      <div class="sport-compact-card__top">
+                        <div class="sport-compact-card__title">{{ item.name }}</div>
+                        <div class="sport-compact-card__value">{{ item.value }}</div>
+                      </div>
+                      <div class="sport-compact-card__meta">{{ item.detail }}</div>
+                    </div>
+                  </div>
+                  <div class="sport-compact-card__summary">{{ item.writeup or item.detail }}</div>
+                  <div class="sport-compact-card__chip-row">
+                    {% if item.actual %}
+                      <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
+                    {% endif %}
+                    {% if item.live_projection %}
+                      <span class="sport-compact-card__chip">Live proj {{ item.live_projection }}</span>
+                    {% elif item.projected %}
+                      <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
+                    {% endif %}
+                    {% if item.line %}
+                      <span class="sport-compact-card__chip">Line {{ item.line }}</span>
+                    {% endif %}
+                    {% if item.odds %}
+                      <span class="sport-compact-card__chip">Odds {{ item.odds }}</span>
+                    {% endif %}
+                    {% if item.confidence %}
+                      <span class="sport-compact-card__chip">Sim {{ item.confidence }}</span>
+                    {% endif %}
+                    {% if item.game_state %}
+                      <span class="sport-compact-card__chip">{{ item.game_state }}</span>
+                    {% endif %}
+                    {% if item.outcome_label %}
+                      <span class="sport-compact-card__chip">{{ item.outcome_label }}</span>
+                    {% endif %}
+                  </div>
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No pregame prop rows were available for this slate.</p>
+          {% endif %}
+        </section>
+
+        <section class="sport-scroll-row sport-scroll-row--props" aria-label="{{ sport.name }} live props rail">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <h4 class="sport-scroll-row__headline">Live props</h4>
+            </div>
+            <div class="sport-scroll-row__links" aria-label="{{ sport.name }} live prop links">
+              <a class="cards-nav-pill" href="{{ sport.wnba_home.live_props_href }}">{{ sport.wnba_home.live_props_label }}</a>
+              <a class="cards-nav-pill" href="{{ sport.wnba_home.live_props_secondary_href }}">{{ sport.wnba_home.live_props_secondary_label }}</a>
+            </div>
+          </div>
+
+          {% if sport.wnba_home.live_props_items %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} live props">
+              {% for item in sport.wnba_home.live_props_items %}
+                <article class="sport-compact-card{% if item.outcome_state == 'hit' %} sport-compact-card--hit{% elif item.outcome_state == 'miss' %} sport-compact-card--miss{% endif %}">
+                  {% if item.away_label or item.home_label %}
+                    <div class="sport-compact-card__scoreboard">
+                      <div class="sport-compact-card__statusline">
+                        <span class="sport-compact-card__badge{% if item.outcome_state == 'hit' %} sport-compact-card__badge--hit{% elif item.outcome_state == 'miss' %} sport-compact-card__badge--miss{% endif %}">{{ item.heading }}</span>
+                        <span class="sport-compact-card__clock">{{ item.matchup }}</span>
+                      </div>
+                      <div class="sport-compact-card__teams">
+                        {% if item.away_label %}
+                          <div class="sport-compact-card__team-row">
+                            <div class="sport-compact-card__team-name">
+                              {% if item.away_logo %}
+                                <img class="sport-compact-card__team-logo" src="{{ item.away_logo }}" alt="{{ item.away_label }} logo" loading="lazy">
+                              {% endif %}
+                              <span>{{ item.away_label }}</span>
+                            </div>
+                          </div>
+                        {% endif %}
+                        {% if item.home_label %}
+                          <div class="sport-compact-card__team-row">
+                            <div class="sport-compact-card__team-name">
+                              {% if item.home_logo %}
+                                <img class="sport-compact-card__team-logo" src="{{ item.home_logo }}" alt="{{ item.home_label }} logo" loading="lazy">
+                              {% endif %}
+                              <span>{{ item.home_label }}</span>
+                            </div>
+                          </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endif %}
+                  <div class="sport-compact-card__identity">
+                    {% if item.headshot_url %}
+                      <img class="sport-compact-card__headshot" src="{{ item.headshot_url }}" alt="{{ item.name }} headshot" loading="lazy">
+                    {% endif %}
+                    <div class="sport-compact-card__identity-copy">
+                      <div class="sport-compact-card__top">
+                        <div class="sport-compact-card__title">{{ item.name }}</div>
+                        <div class="sport-compact-card__value">{{ item.value }}</div>
+                      </div>
+                      <div class="sport-compact-card__meta">{{ item.matchup }}</div>
+                    </div>
+                  </div>
+                  <div class="sport-compact-card__summary">{{ item.detail }}</div>
+                  <div class="sport-compact-card__chip-row">
+                    {% if item.actual %}
+                      <span class="sport-compact-card__chip">Actual {{ item.actual }}</span>
+                    {% endif %}
+                    {% if item.live_projection %}
+                      <span class="sport-compact-card__chip">Live proj {{ item.live_projection }}</span>
+                    {% elif item.projected %}
+                      <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
+                    {% endif %}
+                    {% if item.line %}
+                      <span class="sport-compact-card__chip">Line {{ item.line }}</span>
+                    {% endif %}
+                    {% if item.odds %}
+                      <span class="sport-compact-card__chip">Odds {{ item.odds }}</span>
+                    {% endif %}
+                    {% if item.confidence %}
+                      <span class="sport-compact-card__chip">Sim {{ item.confidence }}</span>
+                    {% endif %}
+                    {% if item.game_state %}
+                      <span class="sport-compact-card__chip">{{ item.game_state }}</span>
+                    {% endif %}
+                    {% if item.live_total %}
+                      <span class="sport-compact-card__chip">Live total {{ item.live_total }}</span>
+                    {% endif %}
+                    {% if item.outcome_label %}
+                      <span class="sport-compact-card__chip">{{ item.outcome_label }}</span>
+                    {% endif %}
                   </div>
                   {% if item.href %}
                     <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>
@@ -639,9 +856,6 @@
                   </div>
                   <div class="sport-compact-card__summary">{{ item.writeup or item.detail }}</div>
                   <div class="sport-compact-card__chip-row">
-                    {% for pill in item.pills or [] %}
-                      <span class="sport-compact-card__chip">{{ pill.label }} {{ pill.value }}</span>
-                    {% endfor %}
                     {% if item.live_total %}
                       <span class="sport-compact-card__chip">Live total {{ item.live_total }}</span>
                     {% endif %}
@@ -654,7 +868,6 @@
                     {% if item.projected %}
                       <span class="sport-compact-card__chip">Projected {{ item.projected }}</span>
                     {% endif %}
-                    <span class="sport-compact-card__chip">{{ item.heading }}</span>
                   </div>
                   {% if item.href %}
                     <a class="sport-compact-card__link" href="{{ item.href }}">Open matchup</a>

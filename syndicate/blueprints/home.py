@@ -3071,6 +3071,45 @@ def _build_sport_overview(
                 context_label=context_label,
             ),
         }
+    if slug == "wnba":
+        overview["wnba_home"] = {
+            "cards_href": f"/wnba/cards?date={context_label}&client=source",
+            "live_lens_href": _link_lookup(links, "Live Lens") or f"/wnba/live-lens?date={context_label}",
+            "betting_href": _link_lookup(links, "Betting Card") or f"/wnba/season/{season or central_year()}/betting-card?date={context_label}",
+            "hub_href": hub_href,
+            "pregame_props_href": _link_lookup(links, "Props") or f"/wnba/props?date={context_label}",
+            "pregame_props_label": "Open WNBA Props",
+            "pregame_props_secondary_href": _link_lookup(links, "Picks") or f"/wnba/picks?date={context_label}",
+            "pregame_props_secondary_label": "Open WNBA Picks",
+            "live_props_href": _link_lookup(links, "Live Lens") or f"/wnba/live-lens?date={context_label}",
+            "live_props_label": "Open WNBA Live Lens",
+            "live_props_secondary_href": _link_lookup(links, "Betting Card") or f"/wnba/season/{season or central_year()}/betting-card?date={context_label}",
+            "live_props_secondary_label": "Open WNBA Betting Card",
+            "pregame_props_items": _finalize_home_prop_rows(
+                _load_home_prop_items(
+                    "wnba",
+                    context_label=context_label,
+                    home_games=[],
+                    season=season,
+                    week=selected_week,
+                    is_active_today=False,
+                ),
+                slug="wnba",
+                context_label=context_label,
+            ),
+            "live_props_items": _finalize_home_prop_rows(
+                _load_home_prop_items(
+                    "wnba",
+                    context_label=context_label,
+                    home_games=home_games,
+                    season=season,
+                    week=selected_week,
+                    is_active_today=True,
+                ),
+                slug="wnba",
+                context_label=context_label,
+            ),
+        }
     props_count = _dashboard_prop_count(overview)
     overview["props_count"] = props_count
     overview["show_on_home"] = bool(active_today and games_count > 0)
