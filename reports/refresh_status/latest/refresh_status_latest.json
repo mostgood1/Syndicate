@@ -1,9 +1,9 @@
 ﻿{
-    "date":  "2026-06-01",
-    "runStamp":  "20260601_125827",
-    "generatedAt":  "2026-06-01T12:58:33.1500251-05:00",
-    "artifactsDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-01\\20260601_124515\\migration",
-    "refreshStatusDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\2026-06-01\\20260601_125827",
+    "date":  "2026-06-02",
+    "runStamp":  "20260602_121918",
+    "generatedAt":  "2026-06-02T12:19:25.9023263-05:00",
+    "artifactsDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-02\\20260602_120056\\migration",
+    "refreshStatusDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\2026-06-02\\20260602_121918",
     "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\refresh_status\\latest\\refresh_status_latest.json",
     "refreshOdds":  false,
     "preferLocalMirrorArtifacts":  true,
@@ -14,8 +14,8 @@
     "jsonMode":  false,
     "skipTests":  true,
     "skipSmoke":  true,
-    "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-01\\20260601_124515\\migration\\refresh_and_gate_run.json",
-    "oddsRefreshPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-01\\20260601_124515\\migration\\odds_refresh.json",
-    "migrationGateReportPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-01\\20260601_124515\\migration\\migration_gate_report.json",
-    "migrationGateConsolePath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-01\\20260601_124515\\migration\\migration_gate_console.txt"
+    "runSummaryPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-02\\20260602_120056\\migration\\refresh_and_gate_run.json",
+    "oddsRefreshPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-02\\20260602_120056\\migration\\odds_refresh.json",
+    "migrationGateReportPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-02\\20260602_120056\\migration\\migration_gate_report.json",
+    "migrationGateConsolePath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-02\\20260602_120056\\migration\\migration_gate_console.txt"
 }
