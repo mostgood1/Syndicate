@@ -309,6 +309,8 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
 
     report_path = live_lens_report_path(selected_date)
     report = load_json_file(report_path)
+    runtime_live_lens_dir = str(report_path.parent)
+    runtime_data_root = str(report_path.parent.parent)
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
     rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
@@ -331,8 +333,6 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         "pregame": 0,
         "props": 0,
     }
-    data_root = (report or {}).get("dataRoot") or "data"
-    live_lens_dir = (report or {}).get("liveLensDir") or "data/live_lens"
     route_path = f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens"
     intro_title = f"MLB {int(season)} Live Lens" if season is not None else "MLB Live Lens"
     intro_body = (
@@ -356,8 +356,8 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         "generatedAt": generated_at,
         "counts": counts,
         "app": (report or {}).get("app") if isinstance((report or {}).get("app"), dict) else {},
-        "dataRoot": data_root,
-        "liveLensDir": live_lens_dir,
+        "dataRoot": runtime_data_root,
+        "liveLensDir": runtime_live_lens_dir,
         "optimizationRegime": (report or {}).get("optimizationRegime"),
         "performance": (report or {}).get("performance") if isinstance((report or {}).get("performance"), dict) else {},
         "header_stats": [
