@@ -1,9 +1,9 @@
 market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
 ATS,Las Vegas Aces,Los Angeles Sparks,Las Vegas Aces,2026-06-02,0.14625,-110.0,0.52381,14.625,7.5,7.125,7.5,,High
-TOTAL,Under,Los Angeles Sparks,Las Vegas Aces,2026-06-02,0.035784,-110.0,0.52381,-3.578357,174.5,,,170.921643,Medium
+TOTAL,Under,Los Angeles Sparks,Las Vegas Aces,2026-06-02,0.045784,-110.0,0.52381,-4.578357,175.5,,,170.921643,High
 ATS,Golden State Valkyries,Golden State Valkyries,Portland Fire,2026-06-02,0.1755,-110.0,0.52381,17.55,9.0,8.55,-9.0,,High
 TOTAL,Under,Golden State Valkyries,Portland Fire,2026-06-02,0.015078,-110.0,0.52381,-1.507843,158.5,,,156.992157,Low
-ATS,Chicago Sky,Washington Mystics,Chicago Sky,2026-06-02,0.02925,-110.0,0.52381,2.925,1.5,1.425,1.5,,Medium
+ATS,Chicago Sky,Washington Mystics,Chicago Sky,2026-06-02,0.03425,-110.0,0.52381,3.425,2.0,1.425,2.0,,Medium
 TOTAL,Under,Washington Mystics,Chicago Sky,2026-06-02,0.003146,-110.0,0.52381,-0.31465,160.5,,,160.18535,Low
-ATS,Atlanta Dream,Atlanta Dream,Connecticut Sun,2026-06-02,0.26825,-110.0,0.52381,26.825,14.0,12.825,-14.0,,High
-TOTAL,Under,Atlanta Dream,Connecticut Sun,2026-06-02,0.014077,-110.0,0.52381,-1.407688,161.0,,,159.592312,Low
+ATS,Atlanta Dream,Atlanta Dream,Connecticut Sun,2026-06-02,0.273,-110.0,0.52381,27.3,14.0,13.3,-14.0,,High
+TOTAL,Under,Atlanta Dream,Connecticut Sun,2026-06-02,0.010577,-110.0,0.52381,-1.057688,161.0,,,159.942312,Low
