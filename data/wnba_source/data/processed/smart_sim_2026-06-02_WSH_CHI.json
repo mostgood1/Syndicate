@@ -3,37 +3,37 @@
   "home": "WSH",
   "away": "CHI",
   "market_total": 160.5,
-  "market_home_spread": -1.0,
+  "market_home_spread": 1.5,
   "quarters": [
     {
       "q": 1,
-      "home_pts_mu": 19.739080375,
+      "home_pts_mu": 19.448142875000002,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 19.506330375000005,
+      "away_pts_mu": 19.797267875000003,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 2,
-      "home_pts_mu": 19.739080375,
+      "home_pts_mu": 19.448142875000002,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 19.506330375000005,
+      "away_pts_mu": 19.797267875000003,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 3,
-      "home_pts_mu": 20.544757125000004,
+      "home_pts_mu": 20.241944625000002,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 20.302507125000005,
+      "away_pts_mu": 20.605319625000007,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 4,
-      "home_pts_mu": 20.544757125000004,
+      "home_pts_mu": 20.241944625000002,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 20.302507125000005,
+      "away_pts_mu": 20.605319625000007,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     }

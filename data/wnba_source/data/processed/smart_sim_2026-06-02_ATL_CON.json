@@ -2,38 +2,38 @@
   "date": "2026-06-02",
   "home": "ATL",
   "away": "CON",
-  "market_total": 159.5,
+  "market_total": 160.5,
   "market_home_spread": -13.5,
   "quarters": [
     {
       "q": 1,
-      "home_pts_mu": 21.03537078125,
+      "home_pts_mu": 21.121120781249996,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 17.893245781250002,
+      "away_pts_mu": 17.97899578125,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 2,
-      "home_pts_mu": 21.03537078125,
+      "home_pts_mu": 21.121120781249996,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 17.893245781250002,
+      "away_pts_mu": 17.97899578125,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 3,
-      "home_pts_mu": 21.89395734375,
+      "home_pts_mu": 21.98320734375,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 18.62358234375,
+      "away_pts_mu": 18.71283234375,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 4,
-      "home_pts_mu": 21.89395734375,
+      "home_pts_mu": 21.98320734375,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 18.62358234375,
+      "away_pts_mu": 18.71283234375,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     }

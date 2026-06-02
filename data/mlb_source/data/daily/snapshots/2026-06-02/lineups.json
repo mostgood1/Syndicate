@@ -2,11 +2,11 @@
   "date": "2026-06-02",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-02T10:06:13.914057",
+  "generated_at": "2026-06-02T11:14:28.722357",
   "summary": {
     "games": 15,
     "projected_teams": 30,
-    "adjusted_teams": 0,
+    "adjusted_teams": 1,
     "partial_teams": 0,
     "fallback_pool_teams": 0,
     "confirmed_teams": 0,
@@ -31,15 +31,15 @@
       "away_confirmed_ids": [],
       "home_confirmed_ids": [],
       "away_projected_ids": [
-        663837,
         805808,
         693307,
         682985,
         663330,
         679529,
+        663837,
         672761,
-        701678,
-        670097
+        670097,
+        690993
       ],
       "home_projected_ids": [
         650490,
@@ -53,56 +53,58 @@
         670764
       ],
       "away_projected_validation": {
-        "status": "ok",
+        "status": "adjusted",
         "raw_ids": [
-          663837,
           805808,
           693307,
           682985,
           663330,
           679529,
+          663837,
           672761,
-          701678,
           670097
         ],
         "ids": [
-          663837,
           805808,
           693307,
           682985,
           663330,
           679529,
+          663837,
           672761,
-          701678,
-          670097
+          670097,
+          690993
         ],
         "missing_ids": [],
-        "backfilled_ids": [],
+        "backfilled_ids": [
+          690993
+        ],
         "pool_source": "active+40Man",
         "pool_size": 18,
         "raw_names": [
-          "Matt Vierling",
+          "Gleyber Torres",
           "Kevin McGonigle",
           "Dillon Dingler",
           "Riley Greene",
           "Jahmai Jones",
           "Spencer Torkelson",
+          "Matt Vierling",
           "Wenceel Perez",
-          "Hao-Yu Lee",
           "Zack Short"
         ],
         "matched_names": [
-          "Matt Vierling",
           "Kevin McGonigle",
           "Dillon Dingler",
           "Riley Greene",
           "Jahmai Jones",
           "Spencer Torkelson",
+          "Matt Vierling",
           "Wenceel P\u00e9rez",
-          "Hao-Yu  Lee",
           "Zack Short"
         ],
-        "missing_name_labels": [],
+        "missing_name_labels": [
+          "Gleyber Torres"
+        ],
         "mapping_source": "projected_rotowire_default_vs_lhp"
       },
       "home_projected_validation": {
@@ -160,7 +162,7 @@
       },
       "away_source": "projected_rotowire_default_vs_lhp",
       "home_source": "projected_rotowire_default_vs_rhp",
-      "away_confidence": 0.66,
+      "away_confidence": 0.48000000000000004,
       "home_confidence": 0.66,
       "away_comparison": {
         "status": "projected_only",

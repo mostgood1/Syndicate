@@ -180,6 +180,7 @@ $files = @(
     "props_boxscores_sim_$Date.csv",
     "props_boxscores_sim_hist_$Date.csv",
     "props_boxscores_sim_samples_$Date.csv",
+    "props_predictions_$Date.csv",
     "props_recommendations_$Date.csv",
     "roster_snapshot_$Date.csv",
     "injuries_$Date.csv",

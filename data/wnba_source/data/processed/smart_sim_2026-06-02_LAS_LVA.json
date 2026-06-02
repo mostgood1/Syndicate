@@ -2,38 +2,38 @@
   "date": "2026-06-02",
   "home": "LAS",
   "away": "LVA",
-  "market_total": 176.0,
+  "market_total": 174.5,
   "market_home_spread": 7.5,
   "quarters": [
     {
       "q": 1,
-      "home_pts_mu": 20.19371375,
+      "home_pts_mu": 20.065088749999997,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 21.939338749999997,
+      "away_pts_mu": 21.810713749999998,
       "away_pts_sigma": 6.0,
       "corr": 0.35
     },
     {
       "q": 2,
-      "home_pts_mu": 20.19371375,
+      "home_pts_mu": 20.065088749999997,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 21.939338749999997,
+      "away_pts_mu": 21.810713749999998,
       "away_pts_sigma": 6.0,
       "corr": 0.35
     },
     {
       "q": 3,
-      "home_pts_mu": 21.017946964285713,
+      "home_pts_mu": 20.884071964285713,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 22.834821964285716,
+      "away_pts_mu": 22.700946964285713,
       "away_pts_sigma": 6.0,
       "corr": 0.35
     },
     {
       "q": 4,
-      "home_pts_mu": 21.017946964285713,
+      "home_pts_mu": 20.884071964285713,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 22.834821964285716,
+      "away_pts_mu": 22.700946964285713,
       "away_pts_sigma": 6.0,
       "corr": 0.35
     }
