@@ -365,6 +365,129 @@
       </div>
 
       <div class="sport-rails">
+        <section class="sport-scroll-row sport-scroll-row--games" aria-label="{{ sport.name }} game board row">
+          <div class="sport-scroll-row__header">
+            <div class="sport-scroll-row__title">
+              <div class="section-label">{{ sport.game_bar.eyebrow }}</div>
+              <h4 class="sport-scroll-row__headline">{{ sport.game_bar.title }}</h4>
+              <div class="sport-scroll-row__tag">{{ sport.game_bar.status_label }}</div>
+            </div>
+            <div class="sport-scroll-row__meta">
+              <span class="sport-board-chip">{{ sport.context_label }}</span>
+              <span class="sport-board-chip">Games {{ sport.games_count }}</span>
+              <span class="sport-board-chip">Data {{ sport.data_health }}</span>
+              {% if sport.active_today %}
+                <span class="sport-board-chip">Active games</span>
+              {% else %}
+                <span class="sport-board-chip">Scheduled slate</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <p class="sport-scroll-row__kicker">{{ sport.game_bar.kicker }}</p>
+          <p class="sport-scroll-row__summary">{{ sport.game_bar.summary }}</p>
+          {% if sport.data_warnings %}
+            <div class="sport-board-rail" aria-label="{{ sport.name }} data warnings">
+              {% for warning in sport.data_warnings %}
+                <span class="sport-board-rail__chip">{{ warning }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="sport-scroll-row__links" aria-label="{{ sport.name }} game row links">
+            {% if sport.game_bar.primary_href %}
+              <a class="cards-nav-pill" href="{{ sport.game_bar.primary_href }}">{{ sport.game_bar.primary_label }}</a>
+            {% endif %}
+            {% if sport.game_bar.secondary_href and sport.game_bar.secondary_label %}
+              <a class="cards-nav-pill" href="{{ sport.game_bar.secondary_href }}">{{ sport.game_bar.secondary_label }}</a>
+            {% endif %}
+            <a class="cards-nav-pill" href="{{ sport.hub_href }}">Open {{ sport.name }} hub</a>
+          </div>
+
+          {% if sport.home_live_embed %}
+            <div class="sport-embed-shell" data-home-preserve-key="{{ sport.home_live_embed.key }}" data-home-preserve-src="{{ sport.home_live_embed.src }}">
+              <iframe
+                class="sport-embed-frame"
+                src="{{ sport.home_live_embed.src }}"
+                title="{{ sport.home_live_embed.title }}"
+                loading="lazy"
+                referrerpolicy="same-origin"
+              ></iframe>
+            </div>
+          {% elif sport.game_bar["items"] %}
+            <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} compact game cards">
+              {% for item in sport.game_bar["items"] %}
+                <article class="sport-compact-card">
+                  <div class="sport-compact-card__scoreboard">
+                    <div class="sport-compact-card__statusline">
+                      <span class="sport-compact-card__badge">{{ item.status_badge }}</span>
+                      <span class="sport-compact-card__clock">{{ item.detail }}</span>
+                    </div>
+                    <div class="sport-compact-card__teams">
+                      <div class="sport-compact-card__team-row">
+                        <div class="sport-compact-card__team-name">
+                          {% if item.away_logo %}
+                            <img class="sport-compact-card__team-logo" src="{{ item.away_logo }}" alt="{{ item.away_label }} logo" loading="lazy">
+                          {% endif %}
+                          <span>{{ item.away_label }}</span>
+                        </div>
+                        <div class="sport-compact-card__team-score{% if not item.has_scores %} sport-compact-card__team-score--empty{% endif %}">{{ item.away_score or '-' }}</div>
+                      </div>
+                      <div class="sport-compact-card__team-row">
+                        <div class="sport-compact-card__team-name">
+                          {% if item.home_logo %}
+                            <img class="sport-compact-card__team-logo" src="{{ item.home_logo }}" alt="{{ item.home_label }} logo" loading="lazy">
+                          {% endif %}
+                          <span>{{ item.home_label }}</span>
+                        </div>
+                        <div class="sport-compact-card__team-score{% if not item.has_scores %} sport-compact-card__team-score--empty{% endif %}">{{ item.home_score or '-' }}</div>
+                      </div>
+                      {% if item.score_kind %}
+                        <div class="sport-compact-card__score-kind">{{ item.score_kind }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div class="sport-compact-card__top">
+                    <div class="sport-compact-card__title">{{ item.matchup }}</div>
+                    <div class="sport-compact-card__meta">Game card</div>
+                  </div>
+                  <div class="sport-compact-card__ribbon">
+                    <div class="sport-compact-card__ribbon-label">Board read</div>
+                    <div class="sport-compact-card__summary">{{ item.summary }}</div>
+                  </div>
+                  {% if item.market_chips %}
+                    <div class="sport-compact-card__chip-row">
+                      {% for chip in item.market_chips %}
+                        <span class="sport-compact-card__chip">{{ chip }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if item.signals %}
+                    <div class="sport-compact-card__signal-box">
+                      {% for signal in item.signals %}
+                        <span>{{ signal }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if item.href %}
+                    <a class="sport-compact-card__link" href="{{ item.href }}">{{ item.href_label }}</a>
+                  {% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="sport-scroll-row__summary">No game rows were surfaced for {{ sport.context_label }}. Open the primary lane to verify upstream slate artifacts.</p>
+          {% endif %}
+
+          {% if sport.game_bar.opportunity_tags %}
+            <div class="sport-board-rail" aria-label="{{ sport.name }} game opportunities">
+              {% for tag in sport.game_bar.opportunity_tags %}
+                <span class="sport-board-rail__chip">{{ tag }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </section>
+
         <section class="sport-scroll-row sport-scroll-row--props" aria-label="{{ sport.name }} pregame props rail">
           <div class="sport-scroll-row__header">
             <div class="sport-scroll-row__title">
