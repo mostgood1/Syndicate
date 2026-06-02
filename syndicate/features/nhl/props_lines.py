@@ -7,11 +7,11 @@ from typing import Any
 from urllib.parse import parse_qs
 
 from syndicate.features.nhl.sources import default_date
-from syndicate.features.nhl.sources import default_nhl_source_root
+from syndicate.features.nhl.sources import default_nhl_data_root
 
 
 def _lines_root() -> Path:
-    return default_nhl_source_root() / "data" / "props" / "player_props_lines"
+    return default_nhl_data_root() / "props" / "player_props_lines"
 
 
 def _date_path(date_str: str) -> Path:

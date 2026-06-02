@@ -27,6 +27,25 @@ def default_nhl_source_root() -> Path:
     return _source_roots()[0]
 
 
+def _data_roots() -> list[Path]:
+    roots: list[Path] = []
+    seen: set[Path] = set()
+    for source_root in _source_roots():
+        for candidate in (
+            (source_root / "source_artifacts" / "data").resolve(),
+            (source_root / "data").resolve(),
+        ):
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            roots.append(candidate)
+    return roots
+
+
+def default_nhl_data_root() -> Path:
+    return _data_roots()[0]
+
+
 def _first_existing_path(candidates: list[Path]) -> Path | None:
     for candidate in candidates:
         try:
@@ -38,8 +57,8 @@ def _first_existing_path(candidates: list[Path]) -> Path | None:
 
 
 def _resolve_processed_path(*parts: str) -> Path:
-    roots = _source_roots()
-    candidates = [(root / "data" / "processed" / Path(*parts)).resolve() for root in reversed(roots)]
+    roots = _data_roots()
+    candidates = [(root / "processed" / Path(*parts)).resolve() for root in roots]
     best = _first_existing_path(candidates)
     if best is not None:
         return best
@@ -51,10 +70,10 @@ def processed_path(*parts: str) -> Path:
 
 
 def scoreboard_snapshot_path(date_str: str) -> Path:
-    roots = _source_roots()
+    roots = _data_roots()
     candidates = [
-        (root / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv").resolve()
-        for root in reversed(roots)
+        (root / "odds" / "games" / f"date={date_str}" / "scoreboard.csv").resolve()
+        for root in roots
     ]
     best = _first_existing_path(candidates)
     if best is not None:
@@ -63,10 +82,10 @@ def scoreboard_snapshot_path(date_str: str) -> Path:
 
 
 def props_lines_snapshot_path(date_str: str) -> Path:
-    roots = _source_roots()
+    roots = _data_roots()
     candidates = [
-        (root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").resolve()
-        for root in reversed(roots)
+        (root / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").resolve()
+        for root in roots
     ]
     best = _first_existing_path(candidates)
     if best is not None:
@@ -97,31 +116,31 @@ def recommendation_path(date_str: str) -> Path:
 
 def slate_summaries() -> list[dict[str, Any]]:
     seen: dict[str, dict[str, Any]] = {}
-    root = default_nhl_source_root()
-    processed = root / "data" / "processed"
-    if processed.exists():
-        for path in sorted(processed.glob("predictions_*.csv")):
-            if path.stem.startswith("predictions_sim_"):
-                continue
-            date_str = path.stem.replace("predictions_", "", 1)
-            seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Predictions snapshot"})
-        for path in sorted(processed.glob("recommendations_sim_*.csv")):
-            date_str = path.stem.replace("recommendations_sim_", "", 1)
-            seen[date_str] = {"date": date_str, "path": str(path), "kind": "Sim snapshot"}
-        for path in sorted(processed.glob("recommendations_*.csv")):
-            if path.stem.startswith("recommendations_sim_"):
-                continue
-            date_str = path.stem.replace("recommendations_", "", 1)
-            seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Direct snapshot"})
+    for root in _data_roots():
+        processed = root / "processed"
+        if processed.exists():
+            for path in sorted(processed.glob("predictions_*.csv")):
+                if path.stem.startswith("predictions_sim_"):
+                    continue
+                date_str = path.stem.replace("predictions_", "", 1)
+                seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Predictions snapshot"})
+            for path in sorted(processed.glob("recommendations_sim_*.csv")):
+                date_str = path.stem.replace("recommendations_sim_", "", 1)
+                seen[date_str] = {"date": date_str, "path": str(path), "kind": "Sim snapshot"}
+            for path in sorted(processed.glob("recommendations_*.csv")):
+                if path.stem.startswith("recommendations_sim_"):
+                    continue
+                date_str = path.stem.replace("recommendations_", "", 1)
+                seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Direct snapshot"})
 
-    scoreboard_root = root / "data" / "odds" / "games"
-    if scoreboard_root.exists():
-        for path in sorted(scoreboard_root.glob("date=*/scoreboard.csv")):
-            parent_name = path.parent.name
-            if not parent_name.startswith("date="):
-                continue
-            date_str = parent_name.replace("date=", "", 1)
-            seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Archived scoreboard"})
+        scoreboard_root = root / "odds" / "games"
+        if scoreboard_root.exists():
+            for path in sorted(scoreboard_root.glob("date=*/scoreboard.csv")):
+                parent_name = path.parent.name
+                if not parent_name.startswith("date="):
+                    continue
+                date_str = parent_name.replace("date=", "", 1)
+                seen.setdefault(date_str, {"date": date_str, "path": str(path), "kind": "Archived scoreboard"})
 
     return sorted(seen.values(), key=lambda item: item["date"])
 
