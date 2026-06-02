@@ -21,7 +21,9 @@ services:
       - key: ODDS_API_KEY
         value: 77ae1c35140c82da1675af85dde36a44
       - key: SYNDICATE_REFRESH_LAUNCH_MODE
-        value: detached_subprocess
+        value: external_runner
+      - key: SYNDICATE_REFRESH_STATE_BACKEND
+        value: keyvalue
       - key: SYNDICATE_DATA_ROOT
         value: /opt/render/project/data
       - key: SYNDICATE_REPORTS_ROOT
