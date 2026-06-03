@@ -1890,9 +1890,6 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
             pass
     if _count_csv_rows_quick(pred_path) <= 0:
         game_odds_path = processed_root / f"game_odds_{date_str}.csv"
-        if game_odds_path.exists() and game_odds_path.is_file() and _count_csv_rows_quick(game_odds_path) > 0:
-            _append_log(log_file, f"source bootstrap did not produce {pred_path.name} for {date_str}; continuing with snapshot-only game card export from {game_odds_path.name}")
-            return True, None
         return False, f"source bootstrap did not produce {pred_path.name} (rc={bootstrap_result.get('predict_date')})"
     _append_log(log_file, f"Generated game predictions at {pred_path} (rows={_count_csv_rows_quick(pred_path)})")
     return True, None
@@ -2102,7 +2099,7 @@ def _run_refresh_via_cli(
             )
             rc_pred = 1
             if not game_predictions_ok:
-                _append_log(log_file, game_predictions_error or f"predictions missing before predict-props for {date_str}; continuing without refreshed predictions")
+                state["error"] = game_predictions_error or f"predictions missing before predict-props for {date_str}"
             else:
                 try:
                     _touch_progress()
@@ -2129,22 +2126,10 @@ def _run_refresh_via_cli(
                     _append_log(log_file, traceback.format_exc())
                     rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
-            existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
-            existing_recs_rows = int(_count_csv_rows_quick(rec_fp))
-            have_downstream_artifacts = (
-                (not do_edges or existing_edges_rows > 0)
-                and (not do_export or existing_recs_rows > 0)
-            )
             if int(rc_pred) != 0:
-                if have_downstream_artifacts:
-                    _append_log(log_file, f"predict-props returned exit code {int(rc_pred)} but downstream artifacts already exist for {date_str}; continuing")
-                else:
-                    _append_log(log_file, f"predict-props failed with exit code {int(rc_pred)} for {date_str}; continuing without refreshed predictions")
+                state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
             elif int(state["predictions_rows"] or 0) <= 0:
-                if have_downstream_artifacts:
-                    _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} but downstream artifacts already exist for {date_str}; continuing")
-                else:
-                    _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} for {date_str}; continuing without refreshed predictions")
+                state["error"] = f"predict-props wrote no rows to {pred_fp.name} for {date_str}"
             else:
                 pred_ready = True
     elif int(state["snapshot_rows"] or 0) <= 0:
@@ -2209,16 +2194,10 @@ def _run_refresh_via_cli(
         state["rc_export"] = int(rc_export)
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
-        if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0:
-            state["rc_export"] = 0
-            _append_log(log_file, f"export stage returned non-zero for {date_str} but recommendations were written; continuing")
-        elif int(rc_export) != 0 and int(state["snapshot_rows"] or 0) <= 0 and source_game_cards_rows <= 0:
-            state["rc_export"] = 0
-            _append_log(log_file, f"export stage returned non-zero for {date_str} with no snapshot rows and no game cards; continuing")
-        elif int(rc_export) != 0:
+        if int(rc_export) != 0:
             state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
-            _append_log(log_file, f"local game_cards builder wrote no rows to game_cards_{date_str}.csv; continuing with props artifacts")
+            state["error"] = f"local game_cards builder wrote no rows to game_cards_{date_str}.csv"
 
     # Build cards_sim_detail in source processed space before parity gating.
     # The source CLI does not emit this file directly; we derive it from /api/cards.
@@ -2245,19 +2224,6 @@ def _run_refresh_via_cli(
     state["smart_sim_files"] = int(_count_matching_files(source_processed_root, f"smart_sim_{date_str}_*.json"))
     if bool(do_export) and int(state["snapshot_rows"] or 0) > 0 and int(state["game_cards_rows"] or 0) > 0 and int(state["cards_sim_detail_games"] or 0) <= 0:
         state["error"] = f"cards_sim_detail_{date_str}.json has zero games while game_cards_{date_str}.csv has rows"
-        stale_exports = [
-            source_game_cards_path,
-            source_cards_sim_detail_path,
-            source_processed_root / f"cards_props_snapshot_{date_str}.json",
-            source_processed_root / f"recommendations_slate_{date_str}.json",
-        ]
-        for stale_path in stale_exports:
-            try:
-                if stale_path.exists() and stale_path.is_file():
-                    stale_path.unlink()
-                    _append_log(log_file, f"removed stale export artifact after sim parity failure: {stale_path}")
-            except Exception:
-                pass
         state["game_cards_rows"] = int(_count_csv_rows_quick(source_game_cards_path))
         state["cards_sim_detail_games"] = int(_count_cards_sim_detail_games(source_cards_sim_detail_path))
         state["smart_sim_files"] = int(_count_matching_files(source_processed_root, f"smart_sim_{date_str}_*.json"))

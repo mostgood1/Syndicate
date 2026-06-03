@@ -83,16 +83,17 @@ def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path
 def _copy_file_with_fallback(source: Path, destination: Path) -> None:
     try:
         shutil.copy2(source, destination)
+                _append_log(log_file, state["error"])
+                return
+
         return
-    except OSError as exc:
-        if exc.errno != errno.EINVAL:
-            raise
-    source_fd = os.open(str(source), os.O_RDONLY)
+                state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
+                _append_log(log_file, state["error"])
+                return
     try:
-        destination_fd = os.open(str(destination), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
-        try:
-            while True:
-                chunk = os.read(source_fd, 1024 * 1024)
+                state["error"] = f"predict-props wrote no rows to {pred_fp.name} for {date_str}"
+                _append_log(log_file, state["error"])
+                return
                 if not chunk:
                     break
                 os.write(destination_fd, chunk)
@@ -1982,9 +1983,6 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
     _repair_predictions_slate_from_game_odds_if_needed(processed_root=processed_root, date_str=date_str, log_file=log_file)
     if _count_csv_rows_quick(pred_path) <= 0:
         game_odds_path = processed_root / f"game_odds_{date_str}.csv"
-        if game_odds_path.exists() and game_odds_path.is_file() and _count_csv_rows_quick(game_odds_path) > 0:
-            _append_log(log_file, f"source bootstrap did not produce {pred_path.name} for {date_str}; continuing with snapshot-only game card export from {game_odds_path.name}")
-            return True, None
         return False, f"source bootstrap did not produce {pred_path.name} (rc={bootstrap_result.get('predict_date')})"
     _append_log(log_file, f"Generated game predictions at {pred_path} (rows={_count_csv_rows_quick(pred_path)})")
     return True, None
@@ -2341,15 +2339,13 @@ def _run_refresh_via_cli(
                 and (not do_export or existing_game_cards_rows > 0)
             )
             if int(rc_pred) != 0:
-                if have_downstream_artifacts:
-                    _append_log(log_file, f"predict-props returned exit code {int(rc_pred)} but downstream artifacts already exist for {date_str}; continuing")
-                else:
-                    _append_log(log_file, f"predict-props failed with exit code {int(rc_pred)} for {date_str}; continuing with snapshot-only game card export")
+                state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
+                _append_log(log_file, state["error"])
+                return
             elif int(state["predictions_rows"] or 0) <= 0:
-                if have_downstream_artifacts:
-                    _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} but downstream artifacts already exist for {date_str}; continuing")
-                else:
-                    _append_log(log_file, f"predict-props wrote no rows to {pred_fp.name} for {date_str}; continuing with snapshot-only game card export")
+                state["error"] = f"predict-props wrote no rows to {pred_fp.name} for {date_str}"
+                _append_log(log_file, state["error"])
+                return
             else:
                 pred_ready = True
     elif int(state["snapshot_rows"] or 0) <= 0:
@@ -2419,15 +2415,7 @@ def _run_refresh_via_cli(
         state["rc_export"] = int(rc_export)
         state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
         source_game_cards_rows = int(_count_csv_rows_quick(source_root / 'data' / 'processed' / f'game_cards_{date_str}.csv'))
-        if int(rc_export) != 0 and int(state["recs_rows"] or 0) > 0 and source_game_cards_rows > 0:
-            state["rc_export"] = 0
-        elif int(rc_export) != 0 and not pred_ready and int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows > 0:
-            state["rc_export"] = 0
-            _append_log(log_file, f"export stage returned non-zero for {date_str} without refreshed props predictions; continuing with snapshot-only game cards")
-        elif int(rc_export) != 0 and int(state["snapshot_rows"] or 0) <= 0 and source_game_cards_rows <= 0:
-            state["rc_export"] = 0
-            _append_log(log_file, f"export stage returned non-zero for {date_str} with no snapshot rows and no game cards; continuing")
-        elif int(rc_export) != 0:
+        if int(rc_export) != 0:
             state["error"] = f"export-props-recommendations failed with exit code {int(rc_export)}"
         elif int(state["snapshot_rows"] or 0) > 0 and source_game_cards_rows <= 0:
             state["error"] = f"local game_cards builder completed without writing rows to game_cards_{date_str}.csv"
