@@ -2008,6 +2008,7 @@ def _run_refresh_via_cli(
 ) -> dict[str, object]:
     raw_root = source_root / "data" / "raw"
     processed_root = source_root / "data" / "processed"
+    package_name = source_root.name
     raw_fp = raw_root / f"odds_nba_player_props_{date_str}.csv"
     pred_fp = processed_root / f"props_predictions_{date_str}.csv"
     edges_fp = processed_root / f"props_edges_{date_str}.csv"
