@@ -246,6 +246,16 @@
     return String(fallbackLabel || "");
   }
 
+  function freshnessText(row, fieldName, fallbackDetail) {
+    const rawValue = row?.[fieldName]
+      || (fieldName === 'last_seen_at' ? row?.firstSeenAt : null)
+      || (fieldName === 'first_seen_at' ? row?.lastSeenAt : null)
+      || fallbackDetail?.sim?.generatedAt
+      || fallbackDetail?.generatedAt
+      || null;
+    return rawValue ? formatTimestampShort(rawValue) : '-';
+  }
+
   function shiftIsoDate(value, days) {
     const text = String(value || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";
@@ -2117,15 +2127,6 @@
   function renderPropOverviewLens(card, detail) {
     const liveStatus = isLiveStatus(detail?.snapshot?.status?.abstractGameState || card?.status?.abstract);
     const simLoaded = !!detail?.sim;
-    function freshnessText(row, fieldName, fallbackDetail) {
-      const rawValue = row?.[fieldName]
-        || (fieldName === 'last_seen_at' ? row?.firstSeenAt : null)
-        || (fieldName === 'first_seen_at' ? row?.lastSeenAt : null)
-        || fallbackDetail?.sim?.generatedAt
-        || fallbackDetail?.generatedAt
-        || null;
-      return rawValue ? formatTimestampShort(rawValue) : '-';
-    }
     function renderPropOverviewRecoCard(entry) {
       const stateObj = entry.state;
       const reco = stateObj.reco;
