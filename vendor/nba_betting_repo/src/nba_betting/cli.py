@@ -13000,6 +13000,36 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
         part = part.drop_duplicates()
         return part if not part.empty else None
 
+    def _build_slate_from_todays_scoreboard(date_str_local: str) -> pd.DataFrame | None:
+        try:
+            import requests  # type: ignore
+
+            if date_str_local != _us_slate_date().isoformat():
+                return None
+            u = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
+            r = requests.get(u, headers={"Accept": "application/json", "User-Agent": "nba-betting/1.0"}, timeout=10)
+            if not r.ok:
+                return None
+            j = r.json() or {}
+            games = (j.get("scoreboard") or {}).get("games") or []
+            if not games:
+                return None
+            rows = []
+            for g in games:
+                home = normalize_team(str((g.get("homeTeam") or {}).get("teamCity") or "").strip() + " " + str((g.get("homeTeam") or {}).get("teamName") or "").strip())
+                away = normalize_team(str((g.get("awayTeam") or {}).get("teamCity") or "").strip() + " " + str((g.get("awayTeam") or {}).get("teamName") or "").strip())
+                if not home or not away:
+                    continue
+                rows.append({
+                    "date": pd.to_datetime(date_str_local).date(),
+                    "home_team": home,
+                    "visitor_team": away,
+                })
+            out = pd.DataFrame(rows)
+            return out if not out.empty else None
+        except Exception:
+            return None
+
     slate = None
     # Fallback: build slate from live schedule data, then local schedule artifacts, when API/history fail
     def _build_slate_from_schedule(date_str_local: str) -> pd.DataFrame | None:
@@ -13097,7 +13127,9 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
             slate = None
     except Exception as e:
         console.print(f"Scoreboard fetch failed ({e}); trying fallbacks for {date_str}.", style="yellow")
-        slate = _build_slate_from_history(date_str)
+        slate = _build_slate_from_todays_scoreboard(date_str)
+        if slate is None or slate.empty:
+            slate = _build_slate_from_history(date_str)
         if slate is None or slate.empty:
             slate = _build_slate_from_schedule(date_str)
         if slate is None or slate.empty:
