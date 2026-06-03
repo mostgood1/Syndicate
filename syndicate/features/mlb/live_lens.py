@@ -460,15 +460,20 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
         merged["trackedProps"] = card_props
     matchup = merged.get("matchup") if isinstance(merged.get("matchup"), dict) else {}
     card_matchup = {"away": card.get("away") if isinstance(card.get("away"), dict) else {}, "home": card.get("home") if isinstance(card.get("home"), dict) else {}}
-    if not matchup.get("away"):
+    if card_matchup["away"]:
         matchup["away"] = card_matchup["away"]
-    if not matchup.get("home"):
+    if card_matchup["home"]:
         matchup["home"] = card_matchup["home"]
-    if not matchup.get("liveText"):
-        matchup["liveText"] = str(card.get("summary") or card.get("detail") or "Live-lens snapshot loaded from the MLB cards artifact.").strip() or "Live-lens snapshot loaded from the MLB cards artifact."
+    matchup["liveText"] = str(card.get("summary") or card.get("detail") or matchup.get("liveText") or "Live-lens snapshot loaded from the MLB cards artifact.").strip() or "Live-lens snapshot loaded from the MLB cards artifact."
     merged["matchup"] = matchup
-    if not merged.get("status"):
-        merged["status"] = card.get("status") if isinstance(card.get("status"), dict) else {"abstract": str(card.get("status_badge") or "Live lens").strip() or "Live lens", "detailed": str(card.get("detail") or "").strip() or str(card.get("status_badge") or "Live lens").strip() or "Live lens"}
+    card_status = card.get("status") if isinstance(card.get("status"), dict) else {}
+    if card_status:
+        merged["status"] = {
+            "abstract": str(card_status.get("abstract") or card_status.get("abstractGameState") or merged.get("status", {}).get("abstract") or "Live lens").strip() or "Live lens",
+            "detailed": str(card_status.get("detailed") or card_status.get("detailedState") or card.get("detail") or merged.get("status", {}).get("detailed") or "Live lens").strip() or "Live lens",
+        }
+    elif not merged.get("status"):
+        merged["status"] = {"abstract": str(card.get("status_badge") or "Live lens").strip() or "Live lens", "detailed": str(card.get("detail") or "").strip() or str(card.get("status_badge") or "Live lens").strip() or "Live lens"}
     if not merged.get("predictions") and isinstance(card.get("predictions"), dict):
         merged["predictions"] = card.get("predictions")
     if not merged.get("gameMarkets") and isinstance(card.get("markets"), dict):
@@ -608,6 +613,9 @@ def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str)
         merged_report["counts"] = {}
     merged_counts = dict(merged_report.get("counts") or {})
     merged_counts["games"] = len(merged_games) if merged_games else int(merged_counts.get("games") or 0)
+    merged_counts["live"] = sum(1 for game in merged_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() == "live")
+    merged_counts["final"] = sum(1 for game in merged_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() == "final")
+    merged_counts["pregame"] = sum(1 for game in merged_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() not in {"live", "final"})
     merged_counts["props"] = sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in merged_games)
     merged_report["counts"] = merged_counts
     merged_report["source_title"] = str(cards_context.get("source_title") or merged_report.get("source_title") or "MLB Game Cards").strip() or "MLB Game Cards"
