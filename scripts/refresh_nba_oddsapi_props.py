@@ -2862,6 +2862,51 @@ def _export_cards_sim_detail_snapshot(*, source_root: Path, date_str: str, proce
         return existing
     out_path = processed_root / f"cards_sim_detail_{date_str}.json"
     games_out = _build_cards_sim_detail_from_local_smart_sim(processed_root=processed_root, date_str=date_str)
+    if not games_out and _source_app_fallback_enabled():
+        source_app = _load_source_app(source_root)
+        if source_app is not None:
+            client = source_app.app.test_client()
+            try:
+                response = client.get(f"/api/cards?date={date_str}&include_players=1&include_sim_ladders=1")
+                if int(getattr(response, "status_code", 0) or 0) == 200:
+                    payload = response.get_json() if response is not None else None
+                    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+                    for game in games:
+                        if not isinstance(game, dict):
+                            continue
+                        home_tri = str(game.get("home_tri") or "").strip().upper()
+                        away_tri = str(game.get("away_tri") or "").strip().upper()
+                        sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+                        if not home_tri or not away_tri or not isinstance(sim, dict):
+                            continue
+                        players = sim.get("players") if isinstance(sim.get("players"), dict) else {"home": [], "away": []}
+                        missing = sim.get("missing_prop_players") if isinstance(sim.get("missing_prop_players"), dict) else {"home": [], "away": []}
+                        injuries = sim.get("injuries") if isinstance(sim.get("injuries"), dict) else {"home": [], "away": []}
+                        summary = sim.get("players_summary") if isinstance(sim.get("players_summary"), dict) else {}
+                        games_out.append(
+                            {
+                                "home_tri": home_tri,
+                                "away_tri": away_tri,
+                                "sim": {
+                                    "players_loaded": True,
+                                    "players_summary": dict(summary),
+                                    "players": {
+                                        "home": [row for row in (players.get("home") or []) if isinstance(row, dict)],
+                                        "away": [row for row in (players.get("away") or []) if isinstance(row, dict)],
+                                    },
+                                    "missing_prop_players": {
+                                        "home": [row for row in (missing.get("home") or []) if isinstance(row, dict)],
+                                        "away": [row for row in (missing.get("away") or []) if isinstance(row, dict)],
+                                    },
+                                    "injuries": {
+                                        "home": [row for row in (injuries.get("home") or []) if isinstance(row, dict)],
+                                        "away": [row for row in (injuries.get("away") or []) if isinstance(row, dict)],
+                                    },
+                                },
+                            }
+                        )
+            except Exception:
+                pass
     if not games_out:
         return None
 

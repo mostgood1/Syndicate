@@ -178,6 +178,60 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(out_path, game_cards_path)
             self.assertTrue(game_cards_path.exists())
 
+    def test_export_cards_sim_detail_snapshot_uses_source_cards_api_fallback(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-05-22"
+
+            class FakeResponse:
+                status_code = 200
+
+                def get_json(self):
+                    return {
+                        "games": [
+                            {
+                                "home_tri": "BOS",
+                                "away_tri": "NYK",
+                                "sim": {
+                                    "players_summary": {"home": 1, "away": 1},
+                                    "players": {"home": [{"player_name": "A"}], "away": [{"player_name": "B"}]},
+                                    "missing_prop_players": {"home": [], "away": []},
+                                    "injuries": {"home": [], "away": []},
+                                },
+                            }
+                        ]
+                    }
+
+            class FakeClient:
+                def get(self, query):
+                    self.query = query
+                    return FakeResponse()
+
+            class FakeApp:
+                def test_client(self):
+                    return FakeClient()
+
+            module._source_app_fallback_enabled = lambda: True
+            module._load_source_app = lambda source_root: types.SimpleNamespace(app=FakeApp())
+
+            out_path = module._export_cards_sim_detail_snapshot(
+                source_root=source_root,
+                date_str=date_str,
+                processed_root=processed_root,
+            )
+
+            self.assertIsNotNone(out_path)
+            assert out_path is not None
+            self.assertTrue(Path(out_path).exists())
+            payload = json.loads(Path(out_path).read_text(encoding="utf-8"))
+            self.assertEqual(payload["date"], date_str)
+            self.assertEqual(len(payload["games"]), 1)
+            self.assertEqual(payload["games"][0]["home_tri"], "BOS")
+
     def test_ensure_source_game_inputs_exports_game_cards_when_missing(self) -> None:
         module = self._load_module()
 
