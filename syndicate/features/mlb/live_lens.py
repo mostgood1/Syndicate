@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -302,13 +303,38 @@ def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at
     }
 
 
-def build_live_lens_page_context(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
+def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
+    report_path = live_lens_report_path(selected_date)
+    try:
+        from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_reports_payload
+    except Exception:
+        return None
+
+    try:
+        payload = _live_lens_reports_payload(selected_date)
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    try:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        return None
+    return payload
+
+
+def build_live_lens_page_context(selected_date: str, *, season: int | None = None, persist: bool = False) -> dict[str, Any]:
     parsed_date = parse_iso_date(selected_date)
     prev_date = parsed_date.fromordinal(parsed_date.toordinal() - 1).isoformat()
     next_date = parsed_date.fromordinal(parsed_date.toordinal() + 1).isoformat()
 
     report_path = live_lens_report_path(selected_date)
-    report = load_json_file(report_path)
+    report = _persist_live_lens_report(selected_date) if persist else None
+    if not isinstance(report, dict):
+        report = load_json_file(report_path)
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date

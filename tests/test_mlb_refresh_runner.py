@@ -239,6 +239,64 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
+    def test_build_live_lens_page_context_persist_rewrites_report(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                runtime_live_lens_dir = runtime_root / "live_lens"
+                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
+                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_01.json"
+                report_path.write_text(
+                    json.dumps(
+                        {
+                            "generatedAt": "1999-01-01T00:00:00-05:00",
+                            "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                            "games": [],
+                            "dataRoot": "stale",
+                            "liveLensDir": "stale",
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+                counter = {"value": 0}
+
+                def fake_persist(selected_date: str):
+                    counter["value"] += 1
+                    payload = {
+                        "generatedAt": f"2026-06-01T21:00:0{counter['value']}-05:00",
+                        "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                        "games": [],
+                        "dataRoot": module.live_lens_report_path(selected_date).parent.parent.as_posix(),
+                        "liveLensDir": module.live_lens_report_path(selected_date).parent.as_posix(),
+                        "optimizationRegime": None,
+                    }
+                    report_path.write_text(json.dumps(payload), encoding="utf-8")
+                    return payload
+
+                module.live_lens_report_path = lambda d: report_path
+                module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
+                module._persist_live_lens_report = fake_persist
+
+                first_context = module.build_live_lens_page_context("2026-06-01", persist=True)
+                second_context = module.build_live_lens_page_context("2026-06-01", persist=True)
+                persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(counter["value"], 2)
+            self.assertEqual(first_context["generatedAt"], "2026-06-01T21:00:01-05:00")
+            self.assertEqual(second_context["generatedAt"], "2026-06-01T21:00:02-05:00")
+            self.assertEqual(persisted_report["generatedAt"], "2026-06-01T21:00:02-05:00")
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_main_prefers_existing_source_artifacts_when_overwrite_off(self) -> None:
         module = self._load_module()
 
