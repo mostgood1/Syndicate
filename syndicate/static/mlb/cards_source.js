@@ -818,7 +818,7 @@
       { key: "first3", label: "F3", innings: 3 },
       { key: "first5", label: "F5", innings: 5 },
       { key: "first7", label: "F7", innings: 7 },
-      { key: "full", label: "Full", innings: 9 },
+      { key: "full", label: "Full game", innings: 9 },
     ];
 
     return dedupeGameLensRows(segments.map((segment) => {
@@ -955,6 +955,7 @@
   function renderGameLens(card, detail) {
     const rows = buildGameLensRows(card, detail);
     if (!rows.length) return '<div class="cards-empty-copy">No live game lens available.</div>';
+    const oddsUpdatedAt = trackedGameLinesUpdatedAt(card);
     function resultLabel(result, prefix) {
       const text = String(result || '').trim().toLowerCase();
       if (!text || text === 'pending') return '';
@@ -1161,6 +1162,7 @@
           ${reasonBlock ? `<div class="cards-live-lens-reasons">${reasonBlock}</div>` : ''}
           <div class="cards-prop-overview-foot">
             <span>${escapeHtml(marketLine || 'No tracked market line')}</span>
+            <span>${escapeHtml(oddsUpdatedAt ? `Odds updated ${formatTimestampShort(oddsUpdatedAt)}` : 'Odds updated -')}</span>
             <span>${escapeHtml(row.closed || row.projection.homeMargin == null ? 'Segment closed' : `Projected margin ${formatSigned(row.projection.homeMargin, 2)}`)}</span>
           </div>
         </div>`;
