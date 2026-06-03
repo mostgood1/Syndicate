@@ -1483,6 +1483,7 @@ if (-not $SkipWNBA) {
     $wnbaEnvOverrides = @{
         REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = [string]$runtimePolicy.WNBA.smartsimNSims
         REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS = [string]$runtimePolicy.WNBA.smartsimWorkers
+        SYNDICATE_WNBA_SOURCE_APP_FALLBACK = '1'
     }
     if (-not [string]::IsNullOrWhiteSpace($sharedOddsApiKey)) {
         $wnbaEnvOverrides.ODDS_API_KEY = $sharedOddsApiKey
@@ -1742,7 +1743,7 @@ try {
             }
 
             if (-not $DryRun -and -not $hasLaterStepForSport) {
-                Assert-AdvancedDataReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot
+                Assert-AdvancedDataReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RunDir $runDir
             }
 
             if (-not $SkipGitPush) {
