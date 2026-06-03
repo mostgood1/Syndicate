@@ -12,9 +12,9 @@
     const intervalMs = Number(settings.intervalMs) > 0 ? Number(settings.intervalMs) : DEFAULT_INTERVAL_MS;
     const onTick = typeof settings.onTick === 'function' ? settings.onTick : function () {};
     const onFocus = typeof settings.onFocus === 'function' ? settings.onFocus : null;
-    const skipWhenHidden = settings.skipWhenHidden !== false;
-    const refreshOnVisible = settings.refreshOnVisible === true;
-    const refreshOnFocus = settings.refreshOnFocus === true;
+    const skipWhenHidden = settings.skipWhenHidden === true;
+    const refreshOnVisible = settings.refreshOnVisible !== false;
+    const refreshOnFocus = settings.refreshOnFocus !== false;
     const stopOnPageHide = settings.stopOnPageHide !== false;
     const preventOverlap = settings.preventOverlap !== false;
     let handle = null;
