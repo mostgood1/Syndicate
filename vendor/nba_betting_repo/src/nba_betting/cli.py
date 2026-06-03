@@ -12408,7 +12408,7 @@ def _predict_from_matchups(inp: pd.DataFrame) -> pd.DataFrame:
             pass
         
     except Exception as e:
-        console.print(f"⚠️  NPU predictor not available: {e}", style="yellow")
+        console.print(f"WARNING: NPU predictor not available: {e}", style="yellow")
         console.print("Falling back to sklearn models (requires sklearn installed)...", style="yellow")
         # Fallback to sklearn models
         win_model = joblib.load(paths.models / "win_prob.joblib")
@@ -12435,7 +12435,7 @@ def _predict_from_matchups(inp: pd.DataFrame) -> pd.DataFrame:
             halves = joblib.load(paths.models / "halves_models.joblib")
             quarters = joblib.load(paths.models / "quarters_models.joblib")
         except Exception:
-            console.print("⚠️  Period models not available in fallback", style="yellow")
+            console.print("WARNING: Period models not available in fallback", style="yellow")
             halves = {}
             quarters = {}
         
@@ -12517,7 +12517,7 @@ def daily_update_cmd(date_str: str | None, season: str, odds_api_key: str | None
                     rc = subprocess.run(cmd, cwd=paths.root, stdout=fh, stderr=subprocess.STDOUT, check=False)
                 console.print(f"  [OK] Game actuals for {past_date} (rc={rc.returncode})")
             except Exception as e:
-                console.print(f"  ⚠️  Game actuals for {past_date}: {e}")
+                console.print(f"  WARNING: Game actuals for {past_date}: {e}")
     except Exception as e:
         console.print(f"Game actuals reconciliation failed: {e}", style="yellow")
 
@@ -12557,7 +12557,7 @@ def daily_update_cmd(date_str: str | None, season: str, odds_api_key: str | None
                             pass
                         console.print(f"  [OK] Prop actuals for {past_date}")
             except Exception as e:
-                console.print(f"  ⚠️  Prop actuals for {past_date}: {e}")
+                console.print(f"  WARNING: Prop actuals for {past_date}: {e}")
     except Exception as e:
         console.print(f"Props actuals reconciliation failed: {e}", style="yellow")
 
@@ -12891,7 +12891,7 @@ def sync_frontend_cmd(date_str: str | None, cleanup_days: int):
             console.print(f"  [OK] {file_path}")
         
         if results["errors"]:
-            console.print(f"\n⚠️  Errors: {len(results['errors'])}")
+            console.print(f"\nWARNING: Errors: {len(results['errors'])}")
             for error in results["errors"]:
                 console.print(f"  [ERROR] {error}")
         
@@ -12943,7 +12943,7 @@ def frontend_status_cmd():
             console.print(f"  {date_str}: {available_count}/{total_count} files available")
         
         if status["missing_files"]:
-            console.print(f"\n⚠️  Missing Files:")
+            console.print(f"\nWARNING: Missing Files:")
             for file_name in status["missing_files"]:
                 console.print(f"  [ERROR] {file_name}")
         
@@ -13052,7 +13052,9 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
         except Exception:
             return None
 
-    slate = None
+    slate = _build_slate_from_game_cards(date_str)
+    if slate is None or slate.empty:
+        slate = None
     # Fallback: build slate from live schedule data, then local schedule artifacts, when API/history fail
     def _build_slate_from_schedule(date_str_local: str) -> pd.DataFrame | None:
         try:
@@ -13102,63 +13104,62 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
             return out if not out.empty else None
         except Exception:
             return None
-    try:
-        # Fetch slate from ScoreboardV2
-        sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
-        nd = sb.get_normalized_dict()
-        gh = pd.DataFrame(nd.get("GameHeader", []))
-        ls = pd.DataFrame(nd.get("LineScore", []))
-        if gh.empty or ls.empty:
-            raise RuntimeError("Scoreboard returned empty tables")
-        gh_cols = {c.upper(): c for c in gh.columns}
-        ls_cols = {c.upper(): c for c in ls.columns}
-        required = ["GAME_ID", "HOME_TEAM_ID", "VISITOR_TEAM_ID", "GAME_DATE_EST"]
-        if "GAME_DATE_EST" not in gh_cols and "GAME_DATE" in gh_cols:
-            gh_cols["GAME_DATE_EST"] = gh_cols["GAME_DATE"]
-        if not all(k in gh_cols for k in required) or not {"GAME_ID", "TEAM_ID", "TEAM_ABBREVIATION"}.issubset(ls_cols.keys()):
-            raise RuntimeError("Scoreboard missing required columns")
+    if slate is None or slate.empty:
+        try:
+            # Fetch slate from ScoreboardV2
+            sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+            nd = sb.get_normalized_dict()
+            gh = pd.DataFrame(nd.get("GameHeader", []))
+            ls = pd.DataFrame(nd.get("LineScore", []))
+            if gh.empty or ls.empty:
+                raise RuntimeError("Scoreboard returned empty tables")
+            gh_cols = {c.upper(): c for c in gh.columns}
+            ls_cols = {c.upper(): c for c in ls.columns}
+            required = ["GAME_ID", "HOME_TEAM_ID", "VISITOR_TEAM_ID", "GAME_DATE_EST"]
+            if "GAME_DATE_EST" not in gh_cols and "GAME_DATE" in gh_cols:
+                gh_cols["GAME_DATE_EST"] = gh_cols["GAME_DATE"]
+            if not all(k in gh_cols for k in required) or not {"GAME_ID", "TEAM_ID", "TEAM_ABBREVIATION"}.issubset(ls_cols.keys()):
+                raise RuntimeError("Scoreboard missing required columns")
 
-        # Map TEAM_ID -> ABBR for this date
-        team_abbr_map = {}
-        for _, r in ls.iterrows():
-            try:
-                team_abbr_map[int(r[ls_cols["TEAM_ID"]])] = str(r[ls_cols["TEAM_ABBREVIATION"]])
-            except Exception:
-                continue
-        # Build matchups
-        team_list = static_teams.get_teams(); abbr_to_full = {t['abbreviation']: t['full_name'] for t in team_list}
-        rows = []
-        for _, g in gh.iterrows():
-            try:
-                home_id = int(g[gh_cols["HOME_TEAM_ID"]]); vis_id = int(g[gh_cols["VISITOR_TEAM_ID"]])
-                habbr = team_abbr_map.get(home_id); vabbr = team_abbr_map.get(vis_id)
-                if not habbr or not vabbr:
+            # Map TEAM_ID -> ABBR for this date
+            team_abbr_map = {}
+            for _, r in ls.iterrows():
+                try:
+                    team_abbr_map[int(r[ls_cols["TEAM_ID"]])] = str(r[ls_cols["TEAM_ABBREVIATION"]])
+                except Exception:
                     continue
-                home = normalize_team(abbr_to_full.get(habbr, habbr))
-                away = normalize_team(abbr_to_full.get(vabbr, vabbr))
-                rows.append({
-                    "date": pd.to_datetime(g[gh_cols["GAME_DATE_EST"]]).date(),
-                    "home_team": home,
-                    "visitor_team": away,
-                })
-            except Exception:
-                continue
-        if rows:
-            slate = pd.DataFrame(rows)
-        else:
-            slate = None
-    except Exception as e:
-        console.print(f"Scoreboard fetch failed ({e}); trying fallbacks for {date_str}.", style="yellow")
-        console.print(f"Trying local game cards for {date_str}.", style="yellow")
-        slate = _build_slate_from_game_cards(date_str)
-        if slate is None or slate.empty:
+            # Build matchups
+            team_list = static_teams.get_teams(); abbr_to_full = {t['abbreviation']: t['full_name'] for t in team_list}
+            rows = []
+            for _, g in gh.iterrows():
+                try:
+                    home_id = int(g[gh_cols["HOME_TEAM_ID"]]); vis_id = int(g[gh_cols["VISITOR_TEAM_ID"]])
+                    habbr = team_abbr_map.get(home_id); vabbr = team_abbr_map.get(vis_id)
+                    if not habbr or not vabbr:
+                        continue
+                    home = normalize_team(abbr_to_full.get(habbr, habbr))
+                    away = normalize_team(abbr_to_full.get(vabbr, vabbr))
+                    rows.append({
+                        "date": pd.to_datetime(g[gh_cols["GAME_DATE_EST"]]).date(),
+                        "home_team": home,
+                        "visitor_team": away,
+                    })
+                except Exception:
+                    continue
+            if rows:
+                slate = pd.DataFrame(rows)
+            else:
+                slate = None
+        except Exception as e:
+            console.print(f"Scoreboard fetch failed ({e}); trying fallbacks for {date_str}.", style="yellow")
+            console.print(f"Trying local game cards for {date_str}.", style="yellow")
             slate = _build_slate_from_todays_scoreboard(date_str)
-        if slate is None or slate.empty:
-            slate = _build_slate_from_history(date_str)
-        if slate is None or slate.empty:
-            slate = _build_slate_from_schedule(date_str)
-        if slate is None or slate.empty:
-            slate = _build_slate_from_game_odds(date_str)
+            if slate is None or slate.empty:
+                slate = _build_slate_from_history(date_str)
+            if slate is None or slate.empty:
+                slate = _build_slate_from_schedule(date_str)
+            if slate is None or slate.empty:
+                slate = _build_slate_from_game_odds(date_str)
 
     if slate is None or slate.empty:
         console.print(f"No games found on {date_str} (API down and no history/schedule/game-odds fallback).", style="yellow"); return
@@ -14995,7 +14996,7 @@ def run_all_improvements():
             stats.to_csv(output_path, index=False)
             console.print(f"[OK] Saved {len(stats)} teams to {output_path}", style="green")
         else:
-            console.print("⚠️  No stats fetched", style="yellow")
+            console.print("WARNING: No stats fetched", style="yellow")
     except Exception as e:
         console.print(f"[ERROR] Error fetching stats: {e}", style="red")
     
@@ -15010,7 +15011,7 @@ def run_all_improvements():
             summary = injuries.groupby(['team', 'status']).size().reset_index(name='count')
             console.print(summary)
         else:
-            console.print("⚠️  No injuries fetched", style="yellow")
+            console.print("WARNING: No injuries fetched", style="yellow")
     except Exception as e:
         console.print(f"[ERROR] Error fetching injuries: {e}", style="red")
     
