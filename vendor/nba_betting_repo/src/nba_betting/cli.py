@@ -13149,6 +13149,7 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
             slate = None
     except Exception as e:
         console.print(f"Scoreboard fetch failed ({e}); trying fallbacks for {date_str}.", style="yellow")
+        console.print(f"Trying local game cards for {date_str}.", style="yellow")
         slate = _build_slate_from_game_cards(date_str)
         if slate is None or slate.empty:
             slate = _build_slate_from_todays_scoreboard(date_str)
