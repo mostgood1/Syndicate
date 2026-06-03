@@ -2191,7 +2191,7 @@
           ${renderPropOverviewLane('Pitcher recos', '', loadingMessage)}
         </div>`;
     }
-    const overviewRows = livePayloadAvailable ? liveRows : (liveStatus ? liveLensAllPropRows(card) : []);
+    const overviewRows = livePayloadAvailable ? liveRows : [];
     const rankedRows = overviewRows
       .map((reco) => ({ reco, state: propLensState(card, detail, reco) }))
       .filter((entry) => entry.state && entry.state.reco)
@@ -2412,7 +2412,7 @@
         { label: "Sim row", value: simLabel },
         { label: "Model mean", value: modelMean == null ? "-" : `${formatLine(modelMean)} ${metricLabel(selected)}` },
         { label: "Live proj", value: liveProjection == null ? "-" : `${formatLine(liveProjection)} ${metricLabel(selected)}` },
-        { label: "Updated", value: freshnessText(selected, 'last_seen_at', detail) },
+        { label: "Odds updated", value: freshnessText(selected, 'last_seen_at', detail) },
         { label: "Active since", value: freshnessText(selected, 'first_seen_at', detail) },
         { label: "Opened at", value: selected?.first_seen_odds != null ? formatOdds(selected.first_seen_odds) : formatOdds(selected?.odds) },
         { label: "Line", value: lineLabel },
