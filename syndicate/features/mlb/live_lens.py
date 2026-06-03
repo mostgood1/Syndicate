@@ -364,7 +364,21 @@ def _card_score_from_card(card: dict[str, Any]) -> dict[str, Any]:
         return dict(score)
     matchup = card.get("matchup") if isinstance(card.get("matchup"), dict) else {}
     score = matchup.get("score") if isinstance(matchup.get("score"), dict) else {}
-    return dict(score) if score else {}
+    if score:
+        return dict(score)
+    actual_box_panel = card.get("actual_box_panel") if isinstance(card.get("actual_box_panel"), dict) else {}
+    actual_box = actual_box_panel.get("actual_box") if isinstance(actual_box_panel.get("actual_box"), dict) else {}
+    totals = actual_box.get("totals") if isinstance(actual_box.get("totals"), list) else []
+    score_by_team: dict[str, Any] = {}
+    for row in totals:
+        if not isinstance(row, dict):
+            continue
+        team = str(row.get("team") or "").strip().lower()
+        total_info = row.get("totals") if isinstance(row.get("totals"), dict) else {}
+        runs = total_info.get("R") if isinstance(total_info, dict) else None
+        if team in {"away", "home"} and runs is not None:
+            score_by_team[team] = runs
+    return {"away": score_by_team.get("away"), "home": score_by_team.get("home")} if score_by_team else {}
 
 
 def _live_lens_segments_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
@@ -536,6 +550,7 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
     merged = dict(row)
     card_props = _live_props_from_card(card)
     card_segments = _live_lens_segments_from_card(card)
+    card_score = _card_score_from_card(card)
     if card_segments:
         merged["gameLens"] = card_segments
     if card_props:
@@ -546,7 +561,6 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
         merged["trackedProps"] = card_props
     matchup = merged.get("matchup") if isinstance(merged.get("matchup"), dict) else {}
     card_matchup = {"away": card.get("away") if isinstance(card.get("away"), dict) else {}, "home": card.get("home") if isinstance(card.get("home"), dict) else {}}
-    card_score = _card_score_from_card(card)
     if card_matchup["away"]:
         matchup["away"] = card_matchup["away"]
     if card_matchup["home"]:
@@ -606,6 +620,7 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
     away = card.get("away") if isinstance(card.get("away"), dict) else {}
     home = card.get("home") if isinstance(card.get("home"), dict) else {}
     score = _card_score_from_card(card)
+    card_props = _live_props_from_card(card)
     return {
         "gamePk": int(card.get("gamePk") or 0),
         "status": card.get("status") if isinstance(card.get("status"), dict) else {"abstract": _card_status_bucket(card).title(), "detailed": str(card.get("detail") or report_date).strip() or report_date},
@@ -623,10 +638,10 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
         "prop_groups": card.get("prop_groups") if isinstance(card.get("prop_groups"), list) else [],
         "prop_lens": card.get("prop_lens") if isinstance(card.get("prop_lens"), dict) else {},
         "market_tiles": card.get("market_tiles") if isinstance(card.get("market_tiles"), list) else [],
-        "props": card.get("props") if isinstance(card.get("props"), list) else [],
-        "liveProps": card.get("liveProps") if isinstance(card.get("liveProps"), list) else [],
+        "props": card_props if card_props else (card.get("props") if isinstance(card.get("props"), list) else []),
+        "liveProps": card_props if card_props else (card.get("liveProps") if isinstance(card.get("liveProps"), list) else []),
         "archivedLiveProps": card.get("archivedLiveProps") if isinstance(card.get("archivedLiveProps"), list) else [],
-        "trackedProps": card.get("trackedProps") if isinstance(card.get("trackedProps"), list) else [],
+        "trackedProps": card_props if card_props else (card.get("trackedProps") if isinstance(card.get("trackedProps"), list) else []),
         "probable": card.get("probable") if isinstance(card.get("probable"), dict) else {},
         "actual_box_panel": card.get("actual_box_panel") if isinstance(card.get("actual_box_panel"), dict) else {},
         "first1BetSignal": card.get("first1BetSignal") if isinstance(card.get("first1BetSignal"), dict) else {},
