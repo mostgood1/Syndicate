@@ -216,7 +216,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
                 module._DATA_DIR = runtime_root
                 module._LIVE_LENS_DIR = runtime_live_lens_dir
-                module._is_live_lens_loop_enabled = lambda: True
+                module._is_live_lens_loop_enabled = lambda: False
                 module._is_historical_date = lambda d: False
                 module._live_lens_report_path = lambda d: report_path
                 module._payload_cache_get_or_build = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cache should be bypassed for persist=on"))
