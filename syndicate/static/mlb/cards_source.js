@@ -2117,6 +2117,15 @@
   function renderPropOverviewLens(card, detail) {
     const liveStatus = isLiveStatus(detail?.snapshot?.status?.abstractGameState || card?.status?.abstract);
     const simLoaded = !!detail?.sim;
+    function freshnessText(row, fieldName, fallbackDetail) {
+      const rawValue = row?.[fieldName]
+        || (fieldName === 'last_seen_at' ? row?.firstSeenAt : null)
+        || (fieldName === 'first_seen_at' ? row?.lastSeenAt : null)
+        || fallbackDetail?.sim?.generatedAt
+        || fallbackDetail?.generatedAt
+        || null;
+      return rawValue ? formatTimestampShort(rawValue) : '-';
+    }
     function renderPropOverviewRecoCard(entry) {
       const stateObj = entry.state;
       const reco = stateObj.reco;
@@ -2387,8 +2396,8 @@
         { label: "Sim row", value: simLabel },
         { label: "Model mean", value: modelMean == null ? "-" : `${formatLine(modelMean)} ${metricLabel(selected)}` },
         { label: "Live proj", value: liveProjection == null ? "-" : `${formatLine(liveProjection)} ${metricLabel(selected)}` },
-        { label: "Updated", value: selected?.last_seen_at ? formatTimestampShort(selected.last_seen_at) : "-" },
-        { label: "Active since", value: selected?.first_seen_at ? formatTimestampShort(selected.first_seen_at) : "-" },
+        { label: "Updated", value: freshnessText(selected, 'last_seen_at', detail) },
+        { label: "Active since", value: freshnessText(selected, 'first_seen_at', detail) },
         { label: "Opened at", value: selected?.first_seen_odds != null ? formatOdds(selected.first_seen_odds) : formatOdds(selected?.odds) },
         { label: "Line", value: lineLabel },
         { label: "Live edge", value: liveEdge == null ? "-" : formatSigned(liveEdge, 2) },
@@ -2564,8 +2573,8 @@
       { label: "Sim row", value: simLabel },
       { label: "Model mean", value: modelMean == null ? "-" : `${formatLine(modelMean)} ${metricLabel(selected)}` },
       { label: "Live proj", value: liveProjection == null ? "-" : `${formatLine(liveProjection)} ${metricLabel(selected)}` },
-      { label: "Updated", value: selected?.last_seen_at ? formatTimestampShort(selected.last_seen_at) : "-" },
-      { label: "Active since", value: selected?.first_seen_at ? formatTimestampShort(selected.first_seen_at) : "-" },
+      { label: "Updated", value: freshnessText(selected, 'last_seen_at', detail) },
+      { label: "Active since", value: freshnessText(selected, 'first_seen_at', detail) },
       { label: "Opened at", value: selected?.first_seen_odds != null ? formatOdds(selected.first_seen_odds) : formatOdds(selected?.odds) },
       { label: "Line", value: lineLabel },
       { label: "Live edge", value: liveEdge == null ? "-" : formatSigned(liveEdge, 2) },

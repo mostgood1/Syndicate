@@ -2513,6 +2513,7 @@ def _bounded_live_pitcher_projection(actual_value: float | None, model_mean: flo
 def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, Any] | None, actual_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(sim_payload, dict) or not isinstance(actual_payload, dict):
         return []
+    refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
     sim_section = sim_payload.get("sim") if isinstance(sim_payload.get("sim"), dict) else {}
     pitcher_models = sim_section.get("pitcher_props") if isinstance(sim_section.get("pitcher_props"), dict) else {}
     market_lines = _pitcher_snapshot_market_lines(selected_date)
@@ -2592,6 +2593,8 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
                     "market_prob_mode": side_pick.get("marketProbMode"),
                     "selected_side_market_prob": side_pick.get("selectedSideMarketProb"),
                     "projection_gap": side_pick.get("projectionGap"),
+                    "firstSeenAt": refreshed_at,
+                    "lastSeenAt": refreshed_at,
                     "recommendation_tier": "live",
                     "source": "current_market",
                 }
@@ -2868,6 +2871,7 @@ def _synth_live_hitter_prop_rows(
     actual_payload: dict[str, Any] | None,
     existing_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
     sim_section = sim_payload.get("sim") if isinstance((sim_payload or {}).get("sim"), dict) else {}
     hitter_models = sim_section.get("hitter_props") if isinstance(sim_section.get("hitter_props"), dict) else {}
     if not hitter_models:
@@ -2977,6 +2981,8 @@ def _synth_live_hitter_prop_rows(
                 "pa_mean": _safe_float(model_row.get("pa_mean")),
                 "ab_mean": _safe_float(model_row.get("ab_mean")),
                 "rank": None,
+                "firstSeenAt": refreshed_at,
+                "lastSeenAt": refreshed_at,
                 "recommendation_tier": "live",
                 "source": "current_market",
             }
@@ -3142,6 +3148,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
     away_team = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
     home_team = matchup.get("home") if isinstance(matchup.get("home"), dict) else {}
     today_iso = central_today_iso()
+    refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds")
     is_historical_date = bool(selected_date and selected_date != today_iso)
     has_live_props = isinstance((live_lens_row or {}).get("liveProps"), list) and bool((live_lens_row or {}).get("liveProps"))
     has_archived_live_props = isinstance((live_lens_row or {}).get("archivedLiveProps"), list) and bool((live_lens_row or {}).get("archivedLiveProps"))
@@ -3180,6 +3187,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
             "found": False,
             "date": selected_date,
             "gamePk": int(game_pk),
+            "generatedAt": refreshed_at,
             "away": {
                 "abbreviation": str(away_team.get("abbr") or "").strip() or None,
                 "name": str(away_team.get("name") or "").strip() or None,
@@ -3225,6 +3233,7 @@ def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, 
         "note": sim_section.get("note") or sim_payload.get("note"),
         "predictedMode": sim_section.get("predictedMode") or sim_payload.get("predicted_mode"),
         "sourceFile": sim_payload.get("source_file") or sim_payload.get("sourceFile"),
+        "generatedAt": refreshed_at,
         "segments": sim_section.get("segments") if isinstance(sim_section.get("segments"), dict) else {},
         "livePitcherModelMismatches": sim_section.get("livePitcherModelMismatches") if isinstance(sim_section.get("livePitcherModelMismatches"), list) else [],
         "roster_snapshot": sim_section.get("roster_snapshot") if isinstance(sim_section.get("roster_snapshot"), dict) else {},
