@@ -430,7 +430,7 @@
     if (state.loading) return;
     state.loading = true;
     try {
-      const response = await fetch(`${state.apiPath}?date=${encodeURIComponent(state.date)}&_ts=${Date.now()}`, { cache: "no-store" });
+      const response = await fetch(`${state.apiPath}?date=${encodeURIComponent(state.date)}&persist=on&_ts=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       const counts = payload?.counts || {};
