@@ -13030,6 +13030,28 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
         except Exception:
             return None
 
+    def _build_slate_from_game_cards(date_str_local: str) -> pd.DataFrame | None:
+        try:
+            cards_path = paths.data_processed / f"game_cards_{date_str_local}.csv"
+            if not cards_path.exists():
+                return None
+            cards = pd.read_csv(cards_path)
+            if cards is None or cards.empty:
+                return None
+            home_col = "home_team" if "home_team" in cards.columns else None
+            away_col = "visitor_team" if "visitor_team" in cards.columns else ("away_team" if "away_team" in cards.columns else None)
+            if not home_col or not away_col:
+                return None
+            out = cards[[home_col, away_col]].copy()
+            out = out.rename(columns={home_col: "home_team", away_col: "visitor_team"})
+            out["home_team"] = out["home_team"].astype(str).map(normalize_team)
+            out["visitor_team"] = out["visitor_team"].astype(str).map(normalize_team)
+            out["date"] = pd.to_datetime(date_str_local).date()
+            out = out[["date", "home_team", "visitor_team"]].dropna().drop_duplicates()
+            return out if not out.empty else None
+        except Exception:
+            return None
+
     slate = None
     # Fallback: build slate from live schedule data, then local schedule artifacts, when API/history fail
     def _build_slate_from_schedule(date_str_local: str) -> pd.DataFrame | None:
@@ -13127,7 +13149,9 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
             slate = None
     except Exception as e:
         console.print(f"Scoreboard fetch failed ({e}); trying fallbacks for {date_str}.", style="yellow")
-        slate = _build_slate_from_todays_scoreboard(date_str)
+        slate = _build_slate_from_game_cards(date_str)
+        if slate is None or slate.empty:
+            slate = _build_slate_from_todays_scoreboard(date_str)
         if slate is None or slate.empty:
             slate = _build_slate_from_history(date_str)
         if slate is None or slate.empty:
