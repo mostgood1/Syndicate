@@ -3,6 +3,7 @@
 # Force redeploy after MLB source_artifacts path fix.
 # Force redeploy after MLB live-lens rebuild fallback.
 # Force redeploy after MLB live-lens deployment lag.
+# Force redeploy after stalled Render healthz commit.
 services:
   - type: web
     name: syndicate
