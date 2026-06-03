@@ -1764,6 +1764,27 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
 
         enriched_games.append(merged_game)
     games = enriched_games
+    live_lens_report = load_json_file(live_lens_report_path(selected_date))
+    live_lens_rows = (live_lens_report.get("games") if isinstance((live_lens_report or {}).get("games"), list) else [])
+    if live_lens_rows:
+        live_lens_by_game_pk: dict[int, dict[str, Any]] = {}
+        for row in live_lens_rows:
+            if not isinstance(row, dict):
+                continue
+            try:
+                game_pk = int(row.get("gamePk") or 0)
+            except Exception:
+                game_pk = 0
+            if game_pk:
+                live_lens_by_game_pk[game_pk] = row
+        if live_lens_by_game_pk:
+            games = [
+                _merge_live_lens_row_into_game(game, live_lens_by_game_pk.get(int(game.get("gamePk") or game.get("game_pk") or 0), {}))
+                if int(game.get("gamePk") or game.get("game_pk") or 0)
+                and int(game.get("gamePk") or game.get("game_pk") or 0) in live_lens_by_game_pk
+                else game
+                for game in games
+            ]
     top_rows = []
     for row in hr_rows:
         if not isinstance(row, dict):
@@ -1941,6 +1962,40 @@ def _live_lens_game_row(selected_date: str, game_pk: int) -> dict[str, Any] | No
         if isinstance(row, dict) and int(row.get("gamePk") or 0) == int(game_pk):
             return row
     return None
+
+def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(game)
+    for key in (
+        "status",
+        "score",
+        "matchup",
+        "predictions",
+        "gameMarkets",
+        "markets",
+        "gameLens",
+        "props",
+        "liveProps",
+        "trackedProps",
+        "archivedLiveProps",
+        "snapshotAvailable",
+        "simContextAvailable",
+    ):
+        value = live_lens_row.get(key)
+        if value is None:
+            continue
+        if isinstance(value, (dict, list)) and not value:
+            continue
+        merged[key] = value
+    summary = str(live_lens_row.get("summary") or "").strip()
+    if summary:
+        merged["summary"] = summary
+    detail = str(live_lens_row.get("detail") or "").strip()
+    if detail:
+        merged["detail"] = detail
+    start_time = str(live_lens_row.get("startTime") or "").strip()
+    if start_time:
+        merged["startTime"] = start_time
+    return merged
 
 
 def _live_prop_kind(market_label: str) -> tuple[str, str]:
@@ -4114,6 +4169,27 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         actual_games=actual_games,
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
+    live_lens_report = load_json_file(live_lens_report_path(selected_date))
+    live_lens_rows = (live_lens_report.get("games") if isinstance((live_lens_report or {}).get("games"), list) else [])
+    if live_lens_rows:
+        live_lens_by_game_pk: dict[int, dict[str, Any]] = {}
+        for row in live_lens_rows:
+            if not isinstance(row, dict):
+                continue
+            try:
+                game_pk = int(row.get("gamePk") or 0)
+            except Exception:
+                game_pk = 0
+            if game_pk:
+                live_lens_by_game_pk[game_pk] = row
+        if live_lens_by_game_pk:
+            games = [
+                _merge_live_lens_row_into_game(game, live_lens_by_game_pk.get(int(game.get("gamePk") or game.get("game_pk") or 0), {}))
+                if int(game.get("gamePk") or game.get("game_pk") or 0)
+                and int(game.get("gamePk") or game.get("game_pk") or 0) in live_lens_by_game_pk
+                else game
+                for game in games
+            ]
     _attach_cards_pregame_starter_ladder_badges(games, selected_date=selected_date)
     _attach_cards_stateful_starter_ladder_badges(
         games,

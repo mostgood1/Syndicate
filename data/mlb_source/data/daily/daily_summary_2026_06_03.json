@@ -4,11 +4,54 @@
   "games": 15,
   "preserved_started_games": [],
   "preserved_started_games_n": 0,
-  "started_game_repairs": [],
-  "started_game_repairs_n": 0,
+  "started_game_repairs": [
+    {
+      "idx": 0,
+      "game_pk": 822727,
+      "status": {
+        "abstract": "Live",
+        "detailed": "Warmup"
+      },
+      "away": {
+        "abbr": "MIA",
+        "team_id": 146
+      },
+      "home": {
+        "abbr": "WSH",
+        "team_id": 120
+      },
+      "reason": "missing_artifact",
+      "existing_sims": null,
+      "target_sims": 1000,
+      "sim_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-06-03/sim_0_MIA_at_WSH_pk822727_g1.json",
+      "roster_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-06-03/roster_0_MIA_at_WSH_pk822727_g1.json"
+    },
+    {
+      "idx": 1,
+      "game_pk": 822973,
+      "status": {
+        "abstract": "Live",
+        "detailed": "Warmup"
+      },
+      "away": {
+        "abbr": "DET",
+        "team_id": 116
+      },
+      "home": {
+        "abbr": "TB",
+        "team_id": 139
+      },
+      "reason": "missing_artifact",
+      "existing_sims": null,
+      "target_sims": 1000,
+      "sim_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/sims/2026-06-03/sim_1_DET_at_TB_pk822973_g1.json",
+      "roster_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/snapshots/2026-06-03/roster_1_DET_at_TB_pk822973_g1.json"
+    }
+  ],
+  "started_game_repairs_n": 2,
   "failures": [],
   "failures_n": 0,
-  "generated_at": "2026-06-03T11:50:21.696151",
+  "generated_at": "2026-06-03T12:12:23.956288",
   "outputs": [
     {
       "game_pk": 822727,
