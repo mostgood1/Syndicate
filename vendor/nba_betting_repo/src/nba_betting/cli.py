@@ -550,7 +550,7 @@ def _us_slate_date() -> _date:
     """Return the current NBA slate date using US local time, not UTC."""
     import datetime as _dt
 
-    tz_name = str(os.environ.get("APP_TZ") or "America/New_York").strip() or "America/New_York"
+    tz_name = str(os.environ.get("APP_TZ") or "America/Chicago").strip() or "America/Chicago"
     cutoff_hour = 6
     try:
         from zoneinfo import ZoneInfo
@@ -558,10 +558,10 @@ def _us_slate_date() -> _date:
         now_local = _dt.datetime.now(ZoneInfo(tz_name))
     except Exception:
         tz_map = {
-            "America/New_York": -5,
-            "US/Eastern": -5,
             "America/Chicago": -6,
             "US/Central": -6,
+            "America/New_York": -5,
+            "US/Eastern": -5,
             "America/Denver": -7,
             "US/Mountain": -7,
             "America/Los_Angeles": -8,
@@ -570,9 +570,9 @@ def _us_slate_date() -> _date:
         off = tz_map.get(tz_name)
         if off is None:
             try:
-                off = int((os.environ.get("APP_TZ_OFFSET_HOURS") or "-5").strip())
+                off = int((os.environ.get("APP_TZ_OFFSET_HOURS") or "-6").strip())
             except Exception:
-                off = -5
+                off = -6
         now_local = _dt.datetime.utcnow() + _dt.timedelta(hours=off)
     if now_local.hour < cutoff_hour:
         now_local = now_local - _dt.timedelta(days=1)
@@ -596,11 +596,20 @@ def _load_schedule_day(date_str: str) -> pd.DataFrame:
     def _filter_day(frame: pd.DataFrame | None) -> pd.DataFrame:
         if frame is None or not isinstance(frame, pd.DataFrame) or frame.empty:
             return pd.DataFrame()
-        day_col = next((col for col in ("date_est", "date_utc", "date") if col in frame.columns), None)
+        day_col = next((col for col in ("date_utc", "date_est", "date") if col in frame.columns), None)
         if not day_col:
             return pd.DataFrame()
         day_frame = frame.copy()
-        day_frame[day_col] = pd.to_datetime(day_frame[day_col], errors="coerce").dt.date
+        if day_col == "date_utc":
+            try:
+                from zoneinfo import ZoneInfo
+
+                tz_name = str(os.environ.get("APP_TZ") or "America/Chicago").strip() or "America/Chicago"
+                day_frame[day_col] = pd.to_datetime(day_frame[day_col], errors="coerce", utc=True).dt.tz_convert(ZoneInfo(tz_name)).dt.date
+            except Exception:
+                day_frame[day_col] = pd.to_datetime(day_frame[day_col], errors="coerce").dt.date
+        else:
+            day_frame[day_col] = pd.to_datetime(day_frame[day_col], errors="coerce").dt.date
         day_frame = day_frame[day_frame[day_col] == target_date].copy()
         return day_frame.reset_index(drop=True) if not day_frame.empty else pd.DataFrame()
 
