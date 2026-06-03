@@ -89,18 +89,24 @@ _DATA_ROOT_ENV = str(os.environ.get("MLB_BETTING_DATA_ROOT") or "").strip()
 
 
 def _resolve_mlb_data_dir() -> Path:
-    if _DATA_ROOT_ENV:
-        return Path(_DATA_ROOT_ENV).resolve()
-
     syndicate_data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     if syndicate_data_root:
         rendered_root = Path(syndicate_data_root).resolve() / "mlb_source" / "source_artifacts" / "data"
+        bundled_root = Path(syndicate_data_root).resolve() / "mlb_source" / "data"
+        env_root = Path(_DATA_ROOT_ENV).resolve() if _DATA_ROOT_ENV else None
+        for candidate in (rendered_root, env_root, bundled_root):
+            if candidate is None:
+                continue
+            if candidate.exists():
+                return candidate
+        return rendered_root
+
+    if _DATA_ROOT_ENV:
+        env_root = Path(_DATA_ROOT_ENV).resolve()
+        rendered_root = env_root.parent / "source_artifacts" / "data"
         if rendered_root.exists():
             return rendered_root
-        bundled_root = Path(syndicate_data_root).resolve() / "mlb_source" / "data"
-        if bundled_root.exists():
-            return bundled_root
-        return rendered_root
+        return env_root
 
     return _TRACKED_DATA_DIR.resolve()
 
@@ -108,9 +114,24 @@ def _resolve_mlb_data_dir() -> Path:
 _DATA_DIR = _resolve_mlb_data_dir()
 _DAILY_DIR = _DATA_DIR / "daily"
 _MARKET_DIR = _DATA_DIR / "market" / "oddsapi"
-_LIVE_LENS_DIR = Path(
-    str(os.environ.get("MLB_LIVE_LENS_DIR") or os.environ.get("LIVE_LENS_DIR") or (_DATA_DIR / "live_lens")).strip()
-).resolve()
+
+
+def _resolve_mlb_live_lens_dir() -> Path:
+    env_value = str(os.environ.get("MLB_LIVE_LENS_DIR") or os.environ.get("LIVE_LENS_DIR") or "").strip()
+    candidates = [(_DATA_DIR / "live_lens").resolve()]
+    if env_value:
+        candidates.append(Path(env_value).resolve())
+    syndicate_data_root = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+    if syndicate_data_root:
+        candidates.insert(0, (Path(syndicate_data_root).resolve() / "mlb_source" / "source_artifacts" / "data" / "live_lens").resolve())
+        candidates.append((Path(syndicate_data_root).resolve() / "mlb_source" / "data" / "live_lens").resolve())
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+_LIVE_LENS_DIR = _resolve_mlb_live_lens_dir()
 _TRACKED_DAILY_SNAPSHOT_DIR = _TRACKED_DATA_DIR / "daily" / "snapshots"
 _CRON_TOKEN = str(
     os.environ.get("MLB_BETTING_CRON_TOKEN")
