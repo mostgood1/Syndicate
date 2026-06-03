@@ -84,6 +84,8 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
     stats_candidates.extend(sorted(paths.data_processed.glob(f"team_advanced_stats_{season}_asof_*.csv"), reverse=True))
 
     seen: set[Path] = set()
+    fallback_stats_df: pd.DataFrame | None = None
+    fallback_stats_source: Path | None = None
     for candidate in stats_candidates:
         if candidate in seen or not candidate.exists():
             continue
@@ -96,6 +98,9 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
             print(f"Loaded advanced stats from {candidate}")
             return stats_df
         print(f"Rejecting advanced stats cache {candidate} as incomplete or flat")
+        if fallback_stats_df is None and not stats_df.empty:
+            fallback_stats_df = stats_df
+            fallback_stats_source = candidate
 
     for builder_name, builder in (
         ('boxscores', compute_team_advanced_stats_from_boxscores),
@@ -117,6 +122,10 @@ def _materialize_advanced_stats(df: pd.DataFrame, season: int) -> pd.DataFrame:
             print(f"Saved advanced stats to {asof_file}")
         print(f"Saved advanced stats to {stats_file}")
         return stats_df
+
+    if fallback_stats_df is not None:
+        print(f"Using cached advanced stats from {fallback_stats_source} as a last resort")
+        return fallback_stats_df
 
     raise RuntimeError(
         f"Unable to materialize real advanced stats for season {season} from local boxscores or player logs"
