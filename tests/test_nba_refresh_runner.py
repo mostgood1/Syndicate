@@ -141,6 +141,55 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(written[0].get("away_tri"), "NYK")
         self.assertEqual(written[0].get("bookmaker"), "oddsapi_consensus")
 
+    def test_ensure_source_game_inputs_exports_game_cards_when_missing(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-05-22"
+            (processed_root / "game_odds_2026-05-22.csv").write_text(
+                "game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker\n"
+                "1,Boston Celtics,New York Knicks,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,218.5,oddsapi_consensus\n",
+                encoding="utf-8",
+            )
+
+            calls: list[list[str]] = []
+
+            def fake_cli(*, source_root, package_name, command_parts, log_file, heartbeat_cb, timeout_s):
+                calls.append(list(command_parts))
+                if command_parts and command_parts[0] == "export-game-cards":
+                    out_path = source_root / "data" / "processed" / f"game_cards_{date_str}.csv"
+                    out_path.write_text(
+                        "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                        "2026-05-22,1,Boston Celtics,New York Knicks,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,218.5,oddsapi_consensus,BOS,NYK\n",
+                        encoding="utf-8",
+                    )
+                return 0
+
+            module._run_source_subprocess_cli_command = fake_cli
+            module._seed_game_odds_from_props_snapshot = lambda **kwargs: None
+            module._seed_game_odds_from_raw_history = lambda **kwargs: None
+
+            result = module._ensure_source_game_inputs(
+                source_root=source_root,
+                package_name="nba_betting",
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+                heartbeat_cb=None,
+            )
+
+            game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+
+            self.assertIn(["export-game-cards", "--date", date_str], calls)
+            self.assertTrue(game_cards_path.exists())
+            with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+                written = list(csv.DictReader(handle))
+            self.assertGreater(len(written), 0)
+
     def test_local_basketball_json_exports_use_owned_inputs(self) -> None:
         module = self._load_module()
 

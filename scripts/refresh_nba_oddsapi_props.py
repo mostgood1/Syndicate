@@ -1500,6 +1500,17 @@ def _ensure_source_game_inputs(
 
     _seed_game_odds_from_props_snapshot(source_root=source_root, date_str=date_str, log_file=log_file)
     _seed_game_odds_from_raw_history(source_root=source_root, date_str=date_str, log_file=log_file)
+
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    if not game_cards_path.exists() or not game_cards_path.is_file() or _count_csv_rows_quick(game_cards_path) <= 0:
+        _run_source_subprocess_cli_command(
+            source_root=source_root,
+            package_name=package_name,
+            command_parts=["export-game-cards", "--date", date_str],
+            log_file=log_file,
+            heartbeat_cb=heartbeat_cb,
+            timeout_s=20 * 60,
+        )
     
     rc_predict_date = _run_source_predict_date(
         source_root=source_root,
