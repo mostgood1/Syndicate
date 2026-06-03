@@ -2,7 +2,7 @@
   "date": "2026-06-03",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-03T12:12:24.058447",
+  "generated_at": "2026-06-03T12:48:00.159464",
   "summary": {
     "games": 15,
     "projected_teams": 22,
@@ -814,7 +814,7 @@
         668715,
         663886,
         695490,
-        670770
+        680574
       ],
       "away_projected_validation": {
         "status": "ok",
@@ -880,7 +880,7 @@
           668715,
           663886,
           695490,
-          670770
+          680574
         ],
         "ids": [
           694362,
@@ -891,7 +891,7 @@
           668715,
           663886,
           695490,
-          670770
+          680574
         ],
         "missing_ids": [],
         "backfilled_ids": [],
@@ -906,7 +906,7 @@
           "Spencer Steer",
           "Tyler Stephenson",
           "Edwin Arroyo",
-          "TJ Friedl"
+          "Matt McLain"
         ],
         "matched_names": [
           "Blake Dunn",
@@ -917,7 +917,7 @@
           "Spencer Steer",
           "Tyler Stephenson",
           "Edwin Arroyo",
-          "TJ Friedl"
+          "Matt McLain"
         ],
         "missing_name_labels": [],
         "mapping_source": "projected_rotowire_default_vs_rhp"
