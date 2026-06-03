@@ -275,6 +275,9 @@ def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at
         "gameMarkets": row.get("gameMarkets") if isinstance(row.get("gameMarkets"), dict) else {},
         "markets": top_level_markets,
         "gamePk": int(row.get("gamePk") or 0),
+        "prop_groups": row.get("prop_groups") if isinstance(row.get("prop_groups"), list) else [],
+        "prop_lens": row.get("prop_lens") if isinstance(row.get("prop_lens"), dict) else {},
+        "market_tiles": row.get("market_tiles") if isinstance(row.get("market_tiles"), list) else [],
         "liveProps": live_props,
         "matchup": matchup,
         "predictions": row.get("predictions") if isinstance(row.get("predictions"), dict) else {},
@@ -283,6 +286,9 @@ def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at
         "snapshotAvailable": bool(row.get("snapshotAvailable")),
         "startTime": str(row.get("startTime") or report_date).strip() or report_date,
         "trackedProps": row.get("trackedProps") if isinstance(row.get("trackedProps"), list) else [],
+        "probable": row.get("probable") if isinstance(row.get("probable"), dict) else {},
+        "actual_box_panel": row.get("actual_box_panel") if isinstance(row.get("actual_box_panel"), dict) else {},
+        "first1BetSignal": row.get("first1BetSignal") if isinstance(row.get("first1BetSignal"), dict) else {},
         "card_variant": "mlb_main",
         "away": {
             "abbr": str(away.get("abbr") or "AWY").strip() or "AWY",
@@ -343,6 +349,8 @@ def _live_props_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
             normalized = _normalize_live_prop_row(value)
             if normalized is not None:
                 rows.append(normalized)
+    if not rows:
+        rows.extend(_live_props_from_prop_groups(card))
     rows.sort(
         key=lambda value: float(value.get("rankingScore") or value.get("estimatedWinProb") or value.get("modelProbOver") or value.get("odds") or 0.0),
         reverse=True,
@@ -455,6 +463,75 @@ def _live_lens_segments_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
     return segments
 
 
+_CARD_PROP_TITLE_RE = re.compile(r"^(?P<player>.+?)\s+(?P<selection>Over|Under)\s+(?P<line>[-+]?\d+(?:\.\d+)?)\s+(?P<market>.+)$", re.IGNORECASE)
+
+
+def _detail_edge_from_text(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    match = re.search(r"edge\s*([-+]?\d+(?:\.\d+)?)", text, re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except Exception:
+        return None
+def _prop_row_from_card_item(item: dict[str, Any], *, group_variant: str, section_title: str) -> dict[str, Any] | None:
+    title = str(item.get("title") or "").strip()
+    match = _CARD_PROP_TITLE_RE.match(title)
+    if not match:
+        return None
+    detail = str(item.get("detail") or "").strip()
+    selection = str(match.group("selection") or "").strip().lower()
+    market_label = str(match.group("market") or "").strip() or section_title or "Prop"
+    line = _parse_number_text(match.group("line"))
+    edge = _detail_edge_from_text(detail)
+    odds = _parse_number_text(detail)
+    return {
+        "playerName": str(match.group("player") or "Prop").strip() or "Prop",
+        "selection": selection,
+        "marketLabel": market_label,
+        "market": section_title.lower().replace(" ", "_") if section_title else "prop",
+        "line": line,
+        "odds": odds,
+        "modelProbOver": None,
+        "estimatedWinProb": None,
+        "rankingScore": edge if edge is not None else line,
+        "tier": "official" if group_variant == "official" else "playable",
+        "status": "live" if group_variant == "official" else "tracked",
+        "source": "cards_prop_groups",
+        "reason_summary": detail or title,
+        "reasons": [detail] if detail else [],
+    }
+
+
+def _live_props_from_prop_groups(card: dict[str, Any]) -> list[dict[str, Any]]:
+    prop_groups = card.get("prop_groups") if isinstance(card.get("prop_groups"), list) else []
+    rows: list[dict[str, Any]] = []
+    for group in prop_groups:
+        if not isinstance(group, dict):
+            continue
+        variant = str(group.get("variant") or "").strip().lower()
+        sections = group.get("sections") if isinstance(group.get("sections"), list) else []
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            section_title = str(section.get("title") or "").strip()
+            items = section.get("items") if isinstance(section.get("items"), list) else []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                normalized = _prop_row_from_card_item(item, group_variant=variant, section_title=section_title)
+                if normalized is not None:
+                    rows.append(normalized)
+    rows.sort(
+        key=lambda value: float(value.get("rankingScore") or value.get("estimatedWinProb") or value.get("modelProbOver") or value.get("odds") or 0.0),
+        reverse=True,
+    )
+    return rows
+
+
 def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]) -> dict[str, Any]:
     merged = dict(row)
     card_props = _live_props_from_card(card)
@@ -492,6 +569,18 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
         merged["predictions"] = card.get("predictions")
     if isinstance(card.get("markets"), dict) and card.get("markets"):
         merged["gameMarkets"] = card.get("markets")
+    if isinstance(card.get("prop_groups"), list) and card.get("prop_groups"):
+        merged["prop_groups"] = card.get("prop_groups")
+    if isinstance(card.get("prop_lens"), dict) and card.get("prop_lens"):
+        merged["prop_lens"] = card.get("prop_lens")
+    if isinstance(card.get("market_tiles"), list) and card.get("market_tiles"):
+        merged["market_tiles"] = card.get("market_tiles")
+    if isinstance(card.get("probable"), dict) and card.get("probable"):
+        merged["probable"] = card.get("probable")
+    if isinstance(card.get("actual_box_panel"), dict) and card.get("actual_box_panel"):
+        merged["actual_box_panel"] = card.get("actual_box_panel")
+    if isinstance(card.get("first1BetSignal"), dict) and card.get("first1BetSignal"):
+        merged["first1BetSignal"] = card.get("first1BetSignal")
     if not merged.get("markets") and isinstance(card.get("markets"), dict):
         merged["markets"] = card.get("markets")
     if isinstance(card.get("archivedLiveProps"), list) and card.get("archivedLiveProps"):
@@ -531,10 +620,16 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
         "predictions": card.get("predictions") if isinstance(card.get("predictions"), dict) else {},
         "gameMarkets": card.get("markets") if isinstance(card.get("markets"), dict) else {},
         "gameLens": card.get("gameLens") if isinstance(card.get("gameLens"), list) else [],
+        "prop_groups": card.get("prop_groups") if isinstance(card.get("prop_groups"), list) else [],
+        "prop_lens": card.get("prop_lens") if isinstance(card.get("prop_lens"), dict) else {},
+        "market_tiles": card.get("market_tiles") if isinstance(card.get("market_tiles"), list) else [],
         "props": card.get("props") if isinstance(card.get("props"), list) else [],
         "liveProps": card.get("liveProps") if isinstance(card.get("liveProps"), list) else [],
         "archivedLiveProps": card.get("archivedLiveProps") if isinstance(card.get("archivedLiveProps"), list) else [],
         "trackedProps": card.get("trackedProps") if isinstance(card.get("trackedProps"), list) else [],
+        "probable": card.get("probable") if isinstance(card.get("probable"), dict) else {},
+        "actual_box_panel": card.get("actual_box_panel") if isinstance(card.get("actual_box_panel"), dict) else {},
+        "first1BetSignal": card.get("first1BetSignal") if isinstance(card.get("first1BetSignal"), dict) else {},
         "simContextAvailable": bool(card.get("simContextAvailable")),
         "snapshotAvailable": bool(card.get("snapshotAvailable")),
     }
