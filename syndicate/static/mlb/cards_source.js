@@ -237,7 +237,7 @@
   function liveRowFreshnessText(reco, fallbackLabel) {
     const updatedAt = reco?.last_seen_at ? formatTimestampShort(reco.last_seen_at) : "";
     if (updatedAt && updatedAt !== '-') {
-      return `Updated ${updatedAt}`;
+      return `Odds updated ${updatedAt}`;
     }
     const activeSince = reco?.first_seen_at ? formatTimestampShort(reco.first_seen_at) : "";
     if (activeSince && activeSince !== '-') {
