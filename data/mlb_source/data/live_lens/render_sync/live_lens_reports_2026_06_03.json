@@ -18,7 +18,7 @@
   "registryLogPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_2026_06_03.jsonl",
   "reportPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_report_2026_06_03.json",
   "dailyRecapPath": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_2026_06_03.json",
-  "entries": 4,
+  "entries": 5,
   "latestEntry": {
     "recordedAt": "2026-06-03T10:32:56-05:00",
     "date": "2026-06-03",
@@ -7951,7 +7951,7 @@
   },
   "latestReport": {
     "date": "2026-06-03",
-    "generatedAt": "2026-06-03T12:22:14-05:00",
+    "generatedAt": "2026-06-03T12:58:22-05:00",
     "dataRoot": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data",
     "liveLensDir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
     "optimizationRegime": {
@@ -15935,15 +15935,15 @@
   },
   "firstObservationArchive": [],
   "rawArtifacts": {
-    "total_bytes": 730897,
-    "total_bytes_text": "713.77 KB",
+    "total_bytes": 857221,
+    "total_bytes_text": "837.13 KB",
     "files": {
       "log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/live_lens_2026_06_03.jsonl",
         "exists": true,
-        "bytes": 505296,
-        "bytes_text": "493.45 KB",
-        "modified_at": "2026-06-03T11:57:50-05:00"
+        "bytes": 631620,
+        "bytes_text": "616.82 KB",
+        "modified_at": "2026-06-03T12:22:14-05:00"
       },
       "observation_log": {
         "path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_2026_06_03.jsonl",
@@ -15971,7 +15971,7 @@
         "exists": true,
         "bytes": 225510,
         "bytes_text": "220.22 KB",
-        "modified_at": "2026-06-03T11:57:50-05:00"
+        "modified_at": "2026-06-03T12:22:14-05:00"
       }
     }
   }
