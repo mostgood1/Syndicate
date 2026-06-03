@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
@@ -11,6 +12,7 @@ from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.ladders_common import format_num
 from syndicate.features.mlb.ladders_common import format_pct
 from syndicate.features.mlb.ladders_common import parse_iso_date
+from syndicate.features.mlb.sources import live_lens_log_path
 from syndicate.features.mlb.sources import live_lens_report_path
 from syndicate.features.mlb.sources import load_json_file
 
@@ -54,6 +56,13 @@ def _structured_status(row: dict[str, Any], *, fallback_date: str) -> dict[str, 
         "abstract": abstract,
         "detailed": detailed,
     }
+
+
+def _append_jsonl(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False))
+        handle.write("\n")
 
 
 def _status_bucket_from_row(row: dict[str, Any]) -> str:
@@ -766,6 +775,7 @@ def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str)
 
 def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     report_path = live_lens_report_path(selected_date)
+    log_path = live_lens_log_path(selected_date)
     try:
         from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_payload
     except Exception:
@@ -789,6 +799,33 @@ def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
         report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     except Exception:
         return None
+
+    games = payload.get("games") if isinstance(payload.get("games"), list) else []
+    log_entry = {
+        "recordedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "date": str(selected_date),
+        "generatedAt": payload.get("generatedAt"),
+        "oddsRefreshedAt": payload.get("oddsRefreshedAt") or payload.get("odds_refreshed_at"),
+        "counts": payload.get("counts") if isinstance(payload.get("counts"), dict) else {},
+        "performance": payload.get("performance") if isinstance(payload.get("performance"), dict) else {},
+        "games": [
+            {
+                "gamePk": game.get("gamePk"),
+                "status": ((game.get("status") or {}).get("abstract")),
+                "score": ((game.get("matchup") or {}).get("score")),
+                "liveText": ((game.get("matchup") or {}).get("liveText")),
+                "propCount": len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []),
+                "topProps": (game.get("liveProps") or game.get("props") or game.get("trackedProps") or [])[:5],
+            }
+            for game in games
+            if isinstance(game, dict)
+        ],
+    }
+
+    try:
+        _append_jsonl(log_path, log_entry)
+    except Exception:
+        pass
     return payload
 
 

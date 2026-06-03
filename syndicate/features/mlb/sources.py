@@ -221,6 +221,11 @@ def live_lens_report_path(selected_date: str) -> Path:
     return _resolve_data_path_with_reconcile("live_lens", filename)
 
 
+def live_lens_log_path(selected_date: str) -> Path:
+    filename = f"live_lens_{selected_date.replace('-', '_')}.jsonl"
+    return _resolve_data_path_with_reconcile("live_lens", filename)
+
+
 def live_prop_registry_path(selected_date: str) -> Path:
     filename = f"live_prop_registry_{selected_date.replace('-', '_')}.json"
     return _resolve_data_path("live_lens", "prop_registry", filename)

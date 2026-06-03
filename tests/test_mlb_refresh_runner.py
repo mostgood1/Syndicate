@@ -391,6 +391,70 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
+    def test_persist_live_lens_report_appends_snapshot_log(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_log", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                runtime_live_lens_dir = runtime_root / "live_lens"
+                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
+                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_01.json"
+                log_path = runtime_live_lens_dir / "live_lens_2026_06_01.jsonl"
+
+                payload = {
+                    "generatedAt": "2026-06-01T21:00:01-05:00",
+                    "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 2, "archivedLiveProps": 0},
+                    "performance": {"marketsRefreshed": True, "persistMs": 12.3},
+                    "games": [
+                        {
+                            "gamePk": 123,
+                            "matchup": {
+                                "away": {"abbr": "AAA", "name": "Away A"},
+                                "home": {"abbr": "BBB", "name": "Home B"},
+                                "score": {"away": 3, "home": 1},
+                                "liveText": "Live snapshot",
+                            },
+                            "status": {"abstract": "Live", "detailed": "In Progress"},
+                            "liveProps": [
+                                {"playerName": "Player One", "selection": "Over", "marketLabel": "Hits", "line": 0.5, "odds": -115},
+                                {"playerName": "Player Two", "selection": "Under", "marketLabel": "Ks", "line": 4.5, "odds": 105},
+                            ],
+                            "props": [],
+                            "trackedProps": [],
+                        }
+                    ],
+                }
+
+                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
+
+                module.live_lens_report_path = lambda d: report_path
+                module.live_lens_log_path = lambda d: log_path
+                module.build_cards_page_context = lambda selected_date: {"source_title": "MLB Game Cards", "using_sample_data": False, "games": []}
+                vendor_frontend._live_lens_payload = lambda date_str, *, persist=False, refresh_markets=False: dict(payload)
+
+                result = module._persist_live_lens_report("2026-06-01")
+                log_lines = log_path.read_text(encoding="utf-8").splitlines()
+
+                self.assertIsNotNone(result)
+                self.assertTrue(report_path.exists())
+                self.assertTrue(log_path.exists())
+                self.assertEqual(len(log_lines), 1)
+                snapshot = json.loads(log_lines[0])
+                self.assertEqual(snapshot["date"], "2026-06-01")
+                self.assertEqual(snapshot["counts"]["live"], 1)
+                self.assertEqual(snapshot["games"][0]["score"], {"away": 3, "home": 1})
+                self.assertEqual(snapshot["games"][0]["propCount"], 2)
+                self.assertEqual(len(snapshot["games"][0]["topProps"]), 2)
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_build_live_lens_page_context_falls_back_to_cards_when_vendor_report_is_empty(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
