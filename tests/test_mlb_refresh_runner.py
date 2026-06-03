@@ -328,6 +328,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 spec.loader.exec_module(module)
+                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
                 runtime_root = Path(tmp_dir) / "source" / "data"
                 runtime_live_lens_dir = runtime_root / "live_lens"
                 runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
@@ -356,13 +357,102 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                     ],
                 }
 
-                context = module.build_live_lens_page_context("2026-06-02", persist=False)
+                context = module.build_live_lens_page_context("2026-06-02", persist=True)
                 persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
 
             self.assertEqual(context["counts"]["games"], 1)
             self.assertEqual(context["games"][0]["away"]["abbr"], "AAA")
             self.assertEqual(context["games"][0]["home"]["abbr"], "BBB")
             self.assertEqual(persisted_report["counts"]["games"], 1)
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def test_build_live_lens_page_context_merges_cards_detail_into_vendor_report(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_cards_merge", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                runtime_live_lens_dir = runtime_root / "live_lens"
+                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
+                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_02.json"
+                report_path.write_text(
+                    json.dumps(
+                        {
+                            "generatedAt": "1999-01-01T00:00:00-05:00",
+                            "counts": {"games": 1, "live": 0, "final": 1, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                            "games": [
+                                {
+                                    "gamePk": 123,
+                                    "status": {"abstract": "Final", "detailed": "Final"},
+                                    "startTime": "7:10 PM",
+                                    "matchup": {
+                                        "away": {"abbr": "AAA", "name": "Away A"},
+                                        "home": {"abbr": "BBB", "name": "Home B"},
+                                        "score": {"away": 0, "home": 0},
+                                        "liveText": "Vendor row",
+                                    },
+                                    "gameMarkets": {},
+                                    "gameLens": [],
+                                    "props": [],
+                                    "liveProps": [],
+                                    "trackedProps": [],
+                                    "archivedLiveProps": [],
+                                    "simContextAvailable": False,
+                                    "snapshotAvailable": False,
+                                }
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+                module.live_lens_report_path = lambda d: report_path
+                module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
+                import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
+                vendor_frontend._live_lens_reports_payload = lambda d, include_archive=False: json.loads(report_path.read_text(encoding="utf-8"))
+                module.build_cards_page_context = lambda selected_date: {
+                    "source_title": "MLB Game Cards",
+                    "using_sample_data": False,
+                    "games": [
+                        {
+                            "gamePk": 123,
+                            "away": {"abbr": "AAA", "name": "Away A"},
+                            "home": {"abbr": "BBB", "name": "Home B"},
+                            "status": {"abstract": "Final", "detailed": "Final"},
+                            "detail": "7:10 PM",
+                            "startTime": "7:10 PM",
+                            "summary": "Fallback slate",
+                            "segment_overview_cards": [
+                                {"label": "F1", "subtitle": "AAA 0.42 - BBB 0.58 | Total 1.00", "reason": "first segment", "score": "AAA 0 - BBB 0", "main": "No surfaced bet", "best_edge": "0.17", "home_win": "58.0%"}
+                            ],
+                            "probability_rows": [{"label": "First 1", "summary": "AAA 18.1% | BBB 24.4% | Tie 57.5%"}],
+                            "markets": {
+                                "extraHitterProps": [{"playerName": "Player A", "selection": "Over", "marketLabel": "Hits", "line": 0.5, "rankingScore": 0.8}],
+                                "extraPitcherProps": [],
+                                "hitterProps": [],
+                                "pitcherProps": [],
+                            },
+                        }
+                    ],
+                }
+
+                context = module.build_live_lens_page_context("2026-06-02", persist=True)
+                persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(context["counts"]["games"], 1)
+            self.assertEqual(context["counts"]["props"], 1)
+            self.assertGreater(len(context["games"][0]["gameLens"]), 0)
+            self.assertGreater(len(context["games"][0]["liveProps"]), 0)
+            self.assertEqual(context["games"][0]["gameLens"][0]["key"], "first1")
+            self.assertEqual(context["games"][0]["liveProps"][0]["playerName"], "Player A")
+            self.assertGreater(len(persisted_report["games"][0]["gameLens"]), 0)
         finally:
             sys.modules.pop(spec.name, None)
 
