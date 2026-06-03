@@ -10,8 +10,8 @@
     "game_number": 1,
     "series_game_number": 3,
     "status": {
-      "abstract": "Preview",
-      "detailed": "Pre-Game"
+      "abstract": "Live",
+      "detailed": "Warmup"
     }
   },
   "away": {

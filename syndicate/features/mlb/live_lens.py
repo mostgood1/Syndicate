@@ -350,6 +350,15 @@ def _live_props_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _card_score_from_card(card: dict[str, Any]) -> dict[str, Any]:
+    score = card.get("score") if isinstance(card.get("score"), dict) else {}
+    if score:
+        return dict(score)
+    matchup = card.get("matchup") if isinstance(card.get("matchup"), dict) else {}
+    score = matchup.get("score") if isinstance(matchup.get("score"), dict) else {}
+    return dict(score) if score else {}
+
+
 def _live_lens_segments_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
     segments: list[dict[str, Any]] = []
     overview_rows = card.get("segment_overview_cards") if isinstance(card.get("segment_overview_cards"), list) else []
@@ -450,20 +459,23 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
     merged = dict(row)
     card_props = _live_props_from_card(card)
     card_segments = _live_lens_segments_from_card(card)
-    if card_segments and not merged.get("gameLens"):
+    if card_segments:
         merged["gameLens"] = card_segments
-    if card_props and not merged.get("liveProps"):
+    if card_props:
         merged["liveProps"] = card_props
-    if card_props and not merged.get("props"):
+    if card_props:
         merged["props"] = card_props
-    if card_props and not merged.get("trackedProps"):
+    if card_props:
         merged["trackedProps"] = card_props
     matchup = merged.get("matchup") if isinstance(merged.get("matchup"), dict) else {}
     card_matchup = {"away": card.get("away") if isinstance(card.get("away"), dict) else {}, "home": card.get("home") if isinstance(card.get("home"), dict) else {}}
+    card_score = _card_score_from_card(card)
     if card_matchup["away"]:
         matchup["away"] = card_matchup["away"]
     if card_matchup["home"]:
         matchup["home"] = card_matchup["home"]
+    if card_score:
+        matchup["score"] = card_score
     matchup["liveText"] = str(card.get("summary") or card.get("detail") or matchup.get("liveText") or "Live-lens snapshot loaded from the MLB cards artifact.").strip() or "Live-lens snapshot loaded from the MLB cards artifact."
     merged["matchup"] = matchup
     card_status = card.get("status") if isinstance(card.get("status"), dict) else {}
@@ -474,12 +486,18 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
         }
     elif not merged.get("status"):
         merged["status"] = {"abstract": str(card.get("status_badge") or "Live lens").strip() or "Live lens", "detailed": str(card.get("detail") or "").strip() or str(card.get("status_badge") or "Live lens").strip() or "Live lens"}
-    if not merged.get("predictions") and isinstance(card.get("predictions"), dict):
+    if card_score:
+        merged["score"] = card_score
+    if isinstance(card.get("predictions"), dict) and card.get("predictions"):
         merged["predictions"] = card.get("predictions")
-    if not merged.get("gameMarkets") and isinstance(card.get("markets"), dict):
+    if isinstance(card.get("markets"), dict) and card.get("markets"):
         merged["gameMarkets"] = card.get("markets")
-    merged.setdefault("snapshotAvailable", bool(card.get("snapshotAvailable", False)))
-    merged.setdefault("simContextAvailable", bool(card.get("simContextAvailable", False)))
+    if not merged.get("markets") and isinstance(card.get("markets"), dict):
+        merged["markets"] = card.get("markets")
+    if isinstance(card.get("archivedLiveProps"), list) and card.get("archivedLiveProps"):
+        merged["archivedLiveProps"] = [dict(prop) for prop in card.get("archivedLiveProps") if isinstance(prop, dict)]
+    merged["snapshotAvailable"] = bool(card.get("snapshotAvailable", merged.get("snapshotAvailable", False)))
+    merged["simContextAvailable"] = bool(card.get("simContextAvailable", merged.get("simContextAvailable", False)))
     return merged
 
 
@@ -498,6 +516,7 @@ def _card_status_bucket(card: dict[str, Any]) -> str:
 def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[str, Any]:
     away = card.get("away") if isinstance(card.get("away"), dict) else {}
     home = card.get("home") if isinstance(card.get("home"), dict) else {}
+    score = _card_score_from_card(card)
     return {
         "gamePk": int(card.get("gamePk") or 0),
         "status": card.get("status") if isinstance(card.get("status"), dict) else {"abstract": _card_status_bucket(card).title(), "detailed": str(card.get("detail") or report_date).strip() or report_date},
@@ -505,9 +524,10 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
         "matchup": {
             "away": away,
             "home": home,
-            "score": card.get("score") if isinstance(card.get("score"), dict) else {"away": None, "home": None},
+            "score": score if score else {"away": None, "home": None},
             "liveText": str(card.get("summary") or card.get("detail") or "Live-lens snapshot loaded from the MLB cards artifact.").strip() or "Live-lens snapshot loaded from the MLB cards artifact.",
         },
+        "score": score,
         "predictions": card.get("predictions") if isinstance(card.get("predictions"), dict) else {},
         "gameMarkets": card.get("markets") if isinstance(card.get("markets"), dict) else {},
         "gameLens": card.get("gameLens") if isinstance(card.get("gameLens"), list) else [],
@@ -670,6 +690,33 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
     rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
+    if persist and games:
+        persisted_games = [dict(game) for game in games if isinstance(game, dict)]
+        persisted_counts = {
+            "games": len(persisted_games),
+            "live": sum(1 for game in persisted_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() == "live"),
+            "final": sum(1 for game in persisted_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() == "final"),
+            "pregame": sum(1 for game in persisted_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() not in {"live", "final"}),
+            "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in persisted_games),
+            "archivedLiveProps": 0,
+        }
+        persisted_report = dict(report or {})
+        persisted_report.update({
+            "date": str(selected_date),
+            "generatedAt": generated_at,
+            "dataRoot": runtime_data_root,
+            "liveLensDir": runtime_live_lens_dir,
+            "counts": persisted_counts,
+            "games": persisted_games,
+            "source_title": str((persisted_report.get("source_title") or "MLB live-lens report artifact")).strip() or "MLB live-lens report artifact",
+            "source_path": str(report_path),
+        })
+        try:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(json.dumps(persisted_report, indent=2), encoding="utf-8")
+            report = persisted_report
+        except Exception:
+            pass
     using_sample_data = False
     scoreboard_items = [
         {
