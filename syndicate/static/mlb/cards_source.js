@@ -742,6 +742,19 @@
       return rows.some((row) => hasUsableLensMarkets(row) && hasUsableLensScores(row));
     }
 
+    function hydrateActualSegment(row, snapshot) {
+      const snapshotAway = toNumber(snapshot?.teams?.away?.totals?.R);
+      const snapshotHome = toNumber(snapshot?.teams?.home?.totals?.R);
+      if (snapshotAway == null || snapshotHome == null) return row;
+      return {
+        ...row,
+        actualSegment: {
+          away: snapshotAway,
+          home: snapshotHome,
+        },
+      };
+    }
+
     function rowFingerprint(row) {
       if (!row || typeof row !== 'object') return '';
       return JSON.stringify({
@@ -788,10 +801,10 @@
       if (rowFingerprint(liveRow) !== rowFingerprint(fullRow)) return rows;
       return rows.filter((row) => row?.key !== 'full');
     }
-    if (canUseDetailLensRows(detail?.sim?.gameLens)) {
-      return dedupeGameLensRows(detail.sim.gameLens);
-    }
     const snapshot = detail?.snapshot || null;
+    if (canUseDetailLensRows(detail?.sim?.gameLens)) {
+      return dedupeGameLensRows((detail.sim.gameLens || []).map((row) => hydrateActualSegment(row, snapshot)));
+    }
     const sim = detail?.sim || null;
     const progress = gameProgress(snapshot, card);
     const predictedAway = toNumber(sim?.predicted?.away);
