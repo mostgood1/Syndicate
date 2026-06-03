@@ -456,6 +456,106 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
+    def test_build_live_lens_page_context_synthesizes_props_and_score_from_cards(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_cards_props", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                runtime_live_lens_dir = runtime_root / "live_lens"
+                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
+                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_03.json"
+                report_path.write_text(
+                    json.dumps(
+                        {
+                            "generatedAt": "1999-01-01T00:00:00-05:00",
+                            "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                            "games": [
+                                {
+                                    "gamePk": 123,
+                                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                                    "startTime": "7:10 PM",
+                                    "matchup": {
+                                        "away": {"abbr": "AAA", "name": "Away A"},
+                                        "home": {"abbr": "BBB", "name": "Home B"},
+                                        "score": {"away": None, "home": None},
+                                        "liveText": "Vendor row",
+                                    },
+                                    "gameMarkets": {},
+                                    "gameLens": [],
+                                    "props": [],
+                                    "liveProps": [],
+                                    "trackedProps": [],
+                                    "archivedLiveProps": [],
+                                    "simContextAvailable": False,
+                                    "snapshotAvailable": False,
+                                }
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+                module.live_lens_report_path = lambda d: report_path
+                module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
+                module._persist_live_lens_report = lambda selected_date: None
+                module.build_cards_page_context = lambda selected_date: {
+                    "source_title": "MLB Game Cards",
+                    "using_sample_data": False,
+                    "games": [
+                        {
+                            "gamePk": 123,
+                            "away": {"abbr": "AAA", "name": "Away A"},
+                            "home": {"abbr": "BBB", "name": "Home B"},
+                            "status": {"abstract": "Live", "detailed": "In Progress"},
+                            "detail": "7:10 PM",
+                            "startTime": "7:10 PM",
+                            "summary": "Fallback slate",
+                            "prop_groups": [
+                                {
+                                    "variant": "official",
+                                    "sections": [
+                                        {
+                                            "title": "Pitcher props",
+                                            "items": [
+                                                {"title": "Player A over 0.5 Hits", "detail": "+105"},
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ],
+                            "actual_box_panel": {
+                                "actual_box": {
+                                    "totals": [
+                                        {"team": "away", "totals": {"R": 3}},
+                                        {"team": "home", "totals": {"R": 1}},
+                                    ]
+                                }
+                            },
+                            "markets": {},
+                        }
+                    ],
+                }
+
+                context = module.build_live_lens_page_context("2026-06-03", persist=True)
+                persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(context["counts"]["props"], 1)
+            self.assertEqual(context["games"][0]["matchup"]["score"], {"away": 3, "home": 1})
+            self.assertEqual(len(context["games"][0]["liveProps"]), 1)
+            self.assertEqual(len(context["games"][0]["trackedProps"]), 1)
+            self.assertEqual(context["games"][0]["liveProps"][0]["playerName"], "Player A")
+            self.assertEqual(persisted_report["counts"]["props"], 1)
+            self.assertEqual(persisted_report["games"][0]["matchup"]["score"], {"away": 3, "home": 1})
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_main_prefers_existing_source_artifacts_when_overwrite_off(self) -> None:
         module = self._load_module()
 
