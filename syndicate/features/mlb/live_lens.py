@@ -645,12 +645,12 @@ def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str)
 def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     report_path = live_lens_report_path(selected_date)
     try:
-        from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_reports_payload
+        from vendor.mlb_bettingv2.tools.web.flask_frontend import _live_lens_payload
     except Exception:
         return None
 
     try:
-        payload = _live_lens_reports_payload(selected_date)
+        payload = _live_lens_payload(selected_date, persist=True, refresh_markets=True)
     except Exception:
         return None
 
