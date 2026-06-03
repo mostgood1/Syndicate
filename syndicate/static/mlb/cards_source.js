@@ -322,6 +322,11 @@
     return card?.trackedGameLines && typeof card.trackedGameLines === "object" ? card.trackedGameLines : {};
   }
 
+  function trackedGameLinesUpdatedAt(card) {
+    const lines = trackedGameLines(card);
+    return String(lines?.retrievedAt || lines?.retrieved_at || lines?.updatedAt || lines?.updated_at || "").trim();
+  }
+
   function extraMarketRows(card, key) {
     return Array.isArray(card?.markets?.[key]) ? card.markets[key] : [];
   }
@@ -1693,6 +1698,7 @@
           <div class="cards-live-line" data-role="live-line">Loading live box...</div>
           <div class="cards-sim-line" data-role="sim-line">Loading sim box...</div>
           <div class="cards-mini-copy">Probables: ${escapeHtml(starterText(card))}</div>
+          ${trackedGameLinesUpdatedAt(card) ? `<div class="cards-mini-copy">Odds updated ${escapeHtml(formatTimestampShort(trackedGameLinesUpdatedAt(card)))}</div>` : ""}
         </div>
       </div>
 
@@ -2778,6 +2784,7 @@
       <div class="cards-strip-live" data-role="strip-live" hidden></div>
       <div class="cards-strip-lens" data-role="strip-lens" hidden></div>
       <div class="cards-strip-meta">${escapeHtml(marketCountSummary(card))}</div>
+      ${trackedGameLinesUpdatedAt(card) ? `<div class="cards-mini-copy cards-strip-odds">Odds updated ${escapeHtml(formatTimestampShort(trackedGameLinesUpdatedAt(card)))}</div>` : ""}
       ${starterLadderStripMarkup(card)}`;
     return anchor;
   }
@@ -2861,6 +2868,7 @@
       if (Number(lineCounts.h2h_games || 0) > 0) marketBits.push(`ML ${lineCounts.h2h_games}`);
       if (Number(lineCounts.totals_games || 0) > 0) marketBits.push(`Tot ${lineCounts.totals_games}`);
       if (Number(lineCounts.spreads_games || 0) > 0) marketBits.push(`Spr ${lineCounts.spreads_games}`);
+      if (gameLines.retrievedAt) marketBits.push(`Odds ${formatTimestampShort(gameLines.retrievedAt)}`);
     } else if (hasArtifactData && gameLines.exists) {
       marketBits.push("Markets pending");
     }

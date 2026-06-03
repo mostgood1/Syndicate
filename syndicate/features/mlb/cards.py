@@ -1617,6 +1617,13 @@ def _game_line_market_score(markets: dict[str, Any] | None) -> int:
 
 def _tracked_game_lines_index(game_lines_doc: dict[str, Any] | None) -> dict[tuple[str, str], dict[str, Any]]:
     rows = game_lines_doc.get("games") if isinstance((game_lines_doc or {}).get("games"), list) else []
+    meta = game_lines_doc.get("meta") if isinstance((game_lines_doc or {}).get("meta"), dict) else {}
+    retrieved_at = str(
+        (game_lines_doc or {}).get("retrieved_at")
+        or meta.get("retrieved_at")
+        or meta.get("retrievedAt")
+        or ""
+    ).strip() or None
     indexed: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
         if not isinstance(row, dict):
@@ -1630,7 +1637,11 @@ def _tracked_game_lines_index(game_lines_doc: dict[str, Any] | None) -> dict[tup
         current_score = _game_line_market_score(markets)
         existing_score = _game_line_market_score(indexed.get(key))
         if current_score >= existing_score:
-            indexed[key] = dict(markets)
+            entry = dict(markets)
+            if retrieved_at:
+                entry["retrievedAt"] = retrieved_at
+                entry["retrieved_at"] = retrieved_at
+            indexed[key] = entry
     return indexed
 
 

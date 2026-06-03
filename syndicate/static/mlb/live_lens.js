@@ -438,6 +438,7 @@
       if (overviewNode) {
         overviewNode.textContent = JSON.stringify({
           generatedAt: payload?.generatedAt,
+          oddsRefreshedAt: payload?.oddsRefreshedAt || payload?.odds_refreshed_at,
           dataRoot: payload?.dataRoot,
           liveLensDir: payload?.liveLensDir,
           counts: payload?.counts,
