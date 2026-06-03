@@ -715,7 +715,7 @@ def live_lens():
 @mlb_bp.get("/api/live-lens")
 def api_live_lens():
     selected_date = _iso_or_today(request.args.get("date"))
-    context = build_live_lens_page_context(selected_date)
+    context = build_live_lens_page_context(selected_date, persist=_query_bool(request.args.get("persist"), default=False))
     return jsonify(build_live_lens_api_payload(context))
 
 
