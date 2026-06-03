@@ -457,16 +457,26 @@
     if (state.autoRefreshHandle && typeof state.autoRefreshHandle.stop === "function") {
       state.autoRefreshHandle.stop();
     }
-    if (!window.SyndicatePolling) {
-      state.autoRefreshHandle = { stop: function () {} };
+    if (window.SyndicatePolling && typeof window.SyndicatePolling.start === "function") {
+      state.autoRefreshHandle = window.SyndicatePolling.start({
+        intervalMs: AUTO_REFRESH_MS,
+        skipWhenHidden: false,
+        refreshOnVisible: true,
+        refreshOnFocus: true,
+        onTick: function () {
+          return load();
+        },
+      });
       return;
     }
-    state.autoRefreshHandle = window.SyndicatePolling.start({
-      intervalMs: AUTO_REFRESH_MS,
-      onTick: function () {
-        return load();
+    const fallbackTimer = window.setInterval(function () {
+      void load();
+    }, AUTO_REFRESH_MS);
+    state.autoRefreshHandle = {
+      stop: function () {
+        window.clearInterval(fallbackTimer);
       },
-    });
+    };
   }
 
   if (monthsNode) {

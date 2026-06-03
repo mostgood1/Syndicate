@@ -456,12 +456,29 @@
   }
 
   function installAutoRefresh() {
-    if (state.autoRefreshHandle) {
-      window.clearInterval(state.autoRefreshHandle);
+    if (state.autoRefreshHandle && typeof state.autoRefreshHandle.stop === "function") {
+      state.autoRefreshHandle.stop();
     }
-    state.autoRefreshHandle = window.setInterval(() => {
-      load();
+    if (window.SyndicatePolling && typeof window.SyndicatePolling.start === "function") {
+      state.autoRefreshHandle = window.SyndicatePolling.start({
+        intervalMs: AUTO_REFRESH_MS,
+        skipWhenHidden: false,
+        refreshOnVisible: true,
+        refreshOnFocus: true,
+        onTick: () => {
+          void load();
+        },
+      });
+      return;
+    }
+    const fallbackTimer = window.setInterval(() => {
+      void load();
     }, AUTO_REFRESH_MS);
+    state.autoRefreshHandle = {
+      stop: () => {
+        window.clearInterval(fallbackTimer);
+      },
+    };
   }
 
   if (monthsNode) {
