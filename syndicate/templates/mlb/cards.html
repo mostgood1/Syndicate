@@ -114,6 +114,23 @@
         client: {{ (cards_client or ('source' if source_client_shell else 'board'))|tojson }},
         preserveClientParam: {{ (cards_client is defined and cards_client is not none)|tojson }},
       };
+      window.freshnessText = window.freshnessText || function (row, fieldName, fallbackDetail) {
+        const rawValue = (row && row[fieldName])
+          || (fieldName === 'last_seen_at' ? row && row.firstSeenAt : null)
+          || (fieldName === 'first_seen_at' ? row && row.lastSeenAt : null)
+          || (fallbackDetail && fallbackDetail.sim && fallbackDetail.sim.generatedAt)
+          || (fallbackDetail && fallbackDetail.generatedAt)
+          || null;
+        if (!rawValue) return '-';
+        const parsed = new Date(rawValue);
+        if (Number.isNaN(parsed.getTime())) return String(rawValue);
+        return new Intl.DateTimeFormat(undefined, {
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        }).format(parsed);
+      };
     </script>
     {% if cards_script == 'mlb/cards_source.js' %}
       <script src="{{ url_for('static', filename='shared/polling.js', v=asset_version) }}"></script>
