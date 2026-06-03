@@ -847,6 +847,97 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
 
 def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path) -> tuple[int, Path | None]:
     out_path = processed_root / f"game_cards_{date_str}.csv"
+    def _build_from_source_cards_api() -> tuple[int, Path | None]:
+        if not _source_app_fallback_enabled():
+            return 0, None
+        source_app = _load_source_app(source_root)
+        if source_app is None:
+            return 0, None
+        try:
+            client = source_app.app.test_client()
+            response = client.get(f"/api/cards?date={date_str}&props_source=source")
+            if int(getattr(response, "status_code", 0) or 0) != 200:
+                return 0, None
+            payload = response.get_json() if response is not None else None
+        except Exception as exc:
+            _append_log(log_file, f"Source app cards fallback failed for {date_str}: {exc}")
+            return 0, None
+        games = []
+        if isinstance(payload, dict):
+            if isinstance(payload.get("games"), list):
+                games = [game for game in payload.get("games") if isinstance(game, dict)]
+            elif isinstance(payload.get("cards"), list):
+                games = [game for game in payload.get("cards") if isinstance(game, dict)]
+        if not games:
+            return 0, None
+
+        def _team_name(side: dict[str, object], fallback_abbr: str) -> str:
+            name = str(side.get("name") or side.get("team_name") or side.get("full_name") or side.get("abbr") or fallback_abbr).strip()
+            return name or fallback_abbr
+
+        def _market_value(markets: dict[str, object], primary_key: str, *fallback_keys: str) -> object:
+            section = markets.get(primary_key) if isinstance(markets.get(primary_key), dict) else {}
+            for key in ("line", "market_line", "homeLine", "awayLine", *fallback_keys):
+                value = section.get(key)
+                if value is not None:
+                    return value
+            return None
+
+        rows_out: list[dict[str, object]] = []
+        for index, game in enumerate(games, start=1):
+            home = game.get("home") if isinstance(game.get("home"), dict) else {}
+            away = game.get("away") if isinstance(game.get("away"), dict) else {}
+            markets = game.get("markets") if isinstance(game.get("markets"), dict) else {}
+            ml = markets.get("ml") if isinstance(markets.get("ml"), dict) else {}
+            totals = markets.get("totals") if isinstance(markets.get("totals"), dict) else {}
+            spreads = markets.get("spreads") if isinstance(markets.get("spreads"), dict) else {}
+            game_id = str(game.get("game_id") or game.get("game_pk") or game.get("gamePk") or f"{away.get('abbr') or away.get('teamTricode') or 'AWY'}@{home.get('abbr') or home.get('teamTricode') or 'HOM'}").strip()
+            home_abbr = str(home.get("abbr") or home.get("teamTricode") or home.get("tricode") or "HOM").strip().upper() or "HOM"
+            away_abbr = str(away.get("abbr") or away.get("teamTricode") or away.get("tricode") or "AWY").strip().upper() or "AWY"
+            rows_out.append(
+                {
+                    "date": date_str,
+                    "game_id": game_id,
+                    "home_team": _team_name(home, home_abbr),
+                    "visitor_team": _team_name(away, away_abbr),
+                    "commence_time": str(game.get("commence_time") or game.get("startTime") or game.get("detail") or "").strip(),
+                    "home_ml": ml.get("home_odds") if isinstance(ml, dict) else None,
+                    "away_ml": ml.get("away_odds") if isinstance(ml, dict) else None,
+                    "home_spread": spreads.get("home_line") if isinstance(spreads, dict) else None,
+                    "away_spread": spreads.get("away_line") if isinstance(spreads, dict) else None,
+                    "total": totals.get("line") if isinstance(totals, dict) else None,
+                    "bookmaker": str(ml.get("bookmaker") or totals.get("bookmaker") or game.get("bookmaker") or "source_app").strip() or "source_app",
+                    "home_tri": home_abbr,
+                    "away_tri": away_abbr,
+                }
+            )
+
+        if not rows_out:
+            return 0, None
+
+        header_order = [
+            "date",
+            "game_id",
+            "home_team",
+            "visitor_team",
+            "commence_time",
+            "home_ml",
+            "away_ml",
+            "home_spread",
+            "away_spread",
+            "total",
+            "bookmaker",
+            "home_tri",
+            "away_tri",
+        ]
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=header_order)
+            writer.writeheader()
+            for current in rows_out:
+                writer.writerow({field: current.get(field, "") for field in header_order})
+        _append_log(log_file, f"Built game_cards from source app cards fallback: {out_path} (rows={len(rows_out)})")
+        return len(rows_out), out_path
 
     raw_candidates = [
         source_root / "data" / "raw" / f"odds_nba_current_{date_str}.csv",
@@ -858,7 +949,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         game_odds_path = source_root / "data" / "processed" / f"game_odds_{date_str}.csv"
         if not game_odds_path.exists() or not game_odds_path.is_file() or _count_csv_rows_quick(game_odds_path) <= 0:
             _append_log(log_file, f"Local game_cards build skipped for {date_str}: no raw team odds snapshot found")
-            return 0, None
+            return _build_from_source_cards_api()
 
         rows_out: list[dict[str, object]] = []
         with game_odds_path.open("r", encoding="utf-8", newline="") as handle:
@@ -890,7 +981,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
 
         if not rows_out:
             _append_log(log_file, f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
-            return 0, None
+            return _build_from_source_cards_api()
 
         header_order = [
             "date",
@@ -926,21 +1017,21 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             raw_frame = pd.read_csv(raw_path)
     except Exception as exc:
         _append_log(log_file, f"Failed to read raw team odds snapshot {raw_path}: {exc}")
-        return 0, None
+        return _build_from_source_cards_api()
 
     if raw_frame.empty:
-        return 0, None
+        return _build_from_source_cards_api()
 
     required_columns = {"event_id", "commence_time", "market", "outcome_name", "point", "price", "home_team", "away_team"}
     if not required_columns.issubset(set(str(column) for column in raw_frame.columns)):
         _append_log(log_file, f"Local game_cards build skipped for {date_str}: raw team odds snapshot missing required columns")
-        return 0, None
+        return _build_from_source_cards_api()
 
     working = raw_frame.copy()
     working["commence_time"] = working["commence_time"].astype(str)
     working = working[working["commence_time"].str.startswith(date_str)].copy()
     if working.empty:
-        return 0, None
+        return _build_from_source_cards_api()
 
     rows_out: list[dict[str, object]] = []
     grouped = working.groupby(["event_id", "commence_time", "home_team", "away_team"], dropna=False, sort=True)
