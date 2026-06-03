@@ -1703,7 +1703,13 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
     for game_pk in game_pks:
         feed_path = raw_feed_live_path(selected_date, int(game_pk))
         payload = load_json_or_gz_file(feed_path)
-        if not isinstance(payload, dict) and selected_date == today_iso:
+        status = (payload or {}).get("gameData", {}).get("status") if isinstance(payload, dict) else {}
+        abstract = str((status or {}).get("abstractGameState") or "").strip().lower()
+        detailed = str((status or {}).get("detailedState") or "").strip().lower()
+        should_refresh_live = not isinstance(payload, dict) or (selected_date != today_iso and (abstract in {"pregame", "preview"} or detailed == "scheduled"))
+        if should_refresh_live and selected_date == today_iso:
+            payload = _fetch_current_feed_live(int(game_pk))
+        elif should_refresh_live and selected_date != today_iso:
             payload = _fetch_current_feed_live(int(game_pk))
         if isinstance(payload, dict):
             out[int(game_pk)] = payload
