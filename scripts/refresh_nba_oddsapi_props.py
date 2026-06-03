@@ -1889,6 +1889,10 @@ def _ensure_game_predictions_for_props_refresh(*, source_root: Path, date_str: s
         except Exception:
             pass
     if _count_csv_rows_quick(pred_path) <= 0:
+        game_odds_path = processed_root / f"game_odds_{date_str}.csv"
+        if game_odds_path.exists() and game_odds_path.is_file() and _count_csv_rows_quick(game_odds_path) > 0:
+            _append_log(log_file, f"source bootstrap did not produce {pred_path.name} for {date_str}; continuing with snapshot-only game card export from {game_odds_path.name}")
+            return True, None
         return False, f"source bootstrap did not produce {pred_path.name} (rc={bootstrap_result.get('predict_date')})"
     _append_log(log_file, f"Generated game predictions at {pred_path} (rows={_count_csv_rows_quick(pred_path)})")
     return True, None
