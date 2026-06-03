@@ -723,13 +723,13 @@
     }
 
     function hasUsableLensScores(row) {
-      const actual = row?.actualSegment || {};
+      const actual = row?.actualSegment || row?.score || row?.matchup?.score || {};
       return toNumber(actual?.away) != null && toNumber(actual?.home) != null;
     }
 
     function canUseDetailLensRows(rows) {
       if (!Array.isArray(rows) || !rows.length) return false;
-      return rows.some((row) => hasUsableLensMarkets(row) || hasUsableLensScores(row));
+      return rows.some((row) => hasUsableLensMarkets(row) && hasUsableLensScores(row));
     }
 
     function rowFingerprint(row) {
@@ -1029,7 +1029,7 @@
       return `<div class="cards-live-lens-reason">${escapeHtml(`${label} status: ${parts.join(' | ')}`)}</div>`;
     }
     function scoreSummary(row) {
-      const actual = row?.actualSegment || {};
+      const actual = row?.actualSegment || row?.score || row?.matchup?.score || {};
       const away = toNumber(actual?.away);
       const home = toNumber(actual?.home);
       if (away == null || home == null) return row?.closed ? 'Segment closed' : 'Live score unavailable';
@@ -3427,15 +3427,22 @@
       if (document.visibilityState === "hidden") return;
       loadCards({ silent: true });
     };
+    const refreshStateKey = "__SYNDICATE_MLB_CARDS_REFRESH__";
+    const previousRefresh = window[refreshStateKey];
     if (state.autoRefreshHandle && typeof state.autoRefreshHandle.stop === "function") {
       state.autoRefreshHandle.stop();
     }
+    if (previousRefresh && typeof previousRefresh.stop === "function") {
+      previousRefresh.stop();
+    }
     if (state.embedMode) {
       state.autoRefreshHandle = { stop: function () {} };
+      window[refreshStateKey] = state.autoRefreshHandle;
       return;
     }
     if (!window.SyndicatePolling) {
       state.autoRefreshHandle = { stop: function () {} };
+      window[refreshStateKey] = state.autoRefreshHandle;
       return;
     }
     state.autoRefreshHandle = window.SyndicatePolling.start({
@@ -3445,6 +3452,7 @@
       refreshOnVisible: true,
       refreshOnFocus: true,
     });
+    window[refreshStateKey] = state.autoRefreshHandle;
   }
 
   function installErrorHandlers() {
