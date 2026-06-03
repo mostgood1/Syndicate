@@ -274,7 +274,27 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                     payload = {
                         "generatedAt": f"2026-06-01T21:00:0{counter['value']}-05:00",
                         "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
-                        "games": [],
+                        "games": [
+                            {
+                                "gamePk": 123,
+                                "matchup": {
+                                    "away": {"abbr": "AAA", "name": "Away A"},
+                                    "home": {"abbr": "BBB", "name": "Home B"},
+                                    "score": {"away": 0, "home": 0},
+                                    "liveText": "Persisted live lens row",
+                                },
+                                "status": {"abstract": "Final", "detailed": "Final"},
+                                "startTime": "7:10 PM",
+                                "gameMarkets": {},
+                                "gameLens": [],
+                                "props": [],
+                                "liveProps": [],
+                                "archivedLiveProps": [],
+                                "trackedProps": [],
+                                "simContextAvailable": False,
+                                "snapshotAvailable": False,
+                            }
+                        ],
                         "dataRoot": module.live_lens_report_path(selected_date).parent.parent.as_posix(),
                         "liveLensDir": module.live_lens_report_path(selected_date).parent.as_posix(),
                         "optimizationRegime": None,
@@ -294,6 +314,55 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(first_context["generatedAt"], "2026-06-01T21:00:01-05:00")
             self.assertEqual(second_context["generatedAt"], "2026-06-01T21:00:02-05:00")
             self.assertEqual(persisted_report["generatedAt"], "2026-06-01T21:00:02-05:00")
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def test_build_live_lens_page_context_falls_back_to_cards_when_vendor_report_is_empty(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_cards_fallback", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                runtime_live_lens_dir = runtime_root / "live_lens"
+                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
+                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_02.json"
+                report_path.write_text(json.dumps({"generatedAt": "1999-01-01T00:00:00-05:00", "counts": {"games": 0, "live": 0, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0}, "games": []}), encoding="utf-8")
+
+                module.live_lens_report_path = lambda d: report_path
+                module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
+                module._persist_live_lens_report = lambda selected_date: None
+                module.build_cards_page_context = lambda selected_date: {
+                    "source_title": "MLB Game Cards",
+                    "using_sample_data": False,
+                    "games": [
+                        {
+                            "gamePk": 123,
+                            "away": {"abbr": "AAA", "name": "Away A"},
+                            "home": {"abbr": "BBB", "name": "Home B"},
+                            "status": {"abstract": "Final", "detailed": "Final"},
+                            "detail": "7:10 PM",
+                            "startTime": "7:10 PM",
+                            "summary": "Fallback slate",
+                            "markets": {},
+                            "props": [],
+                            "trackedProps": [],
+                        }
+                    ],
+                }
+
+                context = module.build_live_lens_page_context("2026-06-02", persist=False)
+                persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(context["counts"]["games"], 1)
+            self.assertEqual(context["games"][0]["away"]["abbr"], "AAA")
+            self.assertEqual(context["games"][0]["home"]["abbr"], "BBB")
+            self.assertEqual(persisted_report["counts"]["games"], 1)
         finally:
             sys.modules.pop(spec.name, None)
 
