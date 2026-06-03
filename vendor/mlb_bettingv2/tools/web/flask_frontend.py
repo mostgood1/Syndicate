@@ -17703,6 +17703,9 @@ def api_live_lens() -> Response:
     report_payload = _load_json_file(report_path) if report_path.exists() else None
     report_has_content = _live_lens_report_has_content(report_payload)
     loop_enabled = _is_live_lens_loop_enabled()
+    if persist:
+        payload = _live_lens_payload(d, persist=True, refresh_markets=not _is_historical_date(d))
+        return _jsonify_app_build(payload, no_store=True)
     serve_report_max_age_seconds = float(_LIVE_ROUTE_CACHE_TTL_SECONDS)
     if not _is_historical_date(d) and loop_enabled:
         serve_report_max_age_seconds = float(_live_lens_report_max_age_seconds())
@@ -17721,9 +17724,6 @@ def api_live_lens() -> Response:
             error="live_lens_background_disabled",
             detail="Live-lens on-demand rebuilds are disabled on this service instance.",
         )
-        return _jsonify_app_build(payload, no_store=True)
-    if persist:
-        payload = _live_lens_payload(d, persist=True, refresh_markets=not _is_historical_date(d))
         return _jsonify_app_build(payload, no_store=True)
     payload = _payload_cache_get_or_build(
         "live_lens_api",
