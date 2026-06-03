@@ -73,6 +73,13 @@ def _iso_or_today(value: str | None) -> str:
     return central_today_iso()
 
 
+def _query_bool(value: str | None, *, default: bool = False) -> bool:
+    text = str(value or "").strip().lower()
+    if not text:
+        return bool(default)
+    return text in {"1", "true", "t", "yes", "y", "on"}
+
+
 def _path_label(path: Path | None) -> str | None:
     return str(path) if path is not None else None
 
