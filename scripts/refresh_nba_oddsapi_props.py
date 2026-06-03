@@ -459,6 +459,31 @@ def _run_source_processed_export(
     return None, int(rc)
 
 
+def _ensure_source_game_cards_export(
+    *,
+    source_root: Path,
+    package_name: str,
+    date_str: str,
+    processed_root: Path,
+    log_file: Path,
+    heartbeat_cb: callable | None,
+) -> tuple[int, Path | None]:
+    _run_source_subprocess_cli_command(
+        source_root=source_root,
+        package_name=package_name,
+        command_parts=["export-game-cards", "--date", date_str],
+        log_file=log_file,
+        heartbeat_cb=heartbeat_cb,
+        timeout_s=20 * 60,
+    )
+    return _build_local_game_cards_artifact(
+        source_root=source_root,
+        processed_root=processed_root,
+        date_str=date_str,
+        log_file=log_file,
+    )
+
+
 def _recommendation_tier(*, market: str, ev_value: float | None, edge_value: float | None) -> str:
     if str(market or "").strip().upper() == "ML":
         if ev_value is None:
@@ -2070,11 +2095,13 @@ def _run_refresh_via_cli(
                 _touch_progress()
             else:
                 _append_log(log_file, f"Skipping local props recommendations export for {date_str}: props predictions were not refreshed")
-            game_cards_rows, local_game_cards_path = _build_local_game_cards_artifact(
+            game_cards_rows, local_game_cards_path = _ensure_source_game_cards_export(
                 source_root=source_root,
-                processed_root=processed_root,
+                package_name=package_name,
                 date_str=date_str,
+                processed_root=processed_root,
                 log_file=log_file,
+                heartbeat_cb=_touch_progress,
             )
             rc_game_cards = 0 if local_game_cards_path is not None and int(game_cards_rows) > 0 else 1
             _, local_recommendations_path = _build_local_game_recommendations_artifact(processed_root=processed_root, date_str=date_str)

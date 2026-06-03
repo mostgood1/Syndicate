@@ -141,6 +141,43 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(written[0].get("away_tri"), "NYK")
         self.assertEqual(written[0].get("bookmaker"), "oddsapi_consensus")
 
+    def test_ensure_source_game_cards_export_invokes_source_cli(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-05-22"
+            game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+            calls: list[list[str]] = []
+
+            def fake_cli(*, source_root, package_name, command_parts, log_file, heartbeat_cb, timeout_s):
+                calls.append(list(command_parts))
+                game_cards_path.write_text(
+                    "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                    "2026-05-22,1,Boston Celtics,New York Knicks,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,218.5,oddsapi_consensus,BOS,NYK\n",
+                    encoding="utf-8",
+                )
+                return 0
+
+            module._run_source_subprocess_cli_command = fake_cli
+            module._build_local_game_cards_artifact = lambda **kwargs: (1, game_cards_path)
+
+            rows, out_path = module._ensure_source_game_cards_export(
+                source_root=source_root,
+                package_name="nba_betting",
+                date_str=date_str,
+                processed_root=processed_root,
+                log_file=Path(tmp_dir) / "refresh.log",
+                heartbeat_cb=None,
+            )
+
+            self.assertIn(["export-game-cards", "--date", date_str], calls)
+            self.assertEqual(rows, 1)
+            self.assertEqual(out_path, game_cards_path)
+            self.assertTrue(game_cards_path.exists())
+
     def test_ensure_source_game_inputs_exports_game_cards_when_missing(self) -> None:
         module = self._load_module()
 
