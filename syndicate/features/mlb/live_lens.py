@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from typing import Any
 
@@ -303,6 +304,180 @@ def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at
     }
 
 
+def _parse_number_text(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", text.replace(",", ""))
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except Exception:
+        return None
+
+
+def _normalize_live_prop_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(row, dict):
+        return None
+    selection = str(row.get("selection") or row.get("side") or row.get("betSide") or row.get("marketSide") or row.get("over_under") or "").strip().title()
+    return {
+        "playerName": str(row.get("playerName") or row.get("player_name") or row.get("batter_name") or row.get("pitcher_name") or row.get("name") or row.get("title") or "Prop").strip() or "Prop",
+        "selection": selection,
+        "marketLabel": str(row.get("marketLabel") or row.get("market_label") or row.get("label") or row.get("market") or "Market").strip() or "Market",
+        "market": str(row.get("market") or row.get("marketGroup") or row.get("group") or "").strip(),
+        "line": row.get("line") if row.get("line") is not None else row.get("threshold") if row.get("threshold") is not None else row.get("market_line"),
+        "odds": row.get("odds") if row.get("odds") is not None else row.get("price") if row.get("price") is not None else row.get("americanOdds") if row.get("americanOdds") is not None else row.get("american_odds"),
+        "modelProbOver": row.get("modelProbOver") if row.get("modelProbOver") is not None else row.get("model_prob_over") if row.get("model_prob_over") is not None else row.get("estimatedWinProb") if row.get("estimatedWinProb") is not None else row.get("estimated_win_prob"),
+        "estimatedWinProb": row.get("estimatedWinProb") if row.get("estimatedWinProb") is not None else row.get("estimated_win_prob") if row.get("estimated_win_prob") is not None else row.get("modelProbOver") if row.get("modelProbOver") is not None else row.get("model_prob_over"),
+        "rankingScore": row.get("rankingScore") if row.get("rankingScore") is not None else row.get("ranking_score") if row.get("ranking_score") is not None else row.get("edge") if row.get("edge") is not None else row.get("live_edge"),
+    }
+
+
+def _live_props_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
+    markets = card.get("markets") if isinstance(card.get("markets"), dict) else {}
+    rows: list[dict[str, Any]] = []
+    for key in ("extraHitterProps", "extraPitcherProps", "hitterProps", "pitcherProps"):
+        values = markets.get(key) if isinstance(markets.get(key), list) else []
+        for value in values:
+            normalized = _normalize_live_prop_row(value)
+            if normalized is not None:
+                rows.append(normalized)
+    rows.sort(
+        key=lambda value: float(value.get("rankingScore") or value.get("estimatedWinProb") or value.get("modelProbOver") or value.get("odds") or 0.0),
+        reverse=True,
+    )
+    return rows
+
+
+def _live_lens_segments_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
+    segments: list[dict[str, Any]] = []
+    overview_rows = card.get("segment_overview_cards") if isinstance(card.get("segment_overview_cards"), list) else []
+    probability_rows = card.get("probability_rows") if isinstance(card.get("probability_rows"), list) else []
+    row_order = ["live", "full", "first7", "first5", "first3", "first1"]
+    for index, row in enumerate(overview_rows):
+        if not isinstance(row, dict):
+            continue
+        label = str(row.get("label") or row_order[index] if index < len(row_order) else f"segment{index + 1}").strip() or f"segment{index + 1}"
+        key_text = label.lower()
+        if "live" in key_text:
+            key = "live"
+        elif "7" in key_text:
+            key = "first7"
+        elif "5" in key_text:
+            key = "first5"
+        elif "3" in key_text:
+            key = "first3"
+        elif "1" in key_text:
+            key = "first1"
+        else:
+            key = row_order[index] if index < len(row_order) else "full"
+        subtitle = str(row.get("subtitle") or "").strip()
+        projection_total = _parse_number_text(subtitle.split("|")[-1] if "|" in subtitle else subtitle)
+        projection_margin = _parse_number_text(row.get("foot_right"))
+        if projection_margin is None:
+            projection_margin = _parse_number_text(row.get("best_edge"))
+        if projection_margin is None:
+            projection_margin = _parse_number_text(row.get("home_win"))
+        reason = str(row.get("reason") or row.get("main") or subtitle).strip()
+        segment = {
+            "key": key,
+            "label": label,
+            "closed": False,
+            "badge": str(row.get("badge") or "").strip(),
+            "score": str(row.get("score") or "").strip(),
+            "subtitle": subtitle,
+            "reason": reason,
+            "projection": {
+                "total": projection_total,
+                "homeMargin": projection_margin,
+            },
+            "markets": {
+                "total": {
+                    "pick": None if str(row.get("badge") or "").strip().lower() in {"", "no bet", "nobet"} else str(row.get("main") or row.get("badge") or "").strip() or None,
+                    "line": projection_total,
+                    "reason": reason,
+                },
+                "spread": {
+                    "pick": None,
+                    "homeLine": projection_margin,
+                    "reason": reason,
+                },
+                "moneyline": {
+                    "pick": None,
+                    "reason": reason,
+                },
+            },
+        }
+        segments.append(segment)
+
+    probability_keys = ["first1", "first3", "first5", "full"]
+    for index, row in enumerate(probability_rows):
+        if not isinstance(row, dict):
+            continue
+        key = probability_keys[index] if index < len(probability_keys) else f"first{index + 1}"
+        summary = str(row.get("summary") or "").strip()
+        if not summary:
+            continue
+        segments.append(
+            {
+                "key": key,
+                "label": str(row.get("label") or key.replace("first", "First ").title()).strip() or key,
+                "closed": False,
+                "badge": "",
+                "score": summary,
+                "subtitle": summary,
+                "reason": summary,
+                "projection": {
+                    "total": _parse_number_text(summary),
+                    "homeMargin": _parse_number_text(row.get("home_pct")),
+                },
+                "markets": {
+                    "total": {
+                        "pick": None,
+                        "line": _parse_number_text(summary),
+                        "reason": summary,
+                    },
+                    "spread": {},
+                    "moneyline": {},
+                },
+            }
+        )
+    return segments
+
+
+def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(row)
+    card_props = _live_props_from_card(card)
+    card_segments = _live_lens_segments_from_card(card)
+    if card_segments and not merged.get("gameLens"):
+        merged["gameLens"] = card_segments
+    if card_props and not merged.get("liveProps"):
+        merged["liveProps"] = card_props
+    if card_props and not merged.get("props"):
+        merged["props"] = card_props
+    if card_props and not merged.get("trackedProps"):
+        merged["trackedProps"] = card_props
+    matchup = merged.get("matchup") if isinstance(merged.get("matchup"), dict) else {}
+    card_matchup = {"away": card.get("away") if isinstance(card.get("away"), dict) else {}, "home": card.get("home") if isinstance(card.get("home"), dict) else {}}
+    if not matchup.get("away"):
+        matchup["away"] = card_matchup["away"]
+    if not matchup.get("home"):
+        matchup["home"] = card_matchup["home"]
+    if not matchup.get("liveText"):
+        matchup["liveText"] = str(card.get("summary") or card.get("detail") or "Live-lens snapshot loaded from the MLB cards artifact.").strip() or "Live-lens snapshot loaded from the MLB cards artifact."
+    merged["matchup"] = matchup
+    if not merged.get("status"):
+        merged["status"] = card.get("status") if isinstance(card.get("status"), dict) else {"abstract": str(card.get("status_badge") or "Live lens").strip() or "Live lens", "detailed": str(card.get("detail") or "").strip() or str(card.get("status_badge") or "Live lens").strip() or "Live lens"}
+    if not merged.get("predictions") and isinstance(card.get("predictions"), dict):
+        merged["predictions"] = card.get("predictions")
+    if not merged.get("gameMarkets") and isinstance(card.get("markets"), dict):
+        merged["gameMarkets"] = card.get("markets")
+    merged.setdefault("snapshotAvailable", bool(card.get("snapshotAvailable", False)))
+    merged.setdefault("simContextAvailable", bool(card.get("simContextAvailable", False)))
+    return merged
+
+
 def _card_status_bucket(card: dict[str, Any]) -> str:
     status = card.get("status") if isinstance(card.get("status"), dict) else {}
     abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower()
@@ -407,6 +582,38 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     return payload
 
 
+def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str) -> dict[str, Any]:
+    try:
+        cards_context = build_cards_page_context(selected_date)
+    except Exception:
+        return report
+
+    cards = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
+    if not cards:
+        return report
+
+    cards_by_game_pk = {int(card.get("gamePk") or 0): card for card in cards if isinstance(card, dict) and int(card.get("gamePk") or 0)}
+    games = report.get("games") if isinstance(report.get("games"), list) else []
+    merged_games: list[dict[str, Any]] = []
+    for row in games:
+        if not isinstance(row, dict):
+            continue
+        game_pk = int(row.get("gamePk") or 0)
+        card = cards_by_game_pk.get(game_pk)
+        merged_games.append(_merge_cards_context_into_live_row(row, card) if isinstance(card, dict) else row)
+    merged_report = dict(report)
+    if merged_games:
+        merged_report["games"] = merged_games
+    if not isinstance(merged_report.get("counts"), dict):
+        merged_report["counts"] = {}
+    merged_counts = dict(merged_report.get("counts") or {})
+    merged_counts["games"] = len(merged_games) if merged_games else int(merged_counts.get("games") or 0)
+    merged_counts["props"] = sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in merged_games)
+    merged_report["counts"] = merged_counts
+    merged_report["source_title"] = str(cards_context.get("source_title") or merged_report.get("source_title") or "MLB Game Cards").strip() or "MLB Game Cards"
+    return merged_report
+
+
 def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     report_path = live_lens_report_path(selected_date)
     try:
@@ -425,6 +632,7 @@ def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
             return fallback_payload
         if not isinstance(payload, dict):
             return None
+    payload = _merge_cards_context_into_report(payload, selected_date)
 
     try:
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -447,6 +655,8 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         fallback_report = _cards_backed_live_lens_report(selected_date)
         if fallback_report is not None:
             report = fallback_report
+    elif isinstance(report, dict):
+        report = _merge_cards_context_into_report(report, selected_date)
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
