@@ -2,7 +2,7 @@
   "meta": {
     "season": 2026,
     "title": "MLB 2026 Rolling Season Eval",
-    "generated_at": "2026-06-03T10:10:20.698576",
+    "generated_at": "2026-06-03T10:53:13.874412",
     "batch_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
     "game_types": [
       "R"
@@ -588,7 +588,7 @@
     {
       "month": "2026-06",
       "label": "Jun 2026",
-      "days": 3,
+      "days": 4,
       "games": 24,
       "segments": {
         "full": {
@@ -1386,15 +1386,15 @@
             "playable_counts": {
               "totals": 0,
               "ml": 0,
-              "pitcher_props": 16,
-              "hitter_props": 35,
+              "pitcher_props": 20,
+              "hitter_props": 33,
               "hitter_home_runs": 0,
               "hitter_hits": 14,
               "hitter_strikeouts": 0,
-              "hitter_total_bases": 16,
+              "hitter_total_bases": 14,
               "hitter_runs": 4,
               "hitter_rbis": 1,
-              "combined": 51
+              "combined": 53
             },
             "results": {
               "combined": {
@@ -1456,6 +1456,114 @@
       "roi": null,
       "settled_n": 0,
       "unresolved_n": 13,
+      "source_kind": "canonical_daily_fallback",
+      "_betting_payload_found": true,
+      "report_path": null
+    },
+    {
+      "date": "2026-06-04",
+      "month": "2026-06",
+      "games": 9,
+      "cards_available": true,
+      "legacy_cards_available": true,
+      "cards_url": "/?date=2026-06-04",
+      "legacy_cards_url": "/?date=2026-06-04",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_04_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "full_game": {
+        "moneyline": {},
+        "totals": {},
+        "runline_fav_minus_1_5": {},
+        "pitcher_props_starters": {},
+        "pitcher_props_at_market_lines": {}
+      },
+      "aggregate": {
+        "full": {
+          "games": 9
+        },
+        "first5": {
+          "games": 9
+        },
+        "first3": {
+          "games": 9
+        }
+      },
+      "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_04_locked_policy.json",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 0,
+        "pitcher_props": 0,
+        "hitter_props": 0,
+        "hitter_home_runs": 0,
+        "hitter_hits": 0,
+        "hitter_strikeouts": 0,
+        "hitter_total_bases": 0,
+        "hitter_runs": 0,
+        "hitter_rbis": 0,
+        "combined": 0
+      },
+      "results": {
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "profit_u": 0.0,
+      "roi": null,
+      "settled_n": 0,
+      "unresolved_n": 0,
       "source_kind": "canonical_daily_fallback",
       "_betting_payload_found": true,
       "report_path": null
