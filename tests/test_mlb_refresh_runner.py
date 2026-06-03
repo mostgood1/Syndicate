@@ -239,6 +239,80 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
+    def test_live_lens_payload_normalizes_in_progress_status_as_live(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_live_status", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                spec.loader.exec_module(module)
+                module._DATA_DIR = Path(tmp_dir) / "data"
+                module._LIVE_LENS_DIR = module._DATA_DIR / "live_lens"
+
+                module._load_cards_artifacts = lambda d: {}
+                module._load_cards_archive_context = lambda d: {}
+                module._should_load_cards_archive_context = lambda d, artifacts=None: False
+                module._schedule_games_for_date = lambda d: []
+                module._load_live_lens_cards = lambda d, artifacts=None, archive=None, schedule_games=None: [
+                    {
+                        "gamePk": 123,
+                        "status": {"abstract": "Preview", "detailed": "Pre-Game"},
+                        "startTime": "7:10 PM",
+                        "away": {"abbr": "AAA", "name": "Away A"},
+                        "home": {"abbr": "BBB", "name": "Home B"},
+                        "markets": {"totals": {}, "ml": {}, "pitcherProps": [], "hitterProps": []},
+                        "predictions": {},
+                        "probable": {},
+                        "gameLens": [],
+                        "liveProps": [],
+                        "trackedProps": [],
+                    }
+                ]
+                module._load_game_line_market_index = lambda d: {}
+                module._load_live_lens_feed = lambda game_pk, d: None
+                module._load_live_lens_snapshot = lambda game_pk, d, feed=None: {
+                    "status": {"abstractGameState": "In Progress", "detailedState": "In Progress"},
+                    "teams": {
+                        "away": {"totals": {"R": 1}},
+                        "home": {"totals": {"R": 2}},
+                    },
+                }
+                module._load_sim_context_for_game = lambda *args, **kwargs: {"found": True}
+                module._prop_lens_rows = lambda card, snapshot, sim_context: []
+                module._normalize_live_lens_live_prop_row = lambda row, snapshot, card: dict(row)
+                module._build_game_lens = lambda *args, **kwargs: []
+                module._live_matchup_text = lambda snapshot: "Live state text"
+
+                def fake_current_live_prop_rows(card, snapshot, sim_context, d, **kwargs):
+                    self.assertEqual(card.get("status", {}).get("abstract"), "Live")
+                    return [
+                        {
+                            "playerName": "Player A",
+                            "selection": "Over",
+                            "marketLabel": "Hits",
+                            "line": 0.5,
+                            "odds": -110,
+                            "rankingScore": 0.9,
+                            "estimatedWinProb": 0.9,
+                            "edge": 0.1,
+                        }
+                    ]
+
+                module._current_live_prop_rows = fake_current_live_prop_rows
+
+                payload = module._live_lens_payload("2026-06-03", persist=False, refresh_markets=False)
+
+            self.assertEqual(payload["counts"]["live"], 1)
+            self.assertEqual(payload["games"][0]["status"]["abstract"], "Live")
+            self.assertEqual(payload["games"][0]["status"]["detailed"], "In Progress")
+            self.assertEqual(len(payload["games"][0]["liveProps"]), 1)
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_build_live_lens_page_context_persist_rewrites_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"

@@ -12823,6 +12823,31 @@ def _status_is_live(status_text: Any) -> bool:
     return abstract in {"live", "in progress", "manager challenge"}
 
 
+def _normalize_live_lens_status(status: Dict[str, Any], fallback_status: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+    fallback_status = fallback_status if isinstance(fallback_status, dict) else {}
+    abstract = str(status.get("abstractGameState") or status.get("abstract") or fallback_status.get("abstract") or "").strip()
+    detailed = str(status.get("detailedState") or status.get("detailed") or fallback_status.get("detailed") or abstract).strip()
+    status_pair = {"abstract": abstract, "detailed": detailed}
+    if _status_is_final(status_pair):
+        return {
+            "abstract": "Final",
+            "detailed": detailed or "Final",
+        }
+    if _status_is_live(status_pair):
+        return {
+            "abstract": "Live",
+            "detailed": detailed or "In Progress",
+        }
+    if not abstract:
+        abstract = detailed or "Pregame"
+    if not detailed:
+        detailed = abstract
+    return {
+        "abstract": abstract,
+        "detailed": detailed,
+    }
+
+
 def _status_is_final(status_text: Any) -> bool:
     if isinstance(status_text, dict):
         abstract = str(
@@ -14496,7 +14521,7 @@ def _current_live_prop_rows(
         return _final_live_prop_rows_from_registry(card, snapshot, d)
     if not isinstance(sim_context, dict) or not sim_context.get("found"):
         return []
-    if abstract != "live":
+    if not _status_is_live({"abstract": abstract, "detailed": str((status or {}).get("detailedState") or ((card or {}).get("status") or {}).get("detailed") or "")}):
         return []
 
     if ensure_market_fresh:
@@ -16948,14 +16973,19 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
         status = ((snapshot or {}).get("status") or {})
         status_detailed = str(status.get("detailedState") or ((card.get("status") or {}).get("detailed") or ""))
         status_abstract = str(status.get("abstractGameState") or ((card.get("status") or {}).get("abstract") or ""))
+        normalized_status = _normalize_live_lens_status({"abstractGameState": status_abstract, "detailedState": status_detailed}, card.get("status") if isinstance(card.get("status"), dict) else {})
+        status_abstract = str(normalized_status.get("abstract") or status_abstract)
+        status_detailed = str(normalized_status.get("detailed") or status_detailed)
+        normalized_card = dict(card)
+        normalized_card["status"] = dict(normalized_status)
         status_is_live = _status_is_live({"abstract": status_abstract, "detailed": status_detailed})
         status_is_final = _status_is_final({"abstract": status_abstract, "detailed": status_detailed})
-        tracked_prop_rows = _prop_lens_rows(card, snapshot, sim_context if sim_context.get("found") else None)
+        tracked_prop_rows = _prop_lens_rows(normalized_card, snapshot, sim_context if sim_context.get("found") else None)
         prop_eval_started_at = time.perf_counter()
         live_prop_rows = [
             _normalize_live_lens_live_prop_row(row, snapshot, card)
             for row in _current_live_prop_rows(
-                card,
+            normalized_card,
                 snapshot,
                 sim_context if sim_context.get("found") else None,
                 d,
