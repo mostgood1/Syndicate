@@ -39,12 +39,12 @@ def _structured_status(row: dict[str, Any], *, fallback_date: str) -> dict[str, 
     abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip()
     detailed = str(status.get("detailed") or status.get("detailedState") or abstract or row.get("startTime") or fallback_date).strip()
     lowered = f"{abstract} {detailed}".strip().lower()
-    if not abstract:
-        if any(token in lowered for token in ("live", "in progress", "manager challenge", "warmup")):
-            abstract = "Live"
-        elif any(token in lowered for token in ("final", "game over", "completed early")):
-            abstract = "Final"
-        elif detailed:
+    if any(token in lowered for token in ("live", "in progress", "manager challenge", "warmup")):
+        abstract = "Live"
+    elif any(token in lowered for token in ("final", "game over", "completed early")):
+        abstract = "Final"
+    elif not abstract:
+        if detailed:
             abstract = detailed
         else:
             abstract = "Pregame"
@@ -54,6 +54,18 @@ def _structured_status(row: dict[str, Any], *, fallback_date: str) -> dict[str, 
         "abstract": abstract,
         "detailed": detailed,
     }
+
+
+def _status_bucket_from_row(row: dict[str, Any]) -> str:
+    status = row.get("status") if isinstance(row.get("status"), dict) else {}
+    abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower()
+    detailed = str(status.get("detailed") or status.get("detailedState") or "").strip().lower()
+    text = f"{abstract} {detailed}".strip()
+    if any(token in text for token in ("live", "in progress", "manager challenge", "warmup")):
+        return "live"
+    if any(token in text for token in ("final", "game over", "completed early")):
+        return "final"
+    return "pregame"
 
 
 def _lens_rows(row: dict[str, Any]) -> list[dict[str, Any]]:
@@ -805,9 +817,9 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         persisted_games = [dict(game) for game in games if isinstance(game, dict)]
         persisted_counts = {
             "games": len(persisted_games),
-            "live": sum(1 for game in persisted_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() == "live"),
-            "final": sum(1 for game in persisted_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() == "final"),
-            "pregame": sum(1 for game in persisted_games if str((game.get("status") or {}).get("abstract") or "").strip().lower() not in {"live", "final"}),
+            "live": sum(1 for game in persisted_games if _status_bucket_from_row(game) == "live"),
+            "final": sum(1 for game in persisted_games if _status_bucket_from_row(game) == "final"),
+            "pregame": sum(1 for game in persisted_games if _status_bucket_from_row(game) == "pregame"),
             "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in persisted_games),
             "archivedLiveProps": 0,
         }
@@ -846,13 +858,13 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         if isinstance(game, dict)
     ]
 
-    counts = (report or {}).get("counts") if isinstance((report or {}).get("counts"), dict) else {
-        "archivedLiveProps": 0,
-        "final": 0,
-        "games": 0,
-        "live": 0,
-        "pregame": 0,
-        "props": 0,
+    counts = {
+        "archivedLiveProps": int(((report or {}).get("counts") or {}).get("archivedLiveProps") or 0) if isinstance((report or {}).get("counts"), dict) else 0,
+        "final": sum(1 for game in games if _status_bucket_from_row(game) == "final"),
+        "games": len(games),
+        "live": sum(1 for game in games if _status_bucket_from_row(game) == "live"),
+        "pregame": sum(1 for game in games if _status_bucket_from_row(game) == "pregame"),
+        "props": sum(len(game.get("liveProps") or game.get("props") or game.get("trackedProps") or []) for game in games),
     }
     route_path = f"/mlb/season/{int(season)}/live-lens" if season is not None else "/mlb/live-lens"
     intro_title = f"MLB {int(season)} Live Lens" if season is not None else "MLB Live Lens"

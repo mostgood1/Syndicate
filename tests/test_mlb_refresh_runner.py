@@ -479,7 +479,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                             "games": [
                                 {
                                     "gamePk": 123,
-                                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                                    "status": {"abstract": "In Progress", "detailed": "In Progress"},
                                     "startTime": "7:10 PM",
                                     "matchup": {
                                         "away": {"abbr": "AAA", "name": "Away A"},
@@ -513,7 +513,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                             "gamePk": 123,
                             "away": {"abbr": "AAA", "name": "Away A"},
                             "home": {"abbr": "BBB", "name": "Home B"},
-                            "status": {"abstract": "Live", "detailed": "In Progress"},
+                            "status": {"abstract": "In Progress", "detailed": "In Progress"},
                             "detail": "7:10 PM",
                             "startTime": "7:10 PM",
                             "summary": "Fallback slate",
@@ -546,6 +546,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 context = module.build_live_lens_page_context("2026-06-03", persist=True)
                 persisted_report = json.loads(report_path.read_text(encoding="utf-8"))
 
+            self.assertEqual(context["counts"]["live"], 1)
             self.assertEqual(context["counts"]["props"], 1)
             self.assertEqual(context["games"][0]["matchup"]["score"], {"away": 3, "home": 1})
             self.assertEqual(len(context["games"][0]["liveProps"]), 1)
