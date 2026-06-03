@@ -303,6 +303,110 @@ def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at
     }
 
 
+def _card_status_bucket(card: dict[str, Any]) -> str:
+    status = card.get("status") if isinstance(card.get("status"), dict) else {}
+    abstract = str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower()
+    detailed = str(status.get("detailed") or status.get("detailedState") or card.get("detail") or "").strip().lower()
+    text = f"{abstract} {detailed}".strip()
+    if any(token in text for token in ("live", "in progress", "warmup")):
+        return "live"
+    if any(token in text for token in ("final", "game over", "completed")):
+        return "final"
+    return "pregame"
+
+
+def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[str, Any]:
+    away = card.get("away") if isinstance(card.get("away"), dict) else {}
+    home = card.get("home") if isinstance(card.get("home"), dict) else {}
+    return {
+        "gamePk": int(card.get("gamePk") or 0),
+        "status": card.get("status") if isinstance(card.get("status"), dict) else {"abstract": _card_status_bucket(card).title(), "detailed": str(card.get("detail") or report_date).strip() or report_date},
+        "startTime": str(card.get("startTime") or card.get("gameDate") or card.get("detail") or report_date).strip() or report_date,
+        "matchup": {
+            "away": away,
+            "home": home,
+            "score": card.get("score") if isinstance(card.get("score"), dict) else {"away": None, "home": None},
+            "liveText": str(card.get("summary") or card.get("detail") or "Live-lens snapshot loaded from the MLB cards artifact.").strip() or "Live-lens snapshot loaded from the MLB cards artifact.",
+        },
+        "predictions": card.get("predictions") if isinstance(card.get("predictions"), dict) else {},
+        "gameMarkets": card.get("markets") if isinstance(card.get("markets"), dict) else {},
+        "gameLens": card.get("gameLens") if isinstance(card.get("gameLens"), list) else [],
+        "props": card.get("props") if isinstance(card.get("props"), list) else [],
+        "liveProps": card.get("liveProps") if isinstance(card.get("liveProps"), list) else [],
+        "archivedLiveProps": card.get("archivedLiveProps") if isinstance(card.get("archivedLiveProps"), list) else [],
+        "trackedProps": card.get("trackedProps") if isinstance(card.get("trackedProps"), list) else [],
+        "simContextAvailable": bool(card.get("simContextAvailable")),
+        "snapshotAvailable": bool(card.get("snapshotAvailable")),
+    }
+
+
+def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
+    try:
+        cards_context = build_cards_page_context(selected_date)
+    except Exception:
+        return None
+
+    cards = cards_context.get("games") if isinstance(cards_context.get("games"), list) else []
+    if not cards:
+        return None
+
+    report_path = live_lens_report_path(selected_date)
+    report_games = [_card_to_live_lens_row(card, report_date=selected_date) for card in cards if isinstance(card, dict)]
+    live_count = 0
+    final_count = 0
+    pregame_count = 0
+    prop_count = 0
+    for card in report_games:
+        bucket = _card_status_bucket(card)
+        if bucket == "live":
+            live_count += 1
+        elif bucket == "final":
+            final_count += 1
+        else:
+            pregame_count += 1
+        prop_count += len(card.get("liveProps") or card.get("props") or card.get("trackedProps") or [])
+
+    payload = {
+        "date": str(selected_date),
+        "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "dataRoot": str(report_path.parent.parent),
+        "liveLensDir": str(report_path.parent),
+        "optimizationRegime": None,
+        "counts": {
+            "games": len(report_games),
+            "live": live_count,
+            "final": final_count,
+            "pregame": pregame_count,
+            "props": prop_count,
+            "archivedLiveProps": 0,
+        },
+        "performance": {
+            "marketsRefreshed": False,
+            "marketRefreshMs": 0.0,
+            "totalMs": 0.0,
+            "snapshotLoadMs": 0.0,
+            "simContextLoadMs": 0.0,
+            "propEvalMs": 0.0,
+            "gameLensMs": 0.0,
+            "gameCount": len(report_games),
+            "liveGameCount": live_count,
+            "feedFetchCount": 0,
+            "cardsFallback": True,
+        },
+        "games": report_games,
+        "source_title": str(cards_context.get("source_title") or "MLB Game Cards").strip() or "MLB Game Cards",
+        "source_path": str(report_path),
+        "using_sample_data": bool(cards_context.get("using_sample_data", False)),
+    }
+
+    try:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        return None
+    return payload
+
+
 def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     report_path = live_lens_report_path(selected_date)
     try:
@@ -315,8 +419,12 @@ def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     except Exception:
         return None
 
-    if not isinstance(payload, dict):
-        return None
+    if not isinstance(payload, dict) or not isinstance(payload.get("games"), list) or not payload.get("games"):
+        fallback_payload = _cards_backed_live_lens_report(selected_date)
+        if fallback_payload is not None:
+            return fallback_payload
+        if not isinstance(payload, dict):
+            return None
 
     try:
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -335,6 +443,10 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     report = _persist_live_lens_report(selected_date) if persist else None
     if not isinstance(report, dict):
         report = load_json_file(report_path)
+    if (not isinstance(report, dict)) or not isinstance(report.get("games"), list) or not report.get("games"):
+        fallback_report = _cards_backed_live_lens_report(selected_date)
+        if fallback_report is not None:
+            report = fallback_report
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
