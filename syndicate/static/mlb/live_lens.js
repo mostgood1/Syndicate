@@ -10,6 +10,8 @@
     loading: false,
   };
 
+  const REFRESH_STATE_KEY = "__SYNDICATE_MLB_LIVE_LENS_REFRESH__";
+
   const AUTO_REFRESH_MS = (window.SyndicatePolling && window.SyndicatePolling.DEFAULT_INTERVAL_MS) || 30000;
 
   const metaNode = document.getElementById("liveLensMeta");
@@ -402,6 +404,7 @@
 
   function renderGames(payload) {
     const games = Array.isArray(payload?.games) ? payload.games : [];
+    const oddsRefreshedAt = String(payload?.oddsRefreshedAt || payload?.odds_refreshed_at || payload?.generatedAt || "").trim();
     if (!games.length) {
       gamesNode.innerHTML = `<div class="empty">No games found for ${escapeHtml(state.date)}.</div>`;
       return;
@@ -418,6 +421,7 @@
           <div class="panel-title">${escapeHtml(String(away.abbr || away.name || "Away"))} at ${escapeHtml(String(home.abbr || home.name || "Home"))}</div>
           <div class="status-line">${escapeHtml(status.abstract)} — ${escapeHtml(status.detailed || game.startTime || "")}</div>
           <div class="status-line">Score: ${escapeHtml(String(score.away ?? "-"))} - ${escapeHtml(String(score.home ?? "-"))}${liveText ? ` | ${escapeHtml(liveText)}` : ""}</div>
+          ${oddsRefreshedAt ? `<div class="status-line">Odds refreshed: ${escapeHtml(oddsRefreshedAt)}</div>` : ""}
           ${renderGameLens(game)}
           ${renderPropSections(game)}
         </section>`;
@@ -455,8 +459,12 @@
   }
 
   function installAutoRefresh() {
+    const previousRefresh = window[REFRESH_STATE_KEY];
     if (state.autoRefreshHandle && typeof state.autoRefreshHandle.stop === "function") {
       state.autoRefreshHandle.stop();
+    }
+    if (previousRefresh && typeof previousRefresh.stop === "function") {
+      previousRefresh.stop();
     }
     if (window.SyndicatePolling && typeof window.SyndicatePolling.start === "function") {
       state.autoRefreshHandle = window.SyndicatePolling.start({
@@ -468,6 +476,7 @@
           return load();
         },
       });
+      window[REFRESH_STATE_KEY] = state.autoRefreshHandle;
       return;
     }
     const fallbackTimer = window.setInterval(function () {
@@ -478,6 +487,7 @@
         window.clearInterval(fallbackTimer);
       },
     };
+    window[REFRESH_STATE_KEY] = state.autoRefreshHandle;
   }
 
   if (monthsNode) {
