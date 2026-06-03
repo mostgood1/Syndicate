@@ -687,6 +687,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         report = _merge_cards_context_into_report(report, selected_date)
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
+    odds_refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds") if persist else None
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
     rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
@@ -704,6 +705,8 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         persisted_report.update({
             "date": str(selected_date),
             "generatedAt": generated_at,
+            "oddsRefreshedAt": odds_refreshed_at,
+            "odds_refreshed_at": odds_refreshed_at,
             "dataRoot": runtime_data_root,
             "liveLensDir": runtime_live_lens_dir,
             "counts": persisted_counts,
@@ -717,6 +720,11 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
             report = persisted_report
         except Exception:
             pass
+    if odds_refreshed_at:
+        if not isinstance(report, dict):
+            report = {}
+        report["oddsRefreshedAt"] = odds_refreshed_at
+        report["odds_refreshed_at"] = odds_refreshed_at
     using_sample_data = False
     scoreboard_items = [
         {
