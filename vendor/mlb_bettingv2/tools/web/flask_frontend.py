@@ -17722,6 +17722,9 @@ def api_live_lens() -> Response:
             detail="Live-lens on-demand rebuilds are disabled on this service instance.",
         )
         return _jsonify_app_build(payload, no_store=True)
+    if persist:
+        payload = _live_lens_payload(d, persist=True, refresh_markets=not _is_historical_date(d))
+        return _jsonify_app_build(payload, no_store=True)
     payload = _payload_cache_get_or_build(
         "live_lens_api",
         str(d),

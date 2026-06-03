@@ -183,6 +183,62 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
+    def test_api_live_lens_persist_bypasses_cache_and_rewrites_report(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_flask_frontend_api_live_lens_persist", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(os.environ, {}, clear=True):
+                spec.loader.exec_module(module)
+                runtime_root = Path(tmp_dir) / "source" / "data"
+                runtime_live_lens_dir = runtime_root / "live_lens"
+                runtime_live_lens_dir.mkdir(parents=True, exist_ok=True)
+                report_path = runtime_live_lens_dir / "live_lens_report_2026_06_01.json"
+                counter = {"value": 0}
+
+                def fake_live_lens_payload(date_str: str, *, persist: bool = False, refresh_markets: bool = False):
+                    counter["value"] += 1
+                    payload = {
+                        "date": date_str,
+                        "generatedAt": f"2026-06-01T21:00:0{counter['value']}-05:00",
+                        "dataRoot": module._relative_path_str(runtime_root),
+                        "liveLensDir": module._relative_path_str(runtime_live_lens_dir),
+                        "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+                        "performance": {"marketsRefreshed": bool(refresh_markets), "persistMs": 0.0},
+                        "games": [],
+                    }
+                    report_path.write_text(json.dumps(payload), encoding="utf-8")
+                    return payload
+
+                module._DATA_DIR = runtime_root
+                module._LIVE_LENS_DIR = runtime_live_lens_dir
+                module._is_live_lens_loop_enabled = lambda: True
+                module._is_historical_date = lambda d: False
+                module._live_lens_report_path = lambda d: report_path
+                module._payload_cache_get_or_build = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("cache should be bypassed for persist=on"))
+                module._live_lens_payload = fake_live_lens_payload
+
+                with module.app.test_client() as client:
+                    first_response = client.get("/api/live-lens?date=2026-06-01&persist=on")
+                    second_response = client.get("/api/live-lens?date=2026-06-01&persist=on")
+
+                first_payload = first_response.get_json()
+                second_payload = second_response.get_json()
+                report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(first_response.status_code, 200)
+            self.assertEqual(second_response.status_code, 200)
+            self.assertEqual(counter["value"], 2)
+            self.assertEqual(first_payload["generatedAt"], "2026-06-01T21:00:01-05:00")
+            self.assertEqual(second_payload["generatedAt"], "2026-06-01T21:00:02-05:00")
+            self.assertEqual(report_payload["generatedAt"], "2026-06-01T21:00:02-05:00")
+        finally:
+            sys.modules.pop(spec.name, None)
+
     def test_main_prefers_existing_source_artifacts_when_overwrite_off(self) -> None:
         module = self._load_module()
 
