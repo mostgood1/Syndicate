@@ -901,10 +901,7 @@ def _home_prop_hero_metrics(item: dict[str, Any]) -> tuple[str | None, str | Non
         live_box = _home_prop_metric_line(item.get("live_total"), market_label)
 
     sim_box = _home_prop_metric_line(
-        item.get("live_projection")
-        if item.get("is_live") and item.get("live_projection") not in {None, "", "-"}
-        else (item.get("projected") if item.get("projected") not in {None, "", "-"} else item.get("live_projection"))
-        ,
+        item.get("projected") if item.get("projected") not in {None, "", "-"} else item.get("live_projection"),
         market_label,
     )
     if not sim_box:
@@ -1054,6 +1051,11 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
 
         if slug == "mlb" and game_pk is not None and context_label:
             actual_payload = _mlb_actual_payload_for_game(context_label, int(game_pk), actual_cache)
+            if not item.get("headshot_url"):
+                headshot_url = _mlb_headshot_from_actual_payload(item.get("player_name") or item.get("name"), actual_payload)
+                if headshot_url:
+                    item["headshot_url"] = headshot_url
+                    item["photo"] = headshot_url
             final_state = _mlb_actual_payload_is_final(actual_payload)
             actual_value = _mlb_prop_actual_value(item, actual_payload)
             if actual_value is not None:
@@ -1156,6 +1158,32 @@ def _mlb_actual_payload_is_final(actual_payload: dict[str, Any] | None) -> bool:
 def _mlb_name_key(value: Any) -> str:
     text = str(value or "").strip().lower()
     return re.sub(r"\s+", " ", text)
+
+
+def _mlb_headshot_from_actual_payload(player_name: Any, actual_payload: dict[str, Any] | None) -> str | None:
+    target_name = _mlb_name_key(player_name)
+    if not target_name or not isinstance(actual_payload, dict):
+        return None
+    try:
+        from syndicate.features.mlb.cards import _mlb_headshot_url
+    except Exception:
+        return None
+
+    boxscore = (actual_payload.get("liveData") or {}).get("boxscore") if isinstance(actual_payload.get("liveData"), dict) else {}
+    teams = boxscore.get("teams") if isinstance(boxscore, dict) else {}
+    for side in ("away", "home"):
+        team = teams.get(side) if isinstance(teams, dict) else {}
+        players = team.get("players") if isinstance(team, dict) else {}
+        if not isinstance(players, dict):
+            continue
+        for player_obj in players.values():
+            if not isinstance(player_obj, dict):
+                continue
+            person = player_obj.get("person") if isinstance(player_obj.get("person"), dict) else {}
+            if _mlb_name_key(person.get("fullName")) != target_name:
+                continue
+            return _mlb_headshot_url(_int_or_none(person.get("id")))
+    return None
 
 
 def _basketball_headshot_url(player_id: Any) -> str | None:
@@ -1510,8 +1538,18 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
 
 
 def _dashboard_prop_count(sport: dict[str, Any]) -> int:
+    home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
+    pregame_items = (home_rails.get("pregame") or {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
+    live_items = (home_rails.get("live") or {}).get("items") if isinstance(home_rails.get("live"), dict) else []
+    rails_count = 0
+    if isinstance(pregame_items, list):
+        rails_count += len(pregame_items)
+    if isinstance(live_items, list):
+        rails_count += len(live_items)
     props_bar = sport.get("props_bar") if isinstance(sport.get("props_bar"), dict) else {}
     base_count = len(props_bar.get("items") or []) if isinstance(props_bar.get("items"), list) else 0
+    if rails_count:
+        return max(base_count, rails_count)
     if str(sport.get("slug") or "").strip().lower() != "mlb":
         return base_count
     mlb_home = sport.get("mlb_home") if isinstance(sport.get("mlb_home"), dict) else {}
@@ -1624,9 +1662,16 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
             continue
         game_bar = sport.get("game_bar") if isinstance(sport.get("game_bar"), dict) else {}
         props_bar = sport.get("props_bar") if isinstance(sport.get("props_bar"), dict) else {}
+        home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
         game_items = game_bar.get("items") if isinstance(game_bar.get("items"), list) else []
         dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
-        prop_items = props_bar.get("items") if isinstance(props_bar.get("items"), list) else []
+        prop_items = []
+        if isinstance((home_rails.get("pregame") or {}).get("items"), list):
+            prop_items.extend((home_rails.get("pregame") or {}).get("items") or [])
+        if isinstance((home_rails.get("live") or {}).get("items"), list):
+            prop_items.extend((home_rails.get("live") or {}).get("items") or [])
+        if not prop_items:
+            prop_items = props_bar.get("items") if isinstance(props_bar.get("items"), list) else []
         for item in game_items:
             if isinstance(item, dict):
                 live_watch.append(_build_game_watch_row(sport, item))
@@ -1636,7 +1681,7 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
         for item in prop_items:
             if isinstance(item, dict):
                 prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface=_safe_text(props_bar.get("title"), "Props")))
-        if str(sport.get("slug") or "").strip().lower() == "mlb":
+        if not home_rails and str(sport.get("slug") or "").strip().lower() == "mlb":
             mlb_home = sport.get("mlb_home") if isinstance(sport.get("mlb_home"), dict) else {}
             for item in mlb_home.get("live_props_items") if isinstance(mlb_home.get("live_props_items"), list) else []:
                 if isinstance(item, dict):
@@ -2451,7 +2496,8 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "game_pk": _int_or_none(game_pk),
                         "matchup": row_matchup if re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE) else matchup_text,
                         "heading": "Betting Card",
-                        "name": f"{pitcher} {prop_type}",
+                        "name": pitcher,
+                        "player_name": pitcher,
                         "detail": f"{selection} {line_val}",
                         "value": edge_text,
                         "is_live": False,
@@ -2551,7 +2597,8 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "game_pk": _int_or_none(game_pk),
                         "matchup": row_matchup if re.fullmatch(r"Game\s+\d+", matchup_text, flags=re.IGNORECASE) else matchup_text,
                         "heading": "Betting Card",
-                        "name": f"{hitter} {prop_type}",
+                        "name": hitter,
+                        "player_name": hitter,
                         "detail": f"{selection} {line_val}",
                         "value": edge_text,
                         "is_live": False,
@@ -2704,6 +2751,8 @@ def _prop_rows_from_mlb_live_games(games: list[dict[str, Any]], *, limit: int = 
                 "matchup": matchup,
                 "heading": "Live props",
                 "name": player,
+                "player_name": player,
+                "player_id": player_id,
                 "photo": headshot_url,
                 "headshot_url": headshot_url,
                 "is_live": True,
@@ -2990,7 +3039,17 @@ def _compact_game_items_from_nhl_live_payload(games: list[dict[str, Any]], *, se
     return items
 
 
-def _load_home_prop_items(
+def _home_games_have_live_action(home_games: list[dict[str, Any]] | None) -> bool:
+    for game in home_games or []:
+        if not isinstance(game, dict):
+            continue
+        scoreboard = _scoreboard_state(game)
+        if _is_liveish(scoreboard.get("status_badge"), scoreboard.get("status_line")):
+            return True
+    return False
+
+
+def _load_home_pregame_prop_items(
     slug: str,
     *,
     context_label: str,
@@ -3002,100 +3061,142 @@ def _load_home_prop_items(
     if slug in {"nfl", "ncaaf"} and not is_active_today:
         return []
     try:
-        if slug == "mlb":
-            if is_active_today:
-                from syndicate.features.mlb.live_lens import build_live_lens_page_context
+        if slug == "nba":
+            nba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+            if nba_rows:
+                return nba_rows
+            return _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/nba/cards?date={context_label}")
+        if slug == "wnba":
+            wnba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+            if wnba_rows:
+                return wnba_rows
+            return _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/wnba/cards?date={context_label}")
+        if slug in {"mlb", "nhl", "nfl", "ncaaf", "ncaab"}:
+            return _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
+    except Exception:
+        return []
+    return []
 
-                live_games = list(build_live_lens_page_context(context_label).get("games") or [])
-                live_rows = _prop_rows_from_mlb_live_games(live_games)
-                if live_rows:
-                    return live_rows
-            mlb_rows = _pregame_prop_rows_from_betting_card("mlb", context_label=context_label, season=season, week=week)
-            if mlb_rows:
-                return mlb_rows
+
+def _load_home_live_prop_items(
+    slug: str,
+    *,
+    context_label: str,
+    home_games: list[dict[str, Any]],
+    season: int | None = None,
+    week: int | None = None,
+    is_active_today: bool,
+) -> list[dict[str, Any]]:
+    if not is_active_today or not _home_games_have_live_action(home_games):
+        return []
+    try:
+        if slug == "mlb":
+            from syndicate.features.mlb.live_lens import build_live_lens_page_context
+
+            live_games = list(build_live_lens_page_context(context_label).get("games") or [])
+            live_games = [game for game in live_games if isinstance(game, dict) and _is_liveish(*(_scoreboard_state(game).get(key) for key in ["status_badge", "status_line"]))]
+            return _prop_rows_from_mlb_live_games(live_games)
         if slug == "nhl":
             from syndicate.features.nhl.cards import build_props_cards_payload
 
             payload = build_props_cards_payload(context_label, top=18)
-            nhl_rows = _prop_rows_from_nhl_cards(
+            return _prop_rows_from_nhl_cards(
                 list(payload.get("cards") or []),
                 fallback_href=f"/nhl/cards?date={payload.get('date') or context_label}",
             )
-            if nhl_rows:
-                return nhl_rows
-        if is_active_today and home_games:
-            live_rows = _compact_prop_rows(home_games)
-            if live_rows:
-                return live_rows
-        if slug == "nhl":
-            nhl_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
-            if nhl_rows:
-                return nhl_rows
         if slug == "nba":
-            if is_active_today:
-                from syndicate.features.nba.cards import build_live_player_lens_payload
-                from syndicate.features.nba.cards import build_live_state_payload
+            from syndicate.features.nba.cards import build_live_player_lens_payload
+            from syndicate.features.nba.cards import build_live_state_payload
 
-                live_state = build_live_state_payload(context_label, ttl=12)
-                event_ids = [
-                    str((game or {}).get("event_id") or "").strip()
-                    for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
-                    if str((game or {}).get("event_id") or "").strip()
-                ]
-                if event_ids:
-                    payload = build_live_player_lens_payload(context_label, event_ids, ttl=20)
-                    rows = _prop_rows_from_nba_live_lens(
-                        list(payload.get("games") or []),
-                        sport_slug="nba",
-                        fallback_href=f"/nba/live-lens?date={context_label}",
-                    )
-                    if rows:
-                        return rows
-            nba_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
-            if nba_rows:
-                return nba_rows
-            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/nba/cards?date={context_label}")
-            if csv_rows:
-                return csv_rows
-        if slug == "wnba":
-            if is_active_today:
-                from syndicate.features.wnba.cards import build_live_player_lens_payload
-                from syndicate.features.wnba.cards import build_live_state_payload
-
-                live_state = build_live_state_payload(context_label, ttl=12)
-                event_ids = [
-                    str((game or {}).get("event_id") or "").strip()
-                    for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
-                    if str((game or {}).get("event_id") or "").strip()
-                ]
-                if event_ids:
-                    payload = build_live_player_lens_payload(context_label, event_ids, ttl=20)
-                    rows = _prop_rows_from_nba_live_lens(
-                        list(payload.get("games") or []),
-                        sport_slug="wnba",
-                        fallback_href=f"/wnba/live-lens?date={context_label}",
-                    )
-                    if rows:
-                        return rows
-
-            from syndicate.features.wnba.props import build_props_page_context
-
-            context = build_props_page_context(context_label)
-            wnba_rows = _prop_rows_from_rank_cards(
-                list(context.get("rank_cards") or []),
-                sport_slug="wnba",
-                fallback_href=f"/wnba/props?date={context.get('date') or context_label}",
-                heading_override="Props",
+            live_state = build_live_state_payload(context_label, ttl=12)
+            event_ids = [
+                str((game or {}).get("event_id") or "").strip()
+                for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
+                if str((game or {}).get("event_id") or "").strip()
+            ]
+            if not event_ids:
+                return []
+            payload = build_live_player_lens_payload(context_label, event_ids, ttl=20)
+            return _prop_rows_from_nba_live_lens(
+                list(payload.get("games") or []),
+                sport_slug="nba",
+                fallback_href=f"/nba/live-lens?date={context_label}",
             )
-            if wnba_rows:
-                return wnba_rows
-            csv_rows = _prop_rows_from_props_recommendations_csv(slug, context_label=context_label, fallback_href=f"/wnba/cards?date={context_label}")
-            if csv_rows:
-                return csv_rows
-        if slug in {"nfl", "ncaaf", "ncaab"}:
-            betting_rows = _pregame_prop_rows_from_betting_card(slug, context_label=context_label, season=season, week=week)
-            if betting_rows:
-                return betting_rows
+        if slug == "wnba":
+            from syndicate.features.wnba.cards import build_live_player_lens_payload
+            from syndicate.features.wnba.cards import build_live_state_payload
+
+            live_state = build_live_state_payload(context_label, ttl=12)
+            event_ids = [
+                str((game or {}).get("event_id") or "").strip()
+                for game in (live_state.get("games") if isinstance(live_state.get("games"), list) else [])
+                if str((game or {}).get("event_id") or "").strip()
+            ]
+            if not event_ids:
+                return []
+            payload = build_live_player_lens_payload(context_label, event_ids, ttl=20)
+            return _prop_rows_from_nba_live_lens(
+                list(payload.get("games") or []),
+                sport_slug="wnba",
+                fallback_href=f"/wnba/live-lens?date={context_label}",
+            )
+    except Exception:
+        return []
+    return []
+
+
+def _load_home_prop_items(
+    slug: str,
+    *,
+    context_label: str,
+    home_games: list[dict[str, Any]],
+    season: int | None = None,
+    week: int | None = None,
+    is_active_today: bool,
+    lane: str = "combined",
+) -> list[dict[str, Any]]:
+    lane_key = str(lane or "combined").strip().lower()
+    if lane_key == "pregame":
+        return _load_home_pregame_prop_items(
+            slug,
+            context_label=context_label,
+            home_games=home_games,
+            season=season,
+            week=week,
+            is_active_today=is_active_today,
+        )
+    if lane_key == "live":
+        return _load_home_live_prop_items(
+            slug,
+            context_label=context_label,
+            home_games=home_games,
+            season=season,
+            week=week,
+            is_active_today=is_active_today,
+        )
+    if slug in {"nfl", "ncaaf"} and not is_active_today:
+        return []
+    try:
+        live_rows = _load_home_live_prop_items(
+            slug,
+            context_label=context_label,
+            home_games=home_games,
+            season=season,
+            week=week,
+            is_active_today=is_active_today,
+        )
+        if live_rows:
+            return live_rows
+        pregame_rows = _load_home_pregame_prop_items(
+            slug,
+            context_label=context_label,
+            home_games=home_games,
+            season=season,
+            week=week,
+            is_active_today=is_active_today,
+        )
+        if pregame_rows:
+            return pregame_rows
     except Exception:
         pass
     rows = _compact_prop_rows(home_games)
@@ -3405,6 +3506,22 @@ def _secondary_links(links: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [link for link in links if str(link.get("label") or "").strip().lower() not in excluded]
 
 
+def _rail_links(*candidates: tuple[str | None, str | None]) -> list[dict[str, str]]:
+    links: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for href, label in candidates:
+        href_text = str(href or "").strip()
+        label_text = str(label or "").strip()
+        if not href_text or not label_text:
+            continue
+        key = (href_text, label_text)
+        if key in seen:
+            continue
+        seen.add(key)
+        links.append({"href": href_text, "label": label_text})
+    return links
+
+
 def _football_in_season(today_value: str) -> bool:
     month = int(today_value[5:7]) if len(today_value) >= 7 and today_value[5:7].isdigit() else 0
     return month in {1, 8, 9, 10, 11, 12}
@@ -3660,30 +3777,47 @@ def _build_sport_overview(
         is_active_today=active_today,
     )
     home_games = _load_home_games(slug, context_label=context_label, season=season, week=selected_week, is_active_today=active_today) if active_today else []
+    live_href, live_label = _link_lookup_any(links, ["Live Lens", "Live Prop Audit"])
+    cards_href, cards_label = _link_lookup_any(links, ["Cards"])
+    props_href, props_label = _link_lookup_any(links, ["Props", "Top props", "Prop Ladders", "Pitcher top props", "Hitter top props", "Pitcher ladders", "Hitter ladders"])
+    betting_href, betting_label = _link_lookup_any(links, ["Betting Card"])
+    picks_href, picks_label = _link_lookup_any(links, ["Picks", "Season Review"])
     game_bar["items"] = game_items
-    props_bar["items"] = _finalize_home_prop_rows(
+    pregame_prop_items = _finalize_home_prop_rows(
         _load_home_prop_items(
-        slug,
-        context_label=context_label,
-        home_games=home_games,
-        season=season,
-        week=selected_week,
-        is_active_today=active_today,
+            slug,
+            context_label=context_label,
+            home_games=home_games,
+            season=season,
+            week=selected_week,
+            is_active_today=active_today,
+            lane="pregame",
         ),
         slug=slug,
         context_label=context_label,
         home_games=home_games,
     )
+    live_prop_items = _finalize_home_prop_rows(
+        _load_home_prop_items(
+            slug,
+            context_label=context_label,
+            home_games=home_games,
+            season=season,
+            week=selected_week,
+            is_active_today=active_today,
+            lane="live",
+        ),
+        slug=slug,
+        context_label=context_label,
+        home_games=home_games,
+    )
+    props_bar["items"] = list(pregame_prop_items)
     if game_bar["items"]:
         overview_stats = [{"label": "Games", "value": str(game_count)}] + overview_stats[1:]
-    if props_bar["items"]:
-        props_bar["summary"] = f"{len(props_bar['items'])} props surfaced from the best available {sport.get('name') or slug.upper()} live or stored props lane."
+    if pregame_prop_items:
+        props_bar["summary"] = f"{len(pregame_prop_items)} pregame props surfaced from the {sport.get('name') or slug.upper()} betting card payload."
     else:
-        if active_today:
-            props_bar["status_label"] = "Live prop lens unavailable"
-            props_bar["summary"] = "No prop rows were available from live, stored, or card-level fallback sources for this slate."
-        else:
-            props_bar["summary"] = "No prop rows were available from the current mirrored board payload for this slate."
+        props_bar["summary"] = "No pregame prop rows were available from the sport betting card payload for this slate."
 
     games_count = len(game_bar.get("items") or []) if isinstance(game_bar.get("items"), list) else 0
     overview = {
@@ -3702,92 +3836,38 @@ def _build_sport_overview(
         "dashboard_games": home_games,
         "home_anchor": f"home-sport-{slug}",
         "games_count": games_count,
+        "home_rails": {
+            "compact": {
+                "title": "Compact game rail",
+                "items": game_items,
+                "links": _rail_links(
+                    (live_href or cards_href or primary_href, f"Open {live_label}" if live_href and live_label else (f"Open {cards_label}" if cards_href and cards_label else "Open Cards")),
+                    (betting_href or cards_href or primary_href, f"Open {betting_label}" if betting_href and betting_label else (f"Open {cards_label}" if cards_href and cards_label else "Open Board")),
+                    (hub_href, f"Open {sport.get('name') or slug.upper()} Hub"),
+                ),
+                "empty_summary": f"No compact game cards were surfaced for {context_label}.",
+            },
+            "pregame": {
+                "title": "Pregame props",
+                "items": pregame_prop_items,
+                "links": _rail_links(
+                    (betting_href or props_href or primary_href, f"Open {betting_label}" if betting_href and betting_label else (f"Open {props_label}" if props_href and props_label else "Open Betting Card")),
+                    (props_href if props_href != betting_href else picks_href, f"Open {props_label}" if props_href and props_href != betting_href and props_label else (f"Open {picks_label}" if picks_href and picks_label else None)),
+                    (hub_href, f"Open {sport.get('name') or slug.upper()} Hub"),
+                ),
+                "empty_summary": "No pregame prop rows were available from the sport betting card payload for this slate.",
+            },
+            "live": {
+                "title": "Top Live Props",
+                "items": live_prop_items,
+                "links": _rail_links(
+                    (live_href or primary_href, f"Open {live_label}" if live_href and live_label else "Open Live Lens"),
+                    (betting_href or props_href or hub_href, f"Open {betting_label}" if betting_href and betting_label else (f"Open {props_label}" if props_href and props_label else f"Open {sport.get('name') or slug.upper()} Hub")),
+                ),
+                "empty_summary": "Top live props only appear when games are in progress." if not live_prop_items else f"No live prop rows were available for {context_label}.",
+            },
+        },
     }
-    if slug == "mlb":
-        overview["mlb_home"] = {
-            "cards_href": f"/mlb/cards?date={context_label}&client=source",
-            "cards_embed_src": f"/mlb/cards?date={context_label}&client=source&embed=home-cards",
-            "live_lens_href": _link_lookup(links, "Live Lens") or f"/mlb/live-lens?date={context_label}",
-            "betting_href": _link_lookup(links, "Betting Card"),
-            "hub_href": hub_href,
-            "hr_targets_href": _link_lookup(links, "HR targets") or f"/mlb/hr-targets?date={context_label}",
-            "hr_targets_items": _finalize_home_prop_rows(
-                _load_mlb_home_hr_target_items(context_label, limit=10),
-                slug="mlb",
-                context_label=context_label,
-                home_games=home_games,
-            ),
-            "pregame_props_href": _link_lookup(links, "Pitcher top props") or f"/mlb/pitcher-top-props?date={context_label}",
-            "pregame_props_secondary_href": _link_lookup(links, "Hitter top props") or f"/mlb/hitter-top-props?date={context_label}",
-            "pregame_props_items": _finalize_home_prop_rows(
-                _load_home_prop_items(
-                    "mlb",
-                    context_label=context_label,
-                    home_games=[],
-                    season=season,
-                    week=selected_week,
-                    is_active_today=False,
-                ),
-                slug="mlb",
-                context_label=context_label,
-                home_games=home_games,
-            ),
-            "live_props_href": _link_lookup(links, "Live Lens") or f"/mlb/live-lens?date={context_label}",
-            "live_props_items": _finalize_home_prop_rows(
-                _load_home_prop_items(
-                    "mlb",
-                    context_label=context_label,
-                    home_games=home_games,
-                    season=season,
-                    week=selected_week,
-                    is_active_today=True,
-                ),
-                slug="mlb",
-                context_label=context_label,
-                home_games=home_games,
-            ),
-        }
-    if slug == "wnba":
-        overview["wnba_home"] = {
-            "cards_href": f"/wnba/cards?date={context_label}&client=source",
-            "live_lens_href": _link_lookup(links, "Live Lens") or f"/wnba/live-lens?date={context_label}",
-            "betting_href": _link_lookup(links, "Betting Card") or f"/wnba/season/{season or central_year()}/betting-card?date={context_label}",
-            "hub_href": hub_href,
-            "pregame_props_href": _link_lookup(links, "Props") or f"/wnba/props?date={context_label}",
-            "pregame_props_label": "Open WNBA Props",
-            "pregame_props_secondary_href": _link_lookup(links, "Picks") or f"/wnba/picks?date={context_label}",
-            "pregame_props_secondary_label": "Open WNBA Picks",
-            "live_props_href": _link_lookup(links, "Live Lens") or f"/wnba/live-lens?date={context_label}",
-            "live_props_label": "Open WNBA Live Lens",
-            "live_props_secondary_href": _link_lookup(links, "Betting Card") or f"/wnba/season/{season or central_year()}/betting-card?date={context_label}",
-            "live_props_secondary_label": "Open WNBA Betting Card",
-            "pregame_props_items": _finalize_home_prop_rows(
-                _load_home_prop_items(
-                    "wnba",
-                    context_label=context_label,
-                    home_games=[],
-                    season=season,
-                    week=selected_week,
-                    is_active_today=False,
-                ),
-                slug="wnba",
-                context_label=context_label,
-                home_games=home_games,
-            ),
-            "live_props_items": _finalize_home_prop_rows(
-                _load_home_prop_items(
-                    "wnba",
-                    context_label=context_label,
-                    home_games=home_games,
-                    season=season,
-                    week=selected_week,
-                    is_active_today=True,
-                ),
-                slug="wnba",
-                context_label=context_label,
-                home_games=home_games,
-            ),
-        }
     props_count = _dashboard_prop_count(overview)
     overview["props_count"] = props_count
     overview["show_on_home"] = bool(active_today and games_count > 0)

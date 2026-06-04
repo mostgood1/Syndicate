@@ -1712,22 +1712,24 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(items[0]["home_label"], "NYL")
         self.assertEqual(items[0]["href"], "/wnba/game/1?date=2026-05-20")
 
-    def test_home_wnba_prop_items_use_local_props_board_without_source_proxy(self) -> None:
+    def test_home_wnba_pregame_prop_items_use_local_betting_card_without_source_proxy(self) -> None:
         from syndicate.blueprints import home as home_module
 
         local_props_context = {
             "rank_cards": [
                 {
                     "title": "A'ja Wilson Over 22.5 Points",
-                    "eyebrow": "WNBA props",
+                    "eyebrow": "WNBA betting card",
                     "meta": "LAS vs NYL",
-                    "summary": "Local WNBA props board row.",
+                    "summary": "Local WNBA betting-card row.",
                 }
-            ]
+            ],
+            "route_path": "/wnba/season/2026/betting-card",
+            "date": "2026-05-20",
         }
 
         with patch(
-            "syndicate.features.wnba.props.build_props_page_context",
+            "syndicate.features.wnba.picks.build_betting_card_page_context",
             return_value=local_props_context,
         ), patch(
             "syndicate.features.wnba.source_proxy.source_web_text",
@@ -1738,11 +1740,52 @@ class HomeBoardTests(unittest.TestCase):
                 context_label="2026-05-20",
                 home_games=[],
                 is_active_today=True,
+                lane="pregame",
             )
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["name"], "A'ja Wilson Over 22.5 Points")
-        self.assertEqual(rows[0]["href"], "/wnba/props?date=2026-05-20")
+        self.assertEqual(rows[0]["href"], "/wnba/season/2026/betting-card?date=2026-05-20")
+
+    def test_home_live_prop_lane_requires_in_progress_games(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        home_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "CLE", "score": 1},
+                "home": {"abbr": "NYY", "score": 2},
+                "status": {"is_live": False, "final": True, "status": "Final", "detailed": "Final"},
+            }
+        ]
+
+        with patch(
+            "syndicate.features.mlb.live_lens.build_live_lens_page_context",
+            side_effect=AssertionError("Top live props should not load when no games are in progress"),
+        ):
+            rows = home_module._load_home_prop_items(
+                "mlb",
+                context_label="2026-06-04",
+                home_games=home_games,
+                is_active_today=True,
+                lane="live",
+            )
+
+        self.assertEqual(rows, [])
+
+    def test_dashboard_prop_count_uses_unified_home_rails(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        sport = {
+            "slug": "nba",
+            "props_bar": {"items": []},
+            "home_rails": {
+                "pregame": {"items": [{"name": "Pregame prop"}]},
+                "live": {"items": [{"name": "Live prop 1"}, {"name": "Live prop 2"}]},
+            },
+        }
+
+        self.assertEqual(home_module._dashboard_prop_count(sport), 3)
 
     def test_finalize_home_prop_rows_uses_player_actual_for_live_total(self) -> None:
         from syndicate.blueprints import home as home_module
@@ -1778,7 +1821,7 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(len(finalized), 1)
         self.assertEqual(finalized[0]["live_total"], "1")
         self.assertEqual(finalized[0]["hero_live_box"], "1 H")
-        self.assertEqual(finalized[0]["hero_sim_box"], "1.6 H")
+        self.assertEqual(finalized[0]["hero_sim_box"], "1.2 H")
 
     def test_finalize_home_prop_rows_falls_back_to_live_total_and_confidence_for_hero_metrics(self) -> None:
         from syndicate.blueprints import home as home_module
@@ -1908,6 +1951,60 @@ class HomeBoardTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].get("game_pk"), 823542)
+        self.assertEqual(rows[0].get("name"), "Ryan McMahon")
+        self.assertEqual(rows[0].get("player_name"), "Ryan McMahon")
+
+    def test_finalize_home_prop_rows_backfills_mlb_headshot_from_actual_payload(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        rows = [
+            {
+                "game_pk": 1,
+                "name": "Jazz Chisholm Jr.",
+                "market": "total bases",
+                "pick": "Over",
+                "line": "0.5",
+                "is_live": True,
+                "away_label": "CLE",
+                "home_label": "NYY",
+                "detail": "Over 0.5 Total Bases",
+                "headshot_url": None,
+            }
+        ]
+        home_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "CLE", "score": 1},
+                "home": {"abbr": "NYY", "score": 2},
+                "status": {"is_live": True, "status": "In Progress", "detailed": "Top 9th | 3 outs"},
+            }
+        ]
+        actual_payload = {
+            "liveData": {
+                "boxscore": {
+                    "teams": {
+                        "away": {"players": {}},
+                        "home": {
+                            "players": {
+                                "ID660271": {
+                                    "person": {"id": 660271, "fullName": "Jazz Chisholm Jr."},
+                                    "stats": {"batting": {"hits": 1, "atBats": 4, "totalBases": 2}},
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+            "gameData": {"status": {"abstractGameState": "Live", "detailedState": "In Progress"}},
+        }
+
+        with patch("syndicate.blueprints.home._mlb_actual_payload_for_game", return_value=actual_payload):
+            finalized = home_module._finalize_home_prop_rows(rows, slug="mlb", context_label="2026-06-04", home_games=home_games)
+
+        self.assertEqual(
+            finalized[0]["headshot_url"],
+            "https://img.mlbstatic.com/mlb-photos/image/upload/w_180,q_auto:best/v1/people/660271/headshot/67/current",
+        )
 
     def test_home_nhl_compact_game_items_use_local_live_lens_without_source_proxy(self) -> None:
         from syndicate.blueprints import home as home_module
