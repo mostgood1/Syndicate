@@ -1742,6 +1742,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     hr_targets = context.get("hr_targets_shelf") if isinstance(context.get("hr_targets_shelf"), dict) else None
     hr_rows = hr_targets.get("rows") if hr_targets and isinstance(hr_targets.get("rows"), list) else []
     selected_date = str(context.get("date") or "").strip()
+    today_iso = central_today_iso()
     lineups_path = daily_snapshot_lineups_path(selected_date) if selected_date else None
     game_lines_path = daily_snapshot_oddsapi_game_lines_path(selected_date) if selected_date else None
     pitcher_props_path = daily_snapshot_oddsapi_pitcher_props_path(selected_date) if selected_date else None
@@ -1775,8 +1776,18 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
 
         enriched_games.append(merged_game)
     games = enriched_games
-    live_lens_report = load_json_file(live_lens_report_path(selected_date))
+    live_lens_report = None
+    if selected_date == today_iso:
+        try:
+            from syndicate.features.mlb.live_lens import _persist_live_lens_report
+
+            live_lens_report = _persist_live_lens_report(selected_date)
+        except Exception:
+            live_lens_report = None
+    if not isinstance(live_lens_report, dict):
+        live_lens_report = load_json_file(live_lens_report_path(selected_date))
     live_lens_rows = (live_lens_report.get("games") if isinstance((live_lens_report or {}).get("games"), list) else [])
+    latest_live_odds_refreshed_at = None
     if live_lens_rows:
         live_lens_by_game_pk: dict[int, dict[str, Any]] = {}
         for row in live_lens_rows:
@@ -1796,6 +1807,15 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
                 else game
                 for game in games
             ]
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        if str(status.get("abstract") or status.get("abstractGameState") or "").strip().lower() != "live":
+            continue
+        odds_refreshed_at = str(game.get("oddsRefreshedAt") or game.get("odds_refreshed_at") or "").strip() or None
+        if odds_refreshed_at and (latest_live_odds_refreshed_at is None or odds_refreshed_at > latest_live_odds_refreshed_at):
+            latest_live_odds_refreshed_at = odds_refreshed_at
     top_rows = []
     for row in hr_rows:
         if not isinstance(row, dict):
@@ -1894,6 +1914,8 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             "spreads_games": spread_games,
         },
     )
+    if selected_date == today_iso and latest_live_odds_refreshed_at:
+        game_lines_summary["oddsRefreshedAt"] = latest_live_odds_refreshed_at
     pitcher_props_summary = _snapshot_market_summary(
         pitcher_props_path,
         pitcher_props_doc,
@@ -4192,6 +4214,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         actual_games=actual_games,
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
+    latest_live_odds_refreshed_at = None
     live_lens_report = load_json_file(live_lens_report_path(selected_date))
     live_lens_rows = (live_lens_report.get("games") if isinstance((live_lens_report or {}).get("games"), list) else [])
     if live_lens_rows:
@@ -4205,6 +4228,9 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 game_pk = 0
             if game_pk:
                 live_lens_by_game_pk[game_pk] = row
+                odds_refreshed_at = str(row.get("oddsRefreshedAt") or row.get("odds_refreshed_at") or "").strip() or None
+                if odds_refreshed_at and (latest_live_odds_refreshed_at is None or odds_refreshed_at > latest_live_odds_refreshed_at):
+                    latest_live_odds_refreshed_at = odds_refreshed_at
         if live_lens_by_game_pk:
             games = [
                 _merge_live_lens_row_into_game(game, live_lens_by_game_pk.get(int(game.get("gamePk") or game.get("game_pk") or 0), {}))
@@ -4214,13 +4240,14 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 for game in games
             ]
     if selected_date == today_iso:
-        refresh_ts = datetime.now().astimezone().isoformat(timespec="seconds")
+        refresh_ts = latest_live_odds_refreshed_at or datetime.now().astimezone().isoformat(timespec="seconds")
         for game in games:
             if not isinstance(game, dict):
                 continue
             if isinstance(game.get("status"), dict) and str(game.get("status", {}).get("abstract") or "").strip().lower() == "live":
-                game.setdefault("oddsRefreshedAt", refresh_ts)
-                game.setdefault("odds_refreshed_at", refresh_ts)
+                game["oddsRefreshedAt"] = refresh_ts
+                game["odds_refreshed_at"] = refresh_ts
+        latest_live_odds_refreshed_at = refresh_ts
     _attach_cards_pregame_starter_ladder_badges(games, selected_date=selected_date)
     _attach_cards_stateful_starter_ladder_badges(
         games,
