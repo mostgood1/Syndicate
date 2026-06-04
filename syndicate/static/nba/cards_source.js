@@ -2789,9 +2789,16 @@
     if (!row) {
       return null;
     }
-    const pts = Number(row?.pts);
-    const reb = Number(row?.reb);
-    const ast = Number(row?.ast);
+    const toNumber = (value) => {
+      if (value == null || value === '') {
+        return null;
+      }
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+    const pts = toNumber(row?.pts);
+    const reb = toNumber(row?.reb);
+    const ast = toNumber(row?.ast);
     if (key === 'pra') {
       return Number.isFinite(pts) && Number.isFinite(reb) && Number.isFinite(ast) ? pts + reb + ast : null;
     }
@@ -2808,10 +2815,10 @@
       pts,
       reb,
       ast,
-      threes: Number(row?.threes_made),
-      stl: Number(row?.stl),
-      blk: Number(row?.blk),
-      tov: Number(row?.tov),
+      threes: toNumber(row?.threes_made),
+      stl: toNumber(row?.stl),
+      blk: toNumber(row?.blk),
+      tov: toNumber(row?.tov),
     }[key] ?? null;
   }
 
@@ -3976,7 +3983,7 @@
       actionLabel: klass || 'LIVE',
       statusLabel,
       lineSource: item?.line_source,
-      actual: Number(item?.actual),
+      actual: Number.isFinite(Number(item?.actual)) ? Number(item?.actual) : null,
       liveProjection: Number.isFinite(projection) ? projection : null,
       liveEdge: Number.isFinite(liveEdge) ? liveEdge : null,
       firstSeenAt: item?.first_seen_at,
