@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import re
 from datetime import datetime
@@ -24,6 +25,7 @@ from syndicate.features.nba.sources import processed_path
 from syndicate.features.nba.sources import live_snapshot_path
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
+from syndicate.features.shared.timezone import central_today_iso
 
 
 def _remote_source_base_url() -> str:
@@ -122,8 +124,6 @@ def _remote_live_snapshot_payload(
     if not isinstance(payload.get("games"), list):
         return None
     return payload
-
-
 def _remote_cards_payload(selected_date: str) -> dict[str, Any] | None:
     date_value = str(selected_date or "").strip()
     payload = _remote_fetch_json("/api/cards", {"date": date_value} if date_value else None)
@@ -193,7 +193,7 @@ def _canonical_nba_tri(team_tri: str) -> str:
         "NEWYORKKNICKS": "NYK",
         "WASHINGTONWIZARDS": "WAS",
         "PHOENIXSUNS": "PHX",
-        "SANTONIOSPURS": "SAS",
+        "SANANTONIOSPURS": "SAS",
         "LOSANGELESLAKERS": "LAL",
         "LOSANGELESCLIPPERS": "LAC",
         "BROOKLYNNETS": "BKN",
@@ -201,10 +201,8 @@ def _canonical_nba_tri(team_tri: str) -> str:
         "MILWAUKEEBUCKS": "MIL",
         "PHILADELPHIA76ERS": "PHI",
         "MIAMIHEAT": "MIA",
-        "ORLANDOMAGIC": "ORL",
         "CHICAGOBULLS": "CHI",
         "CLEVELANDCAVALIERS": "CLE",
-        "DETROITPISTONS": "DET",
         "INDIANAPACERS": "IND",
         "ATLANTAHAWKS": "ATL",
         "CHARLOTTEHORNETS": "CHA",
@@ -389,13 +387,13 @@ def _normalized_game_status(
     }
 
 
-def _implied_prob_from_american(value: Any) -> float | None:
-    number = _safe_float(value)
-    if number is None or number == 0:
+def _implied_prob_from_american(price: float | None) -> float | None:
+    value = _safe_float(price)
+    if value is None or value == 0:
         return None
-    if number > 0:
-        return 100.0 / (number + 100.0)
-    return abs(number) / (abs(number) + 100.0)
+    if value > 0:
+        return 100.0 / (value + 100.0)
+    return abs(value) / (abs(value) + 100.0)
 
 
 def _normalize_two_way(first: Any, second: Any) -> tuple[float, float]:
@@ -1163,6 +1161,166 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
     }
 
 
+def _sum_valid(values: list[float | None]) -> float | None:
+    valid = [value for value in values if value is not None]
+    if not valid:
+        return None
+    return round(sum(valid), 3)
+
+
+def _margin_win_prob(margin_mean: float | None, scale: float = 3.4) -> float | None:
+    margin = _safe_float(margin_mean)
+    if margin is None:
+        return None
+    exponent = max(-60.0, min(60.0, -margin / max(scale, 0.001)))
+    return 1.0 / (1.0 + math.exp(exponent))
+
+
+def _quarter_values(players: list[dict[str, Any]], stat_key: str, quarter_index: int) -> list[float | None]:
+    values: list[float | None] = []
+    for row in players:
+        buckets = row.get(stat_key) if isinstance(row.get(stat_key), list) else []
+        if quarter_index < len(buckets):
+            values.append(_safe_float(buckets[quarter_index]))
+    return values
+
+
+def _source_quarter_summary_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, float | None]]:
+    if not isinstance(sim_game, dict):
+        return {}
+    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    periods_source = sim.get("periods") if isinstance(sim.get("periods"), dict) else {}
+    if periods_source:
+        periods: dict[str, dict[str, float | None]] = {}
+        for period_key, period_payload in periods_source.items():
+            period_name = str(period_key or "").strip().lower()
+            if period_name not in {"q1", "q2", "q3", "q4"} or not isinstance(period_payload, dict):
+                continue
+            away_mean = _safe_float(period_payload.get("away_mean") or period_payload.get("away_pts_mu"))
+            home_mean = _safe_float(period_payload.get("home_mean") or period_payload.get("home_pts_mu"))
+            total_mean = _safe_float(period_payload.get("total_mean"))
+            margin_mean = _safe_float(period_payload.get("margin_mean"))
+            if away_mean is None or home_mean is None:
+                if total_mean is None or margin_mean is None:
+                    continue
+                away_mean = round((total_mean - margin_mean) / 2.0, 3)
+                home_mean = round((total_mean + margin_mean) / 2.0, 3)
+            if total_mean is None:
+                total_mean = round(away_mean + home_mean, 3)
+            if margin_mean is None:
+                margin_mean = round(home_mean - away_mean, 3)
+            periods[period_name] = {
+                "away_mean": away_mean,
+                "home_mean": home_mean,
+                "total_mean": total_mean,
+                "margin_mean": margin_mean,
+                "p_home_win": _margin_win_prob(margin_mean),
+            }
+        if periods:
+            return periods
+    quarters = sim.get("quarters") if isinstance(sim.get("quarters"), list) else []
+    periods: dict[str, dict[str, float | None]] = {}
+    for quarter in quarters:
+        if not isinstance(quarter, dict):
+            continue
+        quarter_number = int(quarter.get("q") or 0)
+        if quarter_number not in (1, 2, 3, 4):
+            continue
+        away_mean = _safe_float(quarter.get("away_pts_mu"))
+        home_mean = _safe_float(quarter.get("home_pts_mu"))
+        if away_mean is None and home_mean is None:
+            continue
+        total_mean = None if away_mean is None or home_mean is None else round(away_mean + home_mean, 3)
+        margin_mean = None if away_mean is None or home_mean is None else round(home_mean - away_mean, 3)
+        periods[f"q{quarter_number}"] = {
+            "away_mean": away_mean,
+            "home_mean": home_mean,
+            "total_mean": total_mean,
+            "margin_mean": margin_mean,
+            "p_home_win": _margin_win_prob(margin_mean),
+        }
+    return periods
+
+
+def _source_sim_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, float | None]]:
+    if not isinstance(sim_game, dict):
+        return {}
+    summary_periods = _source_quarter_summary_periods(sim_game)
+    if summary_periods:
+        return summary_periods
+    sim = sim_game.get("sim") if isinstance(sim_game.get("sim"), dict) else sim_game
+    players = sim.get("players") if isinstance(sim.get("players"), dict) else {}
+    away_players = [row for row in (players.get("away") or []) if isinstance(row, dict)]
+    home_players = [row for row in (players.get("home") or []) if isinstance(row, dict)]
+    periods: dict[str, dict[str, float | None]] = {}
+    for quarter_index, quarter_key in enumerate(("q1", "q2", "q3", "q4")):
+        away_values = _quarter_values(away_players, "q_pts", quarter_index)
+        home_values = _quarter_values(home_players, "q_pts", quarter_index)
+        if not any((value is not None and abs(value) > 1e-9) for value in (away_values + home_values)):
+            continue
+        away_mean = _sum_valid(away_values)
+        home_mean = _sum_valid(home_values)
+        if away_mean is None and home_mean is None:
+            continue
+        total_mean = None if away_mean is None or home_mean is None else round(away_mean + home_mean, 3)
+        margin_mean = None if away_mean is None or home_mean is None else round(home_mean - away_mean, 3)
+        periods[quarter_key] = {
+            "away_mean": away_mean,
+            "home_mean": home_mean,
+            "total_mean": total_mean,
+            "margin_mean": margin_mean,
+            "p_home_win": _margin_win_prob(margin_mean),
+        }
+    return periods
+
+
+def _fallback_live_lines_game(game: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    sim_periods = _source_sim_periods({"sim": game.get("sim")}) if isinstance(game.get("sim"), dict) else {}
+    period_totals: dict[str, float] = {}
+    period_spreads: dict[str, float] = {}
+    for period_key, period_payload in sim_periods.items():
+        if not isinstance(period_payload, dict):
+            continue
+        total_mean = _safe_float(period_payload.get("total_mean"))
+        margin_mean = _safe_float(period_payload.get("margin_mean"))
+        if total_mean is not None:
+            period_totals[period_key] = round(total_mean, 3)
+        if margin_mean is not None:
+            period_spreads[period_key] = round(-margin_mean, 3)
+
+    q1 = _safe_float(period_totals.get("q1"))
+    q2 = _safe_float(period_totals.get("q2"))
+    q3 = _safe_float(period_totals.get("q3"))
+    q4 = _safe_float(period_totals.get("q4"))
+    if q1 is not None and q2 is not None:
+        period_totals.setdefault("h1", round(q1 + q2, 3))
+    if q3 is not None and q4 is not None:
+        period_totals.setdefault("h2", round(q3 + q4, 3))
+    s1 = _safe_float(period_spreads.get("q1"))
+    s2 = _safe_float(period_spreads.get("q2"))
+    s3 = _safe_float(period_spreads.get("q3"))
+    s4 = _safe_float(period_spreads.get("q4"))
+    if s1 is not None and s2 is not None:
+        period_spreads.setdefault("h1", round(s1 + s2, 3))
+    if s3 is not None and s4 is not None:
+        period_spreads.setdefault("h2", round(s3 + s4, 3))
+
+    return {
+        "event_id": game.get("event_id"),
+        "found": True,
+        "lines": {
+            "total": _safe_float(betting.get("total")),
+            "home_spread": _safe_float(betting.get("home_spread")),
+            "away_spread": _safe_float(betting.get("away_spread")),
+            "home_ml": _safe_float(betting.get("home_ml")),
+            "away_ml": _safe_float(betting.get("away_ml")),
+            "period_totals": period_totals if include_period_totals else {},
+            "period_spreads": period_spreads,
+        },
+    }
+
+
 def _resolve_games_for_event_ids(selected_date: str, event_ids: list[str], *, allow_stored_date_fallback: bool = True) -> dict[str, dict[str, Any]]:
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     context_games = context.get("games") if isinstance(context.get("games"), list) else []
@@ -1799,6 +1957,12 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
+    is_today = str(selected_date).strip() == central_today_iso()
+    if is_today:
+        espn_payload = _espn_live_state_payload(selected_date)
+        if isinstance(espn_payload, dict) and isinstance(espn_payload.get("games"), list) and bool(espn_payload.get("games")):
+            return _attach_odds_refresh_timestamp(espn_payload)
+
     local_payload = _best_live_state_payload(selected_date)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         return _attach_odds_refresh_timestamp(local_payload)
@@ -1895,6 +2059,25 @@ def build_live_player_lens_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
+    is_today = str(selected_date).strip() == central_today_iso()
+    local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
+    if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
+        local_payload = None
+    if is_today and _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_player_lens",
+            selected_date=resolved_date,
+            event_ids=normalized_event_ids,
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
+            hydrated_remote_payload = _hydrate_live_player_lens_payload(
+                remote_payload,
+                resolved_date,
+                normalized_event_ids,
+                allow_stored_date_fallback=allow_stored_date_fallback,
+            )
+            if any(isinstance(game, dict) and bool(game.get("rows")) for game in (hydrated_remote_payload.get("games") if isinstance(hydrated_remote_payload.get("games"), list) else [])):
+                return _attach_odds_refresh_timestamp(hydrated_remote_payload)
     if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
         hydrated_local_payload = _hydrate_live_player_lens_payload(
             local_payload,
@@ -1904,7 +2087,7 @@ def build_live_player_lens_payload(
         )
         if any(isinstance(game, dict) and bool(game.get("rows")) for game in (hydrated_local_payload.get("games") if isinstance(hydrated_local_payload.get("games"), list) else [])):
             return _attach_odds_refresh_timestamp(hydrated_local_payload)
-    if _remote_source_fallback_enabled():
+    if _remote_source_fallback_enabled() and not is_today:
         remote_payload = _remote_live_snapshot_payload(
             "live_player_lens",
             selected_date=resolved_date,
@@ -1979,9 +2162,11 @@ def build_live_lines_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
-        return _attach_odds_refresh_timestamp(local_payload)
-    if _remote_source_fallback_enabled():
+    is_today = str(selected_date).strip() == central_today_iso()
+    local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
+    if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
+        local_payload = None
+    if is_today and _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
             "live_lines",
             selected_date=resolved_date,
@@ -1990,12 +2175,73 @@ def build_live_lines_payload(
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             return _attach_odds_refresh_timestamp(remote_payload)
+    if is_today and _remote_source_fallback_enabled():
+        remote_payload = _remote_live_snapshot_payload(
+            "live_lines",
+            selected_date=resolved_date,
+            event_ids=normalized_event_ids,
+            include_period_totals=bool(include_period_totals),
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
+            if not include_period_totals or any(
+                isinstance(game, dict)
+                and isinstance((game.get("lines") or {}).get("period_totals"), dict)
+                and bool((game.get("lines") or {}).get("period_totals"))
+                for game in remote_payload.get("games")
+            ):
+                return _attach_odds_refresh_timestamp(remote_payload)
+
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+        if not include_period_totals or any(
+            isinstance(game, dict)
+            and isinstance((game.get("lines") or {}).get("period_totals"), dict)
+            and bool((game.get("lines") or {}).get("period_totals"))
+            for game in local_payload.get("games")
+        ):
+            return _attach_odds_refresh_timestamp(local_payload)
+
+    if _remote_source_fallback_enabled() and not is_today:
+        remote_payload = _remote_live_snapshot_payload(
+            "live_lines",
+            selected_date=resolved_date,
+            event_ids=normalized_event_ids,
+            include_period_totals=bool(include_period_totals),
+        )
+        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
+            if not include_period_totals or any(
+                isinstance(game, dict)
+                and isinstance((game.get("lines") or {}).get("period_totals"), dict)
+                and bool((game.get("lines") or {}).get("period_totals"))
+                for game in remote_payload.get("games")
+            ):
+                return _attach_odds_refresh_timestamp(remote_payload)
+
+    game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
+    fallback_games = [
+        _fallback_live_lines_game(game, include_period_totals=bool(include_period_totals))
+        for event_id in normalized_event_ids
+        for game in [game_index.get(event_id)]
+        if isinstance(game, dict)
+    ]
+    if fallback_games:
+        return _attach_odds_refresh_timestamp({
+            "ok": True,
+            "ttl": int(ttl),
+            "date": resolved_date,
+            "requested_date": selected_date,
+            "lookahead_applied": bool(resolved_date != selected_date),
+            "include_period_totals": bool(include_period_totals),
+            "games": fallback_games,
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        })
+
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),
         "date": resolved_date,
         "requested_date": selected_date,
         "lookahead_applied": bool(resolved_date != selected_date),
+        "include_period_totals": bool(include_period_totals),
         "games": [{"event_id": event_id, "found": False} for event_id in normalized_event_ids],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     })
