@@ -12,17 +12,17 @@
       "picks": [
         {
           "market": "PROPS",
-          "team": "NYL",
-          "display_pick": "Marine Johannes UNDER 2.5",
-          "selection": "UNDER 2.5",
-          "price": -102.0,
-          "score": 90.18616287075932,
-          "ev_pct": 90.18616287075932,
-          "win_prob": 0.504950495049505,
-          "p_win": 0.504950495049505,
+          "team": "TOR",
+          "display_pick": "Brittney Sykes OVER 0.5",
+          "selection": "OVER 0.5",
+          "price": 116.0,
+          "score": 83.39419511278088,
+          "ev_pct": 83.39419511278088,
+          "win_prob": 0.46296296296296297,
+          "p_win": 0.46296296296296297,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 90.2%",
+            "EV 83.4%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -30,17 +30,35 @@
         },
         {
           "market": "PROPS",
-          "team": "TOR",
-          "display_pick": "Brittney Sykes OVER 0.5",
-          "selection": "OVER 0.5",
-          "price": -122.0,
-          "score": 54.49875271340831,
-          "ev_pct": 54.49875271340831,
-          "win_prob": 0.5495495495495496,
-          "p_win": 0.5495495495495496,
+          "team": "NYL",
+          "display_pick": "Breanna Stewart OVER 12.5",
+          "selection": "OVER 12.5",
+          "price": 100.0,
+          "score": 35.297244078441636,
+          "ev_pct": 35.297244078441636,
+          "win_prob": 0.5,
+          "p_win": 0.5,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 54.5%",
+            "EV 35.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ NYL"
+        },
+        {
+          "market": "PROPS",
+          "team": "NYL",
+          "display_pick": "Marine Johannes UNDER 13.5",
+          "selection": "UNDER 13.5",
+          "price": -135.0,
+          "score": 26.203703703703695,
+          "ev_pct": 26.203703703703695,
+          "win_prob": 0.574468085106383,
+          "p_win": 0.574468085106383,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 26.2%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -49,52 +67,34 @@
         {
           "market": "ATS",
           "team": "New York Liberty",
-          "display_pick": "New York Liberty -10.5",
+          "display_pick": "New York Liberty -9.5",
           "selection": "New York Liberty",
           "price": -110.0,
-          "score": 20.475,
-          "ev_pct": 20.474999999999998,
-          "win_prob": 0.72856,
-          "p_win": 0.72856,
-          "basketball_summary": "Model margin 10.0 vs market -10.5",
+          "score": 19.475,
+          "ev_pct": 19.475,
+          "win_prob": 0.71856,
+          "p_win": 0.71856,
+          "basketball_summary": "Model margin 10.0 vs market -9.5",
           "top_play_reasons": [
-            "Edge 20.5",
-            "EV 20.5%"
-          ],
-          "matchup": "TOR @ NYL"
-        },
-        {
-          "market": "PROPS",
-          "team": "NYL",
-          "display_pick": "Breanna Stewart UNDER 13.5",
-          "selection": "UNDER 13.5",
-          "price": 105.0,
-          "score": 13.747613420894488,
-          "ev_pct": 13.747613420894488,
-          "win_prob": 0.4878048780487805,
-          "p_win": 0.4878048780487805,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 13.7%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
+            "Edge 19.5",
+            "EV 19.5%"
           ],
           "matchup": "TOR @ NYL"
         },
         {
           "market": "TOTAL",
           "team": "Total",
-          "display_pick": "Under 163.5",
+          "display_pick": "Under 162.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -2.476827,
-          "ev_pct": 2.4768,
-          "win_prob": 0.548578,
-          "p_win": 0.548578,
-          "basketball_summary": "Model total 161.0 vs line 163.5",
+          "score": -1.476827,
+          "ev_pct": 1.4768,
+          "win_prob": 0.538578,
+          "p_win": 0.538578,
+          "basketball_summary": "Model total 161.0 vs line 162.5",
           "top_play_reasons": [
-            "Edge -2.5",
-            "EV 2.5%"
+            "Edge -1.5",
+            "EV 1.5%"
           ],
           "matchup": "TOR @ NYL"
         }
