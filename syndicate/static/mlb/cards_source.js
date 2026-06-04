@@ -334,7 +334,7 @@
 
   function trackedGameLinesUpdatedAt(card) {
     const lines = trackedGameLines(card);
-    return String(lines?.retrievedAt || lines?.retrieved_at || lines?.updatedAt || lines?.updated_at || "").trim();
+    return String(card?.oddsRefreshedAt || card?.odds_refreshed_at || lines?.oddsRefreshedAt || lines?.odds_refreshed_at || lines?.retrievedAt || lines?.retrieved_at || lines?.updatedAt || lines?.updated_at || "").trim();
   }
 
   function extraMarketRows(card, key) {
@@ -2893,7 +2893,7 @@
       if (Number(lineCounts.h2h_games || 0) > 0) marketBits.push(`ML ${lineCounts.h2h_games}`);
       if (Number(lineCounts.totals_games || 0) > 0) marketBits.push(`Tot ${lineCounts.totals_games}`);
       if (Number(lineCounts.spreads_games || 0) > 0) marketBits.push(`Spr ${lineCounts.spreads_games}`);
-      if (gameLines.retrievedAt) marketBits.push(`Odds ${formatTimestampShort(gameLines.retrievedAt)}`);
+      if (gameLines.oddsRefreshedAt || gameLines.odds_refreshed_at || gameLines.retrievedAt) marketBits.push(`Odds ${formatTimestampShort(gameLines.oddsRefreshedAt || gameLines.odds_refreshed_at || gameLines.retrievedAt)}`);
     } else if (hasArtifactData && gameLines.exists) {
       marketBits.push("Markets pending");
     }

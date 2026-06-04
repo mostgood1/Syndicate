@@ -1990,6 +1990,8 @@ def _merge_live_lens_row_into_game(game: dict[str, Any], live_lens_row: dict[str
         "archivedLiveProps",
         "snapshotAvailable",
         "simContextAvailable",
+        "oddsRefreshedAt",
+        "odds_refreshed_at",
     ):
         value = live_lens_row.get(key)
         if value is None:
@@ -4166,6 +4168,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     parsed_date = _parse_iso_date(selected_date)
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
     next_date = (parsed_date + timedelta(days=1)).isoformat()
+    today_iso = central_today_iso()
 
     module_links = build_module_links(selected_date, "Cards")
     module_link_labels = {
@@ -4210,6 +4213,14 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 else game
                 for game in games
             ]
+    if selected_date == today_iso:
+        refresh_ts = datetime.now().astimezone().isoformat(timespec="seconds")
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            if isinstance(game.get("status"), dict) and str(game.get("status", {}).get("abstract") or "").strip().lower() == "live":
+                game.setdefault("oddsRefreshedAt", refresh_ts)
+                game.setdefault("odds_refreshed_at", refresh_ts)
     _attach_cards_pregame_starter_ladder_badges(games, selected_date=selected_date)
     _attach_cards_stateful_starter_ladder_badges(
         games,
