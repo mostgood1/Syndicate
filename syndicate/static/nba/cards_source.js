@@ -4459,7 +4459,7 @@
   }
 
   function liveMoneylineHomeProb(game, signal) {
-    const projection = Number(signal?.projection);
+    const projection = signal?.projection != null && Number.isFinite(Number(signal.projection)) ? Number(signal.projection) : null;
     if (!Number.isFinite(projection)) {
       return null;
     }
