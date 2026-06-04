@@ -4122,9 +4122,9 @@
     }
     const klass = String(signal?.klass || '').trim().toUpperCase();
     const side = String(signal?.side || '').trim();
-    const edge = Number(signal?.edge);
-    const line = Number(signal?.line);
-    const projection = Number(signal?.projection);
+    const edge = signal?.edge != null && Number.isFinite(Number(signal.edge)) ? Number(signal.edge) : null;
+    const line = signal?.line != null && Number.isFinite(Number(signal.line)) ? Number(signal.line) : null;
+    const projection = signal?.projection != null && Number.isFinite(Number(signal.projection)) ? Number(signal.projection) : null;
     const edgeValue = Number.isFinite(edge) ? Math.abs(edge) : null;
     const edgeText = Number.isFinite(edge)
       ? (marketType === 'moneyline' ? `${fmtSigned(edge * 100, 1)}pp` : fmtSigned(edge, 1))
