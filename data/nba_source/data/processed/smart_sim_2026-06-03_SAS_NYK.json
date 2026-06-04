@@ -1,0 +1,1310 @@
+{
+  "date": "2026-06-03",
+  "home": "SAS",
+  "away": "NYK",
+  "market_total": 216.5,
+  "market_home_spread": -5.0,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 27.35813178078839,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 26.213575660798387,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 27.35813178078839,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 26.213575660798387,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 28.474790220820573,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 27.283517524504443,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 28.474790220820573,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 27.283517524504443,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Victor Wembanyama",
+        "player_id": 1641705,
+        "pts_mean": 33.11,
+        "reb_mean": 13.15,
+        "ast_mean": 4.25,
+        "threes_mean": 1.8,
+        "pra_mean": 50.51,
+        "stl_mean": 0.6091799999999999,
+        "blk_mean": 0.4984199999999999,
+        "tov_mean": 1.6613999999999998,
+        "pts_sd": 8.2775,
+        "reb_sd": 3.2875,
+        "ast_sd": 1.0625,
+        "threes_sd": 1.0,
+        "pra_sd": 12.6275,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 27.69
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Stephon Castle",
+        "player_id": 1642264,
+        "pts_mean": 15.56,
+        "reb_mean": 8.16,
+        "ast_mean": 9.62,
+        "threes_mean": 1.48,
+        "pra_mean": 33.34,
+        "stl_mean": 0.70334,
+        "blk_mean": 0.57546,
+        "tov_mean": 1.9182,
+        "pts_sd": 3.89,
+        "reb_sd": 2.04,
+        "ast_sd": 2.405,
+        "threes_sd": 1.0,
+        "pra_sd": 8.335,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 31.97
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "De'Aaron Fox",
+        "player_id": 1628368,
+        "pts_mean": 20.08,
+        "reb_mean": 3.92,
+        "ast_mean": 6.19,
+        "threes_mean": 2.46,
+        "pra_mean": 30.19,
+        "stl_mean": 0.69872,
+        "blk_mean": 0.57168,
+        "tov_mean": 1.9056,
+        "pts_sd": 5.02,
+        "reb_sd": 1.0,
+        "ast_sd": 1.5475,
+        "threes_sd": 1.0,
+        "pra_sd": 7.5475,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 31.76
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Keldon Johnson",
+        "player_id": 1629640,
+        "pts_mean": 16.62,
+        "reb_mean": 6.050000000000001,
+        "ast_mean": 1.22,
+        "threes_mean": 1.12,
+        "pra_mean": 23.89,
+        "stl_mean": 0.5238200000000001,
+        "blk_mean": 0.42858,
+        "tov_mean": 1.4286,
+        "pts_sd": 4.155,
+        "reb_sd": 1.5125000000000002,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.9725,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 23.81
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Devin Vassell",
+        "player_id": 1630170,
+        "pts_mean": 13.76,
+        "reb_mean": 4.67,
+        "ast_mean": 2.0700000000000003,
+        "threes_mean": 2.2299999999999995,
+        "pra_mean": 20.5,
+        "stl_mean": 0.68662,
+        "blk_mean": 0.56178,
+        "tov_mean": 1.8726,
+        "pts_sd": 3.44,
+        "reb_sd": 1.1675,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 31.21
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Dylan Harper",
+        "player_id": 1642844,
+        "pts_mean": 11.989999999999998,
+        "reb_mean": 3.78,
+        "ast_mean": 3.29,
+        "threes_mean": 0.78,
+        "pra_mean": 19.06,
+        "stl_mean": 0.5277799999999999,
+        "blk_mean": 0.4318199999999999,
+        "tov_mean": 1.4393999999999998,
+        "pts_sd": 2.9974999999999996,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.765,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 23.99
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Carter Bryant",
+        "player_id": 1642868,
+        "pts_mean": 10.6,
+        "reb_mean": 3.89,
+        "ast_mean": 2.99,
+        "threes_mean": 1.95,
+        "pra_mean": 17.480000000000004,
+        "stl_mean": 0.495,
+        "blk_mean": 0.4049999999999999,
+        "tov_mean": 1.35,
+        "pts_sd": 2.65,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.370000000000001,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 22.5
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Julian Champagnie",
+        "player_id": 1630577,
+        "pts_mean": 8.969999999999999,
+        "reb_mean": 5.33,
+        "ast_mean": 1.6800000000000002,
+        "threes_mean": 1.44,
+        "pra_mean": 15.98,
+        "stl_mean": 0.58916,
+        "blk_mean": 0.4820399999999999,
+        "tov_mean": 1.6068,
+        "pts_sd": 2.2424999999999997,
+        "reb_sd": 1.3325,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.995,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 26.78
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Luke Kornet",
+        "player_id": 1628436,
+        "pts_mean": 5.74,
+        "reb_mean": 5.409999999999999,
+        "ast_mean": 2.33,
+        "threes_mean": 0.0,
+        "pra_mean": 13.48,
+        "stl_mean": 0.4527599999999999,
+        "blk_mean": 0.3704399999999999,
+        "tov_mean": 1.2348,
+        "pts_sd": 1.435,
+        "reb_sd": 1.3524999999999998,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.37,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 20.58
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Harrison Barnes",
+        "player_id": 203084,
+        "pts_mean": 10.2,
+        "reb_mean": 1.48,
+        "ast_mean": 1.16,
+        "threes_mean": 1.4,
+        "pra_mean": 12.84,
+        "stl_mean": 0.53042,
+        "blk_mean": 0.43398,
+        "tov_mean": 1.4466,
+        "pts_sd": 2.55,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.21,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 24.11
+      },
+      {
+        "team": "SAS",
+        "opponent": "NYK",
+        "player_name": "Mason Plumlee",
+        "player_id": 203486,
+        "pts_mean": 1.3299999999999998,
+        "reb_mean": 2.47,
+        "ast_mean": 0.91,
+        "threes_mean": 0.0,
+        "pra_mean": 4.71,
+        "stl_mean": 0.2320999999999999,
+        "blk_mean": 0.1898999999999999,
+        "tov_mean": 0.6329999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.1775,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 10.55
+      }
+    ],
+    "away": [
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Karl-Anthony Towns",
+        "player_id": 1626157,
+        "pts_mean": 19.7007,
+        "reb_mean": 10.6603,
+        "ast_mean": 4.888799999999999,
+        "threes_mean": 1.1543,
+        "pra_mean": 35.24979999999999,
+        "stl_mean": 0.6476689999999999,
+        "blk_mean": 0.5299109999999999,
+        "tov_mean": 1.7663699999999998,
+        "pts_sd": 4.925175,
+        "reb_sd": 2.665075,
+        "ast_sd": 1.2221999999999997,
+        "threes_sd": 1.0,
+        "pra_sd": 8.812449999999998,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 29.4395
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Jalen Brunson",
+        "player_id": 1628973,
+        "pts_mean": 24.7544,
+        "reb_mean": 2.5899,
+        "ast_mean": 7.1877,
+        "threes_mean": 1.9303,
+        "pra_mean": 34.532,
+        "stl_mean": 0.7407113999999998,
+        "blk_mean": 0.6060365999999998,
+        "tov_mean": 2.020122,
+        "pts_sd": 6.1886,
+        "reb_sd": 1.0,
+        "ast_sd": 1.796925,
+        "threes_sd": 1.0,
+        "pra_sd": 8.633,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 33.668699999999994
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "OG Anunoby",
+        "player_id": 1628384,
+        "pts_mean": 13.2599,
+        "reb_mean": 5.432,
+        "ast_mean": 1.9691,
+        "threes_mean": 2.5414,
+        "pra_mean": 20.661,
+        "stl_mean": 0.6175795999999999,
+        "blk_mean": 0.5052923999999999,
+        "tov_mean": 1.6843079999999997,
+        "pts_sd": 3.314975,
+        "reb_sd": 1.358,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.16525,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 28.0718
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Jose Alvarado",
+        "player_id": 1630631,
+        "pts_mean": 10.89,
+        "reb_mean": 3.43,
+        "ast_mean": 4.359999999999999,
+        "threes_mean": 1.9,
+        "pra_mean": 18.68,
+        "stl_mean": 0.4932399999999999,
+        "blk_mean": 0.4035599999999999,
+        "tov_mean": 1.3451999999999995,
+        "pts_sd": 2.7225,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0899999999999999,
+        "threes_sd": 1.0,
+        "pra_sd": 4.67,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 22.42
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Mitchell Robinson",
+        "player_id": 1629011,
+        "pts_mean": 8.57,
+        "reb_mean": 8.399999999999999,
+        "ast_mean": 0.29,
+        "threes_mean": 0.0,
+        "pra_mean": 17.259999999999998,
+        "stl_mean": 0.4362599999999999,
+        "blk_mean": 0.3569399999999999,
+        "tov_mean": 1.1897999999999995,
+        "pts_sd": 2.1425,
+        "reb_sd": 2.0999999999999996,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.3149999999999995,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 19.83
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Josh Hart",
+        "player_id": 1628404,
+        "pts_mean": 8.5554,
+        "reb_mean": 4.5299,
+        "ast_mean": 2.9488,
+        "threes_mean": 1.2222,
+        "pra_mean": 16.0341,
+        "stl_mean": 0.6587658,
+        "blk_mean": 0.5389902,
+        "tov_mean": 1.7966339999999998,
+        "pts_sd": 2.13885,
+        "reb_sd": 1.132475,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.008525,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 29.9439
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Miles McBride",
+        "player_id": 1630540,
+        "pts_mean": 10.59,
+        "reb_mean": 2.03,
+        "ast_mean": 1.63,
+        "threes_mean": 2.3200000000000003,
+        "pra_mean": 14.25,
+        "stl_mean": 0.4437399999999999,
+        "blk_mean": 0.3630599999999999,
+        "tov_mean": 1.2102,
+        "pts_sd": 2.6475,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.5625,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 20.17
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Jeremy Sochan",
+        "player_id": 1631110,
+        "pts_mean": 6.47,
+        "reb_mean": 4.390000000000001,
+        "ast_mean": 2.02,
+        "threes_mean": 0.68,
+        "pra_mean": 12.88,
+        "stl_mean": 0.27434,
+        "blk_mean": 0.2244599999999999,
+        "tov_mean": 0.7481999999999999,
+        "pts_sd": 1.6175,
+        "reb_sd": 1.0975000000000001,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.22,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 12.47
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Ariel Hukporti",
+        "player_id": 1630574,
+        "pts_mean": 6.05,
+        "reb_mean": 5.27,
+        "ast_mean": 0.84,
+        "threes_mean": 0.0,
+        "pra_mean": 12.16,
+        "stl_mean": 0.3592599999999999,
+        "blk_mean": 0.2939399999999999,
+        "tov_mean": 0.9798,
+        "pts_sd": 1.5125,
+        "reb_sd": 1.3175,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.04,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 16.33
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Mikal Bridges",
+        "player_id": 1628969,
+        "pts_mean": 8.280000000000001,
+        "reb_mean": 1.36,
+        "ast_mean": 2.19,
+        "threes_mean": 1.0,
+        "pra_mean": 11.83,
+        "stl_mean": 0.45254,
+        "blk_mean": 0.37026,
+        "tov_mean": 1.2342,
+        "pts_sd": 2.0700000000000003,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.9575,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 20.57
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Jordan Clarkson",
+        "player_id": 203903,
+        "pts_mean": 5.489999999999999,
+        "reb_mean": 2.23,
+        "ast_mean": 1.53,
+        "threes_mean": 0.0,
+        "pra_mean": 9.249999999999998,
+        "stl_mean": 0.3286799999999999,
+        "blk_mean": 0.2689199999999999,
+        "tov_mean": 0.8963999999999999,
+        "pts_sd": 1.3724999999999998,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.3124999999999996,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 14.939999999999998
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Mohamed Diawara",
+        "player_id": 1642885,
+        "pts_mean": 4.3100000000000005,
+        "reb_mean": 1.92,
+        "ast_mean": 2.75,
+        "threes_mean": 0.12,
+        "pra_mean": 8.98,
+        "stl_mean": 0.39292,
+        "blk_mean": 0.32148,
+        "tov_mean": 1.0716,
+        "pts_sd": 1.0775000000000001,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.245,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 17.86
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Pac\u00f4me Dadiet",
+        "player_id": 1642359,
+        "pts_mean": 5.73,
+        "reb_mean": 1.99,
+        "ast_mean": 0.72,
+        "threes_mean": 0.61,
+        "pra_mean": 8.44,
+        "stl_mean": 0.2813799999999999,
+        "blk_mean": 0.2302199999999999,
+        "tov_mean": 0.7673999999999999,
+        "pts_sd": 1.4325,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.11,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 12.789999999999996
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Landry Shamet",
+        "player_id": 1629013,
+        "pts_mean": 5.810299999999999,
+        "reb_mean": 1.2997999999999998,
+        "ast_mean": 0.9894,
+        "threes_mean": 1.3967999999999998,
+        "pra_mean": 8.099499999999999,
+        "stl_mean": 0.5066116,
+        "blk_mean": 0.4145004,
+        "tov_mean": 1.381668,
+        "pts_sd": 1.4525749999999997,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.0248749999999998,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 23.027800000000003
+      },
+      {
+        "team": "NYK",
+        "opponent": "SAS",
+        "player_name": "Kevin McCullar Jr.",
+        "player_id": 1641755,
+        "pts_mean": 5.260000000000001,
+        "reb_mean": 1.14,
+        "ast_mean": 0.42,
+        "threes_mean": 0.68,
+        "pra_mean": 6.82,
+        "stl_mean": 0.2296799999999999,
+        "blk_mean": 0.1879199999999999,
+        "tov_mean": 0.6264,
+        "pts_sd": 1.3150000000000002,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.705,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 10.44
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 147.96,
+  "away_team_total_pts_mean": 143.72070000000002,
+  "excluded_player_keys_by_team": {
+    "SAS": [],
+    "NYK": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 102.0380487804878,
+    "away_pace": 99.13341463414632,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 1000
+}

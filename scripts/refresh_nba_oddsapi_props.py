@@ -3628,6 +3628,7 @@ def main() -> int:
         return 1
     if bool(args.do_edges) and snapshot_rows > 0 and edges_rows <= 0:
         return 1
+    predictions_rows = int(state.get("predictions_rows") or 0)
     if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and predictions_rows > 0 and recs_rows <= 0:
         return 1
     if bool(args.do_export) and snapshot_rows > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
