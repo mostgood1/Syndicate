@@ -57,6 +57,7 @@ _PROP_MARKET_KEYWORDS = {
 }
 
 _GAME_MARKET_KEYWORDS = {"moneyline", "ml", "spread", "side", "total", "game bet", "puck line"}
+_DATE_TOKEN_RE = re.compile(r"(?P<date>\d{4}-\d{2}-\d{2}|\d{8})")
 
 
 def _repo_root() -> Path:
@@ -293,6 +294,77 @@ def _path_status(path: Path, tracked: set[str]) -> dict[str, Any]:
     }
 
 
+def _coerce_date_token(value: str) -> str | None:
+    match = _DATE_TOKEN_RE.search(str(value or ""))
+    if not match:
+        return None
+    token = match.group("date")
+    if re.fullmatch(r"\d{8}", token):
+        return f"{token[:4]}-{token[4:6]}-{token[6:8]}"
+    return token
+
+
+def _latest_matching_path(directory: Path, pattern: str, *, requested_date: str | None = None) -> Path | None:
+    try:
+        candidates = [path for path in directory.glob(pattern) if path.is_file()]
+    except OSError:
+        return None
+    if not candidates:
+        return None
+    requested = str(requested_date or "").strip() or None
+    dated: list[tuple[str, Path]] = []
+    for path in candidates:
+        token = _coerce_date_token(path.name)
+        if token is None:
+            continue
+        if requested and token > requested:
+            continue
+        dated.append((token, path))
+    if dated:
+        dated.sort(key=lambda item: item[0])
+        return dated[-1][1]
+    return max(candidates, key=lambda item: item.name)
+
+
+def _nba_live_lens_path(filename: str) -> Path:
+    processed_root = nba_processed_path("team_advanced_stats_2026.csv").parents[1]
+    return processed_root / "live_lens" / filename
+
+
+def _wnba_live_lens_path(filename: str) -> Path:
+    processed_root = wnba_processed_path("recommendations_slate_2026-06-04.json").parents[1]
+    return processed_root / "live_lens" / filename
+
+
+def _resolve_nba_props_predictions_path(context_label: str) -> Path:
+    direct = nba_processed_path(f"props_predictions_{context_label}.csv")
+    if direct.exists():
+        return direct
+    return _latest_matching_path(direct.parent, "props_predictions_*.csv", requested_date=context_label) or direct
+
+
+def _resolve_nba_live_context_path(context_label: str) -> Path:
+    direct = _nba_live_lens_path(f"live_lens_projections_{context_label}.jsonl")
+    if direct.exists():
+        return direct
+    return _latest_matching_path(direct.parent, "live_lens_projections_*.jsonl", requested_date=context_label) or direct
+
+
+def _resolve_wnba_live_context_path(context_label: str) -> Path:
+    direct = _wnba_live_lens_path(f"live_lens_projections_{context_label}.jsonl")
+    if direct.exists():
+        return direct
+    return _latest_matching_path(direct.parent, "live_lens_projections_*.jsonl", requested_date=context_label) or direct
+
+
+def _resolve_nhl_scoreboard_context_path(context_label: str) -> Path:
+    direct = nhl_scoreboard_snapshot_path(context_label)
+    if direct.exists():
+        return direct
+    games_root = direct.parents[1]
+    return _latest_matching_path(games_root, "date=*/scoreboard.csv", requested_date=context_label) or direct
+
+
 def _advanced_input_rows_for_sport(sport: dict[str, Any], tracked: set[str]) -> list[dict[str, Any]]:
     advanced_rows: list[dict[str, Any]] = []
     for spec in _advanced_input_specs_for_sport(sport):
@@ -311,6 +383,103 @@ def _available_advanced_inputs_for_sport(sport: dict[str, Any], tracked: set[str
     resolved_tracked = tracked if tracked is not None else _tracked_repo_files()
     rows = _advanced_input_rows_for_sport(sport, resolved_tracked)
     return [row for row in rows if bool(row.get("exists"))]
+
+
+def _advanced_readiness_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    required_rows = [row for row in rows if bool(row.get("inside_repo"))]
+    tracked_rows = [row for row in required_rows if bool(row.get("tracked"))]
+    exists_rows = [row for row in required_rows if bool(row.get("exists"))]
+    total = len(required_rows)
+    tracked_count = len(tracked_rows)
+    exists_count = len(exists_rows)
+    ratio = float(exists_count / total) if total else (1.0 if rows else 0.0)
+    missing = [
+        {
+            "label": _safe_text(row.get("label"), "Advanced input"),
+            "path": _safe_text(row.get("path"), "-"),
+            "missing_reason": "missing",
+        }
+        for row in rows
+        if row.get("inside_repo") and not row.get("exists")
+    ]
+    publish_missing = [
+        {
+            "label": _safe_text(row.get("label"), "Advanced input"),
+            "path": _safe_text(row.get("path"), "-"),
+            "missing_reason": "untracked",
+        }
+        for row in rows
+        if row.get("inside_repo") and row.get("exists") and not row.get("tracked")
+    ]
+    return {
+        "required_total": total,
+        "tracked_count": tracked_count,
+        "exists_count": exists_count,
+        "ratio": round(ratio, 3),
+        "ready": bool(rows) and not missing,
+        "missing_inputs": missing,
+        "publish_missing_inputs": publish_missing,
+    }
+
+
+def _advanced_score_adjustment(summary: dict[str, Any]) -> float:
+    ratio = float(summary.get("ratio") or 0.0)
+    if bool(summary.get("ready")):
+        return 6.0
+    if ratio >= 0.75:
+        return 2.5
+    if ratio >= 0.5:
+        return 0.0
+    if ratio > 0.0:
+        return -3.5
+    return -7.5
+
+
+def _readiness_label(summary: dict[str, Any]) -> str:
+    if bool(summary.get("ready")):
+        return "ready"
+    ratio = float(summary.get("ratio") or 0.0)
+    if ratio >= 0.5:
+        return "partial"
+    return "blocked"
+
+
+def _build_readiness_gate(overview: list[dict[str, Any]], tracked: set[str]) -> dict[str, Any]:
+    sport_rows: list[dict[str, Any]] = []
+    for sport in overview:
+        if not isinstance(sport, dict):
+            continue
+        slug = _safe_text(sport.get("slug"), "sport").lower()
+        active_today = bool(sport.get("active_today"))
+        advanced_rows = _advanced_input_rows_for_sport(sport, tracked)
+        summary = _advanced_readiness_summary(advanced_rows)
+        status = "inactive" if not active_today else _readiness_label(summary)
+        sport_rows.append(
+            {
+                "slug": slug,
+                "name": _safe_text(sport.get("name"), slug.upper()),
+                "status": status,
+                "active_today": active_today,
+                "advanced_ready": bool(summary.get("ready")),
+                "required_total": int(summary.get("required_total") or 0),
+                "tracked_count": int(summary.get("tracked_count") or 0),
+                "exists_count": int(summary.get("exists_count") or 0),
+                "missing_inputs": summary.get("missing_inputs") or [],
+                "publish_missing_inputs": summary.get("publish_missing_inputs") or [],
+            }
+        )
+    ready = [row for row in sport_rows if row.get("status") == "ready"]
+    blocked = [row for row in sport_rows if row.get("status") == "blocked"]
+    partial = [row for row in sport_rows if row.get("status") == "partial"]
+    inactive = [row for row in sport_rows if row.get("status") == "inactive"]
+    return {
+        "ready": not blocked,
+        "ready_sports": [row.get("slug") for row in ready],
+        "partial_sports": [row.get("slug") for row in partial],
+        "blocked_sports": [row.get("slug") for row in blocked],
+        "inactive_sports": [row.get("slug") for row in inactive],
+        "sports": sport_rows,
+    }
 
 
 def _advanced_driver_text(rows: list[dict[str, Any]], *, limit_groups: int = 2, limit_metrics: int = 3) -> str:
@@ -361,12 +530,12 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
             {
                 "label": "Player prop model outputs",
                 "metrics": ["Usage context", "Minute expectation", "Prop mean", "Edge vs line", "Calibration"],
-                "path": nba_processed_path(f"props_predictions_{context_label}.csv"),
+                "path": _resolve_nba_props_predictions_path(context_label),
             },
             {
                 "label": "Live state and pace context",
                 "metrics": ["Live pace", "Game state", "In-game line movement", "Board pressure", "Possession context"],
-                "path": nba_live_snapshot_path(f"live_state_{context_label}.jsonl"),
+                "path": _resolve_nba_live_context_path(context_label),
             },
         ]
     if slug == "wnba" and season is not None:
@@ -384,7 +553,7 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
             {
                 "label": "Live state mirror",
                 "metrics": ["Live pace", "Game state", "Rotation pressure", "In-game projection shift", "Board pressure"],
-                "path": wnba_live_snapshot_path(f"live_state_{context_label}.jsonl"),
+                "path": _resolve_wnba_live_context_path(context_label),
             },
         ]
     if slug == "nhl" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
@@ -402,7 +571,7 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
             {
                 "label": "Odds and scoreboard context",
                 "metrics": ["Live scoreboard state", "Props lines", "Market change", "Game status", "Book context"],
-                "path": nhl_scoreboard_snapshot_path(context_label),
+                "path": _resolve_nhl_scoreboard_context_path(context_label),
             },
         ]
     if slug == "nfl":
@@ -513,10 +682,14 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
                 "data_warnings": [str(item).strip() for item in (sport.get("data_warnings") or []) if str(item).strip()],
                 "artifacts": artifact_rows,
                 "advanced_inputs": advanced_rows,
+                "active_today": bool(sport.get("active_today")),
                 "tracked_ready": all(row.get("tracked") for row in artifact_rows if row.get("inside_repo")) if artifact_rows else False,
-                "advanced_ready": all(row.get("tracked") for row in advanced_rows if row.get("inside_repo")) if advanced_rows else False,
+                "advanced_ready": all(row.get("exists") for row in advanced_rows if row.get("inside_repo")) if advanced_rows else False,
+                "advanced_gate": _advanced_readiness_summary(advanced_rows),
             }
         )
+
+    readiness_gate = _build_readiness_gate(overview, tracked)
 
     return {
         "selected_date": _effective_date(selected_date),
@@ -529,6 +702,7 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
             "tracked_ok": advanced_ready_count,
             "tracked_total": advanced_total,
         },
+        "readiness_gate": readiness_gate,
         "local_only": True,
     }
 
@@ -633,9 +807,20 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     return deduped
 
 
+def _apply_advanced_context_to_candidates(candidates: list[dict[str, Any]], advanced_by_sport: dict[str, list[dict[str, Any]]]) -> None:
+    for candidate in candidates:
+        sport_slug = _safe_text(candidate.get("sport_slug"), "sport").lower()
+        advanced_context = advanced_by_sport.get(sport_slug, [])
+        readiness_summary = _advanced_readiness_summary(advanced_context)
+        candidate["advanced_context"] = advanced_context
+        candidate["advanced_gate"] = readiness_summary
+        candidate["score"] = float(candidate.get("score") or 0.0) + _advanced_score_adjustment(readiness_summary)
+
+
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
     advanced_context = candidate.get("advanced_context") if isinstance(candidate.get("advanced_context"), list) else []
     advanced_driver_text = _advanced_driver_text(advanced_context)
+    advanced_gate = candidate.get("advanced_gate") if isinstance(candidate.get("advanced_gate"), dict) else {}
     if _safe_text(candidate.get("candidate_type"), "") == "game":
         notes: list[str] = []
         if _safe_text(candidate.get("edge"), "-") != "-":
@@ -646,6 +831,9 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
             notes.append(f"The quoted book number is {candidate.get('odds')} on {candidate.get('pick')}.")
         if advanced_driver_text:
             notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
+        missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate.get("missing_inputs"), list) else []
+        if missing_inputs:
+            notes.append(f"Readiness is partial because {len(missing_inputs)} advanced inputs are missing or unpublished.")
         detail = _safe_text(candidate.get("detail"), "")
         if detail:
             notes.append(detail if detail.endswith(".") else f"{detail}.")
@@ -665,6 +853,9 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         notes.append(f"Game context currently points to a live total of {candidate.get('live_total')}.")
     if advanced_driver_text:
         notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
+    missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate.get("missing_inputs"), list) else []
+    if missing_inputs:
+        notes.append(f"Readiness is partial because {len(missing_inputs)} advanced inputs are missing or unpublished.")
     if _safe_text(candidate.get("writeup"), ""):
         writeup = _safe_text(candidate.get("writeup"), "")
         notes.append(writeup if writeup.endswith(".") else f"{writeup}.")
@@ -696,6 +887,17 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "href_label": _safe_text(candidate.get("href_label"), "Open board"),
         "rationale": _candidate_rationale(candidate),
         "score": round(float(candidate.get("score") or 0.0), 2),
+        "advanced_ready": bool((candidate.get("advanced_gate") or {}).get("ready")),
+        "advanced_readiness": _readiness_label(candidate.get("advanced_gate") or {}),
+        "missing_advanced_inputs": [
+            {
+                "label": _safe_text(item.get("label"), "Advanced input"),
+                "path": _safe_text(item.get("path"), "-"),
+                "missing_reason": _safe_text(item.get("missing_reason"), "missing"),
+            }
+            for item in ((candidate.get("advanced_gate") or {}).get("missing_inputs") or [])[:3]
+            if isinstance(item, dict)
+        ],
         "advanced_inputs": [
             {
                 "label": _safe_text(item.get("label"), "Advanced input"),
@@ -766,14 +968,13 @@ def run_intelligence_query(
     overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
     tracked = _tracked_repo_files()
     advanced_by_sport = {
-        _safe_text(sport_row.get("slug"), "sport").lower(): _available_advanced_inputs_for_sport(sport_row, tracked)
+        _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
     candidates = _collect_candidates(overview, preferences)
-    for candidate in candidates:
-        sport_slug = _safe_text(candidate.get("sport_slug"), "sport").lower()
-        candidate["advanced_context"] = advanced_by_sport.get(sport_slug, [])
+    _apply_advanced_context_to_candidates(candidates, advanced_by_sport)
+    candidates = sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
     recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]
     parlays = _build_parlays(candidates, limit=min(3, preferences["limit"])) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
 
@@ -785,10 +986,16 @@ def run_intelligence_query(
         if warnings:
             data_notes.append(f"{_safe_text(sport_row.get('name'), 'Sport')}: {'; '.join(warnings)}")
         sport_slug = _safe_text(sport_row.get("slug"), "sport").lower()
-        advanced_rows = advanced_by_sport.get(sport_slug, [])
+        advanced_rows = [row for row in advanced_by_sport.get(sport_slug, []) if bool(row.get("exists"))]
         advanced_driver_text = _advanced_driver_text(advanced_rows, limit_groups=1, limit_metrics=3)
         if advanced_driver_text:
             data_notes.append(f"{_safe_text(sport_row.get('name'), 'Sport')} advanced inputs: {advanced_driver_text}")
+        readiness = _advanced_readiness_summary(advanced_by_sport.get(sport_slug, []))
+        if readiness.get("missing_inputs"):
+            missing_labels = ", ".join(item.get("label") or "input" for item in readiness.get("missing_inputs", [])[:3])
+            data_notes.append(f"{_safe_text(sport_row.get('name'), 'Sport')} missing advanced inputs: {missing_labels}")
+
+    readiness_gate = _build_readiness_gate(overview, tracked)
 
     headline = "Local sports intelligence brief"
     if preferences["intent"] == "parlay":
@@ -811,5 +1018,6 @@ def run_intelligence_query(
         "recommendations": recommendations,
         "parlays": parlays,
         "board_notes": data_notes[:8],
+        "readiness_gate": readiness_gate,
         "local_only": True,
     }

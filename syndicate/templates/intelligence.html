@@ -220,25 +220,65 @@
     </section>
 
     <aside class="intel-panel">
+      {% set readiness_gate = status_report.readiness_gate if status_report.readiness_gate is defined else {'ready': false, 'ready_sports': [], 'partial_sports': [], 'blocked_sports': [], 'inactive_sports': []} %}
       <div class="intel-kicker">Data coverage</div>
       <h2>Advanced artifact status</h2>
       <p class="intel-inline-note">Representative pushed artifacts are checked per sport so the local agent can tell you which boards are fully backed by tracked data before this goes to deployment.</p>
       <div class="intel-chip-row">
         <span class="intel-chip is-good">Tracked {{ status_report.tracked_summary.tracked_ok }}/{{ status_report.tracked_summary.tracked_total }}</span>
         <span class="intel-chip{% if status_report.advanced_summary.tracked_ok == status_report.advanced_summary.tracked_total and status_report.advanced_summary.tracked_total %} is-good{% else %} is-warn{% endif %}">Advanced {{ status_report.advanced_summary.tracked_ok }}/{{ status_report.advanced_summary.tracked_total }}</span>
+        <span class="intel-chip{% if readiness_gate.ready %} is-good{% else %} is-warn{% endif %}">{% if readiness_gate.ready %}Gate ready{% else %}Gate blocked{% endif %}</span>
         <span class="intel-chip">Local-first only</span>
+      </div>
+      <div class="intel-leg-list">
+        <div>
+          <strong>Readiness gate</strong>
+          <div class="intel-chip-row">
+            <span class="intel-chip{% if readiness_gate.ready_sports %} is-good{% endif %}">Ready {{ readiness_gate.ready_sports|length }}</span>
+            <span class="intel-chip{% if readiness_gate.partial_sports %} is-warn{% endif %}">Partial {{ readiness_gate.partial_sports|length }}</span>
+            <span class="intel-chip{% if readiness_gate.blocked_sports %} is-warn{% endif %}">Blocked {{ readiness_gate.blocked_sports|length }}</span>
+            <span class="intel-chip">Inactive {{ readiness_gate.inactive_sports|length }}</span>
+          </div>
+        </div>
       </div>
       <div id="intel-status" class="intel-status-list">
         {% for sport in status_report.sports %}
+          {% set sport_gate = sport.advanced_gate if sport.advanced_gate is defined else {'ready': false, 'missing_inputs': [], 'publish_missing_inputs': []} %}
           <article class="intel-card">
             <h3>{{ sport.name }}</h3>
             <p class="intel-meta">{{ sport.context_label }} · {{ sport.data_health|capitalize }}</p>
             <div class="intel-chip-row">
               <span class="intel-chip{% if sport.tracked_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.tracked_ready %}Tracked{% else %}Needs publish check{% endif %}</span>
               <span class="intel-chip{% if sport.advanced_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.advanced_ready %}Advanced inputs tracked{% else %}Advanced inputs incomplete{% endif %}</span>
+              <span class="intel-chip{% if sport.active_today %} is-live{% endif %}">{% if sport.active_today %}Active today{% else %}Inactive today{% endif %}</span>
+              <span class="intel-chip{% if sport_gate.ready %} is-good{% else %} is-warn{% endif %}">Gate {{ 'ready' if sport_gate.ready else 'partial/blocking' }}</span>
             </div>
             {% if sport.data_warnings %}
               <p>{{ sport.data_warnings|join(' | ') }}</p>
+            {% endif %}
+            {% if sport_gate.missing_inputs %}
+              <div class="intel-leg-list">
+                <div>
+                  <strong>Missing advanced inputs</strong>
+                  <div class="intel-metric-list">
+                    {% for missing in sport_gate.missing_inputs[:4] %}
+                      <span class="intel-chip is-warn">{{ missing.label }}</span>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+            {% if sport_gate.publish_missing_inputs %}
+              <div class="intel-leg-list">
+                <div>
+                  <strong>Unpublished advanced inputs</strong>
+                  <div class="intel-metric-list">
+                    {% for missing in sport_gate.publish_missing_inputs[:4] %}
+                      <span class="intel-chip">{{ missing.label }}</span>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
             {% endif %}
             {% if sport.advanced_inputs %}
               <div class="intel-leg-list">
@@ -383,7 +423,27 @@
             <div class="intel-chip-row">
               ${chip(sport.tracked_ready ? 'Artifacts tracked' : 'Artifacts need publish check', sport.tracked_ready ? 'is-good' : 'is-warn')}
               ${chip(sport.advanced_ready ? 'Advanced inputs tracked' : 'Advanced inputs incomplete', sport.advanced_ready ? 'is-good' : 'is-warn')}
+              ${chip(sport.active_today ? 'Active today' : 'Inactive today', sport.active_today ? 'is-live' : '')}
+              ${chip((sport.advanced_gate || {}).ready ? 'Gate ready' : 'Gate partial/blocking', (sport.advanced_gate || {}).ready ? 'is-good' : 'is-warn')}
             </div>
+            ${Array.isArray((sport.advanced_gate || {}).missing_inputs) && (sport.advanced_gate || {}).missing_inputs.length ? `
+              <div class="intel-leg-list">
+                <div>
+                  <strong>Missing advanced inputs</strong>
+                  <div class="intel-metric-list">
+                    ${((sport.advanced_gate || {}).missing_inputs || []).slice(0, 4).map((missing) => chip(missing.label, 'is-warn')).join('')}
+                  </div>
+                </div>
+              </div>` : ''}
+            ${Array.isArray((sport.advanced_gate || {}).publish_missing_inputs) && (sport.advanced_gate || {}).publish_missing_inputs.length ? `
+              <div class="intel-leg-list">
+                <div>
+                  <strong>Unpublished advanced inputs</strong>
+                  <div class="intel-metric-list">
+                    ${((sport.advanced_gate || {}).publish_missing_inputs || []).slice(0, 4).map((missing) => chip(missing.label)).join('')}
+                  </div>
+                </div>
+              </div>` : ''}
             ${Array.isArray(sport.advanced_inputs) && sport.advanced_inputs.length ? `
               <div class="intel-leg-list">
                 ${sport.advanced_inputs.map((advanced) => `
