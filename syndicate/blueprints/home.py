@@ -654,9 +654,188 @@ def _pill_value_text(value: Any) -> str | None:
     return text
 
 
-def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_label: str | None = None) -> list[dict[str, Any]]:
+def _normalized_prop_lookup_key(*parts: Any) -> str:
+    values = [re.sub(r"\s+", " ", str(part or "").strip().lower()) for part in parts]
+    return "|".join(value for value in values if value)
+
+
+def _home_prop_game_index(home_games: list[dict[str, Any]] | None) -> dict[str, dict[Any, dict[str, Any]]]:
+    by_pk: dict[Any, dict[str, Any]] = {}
+    by_labels: dict[Any, dict[str, Any]] = {}
+    for game in home_games or []:
+        if not isinstance(game, dict):
+            continue
+        game_pk = _int_or_none(game.get("gamePk") or game.get("game_pk") or game.get("game_id"))
+        if game_pk is not None:
+            by_pk[game_pk] = game
+        away = game.get("away") if isinstance(game.get("away"), dict) else {}
+        home = game.get("home") if isinstance(game.get("home"), dict) else {}
+        away_label = str(away.get("abbr") or away.get("name") or game.get("away_tri") or game.get("away_name") or "").strip()
+        home_label = str(home.get("abbr") or home.get("name") or game.get("home_tri") or game.get("home_name") or "").strip()
+        if away_label or home_label:
+            by_labels[_normalized_prop_lookup_key(away_label, home_label)] = game
+        matchup = str(game.get("matchup") or _sport_matchup(game)).strip()
+        if matchup:
+            parsed_away, parsed_home = _split_matchup_labels(matchup)
+            by_labels[_normalized_prop_lookup_key(parsed_away, parsed_home)] = game
+    return {"by_pk": by_pk, "by_labels": by_labels}
+
+
+def _home_prop_matched_game(item: dict[str, Any], game_index: dict[str, dict[Any, dict[str, Any]]]) -> dict[str, Any] | None:
+    game_pk = _int_or_none(item.get("game_pk") or item.get("gamePk") or item.get("game_id"))
+    if game_pk is not None:
+        matched = (game_index.get("by_pk") or {}).get(game_pk)
+        if isinstance(matched, dict):
+            return matched
+    away_label = str(item.get("away_label") or item.get("team") or "").strip()
+    home_label = str(item.get("home_label") or item.get("opponent") or "").strip()
+    if away_label or home_label:
+        matched = (game_index.get("by_labels") or {}).get(_normalized_prop_lookup_key(away_label, home_label))
+        if isinstance(matched, dict):
+            return matched
+    matchup = str(item.get("matchup") or "").strip()
+    parsed_away, parsed_home = _split_matchup_labels(matchup)
+    if parsed_away or parsed_home:
+        matched = (game_index.get("by_labels") or {}).get(_normalized_prop_lookup_key(parsed_away, parsed_home))
+        if isinstance(matched, dict):
+            return matched
+    return None
+
+
+def _display_prop_market_label(value: Any) -> str:
+    raw_text = re.sub(r"[_/]+", " ", str(value or "").strip())
+    raw_text = re.sub(r"\s+", " ", raw_text).strip()
+    lowered = raw_text.lower()
+    for prefix in ("batter ", "hitter ", "pitcher ", "player "):
+        if lowered.startswith(prefix):
+            raw_text = raw_text[len(prefix):].strip()
+            lowered = raw_text.lower()
+            break
+    replacements = {
+        "hits": "Hits",
+        "total bases": "Total Bases",
+        "runs scored": "Runs Scored",
+        "rbis": "RBI",
+        "rbi": "RBI",
+        "outs": "Outs",
+        "strikeouts": "Strikeouts",
+        "hits allowed": "Hits Allowed",
+        "walks allowed": "Walks Allowed",
+        "earned runs": "Earned Runs",
+        "points": "Points",
+        "rebounds": "Rebounds",
+        "assists": "Assists",
+        "points rebounds assists": "Points + Rebounds + Assists",
+        "points rebounds": "Points + Rebounds",
+        "points assists": "Points + Assists",
+        "rebounds assists": "Rebounds + Assists",
+        "three pointers made": "3PT Made",
+        "threes made": "3PT Made",
+        "shots on goal": "Shots on Goal",
+        "saves": "Saves",
+    }
+    if lowered in replacements:
+        return replacements[lowered]
+    tokens: list[str] = []
+    for token in raw_text.split():
+        upper = token.upper()
+        if upper in {"RBI", "PRA", "PTS", "REB", "AST", "3PT", "3PM", "SOG"}:
+            tokens.append(upper)
+        else:
+            tokens.append(token.capitalize())
+    return " ".join(tokens) or "Prop"
+
+
+def _display_prop_title_parts(name: Any, market_label: str) -> tuple[str, str]:
+    raw_name = re.sub(r"\s+", " ", str(name or "").strip()) or "Prop"
+    player_name = raw_name
+    market_suffix = re.search(r"^(?P<player>.+?)\s+(?:Batter|Hitter|Pitcher|Player)[ _].+$", raw_name)
+    if market_suffix:
+        player_name = market_suffix.group("player").strip() or raw_name
+    title = player_name
+    if market_label and market_label.lower() not in title.lower():
+        title = f"{title} {market_label}".strip()
+    return player_name, title
+
+
+def _home_prop_status_display(item: dict[str, Any], matched_game: dict[str, Any] | None) -> str | None:
+    if isinstance(matched_game, dict):
+        scoreboard = _scoreboard_state(matched_game)
+        liveish = _is_liveish(scoreboard.get("status_badge"), scoreboard.get("status_line"))
+        if scoreboard.get("has_scores"):
+            score_text = f"{scoreboard.get('away_score')}-{scoreboard.get('home_score')}"
+            if liveish:
+                return f"{score_text} | {scoreboard.get('status_line')}"
+            if str(scoreboard.get("status_badge") or "").strip().lower() == "final":
+                return f"{score_text} | Final"
+        return _safe_text(scoreboard.get("status_line"), None)
+    return _safe_text(item.get("game_state"), None)
+
+
+def _home_prop_live_total(item: dict[str, Any], matched_game: dict[str, Any] | None) -> str | None:
+    if isinstance(matched_game, dict):
+        scoreboard = _scoreboard_state(matched_game)
+        liveish = _is_liveish(scoreboard.get("status_badge"), scoreboard.get("status_line"))
+        if scoreboard.get("has_scores"):
+            away_score = _numeric_value(scoreboard.get("away_score"))
+            home_score = _numeric_value(scoreboard.get("home_score"))
+            if away_score is not None and home_score is not None:
+                return _score_value(float(away_score) + float(home_score))
+        if not liveish and str(scoreboard.get("status_badge") or "").strip().lower() != "final":
+            return None
+    if not bool(item.get("is_live")):
+        return None
+    live_total = _prop_metric_text(item.get("live_total"))
+    if live_total:
+        return live_total
+    return _score_value(item.get("live_total_line") or item.get("live_line_total") or item.get("total_goals"))
+
+
+def _home_prop_writeup(item: dict[str, Any], *, player_name: str, market_label: str) -> str:
+    raw_writeup = str(item.get("writeup") or "").strip()
+    if raw_writeup and "_" not in raw_writeup:
+        return raw_writeup
+    pick = _safe_text(item.get("pick") or item.get("selection"), "Play")
+    line = _prop_metric_text(item.get("line") or item.get("market_line"))
+    base_sentence = f"{'Live lean' if item.get('is_live') else 'Recommended'} {pick} for {player_name} {market_label}".strip()
+    if line and line != "-":
+        base_sentence = f"{base_sentence} at {line}."
+    else:
+        base_sentence = f"{base_sentence}."
+    detail = str(item.get("detail") or item.get("summary") or "").strip()
+    detail_tail = detail.split("|", 1)[1].strip() if "|" in detail else ""
+    if detail_tail:
+        return f"{base_sentence} {detail_tail.rstrip('.')} .".replace(" .", ".")
+    confidence = _safe_text(item.get("confidence"), None)
+    edge = _safe_text(item.get("value") or item.get("edge"), None)
+    if confidence and edge:
+        return f"{base_sentence} Model gives {confidence} win probability with {edge} edge."
+    if confidence:
+        return f"{base_sentence} Model gives {confidence} win probability."
+    return base_sentence
+
+
+def _home_prop_display_pills(item: dict[str, Any], *, live_total: str | None) -> list[str]:
+    live_flag = bool(item.get("is_live")) or _is_liveish(item.get("heading"), item.get("status_display"))
+    values: list[str] = []
+    for label, raw_value in [
+        ("Line", item.get("line")),
+        ("Odds", item.get("odds")),
+        ("Sim", item.get("confidence")),
+        ("Pregame proj", item.get("projected")),
+        ("Live total", live_total),
+        ("Live proj", item.get("live_projection") if live_flag else None),
+    ]:
+        value = _pill_value_text(raw_value)
+        if value and value != "-":
+            values.append(f"{label} {value}")
+    return values
+
+
+def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_label: str | None = None, home_games: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     finalized: list[dict[str, Any]] = []
     actual_cache: dict[int, dict[str, Any] | None] = {}
+    game_index = _home_prop_game_index(home_games)
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -692,6 +871,21 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
         item["away_logo"] = away_logo
         item["home_logo"] = home_logo
 
+        matched_game = _home_prop_matched_game(item, game_index)
+        market_label = _display_prop_market_label(item.get("market") or item.get("name"))
+        player_name, display_name = _display_prop_title_parts(item.get("name"), market_label)
+        item["name"] = display_name
+        item["market_display"] = market_label
+        item["player_name"] = player_name
+        item["meta_line"] = _safe_text(
+            " ".join(part for part in [str(item.get("pick") or "").strip().upper(), _prop_metric_text(item.get("line") or item.get("market_line")) or ""] if part).strip(),
+            _safe_text(item.get("detail"), None),
+        )
+        item["status_display"] = _home_prop_status_display(item, matched_game)
+        if isinstance(matched_game, dict):
+            scoreboard = _scoreboard_state(matched_game)
+            item["is_live"] = bool(item.get("is_live")) or _is_liveish(scoreboard.get("status_badge"), scoreboard.get("status_line"))
+
         if slug == "mlb" and game_pk is not None and context_label:
             actual_payload = _mlb_actual_payload_for_game(context_label, int(game_pk), actual_cache)
             final_state = _mlb_actual_payload_is_final(actual_payload)
@@ -712,6 +906,9 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
                 live_total = _mlb_live_total_text(actual_payload)
                 if live_total:
                     item["live_total"] = live_total
+        item["live_total"] = _home_prop_live_total(item, matched_game) or _safe_text(item.get("live_total"), None)
+        item["writeup"] = _home_prop_writeup(item, player_name=player_name, market_label=market_label)
+        item["display_pills"] = _home_prop_display_pills(item, live_total=item.get("live_total"))
         finalized.append(item)
     return finalized
 
@@ -3032,6 +3229,7 @@ def _build_sport_overview(
         ),
         slug=slug,
         context_label=context_label,
+        home_games=home_games,
     )
     if game_bar["items"]:
         overview_stats = [{"label": "Games", "value": str(game_count)}] + overview_stats[1:]
@@ -3074,6 +3272,7 @@ def _build_sport_overview(
                 _load_mlb_home_hr_target_items(context_label, limit=10),
                 slug="mlb",
                 context_label=context_label,
+                home_games=home_games,
             ),
             "pregame_props_href": _link_lookup(links, "Pitcher top props") or f"/mlb/pitcher-top-props?date={context_label}",
             "pregame_props_secondary_href": _link_lookup(links, "Hitter top props") or f"/mlb/hitter-top-props?date={context_label}",
@@ -3088,6 +3287,7 @@ def _build_sport_overview(
                 ),
                 slug="mlb",
                 context_label=context_label,
+                home_games=home_games,
             ),
             "live_props_href": _link_lookup(links, "Live Lens") or f"/mlb/live-lens?date={context_label}",
             "live_props_items": _finalize_home_prop_rows(
@@ -3101,6 +3301,7 @@ def _build_sport_overview(
                 ),
                 slug="mlb",
                 context_label=context_label,
+                home_games=home_games,
             ),
         }
     if slug == "wnba":
@@ -3128,6 +3329,7 @@ def _build_sport_overview(
                 ),
                 slug="wnba",
                 context_label=context_label,
+                home_games=home_games,
             ),
             "live_props_items": _finalize_home_prop_rows(
                 _load_home_prop_items(
@@ -3140,6 +3342,7 @@ def _build_sport_overview(
                 ),
                 slug="wnba",
                 context_label=context_label,
+                home_games=home_games,
             ),
         }
     props_count = _dashboard_prop_count(overview)
