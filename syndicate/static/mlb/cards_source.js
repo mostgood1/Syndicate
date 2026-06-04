@@ -248,8 +248,10 @@
 
   function freshnessText(row, fieldName, fallbackDetail) {
     const rawValue = row?.[fieldName]
-      || (fieldName === 'last_seen_at' ? row?.firstSeenAt : null)
-      || (fieldName === 'first_seen_at' ? row?.lastSeenAt : null)
+      || (fieldName === 'last_seen_at' ? row?.lastSeenAt : null)
+      || (fieldName === 'first_seen_at' ? row?.firstSeenAt : null)
+      || (fieldName === 'last_seen_at' ? row?.oddsRefreshedAt || row?.odds_refreshed_at : null)
+      || (fieldName === 'last_seen_at' ? fallbackDetail?.oddsRefreshedAt || fallbackDetail?.odds_refreshed_at : null)
       || fallbackDetail?.sim?.generatedAt
       || fallbackDetail?.generatedAt
       || null;
@@ -335,6 +337,89 @@
   function trackedGameLinesUpdatedAt(card) {
     const lines = trackedGameLines(card);
     return String(card?.oddsRefreshedAt || card?.odds_refreshed_at || lines?.oddsRefreshedAt || lines?.odds_refreshed_at || lines?.retrievedAt || lines?.retrieved_at || lines?.updatedAt || lines?.updated_at || "").trim();
+  }
+
+  function cardFullGamePrediction(card) {
+    const row = card?.predictions?.full && typeof card.predictions.full === "object" ? card.predictions.full : null;
+    if (!row) return null;
+    const away = toNumber(row.away_runs_mean ?? row.awayRunsMean ?? row.away);
+    const home = toNumber(row.home_runs_mean ?? row.homeRunsMean ?? row.home);
+    const total = toNumber(row.total_runs_mean ?? row.totalRunsMean ?? row.total);
+    return {
+      away,
+      home,
+      total: total != null ? total : (away != null && home != null ? away + home : null),
+      homeWinProb: toNumber(row.home_win_prob ?? row.homeWinProb),
+    };
+  }
+
+  function cardTrackedH2H(card) {
+    const lines = trackedGameLines(card);
+    return lines?.h2h && typeof lines.h2h === "object" ? lines.h2h : {};
+  }
+
+  function cardTrackedTotals(card) {
+    const lines = trackedGameLines(card);
+    return lines?.totals && typeof lines.totals === "object" ? lines.totals : {};
+  }
+
+  function pregameMoneylineFallback(card) {
+    const prediction = cardFullGamePrediction(card);
+    const h2h = cardTrackedH2H(card);
+    const homeOdds = h2h.home_odds ?? h2h.homeOdds;
+    const awayOdds = h2h.away_odds ?? h2h.awayOdds;
+    const modelHomeProb = prediction?.homeWinProb;
+    const normalized = normalizeTwoWay(
+      americanOddsImpliedProb(homeOdds),
+      americanOddsImpliedProb(awayOdds)
+    );
+    const marketHomeProb = normalized.first;
+    if (modelHomeProb == null && marketHomeProb == null && !homeOdds && !awayOdds) return null;
+    const pickHome = modelHomeProb == null ? true : modelHomeProb >= 0.5;
+    const pickTeam = pickHome ? card?.home?.abbr : card?.away?.abbr;
+    const modelProb = modelHomeProb == null ? null : (pickHome ? modelHomeProb : 1 - modelHomeProb);
+    const marketProb = marketHomeProb == null ? null : (pickHome ? marketHomeProb : 1 - marketHomeProb);
+    const edge = modelProb == null || marketProb == null ? null : modelProb - marketProb;
+    const odds = pickHome ? homeOdds : awayOdds;
+    return {
+      pickTeam,
+      odds,
+      modelProb,
+      marketProb,
+      edge,
+    };
+  }
+
+  function pregameTotalFallback(card) {
+    const prediction = cardFullGamePrediction(card);
+    const totals = cardTrackedTotals(card);
+    const line = toNumber(totals.line);
+    const modelTotal = prediction?.total;
+    const overOdds = totals.over_odds ?? totals.overOdds;
+    const underOdds = totals.under_odds ?? totals.underOdds;
+    if (line == null && modelTotal == null && !overOdds && !underOdds) return null;
+    const pickOver = modelTotal == null || line == null ? true : modelTotal >= line;
+    const marketProbabilities = normalizeTwoWay(
+      americanOddsImpliedProb(overOdds),
+      americanOddsImpliedProb(underOdds)
+    );
+    const marketProb = pickOver ? marketProbabilities.first : marketProbabilities.second;
+    return {
+      selection: pickOver ? "over" : "under",
+      line,
+      odds: pickOver ? overOdds : underOdds,
+      modelTotal,
+      marketProb,
+      edge: modelTotal == null || line == null ? null : modelTotal - line,
+    };
+  }
+
+  function propRowFreshnessText(row, card, tierLabel) {
+    const timestamp = String(row?.last_seen_at || row?.lastSeenAt || trackedGameLinesUpdatedAt(card) || "").trim();
+    if (timestamp) {
+      return `Odds updated ${formatTimestampShort(timestamp)}`;
+    }
+    return String(tierLabel || "");
   }
 
   function extraMarketRows(card, key) {
@@ -1463,8 +1548,8 @@
   }
 
   function marketTiles(card) {
-    const totals = card?.markets?.totals || null;
-    const ml = card?.markets?.ml || null;
+    const totals = card?.markets?.totals || pregameTotalFallback(card);
+    const ml = card?.markets?.ml || pregameMoneylineFallback(card);
     const pitcherRows = filterPropRowsByOdds(marketRows(card, "pitcherProps"));
     const pitcherExtraRows = filterPropRowsByOdds(extraMarketRows(card, "extraPitcherProps"));
     const hitterRows = filterPropRowsByOdds(marketRows(card, "hitterProps"));
@@ -1474,20 +1559,24 @@
       ? tileMarkup({
           label: "Game Total",
           badge: formatOdds(totals.odds),
-          main: `${String(totals.selection || "").toUpperCase()} ${formatLine(totals.market_line)}`,
-          sub: `Model ${formatLine(totals.model_mean_total)} | Edge ${formatSigned(toNumber(totals.edge), 2)}`,
+          main: `${String(totals.selection || "").toUpperCase()} ${formatLine(totals.market_line ?? totals.line)}`,
+          sub: `Model ${formatLine(totals.model_mean_total ?? totals.modelTotal)} | Market ${formatLine(totals.market_line ?? totals.line)} | Edge ${formatSigned(toNumber(totals.edge), 2)}`,
         })
       : tileMarkup({ label: "Game Total", main: "No total play", sub: "Off card" });
 
     const mlTeam = ml
-      ? (String(ml.selection || "").toLowerCase() === "home" ? card?.home?.abbr : card?.away?.abbr)
+      ? (String(ml.selection || "").toLowerCase() === "home"
+        ? card?.home?.abbr
+        : String(ml.selection || "").toLowerCase() === "away"
+          ? card?.away?.abbr
+          : ml.pickTeam)
       : "";
     const mlTile = ml
       ? tileMarkup({
           label: "Moneyline",
           badge: formatOdds(ml.odds),
           main: `${escapeHtml(mlTeam)} ML`,
-          sub: `Model ${formatPercent(ml.model_prob, 1)} | Market ${formatPercent(ml.market_no_vig_prob, 1)}`,
+          sub: `Model ${formatPercent(ml.model_prob ?? ml.modelProb, 1)} | Market ${formatPercent(ml.market_no_vig_prob ?? ml.marketProb, 1)} | Edge ${formatPercent(ml.edge, 1)}`,
         })
       : tileMarkup({ label: "Moneyline", main: "No ML play", sub: "Off card" });
 
@@ -2311,7 +2400,7 @@
       </div>`;
   }
 
-  function propButtonMarkup(rows, selectedKey, tier) {
+  function propButtonMarkup(card, rows, selectedKey, tier) {
     if (!rows.length) return '<div class="cards-empty-copy">No rows.</div>';
     const buttonTierClass = tier === "candidate" ? "is-candidate" : (tier === "live" ? "is-live" : "is-official");
     const tierLabel = tier === "candidate" ? "Playable" : (tier === "live" ? "Live" : "Official");
@@ -2323,7 +2412,7 @@
         return `
           <button type="button" class="cards-prop-button ${buttonTierClass} ${isActive ? "is-active" : ""}" data-prop-key="${escapeHtml(key)}" data-prop-board="${escapeHtml(boardValue)}">
             ${escapeHtml(propOwnerName(row) || "Player")} ${escapeHtml(marketLabelLong(row))}
-            <small>${escapeHtml(`${tierLabel} | ${formatOdds(row?.odds)} | ${formatPropEdge(row)}`)}</small>
+            <small>${escapeHtml(`${propRowFreshnessText(row, card, tierLabel)} | ${formatOdds(row?.odds)} | ${formatPropEdge(row)}`)}</small>
           </button>`;
       })
       .join("")}</div>`;
@@ -2422,7 +2511,7 @@
               <span class="cards-chip is-live">${escapeHtml(String(filteredLiveRows.length))} plays</span>
             </div>
             <div class="cards-callout-copy">Current market odds ranked by live projection first, then model-vs-market edge.</div>
-            ${propButtonMarkup(filteredLiveRows, selectedKey, "live")}
+            ${propButtonMarkup(card, filteredLiveRows, selectedKey, "live")}
           </div>` : ""}
         ${filteredOfficialCount ? `
           <div class="cards-prop-group">
@@ -2433,12 +2522,12 @@
             ${filteredOfficialPitcherRows.length ? `
               <div class="cards-prop-stack">
                 <div class="cards-section-label">Pitcher props</div>
-                ${propButtonMarkup(filteredOfficialPitcherRows, selectedKey, "official")}
+                ${propButtonMarkup(card, filteredOfficialPitcherRows, selectedKey, "official")}
               </div>` : ""}
             ${filteredOfficialHitterRows.length ? `
               <div class="cards-prop-stack">
                 <div class="cards-section-label">Hitter props</div>
-                ${propButtonMarkup(filteredOfficialHitterRows, selectedKey, "official")}
+                ${propButtonMarkup(card, filteredOfficialHitterRows, selectedKey, "official")}
               </div>` : ""}
           </div>` : ""}
         ${filteredExtraCount ? `
@@ -2451,12 +2540,12 @@
             ${filteredExtraPitcherRows.length ? `
               <div class="cards-prop-stack">
                 <div class="cards-section-label">Pitcher props</div>
-                ${propButtonMarkup(filteredExtraPitcherRows, selectedKey, "candidate")}
+                ${propButtonMarkup(card, filteredExtraPitcherRows, selectedKey, "candidate")}
               </div>` : ""}
             ${filteredExtraHitterRows.length ? `
               <div class="cards-prop-stack">
                 <div class="cards-section-label">Hitter props</div>
-                ${propButtonMarkup(filteredExtraHitterRows, selectedKey, "candidate")}
+                ${propButtonMarkup(card, filteredExtraHitterRows, selectedKey, "candidate")}
               </div>` : ""}
           </div>` : ""}`;
 
@@ -2480,8 +2569,8 @@
         { label: "Sim row", value: simLabel },
         { label: "Model mean", value: modelMean == null ? "-" : `${formatLine(modelMean)} ${metricLabel(selected)}` },
         { label: "Live proj", value: liveProjection == null ? "-" : `${formatLine(liveProjection)} ${metricLabel(selected)}` },
-        { label: "Odds updated", value: freshnessText(selected, 'last_seen_at', detail) },
-        { label: "Active since", value: freshnessText(selected, 'first_seen_at', detail) },
+        { label: "Odds updated", value: freshnessText(selected, 'last_seen_at', { ...detail, oddsRefreshedAt: trackedGameLinesUpdatedAt(card), odds_refreshed_at: trackedGameLinesUpdatedAt(card) }) },
+        { label: "Active since", value: freshnessText(selected, 'first_seen_at', { ...detail, oddsRefreshedAt: trackedGameLinesUpdatedAt(card), odds_refreshed_at: trackedGameLinesUpdatedAt(card) }) },
         { label: "Opened at", value: selected?.first_seen_odds != null ? formatOdds(selected.first_seen_odds) : formatOdds(selected?.odds) },
         { label: "Line", value: lineLabel },
         { label: "Live edge", value: liveEdge == null ? "-" : formatSigned(liveEdge, 2) },
@@ -2597,12 +2686,12 @@
           ${filteredOfficialPitcherRows.length ? `
             <div class="cards-prop-stack">
               <div class="cards-section-label">Pitcher props</div>
-              ${propButtonMarkup(filteredOfficialPitcherRows, selectedKey, "official")}
+              ${propButtonMarkup(card, filteredOfficialPitcherRows, selectedKey, "official")}
             </div>` : ""}
           ${filteredOfficialHitterRows.length ? `
             <div class="cards-prop-stack">
               <div class="cards-section-label">Hitter props</div>
-              ${propButtonMarkup(filteredOfficialHitterRows, selectedKey, "official")}
+              ${propButtonMarkup(card, filteredOfficialHitterRows, selectedKey, "official")}
             </div>` : ""}
         </div>` : ""}
       ${filteredExtraCount ? `
@@ -2615,12 +2704,12 @@
           ${filteredExtraPitcherRows.length ? `
             <div class="cards-prop-stack">
               <div class="cards-section-label">Pitcher props</div>
-              ${propButtonMarkup(filteredExtraPitcherRows, selectedKey, "candidate")}
+              ${propButtonMarkup(card, filteredExtraPitcherRows, selectedKey, "candidate")}
             </div>` : ""}
           ${filteredExtraHitterRows.length ? `
             <div class="cards-prop-stack">
               <div class="cards-section-label">Hitter props</div>
-              ${propButtonMarkup(filteredExtraHitterRows, selectedKey, "candidate")}
+              ${propButtonMarkup(card, filteredExtraHitterRows, selectedKey, "candidate")}
             </div>` : ""}
         </div>` : ""}`;
 
@@ -2657,8 +2746,8 @@
       { label: "Sim row", value: simLabel },
       { label: "Model mean", value: modelMean == null ? "-" : `${formatLine(modelMean)} ${metricLabel(selected)}` },
       { label: "Live proj", value: liveProjection == null ? "-" : `${formatLine(liveProjection)} ${metricLabel(selected)}` },
-      { label: "Updated", value: freshnessText(selected, 'last_seen_at', detail) },
-      { label: "Active since", value: freshnessText(selected, 'first_seen_at', detail) },
+      { label: "Updated", value: freshnessText(selected, 'last_seen_at', { ...detail, oddsRefreshedAt: trackedGameLinesUpdatedAt(card), odds_refreshed_at: trackedGameLinesUpdatedAt(card) }) },
+      { label: "Active since", value: freshnessText(selected, 'first_seen_at', { ...detail, oddsRefreshedAt: trackedGameLinesUpdatedAt(card), odds_refreshed_at: trackedGameLinesUpdatedAt(card) }) },
       { label: "Opened at", value: selected?.first_seen_odds != null ? formatOdds(selected.first_seen_odds) : formatOdds(selected?.odds) },
       { label: "Line", value: lineLabel },
       { label: "Live edge", value: liveEdge == null ? "-" : formatSigned(liveEdge, 2) },
