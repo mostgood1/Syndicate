@@ -651,6 +651,41 @@ def _position_maps_for_date(selected_date: str) -> tuple[dict[str, str], dict[st
     return by_id, by_name
 
 
+@lru_cache(maxsize=32)
+def _player_identity_maps_for_date(selected_date: str) -> tuple[dict[str, str], dict[str, str]]:
+    player_id_by_name: dict[str, str] = {}
+    team_by_name: dict[str, str] = {}
+    candidate_paths = (
+        processed_path(f"roster_snapshot_{selected_date}.csv"),
+        processed_path(f"lineups_{selected_date}.csv"),
+    )
+
+    for path in candidate_paths:
+        rows = _load_csv_rows(path) if path.exists() else []
+        for row in rows:
+            player_name = str(row.get("full_name") or row.get("player") or "").strip().lower()
+            if not player_name:
+                continue
+            player_id = str(row.get("player_id") or "").strip()
+            team = team_abbreviation(row.get("team"))
+            if player_id and player_name not in player_id_by_name:
+                player_id_by_name[player_name] = player_id
+            if team and player_name not in team_by_name:
+                team_by_name[player_name] = team
+    return player_id_by_name, team_by_name
+
+
+def _nhl_headshot_url(player_id: Any, *, team_abbr: Any = None, selected_date: str | None = None) -> str | None:
+    text = str(player_id or "").strip()
+    if not text.isdigit():
+        return None
+    team = team_abbreviation(team_abbr)
+    if not team:
+        return None
+    season = parse_iso_date(selected_date or default_date()).year
+    return f"https://assets.nhle.com/mugs/nhl/{season}/{team}/{text}.png"
+
+
 def _split_reason_tokens(value: Any) -> list[str]:
     raw = str(value or "").strip()
     if not raw:
@@ -702,6 +737,7 @@ def _props_movement_from_recommendation(line_value: float | None, price_value: f
 def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[str, Any]:
     requested_date, resolved_date, lookahead_applied = _resolve_cards_date(selected_date)
     rows, source_path = _props_recommendation_rows(resolved_date)
+    player_id_by_name, team_by_name = _player_identity_maps_for_date(resolved_date)
     try:
         top_n = max(0, min(int(top), 100))
     except Exception:
@@ -717,13 +753,16 @@ def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[
         if ev_value < 0.02:
             continue
 
-        team = team_abbreviation(row.get("team"))
+        player_name = str(row.get("player") or "").strip()
+        player_key = player_name.lower()
+        player_id = str(row.get("player_id") or "").strip() or player_id_by_name.get(player_key, "")
+        team = team_abbreviation(row.get("team") or team_by_name.get(player_key))
         opp = team_abbreviation(row.get("opp"))
         cards.append(
             {
-                "player": str(row.get("player") or "").strip() or None,
-                "player_id": None,
-                "headshot_url": None,
+            "player": player_name or None,
+            "player_id": int(player_id) if player_id.isdigit() else None,
+                "headshot_url": _nhl_headshot_url(player_id, team_abbr=team, selected_date=resolved_date),
                 "team_logo": team_logo_url(team),
                 "team": team or None,
                 "opp": opp or None,
