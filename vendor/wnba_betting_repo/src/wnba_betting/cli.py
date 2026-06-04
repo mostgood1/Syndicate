@@ -13404,6 +13404,35 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
         return part if not part.empty else None
 
     slate = None
+    def _build_slate_from_game_cards(date_str_local: str) -> pd.DataFrame | None:
+        cards_path = paths.data_processed / f"game_cards_{date_str_local}.csv"
+        if not cards_path.exists() or not cards_path.is_file():
+            return None
+        try:
+            cards = pd.read_csv(cards_path)
+        except Exception:
+            return None
+        if cards.empty:
+            return None
+        home_col = next((c for c in ("home_team", "home", "home_name") if c in cards.columns), None)
+        away_col = next((c for c in ("visitor_team", "away", "away_name") if c in cards.columns), None)
+        if not home_col or not away_col:
+            return None
+        rows = []
+        target_date = pd.to_datetime(date_str_local, errors="coerce")
+        for _, row in cards.iterrows():
+            home_team = normalize_team(str(row.get(home_col) or ""))
+            away_team = normalize_team(str(row.get(away_col) or ""))
+            if not home_team or not away_team:
+                continue
+            rows.append({
+                "date": target_date.date() if pd.notna(target_date) else pd.NaT,
+                "home_team": home_team,
+                "visitor_team": away_team,
+            })
+        slate_df = pd.DataFrame(rows).drop_duplicates() if rows else pd.DataFrame()
+        return slate_df if not slate_df.empty else None
+
     # Fallback: build slate from live schedule data, then local schedule artifacts, when API/history fail
     def _build_slate_from_schedule(date_str_local: str) -> pd.DataFrame | None:
         try:
@@ -13458,50 +13487,52 @@ def predict_date_cmd(date_str: str | None, merge_odds_csv: str | None, out_path:
         except Exception:
             return None
     try:
-        # Fetch slate from ScoreboardV2
-        sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
-        nd = sb.get_normalized_dict()
-        gh = pd.DataFrame(nd.get("GameHeader", []))
-        ls = pd.DataFrame(nd.get("LineScore", []))
-        if gh.empty or ls.empty:
-            raise RuntimeError("Scoreboard returned empty tables")
-        gh_cols = {c.upper(): c for c in gh.columns}
-        ls_cols = {c.upper(): c for c in ls.columns}
-        required = ["GAME_ID", "HOME_TEAM_ID", "VISITOR_TEAM_ID", "GAME_DATE_EST"]
-        if "GAME_DATE_EST" not in gh_cols and "GAME_DATE" in gh_cols:
-            gh_cols["GAME_DATE_EST"] = gh_cols["GAME_DATE"]
-        if not all(k in gh_cols for k in required) or not {"GAME_ID", "TEAM_ID", "TEAM_ABBREVIATION"}.issubset(ls_cols.keys()):
-            raise RuntimeError("Scoreboard missing required columns")
+        slate = _build_slate_from_game_cards(date_str)
+        if slate is None or slate.empty:
+            # Fetch slate from ScoreboardV2
+            sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+            nd = sb.get_normalized_dict()
+            gh = pd.DataFrame(nd.get("GameHeader", []))
+            ls = pd.DataFrame(nd.get("LineScore", []))
+            if gh.empty or ls.empty:
+                raise RuntimeError("Scoreboard returned empty tables")
+            gh_cols = {c.upper(): c for c in gh.columns}
+            ls_cols = {c.upper(): c for c in ls.columns}
+            required = ["GAME_ID", "HOME_TEAM_ID", "VISITOR_TEAM_ID", "GAME_DATE_EST"]
+            if "GAME_DATE_EST" not in gh_cols and "GAME_DATE" in gh_cols:
+                gh_cols["GAME_DATE_EST"] = gh_cols["GAME_DATE"]
+            if not all(k in gh_cols for k in required) or not {"GAME_ID", "TEAM_ID", "TEAM_ABBREVIATION"}.issubset(ls_cols.keys()):
+                raise RuntimeError("Scoreboard missing required columns")
 
-        # Map TEAM_ID -> ABBR for this date
-        team_abbr_map = {}
-        for _, r in ls.iterrows():
-            try:
-                team_abbr_map[int(r[ls_cols["TEAM_ID"]])] = str(r[ls_cols["TEAM_ABBREVIATION"]])
-            except Exception:
-                continue
-        # Build matchups
-        team_list = static_teams.get_teams(); abbr_to_full = {t['abbreviation']: t['full_name'] for t in team_list}
-        rows = []
-        for _, g in gh.iterrows():
-            try:
-                home_id = int(g[gh_cols["HOME_TEAM_ID"]]); vis_id = int(g[gh_cols["VISITOR_TEAM_ID"]])
-                habbr = team_abbr_map.get(home_id); vabbr = team_abbr_map.get(vis_id)
-                if not habbr or not vabbr:
+            # Map TEAM_ID -> ABBR for this date
+            team_abbr_map = {}
+            for _, r in ls.iterrows():
+                try:
+                    team_abbr_map[int(r[ls_cols["TEAM_ID"]])] = str(r[ls_cols["TEAM_ABBREVIATION"]])
+                except Exception:
                     continue
-                home = normalize_team(abbr_to_full.get(habbr, habbr))
-                away = normalize_team(abbr_to_full.get(vabbr, vabbr))
-                rows.append({
-                    "date": pd.to_datetime(g[gh_cols["GAME_DATE_EST"]]).date(),
-                    "home_team": home,
-                    "visitor_team": away,
-                })
-            except Exception:
-                continue
-        if rows:
-            slate = pd.DataFrame(rows)
-        else:
-            slate = None
+            # Build matchups
+            team_list = static_teams.get_teams(); abbr_to_full = {t['abbreviation']: t['full_name'] for t in team_list}
+            rows = []
+            for _, g in gh.iterrows():
+                try:
+                    home_id = int(g[gh_cols["HOME_TEAM_ID"]]); vis_id = int(g[gh_cols["VISITOR_TEAM_ID"]])
+                    habbr = team_abbr_map.get(home_id); vabbr = team_abbr_map.get(vis_id)
+                    if not habbr or not vabbr:
+                        continue
+                    home = normalize_team(abbr_to_full.get(habbr, habbr))
+                    away = normalize_team(abbr_to_full.get(vabbr, vabbr))
+                    rows.append({
+                        "date": pd.to_datetime(g[gh_cols["GAME_DATE_EST"]]).date(),
+                        "home_team": home,
+                        "visitor_team": away,
+                    })
+                except Exception:
+                    continue
+            if rows:
+                slate = pd.DataFrame(rows)
+            else:
+                slate = None
     except Exception as e:
         console.print(f"Scoreboard fetch failed ({e}); trying fallbacks for {date_str}.", style="yellow")
         slate = _build_slate_from_history(date_str)
