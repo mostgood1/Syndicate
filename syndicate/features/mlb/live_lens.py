@@ -641,7 +641,10 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
     card_props = _live_props_from_card(card)
     card_segments = _live_lens_segments_from_card(card)
     card_score = _card_score_from_card(card)
-    if card_segments:
+    row_status = row.get("status") if isinstance(row.get("status"), dict) else {}
+    row_status_text = f"{str(row_status.get('abstract') or row_status.get('abstractGameState') or '').strip()} {str(row_status.get('detailed') or row_status.get('detailedState') or '').strip()}".strip().lower()
+    row_is_live_or_final = any(token in row_status_text for token in ("live", "in progress", "warmup", "final", "game over", "completed"))
+    if card_segments and (not isinstance(row.get("gameLens"), list) or not row.get("gameLens") or not row_is_live_or_final):
         merged["gameLens"] = card_segments
     if card_props:
         merged["liveProps"] = card_props
@@ -659,14 +662,6 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
         matchup["score"] = card_score
     matchup["liveText"] = str(card.get("summary") or card.get("detail") or matchup.get("liveText") or "Live-lens snapshot loaded from the MLB cards artifact.").strip() or "Live-lens snapshot loaded from the MLB cards artifact."
     merged["matchup"] = matchup
-    card_status = card.get("status") if isinstance(card.get("status"), dict) else {}
-    if card_status:
-        merged["status"] = {
-            "abstract": str(card_status.get("abstract") or card_status.get("abstractGameState") or merged.get("status", {}).get("abstract") or "Live lens").strip() or "Live lens",
-            "detailed": str(card_status.get("detailed") or card_status.get("detailedState") or card.get("detail") or merged.get("status", {}).get("detailed") or "Live lens").strip() or "Live lens",
-        }
-    elif not merged.get("status"):
-        merged["status"] = {"abstract": str(card.get("status_badge") or "Live lens").strip() or "Live lens", "detailed": str(card.get("detail") or "").strip() or str(card.get("status_badge") or "Live lens").strip() or "Live lens"}
     if card_score:
         merged["score"] = card_score
     if isinstance(card.get("predictions"), dict) and card.get("predictions"):
@@ -689,6 +684,18 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
         merged["markets"] = card.get("markets")
     if isinstance(card.get("archivedLiveProps"), list) and card.get("archivedLiveProps"):
         merged["archivedLiveProps"] = [dict(prop) for prop in card.get("archivedLiveProps") if isinstance(prop, dict)]
+    card_status = card.get("status") if isinstance(card.get("status"), dict) else {}
+    if card_status:
+        merged_status = merged.get("status") if isinstance(merged.get("status"), dict) else {}
+        merged_status_text = f"{str(merged_status.get('abstract') or merged_status.get('abstractGameState') or '').strip()} {str(merged_status.get('detailed') or merged_status.get('detailedState') or '').strip()}".strip().lower()
+        card_status_text = f"{str(card_status.get('abstract') or card_status.get('abstractGameState') or '').strip()} {str(card_status.get('detailed') or card_status.get('detailedState') or '').strip()}".strip().lower()
+        merged_is_live_or_final = any(token in merged_status_text for token in ("live", "in progress", "warmup", "final", "game over", "completed"))
+        card_is_live_or_final = any(token in card_status_text for token in ("live", "in progress", "warmup", "final", "game over", "completed"))
+        if card_is_live_or_final or not merged_is_live_or_final:
+            merged["status"] = {
+                "abstract": str(card_status.get("abstract") or card_status.get("abstractGameState") or merged_status.get("abstract") or "Live lens").strip() or "Live lens",
+                "detailed": str(card_status.get("detailed") or card_status.get("detailedState") or card.get("detail") or merged_status.get("detailed") or "Live lens").strip() or "Live lens",
+            }
     merged["snapshotAvailable"] = bool(card.get("snapshotAvailable", merged.get("snapshotAvailable", False)))
     merged["simContextAvailable"] = bool(card.get("simContextAvailable", merged.get("simContextAvailable", False)))
     return merged
@@ -908,9 +915,10 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     parsed_date = parse_iso_date(selected_date)
     prev_date = parsed_date.fromordinal(parsed_date.toordinal() - 1).isoformat()
     next_date = parsed_date.fromordinal(parsed_date.toordinal() + 1).isoformat()
+    current_date = datetime.now().astimezone().date().isoformat()
 
     report_path = live_lens_report_path(selected_date)
-    report = _persist_live_lens_report(selected_date) if persist else None
+    report = _persist_live_lens_report(selected_date) if persist or selected_date == current_date else None
     if not isinstance(report, dict):
         report = load_json_file(report_path)
     if (not isinstance(report, dict)) or not isinstance(report.get("games"), list) or not report.get("games"):
