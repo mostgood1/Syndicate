@@ -140,6 +140,48 @@ class RefreshStateStoreTests(unittest.TestCase):
         self.assertEqual(status["refresh_status"]["runtime"]["pid"], 4321)
         self.assertEqual(status["refresh_status"]["runtime"]["launch_owner"], "web_process")
 
+    def test_load_latest_refresh_status_prefers_unified_daily_update_manifest(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            reports_root = Path(tmp_dir) / "reports"
+            refresh_latest = reports_root / "refresh_status" / "latest"
+            daily_latest = reports_root / "daily_update" / "latest"
+            artifacts_dir = reports_root / "migration_runs" / "2026-06-04" / "20260604_110712"
+
+            refresh_latest.mkdir(parents=True, exist_ok=True)
+            daily_latest.mkdir(parents=True, exist_ok=True)
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+            refresh_state_store.write_json_file(
+                refresh_latest / "refresh_status_latest.json",
+                {
+                    "date": "2026-06-04",
+                    "artifactsDir": str(artifacts_dir),
+                    "state": "finished",
+                },
+            )
+            refresh_state_store.write_json_file(artifacts_dir / "odds_refresh.json", {"ok": True, "sports": ["wnba"]})
+            refresh_state_store.write_text_file(artifacts_dir / "odds_refresh.stderr.txt", "")
+            refresh_state_store.write_json_file(
+                daily_latest / "daily_update_latest.json",
+                {"date": "2026-05-18"},
+            )
+            refresh_state_store.write_json_file(
+                daily_latest / "unified_daily_update_latest.json",
+                {"date": "2026-06-04", "skipped": {"nba": True}},
+            )
+
+            status = ops_refresh.load_latest_refresh_status()
+
+        self.assertEqual(status["daily_update"]["manifest"]["date"], "2026-06-04")
+        self.assertTrue(status["daily_update"]["manifest_exists"])
+        self.assertTrue(status["daily_update"]["manifest_path"].endswith("unified_daily_update_latest.json"))
+
 
 if __name__ == "__main__":
     unittest.main()
