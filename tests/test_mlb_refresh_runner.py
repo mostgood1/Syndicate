@@ -245,6 +245,27 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(context["games"][0]["detail"], "Final")
         self.assertEqual(context["games"][0]["score"], {"away": 5, "home": 3})
 
+    def test_live_lens_page_context_opts_into_today_ladder_refresh(self) -> None:
+        from syndicate.features.mlb import live_lens as live_lens_module
+
+        captured: dict[str, object] = {}
+
+        def fake_build_cards_page_context(selected_date: str, *, allow_request_daily_ladders_refresh: bool = False):
+            captured["selected_date"] = selected_date
+            captured["allow_request_daily_ladders_refresh"] = allow_request_daily_ladders_refresh
+            return {"games": [], "source_title": "MLB Game Cards", "using_sample_data": False}
+
+        with patch.object(live_lens_module, "build_cards_page_context", side_effect=fake_build_cards_page_context), patch.object(
+            live_lens_module,
+            "load_json_file",
+            return_value={"games": []},
+        ), patch.object(live_lens_module, "live_lens_report_path", return_value=Path("report.json")):
+            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
+
+        self.assertEqual(captured["selected_date"], "2026-06-03")
+        self.assertTrue(captured["allow_request_daily_ladders_refresh"])
+        self.assertEqual(context["counts"]["games"], 0)
+
     def test_api_live_lens_persist_bypasses_cache_and_rewrites_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
