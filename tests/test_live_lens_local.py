@@ -36,6 +36,19 @@ def _write_daily_accuracy_artifacts(root: Path, date_str: str) -> None:
             "tags": ["sim:pace"],
         },
         {
+            "market": "quarter_total",
+            "horizon": "q1",
+            "klass": "BET",
+            "game_id": "1234567890",
+            "home": "HOM",
+            "away": "AWY",
+            "side": "OVER",
+            "live_line": 54.5,
+            "elapsed": 6,
+            "remaining": 6,
+            "tags": ["sim:interval"],
+        },
+        {
             "market": "player_prop",
             "klass": "BET",
             "game_id": "1234567890",
@@ -264,6 +277,9 @@ class LocalDailyAccuracyTests(unittest.TestCase):
         self.assertTrue(payload["summary"]["available"])
         self.assertEqual(((payload["days"] or [])[0].get("date")), "2026-05-16")
         self.assertTrue(bool((((payload["days"] or [])[0].get("signals") or {}).get("exists"))))
+        nba_day = (payload["days"] or [])[0]
+        self.assertEqual(next((row.get("n") for row in nba_day.get("by_market", []) if row.get("key") == "quarter_total"), None), 1)
+        self.assertEqual(next((row.get("n") for row in nba_day.get("by_horizon", []) if row.get("key") == "q1"), None), 1)
 
 
 def _write_game_accuracy_artifacts(root: Path, date_str: str) -> None:
@@ -435,6 +451,9 @@ class LocalWnbaDailyAccuracyTests(unittest.TestCase):
         self.assertTrue(payload["summary"]["available"])
         self.assertEqual(((payload["days"] or [])[0].get("date")), "2026-05-16")
         self.assertTrue(bool((((payload["days"] or [])[0].get("signals") or {}).get("exists"))))
+        wnba_day = (payload["days"] or [])[0]
+        self.assertEqual(next((row.get("n") for row in wnba_day.get("by_market", []) if row.get("key") == "quarter_total"), None), 1)
+        self.assertEqual(next((row.get("n") for row in wnba_day.get("by_horizon", []) if row.get("key") == "q1"), None), 1)
 
 
 def _write_market_accuracy_artifacts(root: Path, date_str: str) -> None:

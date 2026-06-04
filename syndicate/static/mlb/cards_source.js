@@ -1114,9 +1114,11 @@
       return !!(market?.first_seen_at || market?.surface_result || market?.current_result);
     }
     return rows.map((row) => {
-      const projectionLine = row.closed || row.projection.total == null
+      const projectionLine = row.closed
         ? 'Segment closed'
-        : `${card?.away?.abbr || 'Away'} ${formatLine(row.projection.away)} - ${card?.home?.abbr || 'Home'} ${formatLine(row.projection.home)} | Total ${formatLine(row.projection.total)}`;
+        : (row.projection.total == null
+          ? 'Live projection unavailable'
+          : `${card?.away?.abbr || 'Away'} ${formatLine(row.projection.away)} - ${card?.home?.abbr || 'Home'} ${formatLine(row.projection.home)} | Total ${formatLine(row.projection.total)}`);
       const ml = row.markets.moneyline;
       const spread = row.markets.spread;
       const total = row.markets.total;
@@ -1168,7 +1170,7 @@
           <div class="cards-prop-overview-foot">
             <span>${escapeHtml(marketLine || 'No tracked market line')}</span>
             <span>${escapeHtml(oddsUpdatedAt ? `Odds updated ${formatTimestampShort(oddsUpdatedAt)}` : 'Odds updated -')}</span>
-            <span>${escapeHtml(row.closed || row.projection.homeMargin == null ? 'Segment closed' : `Projected margin ${formatSigned(row.projection.homeMargin, 2)}`)}</span>
+            <span>${escapeHtml(row.closed ? 'Segment closed' : (row.projection.homeMargin == null ? 'Live projection unavailable' : `Projected margin ${formatSigned(row.projection.homeMargin, 2)}`))}</span>
           </div>
         </div>`;
     }).join('');
