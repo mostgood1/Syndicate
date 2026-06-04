@@ -209,6 +209,42 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertIsNone(captured["season"])
         mocked_payload.assert_called_once()
 
+    def test_build_live_lens_page_context_refreshes_current_date_status_from_feed(self) -> None:
+        from syndicate.features.mlb import live_lens as live_lens_module
+
+        report = {
+            "games": [
+                {
+                    "gamePk": 822727,
+                    "status": {"abstract": "Preview", "detailed": "Scheduled"},
+                    "matchup": {"score": {"away": 0, "home": 0}},
+                    "detail": "Scheduled",
+                }
+            ]
+        }
+
+        live_feed = {
+            "gameData": {"status": {"abstractGameState": "Final", "detailedState": "Final"}},
+            "liveData": {"linescore": {"teams": {"away": {"runs": 5}, "home": {"runs": 3}}}},
+        }
+
+        with patch.object(live_lens_module, "load_json_file", return_value=report), patch.object(
+            live_lens_module,
+            "build_cards_page_context",
+            return_value={"games": []},
+        ), patch.object(live_lens_module, "_mlb_vendor_client", return_value=object()), patch.object(
+            live_lens_module,
+            "fetch_game_feed_live",
+            return_value=live_feed,
+        ):
+            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
+
+        self.assertEqual(context["counts"]["final"], 1)
+        self.assertEqual(context["counts"]["pregame"], 0)
+        self.assertEqual(context["games"][0]["status"]["abstract"], "Final")
+        self.assertEqual(context["games"][0]["detail"], "Final")
+        self.assertEqual(context["games"][0]["score"], {"away": 5, "home": 3})
+
     def test_api_live_lens_persist_bypasses_cache_and_rewrites_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
