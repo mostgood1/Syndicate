@@ -779,9 +779,75 @@ def _prediction_dates_with_rows() -> list[str]:
     ]
 
 
+def _next_scheduled_game_date_after_empty_slate(selected_date: str) -> str | None:
+    selected = parse_iso_date(selected_date)
+    for date_str in sorted(_prediction_dates_with_rows()):
+        if parse_iso_date(date_str) > selected:
+            return date_str
+    return None
+
+
+def _games_from_scoreboard_snapshot(selected_date: str) -> tuple[list[dict[str, Any]], str]:
+    path = scoreboard_snapshot_path(selected_date)
+    rows = _load_csv_rows(path) if path.exists() else []
+    games: list[dict[str, Any]] = []
+    for idx, row in enumerate(rows, start=1):
+        home_name = str(row.get("home") or row.get("home_team") or "Home").strip() or "Home"
+        away_name = str(row.get("away") or row.get("away_team") or "Away").strip() or "Away"
+        game = _game_from_row(
+            {
+                **row,
+                "home": home_name,
+                "away": away_name,
+                "date": str(row.get("date") or selected_date).strip() or selected_date,
+            },
+            idx=idx,
+            selected_date=selected_date,
+        )
+        if str(row.get("gamePk") or "").strip():
+            game["gamePk"] = str(row.get("gamePk") or "").strip()
+        status_text = str(row.get("status") or row.get("gameState") or row.get("game_state") or game.get("status") or "").strip()
+        detail_text = str(row.get("detail") or row.get("period_disp") or row.get("clock") or game.get("detail") or "").strip()
+        if status_text:
+            game["status"] = status_text
+        if detail_text:
+            game["detail"] = detail_text
+        summary_text = str(row.get("summary") or row.get("score") or row.get("game_state") or "").strip()
+        if summary_text:
+            game["summary"] = summary_text
+        game["gameType"] = str(row.get("gameType") or row.get("game_type") or "NHL").strip() or "NHL"
+        games.append(game)
+    return games, str(path)
+
+
 def _resolve_cards_date(selected_date: str | None) -> tuple[str, str, bool]:
     requested_date = str(selected_date or default_date()).strip() or default_date()
+    next_game_date = _next_scheduled_game_date_after_empty_slate(requested_date)
+    if next_game_date:
+        return requested_date, next_game_date, True
     return requested_date, requested_date, False
+
+
+def _empty_cards_state(*, requested_date: str, resolved_date: str, lookahead_applied: bool) -> dict[str, Any]:
+    if lookahead_applied:
+        return {
+            "eyebrow": "NHL cards",
+            "title": "Today has no NHL games; next game day is queued",
+            "body": "The cards board only renders saved NHL prediction rows for the selected slate, and the next stored game day is queued instead.",
+            "list_items": [
+                f"Requested date: {requested_date}",
+                f"Next scheduled game day: {resolved_date}",
+            ],
+        }
+    return {
+        "eyebrow": "NHL cards",
+        "title": "No game cards were available for this date",
+        "body": "The cards board only renders saved NHL prediction rows for the selected slate, and none were available for the requested date.",
+        "list_items": [
+            f"Requested date: {requested_date}",
+            "Choose another stored NHL date from the date control.",
+        ],
+    }
 
 
 def build_source_bundle_payload(selected_date: str | None) -> dict[str, Any]:
@@ -791,15 +857,7 @@ def build_source_bundle_payload(selected_date: str | None) -> dict[str, Any]:
     props_rows, props_path = _props_recommendation_rows(resolved_date)
     empty_state = None
     if not prediction_rows:
-        empty_state = {
-            "eyebrow": "NHL cards",
-            "title": "No game cards were available for this date",
-            "body": "The source cards shell only renders saved NHL prediction rows for the selected slate, and none were available for this date.",
-            "list_items": [
-                f"Requested date: {requested_date}",
-                "Choose another stored NHL date from the date control.",
-            ],
-        }
+        empty_state = _empty_cards_state(requested_date=requested_date, resolved_date=resolved_date, lookahead_applied=lookahead_applied)
     return {
         "ok": True,
         "date": resolved_date,
@@ -836,6 +894,12 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
 
     games, source_path = _games_from_artifact(resolved_date)
     source_title = "NHL processed predictions"
+    if not games:
+        scoreboard_games, scoreboard_path = _games_from_scoreboard_snapshot(resolved_date)
+        if scoreboard_games:
+            games = scoreboard_games
+            source_path = scoreboard_path
+            source_title = "NHL archived scoreboard"
     using_sample_data = False
 
     scoreboard_items = [
@@ -858,19 +922,11 @@ def build_cards_page_context(selected_date: str | None) -> dict[str, Any]:
         "using_sample_data": using_sample_data,
         "source_path": source_path,
         "source_title": source_title if games else "NHL cards unavailable",
-        "empty_state": {
-            "eyebrow": "NHL cards",
-            "title": "No game cards were available for this date",
-            "body": "The cards board only renders saved NHL prediction rows for the selected slate, and none were available for the requested date.",
-            "list_items": [
-                f"Requested date: {requested_date}",
-                "Choose another stored NHL date from the date control.",
-            ],
-        } if not games else None,
+        "empty_state": _empty_cards_state(requested_date=requested_date, resolved_date=resolved_date, lookahead_applied=lookahead_applied) if not games else None,
         "show_source_summary": True,
         "header_stats": [
             {"label": "Games", "value": str(len(games))},
-            {"label": "Source", "value": Path(source_path).name if games else "No data"},
+            {"label": "Next game day", "value": resolved_date} if lookahead_applied and not games else {"label": "Source", "value": Path(source_path).name if games else "No data"},
             {"label": "Requested", "value": requested_date},
         ],
         "route_path": "/nhl/cards",

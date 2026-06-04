@@ -26,59 +26,45 @@ def _artifact_roots() -> list[Path]:
     seen: set[Path] = set()
     candidate_roots = [*roots, *(root / "source_artifacts" for root in roots)]
     for candidate in candidate_roots:
-        resolved = candidate.resolve()
-        if resolved in seen:
+        if candidate in seen:
             continue
-        seen.add(resolved)
-        expanded.append(resolved)
+        seen.add(candidate)
+        expanded.append(candidate)
     return expanded
 
 
-def _best_existing_path(candidates: list[Path]) -> Path | None:
-    existing: list[Path] = []
+def _first_existing_path(candidates: list[Path]) -> Path | None:
     for candidate in candidates:
         try:
             if candidate.exists() and candidate.is_file():
-                existing.append(candidate)
+                return candidate
         except OSError:
             continue
-    if not existing:
-        return None
-
-    def _score(path: Path) -> tuple[int, int, int]:
-        try:
-            stat = path.stat()
-            size = int(stat.st_size)
-            mtime = int(stat.st_mtime_ns)
-        except OSError:
-            return (0, 0, 0)
-        return (1 if size > 0 else 0, size, mtime)
-
-    return max(existing, key=_score)
+    return None
 
 
 def processed_path(filename: str) -> Path:
     roots = _artifact_roots()
-    candidates = [(root / "data" / "processed" / filename).resolve() for root in roots]
-    best = _best_existing_path(candidates)
+    candidates = [(root / "data" / "processed" / filename) for root in roots]
+    best = _first_existing_path(candidates)
     if best is not None:
         return best
-    return (roots[0] / "data" / "processed" / filename).resolve()
+    return roots[0] / "data" / "processed" / filename if roots else Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / filename
 
 
 def live_snapshot_path(filename: str) -> Path:
     roots = _artifact_roots()
-    candidates = [(root / "data" / "processed" / "live_snapshots" / filename).resolve() for root in roots]
-    best = _best_existing_path(candidates)
+    candidates = [(root / "data" / "processed" / "live_snapshots" / filename) for root in roots]
+    best = _first_existing_path(candidates)
     if best is not None:
         return best
-    return (roots[0] / "data" / "processed" / "live_snapshots" / filename).resolve()
+    return roots[0] / "data" / "processed" / "live_snapshots" / filename if roots else Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed" / "live_snapshots" / filename
 
 
 def _processed_candidate_path(filename: str, *, root: Path | None = None) -> Path:
     roots = _artifact_roots()
     base_root = root or (roots[0] if roots else (_repo_root() / "data" / "nba_source"))
-    return (base_root / "data" / "processed" / filename).resolve()
+    return base_root / "data" / "processed" / filename
 
 
 def _resolve_processed_candidates(filenames: list[str]) -> Path:
@@ -86,11 +72,13 @@ def _resolve_processed_candidates(filenames: list[str]) -> Path:
     candidates: list[Path] = []
     for root in roots:
         for filename in filenames:
-            candidates.append((root / "data" / "processed" / filename).resolve())
-    best = _best_existing_path(candidates)
+            candidates.append(root / "data" / "processed" / filename)
+    best = _first_existing_path(candidates)
     if best is not None:
         return best
-    return _processed_candidate_path(filenames[0], root=roots[0] if roots else None)
+    if roots:
+        return roots[0] / "data" / "processed" / filenames[0]
+    return _processed_candidate_path(filenames[0], root=None)
 
 
 def season_betting_card_manifest_path(season: int, *, profile: str = "retuned", requested_date: str | None = None) -> Path:
@@ -120,8 +108,12 @@ _DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 def available_dates() -> list[str]:
     dates: set[str] = set()
-    for root in _artifact_roots():
-        processed_dir = (root / "data" / "processed").resolve()
+    roots = _artifact_roots()
+    if not roots:
+        return []
+
+    for root in roots:
+        processed_dir = root / "data" / "processed"
         if not processed_dir.exists():
             continue
         for pattern in ("recommendations_slate_*.json", "game_cards_*.csv", "cards_sim_detail_*.json"):
