@@ -5748,7 +5748,9 @@
   function renderLensDetailPairs(selected, simRow, matchedLiveRow) {
     const metricValue = simStatMean(simRow, selected.market);
     const simValue = Number(metricValue ?? selected.simMu);
-    const actualValue = Number.isFinite(Number(selected.actual)) ? Number(selected.actual) : null;
+    const actualValue = Number.isFinite(Number(matchedLiveRow?.actual))
+      ? Number(matchedLiveRow.actual)
+      : (Number.isFinite(Number(selected.actual)) ? Number(selected.actual) : null);
     const projectedValue = Number.isFinite(Number(matchedLiveRow?.liveProjection)) ? Number(matchedLiveRow.liveProjection) : (Number.isFinite(simValue) ? simValue : null);
     const edgeValue = Number.isFinite(Number(selected.edge))
       ? Number(selected.edge)

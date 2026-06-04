@@ -51,6 +51,12 @@ def _format_num(value: float | None) -> str:
     return f"{value:.1f}"
 
 
+def _format_signed_num(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:+.1f}"
+
+
 def _period_label(key: str) -> str:
     normalized = str(key or "").strip().lower()
     mapping = {
@@ -74,6 +80,10 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
     periods = sim.get("periods") if isinstance(sim.get("periods"), dict) else {}
+    betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+    home_abbr = _safe_text(game.get("home", {}).get("abbr"), "HME")
+    betting_total = _safe_float(betting.get("total"))
+    betting_home_spread = _safe_float(betting.get("home_spread"))
     for key, value in periods.items():
         if not isinstance(value, dict):
             continue
@@ -90,6 +100,18 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         away_pct = ((away_mean or 0.0) / total * 100.0) if total > 0 else 50.0
         home_pct = ((home_mean or 0.0) / total * 100.0) if total > 0 else 50.0
         p_home_win = _safe_float(value.get("p_home_win"))
+        market_bits: list[str] = []
+        edge_bits: list[str] = []
+        if betting_home_spread is not None:
+            market_bits.append(f"ATS {home_abbr} {_format_signed_num(betting_home_spread)}")
+            if margin_mean is not None:
+                edge_bits.append(f"ATS {_format_signed_num(margin_mean + betting_home_spread)}")
+        if betting_total is not None:
+            market_bits.append(f"Total {_format_num(betting_total)}")
+            if total_mean is not None:
+                edge_bits.append(f"Total {_format_signed_num(total_mean - betting_total)}")
+        market_value = " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-")
+        best_edge_value = " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or "-")
         rows.append(
             {
                 "label": _period_label(str(key)),
@@ -98,8 +120,8 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
                 "away_pct": away_pct,
                 "home_pct": home_pct,
                 "home_win": _format_pct(p_home_win),
-                "market": _metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-",
-                "best_edge": _metric_lookup(game.get("metrics", []), "Edge") or "-",
+                "market": market_value,
+                "best_edge": best_edge_value,
             }
         )
     if not rows:
