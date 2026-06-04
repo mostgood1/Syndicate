@@ -829,6 +829,85 @@ def evaluate_protected_source_shell_routes() -> list[dict[str, object]]:
     return violations
 
 
+def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
+    try:
+        from syndicate.app import create_app
+        from syndicate.features.intelligence import build_intelligence_status
+        from syndicate.features.shared.timezone import central_today_iso
+    except Exception as error:
+        return {
+            "ok": False,
+            "selected_date": None,
+            "active_sport_count": 0,
+            "violations": [
+                {
+                    "slug": "advanced_readiness",
+                    "issue": "exception",
+                    "expected": "import Syndicate intelligence readiness dependencies",
+                    "actual": repr(error),
+                }
+            ],
+        }
+
+    selected_date = central_today_iso()
+    app = create_app()
+    with app.app_context():
+        payload = build_intelligence_status(selected_date=selected_date, force_refresh=True)
+
+    sports = payload.get("sports") if isinstance(payload, dict) else []
+    active_sports = []
+    for sport in sports:
+        if not isinstance(sport, dict):
+            continue
+        readiness_gate = sport.get("readiness_gate") if isinstance(sport.get("readiness_gate"), dict) else {}
+        if str(readiness_gate.get("state") or "").strip().lower() == "inactive":
+            continue
+        if not bool(sport.get("active_today")):
+            continue
+        active_sports.append(sport)
+    violations: list[dict[str, object]] = []
+    summaries: list[dict[str, object]] = []
+    for sport in active_sports:
+        slug = str(sport.get("slug") or "").strip()
+        gate = sport.get("advanced_gate") if isinstance(sport.get("advanced_gate"), dict) else {}
+        missing_inputs = [item for item in (gate.get("missing_inputs") or []) if isinstance(item, dict)]
+        publish_missing_inputs = [item for item in (gate.get("publish_missing_inputs") or []) if isinstance(item, dict)]
+        summaries.append(
+            {
+                "slug": slug,
+                "name": str(sport.get("name") or slug.upper()).strip(),
+                "state": str((sport.get("readiness_gate") or {}).get("state") or "").strip(),
+                "advanced_ready": bool(sport.get("advanced_ready")),
+                "required_total": int(gate.get("required_total") or 0),
+                "exists_count": int(gate.get("exists_count") or 0),
+                "tracked_count": int(gate.get("tracked_count") or 0),
+            }
+        )
+        if missing_inputs:
+            violations.append(
+                {
+                    "slug": slug,
+                    "issue": "missing_advanced_inputs",
+                    "missing_labels": [str(item.get("label") or "input").strip() for item in missing_inputs],
+                }
+            )
+        if publish_missing_inputs:
+            violations.append(
+                {
+                    "slug": slug,
+                    "issue": "unpublished_advanced_inputs",
+                    "missing_labels": [str(item.get("label") or "input").strip() for item in publish_missing_inputs],
+                }
+            )
+    return {
+        "ok": not violations,
+        "selected_date": selected_date,
+        "active_sport_count": len(active_sports),
+        "active_sports": summaries,
+        "violations": violations,
+    }
+
+
 def render_text_report(report: dict[str, object]) -> str:
     lines: list[str] = []
     overall = "PASS" if report.get("ok") else "FAIL"
@@ -925,6 +1004,27 @@ def render_text_report(report: dict[str, object]) -> str:
             lines.append(f"    - {slug}: score={score}; tier={tier}")
     lines.append("")
 
+    advanced_readiness = report.get("advanced_readiness") or {}
+    readiness_status = "PASS" if advanced_readiness.get("ok") else "FAIL"
+    lines.append(f"Advanced readiness: {readiness_status}")
+    lines.append(f"  Selected date: {advanced_readiness.get('selected_date') or '-'}")
+    lines.append(f"  Active sports checked: {advanced_readiness.get('active_sport_count', 0)}")
+    active_summaries = advanced_readiness.get("active_sports") or []
+    if active_summaries:
+        lines.append("  Active sport summaries:")
+        for item in active_summaries:
+            lines.append(
+                f"    - {item.get('slug')}: state={item.get('state') or '-'}; exists={item.get('exists_count', 0)}/{item.get('required_total', 0)}; tracked={item.get('tracked_count', 0)}/{item.get('required_total', 0)}"
+            )
+    if advanced_readiness.get("violations"):
+        lines.append("  Violations:")
+        for violation in advanced_readiness.get("violations") or []:
+            slug = violation.get("slug") or "<unknown>"
+            issue = violation.get("issue") or "unknown"
+            labels = ", ".join(str(value) for value in (violation.get("missing_labels") or [])) or "-"
+            lines.append(f"    - {slug}: {issue}; {labels}")
+    lines.append("")
+
     for command in report.get("commands") or []:
         status = "PASS" if command.get("ok") else "FAIL"
         lines.append(f"{command.get('name')}: {status}")
@@ -998,6 +1098,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     protected_local_resolver_violations = evaluate_protected_local_resolvers()
     protected_source_shell_violations = evaluate_protected_source_shell_routes()
+    advanced_readiness = evaluate_active_sport_advanced_readiness()
     runtime_dependency_summary = (
         module_tracker_payload.get("gap_summary") if isinstance(module_tracker_payload, dict) else {}
     )
@@ -1010,6 +1111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         and not unexpected_protected_mirror_asset_violations
         and not protected_local_resolver_violations
         and not protected_source_shell_violations
+        and bool(advanced_readiness.get("ok"))
     )
 
     if not args.skip_tests:
@@ -1058,6 +1160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "protected_source_shell_violations": protected_source_shell_violations,
             "lowest_ownership_modules": runtime_dependency_summary.get("lowest_ownership_modules") or [],
         },
+        "advanced_readiness": advanced_readiness,
         "commands": [
             {
                 "name": result.name,

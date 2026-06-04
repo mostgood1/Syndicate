@@ -506,13 +506,8 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
         return [
             {
                 "label": "Statcast batter and pitcher features",
-                "metrics": ["Launch angle", "Exit velocity", "Barrel rate", "Hard-hit rate", "Spray angle"],
+                "metrics": ["Launch angle", "Exit velocity", "Barrel rate", "Hard-hit rate", "Pitch mix"],
                 "path": _mlb_repo_artifact_path("data", "statcast", "features", "player_features_latest.json"),
-            },
-            {
-                "label": "Pitch arsenal mirror",
-                "metrics": ["Pitch mix", "Pitch usage", "Velocity bands", "Pitch-level shape", "Whiff context"],
-                "path": _mlb_repo_artifact_path("data", "raw", "statcast", "pitches"),
             },
             {
                 "label": "Live lens and betting-day synthesis",
