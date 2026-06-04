@@ -4607,8 +4607,10 @@
     ];
 
     return rows.filter((row) => row.projection).map((row) => {
-      const modelProb = Number.isFinite(Number(row.modelHomeWinProb)) ? Number(row.modelHomeWinProb) : 0.5;
-      const baselineProb = Number.isFinite(Number(row.baselineHomeWinProb)) ? Number(row.baselineHomeWinProb) : 0.5;
+      const modelProb = Number.isFinite(Number(row.modelHomeWinProb))
+        ? Number(row.modelHomeWinProb)
+        : (Number.isFinite(Number(row.baselineHomeWinProb)) ? Number(row.baselineHomeWinProb) : null);
+      const baselineProb = Number.isFinite(Number(row.baselineHomeWinProb)) ? Number(row.baselineHomeWinProb) : null;
       const homeDelta = (modelProb - baselineProb) * 100;
       const moneylinePick = homeDelta >= 0 ? game.home_tri : game.away_tri;
       const spreadLine = Number(row.spreadLine);
@@ -4761,16 +4763,20 @@
 
   function segmentProbabilityRows(game) {
     return buildGameLensRows(game).map((row) => {
-      const home = Number.isFinite(Number(row.modelHomeWinProb)) ? Number(row.modelHomeWinProb) : 0.5;
-      const away = 1 - home;
+      const home = Number.isFinite(Number(row.modelHomeWinProb))
+        ? Number(row.modelHomeWinProb)
+        : (Number.isFinite(Number(row.baselineHomeWinProb)) ? Number(row.baselineHomeWinProb) : null);
+      const away = home == null ? null : (1 - home);
+      const awayPct = home == null ? 50 : Math.max(10, away * 100);
+      const homePct = home == null ? 50 : Math.max(10, home * 100);
       return `
         <div class="cards-prob-row">
           <div class="cards-prob-label">${escapeHtml(row.lineLabel)}</div>
-          <div class="cards-prob-bar" style="--away-pct:${Math.max(10, away * 100).toFixed(1)}%; --home-pct:${Math.max(10, home * 100).toFixed(1)}%;">
+          <div class="cards-prob-bar" style="--away-pct:${awayPct.toFixed(1)}%; --home-pct:${homePct.toFixed(1)}%;">
             <div class="cards-prob-away"></div>
             <div class="cards-prob-home"></div>
           </div>
-          <div class="cards-mini-copy">${escapeHtml(`${game.away_tri} ${fmtPercent(away, 1)} | ${game.home_tri} ${fmtPercent(home, 1)}`)}</div>
+          <div class="cards-mini-copy">${escapeHtml(home == null ? 'Probabilities unavailable' : `${game.away_tri} ${fmtPercent(away, 1)} | ${game.home_tri} ${fmtPercent(home, 1)}`)}</div>
         </div>
       `;
     }).join('');
