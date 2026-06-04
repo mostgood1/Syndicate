@@ -18776,6 +18776,7 @@ def _build_cards_api_payload(
     schedule_games = _schedule_games_for_date(d)
     pitcher_market_ctx = _load_pitcher_ladder_market_context(d)
     live_feed_enrichment_enabled = _is_cards_live_feed_enrichment_enabled()
+    should_enrich_with_live_feed = bool(live_feed_enrichment_enabled and _is_current_local_date(str(d)))
     cards = _cards_list_from_sources(
         d=d,
         schedule_games=schedule_games,
@@ -18786,7 +18787,7 @@ def _build_cards_api_payload(
     _attach_cards_starter_ladder_badges(cards, artifacts.get("daily_ladders"), pitcher_market_ctx)
     cards_requiring_feed = [
         card for card in cards
-        if isinstance(card, dict) and _status_is_live(card.get("status"))
+        if isinstance(card, dict) and should_enrich_with_live_feed
     ]
     if not cards_requiring_feed:
         pitcher_market_ctx = {}
@@ -18795,7 +18796,7 @@ def _build_cards_api_payload(
         if not isinstance(card, dict):
             continue
         game_pk = _safe_int(card.get("gamePk"))
-        needs_feed = _status_is_live(card.get("status"))
+        needs_feed = should_enrich_with_live_feed
         if game_pk and needs_feed:
             feed = feed_cache.get(int(game_pk))
             if int(game_pk) not in feed_cache:
