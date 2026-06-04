@@ -2882,6 +2882,7 @@ class ArchiveRouteTests(unittest.TestCase):
                         "status": "Processed artifact",
                         "detail": "2026-05-29T00:00:00Z",
                         "summary": "Consensus market snapshot",
+                        "betting": {"home_spread": -4.5, "total": 168.5},
                         "metrics": [{"label": "Spread", "value": "NYL -4.5"}],
                         "sim": {
                             "periods": {
@@ -2903,6 +2904,9 @@ class ArchiveRouteTests(unittest.TestCase):
 
         self.assertEqual(rows[0].get("main"), "PHX 19.0 - NYL 25.0")
         self.assertEqual(rows[0].get("subtitle"), "Projected total 44.0")
+        self.assertIn("ATS NYL -4.5", rows[0].get("market"))
+        self.assertIn("Total 168.5", rows[0].get("market"))
+        self.assertNotEqual(rows[0].get("best_edge"), "-")
 
     def test_wnba_cards_source_alias_preserves_explicit_source_shell(self) -> None:
         response = self.client.get("/wnba/cards/source?date=2026-05-21", follow_redirects=True)
