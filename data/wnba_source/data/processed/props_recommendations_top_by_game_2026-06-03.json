@@ -1,0 +1,259 @@
+{
+  "date": "2026-06-03",
+  "data": [
+    {
+      "game_key": "TOR@NYL",
+      "game_id": "1",
+      "player": "Jonquel Jones",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "TOR",
+      "score": 107.89999999999999,
+      "score_adj": 107.89999999999999,
+      "tier": "High",
+      "model": {
+        "pts": 12.253190361445782,
+        "reb": 7.805460240963856,
+        "ast": 2.558486746987952,
+        "threes": 0.4693108433734939,
+        "stl": 0.6643694779116466,
+        "blk": 0.3321847389558233,
+        "tov": 1.6609236947791166,
+        "pra": 22.61713734939759,
+        "pr": 20.05865060240964,
+        "pa": 14.811677108433734,
+        "ra": 10.363946987951808
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 3.5,
+        "price": 110.0,
+        "edge": 0.5138095238095238,
+        "ev": 1.079,
+        "ev_pct": 107.89999999999999,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 107.9%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.5 vs line 3.5 (-3.0)"
+    },
+    {
+      "game_key": "TOR@NYL",
+      "game_id": "1",
+      "player": "Marine Johannes",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "TOR",
+      "score": 90.18616287075932,
+      "score_adj": 90.18616287075932,
+      "tier": "High",
+      "model": {
+        "pts": 2.8895691729323305,
+        "reb": 3.0681360902255634,
+        "ast": 5.505272932330827,
+        "threes": 0.7452849624060152,
+        "stl": 1.0407105263157894,
+        "blk": 0.0,
+        "tov": 1.387614035087719,
+        "pra": 11.462978195488722,
+        "pr": 5.957705263157894,
+        "pa": 8.394842105263159,
+        "ra": 8.57340902255639
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": -102.0,
+        "edge": 0.455395475882052,
+        "ev": 0.9018616287075931,
+        "ev_pct": 90.18616287075932,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 90.2%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.7 vs line 2.5 (-1.8)"
+    },
+    {
+      "game_key": "TOR@NYL",
+      "game_id": "1",
+      "player": "Marina Mabrey",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "NYL",
+      "score": 71.7846887140351,
+      "score_adj": 71.7846887140351,
+      "tier": "High",
+      "model": {
+        "pts": 16.35217709677419,
+        "reb": 3.6207648387096776,
+        "ast": 3.504215806451613,
+        "threes": 2.87294129032258,
+        "stl": 1.3236602150537633,
+        "blk": 0.4963725806451612,
+        "tov": 2.8127779569892475,
+        "pra": 23.47715774193548,
+        "pr": 19.97294193548387,
+        "pa": 19.856392903225803,
+        "ra": 7.1249806451612905
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -114.0,
+        "edge": 0.3824044165140188,
+        "ev": 0.7178468871403509,
+        "ev_pct": 71.7846887140351,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 71.8%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.9 vs line 1.5 (+1.4)"
+    },
+    {
+      "game_key": "PHX@SEA",
+      "game_id": "2",
+      "player": "Kahleah Copper",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "SEA",
+      "score": 53.88241487782847,
+      "score_adj": 53.88241487782847,
+      "tier": "High",
+      "model": {
+        "pts": 19.35733209876544,
+        "reb": 3.634804938271605,
+        "ast": 1.942735802469136,
+        "threes": 0.8349148148148149,
+        "stl": 0.7322654320987656,
+        "blk": 0.0,
+        "tov": 2.9290617283950624,
+        "pra": 24.934872839506177,
+        "pr": 22.992137037037043,
+        "pa": 21.300067901234577,
+        "ra": 5.577540740740741
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 106.0,
+        "edge": 0.26156512076615757,
+        "ev": 0.5388241487782847,
+        "ev_pct": 53.88241487782847,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 53.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.8 vs line 1.5 (-0.7)"
+    },
+    {
+      "game_key": "PHX@SEA",
+      "game_id": "2",
+      "player": "Natisha Hiedeman",
+      "team": "SEA",
+      "team_tricode": "SEA",
+      "opponent": "PHX",
+      "score": 50.38504551771021,
+      "score_adj": 50.38504551771021,
+      "tier": "High",
+      "model": {
+        "pts": 16.012678260869563,
+        "reb": 1.2282202898550725,
+        "ast": 4.5781777777777775,
+        "threes": 2.416440579710145,
+        "stl": 0.3927149758454106,
+        "blk": 0.1963574879227053,
+        "tov": 1.3745024154589371,
+        "pra": 21.81907632850241,
+        "pr": 17.240898550724637,
+        "pa": 20.590856038647342,
+        "ra": 5.80639806763285
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -120.0,
+        "edge": 0.2748275210056921,
+        "ev": 0.5038504551771021,
+        "ev_pct": 50.38504551771021,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 50.4%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.4 vs line 1.5 (+0.9)"
+    },
+    {
+      "game_key": "PHX@SEA",
+      "game_id": "2",
+      "player": "Monique Akoa Makani",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "SEA",
+      "score": 46.741996693962854,
+      "score_adj": 46.741996693962854,
+      "tier": "High",
+      "model": {
+        "pts": 0.0,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.176,
+        "blk": 0.144,
+        "tov": 0.48,
+        "pra": 0.0,
+        "pr": 0.0,
+        "pa": 0.0,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -148.0,
+        "edge": 0.27894417381881054,
+        "ev": 0.4674199669396285,
+        "ev_pct": 46.741996693962854,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 46.7%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.0 vs line 1.5 (-1.5)"
+    }
+  ]
+}

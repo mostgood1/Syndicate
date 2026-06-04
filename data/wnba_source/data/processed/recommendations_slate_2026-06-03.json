@@ -1,0 +1,200 @@
+{
+  "date": "2026-06-03",
+  "counts": {
+    "games": 2,
+    "picks": 10
+  },
+  "per_game": [
+    {
+      "home": "NYL",
+      "away": "TOR",
+      "matchup": "TOR @ NYL",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "NYL",
+          "display_pick": "Marine Johannes UNDER 2.5",
+          "selection": "UNDER 2.5",
+          "price": -102.0,
+          "score": 90.18616287075932,
+          "ev_pct": 90.18616287075932,
+          "win_prob": 0.504950495049505,
+          "p_win": 0.504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 90.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ NYL"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes OVER 0.5",
+          "selection": "OVER 0.5",
+          "price": -122.0,
+          "score": 54.49875271340831,
+          "ev_pct": 54.49875271340831,
+          "win_prob": 0.5495495495495496,
+          "p_win": 0.5495495495495496,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 54.5%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ NYL"
+        },
+        {
+          "market": "ATS",
+          "team": "New York Liberty",
+          "display_pick": "New York Liberty -10.5",
+          "selection": "New York Liberty",
+          "price": -110.0,
+          "score": 20.475,
+          "ev_pct": 20.474999999999998,
+          "win_prob": 0.72856,
+          "p_win": 0.72856,
+          "basketball_summary": "Model margin 10.0 vs market -10.5",
+          "top_play_reasons": [
+            "Edge 20.5",
+            "EV 20.5%"
+          ],
+          "matchup": "TOR @ NYL"
+        },
+        {
+          "market": "PROPS",
+          "team": "NYL",
+          "display_pick": "Breanna Stewart UNDER 13.5",
+          "selection": "UNDER 13.5",
+          "price": 105.0,
+          "score": 13.747613420894488,
+          "ev_pct": 13.747613420894488,
+          "win_prob": 0.4878048780487805,
+          "p_win": 0.4878048780487805,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 13.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "TOR @ NYL"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 163.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -2.476827,
+          "ev_pct": 2.4768,
+          "win_prob": 0.548578,
+          "p_win": 0.548578,
+          "basketball_summary": "Model total 161.0 vs line 163.5",
+          "top_play_reasons": [
+            "Edge -2.5",
+            "EV 2.5%"
+          ],
+          "matchup": "TOR @ NYL"
+        }
+      ]
+    },
+    {
+      "home": "SEA",
+      "away": "PHX",
+      "matchup": "PHX @ SEA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "PHX",
+          "display_pick": "Monique Akoa Makani UNDER 1.5",
+          "selection": "UNDER 1.5",
+          "price": -148.0,
+          "score": 46.741996693962854,
+          "ev_pct": 46.741996693962854,
+          "win_prob": 0.5967741935483871,
+          "p_win": 0.5967741935483871,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 46.7%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ SEA"
+        },
+        {
+          "market": "ATS",
+          "team": "Phoenix Mercury",
+          "display_pick": "Phoenix Mercury -7.5",
+          "selection": "Phoenix Mercury",
+          "price": -110.0,
+          "score": 14.625,
+          "ev_pct": 14.625,
+          "win_prob": 0.67006,
+          "p_win": 0.67006,
+          "basketball_summary": "Model margin 7.1 vs market -7.5",
+          "top_play_reasons": [
+            "Edge 14.6",
+            "EV 14.6%"
+          ],
+          "matchup": "PHX @ SEA"
+        },
+        {
+          "market": "PROPS",
+          "team": "PHX",
+          "display_pick": "Alyssa Thomas OVER 24.5",
+          "selection": "OVER 24.5",
+          "price": -111.0,
+          "score": 7.9954338508366085,
+          "ev_pct": 7.9954338508366085,
+          "win_prob": 0.5260663507109005,
+          "p_win": 0.5260663507109005,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.0%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ SEA"
+        },
+        {
+          "market": "PROPS",
+          "team": "SEA",
+          "display_pick": "Jade Melbourne OVER 3.5",
+          "selection": "OVER 3.5",
+          "price": -126.0,
+          "score": 6.189397369516797,
+          "ev_pct": 6.189397369516797,
+          "win_prob": 0.5575221238938053,
+          "p_win": 0.5575221238938053,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 6.2%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "PHX @ SEA"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 160.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -1.408371,
+          "ev_pct": 1.4083999999999999,
+          "win_prob": 0.537894,
+          "p_win": 0.537894,
+          "basketball_summary": "Model total 159.1 vs line 160.5",
+          "top_play_reasons": [
+            "Edge -1.4",
+            "EV 1.4%"
+          ],
+          "matchup": "PHX @ SEA"
+        }
+      ]
+    }
+  ]
+}
