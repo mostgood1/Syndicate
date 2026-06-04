@@ -1,0 +1,447 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Intelligence{% endblock %}
+{% block page_title %}Sports Intelligence{% endblock %}
+
+{% block extra_head %}
+  <style>
+    :root {
+      --intel-ink: #11243a;
+      --intel-accent: #d1582f;
+      --intel-accent-soft: #f4d9c7;
+      --intel-surface: linear-gradient(145deg, rgba(247,241,233,0.96), rgba(232,241,244,0.94));
+      --intel-panel: rgba(255,255,255,0.9);
+      --intel-border: rgba(17,36,58,0.14);
+    }
+
+    .syndicate-intelligence-page .syndicate-header {
+      background: radial-gradient(circle at top left, rgba(209,88,47,0.15), transparent 38%), linear-gradient(135deg, rgba(255,255,255,0.98), rgba(244,240,234,0.96));
+      border-color: var(--intel-border);
+    }
+
+    .intel-grid {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: minmax(320px, 1.15fr) minmax(280px, 0.85fr);
+      align-items: start;
+    }
+
+    .intel-panel {
+      background: var(--intel-surface);
+      border: 1px solid var(--intel-border);
+      border-radius: 24px;
+      box-shadow: 0 18px 48px rgba(17, 36, 58, 0.08);
+      padding: 22px;
+    }
+
+    .intel-kicker {
+      font-size: 0.78rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(17, 36, 58, 0.66);
+      margin-bottom: 10px;
+    }
+
+    .intel-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .intel-form textarea,
+    .intel-form input,
+    .intel-form select {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid rgba(17, 36, 58, 0.15);
+      background: rgba(255,255,255,0.88);
+      padding: 12px 14px;
+      color: var(--intel-ink);
+      font: inherit;
+    }
+
+    .intel-form textarea {
+      min-height: 140px;
+      resize: vertical;
+    }
+
+    .intel-form-row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .intel-quick-asks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .intel-status-list,
+    .intel-response-list,
+    .intel-parlay-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .intel-card {
+      background: var(--intel-panel);
+      border: 1px solid rgba(17, 36, 58, 0.1);
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .intel-card h3,
+    .intel-card h4,
+    .intel-panel h2,
+    .intel-panel h3 {
+      margin: 0;
+      color: var(--intel-ink);
+    }
+
+    .intel-meta,
+    .intel-card p,
+    .intel-panel p,
+    .intel-inline-note {
+      color: rgba(17, 36, 58, 0.78);
+    }
+
+    .intel-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .intel-chip {
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(17, 36, 58, 0.08);
+      color: var(--intel-ink);
+      font-size: 0.85rem;
+    }
+
+    .intel-chip.is-live {
+      background: rgba(209, 88, 47, 0.14);
+      color: #8f3e22;
+    }
+
+    .intel-chip.is-good {
+      background: rgba(52, 123, 80, 0.14);
+      color: #27593b;
+    }
+
+    .intel-chip.is-warn {
+      background: rgba(196, 133, 35, 0.18);
+      color: #7d5511;
+    }
+
+    .intel-leg-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .intel-metric-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .intel-empty {
+      padding: 20px;
+      border-radius: 18px;
+      border: 1px dashed rgba(17, 36, 58, 0.18);
+      background: rgba(255,255,255,0.58);
+      color: rgba(17, 36, 58, 0.72);
+    }
+
+    @media (max-width: 980px) {
+      .intel-grid,
+      .intel-form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block header_meta %}
+  <p class="cards-header-meta">Local-first synthesis layer for cross-sport bets, live board reads, and parlay construction using the same Syndicate artifact-backed rails that drive the homepage.</p>
+{% endblock %}
+
+{% block content %}
+  <div class="intel-grid">
+    <section class="intel-panel">
+      <div class="intel-kicker">Query console</div>
+      <h2>Ask for best bets, live angles, or parlays</h2>
+      <p class="intel-inline-note">This first build is local synthesis only. It works from the pushed artifact-backed board state already inside Syndicate, without any external LLM dependency.</p>
+      <form id="intel-query-form" class="intel-form">
+        <label>
+          <span class="intel-kicker">Question</span>
+          <textarea id="intel-question" name="question" placeholder="Build me a two-leg live parlay from the strongest edges across NBA and MLB."></textarea>
+        </label>
+        <div class="intel-form-row">
+          <label>
+            <span class="intel-kicker">Date</span>
+            <input id="intel-date" name="date" type="date" value="{{ selected_date }}" />
+          </label>
+          <label>
+            <span class="intel-kicker">Mode</span>
+            <select id="intel-mode" name="mode">
+              <option value="">Auto-detect</option>
+              <option value="live">Live</option>
+              <option value="pregame">Pregame</option>
+              <option value="parlay">Parlay</option>
+              <option value="props">Props</option>
+              <option value="game">Game bets</option>
+            </select>
+          </label>
+          <label>
+            <span class="intel-kicker">Sport</span>
+            <select id="intel-sport" name="sport">
+              <option value="">All sports</option>
+              {% for sport in syndicate_sports %}
+                <option value="{{ sport.slug }}">{{ sport.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="intel-quick-asks">
+          {% for prompt in default_questions %}
+            <button class="cards-nav-pill" type="button" data-question="{{ prompt }}">{{ prompt }}</button>
+          {% endfor %}
+          <button class="cards-nav-pill is-active" type="submit">Run intelligence</button>
+        </div>
+      </form>
+      <div id="intel-response" class="intel-response-list">
+        <div class="intel-empty">Run a query to generate sportsbook-facing rationales, ranked local plays, and optional parlay constructions.</div>
+      </div>
+    </section>
+
+    <aside class="intel-panel">
+      <div class="intel-kicker">Data coverage</div>
+      <h2>Advanced artifact status</h2>
+      <p class="intel-inline-note">Representative pushed artifacts are checked per sport so the local agent can tell you which boards are fully backed by tracked data before this goes to deployment.</p>
+      <div class="intel-chip-row">
+        <span class="intel-chip is-good">Tracked {{ status_report.tracked_summary.tracked_ok }}/{{ status_report.tracked_summary.tracked_total }}</span>
+        <span class="intel-chip{% if status_report.advanced_summary.tracked_ok == status_report.advanced_summary.tracked_total and status_report.advanced_summary.tracked_total %} is-good{% else %} is-warn{% endif %}">Advanced {{ status_report.advanced_summary.tracked_ok }}/{{ status_report.advanced_summary.tracked_total }}</span>
+        <span class="intel-chip">Local-first only</span>
+      </div>
+      <div id="intel-status" class="intel-status-list">
+        {% for sport in status_report.sports %}
+          <article class="intel-card">
+            <h3>{{ sport.name }}</h3>
+            <p class="intel-meta">{{ sport.context_label }} · {{ sport.data_health|capitalize }}</p>
+            <div class="intel-chip-row">
+              <span class="intel-chip{% if sport.tracked_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.tracked_ready %}Tracked{% else %}Needs publish check{% endif %}</span>
+              <span class="intel-chip{% if sport.advanced_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.advanced_ready %}Advanced inputs tracked{% else %}Advanced inputs incomplete{% endif %}</span>
+            </div>
+            {% if sport.data_warnings %}
+              <p>{{ sport.data_warnings|join(' | ') }}</p>
+            {% endif %}
+            {% if sport.advanced_inputs %}
+              <div class="intel-leg-list">
+                {% for advanced in sport.advanced_inputs %}
+                  <div>
+                    <strong>{{ advanced.label }}</strong>
+                    <div class="intel-meta">{{ advanced.path }}</div>
+                    <div class="intel-metric-list">
+                      {% for metric in advanced.metrics %}
+                        <span class="intel-chip">{{ metric }}</span>
+                      {% endfor %}
+                    </div>
+                    <div class="intel-chip-row">
+                      <span class="intel-chip{% if advanced.exists %} is-good{% else %} is-warn{% endif %}">{% if advanced.exists %}Exists{% else %}Missing{% endif %}</span>
+                      <span class="intel-chip{% if advanced.tracked %} is-good{% else %} is-warn{% endif %}">{% if advanced.tracked %}Tracked{% else %}Untracked{% endif %}</span>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div class="intel-leg-list">
+              {% for artifact in sport.artifacts %}
+                <div>
+                  <strong>{{ artifact.label }}</strong>
+                  <div class="intel-meta">{{ artifact.path }}</div>
+                  <div class="intel-chip-row">
+                    <span class="intel-chip{% if artifact.exists %} is-good{% else %} is-warn{% endif %}">{% if artifact.exists %}Exists{% else %}Missing{% endif %}</span>
+                    <span class="intel-chip{% if artifact.tracked %} is-good{% else %} is-warn{% endif %}">{% if artifact.tracked %}Tracked{% else %}Untracked{% endif %}</span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    (() => {
+      const form = document.getElementById('intel-query-form');
+      const questionEl = document.getElementById('intel-question');
+      const dateEl = document.getElementById('intel-date');
+      const modeEl = document.getElementById('intel-mode');
+      const sportEl = document.getElementById('intel-sport');
+      const responseRoot = document.getElementById('intel-response');
+      const statusRoot = document.getElementById('intel-status');
+
+      function renderMetricChips(metrics) {
+        return (Array.isArray(metrics) ? metrics : []).map((metric) => chip(metric)).join('');
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function chip(label, extraClass = '') {
+        return `<span class="intel-chip ${extraClass}">${escapeHtml(label)}</span>`;
+      }
+
+      function renderRecommendations(payload) {
+        const response = payload?.response || {};
+        const recommendations = Array.isArray(response.recommendations) ? response.recommendations : [];
+        const parlays = Array.isArray(response.parlays) ? response.parlays : [];
+        const notes = Array.isArray(response.board_notes) ? response.board_notes : [];
+
+        if (!recommendations.length && !parlays.length) {
+          responseRoot.innerHTML = '<div class="intel-empty">No actionable candidates were surfaced from the current board state for that request.</div>';
+          return;
+        }
+
+        const recMarkup = recommendations.map((item) => {
+          const chips = [
+            chip(item.sport),
+            chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
+            item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : '',
+            item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
+            item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
+          ].filter(Boolean).join('');
+          const pills = Array.isArray(item.display_pills) ? item.display_pills.slice(0, 5).map((entry) => chip(entry)).join('') : '';
+          const cta = item.href ? `<a class="cards-nav-pill" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
+          return `
+            <article class="intel-card">
+              <h3>${escapeHtml(item.name || item.pick)}</h3>
+              <p class="intel-meta">${escapeHtml(item.matchup)} · ${escapeHtml(item.market)} · ${escapeHtml(item.surface)}</p>
+              <div class="intel-chip-row">${chips}${pills}</div>
+              <p>${escapeHtml(item.rationale || '')}</p>
+              ${cta}
+            </article>`;
+        }).join('');
+
+        const parlayMarkup = parlays.length ? `
+          <section>
+            <div class="intel-kicker">Parlays</div>
+            <div class="intel-parlay-list">
+              ${parlays.map((parlay) => `
+                <article class="intel-card">
+                  <h3>${escapeHtml(parlay.label)}</h3>
+                  <p>${escapeHtml(parlay.rationale || '')}</p>
+                  <div class="intel-chip-row">${chip(`Score ${parlay.combined_score || '-'}`)}</div>
+                  <div class="intel-leg-list">
+                    ${(Array.isArray(parlay.legs) ? parlay.legs : []).map((leg) => `
+                      <div>
+                        <strong>${escapeHtml(leg.name || leg.pick)}</strong>
+                        <div class="intel-meta">${escapeHtml(leg.sport)} · ${escapeHtml(leg.matchup)} · ${escapeHtml(leg.market)}</div>
+                      </div>`).join('')}
+                  </div>
+                </article>`).join('')}
+            </div>
+          </section>` : '';
+
+        const notesMarkup = notes.length ? `<article class="intel-card"><h3>Board notes</h3><p>${escapeHtml(notes.join(' | '))}</p></article>` : '';
+
+        responseRoot.innerHTML = `
+          <article class="intel-card">
+            <div class="intel-kicker">${escapeHtml(response.headline || 'Local sports intelligence brief')}</div>
+            <h3>${escapeHtml(payload.query || '')}</h3>
+            <p>${escapeHtml(response.summary || '')}</p>
+          </article>
+          ${recMarkup}
+          ${parlayMarkup}
+          ${notesMarkup}`;
+      }
+
+      async function refreshStatus() {
+        const date = dateEl.value;
+        const result = await fetch(`/api/intelligence/status?date=${encodeURIComponent(date)}&refresh=1`);
+        const payload = await result.json();
+        const sports = Array.isArray(payload.sports) ? payload.sports : [];
+        statusRoot.innerHTML = sports.map((sport) => `
+          <article class="intel-card">
+            <h3>${escapeHtml(sport.name)}</h3>
+            <p class="intel-meta">${escapeHtml(sport.context_label)} · ${escapeHtml(sport.data_health)}</p>
+            ${Array.isArray(sport.data_warnings) && sport.data_warnings.length ? `<p>${escapeHtml(sport.data_warnings.join(' | '))}</p>` : ''}
+            <div class="intel-chip-row">
+              ${chip(sport.tracked_ready ? 'Artifacts tracked' : 'Artifacts need publish check', sport.tracked_ready ? 'is-good' : 'is-warn')}
+              ${chip(sport.advanced_ready ? 'Advanced inputs tracked' : 'Advanced inputs incomplete', sport.advanced_ready ? 'is-good' : 'is-warn')}
+            </div>
+            ${Array.isArray(sport.advanced_inputs) && sport.advanced_inputs.length ? `
+              <div class="intel-leg-list">
+                ${sport.advanced_inputs.map((advanced) => `
+                  <div>
+                    <strong>${escapeHtml(advanced.label)}</strong>
+                    <div class="intel-meta">${escapeHtml(advanced.path)}</div>
+                    <div class="intel-metric-list">${renderMetricChips(advanced.metrics)}</div>
+                    <div class="intel-chip-row">
+                      ${chip(advanced.exists ? 'Exists' : 'Missing', advanced.exists ? 'is-good' : 'is-warn')}
+                      ${chip(advanced.tracked ? 'Tracked' : 'Untracked', advanced.tracked ? 'is-good' : 'is-warn')}
+                    </div>
+                  </div>`).join('')}
+              </div>` : ''}
+            <div class="intel-leg-list">
+              ${(Array.isArray(sport.artifacts) ? sport.artifacts : []).map((artifact) => `
+                <div>
+                  <strong>${escapeHtml(artifact.label)}</strong>
+                  <div class="intel-meta">${escapeHtml(artifact.path)}</div>
+                  <div class="intel-chip-row">
+                    ${chip(artifact.exists ? 'Exists' : 'Missing', artifact.exists ? 'is-good' : 'is-warn')}
+                    ${chip(artifact.tracked ? 'Tracked' : 'Untracked', artifact.tracked ? 'is-good' : 'is-warn')}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </article>`).join('');
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        responseRoot.innerHTML = '<div class="intel-empty">Running local intelligence...</div>';
+        const result = await fetch('/api/intelligence/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: questionEl.value,
+            date: dateEl.value,
+            mode: modeEl.value,
+            sport: sportEl.value,
+          }),
+        });
+        const payload = await result.json();
+        if (!payload.ok) {
+          responseRoot.innerHTML = `<div class="intel-empty">${escapeHtml(payload.error || 'The local intelligence query failed.')}</div>`;
+          return;
+        }
+        renderRecommendations(payload);
+        refreshStatus().catch(() => {});
+      });
+
+      document.querySelectorAll('[data-question]').forEach((button) => {
+        button.addEventListener('click', () => {
+          questionEl.value = button.getAttribute('data-question') || '';
+        });
+      });
+
+      dateEl.addEventListener('change', () => {
+        refreshStatus().catch(() => {});
+      });
+    })();
+  </script>
+{% endblock %}
