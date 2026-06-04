@@ -747,23 +747,49 @@
       const snapshotHome = toNumber(snapshot?.teams?.home?.totals?.R);
       if (snapshotAway == null || snapshotHome == null) return row;
       const projection = row?.projection && typeof row.projection === 'object' ? { ...row.projection } : null;
-      if (projection) {
-        const projectionAway = toNumber(projection.away);
-        const projectionHome = toNumber(projection.home);
-        if (projection.total == null && projectionAway != null && projectionHome != null) {
-          projection.total = Number((projectionAway + projectionHome).toFixed(2));
+      const pregameProjection = card?.predictions?.full && typeof card.predictions.full === 'object' ? card.predictions.full : null;
+      const pregameAway = toNumber(projection?.away ?? pregameProjection?.away_runs_mean ?? pregameProjection?.away);
+      const pregameHome = toNumber(projection?.home ?? pregameProjection?.home_runs_mean ?? pregameProjection?.home);
+      const progressFraction = toNumber(row?.progressFraction ?? row?.progress_fraction ?? row?.progress?.fraction ?? row?.fraction);
+      const targetInnings = toNumber(row?.targetInnings ?? row?.target_innings ?? row?.innings ?? row?.segmentInnings ?? row?.segment_innings) || 9;
+      const segmentProgress = Number.isFinite(progressFraction) ? Math.max(0, Math.min(1, progressFraction)) : null;
+      const segmentTarget = Math.max(0, Math.min(1, targetInnings / 9));
+      const derivedProjection = (() => {
+        if (pregameAway == null || pregameHome == null) return null;
+        if (segmentProgress == null) return null;
+        const awayTarget = pregameAway * segmentTarget;
+        const homeTarget = pregameHome * segmentTarget;
+        const expectedAwayToDate = Math.min(pregameAway * segmentProgress, awayTarget);
+        const expectedHomeToDate = Math.min(pregameHome * segmentProgress, homeTarget);
+        const away = snapshotAway + Math.max(awayTarget - expectedAwayToDate, 0);
+        const home = snapshotHome + Math.max(homeTarget - expectedHomeToDate, 0);
+        return {
+          away: Number(away.toFixed(2)),
+          home: Number(home.toFixed(2)),
+          total: Number((away + home).toFixed(2)),
+          homeMargin: Number((home - away).toFixed(2)),
+          closed: false,
+        };
+      })();
+      const projectionAway = toNumber(projection?.away);
+      const projectionHome = toNumber(projection?.home);
+      const projectionTotal = toNumber(projection?.total);
+      const projectionHomeMargin = toNumber(projection?.homeMargin);
+      const projectionLooksStale = projectionAway === 0 && projectionHome === 0 && (projectionTotal === 0 || projectionTotal == null) && (projectionHomeMargin === 0 || projectionHomeMargin == null);
+      const normalizedProjection = projection && !projectionLooksStale && (projectionAway != null || projectionHome != null)
+        ? {
+          ...projection,
+          total: projection.total != null ? projection.total : (projectionAway != null && projectionHome != null ? Number((projectionAway + projectionHome).toFixed(2)) : null),
+          homeMargin: projection.homeMargin != null ? projection.homeMargin : (projectionAway != null && projectionHome != null ? Number((projectionHome - projectionAway).toFixed(2)) : null),
         }
-        if (projection.homeMargin == null && projectionAway != null && projectionHome != null) {
-          projection.homeMargin = Number((projectionHome - projectionAway).toFixed(2));
-        }
-      }
+        : derivedProjection;
       return {
         ...row,
         actualSegment: {
           away: snapshotAway,
           home: snapshotHome,
         },
-        projection: projection || row?.projection || {
+        projection: normalizedProjection || {
           away: null,
           home: null,
           total: null,
