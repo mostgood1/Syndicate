@@ -183,6 +183,32 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
+    def test_api_live_lens_defaults_to_persist_for_current_date(self) -> None:
+        from syndicate.blueprints import mlb as mlb_blueprint
+        from syndicate.app import app as syndicate_app
+
+        captured: dict[str, object] = {}
+
+        def fake_build_live_lens_page_context(selected_date: str, *, persist: bool = False, season: int | None = None):
+            captured["selected_date"] = selected_date
+            captured["persist"] = persist
+            captured["season"] = season
+            return {"date": selected_date, "games": [], "counts": {}, "generatedAt": "2026-06-03T20:15:00-05:00"}
+
+        with patch.object(mlb_blueprint, "central_today_iso", return_value="2026-06-03"), patch.object(
+            mlb_blueprint,
+            "build_live_lens_page_context",
+            side_effect=fake_build_live_lens_page_context,
+        ), patch.object(mlb_blueprint, "build_live_lens_api_payload", return_value={"ok": True}) as mocked_payload:
+            with syndicate_app.test_client() as client:
+                response = client.get("/mlb/api/live-lens?date=2026-06-03")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured["selected_date"], "2026-06-03")
+        self.assertTrue(captured["persist"])
+        self.assertIsNone(captured["season"])
+        mocked_payload.assert_called_once()
+
     def test_api_live_lens_persist_bypasses_cache_and_rewrites_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         module_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "web" / "flask_frontend.py"
