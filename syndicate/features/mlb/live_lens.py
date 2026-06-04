@@ -742,7 +742,10 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
 
 def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     try:
-        cards_context = build_cards_page_context(selected_date)
+        cards_context = build_cards_page_context(
+            selected_date,
+            allow_request_daily_ladders_refresh=selected_date == datetime.now().astimezone().date().isoformat(),
+        )
     except Exception:
         return None
 
@@ -809,7 +812,10 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
 
 def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str) -> dict[str, Any]:
     try:
-        cards_context = build_cards_page_context(selected_date)
+        cards_context = build_cards_page_context(
+            selected_date,
+            allow_request_daily_ladders_refresh=selected_date == datetime.now().astimezone().date().isoformat(),
+        )
     except Exception:
         return report
 
