@@ -175,7 +175,7 @@
           <div class="sport-scroll-row__header">
             <div class="sport-scroll-row__title">
               <div class="section-label">Compact rail</div>
-              <h4 class="sport-scroll-row__headline">{{ compact_rail.title or 'Compact game rail' }}</h4>
+              <h4 class="sport-scroll-row__headline">{{ compact_rail['title'] or 'Compact game rail' }}</h4>
               <div class="sport-scroll-row__tag">{{ 'Live slate' if sport.active_today else 'Stored slate' }}</div>
             </div>
             <div class="sport-scroll-row__meta">
@@ -201,19 +201,19 @@
           {% endif %}
 
           <div class="sport-scroll-row__links" aria-label="{{ sport.name }} compact rail links">
-            {% for link in compact_rail.links or [] %}
+            {% for link in compact_rail['links'] or [] %}
               <a class="cards-nav-pill" href="{{ link.href }}">{{ link.label }}</a>
             {% endfor %}
           </div>
 
-          {% if compact_rail.items %}
+          {% if compact_rail['items'] %}
             <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} compact game cards">
-              {% for item in compact_rail.items %}
+              {% for item in compact_rail['items'] %}
                 {{ render_game_card(item) }}
               {% endfor %}
             </div>
           {% else %}
-            <p class="sport-scroll-row__summary">{{ compact_rail.empty_summary or 'No game rows were surfaced for this slate.' }}</p>
+            <p class="sport-scroll-row__summary">{{ compact_rail['empty_summary'] or 'No game rows were surfaced for this slate.' }}</p>
           {% endif %}
 
           {% if sport.game_bar.opportunity_tags %}
@@ -229,7 +229,7 @@
           <div class="sport-scroll-row__header">
             <div class="sport-scroll-row__title">
               <div class="section-label">Betting card feed</div>
-              <h4 class="sport-scroll-row__headline">{{ pregame_rail.title or 'Pregame props' }}</h4>
+              <h4 class="sport-scroll-row__headline">{{ pregame_rail['title'] or 'Pregame props' }}</h4>
               <div class="sport-scroll-row__tag">Pregame only</div>
             </div>
             <div class="sport-scroll-row__meta">
@@ -251,19 +251,19 @@
           {% endif %}
 
           <div class="sport-scroll-row__links" aria-label="{{ sport.name }} pregame prop links">
-            {% for link in pregame_rail.links or [] %}
+            {% for link in pregame_rail['links'] or [] %}
               <a class="cards-nav-pill" href="{{ link.href }}">{{ link.label }}</a>
             {% endfor %}
           </div>
 
-          {% if pregame_rail.items %}
+          {% if pregame_rail['items'] %}
             <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} compact props">
-              {% for item in pregame_rail.items %}
+              {% for item in pregame_rail['items'] %}
                 {{ render_prop_card(item) }}
               {% endfor %}
             </div>
           {% else %}
-            <p class="sport-scroll-row__summary">{{ pregame_rail.empty_summary or 'No pregame prop rows were surfaced for this slate.' }}</p>
+            <p class="sport-scroll-row__summary">{{ pregame_rail['empty_summary'] or 'No pregame prop rows were surfaced for this slate.' }}</p>
           {% endif %}
 
           {% if sport.props_bar.opportunity_tags %}
@@ -279,7 +279,7 @@
           <div class="sport-scroll-row__header">
             <div class="sport-scroll-row__title">
               <div class="section-label">Live lens feed</div>
-              <h4 class="sport-scroll-row__headline">{{ live_rail.title or 'Top Live Props' }}</h4>
+              <h4 class="sport-scroll-row__headline">{{ live_rail['title'] or 'Top Live Props' }}</h4>
               <div class="sport-scroll-row__tag">Live only</div>
             </div>
             <div class="sport-scroll-row__meta">
@@ -293,19 +293,19 @@
           <p class="sport-scroll-row__summary">This rail stays empty off-game or postgame and never backfills with pregame props.</p>
 
           <div class="sport-scroll-row__links" aria-label="{{ sport.name }} live prop links">
-            {% for link in live_rail.links or [] %}
+            {% for link in live_rail['links'] or [] %}
               <a class="cards-nav-pill" href="{{ link.href }}">{{ link.label }}</a>
             {% endfor %}
           </div>
 
-          {% if live_rail.items %}
+          {% if live_rail['items'] %}
             <div class="sport-scroll-row__strip" aria-label="{{ sport.name }} top live props">
-              {% for item in live_rail.items %}
+              {% for item in live_rail['items'] %}
                 {{ render_prop_card(item) }}
               {% endfor %}
             </div>
           {% else %}
-            <p class="sport-scroll-row__summary">{{ live_rail.empty_summary or 'Top live props are available only while games are live.' }}</p>
+            <p class="sport-scroll-row__summary">{{ live_rail['empty_summary'] or 'Top live props are available only while games are live.' }}</p>
           {% endif %}
 
           {% if sport.props_bar.opportunity_tags %}
