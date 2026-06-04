@@ -1019,7 +1019,7 @@
     const totalGate = Number(thresholds.adjustments?.game_total?.min_elapsed_min);
     const recentWindow = pbpStats?.pbp_recent || {};
     const currentPeriod = Number(liveState?.period);
-    const periodTotals = liveLines?.lines?.period_totals || {};
+    const periodTotals = liveLinesPeriodTotals(liveLines);
     const currentQuarterKey = Number.isFinite(currentPeriod) && currentPeriod >= 1 && currentPeriod <= 4
       ? `q${Math.floor(currentPeriod)}`
       : null;
@@ -3147,13 +3147,25 @@
           { retries: silent ? 2 : 1 }
         );
         let transformed = transformLiveStripPayload(payload, dateValue);
+        let boxscorePayload = null;
 
-        if ((!safeArray(transformed?.items).length) && games.length && liveStatePayload) {
-          const boxscorePayload = await fetchApiJson(
+        if (safeArray(transformed?.items).some((item) => isLivePropItem(item) && !Number.isFinite(Number(item?.actual)))) {
+          boxscorePayload = await fetchApiJson(
             `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live player boxscore.',
             { retries: silent ? 2 : 1 }
           );
+          transformed = mergeLiveStripActuals(transformed, boxscorePayload);
+        }
+
+        if ((!safeArray(transformed?.items).length) && games.length && liveStatePayload) {
+          if (!boxscorePayload) {
+            boxscorePayload = await fetchApiJson(
+              `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
+              'Failed to load live player boxscore.',
+              { retries: silent ? 2 : 1 }
+            );
+          }
           transformed = buildLiveBoxscoreSimFallback(boxscorePayload, games, liveStatePayload, dateValue);
         }
 
@@ -3597,6 +3609,80 @@
       liveEdge: Number.isFinite(liveEdge) ? liveEdge : null,
       firstSeenAt: item?.first_seen_at,
       lastSeenAt: item?.last_seen_at,
+    };
+  }
+
+  function liveLinesPeriodTotals(liveLines) {
+    const candidates = [
+      liveLines?.lines?.period_totals,
+      liveLines?.lines?.periodTotals,
+      liveLines?.period_totals,
+      liveLines?.periodTotals,
+      liveLines?.periods,
+    ];
+    for (const candidate of candidates) {
+      if (candidate && typeof candidate === 'object' && !Array.isArray(candidate) && Object.keys(candidate).length) {
+        return candidate;
+      }
+    }
+    return {};
+  }
+
+  function mergeLiveStripActuals(payload, boxscorePayload) {
+    if (!payload || typeof payload !== 'object') {
+      return payload;
+    }
+    const items = safeArray(payload.items);
+    if (!items.length) {
+      return payload;
+    }
+
+    const boxscoresByEvent = new Map();
+    safeArray(boxscorePayload?.games).forEach((game) => {
+      const eventId = String(game?.event_id || '').trim();
+      if (!eventId) {
+        return;
+      }
+      const byPlayer = new Map();
+      safeArray(game?.players).forEach((row) => {
+        const teamTri = String(row?.team_tri || '').trim().toUpperCase();
+        const playerKey = normalizePlayerKey(row?.player);
+        if (teamTri && playerKey) {
+          byPlayer.set(`${teamTri}::${playerKey}`, row);
+        }
+      });
+      if (byPlayer.size) {
+        boxscoresByEvent.set(eventId, byPlayer);
+      }
+    });
+    if (!boxscoresByEvent.size) {
+      return payload;
+    }
+
+    const mergedItems = items.map((item) => {
+      if (!item || Number.isFinite(Number(item.actual))) {
+        return item;
+      }
+      const eventId = String(item?.event_id || '').trim();
+      const teamTri = String(item?.team_tri || '').trim().toUpperCase();
+      const playerKey = normalizePlayerKey(item?.player);
+      const actualRow = boxscoresByEvent.get(eventId)?.get(`${teamTri}::${playerKey}`);
+      if (!actualRow) {
+        return item;
+      }
+      const actual = actualStatValue(actualRow, item?.market);
+      if (!Number.isFinite(Number(actual))) {
+        return item;
+      }
+      return {
+        ...item,
+        actual,
+      };
+    });
+
+    return {
+      ...payload,
+      items: mergedItems,
     };
   }
 
