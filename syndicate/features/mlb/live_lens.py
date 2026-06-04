@@ -16,6 +16,13 @@ from syndicate.features.mlb.sources import live_lens_log_path
 from syndicate.features.mlb.sources import live_lens_report_path
 from syndicate.features.mlb.sources import load_json_file
 
+try:
+    from vendor.mlb_bettingv2.tools.web.flask_frontend import _client as _mlb_vendor_client
+    from vendor.mlb_bettingv2.tools.web.flask_frontend import fetch_game_feed_live
+except Exception:  # pragma: no cover - vendor import is best-effort in tests
+    _mlb_vendor_client = None
+    fetch_game_feed_live = None
+
 
 def _format_signed_num(value: Any) -> str:
     try:
@@ -75,6 +82,68 @@ def _status_bucket_from_row(row: dict[str, Any]) -> str:
     if any(token in text for token in ("final", "game over", "completed early")):
         return "final"
     return "pregame"
+
+
+def _refresh_current_date_live_statuses(games: list[dict[str, Any]], selected_date: str) -> None:
+    if str(selected_date).strip() != datetime.now().astimezone().date().isoformat():
+        return
+    if _mlb_vendor_client is None or fetch_game_feed_live is None:
+        return
+    try:
+        client = _mlb_vendor_client()
+    except Exception:
+        return
+
+    feed_cache: dict[int, dict[str, Any] | None] = {}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        game_pk = int(game.get("gamePk") or 0)
+        if game_pk <= 0:
+            continue
+        if game_pk not in feed_cache:
+            try:
+                feed_cache[game_pk] = fetch_game_feed_live(client, game_pk)
+            except Exception:
+                feed_cache[game_pk] = None
+        feed = feed_cache.get(game_pk)
+        if not isinstance(feed, dict) or not feed:
+            continue
+
+        feed_status = ((feed.get("gameData") or {}).get("status") or {}) if isinstance((feed.get("gameData") or {}), dict) else {}
+        status = _structured_status(
+            {
+                "status": {
+                    "abstract": str(feed_status.get("abstractGameState") or "").strip(),
+                    "detailed": str(feed_status.get("detailedState") or "").strip(),
+                }
+            },
+            fallback_date=selected_date,
+        )
+        if _status_bucket_from_row({"status": status}) not in {"live", "final"}:
+            continue
+
+        game["status"] = status
+        game["detail"] = status.get("detailed") or game.get("detail")
+
+        linescore = ((feed.get("liveData") or {}).get("linescore") or {}) if isinstance((feed.get("liveData") or {}), dict) else {}
+        team_totals = linescore.get("teams") if isinstance(linescore, dict) else {}
+        away_value = ((team_totals.get("away") or {}).get("runs")) if isinstance(team_totals, dict) else None
+        home_value = ((team_totals.get("home") or {}).get("runs")) if isinstance(team_totals, dict) else None
+        try:
+            away_runs = int(away_value) if away_value is not None else None
+        except Exception:
+            away_runs = None
+        try:
+            home_runs = int(home_value) if home_value is not None else None
+        except Exception:
+            home_runs = None
+        if away_runs is not None or home_runs is not None:
+            score = {"away": away_runs, "home": home_runs}
+            game["score"] = score
+            matchup = game.get("matchup") if isinstance(game.get("matchup"), dict) else None
+            if isinstance(matchup, dict):
+                matchup["score"] = score
 
 
 def _lens_rows(row: dict[str, Any]) -> list[dict[str, Any]]:
@@ -850,6 +919,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
     rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
+    _refresh_current_date_live_statuses(games, selected_date)
     if persist and games:
         persisted_games = [dict(game) for game in games if isinstance(game, dict)]
         persisted_counts = {
