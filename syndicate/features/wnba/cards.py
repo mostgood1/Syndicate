@@ -2265,20 +2265,34 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
-    local_payload = _local_live_state_payload(selected_date)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
-        return _attach_odds_refresh_timestamp(local_payload)
+    is_today = str(selected_date).strip() == central_today_iso()
 
     # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
-    # Keep remote snapshot fallback enabled for today's slate even if strict source-fallback
-    # mode is disabled, so cards can still show live/final states when local snapshots lag.
-    should_try_remote = _remote_source_fallback_enabled() or str(selected_date).strip() == central_today_iso()
-    if should_try_remote:
-        remote_payload = _remote_live_snapshot_payload("live_state", selected_date=selected_date)
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            return _attach_odds_refresh_timestamp(remote_payload)
+    # For today's slate, prefer fresher remote/public live sources ahead of the local snapshot
+    # so a stale halftime file does not mask a game that has already advanced.
+    should_try_remote = _remote_source_fallback_enabled() or is_today
+    candidate_payloads: list[dict[str, Any] | None] = []
+    if is_today:
+        if should_try_remote:
+            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
+        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
+        candidate_payloads.append(_local_live_state_payload(selected_date))
+    else:
+        candidate_payloads.append(_local_live_state_payload(selected_date))
+        if should_try_remote:
+            candidate_payloads.append(_remote_live_snapshot_payload("live_state", selected_date=selected_date))
+        candidate_payloads.append(_public_scoreboard_live_state_payload(selected_date))
 
-    public_payload = _public_scoreboard_live_state_payload(selected_date)
+    for candidate_payload in candidate_payloads:
+        if isinstance(candidate_payload, dict) and isinstance(candidate_payload.get("games"), list) and bool(candidate_payload.get("games")):
+            if candidate_payload.get("source") == "espn" or is_today:
+                public_payload = candidate_payload
+            else:
+                return _attach_odds_refresh_timestamp(candidate_payload)
+            break
+    else:
+        public_payload = None
+
     if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and bool(public_payload.get("games")):
         context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
         context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
