@@ -747,6 +747,7 @@
       const snapshotHome = toNumber(snapshot?.teams?.home?.totals?.R);
       if (snapshotAway == null || snapshotHome == null) return row;
       const projection = row?.projection && typeof row.projection === 'object' ? { ...row.projection } : null;
+      const existingActual = row?.actualSegment && typeof row.actualSegment === 'object' ? row.actualSegment : null;
       const pregameProjection = card?.predictions?.full && typeof card.predictions.full === 'object' ? card.predictions.full : null;
       const pregameAway = toNumber(projection?.away ?? pregameProjection?.away_runs_mean ?? pregameProjection?.away);
       const pregameHome = toNumber(projection?.home ?? pregameProjection?.home_runs_mean ?? pregameProjection?.home);
@@ -783,12 +784,22 @@
           homeMargin: projection.homeMargin != null ? projection.homeMargin : (projectionAway != null && projectionHome != null ? Number((projectionHome - projectionAway).toFixed(2)) : null),
         }
         : derivedProjection;
-      return {
-        ...row,
-        actualSegment: {
+      const actualAway = toNumber(existingActual?.away);
+      const actualHome = toNumber(existingActual?.home);
+      const actualSegment = actualAway != null && actualHome != null
+        ? {
+          away: actualAway,
+          home: actualHome,
+          total: toNumber(existingActual?.total) ?? Number((actualAway + actualHome).toFixed(2)),
+          homeMargin: toNumber(existingActual?.homeMargin) ?? Number((actualHome - actualAway).toFixed(2)),
+        }
+        : {
           away: snapshotAway,
           home: snapshotHome,
-        },
+        };
+      return {
+        ...row,
+        actualSegment,
         projection: normalizedProjection || {
           away: null,
           home: null,
@@ -1109,7 +1120,8 @@
       const away = toNumber(actual?.away);
       const home = toNumber(actual?.home);
       if (away == null || home == null) return row?.closed ? 'Segment closed' : 'Live score unavailable';
-      return `${card?.away?.abbr || 'Away'} ${formatLine(away)} - ${card?.home?.abbr || 'Home'} ${formatLine(home)}`;
+      const scoreLine = `${card?.away?.abbr || 'Away'} ${formatLine(away)} - ${card?.home?.abbr || 'Home'} ${formatLine(home)}`;
+      return row?.closed ? `Final | ${scoreLine}` : scoreLine;
     }
     function edgeComparable(marketType, market) {
       const edge = toNumber(market?.edge);
