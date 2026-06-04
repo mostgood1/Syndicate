@@ -939,20 +939,40 @@ def _home_prop_writeup(item: dict[str, Any], *, player_name: str, market_label: 
     return base_sentence
 
 
+def _home_prop_ladder_groups(item: dict[str, Any]) -> list[dict[str, Any]]:
+    groups = item.get("ladder_groups") if isinstance(item.get("ladder_groups"), list) else []
+    normalized: list[dict[str, Any]] = []
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        label = str(group.get("short_label") or group.get("label") or group.get("stat") or "").strip()
+        targets = [int(total) for total in (group.get("targets") or []) if _int_or_none(total) is not None]
+        if not label or not targets:
+            continue
+        normalized.append({"label": label, "targets": sorted(dict.fromkeys(targets))})
+    return normalized
+
+
 def _home_prop_display_pills(item: dict[str, Any], *, live_total: str | None) -> list[str]:
     live_flag = bool(item.get("is_live")) or _is_liveish(item.get("heading"), item.get("status_display"))
     values: list[str] = []
+    market_label = _safe_text(item.get("market_display") or item.get("market"), None)
+    stat_suffix = _home_prop_stat_suffix(market_label)
     for label, raw_value in [
         ("Line", item.get("line")),
         ("Odds", item.get("odds")),
-        ("Sim", item.get("confidence")),
-        ("Pregame proj", item.get("projected")),
-        ("Live total", live_total),
-        ("Live proj", item.get("live_projection") if live_flag else None),
+        ("Sim%", item.get("confidence") or item.get("value")),
+        (f"Pregame {stat_suffix or 'Proj'} Proj", _home_prop_metric_line(item.get("projected"), market_label)),
+        (f"Live {stat_suffix or 'Total'} Total", _home_prop_metric_line(live_total, market_label) if live_flag else None),
+        (f"Live {stat_suffix or 'Proj'} Proj", _home_prop_metric_line(item.get("live_projection"), market_label) if live_flag else None),
     ]:
         value = _pill_value_text(raw_value)
         if value and value != "-":
             values.append(f"{label} {value}")
+    for group in _home_prop_ladder_groups(item):
+        target_label = "/".join(str(total) for total in (group.get("targets") or []))
+        if target_label:
+            values.append(f"Ladder {group.get('label')} {target_label}")
     return values
 
 
@@ -1002,6 +1022,17 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
             item["pills"] = pills
         if not item.get("writeup"):
             item["writeup"] = _safe_text(item.get("detail") or item.get("summary"), "No prop summary available.")
+        if not item.get("headshot_url") and slug in {"nba", "wnba"}:
+            resolved_player_id = _basketball_resolve_player_id(
+                slug,
+                player_name=item.get("player_name") or item.get("name"),
+                team_tri=item.get("team") or away_label or home_label,
+                player_id=item.get("player_id"),
+            )
+            headshot_url = _basketball_best_headshot_url(player_id=resolved_player_id, photo=item.get("photo"))
+            if headshot_url:
+                item["headshot_url"] = headshot_url
+                item["photo"] = headshot_url
         item["away_label"] = away_label
         item["home_label"] = home_label
         item["away_logo"] = away_logo
@@ -2387,6 +2418,17 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         else prop.get("baseline")
                     )
                     odds_text = _prop_metric_text(prop.get("odds") or prop.get("price"))
+                    ladder_groups = []
+                    for badge in (prop.get("pregameLadderBadges") or prop.get("ladderBadges") or []):
+                        if not isinstance(badge, dict):
+                            continue
+                        targets = [int(total) for total in (badge.get("targets") or []) if _int_or_none(total) is not None]
+                        if not targets:
+                            continue
+                        ladder_groups.append({
+                            "short_label": str(badge.get("short_label") or badge.get("label") or prop_type).strip() or prop_type,
+                            "targets": targets,
+                        })
                     player_id = _int_or_none(prop.get("pitcher_id") or prop.get("player_id"))
                     row_away_label = away_label or str(prop.get("away_abbr") or prop.get("away") or "").strip() or None
                     row_home_label = home_label or str(prop.get("home_abbr") or prop.get("home") or "").strip() or None
@@ -2427,6 +2469,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "away_logo": row_away_logo,
                         "home_logo": row_home_logo,
                         "headshot_url": _mlb_headshot_url(player_id),
+                        "ladder_groups": ladder_groups,
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
@@ -2465,6 +2508,17 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         else prop.get("baseline")
                     )
                     odds_text = _prop_metric_text(prop.get("odds") or prop.get("price"))
+                    ladder_groups = []
+                    for badge in (prop.get("pregameLadderBadges") or prop.get("ladderBadges") or []):
+                        if not isinstance(badge, dict):
+                            continue
+                        targets = [int(total) for total in (badge.get("targets") or []) if _int_or_none(total) is not None]
+                        if not targets:
+                            continue
+                        ladder_groups.append({
+                            "short_label": str(badge.get("short_label") or badge.get("label") or prop_type).strip() or prop_type,
+                            "targets": targets,
+                        })
                     player_id = _int_or_none(prop.get("batter_id") or prop.get("player_id"))
                     row_away_label = away_label or str(prop.get("away_abbr") or prop.get("away") or "").strip() or None
                     row_home_label = home_label or str(prop.get("home_abbr") or prop.get("home") or "").strip() or None
@@ -2515,6 +2569,7 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         "away_logo": row_away_logo,
                         "home_logo": row_home_logo,
                         "headshot_url": _mlb_headshot_url(player_id),
+                        "ladder_groups": ladder_groups,
                         "href": fallback_href,
                     })
                     if len(rows) >= limit:
@@ -3064,21 +3119,40 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
             continue
         reasons = [str(item).strip() for item in (target.get("reasons") or []) if str(item).strip()]
         writeup = str(target.get("writeup") or target.get("summary") or "").strip()
+        matchup = _safe_text(target.get("matchup"), "-")
+        away_label, home_label = _split_matchup_labels(matchup)
+        team_label = _safe_text(target.get("team"), None)
+        opponent_label = _safe_text(target.get("opponent"), None)
+        team_logo = str(target.get("team_logo_url") or "").strip() or None
+        opponent_logo = str(target.get("opponent_logo_url") or "").strip() or None
+        away_logo = None
+        home_logo = None
+        if away_label and home_label and team_label and opponent_label:
+            if away_label == team_label and home_label == opponent_label:
+                away_logo = team_logo
+                home_logo = opponent_logo
+            elif away_label == opponent_label and home_label == team_label:
+                away_logo = opponent_logo
+                home_logo = team_logo
         rows.append(
             {
                 "game_pk": _int_or_none(target.get("game_pk") or target.get("gamePk")),
                 "heading": _safe_text(target.get("team"), "HR target"),
                 "name": _safe_text(target.get("player_name"), "Unknown hitter"),
                 "value": _safe_text(target.get("probability"), "-"),
-                "matchup": _safe_text(target.get("matchup"), "-"),
+                "matchup": matchup,
                 "detail": reasons[0] if reasons else _safe_text(target.get("summary"), "No HR-target summary available."),
                 "writeup": writeup or _safe_text(target.get("summary"), "No HR-target summary available."),
                 "line": _safe_text(target.get("support"), "-"),
                 "team": _safe_text(target.get("team"), "-"),
                 "opponent": _safe_text(target.get("opponent"), "-"),
+                "away_label": away_label,
+                "home_label": home_label,
                 "headshot_url": str(target.get("headshot_url") or "").strip() or None,
-                "team_logo_url": str(target.get("team_logo_url") or "").strip() or None,
-                "opponent_logo_url": str(target.get("opponent_logo_url") or "").strip() or None,
+                "away_logo": away_logo,
+                "home_logo": home_logo,
+                "team_logo_url": team_logo,
+                "opponent_logo_url": opponent_logo,
                 "href": f"/mlb/hr-targets?date={context_label}",
             }
         )

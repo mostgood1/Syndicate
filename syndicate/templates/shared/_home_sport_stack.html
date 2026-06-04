@@ -3,18 +3,6 @@
     <div class="sport-compact-card__headerline">
       <span class="sport-compact-card__badge{% if item.outcome_state == 'hit' %} sport-compact-card__badge--hit{% elif item.outcome_state == 'miss' %} sport-compact-card__badge--miss{% endif %}">{{ item.heading }}</span>
     </div>
-    <div class="sport-compact-card__identity sport-compact-card__identity--top">
-      {% if item.headshot_url %}
-        <img class="sport-compact-card__headshot" src="{{ item.headshot_url }}" alt="{{ item.name }} headshot" loading="lazy">
-      {% endif %}
-      <div class="sport-compact-card__identity-copy">
-        <div class="sport-compact-card__top">
-          <div class="sport-compact-card__title">{{ item.name }}</div>
-          <div class="sport-compact-card__value">{{ item.value }}</div>
-        </div>
-        <div class="sport-compact-card__meta">{{ item.meta_line or item.detail }}</div>
-      </div>
-    </div>
     <div class="sport-compact-card__context-row">
       {% if item.away_label or item.home_label %}
         <div class="sport-compact-card__scoreboard">
@@ -44,6 +32,34 @@
           {% endif %}
         </div>
       {% endif %}
+      {% if item.hero_live_box or item.hero_sim_box %}
+        <div class="sport-compact-card__hero-metrics">
+          {% if item.hero_live_box %}
+            <span class="sport-compact-card__hero-box">
+              <span class="sport-compact-card__hero-label">Live</span>
+              <span class="sport-compact-card__hero-value">{{ item.hero_live_box }}</span>
+            </span>
+          {% endif %}
+          {% if item.hero_sim_box %}
+            <span class="sport-compact-card__hero-box">
+              <span class="sport-compact-card__hero-label">Sim</span>
+              <span class="sport-compact-card__hero-value">{{ item.hero_sim_box }}</span>
+            </span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="sport-compact-card__identity sport-compact-card__identity--top">
+      {% if item.headshot_url %}
+        <img class="sport-compact-card__headshot" src="{{ item.headshot_url }}" alt="{{ item.name }} headshot" loading="lazy">
+      {% endif %}
+      <div class="sport-compact-card__identity-copy">
+        <div class="sport-compact-card__top">
+          <div class="sport-compact-card__title">{{ item.name }}</div>
+          <div class="sport-compact-card__value">{{ item.value }}</div>
+        </div>
+        <div class="sport-compact-card__meta">{{ item.meta_line or item.detail }}</div>
+      </div>
     </div>
     <div class="sport-compact-card__summary">{{ item.writeup or item.detail }}</div>
     {% if item.display_pills %}
