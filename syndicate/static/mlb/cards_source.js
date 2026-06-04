@@ -746,11 +746,29 @@
       const snapshotAway = toNumber(snapshot?.teams?.away?.totals?.R);
       const snapshotHome = toNumber(snapshot?.teams?.home?.totals?.R);
       if (snapshotAway == null || snapshotHome == null) return row;
+      const projection = row?.projection && typeof row.projection === 'object' ? { ...row.projection } : null;
+      if (projection) {
+        const projectionAway = toNumber(projection.away);
+        const projectionHome = toNumber(projection.home);
+        if (projection.total == null && projectionAway != null && projectionHome != null) {
+          projection.total = Number((projectionAway + projectionHome).toFixed(2));
+        }
+        if (projection.homeMargin == null && projectionAway != null && projectionHome != null) {
+          projection.homeMargin = Number((projectionHome - projectionAway).toFixed(2));
+        }
+      }
       return {
         ...row,
         actualSegment: {
           away: snapshotAway,
           home: snapshotHome,
+        },
+        projection: projection || row?.projection || {
+          away: null,
+          home: null,
+          total: null,
+          homeMargin: null,
+          closed: !!row?.closed,
         },
       };
     }
@@ -821,7 +839,12 @@
 
     return dedupeGameLensRows(segments.map((segment) => {
       const prediction = segment.key === 'live'
-        ? (sim?.predicted && typeof sim.predicted === 'object' ? sim.predicted : {})
+        ? (
+          (sim?.predicted && typeof sim.predicted === 'object' ? sim.predicted : null)
+          || (card?.predictions?.full && typeof card.predictions.full === 'object' ? card.predictions.full : null)
+          || (card?.predictions?.live && typeof card.predictions.live === 'object' ? card.predictions.live : null)
+          || {}
+        )
         : (card?.predictions?.[segment.key] && typeof card.predictions[segment.key] === 'object' ? card.predictions[segment.key] : {});
       const predictedAway = segment.key === 'live' ? toNumber(prediction.away) : toNumber(prediction.away_runs_mean);
       const predictedHome = segment.key === 'live' ? toNumber(prediction.home) : toNumber(prediction.home_runs_mean);
