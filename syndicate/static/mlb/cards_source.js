@@ -807,8 +807,6 @@
     }
     const sim = detail?.sim || null;
     const progress = gameProgress(snapshot, card);
-    const predictedAway = toNumber(sim?.predicted?.away);
-    const predictedHome = toNumber(sim?.predicted?.home);
     const actualAway = toNumber(snapshot?.teams?.away?.totals?.R) || 0;
     const actualHome = toNumber(snapshot?.teams?.home?.totals?.R) || 0;
     const lines = trackedGameLines(card);
@@ -822,6 +820,11 @@
     ];
 
     return dedupeGameLensRows(segments.map((segment) => {
+      const prediction = segment.key === 'live'
+        ? (sim?.predicted && typeof sim.predicted === 'object' ? sim.predicted : {})
+        : (card?.predictions?.[segment.key] && typeof card.predictions[segment.key] === 'object' ? card.predictions[segment.key] : {});
+      const predictedAway = segment.key === 'live' ? toNumber(prediction.away) : toNumber(prediction.away_runs_mean);
+      const predictedHome = segment.key === 'live' ? toNumber(prediction.home) : toNumber(prediction.home_runs_mean);
       const segmentLines = (() => {
         const segmentBuckets = lines?.segments && typeof lines.segments === "object" ? lines.segments : {};
         if (segment.key === "live" || segment.key === "full") {
@@ -882,8 +885,8 @@
         progressFraction: progress.fraction,
         targetInnings: segment.innings,
       });
-      const modelHomeProb = logisticWinProb(projection.homeMargin);
       const baselineProb = baselineHomeWinProb(card, segment.key);
+      const modelHomeProb = logisticWinProb(projection.homeMargin) ?? baselineProb;
       const totalLine = toNumber(totals.line);
       const totalDelta = projection.total == null || totalLine == null ? null : Number((projection.total - totalLine).toFixed(2));
       const spreadHomeLine = toNumber(spreads.home_line ?? spreads.homeLine);
@@ -1118,6 +1121,14 @@
       const spread = row.markets.spread;
       const total = row.markets.total;
       const primaryCard = primaryMarketCard(row);
+      const marketLine = [
+        selectedPickLabel('total', total) ? `Total lane ${selectedPickLabel('total', total)}${selectedOdds('total', total) != null ? ` ${formatOdds(selectedOdds('total', total))}` : ''}` : (total.line != null ? `Total ${formatLine(total.line)}` : null),
+        selectedPickLabel('spread', spread) ? `Run line ${selectedPickLabel('spread', spread)}${selectedOdds('spread', spread) != null ? ` ${formatOdds(selectedOdds('spread', spread))}` : ''}` : (spread.homeLine != null ? `Home ${formatSigned(spread.homeLine, 1)}` : null),
+        ml.homeOdds || ml.awayOdds ? `${card?.away?.abbr || 'Away'} ${formatOdds(ml.awayOdds)} / ${card?.home?.abbr || 'Home'} ${formatOdds(ml.homeOdds)}` : null,
+      ].filter(Boolean).join(' | ');
+      const marketProbText = marketLine
+        ? formatPercent(ml.marketHomeProb, 1)
+        : formatPercent(row.baselineHomeWinProb ?? row.modelHomeWinProb, 1);
       const trackedClosedBlocks = row.closed
         ? [
             { shortLabel: 'ML', marketType: 'moneyline', market: ml },
@@ -1136,12 +1147,6 @@
         trackedClosedBlocks.length ? trackedClosedBlocks.join('') : primaryCard.recon,
         trackedClosedBlocks.length ? '' : primaryCard.status,
       ].filter(Boolean).join('');
-      const marketLine = [
-        selectedPickLabel('total', total) ? `Total lane ${selectedPickLabel('total', total)}${selectedOdds('total', total) != null ? ` ${formatOdds(selectedOdds('total', total))}` : ''}` : (total.line != null ? `Total ${formatLine(total.line)}` : null),
-        selectedPickLabel('spread', spread) ? `Run line ${selectedPickLabel('spread', spread)}${selectedOdds('spread', spread) != null ? ` ${formatOdds(selectedOdds('spread', spread))}` : ''}` : (spread.homeLine != null ? `Home ${formatSigned(spread.homeLine, 1)}` : null),
-        ml.homeOdds || ml.awayOdds ? `${card?.away?.abbr || 'Away'} ${formatOdds(ml.awayOdds)} / ${card?.home?.abbr || 'Home'} ${formatOdds(ml.homeOdds)}` : null,
-      ].filter(Boolean).join(' | ');
-      const marketProbText = formatPercent(ml.marketHomeProb, 1);
       return `
         <div class="cards-prop-overview-card ${row.closed ? 'is-closed' : ''}">
           <div class="cards-lens-head">
