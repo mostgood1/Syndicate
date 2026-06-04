@@ -83,28 +83,14 @@ def _copy_existing_processed_artifact(*, source_root: Path, processed_root: Path
 def _copy_file_with_fallback(source: Path, destination: Path) -> None:
     try:
         shutil.copy2(source, destination)
-                _append_log(log_file, state["error"])
-                return
-
-        return
-                state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
-                _append_log(log_file, state["error"])
-                return
-    try:
-                state["error"] = f"predict-props wrote no rows to {pred_fp.name} for {date_str}"
-                _append_log(log_file, state["error"])
-                return
-                if not chunk:
-                    break
-                os.write(destination_fd, chunk)
-        finally:
-            os.close(destination_fd)
-    finally:
-        os.close(source_fd)
-    try:
-        shutil.copystat(source, destination)
     except OSError:
-        pass
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with source.open("rb") as source_handle, destination.open("wb") as destination_handle:
+            shutil.copyfileobj(source_handle, destination_handle)
+        try:
+            shutil.copystat(source, destination)
+        except OSError:
+            pass
 
 
 def _copy_existing_live_lens_artifact(*, source_root: Path, file_name: str, destinations: tuple[tuple[Path, str | None], ...]) -> dict[str, str]:
