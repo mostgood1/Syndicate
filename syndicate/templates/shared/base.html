@@ -27,7 +27,10 @@
               {% endif %}
             </nav>
           </div>
-          <p class="cards-header-meta">One app with seven feature modules. Existing apps remain untouched while Syndicate is built in parallel.</p>
+          {% block header_meta %}
+            <p class="cards-header-meta">One app with seven feature modules. Existing apps remain untouched while Syndicate is built in parallel.</p>
+          {% endblock %}
+          {% block header_extra %}{% endblock %}
         </header>
       {% endif %}
 

@@ -22,43 +22,17 @@
       box-shadow: var(--cards-shadow);
     }
 
-    .home-controls {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      align-items: end;
-      flex-wrap: wrap;
-      padding: 1rem 1.2rem;
-      border: 1px solid rgba(132, 166, 196, 0.14);
-      border-radius: 22px;
-      background: linear-gradient(180deg, rgba(12, 24, 39, 0.96), rgba(7, 15, 26, 0.99));
-      box-shadow: var(--cards-shadow);
-    }
-
-    .home-controls__copy {
-      display: grid;
-      gap: 0.2rem;
-      max-width: 52rem;
-    }
-
-    .home-controls__title {
-      margin: 0;
-      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
-      font-size: clamp(1.15rem, 1.8vw, 1.45rem);
-      letter-spacing: -0.04em;
-    }
-
-    .home-controls__meta {
-      color: rgba(237, 244, 251, 0.68);
-      font-size: 0.92rem;
-    }
-
     .home-topbar__date-form {
       display: flex;
       gap: 0.55rem;
       align-items: end;
       flex-wrap: wrap;
       justify-content: flex-end;
+    }
+
+    .syndicate-header .home-topbar__date-form {
+      margin-top: 0.9rem;
+      justify-content: flex-start;
     }
 
     .home-topbar__date-field {
@@ -936,7 +910,6 @@
 
     @media (max-width: 780px) {
       .home-decision-grid,
-      .home-controls,
       .sport-stack-card__header {
         grid-template-columns: 1fr;
       }
@@ -975,35 +948,32 @@
   </style>
 {% endblock %}
 
+{% block header_meta %}{% endblock %}
+
+{% block header_extra %}
+  {% set selected_home_date = selected_home_date or request.args.get('date', '') %}
+  {% set admin_token = request.args.get('admin_token', '') %}
+  {% set dated_home_reset_href = '/?admin_token=' ~ admin_token if admin_token else '/' %}
+  <form class="home-topbar__date-form" method="get" action="/" aria-label="Select home board date">
+    {% if admin_token %}
+      <input type="hidden" name="admin_token" value="{{ admin_token }}">
+    {% endif %}
+    <label class="home-topbar__date-field" for="home-board-date">Board Date</label>
+    <input id="home-board-date" class="home-topbar__date-input" type="date" name="date" value="{{ selected_home_date }}">
+    <div class="home-topbar__date-actions">
+      {% if selected_home_date %}
+        <span class="home-topbar__selection">Selected: {{ selected_home_date }}</span>
+      {% endif %}
+      <button class="cards-nav-pill" type="submit">Load Date</button>
+      {% if selected_home_date %}
+        <a class="cards-nav-pill" href="{{ dated_home_reset_href }}">Use Today</a>
+      {% endif %}
+    </div>
+  </form>
+{% endblock %}
+
 {% block content %}
   <section class="home-board">
-    {% set selected_home_date = selected_home_date or request.args.get('date', '') %}
-    {% set admin_token = request.args.get('admin_token', '') %}
-    {% set dated_home_reset_href = '/?admin_token=' ~ admin_token if admin_token else '/' %}
-    <section class="home-controls" aria-label="Syndicate home controls">
-      <div class="home-controls__copy">
-        <div class="section-label">Syndicate</div>
-        <h2 class="home-controls__title">Cross-sport daily board</h2>
-        <div class="home-controls__meta">Cross-sport betting dashboard with ranked game reads, prop surfaces, and per-sport action counts.</div>
-      </div>
-      <form class="home-topbar__date-form" method="get" action="/" aria-label="Select home board date">
-        {% if admin_token %}
-          <input type="hidden" name="admin_token" value="{{ admin_token }}">
-        {% endif %}
-        <label class="home-topbar__date-field" for="home-board-date">Board Date</label>
-        <input id="home-board-date" class="home-topbar__date-input" type="date" name="date" value="{{ selected_home_date }}">
-        <div class="home-topbar__date-actions">
-          {% if selected_home_date %}
-            <span class="home-topbar__selection">Selected: {{ selected_home_date }}</span>
-          {% endif %}
-          <button class="cards-nav-pill" type="submit">Load Date</button>
-          {% if selected_home_date %}
-            <a class="cards-nav-pill" href="{{ dated_home_reset_href }}">Use Today</a>
-          {% endif %}
-        </div>
-      </form>
-    </section>
-
     <div id="syndicate-home-sport-stack">
       {% include "shared/_home_dashboard.html" %}
     </div>

@@ -1412,6 +1412,68 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((movement.get("price") or {}).get("cur"), 329.0)
         self.assertEqual((movement.get("price") or {}).get("prev"), 329.0)
 
+    def test_nhl_props_cards_infer_player_headshot_from_roster_snapshot(self) -> None:
+        props_rows = [
+            {
+                "player": "Alexander Nikishin",
+                "team": "CAR",
+                "opp": "VGK",
+                "market": "points",
+                "side": "over",
+                "book": "pinnacle",
+                "ev": "1.16",
+                "chosen_prob": "0.503",
+                "line": "0.5",
+                "price": "+329",
+                "edge_reasons": "model edge · role edge",
+            }
+        ]
+
+        with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-05-17", "2026-05-17", False)):
+            with patch("syndicate.features.nhl.cards._props_recommendation_rows", return_value=(props_rows, "props.csv")):
+                with patch(
+                    "syndicate.features.nhl.cards._player_identity_maps_for_date",
+                    return_value=({"alexander nikishin": "8484153"}, {"alexander nikishin": "CAR"}),
+                ):
+                    payload = build_nhl_props_cards_payload("2026-05-17", top=12)
+
+        card = (payload.get("cards") or [{}])[0]
+
+        self.assertEqual(card.get("player_id"), 8484153)
+        self.assertEqual(card.get("headshot_url"), "https://assets.nhle.com/mugs/nhl/2026/CAR/8484153.png")
+
+    def test_finalize_home_prop_rows_uses_matched_game_for_real_away_home_labels(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        rows = [
+            {
+                "name": "Alexander Nikishin",
+                "market": "Shots on Goal",
+                "pick": "Over",
+                "line": "0.5",
+                "team": "CAR",
+                "opponent": "Opp",
+                "away_label": "CAR",
+                "home_label": "Opp",
+                "detail": "Over 0.5 Shots on Goal",
+                "is_live": True,
+            }
+        ]
+        home_games = [
+            {
+                "away": {"abbr": "VGK", "name": "Vegas Golden Knights"},
+                "home": {"abbr": "CAR", "name": "Carolina Hurricanes"},
+                "status": {"is_live": True, "status": "In Progress", "detailed": "3rd Period"},
+            }
+        ]
+
+        finalized = home_module._finalize_home_prop_rows(rows, slug="nhl", context_label="2026-06-04", home_games=home_games)
+
+        self.assertEqual(len(finalized), 1)
+        self.assertEqual(finalized[0]["away_label"], "VGK")
+        self.assertEqual(finalized[0]["home_label"], "CAR")
+        self.assertEqual(finalized[0]["matchup_summary"], "VGK at CAR")
+
     def test_nhl_cards_missing_requested_date_does_not_fall_back_to_previous_slate(self) -> None:
         with patch("syndicate.features.nhl.cards._prediction_dates_with_rows", return_value=["2026-05-27"]):
             with patch("syndicate.features.nhl.cards._next_scheduled_game_date_after_empty_slate", return_value=None):
@@ -1682,6 +1744,105 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(rows[0]["name"], "A'ja Wilson Over 22.5 Points")
         self.assertEqual(rows[0]["href"], "/wnba/props?date=2026-05-20")
 
+    def test_finalize_home_prop_rows_uses_player_actual_for_live_total(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        rows = [
+            {
+                "game_pk": 1,
+                "name": "Garrett Mitchell",
+                "market": "Hitter Hits",
+                "pick": "Over",
+                "line": "0.5",
+                "actual": "1",
+                "live_projection": "1.6",
+                "projected": "1.2",
+                "is_live": True,
+                "away_label": "SF",
+                "home_label": "MIL",
+                "detail": "Over 0.5 Hitter Hits",
+            }
+        ]
+        home_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "SF", "score": 5},
+                "home": {"abbr": "MIL", "score": 1},
+                "status": {"is_live": True, "status": "In Progress", "detailed": "Top 6th"},
+            }
+        ]
+
+        with patch("syndicate.blueprints.home._mlb_actual_payload_for_game", return_value=None):
+            finalized = home_module._finalize_home_prop_rows(rows, slug="mlb", context_label="2026-06-04", home_games=home_games)
+
+        self.assertEqual(len(finalized), 1)
+        self.assertEqual(finalized[0]["live_total"], "1")
+        self.assertEqual(finalized[0]["hero_live_box"], "1 H")
+        self.assertEqual(finalized[0]["hero_sim_box"], "1.6 H")
+
+    def test_finalize_home_prop_rows_falls_back_to_live_total_and_confidence_for_hero_metrics(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        rows = [
+            {
+                "game_pk": 1,
+                "name": "Ryan McMahon",
+                "market": "Batter Hits",
+                "pick": "Over",
+                "line": "0.5",
+                "confidence": "67.8%",
+                "live_total": "2",
+                "is_live": True,
+                "away_label": "CLE",
+                "home_label": "NYY",
+                "detail": "Over 0.5 Batter Hits",
+            }
+        ]
+        home_games = [
+            {
+                "gamePk": 1,
+                "away": {"abbr": "CLE", "score": 1},
+                "home": {"abbr": "NYY", "score": 2},
+                "status": {"is_live": True, "status": "In Progress", "detailed": "Top 8th | 1 out"},
+            }
+        ]
+
+        with patch("syndicate.blueprints.home._mlb_actual_payload_for_game", return_value=None):
+            finalized = home_module._finalize_home_prop_rows(rows, slug="mlb", context_label="2026-06-04", home_games=home_games)
+
+        self.assertEqual(len(finalized), 1)
+        self.assertEqual(finalized[0]["hero_live_box"], "2 H")
+        self.assertEqual(finalized[0]["hero_sim_box"], "0.5 H")
+        self.assertEqual(finalized[0]["matchup_summary"], "CLE at NYY")
+
+    def test_mlb_pregame_hitter_rows_keep_game_pk_for_live_actual_lookup(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        reco_payload = {
+            823542: {
+                "markets": {
+                    "hitterProps": [
+                        {
+                            "player_name": "Ryan McMahon",
+                            "prop": "hits",
+                            "market_line": 0.5,
+                            "selection": "OVER",
+                            "edge": 0.145,
+                            "model_prob": 0.678,
+                        }
+                    ]
+                },
+                "away": {"abbr": "CLE", "teamId": 114},
+                "home": {"abbr": "NYY", "teamId": 147},
+            }
+        }
+
+        with patch("syndicate.features.mlb.cards._cards_recommendation_payload_by_game", return_value=reco_payload):
+            rows = home_module._pregame_prop_rows_from_mlb_recommendations("2026-06-04", limit=5)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].get("game_pk"), 823542)
+
     def test_home_nhl_compact_game_items_use_local_live_lens_without_source_proxy(self) -> None:
         from syndicate.blueprints import home as home_module
 
@@ -1711,6 +1872,138 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(items[0]["away_label"], "COL")
         self.assertEqual(items[0]["home_label"], "TOR")
         self.assertEqual(items[0]["href"], "/nhl/game/77?date=2026-05-20")
+
+    def test_home_nhl_prop_items_prefer_player_props_over_live_game_fallback(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        home_games = [
+            {
+                "away": {"abbr": "COL", "name": "Colorado"},
+                "home": {"abbr": "TOR", "name": "Toronto"},
+                "href": "/nhl/game/77?date=2026-05-20",
+                "shared_is_live": True,
+                "shared_prop_rows": [
+                    {
+                        "heading": "Live props",
+                        "name": "Fallback team market",
+                        "detail": "This generic fallback should not win.",
+                        "value": "50.0%",
+                    }
+                ],
+            }
+        ]
+        props_payload = {
+            "date": "2026-05-20",
+            "cards": [
+                {
+                    "player": "Nathan MacKinnon",
+                    "headshot_url": "https://example.test/nathan.png",
+                    "side": "Over",
+                    "line": 3.5,
+                    "market": "SOG",
+                    "team": "COL",
+                    "opp": "TOR",
+                    "prob": 0.612,
+                    "price": -115,
+                    "ev": 0.083,
+                    "reason_summary": "Local NHL player props row.",
+                }
+            ],
+        }
+
+        with patch(
+            "syndicate.features.nhl.cards.build_props_cards_payload",
+            return_value=props_payload,
+        ):
+            rows = home_module._load_home_prop_items(
+                "nhl",
+                context_label="2026-05-20",
+                home_games=home_games,
+                is_active_today=True,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "Nathan MacKinnon")
+        self.assertEqual(rows[0]["market"], "SOG")
+        self.assertEqual(rows[0]["headshot_url"], "https://example.test/nathan.png")
+        self.assertEqual(rows[0]["href"], "/nhl/cards?date=2026-05-20")
+
+    def test_home_wnba_live_prop_rows_resolve_headshot_and_matchup_labels(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        games = [
+            {
+                "event_id": "401856961",
+                "away": "ATL",
+                "home": "IND",
+                "status": {"status": "6/4 - 7:00 PM EDT", "in_progress": False, "final": False, "period": None, "clock": ""},
+                "rows": [
+                    {
+                        "player": "Caitlin Clark",
+                        "player_id": None,
+                        "player_photo": None,
+                        "team_tri": "IND",
+                        "opponent_tri": "ATL",
+                        "stat": "threes",
+                        "line": 2.5,
+                        "line_live": 2.5,
+                        "lean": "OVER",
+                        "price": 102.0,
+                        "ev": 0.563635,
+                        "win_prob": 1.0,
+                        "recommendation_priority_score": 56.3634805411951,
+                        "klass": "BET",
+                        "status_label": "Live",
+                    }
+                ],
+            }
+        ]
+
+        with patch("syndicate.blueprints.home._basketball_resolve_player_id", return_value=1642286):
+            rows = home_module._prop_rows_from_nba_live_lens(
+                games,
+                sport_slug="wnba",
+                fallback_href="/wnba/live-lens?date=2026-06-04",
+            )
+            finalized = home_module._finalize_home_prop_rows(rows, slug="wnba", context_label="2026-06-04", home_games=[])
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "Caitlin Clark")
+        self.assertEqual(rows[0]["away_label"], "ATL")
+        self.assertEqual(rows[0]["home_label"], "IND")
+        self.assertEqual(rows[0]["headshot_url"], "https://cdn.nba.com/headshots/nba/latest/1040x760/1642286.png")
+        self.assertEqual(finalized[0]["name"], "Caitlin Clark 3PM")
+        self.assertEqual(finalized[0]["market_display"], "3PM")
+        self.assertEqual(finalized[0]["meta_line"], "OVER 2.5")
+
+    def test_wnba_rank_card_prop_rows_resolve_pregame_headshot(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        cards = [
+            {
+                "title": "Caitlin Clark Over 2.5 3PM",
+                "eyebrow": "Props",
+                "badge": "56.4% EV",
+                "meta": "ATL vs IND",
+                "summary": "Caitlin Clark",
+                "metrics": [
+                    {"label": "Price", "value": "102"},
+                ],
+            }
+        ]
+
+        with patch("syndicate.blueprints.home._basketball_resolve_player_id", return_value=4433403):
+            rows = home_module._prop_rows_from_rank_cards(
+                cards,
+                sport_slug="wnba",
+                fallback_href="/wnba/props?date=2026-06-04",
+                heading_override="Props",
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["headshot_url"], "https://cdn.nba.com/headshots/nba/latest/1040x760/4433403.png")
+        self.assertEqual(rows[0]["away_label"], "ATL")
+        self.assertEqual(rows[0]["home_label"], "IND")
 
     def test_mlb_cards_embed_mode_renders_compact_source_shell(self) -> None:
         response = self.client.get('/mlb/cards?date=2026-05-20&client=source&embed=home-cards')
