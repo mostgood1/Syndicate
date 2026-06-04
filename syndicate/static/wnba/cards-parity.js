@@ -2268,7 +2268,7 @@
       return '';
     }
     const player = String(item?.player || 'This player').trim() || 'This player';
-    const actual = Number(item?.actual);
+    const actual = item?.actual != null && Number.isFinite(Number(item.actual)) ? Number(item.actual) : null;
     const paceProj = Number(item?.pace_proj);
     const line = Number(item?.line);
     if (Number.isFinite(actual) && Number.isFinite(paceProj) && Number.isFinite(line)) {
@@ -2309,7 +2309,7 @@
       return [lensLabel, shapeSummary, projectionSummary].filter(Boolean).join(' ');
     }
     const player = String(item?.player || 'This player').trim() || 'This player';
-    const actual = Number(item?.actual);
+    const actual = item?.actual != null && Number.isFinite(Number(item.actual)) ? Number(item.actual) : null;
     const paceProj = Number(item?.pace_proj);
     const line = Number(item?.line);
     const side = livePropPrimarySide(item) || String(item?.side || '').trim().toUpperCase();
