@@ -1124,7 +1124,6 @@
         side,
         edge: Number.isFinite(edgeValue) ? edgeValue : null,
         line: Number.isFinite(lineValue) ? lineValue : null,
-        projection: Number.isFinite(projectionValue) ? projectionValue : null,
         score: 0,
         detail: parts.join(' · '),
         compactLabel: klass === 'NONE' ? `${label} —` : `${label} ${klass} ${sideLabel}${key === 'ml' ? fmtSigned(edgeValue * 100, 1) + 'pp' : fmtSigned(edgeValue, 1)}`.trim(),
@@ -3660,7 +3659,7 @@
     }
 
     const mergedItems = items.map((item) => {
-      if (!item || Number.isFinite(Number(item.actual))) {
+      if (!item) {
         return item;
       }
       const eventId = String(item?.event_id || '').trim();
@@ -4257,6 +4256,22 @@
     const betting = game?.betting || {};
     const score = game?.sim?.score || {};
     const periods = game?.sim?.periods || {};
+    const periodLines = game?.lines || {};
+
+    function periodTotalLine(periodKey) {
+      const rawLine = periodLines?.period_totals?.[periodKey]
+        ?? periodLines?.periodTotals?.[periodKey]
+        ?? periodLines?.periods?.[periodKey];
+      const line = Number(rawLine);
+      return Number.isFinite(line) ? line : null;
+    }
+
+    function periodSpreadLine(periodKey) {
+      const rawLine = periodLines?.period_spreads?.[periodKey]
+        ?? periodLines?.periodSpreads?.[periodKey];
+      const line = Number(rawLine);
+      return Number.isFinite(line) ? line : null;
+    }
     const rows = [
       {
         key: 'q1',
@@ -4265,6 +4280,8 @@
         projection: segmentProjection(periods?.q1?.total_mean, periods?.q1?.margin_mean),
         modelHomeWinProb: Number.isFinite(Number(periods?.q1?.p_home_win)) ? Number(periods.q1.p_home_win) : marginWinProb(periods?.q1?.margin_mean, 3.4),
         baselineHomeWinProb: baselineHomeWinProb(game, 'q1'),
+        totalLine: periodTotalLine('q1'),
+        spreadLine: periodSpreadLine('q1'),
       },
       {
         key: 'q2',
@@ -4273,6 +4290,8 @@
         projection: segmentProjection(periods?.q2?.total_mean, periods?.q2?.margin_mean),
         modelHomeWinProb: Number.isFinite(Number(periods?.q2?.p_home_win)) ? Number(periods.q2.p_home_win) : marginWinProb(periods?.q2?.margin_mean, 3.4),
         baselineHomeWinProb: baselineHomeWinProb(game, 'q2'),
+        totalLine: periodTotalLine('q2'),
+        spreadLine: periodSpreadLine('q2'),
       },
       {
         key: 'q3',
@@ -4281,6 +4300,8 @@
         projection: segmentProjection(periods?.q3?.total_mean, periods?.q3?.margin_mean),
         modelHomeWinProb: Number.isFinite(Number(periods?.q3?.p_home_win)) ? Number(periods.q3.p_home_win) : marginWinProb(periods?.q3?.margin_mean, 3.4),
         baselineHomeWinProb: baselineHomeWinProb(game, 'q3'),
+        totalLine: periodTotalLine('q3'),
+        spreadLine: periodSpreadLine('q3'),
       },
       {
         key: 'q4',
@@ -4289,6 +4310,8 @@
         projection: segmentProjection(periods?.q4?.total_mean, periods?.q4?.margin_mean),
         modelHomeWinProb: Number.isFinite(Number(periods?.q4?.p_home_win)) ? Number(periods.q4.p_home_win) : marginWinProb(periods?.q4?.margin_mean, 3.4),
         baselineHomeWinProb: baselineHomeWinProb(game, 'q4'),
+        totalLine: periodTotalLine('q4'),
+        spreadLine: periodSpreadLine('q4'),
       },
       {
         key: 'full',
