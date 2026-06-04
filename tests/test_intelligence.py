@@ -201,6 +201,59 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(recommendations[1].get("missing_advanced_inputs"))
         self.assertIn("missing or unpublished", recommendations[1].get("rationale") or "")
 
+    def test_intelligence_query_excludes_props_for_final_games(self) -> None:
+        overview = _sample_overview()
+        live_items = (((overview[0].get("home_rails") or {}).get("live") or {}).get("items") or [])
+        live_items.insert(
+            0,
+            {
+                "name": "Jalen Brunson Over 6.5 Assists",
+                "market": "AST",
+                "pick": "Over 6.5",
+                "matchup": "BOS at NYK",
+                "projected": 7.4,
+                "live_projection": 7.1,
+                "actual": 6,
+                "line": 6.5,
+                "odds": "+110",
+                "confidence": "62%",
+                "edge": "+4.0%",
+                "writeup": "This should be filtered because the game is over.",
+                "display_pills": ["Line 6.5", "Odds +110", "Live Proj 7.1"],
+                "is_live": True,
+                "status_display": "102-99 | Final",
+                "status_context": "102-99 | Final",
+                "href": "/nba/season/2026/live-lens?date=2026-06-04",
+            },
+        )
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Show me the best live NBA props",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        result = payload.get("response") or {}
+        recommendation_names = [item.get("name") for item in (result.get("recommendations") or [])]
+        self.assertNotIn("Jalen Brunson Over 6.5 Assists", recommendation_names)
+        self.assertIn("Donovan Mitchell Over 4.5 3PM", recommendation_names)
+
     def test_intelligence_query_requires_question(self) -> None:
         response = self.client.post("/api/intelligence/query", json={"date": "2026-06-04"})
 

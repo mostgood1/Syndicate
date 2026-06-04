@@ -723,6 +723,7 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
             "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
             "writeup": _safe_text(item.get("writeup"), ""),
             "status_context": _safe_text(item.get("status_context"), ""),
+            "status_display": _safe_text(item.get("status_display"), ""),
             "hero_live_box": item.get("hero_live_box") if isinstance(item.get("hero_live_box"), dict) else None,
             "hero_sim_box": item.get("hero_sim_box") if isinstance(item.get("hero_sim_box"), dict) else None,
             "display_pills": item.get("display_pills") if isinstance(item.get("display_pills"), list) else [],
@@ -744,6 +745,16 @@ def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
             row["candidate_type"] = "game"
             candidates.append(row)
     return candidates
+
+
+def _candidate_is_final(candidate: dict[str, Any]) -> bool:
+    if bool(candidate.get("is_final")):
+        return True
+    terminal_text = " ".join(
+        _safe_text(candidate.get(field), "")
+        for field in ("status_badge", "status_line", "status_display", "status_context", "detail", "summary", "score_kind")
+    ).lower()
+    return any(token in terminal_text for token in ("final", "game over", "completed"))
 
 
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
@@ -784,6 +795,8 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             if preferences.get("pregame_only"):
                 game_candidates = [row for row in game_candidates if not bool(row.get("is_live")) and "live" not in _safe_text(row.get("market"), "").lower()]
             candidates.extend(game_candidates)
+
+    candidates = [row for row in candidates if not _candidate_is_final(row)]
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
