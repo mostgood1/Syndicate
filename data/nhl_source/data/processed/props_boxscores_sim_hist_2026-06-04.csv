@@ -1,0 +1,1207 @@
+team,player_id,player,market,value,count,n_sims,game_home,game_away,date,period
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,4.0,166,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,GOALS,1.0,262,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,ASSISTS,0.0,590,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,POINTS,1.0,380,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,BLOCKS,1.0,366,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,5.0,142,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,GOALS,1.0,329,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,ASSISTS,1.0,320,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,POINTS,2.0,197,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,BLOCKS,0.0,475,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,2.0,241,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,GOALS,0.0,661,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,ASSISTS,0.0,606,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,POINTS,0.0,396,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,BLOCKS,0.0,370,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,1.0,140,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,GOALS,0.0,869,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,ASSISTS,2.0,104,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,POINTS,2.0,133,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,4.0,114,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,2.0,217,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,GOALS,0.0,870,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,ASSISTS,0.0,540,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,POINTS,0.0,469,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,2.0,228,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,4.0,172,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,GOALS,0.0,788,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,ASSISTS,0.0,480,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,POINTS,0.0,379,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,1.0,353,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,1.0,168,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,GOALS,0.0,814,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,ASSISTS,0.0,499,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,POINTS,0.0,405,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,2.0,271,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,5.0,119,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,GOALS,1.0,363,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,ASSISTS,0.0,721,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,POINTS,1.0,345,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,BLOCKS,0.0,475,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,4.0,176,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,GOALS,0.0,856,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,ASSISTS,0.0,479,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,POINTS,0.0,415,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,6.0,44,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,1.0,216,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,GOALS,0.0,887,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,ASSISTS,0.0,554,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,POINTS,0.0,493,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,1.0,308,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SOG,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,GOALS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,ASSISTS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,POINTS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,BLOCKS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,42.0,23,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SOG,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,GOALS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,ASSISTS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,POINTS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,BLOCKS,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,27.0,16,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,4.0,105,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,GOALS,1.0,242,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,ASSISTS,1.0,237,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,POINTS,2.0,116,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,BLOCKS,1.0,357,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,2.0,239,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,GOALS,1.0,256,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,ASSISTS,1.0,258,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,POINTS,2.0,130,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,BLOCKS,0.0,695,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,0.0,179,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,GOALS,0.0,804,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,ASSISTS,0.0,707,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,POINTS,0.0,572,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,BLOCKS,3.0,49,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SOG,3.0,136,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,GOALS,0.0,689,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,ASSISTS,3.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,POINTS,3.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,BLOCKS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,0.0,197,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,GOALS,0.0,923,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,ASSISTS,1.0,232,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,POINTS,1.0,277,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,BLOCKS,1.0,271,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,4.0,84,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,GOALS,0.0,718,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,ASSISTS,0.0,732,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,POINTS,0.0,518,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,BLOCKS,0.0,503,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,3.0,137,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,GOALS,0.0,779,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,ASSISTS,0.0,718,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,POINTS,0.0,561,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,0.0,356,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,2.0,263,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,GOALS,0.0,763,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,ASSISTS,0.0,699,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,POINTS,0.0,535,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,BLOCKS,2.0,209,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,1.0,281,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,GOALS,0.0,902,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,ASSISTS,1.0,258,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,POINTS,1.0,312,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,BLOCKS,1.0,352,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,1.0,240,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,GOALS,0.0,686,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,ASSISTS,0.0,763,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,POINTS,0.0,525,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,BLOCKS,0.0,726,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,1.0,235,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,GOALS,0.0,728,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,ASSISTS,1.0,224,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,POINTS,1.0,338,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,BLOCKS,0.0,446,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,2.0,262,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,GOALS,1.0,68,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,ASSISTS,0.0,665,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,POINTS,1.0,290,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,BLOCKS,0.0,350,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,0.0,190,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,GOALS,0.0,920,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,ASSISTS,0.0,659,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,POINTS,0.0,610,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,1.0,264,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,1.0,284,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,GOALS,0.0,900,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,ASSISTS,0.0,632,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,POINTS,0.0,567,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,BLOCKS,0.0,301,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,3.0,209,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,GOALS,0.0,896,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,ASSISTS,1.0,330,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,POINTS,1.0,370,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,BLOCKS,0.0,203,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,5.0,59,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,GOALS,0.0,841,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,ASSISTS,1.0,274,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,POINTS,1.0,318,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,2.0,153,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,0.0,159,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,GOALS,0.0,655,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,ASSISTS,0.0,781,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,POINTS,0.0,523,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,BLOCKS,0.0,614,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,3.0,196,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,GOALS,1.0,207,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,ASSISTS,0.0,691,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,POINTS,1.0,344,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,BLOCKS,0.0,375,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SOG,2.0,256,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,GOALS,0.0,937,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,ASSISTS,0.0,699,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,POINTS,0.0,655,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,0.0,273,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SOG,2.0,233,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,GOALS,0.0,911,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,ASSISTS,0.0,748,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,POINTS,0.0,677,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,BLOCKS,1.0,330,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,3.0,134,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,GOALS,2.0,28,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,ASSISTS,0.0,756,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,POINTS,2.0,78,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,BLOCKS,0.0,396,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,0.0,221,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,GOALS,0.0,796,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,ASSISTS,1.0,225,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,POINTS,1.0,321,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,BLOCKS,0.0,369,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,3.0,125,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,GOALS,0.0,798,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,ASSISTS,1.0,206,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,POINTS,1.0,297,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,BLOCKS,1.0,356,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,0.0,310,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,GOALS,0.0,946,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,ASSISTS,0.0,784,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,POINTS,0.0,739,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,BLOCKS,1.0,346,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,1.0,282,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,GOALS,0.0,751,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,ASSISTS,0.0,786,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,POINTS,0.0,583,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,BLOCKS,0.0,338,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,3.0,171,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,GOALS,0.0,917,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,ASSISTS,0.0,723,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,POINTS,0.0,661,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,BLOCKS,1.0,362,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SAVES,0.0,1000,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,3.0,231,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,BLOCKS,0.0,473,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,3.0,221,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,GOALS,0.0,573,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,POINTS,1.0,379,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,BLOCKS,1.0,356,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,4.0,150,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,BLOCKS,1.0,359,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,2.0,208,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,ASSISTS,1.0,332,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,POINTS,1.0,351,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,2.0,253,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,4.0,182,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,GOALS,1.0,124,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,POINTS,1.0,365,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,1.0,180,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,5.0,108,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,0.0,286,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,4.0,142,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,5.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,3.0,231,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,ASSISTS,1.0,236,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,POINTS,2.0,235,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,BLOCKS,1.0,340,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,1.0,139,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,GOALS,1.0,127,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,ASSISTS,1.0,339,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,POINTS,2.0,177,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,2.0,244,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,3.0,210,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,ASSISTS,2.0,89,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,POINTS,2.0,120,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,4.0,66,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,29.0,53,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,37.0,64,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SOG,1.0,336,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,ASSISTS,0.0,812,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,POINTS,0.0,551,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,BLOCKS,0.0,402,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,2.0,278,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,ASSISTS,0.0,725,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,POINTS,0.0,662,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,BLOCKS,0.0,650,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,0.0,101,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,0.0,409,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,1.0,303,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,GOALS,1.0,282,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,POINTS,1.0,331,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,1.0,286,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,GOALS,0.0,773,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,ASSISTS,1.0,260,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,BLOCKS,2.0,175,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,2.0,243,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,GOALS,1.0,94,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,ASSISTS,0.0,662,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,BLOCKS,2.0,186,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,0.0,89,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,GOALS,0.0,706,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,POINTS,1.0,348,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,6.0,43,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,ASSISTS,0.0,694,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,POINTS,1.0,352,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,1.0,309,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,ASSISTS,1.0,240,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,POINTS,1.0,303,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,BLOCKS,0.0,408,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,3.0,149,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,ASSISTS,1.0,270,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,POINTS,1.0,291,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,3.0,173,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,2.0,267,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,BLOCKS,1.0,366,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,2.0,266,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,ASSISTS,0.0,597,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,POINTS,0.0,526,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,BLOCKS,4.0,59,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SOG,0.0,240,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,ASSISTS,1.0,253,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,POINTS,1.0,281,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,1.0,377,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,3.0,186,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,GOALS,1.0,256,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,POINTS,1.0,332,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,3.0,202,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,BLOCKS,1.0,372,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,1.0,301,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,GOALS,0.0,927,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,POINTS,0.0,613,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,BLOCKS,1.0,389,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,2.0,274,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,ASSISTS,1.0,247,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,POINTS,1.0,368,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,0.0,171,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,1.0,317,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,GOALS,1.0,214,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,POINTS,1.0,341,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,BLOCKS,1.0,369,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,GOALS,1.0,185,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,POINTS,1.0,318,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,BLOCKS,2.0,179,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,3.0,132,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,BLOCKS,1.0,356,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,1.0,354,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,ASSISTS,0.0,767,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,POINTS,0.0,611,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,BLOCKS,0.0,386,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SOG,3.0,84,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,ASSISTS,1.0,213,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,POINTS,1.0,265,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,BLOCKS,0.0,517,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,1.0,332,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,BLOCKS,2.0,146,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,0.0,139,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,BLOCKS,3.0,60,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,2.0,275,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,BLOCKS,0.0,437,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,GOALS,0.0,711,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,POINTS,0.0,415,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,7.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,ASSISTS,0.0,608,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,POINTS,0.0,348,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,3.0,221,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,5.0,120,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,ASSISTS,0.0,540,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,POINTS,0.0,471,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,3.0,226,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,3.0,235,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,0.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,2.0,234,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,ASSISTS,1.0,353,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,POINTS,1.0,375,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,3.0,110,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,2.0,244,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,ASSISTS,1.0,332,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,POINTS,1.0,357,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,3.0,177,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,2.0,205,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,GOALS,2.0,207,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,3.0,224,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,ASSISTS,1.0,336,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,POINTS,1.0,352,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,3.0,149,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,30.0,56,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,36.0,51,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,2.0,276,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,ASSISTS,0.0,721,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,POINTS,0.0,504,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,BLOCKS,0.0,383,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,GOALS,0.0,700,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,POINTS,0.0,488,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,BLOCKS,2.0,161,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,1.0,240,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,ASSISTS,0.0,675,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,POINTS,0.0,574,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,1.0,372,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,2.0,259,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,2.0,251,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,POINTS,0.0,533,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,2.0,256,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,0.0,138,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,BLOCKS,4.0,26,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,5.0,53,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,BLOCKS,1.0,336,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SOG,3.0,117,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,1.0,287,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,1.0,285,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,3.0,137,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,ASSISTS,0.0,738,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,POINTS,0.0,533,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SOG,2.0,248,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,BLOCKS,1.0,376,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,GOALS,1.0,71,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,0.0,229,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,GOALS,0.0,784,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,ASSISTS,1.0,213,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,GOALS,2.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,ASSISTS,0.0,743,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,POINTS,2.0,72,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,3.0,179,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,ASSISTS,2.0,71,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,POINTS,3.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SOG,1.0,357,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,ASSISTS,1.0,192,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,POINTS,1.0,230,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,BLOCKS,1.0,394,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,1.0,269,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,ASSISTS,1.0,241,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,POINTS,1.0,285,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,5.0,118,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,0.0,88,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,4.0,152,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,ASSISTS,2.0,137,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,POINTS,5.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,3.0,229,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,GOALS,1.0,165,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,ASSISTS,2.0,138,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,POINTS,3.0,55,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,1.0,303,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,POINTS,5.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,2.0,225,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,ASSISTS,2.0,140,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,1.0,184,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,0.0,189,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,26.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,4.0,113,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,BLOCKS,1.0,296,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,BLOCKS,1.0,360,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,4.0,61,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,5.0,36,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,ASSISTS,1.0,291,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,POINTS,1.0,324,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,1.0,243,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,6.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,GOALS,1.0,269,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,POINTS,1.0,344,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,1.0,281,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,2.0,256,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,POINTS,0.0,587,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,1.0,331,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,POINTS,0.0,590,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,2.0,243,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,GOALS,1.0,172,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,GOALS,2.0,51,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,POINTS,2.0,112,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,ASSISTS,2.0,62,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,POINTS,2.0,81,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,GOALS,1.0,236,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,ASSISTS,1.0,254,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,BLOCKS,0.0,327,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,2.0,226,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,BLOCKS,0.0,473,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,ASSISTS,1.0,194,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,POINTS,1.0,335,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,4.0,80,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,0.0,145,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,POINTS,0.0,587,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SOG,0.0,286,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,ASSISTS,1.0,309,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,4.0,184,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,1.0,173,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,ASSISTS,1.0,307,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,POINTS,1.0,379,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,5.0,86,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,3.0,218,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,6.0,48,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,3.0,227,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,POINTS,1.0,341,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,5.0,88,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,39.0,30,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,49.0,9,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,3.0,223,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,4.0,145,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,4.0,64,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,3.0,192,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,3.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,5.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,BLOCKS,5.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SOG,1.0,336,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,4.0,33,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,0.0,130,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,3.0,175,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,BLOCKS,2.0,139,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,1.0,345,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,6.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,5.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,2.0,272,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,BLOCKS,1.0,342,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,BLOCKS,2.0,186,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,0.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,BLOCKS,2.0,201,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,GOALS,1.0,120,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,0.0,64,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,37.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,33.0,53,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,1.0,199,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,BLOCKS,3.0,70,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,2.0,249,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,3.0,92,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,5.0,37,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,GOALS,1.0,224,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,POINTS,2.0,67,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,GOALS,1.0,82,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,POINTS,2.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,6.0,22,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,3.0,174,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,2.0,241,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,2.0,264,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,3.0,172,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SOG,0.0,190,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,ASSISTS,1.0,162,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,2.0,234,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,2.0,194,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,2.0,181,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,ASSISTS,2.0,62,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,GOALS,1.0,271,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,6.0,59,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,10.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,GOALS,2.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,POINTS,2.0,128,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,1.0,302,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,32.0,71,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,35.0,63,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,GOALS,1.0,191,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,POINTS,2.0,174,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,BLOCKS,2.0,145,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,0.0,110,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,2.0,254,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,4.0,78,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,GOALS,1.0,98,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,1.0,195,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,BLOCKS,1.0,261,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,3.0,163,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,1.0,315,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,BLOCKS,2.0,211,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,3.0,105,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,4.0,97,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,GOALS,1.0,225,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,BLOCKS,2.0,137,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,0.0,137,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,0.0,139,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,4.0,64,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,BLOCKS,3.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,BLOCKS,2.0,132,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,3.0,225,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,1.0,150,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,5.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,POINTS,2.0,173,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,4.0,170,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,5.0,64,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,33.0,64,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,34.0,46,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,GOALS,1.0,53,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,ASSISTS,2.0,33,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,BLOCKS,4.0,23,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,ASSISTS,1.0,198,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,POINTS,2.0,117,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,POINTS,2.0,101,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,2.0,274,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,0.0,103,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,BLOCKS,1.0,333,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,GOALS,1.0,184,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,POINTS,1.0,320,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,4.0,133,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,BLOCKS,1.0,237,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,4.0,75,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,BLOCKS,2.0,122,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,0.0,212,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,BLOCKS,4.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,4.0,172,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,8.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,9.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,4.0,83,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,8.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,45.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,40.0,55,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,ASSISTS,2.0,44,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,ASSISTS,2.0,50,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,POINTS,2.0,107,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,BLOCKS,1.0,374,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,4.0,92,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,BLOCKS,2.0,255,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,4.0,94,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,GOALS,2.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,POINTS,2.0,92,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,3.0,168,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,BLOCKS,2.0,144,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,0.0,192,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,BLOCKS,3.0,75,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,0.0,97,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,BLOCKS,0.0,386,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,5.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,BLOCKS,3.0,65,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,BLOCKS,2.0,134,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,1.0,142,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,2.0,209,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,0.0,126,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,0.0,55,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,2.0,228,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,31.0,60,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,ASSISTS,2.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,POINTS,3.0,25,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,ASSISTS,1.0,260,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,BLOCKS,3.0,76,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,4.0,98,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,GOALS,1.0,63,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,ASSISTS,2.0,42,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,POINTS,3.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,2.0,291,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,5.0,45,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,ASSISTS,2.0,86,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,POINTS,2.0,156,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,BLOCKS,5.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,3.0,205,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,GOALS,2.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,POINTS,3.0,59,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,ASSISTS,3.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,8.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,ASSISTS,3.0,36,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,POINTS,3.0,52,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,4.0,133,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,GOALS,1.0,105,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,5.0,60,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,3.0,214,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,2.0,262,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,BLOCKS,3.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,3.0,171,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,BLOCKS,2.0,154,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,6.0,64,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,ASSISTS,2.0,71,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,POINTS,3.0,59,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,BLOCKS,3.0,54,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,0.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,ASSISTS,1.0,344,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,6.0,48,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,5.0,96,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,29.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,POINTS,2.0,86,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,4.0,61,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,BLOCKS,3.0,67,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,3.0,67,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,BLOCKS,2.0,186,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,ASSISTS,2.0,30,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,GOALS,1.0,182,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,5.0,89,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,34.0,73,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,30.0,44,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,4.0,71,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,BLOCKS,3.0,126,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,GOALS,1.0,76,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,POINTS,2.0,84,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,0.0,154,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,GOALS,2.0,76,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,POINTS,4.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,POINTS,2.0,154,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,5.0,72,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,6.0,54,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,4.0,124,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,GOALS,2.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,0.0,141,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,BLOCKS,3.0,89,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,ASSISTS,2.0,24,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,POINTS,2.0,85,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,BLOCKS,3.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,4.0,84,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,ASSISTS,2.0,92,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,27.0,44,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,BLOCKS,2.0,183,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,GOALS,1.0,96,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,4.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,0.0,148,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,ASSISTS,1.0,203,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,BLOCKS,3.0,57,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,ASSISTS,1.0,244,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,43.0,42,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,5.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,GOALS,2.0,41,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,POINTS,2.0,90,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,1.0,118,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,0.0,49,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,25.0,9,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,2.0,203,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,0.0,50,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,9.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,41.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,23.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,POINTS,2.0,99,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,ASSISTS,2.0,66,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,2.0,196,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,5.0,77,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,BLOCKS,2.0,174,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,GOALS,3.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,POINTS,3.0,57,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,ASSISTS,3.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,POINTS,3.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,ASSISTS,3.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,4.0,33,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,0.0,51,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,GOALS,3.0,65,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,POINTS,3.0,119,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,GOALS,2.0,46,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,5.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SOG,5.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,GOALS,2.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,POINTS,2.0,52,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,ASSISTS,2.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,1.0,210,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,9.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,6.0,52,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,36.0,42,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,BLOCKS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,BLOCKS,2.0,40,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,GOALS,2.0,53,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,ASSISTS,2.0,41,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SOG,5.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,6.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,1.0,128,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,45.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,GOALS,2.0,36,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,6.0,28,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,POINTS,3.0,26,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,1.0,136,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,GOALS,0.0,344,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,POINTS,0.0,251,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,0.0,68,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,5.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,BLOCKS,3.0,60,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,4.0,88,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SOG,4.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,BLOCKS,4.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,ASSISTS,3.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,POINTS,3.0,32,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,8.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,GOALS,2.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,ASSISTS,2.0,40,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,22.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,ASSISTS,2.0,33,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,GOALS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,POINTS,3.0,26,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,ASSISTS,2.0,60,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,ASSISTS,2.0,23,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,POINTS,2.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,GOALS,2.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,GOALS,3.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,ASSISTS,3.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,POINTS,3.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,ASSISTS,2.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,POINTS,2.0,93,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,GOALS,2.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,POINTS,3.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,BLOCKS,4.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,POINTS,3.0,42,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,7.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,40.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,BLOCKS,2.0,166,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,4.0,55,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,46.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,GOALS,1.0,171,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,BLOCKS,4.0,18,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,3.0,148,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,6.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,ASSISTS,2.0,24,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,POINTS,2.0,80,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,BLOCKS,3.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,GOALS,2.0,58,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,BLOCKS,3.0,35,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,7.0,11,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,GOALS,1.0,146,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,ASSISTS,2.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,GOALS,2.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,GOALS,1.0,85,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,4.0,56,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,BLOCKS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,39.0,61,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,POINTS,2.0,88,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,BLOCKS,2.0,75,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,POINTS,2.0,101,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,BLOCKS,5.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,5.0,91,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,5.0,90,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,35.0,52,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,ASSISTS,2.0,60,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,POINTS,2.0,84,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,6.0,30,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,BLOCKS,2.0,30,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,5.0,25,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,GOALS,2.0,32,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,0.0,38,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,5.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,ASSISTS,2.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,BLOCKS,4.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,38.0,43,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,4.0,49,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,5.0,24,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,GOALS,2.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,GOALS,2.0,43,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,38.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,5.0,26,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,4.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,BLOCKS,5.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,4.0,80,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,6.0,48,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,6.0,46,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,47.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,5.0,18,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,5.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,BLOCKS,2.0,67,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,5.0,31,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,6.0,17,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,20.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,41.0,44,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,6.0,59,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,ASSISTS,2.0,35,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,7.0,24,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,10.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,8.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,5.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,51.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,BLOCKS,4.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,ASSISTS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,7.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,BLOCKS,3.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,BLOCKS,3.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,POINTS,3.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,6.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,5.0,65,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,44.0,18,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,ASSISTS,3.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,POINTS,3.0,25,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,6.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,6.0,11,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,BLOCKS,3.0,56,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,7.0,28,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,6.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,7.0,36,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,7.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,ASSISTS,3.0,18,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,21.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,42.0,49,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,7.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,BLOCKS,6.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,POINTS,2.0,55,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,POINTS,3.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,ASSISTS,2.0,17,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SOG,4.0,39,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,GOALS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,POINTS,3.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,ASSISTS,2.0,33,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,6.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,24.0,22,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,ASSISTS,2.0,42,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,48.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,ASSISTS,2.0,44,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,ASSISTS,3.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,POINTS,4.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,GOALS,2.0,25,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,ASSISTS,3.0,16,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,7.0,11,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,49.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,26.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,POINTS,4.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,GOALS,2.0,24,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,GOALS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,POINTS,3.0,22,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,POINTS,3.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,BLOCKS,5.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,6.0,26,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,7.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,POINTS,4.0,37,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,BLOCKS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,7.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,SOG,7.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,BLOCKS,3.0,28,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,8.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,48.0,16,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SOG,4.0,58,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,BLOCKS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,POINTS,3.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,8.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,ASSISTS,3.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,32.0,49,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,31.0,36,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,POINTS,3.0,17,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,7.0,35,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,25.0,34,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,BLOCKS,3.0,54,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,28.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,ASSISTS,2.0,34,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,POINTS,2.0,50,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,POINTS,3.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,GOALS,3.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,POINTS,3.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,9.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,SOG,6.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,6.0,25,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,5.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,GOALS,3.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,POINTS,4.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,9.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,43.0,16,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,5.0,18,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,GOALS,2.0,17,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,ASSISTS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,POINTS,4.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,44.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,8.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,ASSISTS,3.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,8.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SOG,6.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,BLOCKS,3.0,27,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,BLOCKS,5.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,7.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,ASSISTS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,POINTS,4.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,5.0,34,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,6.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,POINTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,POINTS,3.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,20.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,ASSISTS,3.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,47.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,6.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,0.0,41,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,SOG,6.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,BLOCKS,4.0,17,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,GOALS,2.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,POINTS,3.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,6.0,43,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,SOG,5.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,BLOCKS,4.0,18,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,24.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,8.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,BLOCKS,6.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,ASSISTS,3.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,POINTS,3.0,20,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,6.0,11,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,BLOCKS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,6.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,BLOCKS,3.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,BLOCKS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,POINTS,4.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,ASSISTS,3.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,POINTS,3.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,8.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,28.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,53.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,6.0,9,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,6.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,GOALS,2.0,29,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,ASSISTS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,ASSISTS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,BLOCKS,4.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,BLOCKS,4.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,SOG,9.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,5.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,7.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,POINTS,3.0,17,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,10.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,ASSISTS,3.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,GOALS,2.0,11,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,BLOCKS,4.0,21,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,SOG,6.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,GOALS,2.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,19.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,8.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,POINTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,BLOCKS,5.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,GOALS,3.0,10,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,POINTS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,POINTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,ASSISTS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,7.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,GOALS,4.0,17,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,58.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,7.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,BLOCKS,3.0,47,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,POINTS,3.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,0.0,43,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,50.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,ASSISTS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,POINTS,5.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,POINTS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,POINTS,4.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,5.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,BLOCKS,4.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,BLOCKS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,SOG,7.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,ASSISTS,3.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,BLOCKS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,22.0,15,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,7.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,POINTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,4.0,25,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,SOG,7.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,SOG,6.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,8.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,50.0,12,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,9.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,GOALS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,POINTS,4.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,ASSISTS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,POINTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,ASSISTS,3.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,ASSISTS,3.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,POINTS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,POINTS,3.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,23.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,ASSISTS,4.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,POINTS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,7.0,14,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,8.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,GOALS,5.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,SOG,7.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,6.0,16,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,9.0,9,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,ASSISTS,3.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,POINTS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,ASSISTS,3.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,SOG,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,GOALS,2.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,7.0,19,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,18.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,BLOCKS,4.0,9,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,9.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,POINTS,3.0,23,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,BLOCKS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,6.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,7.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,6.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,POINTS,4.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,46.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,GOALS,3.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,SOG,11.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,7.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,SOG,7.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,BLOCKS,7.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,SOG,7.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,9.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,BLOCKS,9.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,ASSISTS,3.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,GOALS,3.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,BLOCKS,8.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,BLOCKS,4.0,13,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,GOALS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,ASSISTS,3.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482702,Logan Stankoven,BLOCKS,3.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,7.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,8.0,7,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,8.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,ASSISTS,3.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,BLOCKS,6.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,BLOCKS,5.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,GOALS,3.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,GOALS,2.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,9.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,GOALS,3.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,8.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,19.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481604,Pavel Dorofeyev,POINTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,BLOCKS,5.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,SOG,6.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,ASSISTS,3.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,BLOCKS,5.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,SOG,7.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,POINTS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,GOALS,2.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,8.0,8,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,ASSISTS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,12.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,SOG,7.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,BLOCKS,5.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,BLOCKS,4.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,52.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479639,Dylan Coghlan,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482809,Jackson Blake,SOG,9.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478468,Jeremy Lauzon,GOALS,2.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,BLOCKS,9.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,ASSISTS,3.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,ASSISTS,3.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,ASSISTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,POINTS,5.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,11.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,POINTS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,BLOCKS,5.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,GOALS,2.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,BLOCKS,5.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,12.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,GOALS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,16.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,52.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,8.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,5.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,6.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,SOG,9.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8484803,Trevor Connelly,SOG,7.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,13.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,ASSISTS,3.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,POINTS,5.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,GOALS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,SOG,11.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480830,Andrei Svechnikov,SOG,9.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,SOG,8.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,POINTS,4.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,16.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,BLOCKS,5.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,SOG,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475235,Nicolas Deslauriers,ASSISTS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,ASSISTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,9.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,SOG,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,GOALS,2.0,5,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,10.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,GOALS,3.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,POINTS,4.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,ASSISTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,21.0,6,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476873,Mark Jankowski,SOG,7.0,4,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,POINTS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,60.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,GOALS,3.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476958,Jaccob Slavin,BLOCKS,11.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,17.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,ASSISTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,54.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,18.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478403,Jack Eichel,GOALS,3.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482093,Seth Jarvis,BLOCKS,5.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8477940,Nikolaj Ehlers,SOG,9.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,BLOCKS,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477964,Ivan Barbashev,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,11.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,SOG,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,SOG,11.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,POINTS,4.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480829,Jesperi Kotkaniemi,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,10.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479353,Brett Howden,SOG,8.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,BLOCKS,8.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,GOALS,3.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475913,Mark Stone,SOG,10.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,14.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,ASSISTS,4.0,3,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8481534,Raphael Lavoie,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478397,Rasmus Andersson,SOG,8.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8475188,Brayden McNabb,BLOCKS,7.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480817,K'Andre Miller,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478483,Mitch Marner,SOG,10.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476906,Shayne Gostisbehere,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8483890,Braeden Bowman,BLOCKS,6.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479550,Tanner Laczynski,BLOCKS,6.0,2,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478427,Sebastian Aho,SOG,10.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8478970,Jalen Chatfield,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8473533,Jordan Staal,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475883,Frederik Andersen,SAVES,51.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8482125,Alexander Holtz,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8482100,Alexander Nikishin,POINTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8475791,Taylor Hall,ASSISTS,4.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8477447,Shea Theodore,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,ASSISTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8480336,Sean Walker,POINTS,5.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8479394,Carter Hart,SAVES,59.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Carolina Hurricanes,8476921,Jordan Martinook,SOG,8.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8476448,William Karlsson,SOG,8.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0
+Vegas Golden Knights,8478396,Noah Hanifin,GOALS,3.0,1,1000,Carolina Hurricanes,Vegas Golden Knights,2026-06-04,0

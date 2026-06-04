@@ -1,0 +1,202 @@
+{
+  "date": "2026-06-04",
+  "counts": {
+    "games": 2,
+    "picks": 10
+  },
+  "per_game": [
+    {
+      "home": "MIN",
+      "away": "GSV",
+      "matchup": "GSV @ MIN",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Courtney Williams OVER 1.5",
+          "selection": "OVER 1.5",
+          "price": 102.0,
+          "score": 36.21479652389844,
+          "ev_pct": 36.21479652389844,
+          "win_prob": 0.49504950495049505,
+          "p_win": 0.49504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 36.2%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Natasha Howard OVER 10.5",
+          "selection": "OVER 10.5",
+          "price": 101.0,
+          "score": 16.25740331031802,
+          "ev_pct": 16.25740331031802,
+          "win_prob": 0.4975124378109453,
+          "p_win": 0.4975124378109453,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 16.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ MIN"
+        },
+        {
+          "market": "PROPS",
+          "team": "MIN",
+          "display_pick": "Olivia Miles UNDER 5.5",
+          "selection": "UNDER 5.5",
+          "price": 118.0,
+          "score": 11.50031752419931,
+          "ev_pct": 11.50031752419931,
+          "win_prob": 0.45871559633027525,
+          "p_win": 0.45871559633027525,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 11.5%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ MIN"
+        },
+        {
+          "market": "ATS",
+          "team": "Minnesota Lynx",
+          "display_pick": "Minnesota Lynx -3.5",
+          "selection": "Minnesota Lynx",
+          "price": -110.0,
+          "score": 6.825,
+          "ev_pct": 6.825,
+          "win_prob": 0.59206,
+          "p_win": 0.59206,
+          "basketball_summary": "Model margin 3.3 vs market -3.5",
+          "top_play_reasons": [
+            "Edge 6.8",
+            "EV 6.8%"
+          ],
+          "matchup": "GSV @ MIN"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 164.0",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -3.051986,
+          "ev_pct": 3.052,
+          "win_prob": 0.55433,
+          "p_win": 0.55433,
+          "basketball_summary": "Model total 160.9 vs line 164.0",
+          "top_play_reasons": [
+            "Edge -3.1",
+            "EV 3.1%"
+          ],
+          "matchup": "GSV @ MIN"
+        }
+      ]
+    },
+    {
+      "home": "IND",
+      "away": "ATL",
+      "matchup": "ATL @ IND",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Allisha Gray UNDER 6.5",
+          "selection": "UNDER 6.5",
+          "price": 101.0,
+          "score": 15.161746173781843,
+          "ev_pct": 15.161746173781843,
+          "win_prob": 0.4975124378109453,
+          "p_win": 0.4975124378109453,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 15.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "ATL @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Rhyne Howard OVER 3.5",
+          "selection": "OVER 3.5",
+          "price": -109.0,
+          "score": 10.015569979206873,
+          "ev_pct": 10.015569979206873,
+          "win_prob": 0.5215311004784688,
+          "p_win": 0.5215311004784688,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 10.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "ATL @ IND"
+        },
+        {
+          "market": "PROPS",
+          "team": "ATL",
+          "display_pick": "Jordin Canada OVER 6.5",
+          "selection": "OVER 6.5",
+          "price": 110.0,
+          "score": 9.87035410304774,
+          "ev_pct": 9.87035410304774,
+          "win_prob": 0.47619047619047616,
+          "p_win": 0.47619047619047616,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 9.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "ATL @ IND"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 174.0",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -3.76805,
+          "ev_pct": 3.768,
+          "win_prob": 0.56149,
+          "p_win": 0.56149,
+          "basketball_summary": "Model total 170.2 vs line 174.0",
+          "top_play_reasons": [
+            "Edge -3.8",
+            "EV 3.8%"
+          ],
+          "matchup": "ATL @ IND"
+        },
+        {
+          "market": "ATS",
+          "team": "Indiana Fever",
+          "display_pick": "Indiana Fever -1.0",
+          "selection": "Indiana Fever",
+          "price": -110.0,
+          "score": 1.95,
+          "ev_pct": 1.95,
+          "win_prob": 0.54331,
+          "p_win": 0.54331,
+          "basketball_summary": "Model margin 0.9 vs market -1.0",
+          "top_play_reasons": [
+            "Edge 1.9",
+            "EV 1.9%"
+          ],
+          "matchup": "ATL @ IND"
+        }
+      ]
+    }
+  ]
+}
