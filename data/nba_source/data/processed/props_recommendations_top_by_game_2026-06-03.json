@@ -46,6 +46,48 @@
     {
       "game_key": "NYK@SAS",
       "game_id": "1",
+      "player": "Jose Alvarado",
+      "team": "NYK",
+      "team_tricode": "NYK",
+      "opponent": "SAS",
+      "score": 54.3263684590683,
+      "score_adj": 54.3263684590683,
+      "tier": "High",
+      "model": {
+        "pts": 10.89,
+        "reb": 3.43,
+        "ast": 4.359999999999999,
+        "threes": 1.9,
+        "stl": 0.4932399999999999,
+        "blk": 0.4035599999999999,
+        "tov": 1.3451999999999995,
+        "pra": 18.68,
+        "pr": 14.32,
+        "pa": 15.25,
+        "ra": 7.789999999999999
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "OVER",
+        "line": 2.5,
+        "price": 113.0,
+        "edge": 0.25505337304726905,
+        "ev": 0.543263684590683,
+        "ev_pct": 54.3263684590683,
+        "book": "williamhill_us",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 54.3%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 10.9 vs line 2.5 (+8.4)"
+    },
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
       "player": "Julian Champagnie",
       "team": "SAS",
       "team_tricode": "SAS",
@@ -85,48 +127,6 @@
         "Best line available"
       ],
       "basketball_summary": "model 1.4 vs line 2.5 (-1.1)"
-    },
-    {
-      "game_key": "NYK@SAS",
-      "game_id": "1",
-      "player": "Jose Alvarado",
-      "team": "NYK",
-      "team_tricode": "NYK",
-      "opponent": "SAS",
-      "score": 50.70368375345639,
-      "score_adj": 50.70368375345639,
-      "tier": "High",
-      "model": {
-        "pts": 10.89,
-        "reb": 3.43,
-        "ast": 4.359999999999999,
-        "threes": 1.9,
-        "stl": 0.4932399999999999,
-        "blk": 0.4035599999999999,
-        "tov": 1.3451999999999995,
-        "pra": 18.68,
-        "pr": 14.32,
-        "pa": 15.25,
-        "ra": 7.789999999999999
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "OVER",
-        "line": 2.5,
-        "price": 108.0,
-        "edge": 0.24376771035315564,
-        "ev": 0.5070368375345639,
-        "ev_pct": 50.70368375345639,
-        "book": "fanduel",
-        "p_win": 0.9878060683037946,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 50.7%",
-        "Regular price range (-150 to +150)",
-        "Best line available"
-      ],
-      "basketball_summary": "model 10.9 vs line 2.5 (+8.4)"
     }
   ]
 }
