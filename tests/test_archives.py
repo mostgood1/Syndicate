@@ -1815,6 +1815,72 @@ class HomeBoardTests(unittest.TestCase):
         self.assertEqual(finalized[0]["hero_sim_box"], "0.5 H")
         self.assertEqual(finalized[0]["matchup_summary"], "CLE at NYY")
 
+    def test_finalize_home_prop_rows_builds_required_display_pills_and_ladder_callout(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        rows = [
+            {
+                "name": "Caitlin Clark",
+                "market": "threes",
+                "pick": "Over",
+                "line": "2.5",
+                "odds": "102",
+                "confidence": "64.1%",
+                "projected": "3.1",
+                "live_total": "1",
+                "live_projection": "2.8",
+                "is_live": True,
+                "away_label": "ATL",
+                "home_label": "IND",
+                "detail": "Over 2.5 3PM",
+                "ladder_groups": [{"short_label": "3PM", "targets": [3, 4]}],
+            }
+        ]
+
+        finalized = home_module._finalize_home_prop_rows(rows, slug="wnba", context_label="2026-06-04", home_games=[])
+
+        self.assertEqual(
+            finalized[0]["display_pills"],
+            [
+                "Line 2.5",
+                "Odds 102",
+                "Sim% 64.1%",
+                "Pregame 3PM Proj 3.1 3PM",
+                "Live 3PM Total 1 3PM",
+                "Live 3PM Proj 2.8 3PM",
+                "Ladder 3PM 3/4",
+            ],
+        )
+
+    def test_load_mlb_home_hr_target_items_aligns_away_home_logos_to_matchup(self) -> None:
+        from syndicate.blueprints import home as home_module
+
+        context = {
+            "targets": [
+                {
+                    "game_pk": 1,
+                    "team": "MIL",
+                    "opponent": "SF",
+                    "matchup": "SF @ MIL",
+                    "player_name": "Rhys Hoskins",
+                    "probability": "18.0%",
+                    "support": "72",
+                    "summary": "HR target",
+                    "headshot_url": "https://example.test/rhys.png",
+                    "team_logo_url": "https://example.test/mil.png",
+                    "opponent_logo_url": "https://example.test/sf.png",
+                }
+            ]
+        }
+
+        with patch("syndicate.features.mlb.hr_targets.build_hr_targets_page_context", return_value=context):
+            rows = home_module._load_mlb_home_hr_target_items("2026-06-04", limit=5)
+
+        self.assertEqual(rows[0]["away_label"], "SF")
+        self.assertEqual(rows[0]["home_label"], "MIL")
+        self.assertEqual(rows[0]["away_logo"], "https://example.test/sf.png")
+        self.assertEqual(rows[0]["home_logo"], "https://example.test/mil.png")
+
     def test_mlb_pregame_hitter_rows_keep_game_pk_for_live_actual_lookup(self) -> None:
         from syndicate.blueprints import home as home_module
 

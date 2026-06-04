@@ -427,7 +427,8 @@
 }
 
 .sport-compact-card__context-row {
-  display: block;
+  display: grid;
+  gap: 8px;
 }
 
 .sport-compact-card__context-row .sport-compact-card__scoreboard {
@@ -442,6 +443,38 @@
 .sport-compact-card__identity-copy {
   display: grid;
   gap: 6px;
+}
+
+.sport-compact-card__hero-metrics {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sport-compact-card__hero-box {
+  display: grid;
+  gap: 2px;
+  min-width: 72px;
+  padding: 8px 10px;
+  border: 1px solid rgba(132, 166, 196, 0.12);
+  border-radius: 14px;
+  background: rgba(8, 18, 30, 0.64);
+}
+
+.sport-compact-card__hero-label {
+  color: var(--cards-text-dim);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sport-compact-card__hero-value {
+  color: var(--cards-text);
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .sport-compact-card__context-row .sport-compact-card__scoreboard {
