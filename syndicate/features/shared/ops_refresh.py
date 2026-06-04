@@ -427,8 +427,18 @@ def load_latest_refresh_status() -> dict[str, Any]:
     runtime_state = _derive_refresh_runtime_state(refresh_manifest, refresh_artifacts)
 
     daily_update_latest_dir = current_reports_root / "daily_update" / "latest"
-    daily_update_manifest_path = daily_update_latest_dir / "daily_update_latest.json"
-    daily_update_manifest = read_json_file(daily_update_manifest_path)
+    daily_update_manifest_candidates = [
+        daily_update_latest_dir / "unified_daily_update_latest.json",
+        daily_update_latest_dir / "daily_update_latest.json",
+    ]
+    daily_update_manifest_path = daily_update_manifest_candidates[0]
+    daily_update_manifest = None
+    for candidate in daily_update_manifest_candidates:
+        candidate_payload = read_json_file(candidate)
+        if isinstance(candidate_payload, dict):
+            daily_update_manifest_path = candidate
+            daily_update_manifest = candidate_payload
+            break
 
     return {
         "reports_root": str(current_reports_root),

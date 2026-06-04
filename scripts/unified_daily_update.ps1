@@ -1377,7 +1377,9 @@ function Invoke-GitPublish {
 $sourceSteps = @()
 $publishRepos = @()
 $preferLocalMirrorArtifactsForGate = $false
-$forcedPublishArtifactPaths = Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNCAAB ([bool]$SkipNCAAB)
+$resolveForcedPublishArtifactPaths = {
+    Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNCAAB ([bool]$SkipNCAAB)
+}
 $sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
 $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
 
@@ -1663,7 +1665,7 @@ try {
 
     if (-not $SkipGitPush) {
         foreach ($repo in $publishRepos) {
-            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths $forcedPublishArtifactPaths
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
             $runManifest.pushResults += @([ordered]@{
                 name = $result.name
                 repoPath = $result.repoPath
@@ -1751,7 +1753,7 @@ try {
 
             if (-not $SkipGitPush) {
                 foreach ($repo in $publishRepos) {
-                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote -ForceIncludePaths $forcedPublishArtifactPaths
+                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
                     $runManifest.pushResults += @([ordered]@{
                         name = $result.name
                         repoPath = $result.repoPath
@@ -1806,7 +1808,7 @@ try {
 
     if (-not $SkipGitPush) {
         foreach ($repo in $publishRepos) {
-            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $forcedPublishArtifactPaths
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
             $runManifest.pushResults += @([ordered]@{
                 name = $result.name
                 repoPath = $result.repoPath
