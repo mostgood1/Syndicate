@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Flask
 
 from syndicate.blueprints.home import home_bp
+from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.ops import ops_bp
 from syndicate.blueprints.nfl import nfl_bp
 from syndicate.blueprints.nhl import nhl_bp
@@ -151,6 +152,7 @@ def create_app() -> Flask:
         return {"syndicate_sports": app.config.get("SYNDICATE_SPORTS", [])}
 
     app.register_blueprint(home_bp)
+    app.register_blueprint(intelligence_bp)
     app.register_blueprint(ops_bp)
     app.register_blueprint(mlb_bp)
     app.register_blueprint(nba_bp)

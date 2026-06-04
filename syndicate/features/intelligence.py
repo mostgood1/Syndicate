@@ -1,0 +1,815 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from itertools import combinations
+from pathlib import Path
+import re
+import subprocess
+from typing import Any
+
+from flask import current_app
+
+from syndicate.blueprints.home import _build_prop_dashboard_row
+from syndicate.blueprints.home import _build_sport_overview
+from syndicate.blueprints.home import _game_bet_candidates_from_game
+from syndicate.features.mlb.sources import default_mlb_source_root
+from syndicate.features.nba.sources import live_snapshot_path as nba_live_snapshot_path
+from syndicate.features.nba.sources import processed_path as nba_processed_path
+from syndicate.features.nba.sources import season_betting_card_day_path as nba_season_betting_card_day_path
+from syndicate.features.ncaaf import sources as ncaaf_sources
+from syndicate.features.ncaab import sources as ncaab_sources
+from syndicate.features.nfl import sources as nfl_sources
+from syndicate.features.nhl.sources import processed_path as nhl_processed_path
+from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_props_lines_snapshot_path
+from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
+from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
+from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
+from syndicate.features.wnba.sources import processed_path as wnba_processed_path
+
+
+_SPORT_KEYWORDS: dict[str, set[str]] = {
+    "mlb": {"mlb", "baseball", "homer", "home run", "strikeout", "ks", "hits", "total bases", "rbi"},
+    "nba": {"nba", "basketball", "points", "rebounds", "assists", "threes", "pra", "double-double"},
+    "wnba": {"wnba", "women's basketball", "womens basketball", "threes", "pra", "points", "rebounds", "assists"},
+    "nhl": {"nhl", "hockey", "shots", "saves", "goalie", "puck line", "goals", "assists"},
+    "nfl": {"nfl", "football", "touchdown", "passing", "rushing", "receiving", "yards"},
+    "ncaaf": {"ncaaf", "college football", "cfb", "touchdown", "passing", "rushing", "receiving", "yards"},
+    "ncaab": {"ncaab", "college basketball", "cbb", "points", "rebounds", "assists", "threes"},
+}
+
+_PROP_MARKET_KEYWORDS = {
+    "prop",
+    "props",
+    "player",
+    "pts",
+    "reb",
+    "ast",
+    "pra",
+    "threes",
+    "shots",
+    "strikeout",
+    "ks",
+    "hits",
+    "rbi",
+    "yards",
+    "touchdown",
+}
+
+_GAME_MARKET_KEYWORDS = {"moneyline", "ml", "spread", "side", "total", "game bet", "puck line"}
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _effective_date(selected_date: str | None = None) -> str:
+    value = str(selected_date or "").strip()
+    return value or central_today_iso()
+
+
+def _safe_text(value: Any, fallback: str = "-") -> str:
+    text = str(value or "").strip()
+    return text or fallback
+
+
+def _relative_repo_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(_repo_root()).as_posix()
+    except Exception:
+        return str(path)
+
+
+def _numeric_hint(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text or text == "-":
+        return None
+    match = re.search(r"([+-]?\d+(?:\.\d+)?)", text)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except Exception:
+        return None
+
+
+def _pct_hint(value: Any) -> float | None:
+    number = _numeric_hint(value)
+    if number is None:
+        return None
+    if abs(number) <= 1.0:
+        number *= 100.0
+    return float(number)
+
+
+@lru_cache(maxsize=1)
+def _tracked_repo_files() -> set[str]:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(_repo_root()), "ls-files"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except Exception:
+        return set()
+    return {line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()}
+
+
+def _query_preferences(question: str, *, mode: str | None = None, sport: str | None = None, limit: int | None = None) -> dict[str, Any]:
+    lowered = str(question or "").lower()
+    explicit_mode = str(mode or "").strip().lower()
+    explicit_sport = str(sport or "").strip().lower()
+
+    requested_sports = set()
+    if explicit_sport:
+        requested_sports.add(explicit_sport)
+    for slug, keywords in _SPORT_KEYWORDS.items():
+        if any(keyword in lowered for keyword in keywords):
+            requested_sports.add(slug)
+
+    intent = "best_bets"
+    if explicit_mode in {"parlay", "parlays"} or "parlay" in lowered:
+        intent = "parlay"
+    elif explicit_mode in {"live", "live_bets"} or "live bet" in lowered or "in-game" in lowered or "live board" in lowered:
+        intent = "live_bets"
+    elif explicit_mode in {"pregame", "pregame_bets"} or "pregame" in lowered:
+        intent = "pregame_bets"
+
+    live_only = intent == "live_bets"
+    pregame_only = intent == "pregame_bets"
+    if "live and pregame" in lowered or "pregame and live" in lowered:
+        live_only = False
+        pregame_only = False
+
+    include_props = any(keyword in lowered for keyword in _PROP_MARKET_KEYWORDS)
+    include_games = any(keyword in lowered for keyword in _GAME_MARKET_KEYWORDS)
+    if explicit_mode in {"game", "games"}:
+        include_games = True
+    if explicit_mode in {"prop", "props"}:
+        include_props = True
+    if not include_props and not include_games:
+        include_props = True
+        include_games = True
+
+    requested_limit = int(limit or 0) if str(limit or "").strip() else 0
+    if requested_limit <= 0:
+        match = re.search(r"\b(?:top|best)\s+(\d+)\b", lowered)
+        if match:
+            requested_limit = int(match.group(1))
+    if requested_limit <= 0:
+        requested_limit = 5
+
+    return {
+        "intent": intent,
+        "requested_sports": sorted(requested_sports),
+        "include_props": include_props,
+        "include_games": include_games,
+        "live_only": live_only,
+        "pregame_only": pregame_only,
+        "limit": max(1, min(requested_limit, 8)),
+        "question": str(question or "").strip(),
+    }
+
+
+def build_intelligence_overview(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
+    effective_date = _effective_date(selected_date)
+    sports = current_app.config.get("SYNDICATE_SPORTS", [])
+    overview: list[dict[str, Any]] = []
+    for sport in sports:
+        if not isinstance(sport, dict):
+            continue
+        try:
+            overview.append(
+                _build_sport_overview(
+                    sport,
+                    effective_date,
+                    force_refresh=force_refresh,
+                    preserve_requested_date=True,
+                )
+            )
+        except Exception as exc:
+            overview.append(
+                {
+                    **sport,
+                    "context_label": effective_date,
+                    "data_health": "error",
+                    "data_warnings": [f"Overview build failed: {exc}"],
+                    "home_rails": {"pregame": {"items": []}, "live": {"items": []}, "compact": {"items": []}},
+                    "dashboard_games": [],
+                }
+            )
+    return overview
+
+
+def _artifact_specs_for_sport(sport: dict[str, Any]) -> list[tuple[str, Path]]:
+    slug = str(sport.get("slug") or "").strip().lower()
+    context_label = str(sport.get("context_label") or "").strip()
+    if slug == "mlb" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        season = int(context_label[:4])
+        return [
+            ("Live lens report", _mlb_repo_artifact_path("data", "live_lens", f"live_lens_report_{context_label.replace('-', '_')}.json")),
+            ("Live lens log", _mlb_repo_artifact_path("data", "live_lens", f"live_lens_{context_label.replace('-', '_')}.jsonl")),
+            (
+                "Season betting day",
+                _mlb_repo_artifact_path(
+                    "data",
+                    "eval",
+                    "seasons",
+                    str(season),
+                    "betting_day_payloads_retuned",
+                    f"season_betting_day_{season}_{context_label.replace('-', '_')[5:]}.json",
+                ),
+            ),
+        ]
+    if slug == "nba" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        season = int(context_label[:4])
+        return [
+            ("Recommendations slate", nba_processed_path(f"recommendations_slate_{context_label}.json")),
+            ("Props recommendations", nba_processed_path(f"props_recommendations_{context_label}.csv")),
+            ("Live state snapshot", nba_live_snapshot_path(f"live_state_{context_label}.jsonl")),
+            ("Season betting day", nba_season_betting_card_day_path(season, context_label, profile="retuned")),
+        ]
+    if slug == "wnba" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        season = int(context_label[:4])
+        return [
+            ("Recommendations slate", wnba_processed_path(f"recommendations_slate_{context_label}.json")),
+            ("Props recommendations", wnba_processed_path(f"props_recommendations_{context_label}.csv")),
+            ("Live state snapshot", wnba_live_snapshot_path(f"live_state_{context_label}.jsonl")),
+            ("Season betting day", wnba_processed_path(f"season_betting_card_day_{season}_retuned_{context_label}.json")),
+        ]
+    if slug == "nhl" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        return [
+            ("Recommendations", nhl_recommendation_path(context_label)),
+            ("Props recommendations", nhl_processed_path(f"props_recommendations_{context_label}.csv")),
+            ("Scoreboard snapshot", nhl_scoreboard_snapshot_path(context_label)),
+            ("Props lines snapshot", nhl_props_lines_snapshot_path(context_label)),
+        ]
+    if slug == "nfl":
+        week_match = re.search(r"(?P<season>\d{4})\s+Week\s+(?P<week>\d+)", context_label)
+        if week_match:
+            season = int(week_match.group("season"))
+            week = int(week_match.group("week"))
+            return [
+                ("Weekly recommendations", nfl_sources.recommendation_path(week, season=season)),
+                ("Current week", nfl_sources.data_path("current_week.json")),
+            ]
+    if slug == "ncaaf":
+        week_match = re.search(r"(?P<season>\d{4})\s+Week\s+(?P<week>\d+)", context_label)
+        if week_match:
+            week = int(week_match.group("week"))
+            return [
+                ("Recommendation summary", ncaaf_sources.summary_path(week)),
+                ("Summary index", ncaaf_sources.data_path("recommendations_summary", "index.json")),
+            ]
+    if slug == "ncaab" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        root = ncaab_sources._source_roots()[0]
+        return [
+            ("Recommendations", root / "api" / "recommendations" / f"recommendations_{context_label}.json"),
+            ("Live state", root / "api" / "live_state" / f"live_state_{context_label}.json"),
+            ("Live lines", root / "api" / "live_lines" / f"live_lines_{context_label}.json"),
+        ]
+    return []
+
+
+def _mlb_repo_artifact_path(*parts: str) -> Path:
+    return default_mlb_source_root().joinpath(*parts)
+
+
+def _path_status(path: Path, tracked: set[str]) -> dict[str, Any]:
+    relative_path = _relative_repo_path(path)
+    inside_repo = not Path(relative_path).is_absolute() and not relative_path.startswith("..")
+    exists = False
+    try:
+        exists = path.exists()
+    except OSError:
+        exists = False
+    tracked_here = inside_repo and relative_path in tracked
+    return {
+        "path": relative_path,
+        "exists": exists,
+        "tracked": tracked_here,
+        "inside_repo": inside_repo,
+    }
+
+
+def _advanced_input_rows_for_sport(sport: dict[str, Any], tracked: set[str]) -> list[dict[str, Any]]:
+    advanced_rows: list[dict[str, Any]] = []
+    for spec in _advanced_input_specs_for_sport(sport):
+        status = _path_status(spec["path"], tracked)
+        advanced_rows.append(
+            {
+                "label": str(spec.get("label") or "Advanced input"),
+                "metrics": [str(metric).strip() for metric in (spec.get("metrics") or []) if str(metric).strip()],
+                **status,
+            }
+        )
+    return advanced_rows
+
+
+def _available_advanced_inputs_for_sport(sport: dict[str, Any], tracked: set[str] | None = None) -> list[dict[str, Any]]:
+    resolved_tracked = tracked if tracked is not None else _tracked_repo_files()
+    rows = _advanced_input_rows_for_sport(sport, resolved_tracked)
+    return [row for row in rows if bool(row.get("exists"))]
+
+
+def _advanced_driver_text(rows: list[dict[str, Any]], *, limit_groups: int = 2, limit_metrics: int = 3) -> str:
+    if not rows:
+        return ""
+    groups: list[str] = []
+    for row in rows[:limit_groups]:
+        metrics = [str(metric).strip() for metric in (row.get("metrics") or []) if str(metric).strip()][:limit_metrics]
+        if metrics:
+            groups.append(f"{row.get('label')}: {', '.join(metrics)}")
+        else:
+            groups.append(str(row.get("label") or "Advanced inputs"))
+    return "; ".join(groups)
+
+
+def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
+    slug = str(sport.get("slug") or "").strip().lower()
+    context_label = str(sport.get("context_label") or "").strip()
+    season = None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        season = int(context_label[:4])
+
+    if slug == "mlb":
+        return [
+            {
+                "label": "Statcast batter and pitcher features",
+                "metrics": ["Launch angle", "Exit velocity", "Barrel rate", "Hard-hit rate", "Spray angle"],
+                "path": _mlb_repo_artifact_path("data", "statcast", "features", "player_features_latest.json"),
+            },
+            {
+                "label": "Pitch arsenal mirror",
+                "metrics": ["Pitch mix", "Pitch usage", "Velocity bands", "Pitch-level shape", "Whiff context"],
+                "path": _mlb_repo_artifact_path("data", "raw", "statcast", "pitches"),
+            },
+            {
+                "label": "Live lens and betting-day synthesis",
+                "metrics": ["Live projection delta", "Hit pace", "Ladder viability", "Board edge", "Sim confidence"],
+                "path": _mlb_repo_artifact_path("data", "live_lens", f"live_lens_report_{context_label.replace('-', '_')}.json") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label) else _mlb_repo_artifact_path("data", "live_lens"),
+            },
+        ]
+    if slug == "nba" and season is not None:
+        return [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Defensive rating", "Shot profile", "Rebound environment"],
+                "path": nba_processed_path(f"team_advanced_stats_{season}.csv"),
+            },
+            {
+                "label": "Player prop model outputs",
+                "metrics": ["Usage context", "Minute expectation", "Prop mean", "Edge vs line", "Calibration"],
+                "path": nba_processed_path(f"props_predictions_{context_label}.csv"),
+            },
+            {
+                "label": "Live state and pace context",
+                "metrics": ["Live pace", "Game state", "In-game line movement", "Board pressure", "Possession context"],
+                "path": nba_live_snapshot_path(f"live_state_{context_label}.jsonl"),
+            },
+        ]
+    if slug == "wnba" and season is not None:
+        return [
+            {
+                "label": "Team environment and pace layer",
+                "metrics": ["Pace", "Team environment", "Shot volume context", "Possession profile", "Matchup pressure"],
+                "path": wnba_processed_path(f"recommendations_slate_{context_label}.json"),
+            },
+            {
+                "label": "Player prop model outputs",
+                "metrics": ["Usage context", "Minute expectation", "Prop mean", "Edge vs line", "Calibration"],
+                "path": wnba_processed_path(f"props_recommendations_{context_label}.csv"),
+            },
+            {
+                "label": "Live state mirror",
+                "metrics": ["Live pace", "Game state", "Rotation pressure", "In-game projection shift", "Board pressure"],
+                "path": wnba_live_snapshot_path(f"live_state_{context_label}.jsonl"),
+            },
+        ]
+    if slug == "nhl" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        return [
+            {
+                "label": "Game recommendation layer",
+                "metrics": ["xG proxy last 10", "Goal pace per 60", "SOG pace per 60", "Pressure flags", "Score effects"],
+                "path": nhl_recommendation_path(context_label),
+            },
+            {
+                "label": "Props recommendation layer",
+                "metrics": ["Shot volume", "Goalie saves", "Skater opportunity", "Line edge", "Market depth"],
+                "path": nhl_processed_path(f"props_recommendations_{context_label}.csv"),
+            },
+            {
+                "label": "Odds and scoreboard context",
+                "metrics": ["Live scoreboard state", "Props lines", "Market change", "Game status", "Book context"],
+                "path": nhl_scoreboard_snapshot_path(context_label),
+            },
+        ]
+    if slug == "nfl":
+        tracked_week = nfl_sources.tracked_week() or {}
+        season_value = tracked_week.get("season")
+        week_value = tracked_week.get("week")
+        if isinstance(season_value, int) and isinstance(week_value, int):
+            return [
+                {
+                    "label": "Weekly recommendation snapshot",
+                    "metrics": ["Off EPA", "Def EPA", "Pace", "Pass rate", "Market edge"],
+                    "path": nfl_sources.recommendation_path(week_value, season=season_value),
+                },
+                {
+                    "label": "Current week context",
+                    "metrics": ["Season", "Week", "Publish state", "Board freshness", "Routing context"],
+                    "path": nfl_sources.data_path("current_week.json"),
+                },
+                {
+                    "label": "Player props mirror",
+                    "metrics": ["Passing yards", "Rushing yards", "Receiving yards", "TD market context", "Book coverage"],
+                    "path": nfl_sources.data_path(f"oddsapi_player_props_{season_value}_wk{week_value}.csv"),
+                },
+            ]
+    if slug == "ncaaf":
+        week_match = re.search(r"(?P<season>\d{4})\s+Week\s+(?P<week>\d+)", context_label)
+        if week_match:
+            week = int(week_match.group("week"))
+            season_value = int(week_match.group("season"))
+            return [
+                {
+                    "label": "Weekly recommendation summary",
+                    "metrics": ["Model spread", "Model total", "Market edge", "Confidence", "Slate coverage"],
+                    "path": ncaaf_sources.summary_path(week),
+                },
+                {
+                    "label": "Recommendation index",
+                    "metrics": ["Week availability", "Fetch health", "Artifact coverage", "Season routing", "Publish context"],
+                    "path": ncaaf_sources.data_path("recommendations_summary", "index.json"),
+                },
+                {
+                    "label": "Enhanced totals export",
+                    "metrics": ["Projected total", "Schedule context", "Enhanced totals layer", "Game metadata", "Output freshness"],
+                    "path": _repo_root().parent / "NCAAFCompare" / "data" / f"college_football_schedule_{season_value}_predicted_totals_enhanced_20251123T161637Z.csv",
+                },
+            ]
+    if slug == "ncaab" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
+        root = ncaab_sources._source_roots()[0]
+        return [
+            {
+                "label": "Recommendations mirror",
+                "metrics": ["Spread edge", "Total edge", "Confidence", "Board ranking", "Availability"],
+                "path": root / "api" / "recommendations" / f"recommendations_{context_label}.json",
+            },
+            {
+                "label": "Live state mirror",
+                "metrics": ["Possession state", "Live total context", "Score pressure", "Game status", "Board timing"],
+                "path": root / "api" / "live_state" / f"live_state_{context_label}.json",
+            },
+            {
+                "label": "Pace and live-line context",
+                "metrics": ["Pace hi", "Pace low", "Live lines", "Possession rate", "Tempo buckets"],
+                "path": root / "api" / "live_lines" / f"live_lines_{context_label}.json",
+            },
+        ]
+    return []
+
+
+def build_intelligence_status(*, selected_date: str | None = None, force_refresh: bool = False) -> dict[str, Any]:
+    if force_refresh:
+        _tracked_repo_files.cache_clear()
+    overview = build_intelligence_overview(selected_date=selected_date, force_refresh=force_refresh)
+    tracked = _tracked_repo_files()
+    sports_status: list[dict[str, Any]] = []
+    tracked_ok_count = 0
+    tracked_total = 0
+    advanced_ready_count = 0
+    advanced_total = 0
+
+    for sport in overview:
+        artifact_rows: list[dict[str, Any]] = []
+        for label, path in _artifact_specs_for_sport(sport):
+            status = _path_status(path, tracked)
+            if status["inside_repo"]:
+                tracked_total += 1
+                if status["tracked"]:
+                    tracked_ok_count += 1
+            artifact_rows.append(
+                {
+                    "label": label,
+                    **status,
+                }
+            )
+
+        advanced_rows = _advanced_input_rows_for_sport(sport, tracked)
+        for status in advanced_rows:
+            if status["inside_repo"]:
+                advanced_total += 1
+                if status["tracked"]:
+                    advanced_ready_count += 1
+
+        sports_status.append(
+            {
+                "slug": _safe_text(sport.get("slug"), "sport").lower(),
+                "name": _safe_text(sport.get("name"), "Sport"),
+                "context_label": _safe_text(sport.get("context_label"), _effective_date(selected_date)),
+                "data_health": _safe_text(sport.get("data_health"), "unknown"),
+                "data_warnings": [str(item).strip() for item in (sport.get("data_warnings") or []) if str(item).strip()],
+                "artifacts": artifact_rows,
+                "advanced_inputs": advanced_rows,
+                "tracked_ready": all(row.get("tracked") for row in artifact_rows if row.get("inside_repo")) if artifact_rows else False,
+                "advanced_ready": all(row.get("tracked") for row in advanced_rows if row.get("inside_repo")) if advanced_rows else False,
+            }
+        )
+
+    return {
+        "selected_date": _effective_date(selected_date),
+        "sports": sports_status,
+        "tracked_summary": {
+            "tracked_ok": tracked_ok_count,
+            "tracked_total": tracked_total,
+        },
+        "advanced_summary": {
+            "tracked_ok": advanced_ready_count,
+            "tracked_total": advanced_total,
+        },
+        "local_only": True,
+    }
+
+
+def _sport_matches_preferences(sport: dict[str, Any], preferences: dict[str, Any]) -> bool:
+    requested_sports = preferences.get("requested_sports") or []
+    if not requested_sports:
+        return True
+    return _safe_text(sport.get("slug"), "").lower() in requested_sports
+
+
+def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, surface_key: str, surface_title: str) -> dict[str, Any]:
+    row = _build_prop_dashboard_row(sport, item, default_surface=surface_title)
+    projected_value = _numeric_hint(row.get("projected"))
+    line_value = _numeric_hint(row.get("line"))
+    if projected_value is not None and line_value is not None:
+        row["score"] = float(row.get("score", 0.0)) + abs(projected_value - line_value) * 3.0
+    row.update(
+        {
+            "candidate_type": "prop",
+            "surface_key": surface_key,
+            "surface_title": surface_title,
+            "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
+            "writeup": _safe_text(item.get("writeup"), ""),
+            "status_context": _safe_text(item.get("status_context"), ""),
+            "hero_live_box": item.get("hero_live_box") if isinstance(item.get("hero_live_box"), dict) else None,
+            "hero_sim_box": item.get("hero_sim_box") if isinstance(item.get("hero_sim_box"), dict) else None,
+            "display_pills": item.get("display_pills") if isinstance(item.get("display_pills"), list) else [],
+        }
+    )
+    return row
+
+
+def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
+    dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
+    candidates: list[dict[str, Any]] = []
+    for game in dashboard_games:
+        if not isinstance(game, dict):
+            continue
+        for row in _game_bet_candidates_from_game(sport, game, fallback_epoch=0.0):
+            if not isinstance(row, dict):
+                continue
+            row = dict(row)
+            row["candidate_type"] = "game"
+            candidates.append(row)
+    return candidates
+
+
+def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for sport in overview:
+        if not isinstance(sport, dict) or not _sport_matches_preferences(sport, preferences):
+            continue
+        home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
+        if preferences.get("include_props"):
+            if not preferences.get("live_only"):
+                pregame = home_rails.get("pregame") if isinstance(home_rails.get("pregame"), dict) else {}
+                for item in pregame.get("items") or []:
+                    if isinstance(item, dict):
+                        candidates.append(
+                            _prop_candidate_from_item(
+                                sport,
+                                item,
+                                surface_key="pregame",
+                                surface_title=_safe_text(pregame.get("title"), "Pregame props"),
+                            )
+                        )
+            if not preferences.get("pregame_only"):
+                live = home_rails.get("live") if isinstance(home_rails.get("live"), dict) else {}
+                for item in live.get("items") or []:
+                    if isinstance(item, dict):
+                        candidates.append(
+                            _prop_candidate_from_item(
+                                sport,
+                                item,
+                                surface_key="live",
+                                surface_title=_safe_text(live.get("title"), "Top Live Props"),
+                            )
+                        )
+        if preferences.get("include_games"):
+            game_candidates = _game_candidates_for_sport(sport)
+            if preferences.get("live_only"):
+                game_candidates = [row for row in game_candidates if bool(row.get("is_live")) or "live" in _safe_text(row.get("market"), "").lower()]
+            if preferences.get("pregame_only"):
+                game_candidates = [row for row in game_candidates if not bool(row.get("is_live")) and "live" not in _safe_text(row.get("market"), "").lower()]
+            candidates.extend(game_candidates)
+
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+    for row in sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True):
+        identity = (
+            _safe_text(row.get("candidate_type"), "candidate"),
+            _safe_text(row.get("sport_slug"), "sport"),
+            _safe_text(row.get("matchup"), "matchup"),
+            _safe_text(row.get("market"), "market"),
+            _safe_text(row.get("pick") or row.get("name"), "pick"),
+        )
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduped.append(row)
+    return deduped
+
+
+def _candidate_rationale(candidate: dict[str, Any]) -> str:
+    advanced_context = candidate.get("advanced_context") if isinstance(candidate.get("advanced_context"), list) else []
+    advanced_driver_text = _advanced_driver_text(advanced_context)
+    if _safe_text(candidate.get("candidate_type"), "") == "game":
+        notes: list[str] = []
+        if _safe_text(candidate.get("edge"), "-") != "-":
+            notes.append(f"Model edge is {candidate.get('edge')} against the current book price.")
+        if _safe_text(candidate.get("confidence"), "-") != "-":
+            notes.append(f"Win-rate confidence sits at {candidate.get('confidence')}.")
+        if _safe_text(candidate.get("odds"), "-") != "-":
+            notes.append(f"The quoted book number is {candidate.get('odds')} on {candidate.get('pick')}.")
+        if advanced_driver_text:
+            notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
+        detail = _safe_text(candidate.get("detail"), "")
+        if detail:
+            notes.append(detail if detail.endswith(".") else f"{detail}.")
+        return " ".join(notes) or "The game board shows a playable sportsbook edge with support from the current model snapshot."
+
+    notes = []
+    if _safe_text(candidate.get("projected"), "-") != "-" and _safe_text(candidate.get("line"), "-") != "-":
+        notes.append(f"Model projection is {candidate.get('projected')} versus a book line of {candidate.get('line')}.")
+    if bool(candidate.get("is_live")) and _safe_text(candidate.get("live_projection"), "-") != "-":
+        actual_value = _safe_text(candidate.get("actual"), "-")
+        notes.append(f"Live rest-of-game projection is {candidate.get('live_projection')} with current box score at {actual_value}.")
+    if _safe_text(candidate.get("edge"), "-") != "-":
+        notes.append(f"The stored edge reads {candidate.get('edge')}.")
+    if _safe_text(candidate.get("confidence"), "-") != "-":
+        notes.append(f"Sim confidence is {candidate.get('confidence')}.")
+    if _safe_text(candidate.get("live_total"), "-") != "-":
+        notes.append(f"Game context currently points to a live total of {candidate.get('live_total')}.")
+    if advanced_driver_text:
+        notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
+    if _safe_text(candidate.get("writeup"), ""):
+        writeup = _safe_text(candidate.get("writeup"), "")
+        notes.append(writeup if writeup.endswith(".") else f"{writeup}.")
+    elif _safe_text(candidate.get("detail"), ""):
+        detail = _safe_text(candidate.get("detail"), "")
+        notes.append(detail if detail.endswith(".") else f"{detail}.")
+    return " ".join(notes) or "The prop sits above the local model threshold with enough context to justify a sportsbook-facing recommendation."
+
+
+def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
+    output = {
+        "candidate_type": _safe_text(candidate.get("candidate_type"), "candidate"),
+        "sport": _safe_text(candidate.get("sport"), "Sport"),
+        "sport_slug": _safe_text(candidate.get("sport_slug"), "sport"),
+        "matchup": _safe_text(candidate.get("matchup"), "-"),
+        "market": _safe_text(candidate.get("market"), "Market"),
+        "pick": _safe_text(candidate.get("pick"), _safe_text(candidate.get("name"), "Play")),
+        "name": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
+        "surface": _safe_text(candidate.get("surface_title"), _safe_text(candidate.get("surface"), "Board")),
+        "is_live": bool(candidate.get("is_live")),
+        "line": _safe_text(candidate.get("line"), "-"),
+        "odds": _safe_text(candidate.get("odds"), "-"),
+        "edge": _safe_text(candidate.get("edge"), "-"),
+        "confidence": _safe_text(candidate.get("confidence"), "-"),
+        "projected": _safe_text(candidate.get("projected"), "-"),
+        "live_projection": _safe_text(candidate.get("live_projection"), "-"),
+        "actual": _safe_text(candidate.get("actual"), "-"),
+        "href": candidate.get("href"),
+        "href_label": _safe_text(candidate.get("href_label"), "Open board"),
+        "rationale": _candidate_rationale(candidate),
+        "score": round(float(candidate.get("score") or 0.0), 2),
+        "advanced_inputs": [
+            {
+                "label": _safe_text(item.get("label"), "Advanced input"),
+                "metrics": [str(metric).strip() for metric in (item.get("metrics") or []) if str(metric).strip()][:5],
+            }
+            for item in (candidate.get("advanced_context") or [])[:2]
+            if isinstance(item, dict)
+        ],
+    }
+    pills = candidate.get("display_pills") if isinstance(candidate.get("display_pills"), list) else []
+    output["display_pills"] = [str(item).strip() for item in pills if str(item).strip()][:6]
+    return output
+
+
+def _parlay_rationale(legs: list[dict[str, Any]]) -> str:
+    live_count = sum(1 for leg in legs if bool(leg.get("is_live")))
+    sports = sorted({_safe_text(leg.get("sport"), "Sport") for leg in legs})
+    if live_count and live_count == len(legs):
+        return "All legs are coming from live board prices, so the angle is to exploit book lag while the local model is already repricing the same states."
+    if live_count:
+        return "This mix pairs live board momentum with pregame value so you are not stacking the same timing risk on every leg."
+    if len(sports) > 1:
+        return "This parlay spreads risk across sports and board types instead of doubling down on one matchup or one feed."
+    return "This parlay keeps the legs inside the highest-scoring local recommendations while avoiding duplicate market exposure."
+
+
+def _build_parlays(candidates: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    usable = [candidate for candidate in candidates if _safe_text(candidate.get("odds"), "-") != "-"]
+    if len(usable) < 2:
+        usable = list(candidates)
+    parlays: list[dict[str, Any]] = []
+    seen: set[tuple[str, ...]] = set()
+    for leg_count in (2, 3):
+        for legs in combinations(usable[:6], leg_count):
+            matchups = {_safe_text(leg.get("matchup"), "") for leg in legs}
+            if len(matchups) < len(legs):
+                continue
+            identity = tuple(sorted(f"{_safe_text(leg.get('sport_slug'), 'sport')}::{_safe_text(leg.get('pick'), 'pick')}::{_safe_text(leg.get('market'), 'market')}" for leg in legs))
+            if identity in seen:
+                continue
+            seen.add(identity)
+            summary_legs = [_candidate_summary(leg) for leg in legs]
+            avg_score = sum(float(leg.get("score") or 0.0) for leg in legs) / float(len(legs))
+            parlays.append(
+                {
+                    "label": f"{leg_count}-leg {'live' if any(leg.get('is_live') for leg in legs) else 'pregame'} parlay",
+                    "legs": summary_legs,
+                    "combined_score": round(avg_score, 2),
+                    "rationale": _parlay_rationale(summary_legs),
+                }
+            )
+            if len(parlays) >= limit:
+                return parlays
+    return parlays
+
+
+def run_intelligence_query(
+    question: str,
+    *,
+    selected_date: str | None = None,
+    mode: str | None = None,
+    sport: str | None = None,
+    limit: int | None = None,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    effective_date = _effective_date(selected_date)
+    preferences = _query_preferences(question, mode=mode, sport=sport, limit=limit)
+    overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
+    tracked = _tracked_repo_files()
+    advanced_by_sport = {
+        _safe_text(sport_row.get("slug"), "sport").lower(): _available_advanced_inputs_for_sport(sport_row, tracked)
+        for sport_row in overview
+        if isinstance(sport_row, dict)
+    }
+    candidates = _collect_candidates(overview, preferences)
+    for candidate in candidates:
+        sport_slug = _safe_text(candidate.get("sport_slug"), "sport").lower()
+        candidate["advanced_context"] = advanced_by_sport.get(sport_slug, [])
+    recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]
+    parlays = _build_parlays(candidates, limit=min(3, preferences["limit"])) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
+
+    live_rows = sum(1 for candidate in candidates if bool(candidate.get("is_live")))
+    pregame_rows = sum(1 for candidate in candidates if not bool(candidate.get("is_live")))
+    data_notes = []
+    for sport_row in overview:
+        warnings = [str(item).strip() for item in (sport_row.get("data_warnings") or []) if str(item).strip()]
+        if warnings:
+            data_notes.append(f"{_safe_text(sport_row.get('name'), 'Sport')}: {'; '.join(warnings)}")
+        sport_slug = _safe_text(sport_row.get("slug"), "sport").lower()
+        advanced_rows = advanced_by_sport.get(sport_slug, [])
+        advanced_driver_text = _advanced_driver_text(advanced_rows, limit_groups=1, limit_metrics=3)
+        if advanced_driver_text:
+            data_notes.append(f"{_safe_text(sport_row.get('name'), 'Sport')} advanced inputs: {advanced_driver_text}")
+
+    headline = "Local sports intelligence brief"
+    if preferences["intent"] == "parlay":
+        headline = "Local parlay builder"
+    elif preferences["intent"] == "live_bets":
+        headline = "Local live board brief"
+    elif preferences["intent"] == "pregame_bets":
+        headline = "Local pregame board brief"
+
+    summary = (
+        f"Scanned {len(candidates)} board candidates across {len([sport_row for sport_row in overview if _sport_matches_preferences(sport_row, preferences)]) or len(overview)} sports. "
+        f"Live candidates: {live_rows}. Pregame candidates: {pregame_rows}."
+    )
+
+    return {
+        "selected_date": effective_date,
+        "preferences": preferences,
+        "headline": headline,
+        "summary": summary,
+        "recommendations": recommendations,
+        "parlays": parlays,
+        "board_notes": data_notes[:8],
+        "local_only": True,
+    }

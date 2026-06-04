@@ -19,6 +19,7 @@
             </div>
             <nav class="syndicate-nav" aria-label="Sports">
               <a class="cards-nav-pill" href="/">Home</a>
+              <a class="cards-nav-pill" href="/intelligence{% if nav_date %}?date={{ nav_date }}{% endif %}">Intelligence</a>
               {% for sport in syndicate_sports %}
                 <a class="cards-nav-pill" href="/{{ sport.slug }}{% if nav_date %}?date={{ nav_date }}{% endif %}">{{ sport.name }}</a>
               {% endfor %}
