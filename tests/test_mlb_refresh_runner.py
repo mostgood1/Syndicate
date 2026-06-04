@@ -228,10 +228,27 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             "liveData": {"linescore": {"teams": {"away": {"runs": 5}, "home": {"runs": 3}}}},
         }
 
+        fresh_report = {
+            "games": [
+                {
+                    "gamePk": 822727,
+                    "status": {"abstract": "Final", "detailed": "Final"},
+                    "matchup": {"score": {"away": 5, "home": 3}},
+                    "detail": "Final",
+                }
+            ],
+            "counts": {"games": 1, "live": 0, "final": 1, "pregame": 0, "props": 0, "archivedLiveProps": 0},
+            "source_title": "MLB Game Cards",
+        }
+
         with patch.object(live_lens_module, "load_json_file", return_value=report), patch.object(
             live_lens_module,
             "build_cards_page_context",
             return_value={"games": []},
+        ), patch.object(live_lens_module, "_persist_live_lens_report", return_value=fresh_report), patch.object(
+            live_lens_module,
+            "live_lens_report_path",
+            return_value=Path("report.json"),
         ), patch.object(live_lens_module, "_mlb_vendor_client", return_value=object()), patch.object(
             live_lens_module,
             "fetch_game_feed_live",
@@ -255,16 +272,117 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             captured["allow_request_daily_ladders_refresh"] = allow_request_daily_ladders_refresh
             return {"games": [], "source_title": "MLB Game Cards", "using_sample_data": False}
 
+        empty_report = {"games": [], "counts": {"games": 0, "live": 0, "final": 0, "pregame": 0, "props": 0, "archivedLiveProps": 0}, "source_title": "MLB Game Cards"}
+
         with patch.object(live_lens_module, "build_cards_page_context", side_effect=fake_build_cards_page_context), patch.object(
             live_lens_module,
-            "load_json_file",
-            return_value={"games": []},
+            "_persist_live_lens_report",
+            return_value=empty_report,
         ), patch.object(live_lens_module, "live_lens_report_path", return_value=Path("report.json")):
             context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
 
         self.assertEqual(captured["selected_date"], "2026-06-03")
         self.assertTrue(captured["allow_request_daily_ladders_refresh"])
         self.assertEqual(context["counts"]["games"], 0)
+
+    def test_live_lens_page_context_prefers_today_live_report_over_cards_merge(self) -> None:
+        from syndicate.features.mlb import live_lens as live_lens_module
+
+        fresh_report = {
+            "games": [
+                {
+                    "gamePk": 824755,
+                    "status": {"abstract": "Live", "detailed": "In Progress"},
+                    "gameLens": [{"key": "live", "label": "Top 9"}],
+                    "props": [{"id": "live-prop"}],
+                    "liveProps": [{"id": "live-prop"}],
+                    "trackedProps": [{"id": "live-prop"}],
+                }
+            ],
+            "counts": {"games": 1, "live": 1, "final": 0, "pregame": 0, "props": 1, "archivedLiveProps": 0},
+            "source_title": "MLB Live Lens",
+            "generatedAt": "2026-06-03T12:00:00-05:00",
+        }
+
+        def fake_persist_live_lens_report(selected_date: str):
+            self.assertEqual(selected_date, "2026-06-03")
+            return fresh_report
+
+        def fake_build_cards_page_context(selected_date: str, *, allow_request_daily_ladders_refresh: bool = False):
+            self.assertEqual(selected_date, "2026-06-03")
+            self.assertTrue(allow_request_daily_ladders_refresh)
+            return {
+                "games": [
+                    {
+                        "gamePk": 824755,
+                        "status": {"abstract": "Preview", "detailed": "Scheduled"},
+                        "gameLens": [{"key": "first1", "label": "F1"}],
+                        "props": [],
+                    }
+                ],
+                "source_title": "MLB Game Cards",
+                "using_sample_data": False,
+            }
+
+        with patch.object(live_lens_module, "build_cards_page_context", side_effect=fake_build_cards_page_context), patch.object(
+            live_lens_module,
+            "_persist_live_lens_report",
+            side_effect=fake_persist_live_lens_report,
+        ), patch.object(live_lens_module, "_refresh_current_date_live_statuses", return_value=None), patch.object(
+            live_lens_module,
+            "live_lens_report_path",
+            return_value=Path("report.json"),
+        ):
+            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
+
+        self.assertEqual(context["games"][0]["status"]["abstract"], "Live")
+        self.assertEqual(context["games"][0]["gameLens"][0]["key"], "live")
+        self.assertEqual(context["games"][0]["props"][0]["id"], "live-prop")
+
+    def test_live_lens_payload_refreshes_card_before_game_lens(self) -> None:
+        from vendor.mlb_bettingv2.tools.web import flask_frontend as mlb_frontend
+
+        captured: dict[str, object] = {}
+
+        def fake_supplement(card: dict[str, object], d: str, *, feed=None) -> None:
+            card["status"] = {"abstract": "Live", "detailed": "In Progress"}
+
+        def fake_build_game_lens(card, snapshot, sim_context, market_row, *, date_str=None):
+            captured["status"] = dict(card.get("status") or {})
+            captured["date_str"] = date_str
+            return []
+
+        with patch.object(mlb_frontend, "_load_cards_artifacts", return_value={}), patch.object(
+            mlb_frontend,
+            "_load_cards_archive_context",
+            return_value={},
+        ), patch.object(mlb_frontend, "_should_load_cards_archive_context", return_value=False), patch.object(
+            mlb_frontend,
+            "_schedule_games_for_date",
+            return_value=[{"gamePk": 824755}],
+        ), patch.object(mlb_frontend, "_load_live_lens_cards", return_value=[{"gamePk": 824755, "status": {"abstract": "Preview", "detailed": "Scheduled"}, "markets": {}, "away": {}, "home": {}}]), patch.object(
+            mlb_frontend,
+            "_load_game_line_market_index",
+            return_value={},
+        ), patch.object(mlb_frontend, "_load_live_lens_snapshot", return_value={"status": {"abstractGameState": "Preview", "detailedState": "Scheduled"}, "teams": {"away": {"totals": {}}, "home": {"totals": {}}}}), patch.object(
+            mlb_frontend,
+            "_load_sim_context_for_game",
+            return_value={"found": True},
+        ), patch.object(mlb_frontend, "_current_live_prop_rows", return_value=[]), patch.object(
+            mlb_frontend,
+            "_normalize_live_lens_live_prop_row",
+            side_effect=lambda row, snapshot, card: row,
+        ), patch.object(mlb_frontend, "_supplement_card_status_from_live_feed", side_effect=fake_supplement), patch.object(
+            mlb_frontend,
+            "_build_game_lens",
+            side_effect=fake_build_game_lens,
+        ):
+            payload = mlb_frontend._live_lens_payload("2026-06-03", persist=False)
+
+        self.assertEqual(captured["status"].get("abstract"), "Live")
+        self.assertEqual(captured["status"].get("detailed"), "In Progress")
+        self.assertEqual(captured["date_str"], "2026-06-03")
+        self.assertEqual((payload.get("counts") or {}).get("games"), 1)
 
     def test_api_live_lens_persist_bypasses_cache_and_rewrites_report(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
