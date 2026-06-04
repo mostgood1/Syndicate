@@ -1,0 +1,1786 @@
+{
+  "pitch_model": {
+    "name": "pitch_model_v1_tuned_20260308_hrcluster_sigma008_hrw135"
+  },
+  "mode": {
+    "spring_mode": false,
+    "season": 2026,
+    "stats_season": 2026
+  },
+  "statcast": {
+    "starter_splits": "starter",
+    "cache_ttl_hours": 336,
+    "enabled": true,
+    "x64_prefetch": "off"
+  },
+  "umpire_factors": {
+    "x64_prefetch": "off",
+    "x64_ttl_hours": 336,
+    "statcast_days_back": 21,
+    "statcast_min_pitches": 1500,
+    "shrink": 0.75
+  },
+  "pbp": {
+    "mode": "off",
+    "max_events": 20000
+  },
+  "away": {
+    "team": {
+      "team_id": 119,
+      "name": "Los Angeles Dodgers",
+      "abbreviation": "LAD"
+    },
+    "manager": {
+      "pull_starter_pitch_count": 95,
+      "pull_starter_third_time_penalty": 0.04,
+      "starter_min_innings": 5,
+      "starter_blowup_run_diff": 6,
+      "closer_leverage_max_run_diff": 3,
+      "use_closer_in_9th_only": true,
+      "pinch_hit_aggressiveness": 0.15
+    },
+    "confirmed_lineup_ids": [],
+    "projected_lineup_ids": [
+      660271,
+      681624,
+      518692,
+      605141,
+      663656,
+      571970,
+      669257,
+      669743,
+      690976
+    ],
+    "lineup_source": "projected_rotowire_default_vs_rhp",
+    "lineup_confidence": 0.66,
+    "probable_pitcher": {
+      "id": 680736,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 680736,
+      "raw_feed_id": 680736
+    },
+    "starter": {
+      "id": 680736,
+      "name": "Justin Wrobleski",
+      "role": "SP",
+      "selection_source": "probable",
+      "requested_id": 680736
+    },
+    "bullpen": [
+      {
+        "id": 681911,
+        "name": "Alex Vesia",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
+        "id": 595014,
+        "name": "Blake Treinen",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 683618,
+        "name": "Edgardo Henriquez",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 676263,
+        "name": "Jack Dreyer",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 642546,
+        "name": "Jonathan Hern\u00e1ndez",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 669165,
+        "name": "Kyle Hurt",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
+        "id": 656945,
+        "name": "Tanner Scott",
+        "role": "CL",
+        "lev": 0.85
+      },
+      {
+        "id": 694361,
+        "name": "Will Klein",
+        "role": "MR",
+        "lev": 0.5
+      }
+    ],
+    "lineup": [
+      {
+        "id": 660271,
+        "name": "Shohei Ohtani",
+        "pos": "TWP",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.21658119658119657,
+        "bb_rate": 0.1552991452991453,
+        "hbp_rate": 0.018518518518518517,
+        "hr_rate": 0.0384045584045584,
+        "inplay_hit_rate": 0.35830360964474245,
+        "xb_hit_share": 0.24242424242424243,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9240331491712708,
+          "bb": 0.8075,
+          "hr": 1.0228486646884274,
+          "inplay": 0.9518305355225737
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0490528808208368,
+          "bb": 1.1038249862410567,
+          "hr": 0.9640949554896143,
+          "inplay": 0.9893282066983463
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 681624,
+        "name": "Andy Pages",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.180183435241801,
+        "bb_rate": 0.06574949045766167,
+        "hbp_rate": 0.007782101167315175,
+        "hr_rate": 0.05013896609227349,
+        "inplay_hit_rate": 0.2820526315789474,
+        "xb_hit_share": 0.23529411764705882,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0604889711553294,
+          "bb": 1.0076722558827673,
+          "hr": 0.9984756097560975,
+          "inplay": 1.0261336070162344
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0078071817662908,
+          "bb": 1.002010608614922,
+          "hr": 1.006828030209236,
+          "inplay": 1.0109562201085358
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 518692,
+        "name": "Freddie Freeman",
+        "pos": "1B",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.1819015444015444,
+        "bb_rate": 0.11954934845559845,
+        "hbp_rate": 0.003861003861003861,
+        "hr_rate": 0.04125542953667954,
+        "inplay_hit_rate": 0.29483695652173914,
+        "xb_hit_share": 0.25806451612903225,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0950375873352791,
+          "bb": 1.0020732722731058,
+          "hr": 0.8055087616680071,
+          "inplay": 0.9449120662089721
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.910115126835627,
+          "bb": 0.9750696883032256,
+          "hr": 0.9571796192274559,
+          "inplay": 1.0027223075610172
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 605141,
+        "name": "Mookie Betts",
+        "pos": "SS",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.132903981264637,
+        "bb_rate": 0.07460967993754879,
+        "hbp_rate": 0.00819672131147541,
+        "hr_rate": 0.04656518345042935,
+        "inplay_hit_rate": 0.16036352040816326,
+        "xb_hit_share": 0.14285714285714285,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9368618813164031,
+          "bb": 0.8836292717453186,
+          "hr": 1.144788225432671,
+          "inplay": 1.0624478027440845
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.01431718061674,
+          "bb": 1.0363850379283286,
+          "hr": 0.9868818105616094,
+          "inplay": 0.9543687787304224
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 663656,
+        "name": "Kyle Tucker",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.18332886715348026,
+        "bb_rate": 0.1253064915924164,
+        "hbp_rate": 0.003952569169960474,
+        "hr_rate": 0.01934079185368795,
+        "inplay_hit_rate": 0.2679810074318745,
+        "xb_hit_share": 0.32075471698113206,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9115497053420717,
+          "bb": 1.0577406300828474,
+          "hr": 0.8874970024779516,
+          "inplay": 1.0746386859724748
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0404399156104693,
+          "bb": 0.9869812304810027,
+          "hr": 1.0550490459801456,
+          "inplay": 0.9994572018340555
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 571970,
+        "name": "Max Muncy",
+        "pos": "3B",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.26645794392523364,
+        "bb_rate": 0.11527102803738318,
+        "hbp_rate": 0.004672897196261682,
+        "hr_rate": 0.06160747663551401,
+        "inplay_hit_rate": 0.2425,
+        "xb_hit_share": 0.14893617021276595,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0004308278676066,
+          "bb": 0.8075,
+          "hr": 1.045165857605178,
+          "inplay": 0.9192499111269108
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9751891774772282,
+          "bb": 1.0993571913112645,
+          "hr": 1.0310790917447006,
+          "inplay": 1.044535081573416
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669257,
+        "name": "Will Smith",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.16348204763597582,
+        "bb_rate": 0.11269996445076431,
+        "hbp_rate": 0.010309278350515464,
+        "hr_rate": 0.034047280483469604,
+        "inplay_hit_rate": 0.24941217757501316,
+        "xb_hit_share": 0.09523809523809523,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 1.147173499160724,
+          "hr": 0.78,
+          "inplay": 0.9645431733971203
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9140391410709432,
+          "bb": 0.9211931235706963,
+          "hr": 1.1184416601409555,
+          "inplay": 1.03670060400458
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669743,
+        "name": "Alex Call",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.11645833333333333,
+        "bb_rate": 0.13354166666666667,
+        "hbp_rate": 0.025,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.3173371647509578,
+        "xb_hit_share": 0.2631578947368421,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1925000000000001,
+          "bb": 1.1239469578783152,
+          "hr": 1.0,
+          "inplay": 0.8832930878357984
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 690976,
+        "name": "Alex Freeland",
+        "pos": "2B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.25522423664122135,
+        "bb_rate": 0.10310114503816793,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.02571564885496183,
+        "inplay_hit_rate": 0.3117196056955093,
+        "xb_hit_share": 0.1724137931034483,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8310405235671317,
+          "hr": 0.78,
+          "inplay": 0.9541160526051601
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.984137306545943,
+          "bb": 0.9971351107630608,
+          "hr": 0.9984039769754056,
+          "inplay": 1.0071809002478085
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 687221,
+        "name": "Dalton Rushing",
+        "pos": "C",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.24047619047619045,
+        "bb_rate": 0.08095238095238094,
+        "hbp_rate": 0.029411764705882353,
+        "hr_rate": 0.058333333333333334,
+        "inplay_hit_rate": 0.2551462904911181,
+        "xb_hit_share": 0.125,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0737623762376238,
+          "bb": 0.8075,
+          "hr": 0.8785714285714286,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9931930693069306,
+          "bb": 1.0444852941176472,
+          "hr": 1.157142857142857,
+          "inplay": 0.9059978262752911
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 500743,
+        "name": "Miguel Rojas",
+        "pos": "SS",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.11738461538461538,
+        "bb_rate": 0.05869230769230769,
+        "hbp_rate": 0.02,
+        "hr_rate": 0.0085,
+        "inplay_hit_rate": 0.2701136363636364,
+        "xb_hit_share": 0.17391304347826086,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1572380622666238,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.1287266862992567
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.8487618861716071,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8969663543921934
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669899,
+        "name": "Ryan Ward",
+        "pos": "LF",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.25,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.08333333333333333,
+        "inplay_hit_rate": 0.2222222222222222,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {},
+        "platoon_mult_vs_rhp": {
+          "k": 1.0,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.0
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 669289,
+        "name": "Santiago Espinal",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.12351063829787233,
+        "bb_rate": 0.02558510638297872,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.02558510638297872,
+        "inplay_hit_rate": 0.19647058823529412,
+        "xb_hit_share": 0.3333333333333333,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0245880914673113,
+          "bb": 1.143447790221984,
+          "hr": 1.143447790221984,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0066322136089578,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "starter_profile": {
+      "id": 680736,
+      "name": "Justin Wrobleski",
+      "throw": "L",
+      "role": "SP",
+      "leverage_skill": 0.5,
+      "stamina_pitches": 96,
+      "availability_mult": 1.0,
+      "platoon_mult_vs_lhb": {
+        "k": 1.0587408220075676,
+        "bb": 1.0018977598285752,
+        "hr": 1.275,
+        "inplay": 1.0160968285828984
+      },
+      "platoon_mult_vs_rhb": {
+        "k": 0.9514852409920529,
+        "bb": 0.9972729182657658,
+        "hr": 0.78,
+        "inplay": 0.9819704240229364
+      },
+      "statcast_quality_mult": {},
+      "arsenal_source": "statsapi_pitchArsenal",
+      "arsenal_sample_size": 908,
+      "statcast_splits_found": false,
+      "statcast_splits_source": "",
+      "statcast_splits_n_pitches": 0,
+      "statcast_splits_start_date": "",
+      "statcast_splits_end_date": "",
+      "k_rate": 0.16543037974683544,
+      "bb_rate": 0.05614430379746835,
+      "hbp_rate": 0.008,
+      "hr_rate": 0.01739746835443038,
+      "inplay_hit_rate": 0.2566398741918574,
+      "arsenal": {
+        "FF": 0.5132158524711451,
+        "OTHER": 0.008810572214096903,
+        "CU": 0.055066081338105775,
+        "CH": 0.03193832677610134,
+        "SI": 0.055066081338105775,
+        "SL": 0.33039647802863437,
+        "FC": 0.005506607833810569
+      },
+      "pitch_type_whiff_mult": {},
+      "pitch_type_inplay_mult": {},
+      "pitch_type_hr_mult": {}
+    },
+    "bullpen_profiles": [
+      {
+        "id": 681911,
+        "name": "Alex Vesia",
+        "throw": "L",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 19,
+        "availability_mult": 0.97,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8569886947584789,
+          "bb": 0.9478783592644978,
+          "hr": 1.0,
+          "inplay": 0.8233333333333334
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1182653876898483,
+          "bb": 1.0308580858085807,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 356,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.3475,
+        "bb_rate": 0.12625,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.20089285714285712,
+        "arsenal": {
+          "FF": 0.5477527967134832,
+          "CH": 0.12359550525842695,
+          "SL": 0.3286516980280898
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 595014,
+        "name": "Blake Treinen",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 18,
+        "availability_mult": 0.965,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8855888723514962,
+          "bb": 0.8578112609040445,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0273687798227675,
+          "bb": 0.9697594501718213,
+          "hr": 0.9384659746251441,
+          "inplay": 0.861764705882353
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 282,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.24281894576012222,
+        "bb_rate": 0.10374331550802139,
+        "hbp_rate": 0.012987012987012988,
+        "hr_rate": 0.02207792207792208,
+        "inplay_hit_rate": 0.2833333333333333,
+        "arsenal": {
+          "FF": 0.0992907815886525,
+          "OTHER": 0.4680851074893617,
+          "SI": 0.3510638256170212,
+          "FC": 0.08156028530496456
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 683618,
+        "name": "Edgardo Henriquez",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 21,
+        "availability_mult": 0.905,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9438623527944557,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0410374249076504,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8232224532224532
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 346,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.21069444444444443,
+        "bb_rate": 0.0975,
+        "hbp_rate": 0.022222222222222223,
+        "hr_rate": 0.009444444444444445,
+        "inplay_hit_rate": 0.2389705882352941,
+        "arsenal": {
+          "FF": 0.33815029289884385,
+          "CU": 0.023121386514450885,
+          "SI": 0.2976878537485551,
+          "SL": 0.24566474484104037,
+          "FC": 0.09537572199710984
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 676263,
+        "name": "Jack Dreyer",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 21,
+        "availability_mult": 0.8516666666666667,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8346934861578033,
+          "bb": 1.027040229236705,
+          "hr": 0.78,
+          "inplay": 0.8565573770491804
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 1.0395845820461986,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 367,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2433548387096774,
+        "bb_rate": 0.06083870967741935,
+        "hbp_rate": 0.010752688172043012,
+        "hr_rate": 0.024279569892473117,
+        "inplay_hit_rate": 0.2705645161290322,
+        "arsenal": {
+          "FF": 0.4931880076702999,
+          "CU": 0.09809264254768396,
+          "SL": 0.4087193497820163
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 642546,
+        "name": "Jonathan Hern\u00e1ndez",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 24,
+        "availability_mult": 0.7416666666666667,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.1925000000000001,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 112,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2857142857142857,
+        "bb_rate": 0.07142857142857142,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03571428571428571,
+        "inplay_hit_rate": 0.05555555555555555,
+        "arsenal": {
+          "FF": 0.05357142924999999,
+          "CH": 0.017857143749999985,
+          "SI": 0.4821428632499999,
+          "SL": 0.4464285637500001
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 669165,
+        "name": "Kyle Hurt",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 19,
+        "availability_mult": 0.88,
+        "platoon_mult_vs_lhb": {
+          "k": 1.140250687671918,
+          "bb": 1.1076576576576578,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9315702472129661,
+          "bb": 0.8075,
+          "hr": 1.1749386104290047,
+          "inplay": 1.1291640076579452
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 248,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2921643835616438,
+        "bb_rate": 0.11150684931506849,
+        "hbp_rate": 0.0136986301369863,
+        "hr_rate": 0.017643835616438355,
+        "inplay_hit_rate": 0.26029900332225914,
+        "arsenal": {
+          "FF": 0.6088709799072577,
+          "CH": 0.3387096688225809,
+          "SL": 0.0524193512701614
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 656945,
+        "name": "Tanner Scott",
+        "throw": "L",
+        "role": "CL",
+        "leverage_skill": 0.85,
+        "stamina_pitches": 18,
+        "availability_mult": 0.9,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0595050964018176,
+          "bb": 1.0463091118800463,
+          "hr": 0.78,
+          "inplay": 1.1401436956081765
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9392971468336813,
+          "bb": 1.1258169934640523,
+          "hr": 1.2739043824701197,
+          "inplay": 0.8539865535267375
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 365,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.3184840425531915,
+        "bb_rate": 0.027127659574468083,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03337765957446808,
+        "inplay_hit_rate": 0.26564516129032256,
+        "arsenal": {
+          "FF": 0.5068493101369862,
+          "SL": 0.49315068986301386
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 694361,
+        "name": "Will Klein",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 23,
+        "availability_mult": 0.885,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9197184315080325,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.1563063063063064
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0779222087867795,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.871505376344086
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 402,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2554721977052074,
+        "bb_rate": 0.07965578111209179,
+        "hbp_rate": 0.009708737864077669,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.29464285714285715,
+        "arsenal": {
+          "FF": 0.5099502305970138,
+          "OTHER": 0.2512437850746271,
+          "CU": 0.18407961104477666,
+          "SL": 0.054726373283582395
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      }
+    ]
+  },
+  "home": {
+    "team": {
+      "team_id": 109,
+      "name": "Arizona Diamondbacks",
+      "abbreviation": "AZ"
+    },
+    "manager": {
+      "pull_starter_pitch_count": 95,
+      "pull_starter_third_time_penalty": 0.04,
+      "starter_min_innings": 5,
+      "starter_blowup_run_diff": 6,
+      "closer_leverage_max_run_diff": 3,
+      "use_closer_in_9th_only": true,
+      "pinch_hit_aggressiveness": 0.15
+    },
+    "confirmed_lineup_ids": [],
+    "projected_lineup_ids": [
+      606466,
+      682998,
+      672695,
+      571448,
+      545121,
+      814439,
+      672515,
+      699912,
+      694371
+    ],
+    "lineup_source": "projected_rotowire_default_vs_lhp",
+    "lineup_confidence": 0.66,
+    "probable_pitcher": {
+      "id": 669194,
+      "source": "feed_gameData_probablePitchers",
+      "confidence": 0.75,
+      "raw_schedule_id": 669194,
+      "raw_feed_id": 669194
+    },
+    "starter": {
+      "id": 669194,
+      "name": "Ryne Nelson",
+      "role": "SP",
+      "selection_source": "probable",
+      "requested_id": 669194
+    },
+    "bullpen": [
+      {
+        "id": 805299,
+        "name": "Brandyn Garcia",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 642528,
+        "name": "Jonathan Lo\u00e1isiga",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
+        "id": 666661,
+        "name": "Juan Morillo",
+        "role": "SU",
+        "lev": 0.7
+      },
+      {
+        "id": 656464,
+        "name": "Kevin Ginkel",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 623149,
+        "name": "Paul Sewald",
+        "role": "CL",
+        "lev": 0.85
+      },
+      {
+        "id": 657044,
+        "name": "Ryan Thompson",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 664199,
+        "name": "Taylor Clarke",
+        "role": "MR",
+        "lev": 0.5
+      },
+      {
+        "id": 694297,
+        "name": "Brandon Pfaadt",
+        "role": "LR",
+        "lev": 0.35
+      }
+    ],
+    "lineup": [
+      {
+        "id": 606466,
+        "name": "Ketel Marte",
+        "pos": "2B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.13893516841724013,
+        "bb_rate": 0.08363817457442954,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.04522817819630569,
+        "inplay_hit_rate": 0.25997374051740907,
+        "xb_hit_share": 0.22033898305084745,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0155258453746463,
+          "bb": 0.8075,
+          "hr": 0.9711668811668812,
+          "inplay": 1.0438521506249678
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0405214628497688,
+          "bb": 1.067630153053687,
+          "hr": 0.9202979222316239,
+          "inplay": 0.9595966675755312
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 682998,
+        "name": "Corbin Carroll",
+        "pos": "RF",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.21290877796901891,
+        "bb_rate": 0.10955249569707401,
+        "hbp_rate": 0.008032128514056224,
+        "hr_rate": 0.02969018932874354,
+        "inplay_hit_rate": 0.3263803680981595,
+        "xb_hit_share": 0.36065573770491804,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8910454088372736,
+          "bb": 0.9397974824210144,
+          "hr": 0.9018204312477908,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0687463391729073,
+          "bb": 1.1113732472211901,
+          "hr": 1.115555844832075,
+          "inplay": 0.8590170815387984
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 672695,
+        "name": "Geraldo Perdomo",
+        "pos": "SS",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.1294888455707169,
+        "bb_rate": 0.12595841455490578,
+        "hbp_rate": 0.00411522633744856,
+        "hr_rate": 0.013125406107862246,
+        "inplay_hit_rate": 0.2338951310861423,
+        "xb_hit_share": 0.26666666666666666,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9030634774609017,
+          "bb": 1.0904230074800103,
+          "hr": 1.008712871287129,
+          "inplay": 0.8699073544549927
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0314988829018268,
+          "bb": 1.0218062566785806,
+          "hr": 0.9488507779349364,
+          "inplay": 1.0667819501502844
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 571448,
+        "name": "Nolan Arenado",
+        "pos": "3B",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.19216457023060796,
+        "bb_rate": 0.08729035639412998,
+        "hbp_rate": 0.02358490566037736,
+        "hr_rate": 0.037631027253668764,
+        "inplay_hit_rate": 0.27082482993197277,
+        "xb_hit_share": 0.24489795918367346,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9099851941322008,
+          "bb": 1.1925000000000001,
+          "hr": 0.9719856744926382,
+          "inplay": 0.9186537676584461
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0371036096046324,
+          "bb": 0.89428792462416,
+          "hr": 1.0121384186843798,
+          "inplay": 1.051728294277511
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 545121,
+        "name": "Ildemaro Vargas",
+        "pos": "1B",
+        "bat": "S",
+        "throw": "R",
+        "k_rate": 0.09455634880163181,
+        "bb_rate": 0.03912119666836648,
+        "hbp_rate": 0.0045045045045045045,
+        "hr_rate": 0.0268018018018018,
+        "inplay_hit_rate": 0.25130208333333337,
+        "xb_hit_share": 0.18333333333333332,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.9787852231360389,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 1.106580310880829
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0092920629323487,
+          "bb": 1.1709679306138139,
+          "hr": 0.78,
+          "inplay": 1.0303108808290156
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 814439,
+        "name": "Ryan Waldschmidt",
+        "pos": "CF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.3327124183006536,
+        "bb_rate": 0.07493464052287581,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.43167989417989416,
+        "xb_hit_share": 0.2608695652173913,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.0,
+          "inplay": 1.049572815183987
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1063697082801296,
+          "bb": 0.8817488006977758,
+          "hr": 1.0,
+          "inplay": 0.9665238779456644
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 672515,
+        "name": "Gabriel Moreno",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.19223318713450294,
+        "bb_rate": 0.09778874269005847,
+        "hbp_rate": 0.006944444444444444,
+        "hr_rate": 0.022971491228070174,
+        "inplay_hit_rate": 0.30003622313450856,
+        "xb_hit_share": 0.2727272727272727,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0222216940773838,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.8573582214352466
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0274714343900204,
+          "bb": 1.0691966176261318,
+          "hr": 0.78,
+          "inplay": 1.0445228096622519
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 699912,
+        "name": "Jose Fernandez",
+        "pos": "DH",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.21661849710982659,
+        "bb_rate": 0.04153592072667217,
+        "hbp_rate": 0.005780346820809248,
+        "hr_rate": 0.014739884393063582,
+        "inplay_hit_rate": 0.2881673881673881,
+        "xb_hit_share": 0.17073170731707318,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.0442401317190184,
+          "bb": 1.013470242375534,
+          "hr": 0.78,
+          "inplay": 1.0674924150932281
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0142280038544214,
+          "bb": 0.9754583609454385,
+          "hr": 1.275,
+          "inplay": 1.0101364002525528
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 694371,
+        "name": "Tommy Troy",
+        "pos": "LF",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.15625,
+        "bb_rate": 0.125,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.03125,
+        "inplay_hit_rate": 0.30434782608695654,
+        "xb_hit_share": 0.25,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1018518518518519,
+          "bb": 0.9388888888888889,
+          "hr": 1.1018518518518519,
+          "inplay": 0.8304511278195488
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "bench": [
+      {
+        "id": 680728,
+        "name": "Adrian Del Castillo",
+        "pos": "DH",
+        "bat": "L",
+        "throw": "R",
+        "k_rate": 0.30993297337553527,
+        "bb_rate": 0.08317817911003537,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.029612735058648296,
+        "inplay_hit_rate": 0.233125,
+        "xb_hit_share": 0.17391304347826086,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 1.1925000000000001,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 0.9636934111327338,
+          "bb": 1.0300272926300083,
+          "hr": 1.1016873762526405,
+          "inplay": 1.048119548389533
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 605244,
+        "name": "Aramis Garcia",
+        "pos": "C",
+        "bat": "R",
+        "throw": "R",
+        "k_rate": 0.3076923076923077,
+        "bb_rate": 0.0,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2222222222222222,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0458333333333334,
+          "bb": 1.0,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 678489,
+        "name": "Jorge Barrosa",
+        "pos": "CF",
+        "bat": "S",
+        "throw": "L",
+        "k_rate": 0.2916666666666667,
+        "bb_rate": 0.08333333333333333,
+        "hbp_rate": 0.00980392156862745,
+        "hr_rate": 0.008333333333333333,
+        "inplay_hit_rate": 0.22965367965367964,
+        "xb_hit_share": 0.45,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8540816326530611,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.070902712325898
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.1099999999999999,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.9822023248507697
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      },
+      {
+        "id": 656976,
+        "name": "Pavin Smith",
+        "pos": "1B",
+        "bat": "L",
+        "throw": "L",
+        "k_rate": 0.3333333333333333,
+        "bb_rate": 0.2,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.14285714285714285,
+        "xb_hit_share": 0.05,
+        "vs_pitch_type": {},
+        "vs_pitch_type_hr": {},
+        "platoon_mult_vs_lhp": {
+          "k": 0.8075,
+          "bb": 0.8075,
+          "hr": 1.0,
+          "inplay": 0.8075
+        },
+        "platoon_mult_vs_rhp": {
+          "k": 1.0392857142857144,
+          "bb": 1.0392857142857144,
+          "hr": 1.0,
+          "inplay": 1.0916666666666668
+        },
+        "statcast_quality_mult": {},
+        "vs_pitcher_history": {}
+      }
+    ],
+    "starter_profile": {
+      "id": 669194,
+      "name": "Ryne Nelson",
+      "throw": "R",
+      "role": "SP",
+      "leverage_skill": 0.5,
+      "stamina_pitches": 88,
+      "availability_mult": 1.0,
+      "platoon_mult_vs_lhb": {
+        "k": 0.9105843145628698,
+        "bb": 0.9591601323015734,
+        "hr": 0.9964259137369859,
+        "inplay": 0.9448287349097267
+      },
+      "platoon_mult_vs_rhb": {
+        "k": 1.111146447526367,
+        "bb": 1.0940658083814774,
+        "hr": 0.9943242756072282,
+        "inplay": 1.0912710395571297
+      },
+      "statcast_quality_mult": {},
+      "arsenal_source": "statsapi_pitchArsenal",
+      "arsenal_sample_size": 1021,
+      "statcast_splits_found": false,
+      "statcast_splits_source": "",
+      "statcast_splits_n_pitches": 0,
+      "statcast_splits_start_date": "",
+      "statcast_splits_end_date": "",
+      "k_rate": 0.18557508423640834,
+      "bb_rate": 0.06568846188871688,
+      "hbp_rate": 0.007194244604316547,
+      "hr_rate": 0.054407613149986336,
+      "inplay_hit_rate": 0.28274890043982404,
+      "arsenal": {
+        "FF": 0.5798237069578845,
+        "CU": 0.09598433115181199,
+        "SI": 0.04113614249363371,
+        "SL": 0.18315376219784515,
+        "FC": 0.0999020571988247
+      },
+      "pitch_type_whiff_mult": {},
+      "pitch_type_inplay_mult": {},
+      "pitch_type_hr_mult": {}
+    },
+    "bullpen_profiles": [
+      {
+        "id": 805299,
+        "name": "Brandyn Garcia",
+        "throw": "L",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 19,
+        "availability_mult": 0.97,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9841011743450767,
+          "bb": 1.1455882352941178,
+          "hr": 1.0,
+          "inplay": 1.0960717009916097
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0073229645339932,
+          "bb": 1.0548593350383633,
+          "hr": 1.0,
+          "inplay": 0.9345537757437072
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 149,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2574418604651163,
+        "bb_rate": 0.03953488372093023,
+        "hbp_rate": 0.046511627906976744,
+        "hr_rate": 0.0,
+        "inplay_hit_rate": 0.2837662337662337,
+        "arsenal": {
+          "OTHER": 0.24161074483221487,
+          "SI": 0.6241610724832214,
+          "SL": 0.13422818268456363
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 642528,
+        "name": "Jonathan Lo\u00e1isiga",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 19,
+        "availability_mult": 0.7168333333333333,
+        "platoon_mult_vs_lhb": {
+          "k": 1.090092807424594,
+          "bb": 1.1918522103904488,
+          "hr": 0.78,
+          "inplay": 1.1925000000000001
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9241428203145141,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.8075
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 368,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.15466507177033492,
+        "bb_rate": 0.07413875598086124,
+        "hbp_rate": 0.010526315789473684,
+        "hr_rate": 0.008947368421052631,
+        "inplay_hit_rate": 0.30303938356164384,
+        "arsenal": {
+          "FF": 0.2038043461141304,
+          "CU": 0.19565217586956526,
+          "CH": 0.2961956688858701,
+          "SI": 0.3043478091304343
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 666661,
+        "name": "Juan Morillo",
+        "throw": "R",
+        "role": "SU",
+        "leverage_skill": 0.7,
+        "stamina_pitches": 20,
+        "availability_mult": 0.905,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0396305101170047,
+          "bb": 0.9483015546353921,
+          "hr": 0.78,
+          "inplay": 0.9941671865252651
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.895324482724028,
+          "bb": 0.9289875408898344,
+          "hr": 1.275,
+          "inplay": 0.8495633187772926
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 421,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.315944170771757,
+        "bb_rate": 0.10681444991789818,
+        "hbp_rate": 0.01904761904761905,
+        "hr_rate": 0.008095238095238096,
+        "inplay_hit_rate": 0.3176544766708701,
+        "arsenal": {
+          "FF": 0.5296912,
+          "CH": 0.18289787,
+          "SI": 0.13301663,
+          "SL": 0.1543943
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 656464,
+        "name": "Kevin Ginkel",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 19,
+        "availability_mult": 0.945,
+        "platoon_mult_vs_lhb": {
+          "k": 1.0531413612565446,
+          "bb": 1.1925000000000001,
+          "hr": 0.78,
+          "inplay": 1.1323728813559324
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.9444451538756226,
+          "bb": 0.8075,
+          "hr": 1.275,
+          "inplay": 0.8892285213325541
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 388,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.2984375,
+        "bb_rate": 0.06145833333333333,
+        "hbp_rate": 0.0,
+        "hr_rate": 0.026041666666666664,
+        "inplay_hit_rate": 0.3022540983606557,
+        "arsenal": {
+          "FF": 0.4484535986546392,
+          "SI": 0.033505152899484546,
+          "SL": 0.5180412484458763
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 623149,
+        "name": "Paul Sewald",
+        "throw": "R",
+        "role": "CL",
+        "leverage_skill": 0.85,
+        "stamina_pitches": 18,
+        "availability_mult": 0.9566666666666667,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9776020861074124,
+          "bb": 1.1925000000000001,
+          "hr": 1.1606541450777204,
+          "inplay": 1.115100297429072
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0452433791981064,
+          "bb": 0.8075,
+          "hr": 0.78,
+          "inplay": 0.9857752395956413
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 332,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.28233082706766915,
+        "bb_rate": 0.06071428571428571,
+        "hbp_rate": 0.011904761904761904,
+        "hr_rate": 0.04837092731829573,
+        "inplay_hit_rate": 0.17109164420485176,
+        "arsenal": {
+          "FF": 0.6024096419277106,
+          "OTHER": 0.39759035807228926
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 657044,
+        "name": "Ryan Thompson",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 18,
+        "availability_mult": 0.7,
+        "platoon_mult_vs_lhb": {
+          "k": 0.8075,
+          "bb": 1.1925000000000001,
+          "hr": 1.275,
+          "inplay": 1.124908424908425
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.175640131976393,
+          "bb": 0.8742274819197896,
+          "hr": 0.78,
+          "inplay": 0.886094674556213
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 320,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.1543975203409531,
+        "bb_rate": 0.07202634637737311,
+        "hbp_rate": 0.011235955056179775,
+        "hr_rate": 0.019101123595505618,
+        "inplay_hit_rate": 0.291044776119403,
+        "arsenal": {
+          "FF": 0.05,
+          "SI": 0.678125,
+          "SL": 0.271875
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 664199,
+        "name": "Taylor Clarke",
+        "throw": "R",
+        "role": "MR",
+        "leverage_skill": 0.5,
+        "stamina_pitches": 18,
+        "availability_mult": 0.7916666666666666,
+        "platoon_mult_vs_lhb": {
+          "k": 1.1505003573981416,
+          "bb": 0.8524640657084188,
+          "hr": 0.78,
+          "inplay": 1.1431364338170362
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 0.8075,
+          "bb": 0.964779618929373,
+          "hr": 1.275,
+          "inplay": 0.8239288656118221
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 362,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.14275510204081632,
+        "bb_rate": 0.04969387755102041,
+        "hbp_rate": 0.02040816326530612,
+        "hr_rate": 0.008673469387755102,
+        "inplay_hit_rate": 0.19353526220614828,
+        "arsenal": {
+          "FF": 0.030386740303867402,
+          "CH": 0.2348066323480663,
+          "SI": 0.19060774190607743,
+          "SL": 0.3176795531767955,
+          "FC": 0.22651933226519333
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      },
+      {
+        "id": 694297,
+        "name": "Brandon Pfaadt",
+        "throw": "R",
+        "role": "LR",
+        "leverage_skill": 0.35,
+        "stamina_pitches": 34,
+        "availability_mult": 0.6916666666666667,
+        "platoon_mult_vs_lhb": {
+          "k": 0.9656759548226472,
+          "bb": 1.01655215461151,
+          "hr": 1.275,
+          "inplay": 1.060236220472441
+        },
+        "platoon_mult_vs_rhb": {
+          "k": 1.0130006468791561,
+          "bb": 1.0364731164473577,
+          "hr": 0.78,
+          "inplay": 0.89750656167979
+        },
+        "statcast_quality_mult": {},
+        "arsenal_source": "statsapi_pitchArsenal",
+        "arsenal_sample_size": 627,
+        "statcast_splits_found": false,
+        "statcast_splits_source": "",
+        "statcast_splits_n_pitches": 0,
+        "statcast_splits_start_date": "",
+        "statcast_splits_end_date": "",
+        "k_rate": 0.1854889160886713,
+        "bb_rate": 0.09496804025567794,
+        "hbp_rate": 0.017543859649122806,
+        "hr_rate": 0.04177206582347341,
+        "inplay_hit_rate": 0.34139784946236557,
+        "arsenal": {
+          "FF": 0.19138755808612445,
+          "OTHER": 0.14673046853269534,
+          "CU": 0.21052631789473683,
+          "CH": 0.09409887905901121,
+          "SI": 0.21531099784689003,
+          "FC": 0.14194577858054222
+        },
+        "pitch_type_whiff_mult": {},
+        "pitch_type_inplay_mult": {},
+        "pitch_type_hr_mult": {}
+      }
+    ]
+  },
+  "weather": {
+    "source": "statsapi_live_feed",
+    "condition": "",
+    "temperature_f": null,
+    "wind_speed_mph": null,
+    "wind_direction": "unknown",
+    "wind_raw": "",
+    "is_dome": null,
+    "multipliers": {
+      "hr_mult": 1.0,
+      "inplay_hit_mult": 1.0,
+      "xb_share_mult": 1.0
+    }
+  },
+  "park": {
+    "source": "statsapi_live_feed",
+    "venue_id": 15,
+    "venue_name": "Chase Field",
+    "roof_type": "Retractable",
+    "roof_status": "",
+    "left_line": 328.0,
+    "center": 407.0,
+    "right_line": 335.0,
+    "multipliers": {
+      "hr_mult": 1.0266666666666666,
+      "inplay_hit_mult": 0.9893333333333334,
+      "xb_share_mult": 0.9866666666666667
+    }
+  },
+  "umpire": {
+    "source": "statsapi_live_feed",
+    "home_plate_umpire_id": null,
+    "home_plate_umpire_name": "",
+    "called_strike_mult": 1.0,
+    "multipliers": {
+      "called_strike_mult": 1.0
+    }
+  }
+}
