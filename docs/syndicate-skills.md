@@ -29,7 +29,9 @@ The VS Code skills are still developer-side playbooks, but Syndicate runtime int
 - `syndicate/features/intelligence_analysis_views.py`: stable analysis-view entrypoint that delegates to sport-owned builders.
 - `syndicate/features/intelligence_analysis_common.py`: shared row/filter/signal helpers used by the analysis builders.
 - `syndicate/features/mlb/intelligence_analysis.py`: MLB prop analysis builders.
-- `syndicate/features/nba/intelligence_analysis.py`: basketball-family analysis builders for NBA, WNBA, and NCAAB asks.
+- `syndicate/features/nba/intelligence_analysis.py`: NBA analysis builders.
+- `syndicate/features/wnba/intelligence_analysis.py`: WNBA analysis builders with league-specific environment and pressure fields.
+- `syndicate/features/ncaab/intelligence_analysis.py`: NCAAB analysis builders with college-specific tempo and volatility fields.
 - `syndicate/features/nfl/intelligence_analysis.py`: football-family analysis builders for NFL and NCAAF asks.
 - `syndicate/features/nhl/intelligence_analysis.py`: hockey prop analysis builders.
 - `syndicate/features/intelligence_parlay_correlation.py`: same-game pair penalties and medium-correlation preference enforcement.
@@ -39,7 +41,7 @@ The current runtime path supports:
 - candidate-driven market inference instead of relying only on hardcoded query aliases
 - market-shape-aware recommendation scoring
 - medium-correlation and pair-penalty-aware parlay filtering and ranking
-- structured analysis views for MLB HR plus strikeout/total-bases explainer asks, basketball matchup asks with pace/usage/shot-profile context, football market asks with EPA/target-share/pass-rate context, and hockey prop asks
+- structured analysis views for MLB HR plus strikeout/total-bases explainer asks, NBA matchup asks with pace/usage/shot-profile context, WNBA matchup asks with team-environment and matchup-pressure context, NCAAB matchup asks with tempo/volatility context, football market asks with EPA/target-share/pass-rate context, and hockey prop asks
 
 The main remaining expansion area is deeper sport-native reasoning and artifact-backed explainers inside each sport module now that the router, parlay runtime, and analysis-builder boundaries are in place.
 

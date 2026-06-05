@@ -15,11 +15,11 @@ def build_basketball_matchup_analysis_views(
     candidate_market_focuses,
     advanced_signal_text,
 ) -> dict[str, Any] | None:
-    if preferences.get("analysis_focus") != "basketball_matchups":
+    if preferences.get("analysis_focus") != "nba_matchups":
         return None
     filtered_candidates = filtered_analysis_candidates(
         candidates,
-        sports={"nba", "wnba", "ncaab"},
+        sports={"nba"},
         preferences=preferences,
         candidate_types={"prop"},
         safe_text=safe_text,
@@ -42,9 +42,16 @@ def build_basketball_matchup_analysis_views(
             why_bits.append(f"usage {usage_signal:.2f}")
         if shot_profile_signal is not None:
             why_bits.append(f"shot profile {shot_profile_signal:.2f}")
+        market_key = safe_text((candidate.get("market_fit") or {}).get("market_key"), "").lower()
+        analysis_shape = "nba_usage_creation"
+        if market_key in {"rebounds", "blocks", "steals"}:
+            analysis_shape = "nba_rebound_environment"
+        elif market_key in {"assists", "pra"}:
+            analysis_shape = "nba_playmaking_network"
         table_rows.append(
             {
                 **base_row,
+                "analysis_shape": analysis_shape,
                 "pace_signal": pace_signal,
                 "usage_signal": usage_signal,
                 "shot_profile_signal": shot_profile_signal,
@@ -55,15 +62,15 @@ def build_basketball_matchup_analysis_views(
     if not table_rows:
         return None
     return {
-        "focus": "basketball_matchups",
-        "title": "Top basketball matchup targets",
+        "focus": "nba_matchups",
+        "title": "Top NBA matchup targets",
         "table": {
-            "title": "Top matchup-backed basketball targets",
-            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "pace_signal", "usage_signal", "shot_profile_signal", "role_signal", "why"],
+            "title": "Top NBA matchup-backed targets",
+            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "analysis_shape", "pace_signal", "usage_signal", "shot_profile_signal", "role_signal", "why"],
             "rows": table_rows,
         },
         "chart": {
-            "title": "Basketball matchup score grid",
+            "title": "NBA matchup score grid",
             "type": "bar",
             "x_key": "label",
             "series": ["score", "market_fit_score", "pace_signal", "usage_signal", "shot_profile_signal"],

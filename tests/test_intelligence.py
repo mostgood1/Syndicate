@@ -105,6 +105,11 @@ def _sample_overview_with_secondary_sport() -> list[dict[str, object]]:
                             "market": "PTS",
                             "pick": "Over 24.5",
                             "matchup": "LVA at SEA",
+                            "team_environment_advanced": 1.12,
+                            "possession_profile_advanced": 1.05,
+                            "matchup_pressure_advanced": 1.09,
+                            "rotation_pressure_advanced": 1.03,
+                            "live_shift_advanced": 1.01,
                             "projected": 28.1,
                             "line": 24.5,
                             "odds": "+102",
@@ -552,7 +557,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("pitcher_hr_mult", first_row)
         self.assertIn("why", first_row)
 
-    def test_intelligence_query_builds_basketball_analysis_views(self) -> None:
+    def test_intelligence_query_builds_nba_analysis_views(self) -> None:
         advanced_rows = [
             {
                 "label": "Team advanced stats",
@@ -577,15 +582,49 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = (response.get_json() or {}).get("response") or {}
         analysis_views = result.get("analysis_views") or {}
-        self.assertEqual(analysis_views.get("focus"), "basketball_matchups")
+        self.assertEqual(analysis_views.get("focus"), "nba_matchups")
         self.assertTrue((analysis_views.get("table") or {}).get("rows"))
         self.assertTrue((analysis_views.get("chart") or {}).get("rows"))
         first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
         self.assertIn("market_fit_score", first_row)
+        self.assertEqual(first_row.get("analysis_shape"), "nba_usage_creation")
         self.assertEqual(first_row.get("pace_signal"), 1.08)
         self.assertEqual(first_row.get("usage_signal"), 1.14)
         self.assertEqual(first_row.get("shot_profile_signal"), 1.06)
         self.assertIn("why", first_row)
+
+    def test_intelligence_query_builds_wnba_analysis_views(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team environment and pace layer",
+                "metrics": ["Team environment", "Possession profile", "Matchup pressure"],
+                "path": "data/wnba_source/data/processed/recommendations_slate_2026-06-04.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview_with_secondary_sport()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the best WNBA matchup targets today with a table and chart.",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "wnba_matchups")
+        self.assertTrue((analysis_views.get("table") or {}).get("rows"))
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertEqual(first_row.get("analysis_shape"), "wnba_role_pressure")
+        self.assertEqual(first_row.get("team_environment_signal"), 1.12)
+        self.assertEqual(first_row.get("possession_profile_signal"), 1.05)
+        self.assertEqual(first_row.get("matchup_pressure_signal"), 1.09)
 
     def test_intelligence_query_builds_football_analysis_views(self) -> None:
         advanced_rows = [

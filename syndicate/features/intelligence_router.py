@@ -43,8 +43,14 @@ def analysis_focus_from_question(
     if lowered_sports & mlb_sports or lowered_markets & mlb_markets:
         return "mlb_props"
 
-    if lowered_sports & basketball_sports or lowered_markets & basketball_markets:
-        return "basketball_matchups"
+    if "wnba" in lowered_sports:
+        return "wnba_matchups"
+    if "nba" in lowered_sports:
+        return "nba_matchups"
+    if "ncaab" in lowered_sports:
+        return "ncaab_matchups"
+    if lowered_markets & basketball_markets:
+        return "nba_matchups"
     if lowered_sports & football_sports or lowered_markets & football_markets:
         return "football_markets"
     if lowered_sports & hockey_sports or lowered_markets & hockey_markets:
