@@ -296,6 +296,36 @@
       gap: 12px;
     }
 
+    .intel-analysis-overview {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      align-items: start;
+      background:
+        radial-gradient(circle at top right, rgba(139, 211, 255, 0.1), transparent 32%),
+        linear-gradient(145deg, rgba(7, 17, 28, 0.98), rgba(12, 25, 39, 0.94));
+    }
+
+    .intel-analysis-overview__stats {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(6, 16, 26, 0.78);
+      border: 1px solid rgba(125, 152, 178, 0.14);
+    }
+
+    .intel-analysis-series {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .intel-analysis-series .intel-chip {
+      background: rgba(139, 211, 255, 0.08);
+      color: var(--intel-ink);
+    }
+
     .intel-analysis-table-wrap {
       overflow-x: auto;
       border-radius: 16px;
@@ -346,6 +376,17 @@
       border: 1px solid rgba(125, 152, 178, 0.12);
     }
 
+    .intel-chart-card__meta {
+      color: var(--intel-dim);
+      font-size: 0.84rem;
+    }
+
+    .intel-chart-card__why {
+      color: var(--intel-soft);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
     .intel-bar-track {
       height: 12px;
       border-radius: 999px;
@@ -387,7 +428,8 @@
 
     @media (max-width: 980px) {
       .intel-form-row,
-      .intel-top-card__grid {
+      .intel-top-card__grid,
+      .intel-analysis-overview {
         grid-template-columns: 1fr;
       }
     }
@@ -546,6 +588,41 @@
         }).filter(Boolean).join('');
       }
 
+      function compactText(value, limit = 220) {
+        const text = String(value || '').trim();
+        if (!text) {
+          return '';
+        }
+        return text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
+      }
+
+      function renderAnalysisOverview(analysis, rows, chartSeries) {
+        const summaryMetrics = [
+          rows.length ? metricPill('Rows', rows.length) : '',
+          chartSeries.length ? metricPill('Tracked series', chartSeries.length) : '',
+          analysis?.focus ? metricPill('Focus', prettyLabel(analysis.focus)) : '',
+          analysis?.chart?.type ? metricPill('Chart', prettyLabel(analysis.chart.type)) : ''
+        ].filter(Boolean).join('');
+
+        const seriesMarkup = chartSeries.length
+          ? `<div class="intel-analysis-series">${chartSeries.map((key) => chip(prettyLabel(key))).join('')}</div>`
+          : '<p class="intel-table-note">No chart series were returned for this view.</p>';
+
+        return `
+          <article class="intel-analysis-card intel-analysis-overview">
+            <div>
+              <div class="intel-kicker">Analysis brief</div>
+              <h3>${escapeHtml(analysis?.title || 'Returned analysis')}</h3>
+              <p class="intel-table-note">The engine returned a structured analysis contract for this prompt. The chips below show the exact metrics being visualized in the score cards.</p>
+              ${seriesMarkup}
+            </div>
+            <div class="intel-analysis-overview__stats">
+              <div class="intel-kicker">Active view</div>
+              <div class="intel-metric-grid">${summaryMetrics}</div>
+            </div>
+          </article>`;
+      }
+
       function updateStatusLink() {
         if (!statusLink) {
           return;
@@ -641,6 +718,7 @@
         const chartRows = Array.isArray(chart.rows) ? chart.rows : [];
         const chartSeries = Array.isArray(chart.series) ? chart.series : [];
         const scoreMax = chartRows.reduce((max, row) => Math.max(max, Number(row?.score || 0)), 0) || 1;
+        const overviewMarkup = rows.length || chartSeries.length ? renderAnalysisOverview(analysis, rows, chartSeries) : '';
 
         const tableMarkup = columns.length && rows.length ? `
           <article class="intel-analysis-card">
@@ -672,12 +750,16 @@
                 const score = Number(row?.score || 0);
                 const widthPct = Math.max(10, Math.min(100, (score / scoreMax) * 100));
                 const metrics = buildAnalysisMetricPills(row, chartSeries);
+                const meta = [row?.matchup, row?.market, row?.pick].filter(Boolean).map((value) => escapeHtml(value)).join(' · ');
+                const why = compactText(row?.why || '');
 
                 return `
                   <div class="intel-chart-card">
                     <strong>${escapeHtml(row?.label || 'Target')}</strong>
+                    ${meta ? `<div class="intel-chart-card__meta">${meta}</div>` : ''}
                     <div class="intel-bar-track"><div class="intel-bar-fill" style="width:${widthPct.toFixed(1)}%"></div></div>
                     <div class="intel-metric-grid">${metrics}</div>
+                    ${why ? `<div class="intel-chart-card__why">${escapeHtml(why)}</div>` : ''}
                   </div>`;
               }).join('')}
             </div>
@@ -687,7 +769,7 @@
           return '';
         }
 
-        return `<section class="intel-analysis-stack">${tableMarkup}${chartMarkup}</section>`;
+        return `<section class="intel-analysis-stack">${overviewMarkup}${tableMarkup}${chartMarkup}</section>`;
       }
 
       function renderRecommendationCards(recommendations) {
