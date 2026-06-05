@@ -781,16 +781,17 @@ def _basketball_summary_signals_from_text(item: dict[str, Any]) -> list[dict[str
 
     if line_value is not None and line_value > 0:
         patterns = (
-            (r"last-five average of (?P<value>\d+(?:\.\d+)?)", "basketball_last5_delta"),
-            (r"last-10 sample(?: is [^.,;]*?)? at (?P<value>\d+(?:\.\d+)?)", "basketball_last10_delta"),
-            (r"last game landed at (?P<value>\d+(?:\.\d+)?)", "basketball_last_game_delta"),
+            (r"last-five average of (?P<value>\d+(?:\.\d+)?)", "basketball_last5_average", "basketball_last5_delta"),
+            (r"last-10 sample(?: is [^.,;]*?)? at (?P<value>\d+(?:\.\d+)?)", "basketball_last10_average", "basketball_last10_delta"),
+            (r"last game landed at (?P<value>\d+(?:\.\d+)?)", "basketball_last_game_value", "basketball_last_game_delta"),
         )
-        for pattern, key in patterns:
+        for pattern, raw_key, delta_key in patterns:
             match = re.search(pattern, summary_text)
             if not match:
                 continue
             value = float(match.group("value"))
-            append_signal(key, (value - line_value) / max(line_value, 8.0))
+            append_signal(raw_key, value)
+            append_signal(delta_key, (value - line_value) / max(line_value, 8.0))
 
     minutes_match = re.search(
         r"projected minutes \((?P<projected>\d+(?:\.\d+)?)\) (?P<relation>sit above|are lighter than) (?:his|her|their) last-10 workload \((?P<workload>\d+(?:\.\d+)?)\)",
@@ -800,6 +801,8 @@ def _basketball_summary_signals_from_text(item: dict[str, Any]) -> list[dict[str
         projected_minutes = float(minutes_match.group("projected"))
         workload_minutes = float(minutes_match.group("workload"))
         relation = 1.0 if minutes_match.group("relation") == "sit above" else -1.0
+        append_signal("basketball_projected_minutes", projected_minutes)
+        append_signal("basketball_last10_workload", workload_minutes)
         append_signal(
             "basketball_minutes_workload_delta",
             relation * abs(projected_minutes - workload_minutes) / max(workload_minutes, 12.0),
@@ -3305,6 +3308,163 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
     return output
 
 
+def _supporting_evidence_table(analysis_views: dict[str, Any]) -> dict[str, Any] | None:
+    table = analysis_views.get("table") if isinstance(analysis_views.get("table"), dict) else {}
+    rows = table.get("rows") if isinstance(table.get("rows"), list) else []
+    if not rows:
+        return None
+    evidence_rows: list[dict[str, Any]] = []
+    for row in rows[:5]:
+        if not isinstance(row, dict):
+            continue
+        evidence_rows.append(
+            {
+                "target": _safe_text(row.get("label") or row.get("player") or row.get("name"), "Target"),
+                "matchup": _safe_text(row.get("matchup"), "-"),
+                "market": _safe_text(row.get("market"), "Market"),
+                "pick": _safe_text(row.get("pick"), "-"),
+                "score": row.get("score"),
+                "why": _safe_text(row.get("why"), "-"),
+            }
+        )
+    if not evidence_rows:
+        return None
+    return {
+        "kind": "table",
+        "title": _safe_text(table.get("title"), "Evidence grid"),
+        "columns": ["target", "matchup", "market", "pick", "score", "why"],
+        "rows": evidence_rows,
+    }
+
+
+def _recent_form_supporting_evidence_table(analysis_views: dict[str, Any]) -> dict[str, Any] | None:
+    focus = _safe_text(analysis_views.get("focus"), "").lower()
+    if focus not in {"nba_matchups", "wnba_matchups", "ncaab_matchups"}:
+        return None
+    table = analysis_views.get("table") if isinstance(analysis_views.get("table"), dict) else {}
+    rows = table.get("rows") if isinstance(table.get("rows"), list) else []
+    if not rows:
+        return None
+    recent_form_rows: list[dict[str, Any]] = []
+    for row in rows[:5]:
+        if not isinstance(row, dict):
+            continue
+        if all(
+            row.get(key) in {None, ""}
+            for key in [
+                "last5_average",
+                "last10_average",
+                "last_game_value",
+                "projected_minutes",
+                "last10_workload",
+                "last5_delta_signal",
+                "last10_delta_signal",
+                "last_game_delta_signal",
+                "workload_delta_signal",
+            ]
+        ):
+            continue
+        recent_form_rows.append(
+            {
+                "target": _safe_text(row.get("label") or row.get("player") or row.get("name"), "Target"),
+                "market": _safe_text(row.get("market"), "Market"),
+                "last5_average": row.get("last5_average"),
+                "last10_average": row.get("last10_average"),
+                "last_game_value": row.get("last_game_value"),
+                "projected_minutes": row.get("projected_minutes"),
+                "last10_workload": row.get("last10_workload"),
+                "last5_delta_signal": row.get("last5_delta_signal"),
+                "last10_delta_signal": row.get("last10_delta_signal"),
+                "last_game_delta_signal": row.get("last_game_delta_signal"),
+                "workload_delta_signal": row.get("workload_delta_signal"),
+                "why": _safe_text(row.get("why"), "-"),
+            }
+        )
+    if not recent_form_rows:
+        return None
+    return {
+        "kind": "table",
+        "title": "Recent form table",
+        "columns": ["target", "market", "last5_average", "last10_average", "last_game_value", "projected_minutes", "last10_workload", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
+        "rows": recent_form_rows,
+    }
+
+
+def _build_supporting_evidence(recommendations: list[dict[str, Any]], analysis_views: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not recommendations:
+        return None
+
+    top = recommendations[0] if isinstance(recommendations[0], dict) else {}
+    sections: list[dict[str, Any]] = []
+
+    metric_items = [
+        {"label": "Projection", "value": top.get("projected")},
+        {"label": "Line", "value": top.get("line")},
+        {"label": "Live projection", "value": top.get("live_projection")},
+        {"label": "Confidence", "value": top.get("confidence")},
+        {"label": "Price edge", "value": f"{top.get('price_edge_pct')}%" if top.get("price_edge_pct") is not None else None},
+        {"label": "Implied probability", "value": f"{top.get('implied_probability')}%" if top.get("implied_probability") is not None else None},
+        {"label": "Market fit", "value": top.get("market_fit_score")},
+        {"label": "Advanced signal score", "value": top.get("advanced_signal_score")},
+        {"label": "Source summary score", "value": top.get("source_summary_score")},
+    ]
+    metric_items = [item for item in metric_items if item.get("value") not in {None, "", "-"}]
+    if metric_items:
+        sections.append({"kind": "metrics", "title": "Top case evidence", "items": metric_items})
+
+    signal_items = [
+        {"label": _safe_text(item.get("label"), "Advanced signal"), "value": item.get("value")}
+        for item in (top.get("advanced_signals") or [])[:6]
+        if isinstance(item, dict) and item.get("value") not in {None, ""}
+    ]
+    if not signal_items and isinstance(analysis_views, dict):
+        chart = analysis_views.get("chart") if isinstance(analysis_views.get("chart"), dict) else {}
+        chart_rows = chart.get("rows") if isinstance(chart.get("rows"), list) else []
+        chart_series = chart.get("series") if isinstance(chart.get("series"), list) else []
+        first_chart_row = chart_rows[0] if chart_rows and isinstance(chart_rows[0], dict) else {}
+        signal_items = [
+            {"label": _humanize_signal_key(key), "value": first_chart_row.get(key)}
+            for key in chart_series[:6]
+            if key not in {"score", "market_fit_score", "advanced_signal_score", "source_summary_score"} and first_chart_row.get(key) not in {None, ""}
+        ]
+    if signal_items:
+        sections.append({"kind": "signals", "title": "Key advanced signals", "items": signal_items})
+
+    source_items: list[dict[str, Any]] = []
+    seen_sources: set[str] = set()
+    for recommendation in recommendations[:3]:
+        if not isinstance(recommendation, dict):
+            continue
+        for item in (recommendation.get("advanced_inputs") or [])[:3]:
+            if not isinstance(item, dict):
+                continue
+            label = _safe_text(item.get("label"), "Advanced input")
+            if label in seen_sources:
+                continue
+            seen_sources.add(label)
+            metrics = [str(metric).strip() for metric in (item.get("metrics") or []) if str(metric).strip()]
+            source_items.append({"label": label, "detail": ", ".join(metrics[:5]) if metrics else None})
+    if source_items:
+        sections.append({"kind": "sources", "title": "Source inputs", "items": source_items})
+
+    if isinstance(analysis_views, dict):
+        recent_form_table = _recent_form_supporting_evidence_table(analysis_views)
+        if recent_form_table is not None:
+            sections.append(recent_form_table)
+        evidence_table = _supporting_evidence_table(analysis_views)
+        if evidence_table is not None:
+            sections.append(evidence_table)
+
+    if not sections:
+        return None
+
+    return {
+        "title": "Supporting evidence",
+        "focus": analysis_views.get("focus") if isinstance(analysis_views, dict) else None,
+        "sections": sections,
+    }
+
+
 def _parlay_rationale(legs: list[dict[str, Any]]) -> str:
     live_count = sum(1 for leg in legs if bool(leg.get("is_live")))
     sports = sorted({_safe_text(leg.get("sport"), "Sport") for leg in legs})
@@ -3790,6 +3950,7 @@ def run_intelligence_query(
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
     parlays = _build_parlays(candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
     analysis_views = _analysis_views_for_query(candidates, preferences)
+    supporting_evidence = _build_supporting_evidence(recommendations, analysis_views)
 
     live_rows = sum(1 for candidate in candidates if bool(candidate.get("is_live")))
     pregame_rows = sum(1 for candidate in candidates if not bool(candidate.get("is_live")))
@@ -3838,6 +3999,7 @@ def run_intelligence_query(
         "recommendations": recommendations,
         "parlays": parlays,
         "analysis_views": analysis_views,
+        "supporting_evidence": supporting_evidence,
         "board_notes": data_notes[:8],
         "readiness_gate": readiness_gate,
         "local_only": True,

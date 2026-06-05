@@ -40,6 +40,11 @@ def build_wnba_matchup_analysis_views(
         last10_delta_signal = first_signal_value(candidate, "basketball_last10_delta")
         last_game_delta_signal = first_signal_value(candidate, "basketball_last_game_delta")
         workload_delta_signal = first_signal_value(candidate, "basketball_minutes_workload_delta")
+        last5_average = first_signal_value(candidate, "basketball_last5_average")
+        last10_average = first_signal_value(candidate, "basketball_last10_average")
+        last_game_value = first_signal_value(candidate, "basketball_last_game_value")
+        projected_minutes = first_signal_value(candidate, "basketball_projected_minutes")
+        last10_workload = first_signal_value(candidate, "basketball_last10_workload")
         market_key = safe_text((candidate.get("market_fit") or {}).get("market_key"), "").lower()
         analysis_shape = "wnba_role_pressure"
         if market_key in {"rebounds", "blocks", "steals"}:
@@ -70,6 +75,11 @@ def build_wnba_matchup_analysis_views(
                 "matchup_pressure_signal": matchup_pressure_signal,
                 "rotation_pressure_signal": rotation_pressure_signal,
                 "live_shift_signal": live_shift_signal,
+                "last5_average": last5_average,
+                "last10_average": last10_average,
+                "last_game_value": last_game_value,
+                "projected_minutes": projected_minutes,
+                "last10_workload": last10_workload,
                 "last5_delta_signal": last5_delta_signal,
                 "last10_delta_signal": last10_delta_signal,
                 "last_game_delta_signal": last_game_delta_signal,

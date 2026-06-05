@@ -39,6 +39,11 @@ def build_basketball_matchup_analysis_views(
         last10_delta_signal = first_signal_value(candidate, "basketball_last10_delta")
         last_game_delta_signal = first_signal_value(candidate, "basketball_last_game_delta")
         workload_delta_signal = first_signal_value(candidate, "basketball_minutes_workload_delta")
+        last5_average = first_signal_value(candidate, "basketball_last5_average")
+        last10_average = first_signal_value(candidate, "basketball_last10_average")
+        last_game_value = first_signal_value(candidate, "basketball_last_game_value")
+        projected_minutes = first_signal_value(candidate, "basketball_projected_minutes")
+        last10_workload = first_signal_value(candidate, "basketball_last10_workload")
         why_bits = [base_row.get("why")]
         if pace_signal is not None:
             why_bits.append(f"pace {pace_signal:.2f}")
@@ -68,6 +73,11 @@ def build_basketball_matchup_analysis_views(
                 "usage_signal": usage_signal,
                 "shot_profile_signal": shot_profile_signal,
                 "role_signal": role_signal,
+                "last5_average": last5_average,
+                "last10_average": last10_average,
+                "last_game_value": last_game_value,
+                "projected_minutes": projected_minutes,
+                "last10_workload": last10_workload,
                 "last5_delta_signal": last5_delta_signal,
                 "last10_delta_signal": last10_delta_signal,
                 "last_game_delta_signal": last_game_delta_signal,

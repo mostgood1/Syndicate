@@ -20,6 +20,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 
 from syndicate.features.mlb.ladders_common import build_module_links as build_mlb_module_links
 from syndicate.features.mlb.sources import available_daily_summary_dates
+from syndicate.features.mlb.sources import daily_top_props_path
 from syndicate.features.mlb.sources import load_json_or_gz_file
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.nba.sources import available_dates as nba_available_dates
@@ -3113,7 +3114,10 @@ def _load_home_live_prop_items(
                 for game in (liveish_games or live_games)
                 if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
             ]
-            return _prop_rows_from_mlb_live_games(prop_backed_games)
+            live_rows = _prop_rows_from_mlb_live_games(prop_backed_games)
+            if live_rows:
+                return live_rows
+            return _load_mlb_home_top_prop_items(context_label)
         if not _home_games_have_live_action(home_games):
             return []
         if slug == "nhl":
@@ -3163,6 +3167,95 @@ def _load_home_live_prop_items(
     except Exception:
         return []
     return []
+
+
+def _mlb_top_prop_rows_from_group(
+    summary: dict[str, Any],
+    *,
+    group_key: str,
+    fallback_href: str,
+    limit: int,
+) -> list[dict[str, Any]]:
+    groups = summary.get("groups") if isinstance(summary.get("groups"), dict) else {}
+    group = groups.get(group_key) if isinstance(groups.get(group_key), dict) else {}
+    sections = group.get("sections") if isinstance(group.get("sections"), list) else []
+    heading = "Pitcher top props" if group_key == "pitcher" else "Hitter top props"
+    candidates: list[tuple[float, dict[str, Any]]] = []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        values = section.get("rows") if isinstance(section.get("rows"), list) else []
+        for value in values:
+            if not isinstance(value, dict):
+                continue
+            probability = _numeric_value(value.get("simProb"))
+            edge = _numeric_value(value.get("rawEdge"))
+            matchup = _safe_text(value.get("matchup"), "-")
+            away_label, home_label = _split_matchup_labels(matchup)
+            team_label = str(value.get("team") or "").strip()
+            opponent_label = str(value.get("opponent") or "").strip()
+            team_logo = str(value.get("teamLogoUrl") or "").strip() or None
+            opponent_logo = str(value.get("opponentLogoUrl") or "").strip() or None
+            odds_value = _numeric_value(value.get("odds"))
+            odds_text = None
+            if odds_value is not None:
+                odds_int = int(odds_value)
+                odds_text = f"+{odds_int}" if odds_int > 0 else str(odds_int)
+            selection = _safe_text(value.get("selectionLabel") or value.get("selection"), "Play")
+            target_label = str(value.get("targetLabel") or "").strip()
+            market = _safe_text(value.get("statLabel") or value.get("stat"), "Market")
+            pick = f"{selection} {target_label}".strip()
+            candidates.append(
+                (
+                    float(edge or probability or 0.0),
+                    {
+                        "game_pk": _int_or_none(value.get("gamePk")),
+                        "matchup": matchup,
+                        "heading": heading,
+                        "name": _safe_text(value.get("playerName") or value.get("ownerName"), "MLB prop"),
+                        "player_name": _safe_text(value.get("playerName") or value.get("ownerName"), "MLB prop"),
+                        "player_id": _int_or_none(value.get("ownerId") or value.get("playerId")),
+                        "photo": str(value.get("headshotUrl") or "").strip() or None,
+                        "headshot_url": str(value.get("headshotUrl") or "").strip() or None,
+                        "is_live": False,
+                        "market": market,
+                        "pick": pick,
+                        "detail": f"{pick} {market} | Daily top props fallback".strip(),
+                        "value": f"{probability * 100:.1f}% win" if probability is not None else heading,
+                        "projected": _prop_metric_text(value.get("mean")),
+                        "line": _prop_metric_text(value.get("line")) or _safe_text(value.get("line"), "-"),
+                        "odds": odds_text or _prop_metric_text(value.get("odds")),
+                        "edge": _pct_text(edge),
+                        "confidence": _pct_text(probability),
+                        "away_label": away_label,
+                        "home_label": home_label,
+                        "away_logo": opponent_logo if away_label == opponent_label else team_logo if away_label == team_label else None,
+                        "home_logo": team_logo if home_label == team_label else opponent_logo if home_label == opponent_label else None,
+                        "href": fallback_href,
+                    },
+                )
+            )
+    return [row for _, row in sorted(candidates, key=lambda item: item[0], reverse=True)[:limit]]
+
+
+def _load_mlb_home_top_prop_items(context_label: str, *, limit: int = 18) -> list[dict[str, Any]]:
+    summary = load_json_or_gz_file(daily_top_props_path(context_label))
+    if not isinstance(summary, dict):
+        return []
+    per_group_limit = max(1, limit // 2)
+    pitcher_rows = _mlb_top_prop_rows_from_group(
+        summary,
+        group_key="pitcher",
+        fallback_href=f"/mlb/pitcher-top-props?date={context_label}",
+        limit=per_group_limit,
+    )
+    hitter_rows = _mlb_top_prop_rows_from_group(
+        summary,
+        group_key="hitter",
+        fallback_href=f"/mlb/hitter-top-props?date={context_label}",
+        limit=per_group_limit,
+    )
+    return _interleave_rows(pitcher_rows, hitter_rows, limit=limit)
 
 
 def _load_home_prop_items(

@@ -858,6 +858,25 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
         self.assertTrue(any(text in (first_row.get("why") or "") for text in concrete_nba_writeups))
         self.assertTrue(any(text in ((result.get("recommendations") or [])[0].get("rationale") or "") for text in concrete_nba_writeups))
+        supporting_evidence = result.get("supporting_evidence") or {}
+        sections = supporting_evidence.get("sections") or []
+        self.assertTrue(sections)
+        recent_form_table = next((section for section in sections if section.get("title") == "Recent form table"), None)
+        self.assertIsNotNone(recent_form_table)
+        recent_form_row = ((recent_form_table.get("rows") or [])[0] or {})
+        self.assertEqual(recent_form_row.get("target"), "Donovan Mitchell Over 4.5 3PM")
+        self.assertEqual(recent_form_row.get("last5_average"), 5.1)
+        self.assertEqual(recent_form_row.get("last10_average"), 4.8)
+        self.assertEqual(recent_form_row.get("last_game_value"), 6.0)
+        self.assertEqual(recent_form_row.get("projected_minutes"), 35.0)
+        self.assertEqual(recent_form_row.get("last10_workload"), 33.0)
+        self.assertGreater(recent_form_row.get("last5_delta_signal") or 0.0, 0.0)
+        evidence_table = next((section for section in sections if section.get("kind") == "table"), None)
+        self.assertIsNotNone(evidence_table)
+        self.assertTrue(any((row.get("target") == "Jayson Tatum Over 28.5") for row in (evidence_table.get("rows") or [])))
+        sources_section = next((section for section in sections if section.get("kind") == "sources"), None)
+        self.assertIsNotNone(sources_section)
+        self.assertEqual((sources_section.get("items") or [])[0].get("label"), "Team advanced stats")
 
     def test_intelligence_query_builds_wnba_analysis_views(self) -> None:
         advanced_rows = [
@@ -904,6 +923,19 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreater(first_row.get("workload_delta_signal") or 0.0, 0.0)
         self.assertIn("Projection is clearing the number with stable volume.", first_row.get("why") or "")
         self.assertIn("Projection is clearing the number with stable volume.", recommendations[0].get("rationale") or "")
+        supporting_evidence = result.get("supporting_evidence") or {}
+        sections = supporting_evidence.get("sections") or []
+        recent_form_table = next((section for section in sections if section.get("title") == "Recent form table"), None)
+        self.assertIsNotNone(recent_form_table)
+        recent_form_row = ((recent_form_table.get("rows") or [])[0] or {})
+        self.assertEqual(recent_form_row.get("last5_average"), 28.4)
+        self.assertEqual(recent_form_row.get("last10_average"), 26.8)
+        self.assertEqual(recent_form_row.get("last_game_value"), 29.0)
+        self.assertEqual(recent_form_row.get("projected_minutes"), 34.0)
+        self.assertEqual(recent_form_row.get("last10_workload"), 31.5)
+        recent_form_row = ((recent_form_table.get("rows") or [])[0] or {})
+        self.assertEqual(recent_form_row.get("target"), "A'ja Wilson Over 24.5")
+        self.assertGreater(recent_form_row.get("last10_delta_signal") or 0.0, 0.0)
 
     def test_intelligence_query_uses_basketball_source_summary_without_writeup(self) -> None:
         overview = _sample_overview_with_secondary_sport()
@@ -1114,8 +1146,12 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         )
 
         signal_keys = {signal.get("key") for signal in signals}
+        self.assertIn("basketball_last5_average", signal_keys)
+        self.assertIn("basketball_last10_average", signal_keys)
         self.assertIn("basketball_last5_delta", signal_keys)
         self.assertIn("basketball_last10_delta", signal_keys)
+        self.assertIn("basketball_projected_minutes", signal_keys)
+        self.assertIn("basketball_last10_workload", signal_keys)
         self.assertIn("basketball_minutes_workload_delta", signal_keys)
 
     def test_advanced_signal_score_handles_basketball_summary_deltas(self) -> None:
@@ -1352,12 +1388,23 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = (response.get_json() or {}).get("response") or {}
         analysis_views = result.get("analysis_views") or {}
+        supporting_evidence = result.get("supporting_evidence") or {}
         self.assertEqual(analysis_views.get("focus"), "mlb_props")
         first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
         self.assertEqual(first_row.get("market_key"), "strikeouts")
         self.assertEqual(first_row.get("pitcher_k_mult"), 1.27)
         self.assertEqual(first_row.get("batter_k_mult"), 1.19)
         self.assertIn("pitch mix", first_row.get("why") or "")
+        sections = supporting_evidence.get("sections") or []
+        self.assertTrue(sections)
+        metrics_section = next((section for section in sections if section.get("kind") == "metrics"), None)
+        self.assertIsNotNone(metrics_section)
+        signals_section = next((section for section in sections if section.get("kind") == "signals"), None)
+        self.assertIsNotNone(signals_section)
+        self.assertEqual((signals_section.get("items") or [])[0].get("label"), "Batter K Mult")
+        sources_section = next((section for section in sections if section.get("kind") == "sources"), None)
+        self.assertIsNotNone(sources_section)
+        self.assertEqual((sources_section.get("items") or [])[0].get("label"), "Statcast batter and pitcher features")
 
     def test_intelligence_query_builds_mlb_total_bases_analysis_views(self) -> None:
         advanced_rows = [
@@ -2065,6 +2112,98 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(rows[0].get("is_live"))
         self.assertEqual(rows[0].get("href"), "/mlb/live-lens?date=2026-06-05")
 
+    def test_mlb_live_prop_rows_fall_back_to_top_props_when_live_payload_has_no_props(self) -> None:
+        from syndicate.blueprints.home import _load_home_live_prop_items
+
+        live_lens_games = [
+            {
+                "gamePk": 123,
+                "away": {"abbr": "NYY", "name": "Yankees"},
+                "home": {"abbr": "BOS", "name": "Red Sox"},
+                "status": {"abstract": "Live", "detailed": "Top 3"},
+                "matchup": {"status_badge": "Live", "status_line": None},
+                "liveProps": [],
+                "archivedLiveProps": [],
+            }
+        ]
+        top_props_payload = {
+            "groups": {
+                "pitcher": {
+                    "sections": [
+                        {
+                            "rows": [
+                                {
+                                    "playerName": "Ryan Feltner",
+                                    "ownerId": 663372,
+                                    "headshotUrl": "https://example.com/feltner.png",
+                                    "team": "COL",
+                                    "teamLogoUrl": "https://example.com/col.svg",
+                                    "opponent": "MIL",
+                                    "opponentLogoUrl": "https://example.com/mil.svg",
+                                    "matchup": "MIL @ COL",
+                                    "gamePk": 824350,
+                                    "mean": 5.468,
+                                    "line": 3.5,
+                                    "selection": "over",
+                                    "selectionLabel": "Over",
+                                    "targetLabel": "4+",
+                                    "simProb": 0.821,
+                                    "rawEdge": 0.3446,
+                                    "odds": 100,
+                                    "statLabel": "Strikeouts",
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "hitter": {
+                    "sections": [
+                        {
+                            "rows": [
+                                {
+                                    "playerName": "Javier Sanoja",
+                                    "ownerId": 691594,
+                                    "headshotUrl": "https://example.com/sanoja.png",
+                                    "team": "MIA",
+                                    "teamLogoUrl": "https://example.com/mia.svg",
+                                    "opponent": "TB",
+                                    "opponentLogoUrl": "https://example.com/tb.svg",
+                                    "matchup": "TB @ MIA",
+                                    "gamePk": 823860,
+                                    "mean": 0.0,
+                                    "line": 0.5,
+                                    "selection": "under",
+                                    "selectionLabel": "Under",
+                                    "targetLabel": "0",
+                                    "simProb": 1.0,
+                                    "rawEdge": 0.6339,
+                                    "odds": 156,
+                                    "statLabel": "Hits",
+                                }
+                            ]
+                        }
+                    ]
+                },
+            }
+        }
+
+        with patch("syndicate.features.mlb.live_lens.build_live_lens_page_context", return_value={"games": live_lens_games}):
+            with patch("syndicate.blueprints.home.load_json_or_gz_file", return_value=top_props_payload):
+                rows = _load_home_live_prop_items(
+                    "mlb",
+                    context_label="2026-06-05",
+                    home_games=[],
+                    is_active_today=True,
+                )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0].get("name"), "Ryan Feltner")
+        self.assertEqual(rows[0].get("heading"), "Pitcher top props")
+        self.assertFalse(rows[0].get("is_live"))
+        self.assertEqual(rows[0].get("href"), "/mlb/pitcher-top-props?date=2026-06-05")
+        self.assertEqual(rows[1].get("name"), "Javier Sanoja")
+        self.assertEqual(rows[1].get("heading"), "Hitter top props")
+
     def test_mlb_pregame_rows_include_extra_pitcher_props(self) -> None:
         from syndicate.blueprints.home import _pregame_prop_rows_from_mlb_recommendations
 
@@ -2577,5 +2716,6 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('id="intel-query-form"', body)
         self.assertIn('/api/intelligence/query', body)
+        self.assertIn('renderSupportingEvidence', body)
         self.assertIn('View data coverage page', body)
         self.assertIn('Prompt The Syndicate', body)

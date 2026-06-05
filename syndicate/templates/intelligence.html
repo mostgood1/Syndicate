@@ -857,6 +857,9 @@
         if (response.analysis_views?.focus) {
           metrics.push(metricPill('Analysis', prettyLabel(response.analysis_views.focus)));
         }
+        if (Array.isArray(response.supporting_evidence?.sections) && response.supporting_evidence.sections.length) {
+          metrics.push(metricPill('Evidence', response.supporting_evidence.sections.length));
+        }
         const top = recommendations[0] || null;
         if (top?.confidence && top.confidence !== '-') {
           metrics.push(metricPill('Top confidence', top.confidence));
@@ -865,6 +868,70 @@
           metrics.push(metricPill('Primary market', top.market_label));
         }
         return metrics.join('');
+      }
+
+      function renderSupportingEvidence(response) {
+        const evidence = response?.supporting_evidence;
+        const sections = Array.isArray(evidence?.sections) ? evidence.sections : [];
+        if (!sections.length) {
+          return '';
+        }
+
+        const sectionMarkup = sections.map((section) => {
+          if (!section || typeof section !== 'object') {
+            return '';
+          }
+          if (section.kind === 'table') {
+            const columns = Array.isArray(section.columns) ? section.columns : [];
+            const rows = Array.isArray(section.rows) ? section.rows : [];
+            if (!columns.length || !rows.length) {
+              return '';
+            }
+            return `
+              <article class="intel-analysis-card">
+                <div>
+                  <div class="intel-kicker">Supporting evidence</div>
+                  <h3>${escapeHtml(section.title || 'Evidence grid')}</h3>
+                </div>
+                <div class="intel-analysis-table-wrap">
+                  <table class="intel-analysis-table">
+                    <thead>
+                      <tr>${columns.map((column) => `<th>${escapeHtml(prettyLabel(column))}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+                      ${rows.map((row) => `
+                        <tr>
+                          ${columns.map((column) => `<td>${escapeHtml(column === 'why' ? compactText(row?.[column] || '', 220) || '—' : formatCell(row?.[column]))}</td>`).join('')}
+                        </tr>`).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </article>`;
+          }
+
+          const items = Array.isArray(section.items) ? section.items : [];
+          if (!items.length) {
+            return '';
+          }
+          const body = section.kind === 'sources'
+            ? `<div class="intel-smart-stack">${items.map((item) => `<div class="intel-smart-line"><span>${escapeHtml(item?.label || 'Source')}</span><strong>${escapeHtml(item?.detail || 'Tracked input')}</strong></div>`).join('')}</div>`
+            : `<div class="intel-metric-grid">${items.map((item) => metricPill(item?.label || 'Metric', item?.value ?? '—')).join('')}</div>`;
+
+          return `
+            <article class="intel-analysis-card">
+              <div>
+                <div class="intel-kicker">Supporting evidence</div>
+                <h3>${escapeHtml(section.title || 'Evidence')}</h3>
+              </div>
+              ${body}
+            </article>`;
+        }).filter(Boolean).join('');
+
+        if (!sectionMarkup) {
+          return '';
+        }
+
+        return `<section class="intel-analysis-stack">${sectionMarkup}</section>`;
       }
 
       function renderTopRecommendation(item) {
@@ -1071,6 +1138,7 @@
         responseRoot.innerHTML = `
           ${briefMarkup}
           ${renderTopRecommendation(recommendations[0] || null)}
+          ${renderSupportingEvidence(response)}
           ${renderAnalysisViews(response)}
           ${renderRecommendationCards(recommendations)}
           ${renderParlays(parlays)}
