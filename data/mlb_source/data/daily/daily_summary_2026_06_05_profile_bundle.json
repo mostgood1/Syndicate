@@ -1,7 +1,7 @@
 {
   "date": "2026-06-05",
   "season": 2026,
-  "generated_at": "2026-06-05T09:45:48.121959",
+  "generated_at": "2026-06-05T10:14:11.081443",
   "tool": "tools/daily_update_multi_profile.py",
   "daily_update_tool": "tools\\daily_update.py",
   "python_exe": "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
@@ -33,7 +33,7 @@
         "data/tuning/pitch_model_overrides/_tmp_hr_bbhbp1p04_starterbbhbp1p04.json"
       ],
       "exit_code": 0,
-      "duration_s": 725.748,
+      "duration_s": 100.326,
       "skipped": false
     },
     "pitcher_props_recos": {
@@ -44,7 +44,7 @@
       "snapshot_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily_pitcher_props\\snapshots\\2026-06-05",
       "extra_args": [],
       "exit_code": 0,
-      "duration_s": 156.19,
+      "duration_s": 139.168,
       "skipped": false
     },
     "hitter_props_recos": {
@@ -64,7 +64,7 @@
         "24"
       ],
       "exit_code": 0,
-      "duration_s": 127.545,
+      "duration_s": 139.901,
       "skipped": false
     }
   },
@@ -95,7 +95,7 @@
     },
     "selected_counts": {
       "totals": 0,
-      "ml": 1,
+      "ml": 0,
       "pitcher_props": 1,
       "hitter_props": 11,
       "hitter_home_runs": 0,
@@ -107,7 +107,7 @@
     },
     "shadow_counts": {
       "pitcher_props": {
-        "raw_candidates_n": 20,
+        "raw_candidates_n": 22,
         "selected_n": 4,
         "cap": 8,
         "stake_u": 0.0,
@@ -116,7 +116,7 @@
           "hits_allowed",
           "walks_allowed"
         ],
-        "playable_support_removed_n": 16,
+        "playable_support_removed_n": 18,
         "recommendations": [
           {
             "date": "2026-06-05",
@@ -193,19 +193,19 @@
             "team_side": "away",
             "prop": "hits_allowed",
             "selection": "over",
-            "edge": 0.274,
+            "edge": 0.26452132701421793,
             "market_line": 4.5,
             "model_prob_over": 0.774,
-            "market_prob_over": 0.5,
-            "market_prob_under": 0.5,
+            "market_prob_over": 0.5094786729857821,
+            "market_prob_under": 0.490521327014218,
             "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5,
-            "selected_side_market_prob": 0.5,
+            "market_no_vig_prob_over": 0.5094786729857821,
+            "selected_side_market_prob": 0.5094786729857821,
             "selected_side_model_prob": 0.774,
             "mean_support": 2.213,
             "hits_mean": 6.713,
             "market_alternates": [],
-            "odds": "-120",
+            "odds": "-125",
             "stake_u": 0.0,
             "sim_sample_size": 1000,
             "baseball_reasons": [
@@ -226,9 +226,9 @@
               ]
             },
             "reasons": [
-              "The model lands on the over side in 77.4% of sims, while the market is pricing it closer to 50.0%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.7 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume."
+              "The model lands on the over side in 77.4% of sims, while the market is pricing it closer to 50.9%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.7 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume."
             ],
-            "reason_summary": "The model lands on the over side in 77.4% of sims, while the market is pricing it closer to 50.0%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.7 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume.",
+            "reason_summary": "The model lands on the over side in 77.4% of sims, while the market is pricing it closer to 50.9%. Across his last 5 starts, he has averaged 5 hits allowed. He mixes four-seam fastball, changeup, and sinker often enough that hitters have to cover multiple looks. The model baseline sits around 6.7 hits allowed against a line of 4.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume.",
             "rank": 2,
             "shadow_only": true
           },
@@ -363,15 +363,16 @@
     },
     "warnings": [
       "No support-qualified hitter strikeout shadow candidates were published; current hitter sim artifacts may not include strikeout distributions yet.",
-      "Removed 8 sparse-support official recommendation(s) before final publish"
+      "Removed 8 sparse-support official recommendation(s) before final publish",
+      "Official card could not fully replace 1 sparse-support recommendation slot(s) with support-qualified alternatives"
     ],
     "explanation_diagnostics": {
-      "selected_rows_n": 13,
+      "selected_rows_n": 12,
       "sparse_support_n": 0,
       "sparse_support_rate": 0.0,
       "support_min_reasons": 2,
       "status_counts": {
-        "strong": 2,
+        "strong": 1,
         "supported": 11,
         "thin": 0,
         "none": 0
@@ -389,11 +390,11 @@
           "examples": []
         },
         "ml": {
-          "selected_n": 1,
+          "selected_n": 0,
           "sparse_support_n": 0,
           "status_counts": {
             "strong": 0,
-            "supported": 1,
+            "supported": 0,
             "thin": 0,
             "none": 0
           },
@@ -425,8 +426,8 @@
           "selected_n": 4,
           "sparse_support_n": 0,
           "status_counts": {
-            "strong": 1,
-            "supported": 3,
+            "strong": 0,
+            "supported": 4,
             "thin": 0,
             "none": 0
           },
@@ -447,8 +448,8 @@
           "selected_n": 6,
           "sparse_support_n": 0,
           "status_counts": {
-            "strong": 1,
-            "supported": 5,
+            "strong": 0,
+            "supported": 6,
             "thin": 0,
             "none": 0
           },
@@ -458,8 +459,8 @@
           "selected_n": 1,
           "sparse_support_n": 0,
           "status_counts": {
-            "strong": 0,
-            "supported": 1,
+            "strong": 1,
+            "supported": 0,
             "thin": 0,
             "none": 0
           },
@@ -481,12 +482,12 @@
     },
     "audit_track": {
       "official_card_explanation_support": {
-        "selected_rows_n": 13,
+        "selected_rows_n": 12,
         "sparse_support_n": 0,
         "sparse_support_rate": 0.0,
         "support_min_reasons": 2,
         "status_counts": {
-          "strong": 2,
+          "strong": 1,
           "supported": 11,
           "thin": 0,
           "none": 0
@@ -504,11 +505,11 @@
             "examples": []
           },
           "ml": {
-            "selected_n": 1,
+            "selected_n": 0,
             "sparse_support_n": 0,
             "status_counts": {
               "strong": 0,
-              "supported": 1,
+              "supported": 0,
               "thin": 0,
               "none": 0
             },
@@ -540,8 +541,8 @@
             "selected_n": 4,
             "sparse_support_n": 0,
             "status_counts": {
-              "strong": 1,
-              "supported": 3,
+              "strong": 0,
+              "supported": 4,
               "thin": 0,
               "none": 0
             },
@@ -562,8 +563,8 @@
             "selected_n": 6,
             "sparse_support_n": 0,
             "status_counts": {
-              "strong": 1,
-              "supported": 5,
+              "strong": 0,
+              "supported": 6,
               "thin": 0,
               "none": 0
             },
@@ -573,8 +574,8 @@
             "selected_n": 1,
             "sparse_support_n": 0,
             "status_counts": {
-              "strong": 0,
-              "supported": 1,
+              "strong": 1,
+              "supported": 0,
               "thin": 0,
               "none": 0
             },
@@ -597,8 +598,8 @@
       "selected_support_policy": {
         "support_min_reasons": 2,
         "removed_sparse_support_n": 8,
-        "replacement_added_n": 8,
-        "selection_shortfall_n": 0,
+        "replacement_added_n": 7,
+        "selection_shortfall_n": 1,
         "markets": {
           "totals": {
             "market": "totals",
@@ -614,17 +615,17 @@
             "market": "ml",
             "support_min_reasons": 2,
             "baseline_selected_n": 1,
-            "final_selected_n": 1,
+            "final_selected_n": 0,
             "removed_sparse_support_n": 1,
-            "replacement_added_n": 1,
-            "selection_shortfall_n": 0,
+            "replacement_added_n": 0,
+            "selection_shortfall_n": 1,
             "removed_examples": [
               {
                 "subject": "LAA @ LAD",
                 "selection": "away",
                 "market": "ml",
                 "baseball_reasons_n": 1,
-                "reason_summary": "The model lands on the away side in 63.3% of sims, while the market is pricing it closer to 35.7%. Across his last 5 starts, Jos\u00e9 Soriano has allowed about 2.8 earned runs per outing. LAA wins this matchup in about 63.3% of model runs."
+                "reason_summary": "The model lands on the away side in 63.0% of sims, while the market is pricing it closer to 35.7%. Across his last 5 starts, Jos\u00e9 Soriano has allowed about 2.8 earned runs per outing. LAA wins this matchup in about 63.0% of model runs."
               }
             ]
           },
@@ -804,8 +805,8 @@
         "markets": {
           "pitcher_props": {
             "market": "pitcher_props",
-            "evaluated_n": 16,
-            "kept_n": 16,
+            "evaluated_n": 28,
+            "kept_n": 28,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
@@ -818,8 +819,8 @@
           },
           "hitter_hits": {
             "market": "hitter_hits",
-            "evaluated_n": 18,
-            "kept_n": 18,
+            "evaluated_n": 19,
+            "kept_n": 19,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
@@ -832,15 +833,15 @@
           },
           "hitter_total_bases": {
             "market": "hitter_total_bases",
-            "evaluated_n": 14,
-            "kept_n": 14,
+            "evaluated_n": 15,
+            "kept_n": 15,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
           "hitter_runs": {
             "market": "hitter_runs",
-            "evaluated_n": 3,
-            "kept_n": 3,
+            "evaluated_n": 5,
+            "kept_n": 5,
             "removed_sparse_support_n": 0,
             "removed_examples": []
           },
@@ -856,9 +857,9 @@
       "shadow_support_policy": {
         "pitcher_props": {
           "market": "shadow_pitcher_props",
-          "evaluated_n": 20,
+          "evaluated_n": 22,
           "kept_n": 4,
-          "removed_sparse_support_n": 16,
+          "removed_sparse_support_n": 18,
           "removed_examples": [
             {
               "subject": "Robbie Ray",
@@ -879,14 +880,14 @@
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 1,
-              "reason_summary": "The model lands on the over side in 59.6% of sims, while the market is pricing it closer to 41.7%. He mixes four-seam fastball, slider, and curveball often enough that hitters have to cover multiple looks. The model baseline sits around 6.4 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against KC gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 59.6% of sims, while the market is pricing it closer to 43.3%. He mixes four-seam fastball, slider, and curveball often enough that hitters have to cover multiple looks. The model baseline sits around 6.4 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against KC gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Brandon Sproat",
               "selection": "over",
               "market": "pitcher_props:hits allowed",
               "baseball_reasons_n": 1,
-              "reason_summary": "The model lands on the over side in 77.1% of sims, while the market is pricing it closer to 52.9%. He mixes sinker, cutter, and four-seam fastball often enough that hitters have to cover multiple looks. The model baseline sits around 7.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against COL gives him a fair shot to reach full workload volume."
+              "reason_summary": "The model lands on the over side in 77.1% of sims, while the market is pricing it closer to 53.8%. He mixes sinker, cutter, and four-seam fastball often enough that hitters have to cover multiple looks. The model baseline sits around 7.8 hits allowed against a line of 5.5. If he stays on his normal starter path, the matchup against COL gives him a fair shot to reach full workload volume."
             },
             {
               "subject": "Ryan Feltner",
@@ -924,12 +925,12 @@
   },
   "timings": {
     "profiles": {
-      "game_recos": 725.748,
-      "pitcher_props_recos": 156.19,
-      "hitter_props_recos": 127.545
+      "game_recos": 100.326,
+      "pitcher_props_recos": 139.168,
+      "hitter_props_recos": 139.901
     },
-    "locked_policy_s": 29.01,
-    "total_s": 1039.108
+    "locked_policy_s": 2.049,
+    "total_s": 381.977
   },
   "failures": [],
   "failures_n": 0
