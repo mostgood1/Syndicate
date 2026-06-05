@@ -1980,17 +1980,14 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
     pred_path = processed_root / f"predictions_{date_str}.csv"
     game_odds_path = processed_root / f"game_odds_{date_str}.csv"
     props_snapshot_path = processed_root / f"oddsapi_player_props_{date_str}.csv"
-    if not pred_path.exists() or not pred_path.is_file() or _count_csv_rows_quick(pred_path) <= 0:
-        return False
+    pred_exists = pred_path.exists() and pred_path.is_file() and _count_csv_rows_quick(pred_path) > 0
 
     try:
-        pred_df = pd.read_csv(pred_path)
+        pred_df = pd.read_csv(pred_path) if pred_exists else pd.DataFrame()
         odds_df = pd.read_csv(game_odds_path) if (game_odds_path.exists() and game_odds_path.is_file() and _count_csv_rows_quick(game_odds_path) > 0) else pd.DataFrame()
         props_df = pd.read_csv(props_snapshot_path) if (props_snapshot_path.exists() and props_snapshot_path.is_file() and _count_csv_rows_quick(props_snapshot_path) > 0) else pd.DataFrame()
     except Exception:
-        return True
-    if pred_df is None or pred_df.empty:
-        return True
+        return bool(pred_exists)
 
     def _norm_pair(home_val: object, away_val: object) -> tuple[str, str]:
         return (str(home_val or "").strip().upper(), str(away_val or "").strip().upper())
@@ -2010,21 +2007,22 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
         for _, row in props_df.iterrows()
         if str(row.get("home_team") or "").strip() and str(row.get("away_team") or "").strip()
     }
-
-    pred_work = pred_df.copy()
-    if "date" in pred_work.columns:
-        pred_work["date"] = pd.to_datetime(pred_work["date"], errors="coerce").dt.strftime("%Y-%m-%d")
-        pred_work = pred_work[pred_work["date"] == str(date_str)].copy()
-    pred_pairs = {
-        _norm_pair(row.get("home_team"), row.get("visitor_team"))
-        for _, row in pred_work.iterrows()
-        if str(row.get("home_team") or "").strip() and str(row.get("visitor_team") or "").strip()
-    }
     target_pairs = props_pairs or odds_pairs
     if not target_pairs:
-        return True
-    if pred_pairs & target_pairs:
-        return True
+        return bool(pred_exists)
+
+    if pred_df is not None and not pred_df.empty:
+        pred_work = pred_df.copy()
+        if "date" in pred_work.columns:
+            pred_work["date"] = pd.to_datetime(pred_work["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+            pred_work = pred_work[pred_work["date"] == str(date_str)].copy()
+        pred_pairs = {
+            _norm_pair(row.get("home_team"), row.get("visitor_team"))
+            for _, row in pred_work.iterrows()
+            if str(row.get("home_team") or "").strip() and str(row.get("visitor_team") or "").strip()
+        }
+        if pred_pairs & target_pairs:
+            return True
 
     # Rebuild a minimal predictions slate from local props snapshot/game odds when existing predictions are cross-league.
     if not props_df.empty:
@@ -2200,7 +2198,7 @@ def _run_refresh_via_cli(
     do_edges: bool,
     do_export: bool,
     do_push: bool,
-    smart_sim_overwrite: bool,
+    smart_sim_overwrite: bool = False,
     log_file: Path,
     started_at: str | None = None,
 ) -> dict[str, object]:
@@ -2314,6 +2312,7 @@ def _run_refresh_via_cli(
                     _touch_progress()
                     rc_pred = 0
                 except Exception:
+                    _append_log(log_file, traceback.format_exc())
                     rc_pred = 1
             state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
             existing_edges_rows = int(_count_csv_rows_quick(edges_fp))
@@ -2327,11 +2326,9 @@ def _run_refresh_via_cli(
             if int(rc_pred) != 0:
                 state["error"] = f"predict-props failed with exit code {int(rc_pred)}"
                 _append_log(log_file, state["error"])
-                return
             elif int(state["predictions_rows"] or 0) <= 0:
                 state["error"] = f"predict-props wrote no rows to {pred_fp.name} for {date_str}"
                 _append_log(log_file, state["error"])
-                return
             else:
                 pred_ready = True
     elif int(state["snapshot_rows"] or 0) <= 0:
@@ -3507,6 +3504,12 @@ def main() -> int:
                 log_file=Path(args.log_file).resolve(),
                 started_at=started_at,
             )
+            if state is None:
+                state = {
+                    "date": str(target_date),
+                    "error": f"refresh runner returned no state for {target_date}",
+                    "artifact_bundle_root": str(artifact_root_path) if artifact_root_path else None,
+                }
         if source_root is not None:
             state["playoff_transition"] = _run_playoff_transition_if_needed(source_root=source_root, date_str=target_date)
         if artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle"):
