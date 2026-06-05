@@ -34,11 +34,23 @@ def build_ncaab_matchup_analysis_views(
         tempo_bucket_signal = first_signal_value(candidate, "tempo_bucket_advanced", "pace_advanced")
         volatility_signal = first_signal_value(candidate, "volatility_advanced", "rotation_volatility_advanced")
         role_signal = first_signal_value(candidate, "minutes_role_advanced", "usage_signal")
+        last5_delta_signal = first_signal_value(candidate, "basketball_last5_delta")
+        last10_delta_signal = first_signal_value(candidate, "basketball_last10_delta")
+        last_game_delta_signal = first_signal_value(candidate, "basketball_last_game_delta")
+        workload_delta_signal = first_signal_value(candidate, "basketball_minutes_workload_delta")
         why_bits = [base_row.get("why")]
         if tempo_bucket_signal is not None:
             why_bits.append(f"tempo {tempo_bucket_signal:.2f}")
         if volatility_signal is not None:
             why_bits.append(f"volatility {volatility_signal:.2f}")
+        if last5_delta_signal is not None:
+            why_bits.append(f"last 5 delta {last5_delta_signal:.2f}")
+        if last10_delta_signal is not None:
+            why_bits.append(f"last 10 delta {last10_delta_signal:.2f}")
+        if last_game_delta_signal is not None:
+            why_bits.append(f"last game delta {last_game_delta_signal:.2f}")
+        if workload_delta_signal is not None:
+            why_bits.append(f"workload delta {workload_delta_signal:.2f}")
         table_rows.append(
             {
                 **base_row,
@@ -46,6 +58,10 @@ def build_ncaab_matchup_analysis_views(
                 "tempo_bucket_signal": tempo_bucket_signal,
                 "volatility_signal": volatility_signal,
                 "role_signal": role_signal,
+                "last5_delta_signal": last5_delta_signal,
+                "last10_delta_signal": last10_delta_signal,
+                "last_game_delta_signal": last_game_delta_signal,
+                "workload_delta_signal": workload_delta_signal,
                 "why": "; ".join(bit for bit in why_bits if bit),
             }
         )
@@ -56,14 +72,14 @@ def build_ncaab_matchup_analysis_views(
         "title": "Top NCAAB matchup targets",
         "table": {
             "title": "Top college basketball matchup targets",
-            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "score", "market_fit_score", "analysis_shape", "tempo_bucket_signal", "volatility_signal", "role_signal", "why"],
+            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "score", "market_fit_score", "analysis_shape", "tempo_bucket_signal", "volatility_signal", "role_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
             "rows": table_rows,
         },
         "chart": {
             "title": "NCAAB matchup score grid",
             "type": "bar",
             "x_key": "label",
-            "series": ["score", "market_fit_score", "tempo_bucket_signal", "volatility_signal"],
+            "series": ["score", "market_fit_score", "tempo_bucket_signal", "volatility_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal"],
             "rows": table_rows,
         },
     }

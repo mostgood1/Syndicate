@@ -6,8 +6,10 @@ from unittest.mock import patch
 from syndicate.app import create_app
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
+from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _build_parlays
 from syndicate.features.intelligence import _candidate_advanced_signal_score
+from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
@@ -41,6 +43,8 @@ def _sample_overview() -> list[dict[str, object]]:
                             "odds": "+102",
                             "confidence": "63%",
                             "edge": "+5.4%",
+                            "basketball_summary": "Recent form is already clearing this number with a last-five average of 31.2. The last-10 sample is still above this number at 30.1, so the over is not just riding a short heater. Last game landed at 33.0, which keeps the most recent touch well above the book.",
+                            "why_explain": "Projected minutes (36.0) sit above his last-10 workload (34.0), which strengthens the volume path.",
                             "writeup": "Projection is clearing the number with usage and minutes support.",
                             "display_pills": ["Line 28.5", "Odds +102", "Sim% 63%"],
                             "href": "/nba/prop-ladders?date=2026-06-04",
@@ -66,6 +70,8 @@ def _sample_overview() -> list[dict[str, object]]:
                             "odds": "+118",
                             "confidence": "61%",
                             "edge": "+4.1%",
+                            "basketball_summary": "Recent form is already clearing this number with a last-five average of 5.1. The last-10 sample is still above this number at 4.8, so the over is not just riding a short heater. Last game landed at 6.0, which keeps the recent shot volume above the book.",
+                            "why_explain": "Projected minutes (35.0) sit above his last-10 workload (33.0), which strengthens the volume path.",
                             "writeup": "The live model is still above the book after the in-game adjustment.",
                             "display_pills": ["Line 4.5", "Odds +118", "Live Proj 5.8"],
                             "is_live": True,
@@ -120,6 +126,8 @@ def _sample_overview_with_secondary_sport() -> list[dict[str, object]]:
                             "odds": "+102",
                             "confidence": "63%",
                             "edge": "+5.4%",
+                            "basketball_summary": "Recent form is already clearing this number with a last-five average of 28.4. The last-10 sample is still above this number at 26.8, so the over is not just riding a short heater. Last game landed at 29.0, which keeps the most recent result on the right side of the number.",
+                            "why_explain": "Projected minutes (34.0) sit above his last-10 workload (31.5), which strengthens the volume path.",
                             "writeup": "Projection is clearing the number with stable volume.",
                             "display_pills": ["Line 24.5", "Odds +102", "Sim% 63%"],
                             "href": "/wnba/prop-ladders?date=2026-06-04",
@@ -832,12 +840,17 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(analysis_views.get("focus"), "nba_matchups")
         self.assertTrue((analysis_views.get("table") or {}).get("rows"))
         self.assertTrue((analysis_views.get("chart") or {}).get("rows"))
+        self.assertIn("last_game_delta_signal", (analysis_views.get("chart") or {}).get("series") or [])
         first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
         self.assertIn("market_fit_score", first_row)
         self.assertEqual(first_row.get("analysis_shape"), "nba_usage_creation")
         self.assertEqual(first_row.get("pace_signal"), 1.08)
         self.assertEqual(first_row.get("usage_signal"), 1.14)
         self.assertEqual(first_row.get("shot_profile_signal"), 1.06)
+        self.assertGreater(first_row.get("last5_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("last10_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("last_game_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("workload_delta_signal") or 0.0, 0.0)
         self.assertIn("why", first_row)
         concrete_nba_writeups = {
             "Projection is clearing the number with usage and minutes support.",
@@ -863,8 +876,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     response = self.client.post(
                         "/api/intelligence/query",
                         json={
-                            "question": "Explain the best WNBA matchup targets today with a table and chart.",
+                            "question": "Explain the top 2 WNBA matchup targets today with a table and chart.",
                             "date": "2026-06-04",
+                            "limit": 2,
                         },
                     )
 
@@ -876,6 +890,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(analysis_views.get("focus"), "wnba_matchups")
         self.assertEqual(parsed_request.get("sports"), ["WNBA"])
         self.assertTrue((analysis_views.get("table") or {}).get("rows"))
+        self.assertIn("last_game_delta_signal", (analysis_views.get("chart") or {}).get("series") or [])
         first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
         self.assertTrue(recommendations)
         self.assertEqual(recommendations[0].get("sport_slug"), "wnba")
@@ -883,8 +898,126 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(first_row.get("team_environment_signal"), 1.12)
         self.assertEqual(first_row.get("possession_profile_signal"), 1.05)
         self.assertEqual(first_row.get("matchup_pressure_signal"), 1.09)
+        self.assertGreater(first_row.get("last5_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("last10_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("last_game_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("workload_delta_signal") or 0.0, 0.0)
         self.assertIn("Projection is clearing the number with stable volume.", first_row.get("why") or "")
         self.assertIn("Projection is clearing the number with stable volume.", recommendations[0].get("rationale") or "")
+
+    def test_intelligence_query_uses_basketball_source_summary_without_writeup(self) -> None:
+        overview = _sample_overview_with_secondary_sport()
+        wnba_item = ((((overview[1].get("home_rails") or {}).get("pregame") or {}).get("items") or [])[0])
+        wnba_item.pop("writeup", None)
+        wnba_item["basketball_summary"] = "Source matchup summary says the volume is stable and the defense is yielding clean looks."
+        wnba_item["why_explain"] = "Primary creator workload remains intact in this matchup."
+        wnba_item["basketball_reasons"] = [
+            "Opponent is allowing efficient pull-up attempts.",
+            "Projected role remains unchanged.",
+        ]
+        advanced_rows = [
+            {
+                "label": "Team environment and pace layer",
+                "metrics": ["Team environment", "Possession profile", "Matchup pressure"],
+                "path": "data/wnba_source/data/processed/recommendations_slate_2026-06-04.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the top 2 WNBA matchup targets today with a table and chart.",
+                            "date": "2026-06-04",
+                            "limit": 2,
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        first_recommendation = (result.get("recommendations") or [])[0]
+        self.assertIn("Source matchup summary says the volume is stable", first_row.get("why") or "")
+        self.assertIn("Source matchup summary says the volume is stable", first_recommendation.get("rationale") or "")
+
+    def test_intelligence_query_builds_ncaab_analysis_views(self) -> None:
+        overview = [
+            {
+                "slug": "ncaab",
+                "name": "NCAAB",
+                "context_label": "2026-06-04",
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "Braden Smith Over 15.5 PA",
+                                "market": "PA",
+                                "pick": "Over 15.5",
+                                "matchup": "PUR at ILL",
+                                "tempo_bucket_advanced": 1.07,
+                                "volatility_advanced": 1.03,
+                                "minutes_role_advanced": 1.05,
+                                "projected": 18.4,
+                                "line": 15.5,
+                                "odds": "+101",
+                                "confidence": "61%",
+                                "edge": "+4.0%",
+                                "basketball_summary": "Recent form is already clearing this number with a last-five average of 18.8. The last-10 sample is still above this number at 17.9, so the over is not just riding a short heater. Last game landed at 19.0, which keeps the most recent touch above the book.",
+                                "why_explain": "Projected minutes (36.0) sit above his last-10 workload (33.5), which strengthens the volume path.",
+                                "writeup": "Projection is clearing the number in a stable role.",
+                                "href": "/ncaab/prop-ladders?date=2026-06-04",
+                            }
+                        ],
+                    },
+                    "live": {"title": "Top Live Props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            }
+        ]
+        advanced_rows = [
+            {
+                "label": "College pace and volatility layer",
+                "metrics": ["Tempo", "Volatility", "Role"],
+                "path": "data/ncaab_source/data/processed/recommendations_2026-06-04.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the best NCAAB matchup targets today with a table and chart.",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "ncaab_matchups")
+        self.assertIn("last_game_delta_signal", (analysis_views.get("chart") or {}).get("series") or [])
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertEqual(first_row.get("analysis_shape"), "ncaab_tempo_volatility")
+        self.assertEqual(first_row.get("tempo_bucket_signal"), 1.07)
+        self.assertEqual(first_row.get("volatility_signal"), 1.03)
+        self.assertGreater(first_row.get("last5_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("last10_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("last_game_delta_signal") or 0.0, 0.0)
+        self.assertGreater(first_row.get("workload_delta_signal") or 0.0, 0.0)
+        self.assertIn("Projection is clearing the number in a stable role.", first_row.get("why") or "")
 
     def test_basketball_market_fit_scoring_diverges_by_league(self) -> None:
         market_context = {
@@ -947,6 +1080,144 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         )
 
         self.assertGreater(score, 0.0)
+
+    def test_basketball_source_summary_score_is_direction_aware(self) -> None:
+        over_score = _basketball_source_summary_score(
+            {
+                "candidate_type": "prop",
+                "sport_slug": "wnba",
+                "pick": "Over 18.5",
+                "line": 18.5,
+                "summary": "Recent form is already clearing this number with a last-five average of 22.2. The last-10 sample is still above this number at 21.7, so the over is not just riding a short heater.",
+            }
+        )
+        under_score = _basketball_source_summary_score(
+            {
+                "candidate_type": "prop",
+                "sport_slug": "wnba",
+                "pick": "Over 18.5",
+                "line": 18.5,
+                "summary": "Recent form has stayed below this line with a last-five average of 12.6. The last-10 sample is holding under this line at 9.0, which supports the lower-volume case.",
+            }
+        )
+
+        self.assertGreater(over_score, 0.0)
+        self.assertLess(under_score, 0.0)
+
+    def test_advanced_signals_extract_basketball_summary_deltas(self) -> None:
+        signals = _advanced_signals_from_item(
+            {
+                "line": 18.5,
+                "basketball_summary": "Recent form is already clearing this number with a last-five average of 22.2. The last-10 sample is still above this number at 21.7, so the over is not just riding a short heater.",
+                "why_explain": "Projected minutes (32.0) sit above his last-10 workload (30.0), which strengthens the volume path.",
+            }
+        )
+
+        signal_keys = {signal.get("key") for signal in signals}
+        self.assertIn("basketball_last5_delta", signal_keys)
+        self.assertIn("basketball_last10_delta", signal_keys)
+        self.assertIn("basketball_minutes_workload_delta", signal_keys)
+
+    def test_advanced_signal_score_handles_basketball_summary_deltas(self) -> None:
+        signals = _advanced_signals_from_item(
+            {
+                "line": 18.5,
+                "basketball_summary": "Recent form is already clearing this number with a last-five average of 22.2. The last-10 sample is still above this number at 21.7, so the over is not just riding a short heater.",
+            }
+        )
+
+        score = _candidate_advanced_signal_score(
+            {
+                "market": "PA",
+                "pick": "Over 18.5",
+                "name": "Chelsea Gray Over 18.5 PA",
+                "advanced_signals": signals,
+            }
+        )
+
+        self.assertGreater(score, 0.0)
+
+    def test_intelligence_query_ranks_basketball_candidates_using_source_summary(self) -> None:
+        overview = [
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "context_label": "2026-06-04",
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {
+                        "title": "Pregame props",
+                        "items": [
+                            {
+                                "name": "Chelsea Gray Over 18.5 PA",
+                                "market": "PA",
+                                "pick": "Over 18.5",
+                                "matchup": "LVA at SEA",
+                                "team_environment_advanced": 1.05,
+                                "possession_profile_advanced": 1.03,
+                                "matchup_pressure_advanced": 1.04,
+                                "projected": 18.9,
+                                "line": 18.5,
+                                "odds": "+102",
+                                "confidence": "60%",
+                                "edge": "+3.0%",
+                                "basketball_summary": "Recent form is already clearing this number with a last-five average of 22.2. The last-10 sample is still above this number at 21.7, so the over is not just riding a short heater.",
+                                "href": "/wnba/prop-ladders?date=2026-06-04",
+                            },
+                            {
+                                "name": "Jackie Young Over 13.5 RA",
+                                "market": "RA",
+                                "pick": "Over 13.5",
+                                "matchup": "LVA at SEA",
+                                "team_environment_advanced": 1.05,
+                                "possession_profile_advanced": 1.03,
+                                "matchup_pressure_advanced": 1.04,
+                                "projected": 13.9,
+                                "line": 13.5,
+                                "odds": "+102",
+                                "confidence": "60%",
+                                "edge": "+3.0%",
+                                "basketball_summary": "Recent form has stayed below this line with a last-five average of 12.6. The last-10 sample is holding under this line at 9.0, which supports the lower-volume case.",
+                                "href": "/wnba/prop-ladders?date=2026-06-04",
+                            },
+                        ],
+                    },
+                    "live": {"title": "Top Live Props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            }
+        ]
+        advanced_rows = [
+            {
+                "label": "Team environment and pace layer",
+                "metrics": ["Team environment", "Possession profile", "Matchup pressure"],
+                "path": "data/wnba_source/data/processed/recommendations_slate_2026-06-04.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the top 2 WNBA matchup targets today with a table and chart.",
+                            "date": "2026-06-04",
+                            "limit": 2,
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        recommendations = result.get("recommendations") or []
+        self.assertEqual(len(recommendations), 2)
+        self.assertEqual(recommendations[0].get("name"), "Chelsea Gray Over 18.5 PA")
+        self.assertGreater(float(recommendations[0].get("source_summary_score") or 0.0), 0.0)
+        self.assertLess(float(recommendations[1].get("source_summary_score") or 0.0), 0.0)
 
     def test_advanced_input_rows_include_basketball_pbp_recap(self) -> None:
         rows = _advanced_input_rows_for_sport(

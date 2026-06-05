@@ -36,6 +36,10 @@ def build_wnba_matchup_analysis_views(
         matchup_pressure_signal = first_signal_value(candidate, "matchup_pressure_advanced", "shot_volume_pressure_advanced")
         rotation_pressure_signal = first_signal_value(candidate, "rotation_pressure_advanced", "minutes_stability_advanced")
         live_shift_signal = first_signal_value(candidate, "live_shift_advanced", "projection_shift_advanced")
+        last5_delta_signal = first_signal_value(candidate, "basketball_last5_delta")
+        last10_delta_signal = first_signal_value(candidate, "basketball_last10_delta")
+        last_game_delta_signal = first_signal_value(candidate, "basketball_last_game_delta")
+        workload_delta_signal = first_signal_value(candidate, "basketball_minutes_workload_delta")
         market_key = safe_text((candidate.get("market_fit") or {}).get("market_key"), "").lower()
         analysis_shape = "wnba_role_pressure"
         if market_key in {"rebounds", "blocks", "steals"}:
@@ -49,6 +53,14 @@ def build_wnba_matchup_analysis_views(
             why_bits.append(f"possession profile {possession_profile_signal:.2f}")
         if matchup_pressure_signal is not None:
             why_bits.append(f"matchup pressure {matchup_pressure_signal:.2f}")
+        if last5_delta_signal is not None:
+            why_bits.append(f"last 5 delta {last5_delta_signal:.2f}")
+        if last10_delta_signal is not None:
+            why_bits.append(f"last 10 delta {last10_delta_signal:.2f}")
+        if last_game_delta_signal is not None:
+            why_bits.append(f"last game delta {last_game_delta_signal:.2f}")
+        if workload_delta_signal is not None:
+            why_bits.append(f"workload delta {workload_delta_signal:.2f}")
         table_rows.append(
             {
                 **base_row,
@@ -58,6 +70,10 @@ def build_wnba_matchup_analysis_views(
                 "matchup_pressure_signal": matchup_pressure_signal,
                 "rotation_pressure_signal": rotation_pressure_signal,
                 "live_shift_signal": live_shift_signal,
+                "last5_delta_signal": last5_delta_signal,
+                "last10_delta_signal": last10_delta_signal,
+                "last_game_delta_signal": last_game_delta_signal,
+                "workload_delta_signal": workload_delta_signal,
                 "why": "; ".join(bit for bit in why_bits if bit),
             }
         )
@@ -68,14 +84,14 @@ def build_wnba_matchup_analysis_views(
         "title": "Top WNBA matchup targets",
         "table": {
             "title": "Top WNBA matchup-backed targets",
-            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "score", "market_fit_score", "analysis_shape", "team_environment_signal", "possession_profile_signal", "matchup_pressure_signal", "rotation_pressure_signal", "live_shift_signal", "why"],
+            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "score", "market_fit_score", "analysis_shape", "team_environment_signal", "possession_profile_signal", "matchup_pressure_signal", "rotation_pressure_signal", "live_shift_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
             "rows": table_rows,
         },
         "chart": {
             "title": "WNBA matchup score grid",
             "type": "bar",
             "x_key": "label",
-            "series": ["score", "market_fit_score", "team_environment_signal", "possession_profile_signal", "matchup_pressure_signal"],
+            "series": ["score", "market_fit_score", "team_environment_signal", "possession_profile_signal", "matchup_pressure_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal"],
             "rows": table_rows,
         },
     }

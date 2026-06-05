@@ -35,6 +35,10 @@ def build_basketball_matchup_analysis_views(
         usage_signal = first_signal_value(candidate, "usage_rate_advanced", "usage_signal", "role_usage_advanced")
         shot_profile_signal = first_signal_value(candidate, "shot_profile_advanced", "shot_quality_advanced")
         role_signal = first_signal_value(candidate, "minutes_role_advanced", "rotation_role_advanced")
+        last5_delta_signal = first_signal_value(candidate, "basketball_last5_delta")
+        last10_delta_signal = first_signal_value(candidate, "basketball_last10_delta")
+        last_game_delta_signal = first_signal_value(candidate, "basketball_last_game_delta")
+        workload_delta_signal = first_signal_value(candidate, "basketball_minutes_workload_delta")
         why_bits = [base_row.get("why")]
         if pace_signal is not None:
             why_bits.append(f"pace {pace_signal:.2f}")
@@ -42,6 +46,14 @@ def build_basketball_matchup_analysis_views(
             why_bits.append(f"usage {usage_signal:.2f}")
         if shot_profile_signal is not None:
             why_bits.append(f"shot profile {shot_profile_signal:.2f}")
+        if last5_delta_signal is not None:
+            why_bits.append(f"last 5 delta {last5_delta_signal:.2f}")
+        if last10_delta_signal is not None:
+            why_bits.append(f"last 10 delta {last10_delta_signal:.2f}")
+        if last_game_delta_signal is not None:
+            why_bits.append(f"last game delta {last_game_delta_signal:.2f}")
+        if workload_delta_signal is not None:
+            why_bits.append(f"workload delta {workload_delta_signal:.2f}")
         market_key = safe_text((candidate.get("market_fit") or {}).get("market_key"), "").lower()
         analysis_shape = "nba_usage_creation"
         if market_key in {"rebounds", "blocks", "steals"}:
@@ -56,6 +68,10 @@ def build_basketball_matchup_analysis_views(
                 "usage_signal": usage_signal,
                 "shot_profile_signal": shot_profile_signal,
                 "role_signal": role_signal,
+                "last5_delta_signal": last5_delta_signal,
+                "last10_delta_signal": last10_delta_signal,
+                "last_game_delta_signal": last_game_delta_signal,
+                "workload_delta_signal": workload_delta_signal,
                 "why": "; ".join(bit for bit in why_bits if bit),
             }
         )
@@ -66,14 +82,14 @@ def build_basketball_matchup_analysis_views(
         "title": "Top NBA matchup targets",
         "table": {
             "title": "Top NBA matchup-backed targets",
-            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "analysis_shape", "pace_signal", "usage_signal", "shot_profile_signal", "role_signal", "why"],
+            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "analysis_shape", "pace_signal", "usage_signal", "shot_profile_signal", "role_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
             "rows": table_rows,
         },
         "chart": {
             "title": "NBA matchup score grid",
             "type": "bar",
             "x_key": "label",
-            "series": ["score", "market_fit_score", "pace_signal", "usage_signal", "shot_profile_signal"],
+            "series": ["score", "market_fit_score", "pace_signal", "usage_signal", "shot_profile_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal"],
             "rows": table_rows,
         },
     }

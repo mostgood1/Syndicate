@@ -491,7 +491,14 @@
       }
 
       function prettyLabel(value) {
-        return String(value || '').replace(/_/g, ' ');
+        const normalized = String(value || '')
+          .replace(/last(\d+)/gi, 'last $1')
+          .replace(/_/g, ' ')
+          .replace(/\bpa\b/g, 'PA')
+          .replace(/\bpra\b/g, 'PRA')
+          .replace(/\bra\b/g, 'RA')
+          .replace(/\bpts\b/g, 'PTS');
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
       }
 
       function chip(label, extraClass = '') {
@@ -506,7 +513,37 @@
         if (value === null || value === undefined || value === '') {
           return '—';
         }
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return escapeHtml(Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(2));
+        }
         return escapeHtml(value);
+      }
+
+      function formatMetricValue(key, value) {
+        if (value === null || value === undefined || value === '') {
+          return '—';
+        }
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          return String(value);
+        }
+        if (key === 'confidence' || key === 'implied_probability' || key === 'price_edge_pct' || key === 'barrel_rate') {
+          return `${value}%`;
+        }
+        if (key.includes('delta') || key.includes('score') || key.includes('signal') || key.includes('mult') || key === 'ev_mean') {
+          return value.toFixed(2);
+        }
+        return Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(2);
+      }
+
+      function buildAnalysisMetricPills(row, series) {
+        const keys = Array.isArray(series) ? series : [];
+        return keys.map((key) => {
+          const value = row?.[key];
+          if (value === null || value === undefined || value === '') {
+            return '';
+          }
+          return metricPill(prettyLabel(key), formatMetricValue(key, value));
+        }).filter(Boolean).join('');
       }
 
       function updateStatusLink() {
@@ -602,6 +639,7 @@
         const columns = Array.isArray(table.columns) ? table.columns : [];
         const rows = Array.isArray(table.rows) ? table.rows : [];
         const chartRows = Array.isArray(chart.rows) ? chart.rows : [];
+        const chartSeries = Array.isArray(chart.series) ? chart.series : [];
         const scoreMax = chartRows.reduce((max, row) => Math.max(max, Number(row?.score || 0)), 0) || 1;
 
         const tableMarkup = columns.length && rows.length ? `
@@ -633,15 +671,7 @@
               ${chartRows.map((row) => {
                 const score = Number(row?.score || 0);
                 const widthPct = Math.max(10, Math.min(100, (score / scoreMax) * 100));
-                const metrics = [
-                  row?.score !== null && row?.score !== undefined ? metricPill('Score', row.score) : '',
-                  row?.advanced_signal_score !== null && row?.advanced_signal_score !== undefined ? metricPill('Advanced', row.advanced_signal_score) : '',
-                  row?.confidence !== null && row?.confidence !== undefined ? metricPill('Conf', `${row.confidence}%`) : '',
-                  row?.batter_hr_mult !== null && row?.batter_hr_mult !== undefined ? metricPill('Batter HR', `x${row.batter_hr_mult}`) : '',
-                  row?.pitcher_hr_mult !== null && row?.pitcher_hr_mult !== undefined ? metricPill('Pitcher HR', `x${row.pitcher_hr_mult}`) : '',
-                  row?.barrel_rate !== null && row?.barrel_rate !== undefined ? metricPill('Barrel', `${row.barrel_rate}%`) : '',
-                  row?.ev_mean !== null && row?.ev_mean !== undefined ? metricPill('EV', row.ev_mean) : ''
-                ].filter(Boolean).join('');
+                const metrics = buildAnalysisMetricPills(row, chartSeries);
 
                 return `
                   <div class="intel-chart-card">

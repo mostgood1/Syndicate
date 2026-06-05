@@ -421,6 +421,10 @@ _ADVANCED_SIGNAL_LABELS = {
     "batter_statcast_hr_mult": "Batter Statcast home-run multiplier",
     "batter_statcast_inplay_mult": "Batter Statcast in-play multiplier",
     "batter_statcast_k_mult": "Batter Statcast strikeout multiplier",
+    "basketball_last5_delta": "Basketball last-five delta",
+    "basketball_last10_delta": "Basketball last-10 delta",
+    "basketball_last_game_delta": "Basketball last-game delta",
+    "basketball_minutes_workload_delta": "Basketball minutes-workload delta",
     "pitcher_statcast_bb_mult": "Pitcher Statcast walk multiplier",
     "pitcher_statcast_hr_mult": "Pitcher Statcast home-run multiplier",
     "pitcher_statcast_inplay_mult": "Pitcher Statcast in-play multiplier",
@@ -724,6 +728,83 @@ def _humanize_signal_key(key: str) -> str:
     return _ADVANCED_SIGNAL_LABELS.get(key, key.replace("_", " ").strip().title())
 
 
+def _item_reason_summary(item: dict[str, Any]) -> str:
+    for key in ("basketball_reasons", "top_play_reasons", "reasons"):
+        values = item.get(key)
+        if not isinstance(values, list):
+            continue
+        fragments = [str(value).strip() for value in values if str(value).strip()]
+        if fragments:
+            return "; ".join(fragments[:3])
+    return ""
+
+
+def _item_source_summary(item: dict[str, Any]) -> str:
+    for value in (
+        item.get("writeup"),
+        item.get("basketball_summary"),
+        item.get("why_explain"),
+        item.get("shape_summary"),
+        item.get("summary"),
+        item.get("detail"),
+        _item_reason_summary(item),
+    ):
+        text = _safe_text(value, "")
+        if text:
+            return text
+    return ""
+
+
+def _basketball_summary_signals_from_text(item: dict[str, Any]) -> list[dict[str, Any]]:
+    summary_text = " ".join(
+        part for part in (
+            _safe_text(item.get("basketball_summary"), ""),
+            _safe_text(item.get("why_explain"), ""),
+            _item_reason_summary(item),
+        ) if part
+    ).lower()
+    line_value = _numeric_hint(item.get("line"))
+    signals: list[dict[str, Any]] = []
+    if not summary_text:
+        return signals
+
+    def append_signal(key: str, value: float) -> None:
+        signals.append(
+            {
+                "key": key,
+                "label": _humanize_signal_key(key),
+                "value": round(float(value), 3),
+            }
+        )
+
+    if line_value is not None and line_value > 0:
+        patterns = (
+            (r"last-five average of (?P<value>\d+(?:\.\d+)?)", "basketball_last5_delta"),
+            (r"last-10 sample(?: is [^.,;]*?)? at (?P<value>\d+(?:\.\d+)?)", "basketball_last10_delta"),
+            (r"last game landed at (?P<value>\d+(?:\.\d+)?)", "basketball_last_game_delta"),
+        )
+        for pattern, key in patterns:
+            match = re.search(pattern, summary_text)
+            if not match:
+                continue
+            value = float(match.group("value"))
+            append_signal(key, (value - line_value) / max(line_value, 8.0))
+
+    minutes_match = re.search(
+        r"projected minutes \((?P<projected>\d+(?:\.\d+)?)\) (?P<relation>sit above|are lighter than) (?:his|her|their) last-10 workload \((?P<workload>\d+(?:\.\d+)?)\)",
+        summary_text,
+    )
+    if minutes_match:
+        projected_minutes = float(minutes_match.group("projected"))
+        workload_minutes = float(minutes_match.group("workload"))
+        relation = 1.0 if minutes_match.group("relation") == "sit above" else -1.0
+        append_signal(
+            "basketball_minutes_workload_delta",
+            relation * abs(projected_minutes - workload_minutes) / max(workload_minutes, 12.0),
+        )
+    return signals
+
+
 def _advanced_signals_from_item(item: dict[str, Any]) -> list[dict[str, Any]]:
     signals: list[dict[str, Any]] = []
     for raw_key, raw_value in item.items():
@@ -746,6 +827,7 @@ def _advanced_signals_from_item(item: dict[str, Any]) -> list[dict[str, Any]]:
                     "value": round(float(numeric_value), 3),
                 }
             )
+    signals.extend(_basketball_summary_signals_from_text(item))
     return signals
 
 
@@ -787,6 +869,8 @@ def _advanced_signal_delta(signal: dict[str, Any]) -> float | None:
     if not key or not isinstance(value, (int, float)):
         return None
     numeric_value = float(value)
+    if key.startswith("basketball_") and key.endswith("_delta"):
+        return numeric_value * 4.0
     if key.endswith("_mult"):
         return (numeric_value - 1.0) / 0.12
     if "target_share" in key or key.endswith("_share") or "share_" in key:
@@ -817,6 +901,51 @@ def _candidate_advanced_signal_score(candidate: dict[str, Any]) -> float:
     direction = -1.0 if "under" in _safe_text(candidate.get("pick"), "").lower() else 1.0
     avg_delta = sum(normalized_deltas) / float(len(normalized_deltas))
     return max(-6.0, min(6.0, avg_delta * 2.5 * direction))
+
+
+def _basketball_source_summary_score(candidate: dict[str, Any]) -> float:
+    if _safe_text(candidate.get("sport_slug"), "").lower() not in {"nba", "wnba", "ncaab"}:
+        return 0.0
+    if _safe_text(candidate.get("candidate_type"), "").lower() != "prop":
+        return 0.0
+    text = " ".join(
+        part for part in (
+            _safe_text(candidate.get("writeup"), ""),
+            _safe_text(candidate.get("detail"), ""),
+            _safe_text(candidate.get("summary"), ""),
+        ) if part
+    ).lower()
+    if not text:
+        return 0.0
+
+    direction = -1.0 if "under" in _safe_text(candidate.get("pick"), "").lower() else 1.0
+    adjustments: list[float] = []
+    structured_signals = {
+        _safe_text(signal.get("key"), ""): float(signal.get("value") or 0.0)
+        for signal in (candidate.get("advanced_signals") or [])
+        if isinstance(signal, dict)
+        and _safe_text(signal.get("key"), "").startswith("basketball_")
+        and isinstance(signal.get("value"), (int, float))
+    }
+    if structured_signals:
+        for key in (
+            "basketball_last5_delta",
+            "basketball_last10_delta",
+            "basketball_last_game_delta",
+            "basketball_minutes_workload_delta",
+        ):
+            if key in structured_signals:
+                adjustments.append(direction * structured_signals[key] * 8.0)
+
+    if "not just riding a short heater" in text:
+        adjustments.append(0.8 * direction)
+    if "supports the lower-volume case" in text or "leans under" in text:
+        adjustments.append(-0.8 * direction)
+
+    if not adjustments:
+        return 0.0
+    average_adjustment = sum(adjustments) / float(len(adjustments))
+    return max(-3.0, min(3.0, average_adjustment))
 
 
 def _advanced_signal_text(candidate: dict[str, Any], *, limit: int = 2) -> str:
@@ -2349,13 +2478,18 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
     if projected_value is not None and line_value is not None:
         row["score"] = float(row.get("score", 0.0)) + abs(projected_value - line_value) * 3.0
     advanced_signals = _advanced_signals_from_item(item)
+    source_summary = _item_source_summary(item)
+    detail_text = _safe_text(item.get("detail"), "") or _safe_text(item.get("why_explain"), "") or _safe_text(item.get("shape_summary"), "")
+    summary_text = _safe_text(item.get("summary"), "") or _safe_text(item.get("basketball_summary"), "") or _item_reason_summary(item)
     row.update(
         {
             "candidate_type": "prop",
             "surface_key": surface_key,
             "surface_title": surface_title,
             "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
-            "writeup": _safe_text(item.get("writeup"), ""),
+            "writeup": source_summary,
+            "detail": detail_text,
+            "summary": summary_text,
             "status_context": _safe_text(item.get("status_context"), ""),
             "status_display": _safe_text(item.get("status_display"), ""),
             "hero_live_box": item.get("hero_live_box") if isinstance(item.get("hero_live_box"), dict) else None,
@@ -2887,6 +3021,7 @@ def _apply_advanced_context_to_candidates(
         candidate["market_fit"] = market_fit
         candidate["mlb_statcast_profile"] = statcast_profile
         candidate["advanced_signal_score"] = _candidate_advanced_signal_score(candidate)
+        candidate["source_summary_score"] = _basketball_source_summary_score(candidate)
         candidate["score"] = (
             float(candidate.get("score") or 0.0)
             + _advanced_score_adjustment(readiness_summary)
@@ -2894,6 +3029,7 @@ def _apply_advanced_context_to_candidates(
             + _market_specific_score_adjustment(candidate, preferences, market_context)
             + _risk_profile_score_adjustment(candidate, preferences, market_context)
             + float(candidate.get("advanced_signal_score") or 0.0)
+            + float(candidate.get("source_summary_score") or 0.0)
         )
 
 
@@ -3027,6 +3163,7 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
             if isinstance(item, dict)
         ],
         "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
+        "source_summary_score": round(float(candidate.get("source_summary_score") or 0.0), 2),
         "selection_direction": _candidate_selection_direction(candidate),
         "subject_key": _candidate_subject_key(candidate),
         "team_key": _candidate_team_key(candidate),
