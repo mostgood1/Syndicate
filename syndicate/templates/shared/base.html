@@ -13,9 +13,12 @@
         <header class="cards-header syndicate-header">
           {% set nav_date = request.args.get('date') %}
           <div class="cards-title-row">
-            <div>
-              <div class="eyebrow">Syndicate</div>
-              <h1>{% block page_title %}Multi-Sport Betting Hub{% endblock %}</h1>
+            <div class="syndicate-title-lockup">
+              <img class="syndicate-title-lockup__logo" src="{{ url_for('static', filename='shared/syndicate-logo.svg') }}" alt="Syndicate logo" />
+              <div>
+                <div class="eyebrow">Syndicate</div>
+                <h1>{% block page_title %}Multi-Sport Betting Hub{% endblock %}</h1>
+              </div>
             </div>
             <nav class="syndicate-nav" aria-label="Sports">
               <a class="cards-nav-pill" href="/">Home</a>

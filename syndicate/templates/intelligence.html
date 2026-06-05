@@ -6,16 +6,25 @@
 {% block extra_head %}
   <style>
     :root {
-      --intel-ink: #11243a;
-      --intel-accent: #d1582f;
-      --intel-accent-soft: #f4d9c7;
-      --intel-surface: linear-gradient(145deg, rgba(247,241,233,0.96), rgba(232,241,244,0.94));
-      --intel-panel: rgba(255,255,255,0.9);
-      --intel-border: rgba(17,36,58,0.14);
+      --intel-ink: var(--cards-text);
+      --intel-ink-soft: var(--cards-text-soft);
+      --intel-ink-dim: var(--cards-text-dim);
+      --intel-accent: #4ecdc4;
+      --intel-accent-strong: #9af3de;
+      --intel-live: #ffbf69;
+      --intel-good: #68d391;
+      --intel-warn: #f6c453;
+      --intel-surface: linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
+      --intel-panel: rgba(15, 30, 47, 0.78);
+      --intel-panel-strong: rgba(10, 22, 35, 0.92);
+      --intel-border: rgba(132, 166, 196, 0.18);
     }
 
     .syndicate-intelligence-page .syndicate-header {
-      background: radial-gradient(circle at top left, rgba(209,88,47,0.15), transparent 38%), linear-gradient(135deg, rgba(255,255,255,0.98), rgba(244,240,234,0.96));
+      background:
+        radial-gradient(circle at top left, rgba(78, 205, 196, 0.16), transparent 34%),
+        radial-gradient(circle at top right, rgba(255, 191, 105, 0.12), transparent 28%),
+        linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
       border-color: var(--intel-border);
     }
 
@@ -30,15 +39,53 @@
       background: var(--intel-surface);
       border: 1px solid var(--intel-border);
       border-radius: 24px;
-      box-shadow: 0 18px 48px rgba(17, 36, 58, 0.08);
+      box-shadow: var(--cards-shadow);
       padding: 22px;
+    }
+
+    .intel-brand-hero {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+      padding: 16px 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(132, 166, 196, 0.16);
+      background:
+        radial-gradient(circle at left center, rgba(78, 205, 196, 0.14), transparent 28%),
+        linear-gradient(135deg, rgba(9, 17, 29, 0.98), rgba(15, 24, 39, 0.94));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .intel-brand-hero__logo {
+      width: min(320px, 52vw);
+      max-width: 100%;
+      display: block;
+      filter: drop-shadow(0 12px 28px rgba(0,0,0,0.22));
+    }
+
+    .intel-brand-hero__copy {
+      display: grid;
+      gap: 6px;
+      color: var(--intel-ink);
+    }
+
+    .intel-brand-hero__copy strong {
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      font-size: clamp(1.15rem, 2.2vw, 1.5rem);
+      letter-spacing: -0.02em;
+    }
+
+    .intel-brand-hero__copy span {
+      color: var(--intel-ink-soft);
+      max-width: 30rem;
     }
 
     .intel-kicker {
       font-size: 0.78rem;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: rgba(17, 36, 58, 0.66);
+      color: var(--intel-accent-strong);
       margin-bottom: 10px;
     }
 
@@ -52,11 +99,24 @@
     .intel-form select {
       width: 100%;
       border-radius: 16px;
-      border: 1px solid rgba(17, 36, 58, 0.15);
-      background: rgba(255,255,255,0.88);
+      border: 1px solid rgba(132, 166, 196, 0.2);
+      background: rgba(6, 16, 26, 0.88);
       padding: 12px 14px;
       color: var(--intel-ink);
       font: inherit;
+    }
+
+    .intel-form textarea::placeholder {
+      color: var(--intel-ink-dim);
+    }
+
+    .intel-form textarea:focus,
+    .intel-form input:focus,
+    .intel-form select:focus {
+      outline: 2px solid rgba(78, 205, 196, 0.2);
+      outline-offset: 1px;
+      border-color: rgba(154, 243, 222, 0.42);
+      box-shadow: 0 0 0 4px rgba(78, 205, 196, 0.08);
     }
 
     .intel-form textarea {
@@ -86,7 +146,7 @@
 
     .intel-card {
       background: var(--intel-panel);
-      border: 1px solid rgba(17, 36, 58, 0.1);
+      border: 1px solid rgba(132, 166, 196, 0.14);
       border-radius: 18px;
       padding: 16px;
     }
@@ -103,7 +163,7 @@
     .intel-card p,
     .intel-panel p,
     .intel-inline-note {
-      color: rgba(17, 36, 58, 0.78);
+      color: var(--intel-ink-soft);
     }
 
     .intel-chip-row {
@@ -116,24 +176,25 @@
     .intel-chip {
       border-radius: 999px;
       padding: 6px 10px;
-      background: rgba(17, 36, 58, 0.08);
-      color: var(--intel-ink);
+      border: 1px solid rgba(132, 166, 196, 0.14);
+      background: rgba(8, 18, 30, 0.72);
+      color: var(--intel-ink-soft);
       font-size: 0.85rem;
     }
 
     .intel-chip.is-live {
-      background: rgba(209, 88, 47, 0.14);
-      color: #8f3e22;
+      background: rgba(255, 191, 105, 0.16);
+      color: #ffd7a6;
     }
 
     .intel-chip.is-good {
-      background: rgba(52, 123, 80, 0.14);
-      color: #27593b;
+      background: rgba(104, 211, 145, 0.16);
+      color: #bff4cf;
     }
 
     .intel-chip.is-warn {
-      background: rgba(196, 133, 35, 0.18);
-      color: #7d5511;
+      background: rgba(246, 196, 83, 0.16);
+      color: #ffe2a0;
     }
 
     .intel-leg-list {
@@ -152,15 +213,24 @@
     .intel-empty {
       padding: 20px;
       border-radius: 18px;
-      border: 1px dashed rgba(17, 36, 58, 0.18);
-      background: rgba(255,255,255,0.58);
-      color: rgba(17, 36, 58, 0.72);
+      border: 1px dashed rgba(132, 166, 196, 0.22);
+      background: rgba(10, 22, 35, 0.68);
+      color: var(--intel-ink-soft);
     }
 
     @media (max-width: 980px) {
       .intel-grid,
       .intel-form-row {
         grid-template-columns: 1fr;
+      }
+
+      .intel-brand-hero {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .intel-brand-hero__logo {
+        width: min(280px, 100%);
       }
     }
   </style>
@@ -173,6 +243,13 @@
 {% block content %}
   <div class="intel-grid">
     <section class="intel-panel">
+      <div class="intel-brand-hero">
+        <img class="intel-brand-hero__logo" src="{{ url_for('static', filename='shared/syndicate-logo.svg') }}" alt="Syndicate logo" />
+        <div class="intel-brand-hero__copy">
+          <strong>The Syndicate</strong>
+          <span>Cross-sport synthesis for live reads, ranked bets, and parlay construction from the same artifact-backed betting rails that power the app.</span>
+        </div>
+      </div>
       <div class="intel-kicker">Query console</div>
       <h2>Ask The Syndicate for best bets, live angles, or parlays</h2>
       <p class="intel-inline-note">This first build is local synthesis only. It works from the pushed artifact-backed board state already inside Syndicate, without any external LLM dependency.</p>
