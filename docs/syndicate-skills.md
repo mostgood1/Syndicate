@@ -22,11 +22,31 @@ This workspace now includes a set of task-specific Copilot skills for planning, 
 - Use a workflow skill when the task is about changing code, debugging behavior, validating readiness, or checking deployment state.
 - Use a sport-level analyst skill when the ask is primarily a sports question that needs evidence-backed reasoning from local Syndicate artifacts.
 
+## Current runtime alignment
+The VS Code skills are still developer-side playbooks, but Syndicate runtime intelligence now mirrors part of that structure in code:
+- `syndicate/features/intelligence.py`: main query engine, candidate collection, market-fit scoring, and unified response contract.
+- `syndicate/features/intelligence_router.py`: internal analysis-focus routing for richer sport-specific asks.
+- `syndicate/features/intelligence_analysis_views.py`: stable analysis-view entrypoint that delegates to sport-owned builders.
+- `syndicate/features/intelligence_analysis_common.py`: shared row/filter/signal helpers used by the analysis builders.
+- `syndicate/features/mlb/intelligence_analysis.py`: MLB prop analysis builders.
+- `syndicate/features/nba/intelligence_analysis.py`: basketball-family analysis builders for NBA, WNBA, and NCAAB asks.
+- `syndicate/features/nfl/intelligence_analysis.py`: football-family analysis builders for NFL and NCAAF asks.
+- `syndicate/features/nhl/intelligence_analysis.py`: hockey prop analysis builders.
+- `syndicate/features/intelligence_parlay_correlation.py`: same-game pair penalties and medium-correlation preference enforcement.
+- `syndicate/features/intelligence_parlay_runtime.py`: parlay payload assembly, round-robin generation, and parlay ranking.
+
+The current runtime path supports:
+- candidate-driven market inference instead of relying only on hardcoded query aliases
+- market-shape-aware recommendation scoring
+- medium-correlation and pair-penalty-aware parlay filtering and ranking
+- structured analysis views for MLB HR plus strikeout/total-bases explainer asks, basketball matchup asks with pace/usage/shot-profile context, football market asks with EPA/target-share/pass-rate context, and hockey prop asks
+
+The main remaining expansion area is deeper sport-native reasoning and artifact-backed explainers inside each sport module now that the router, parlay runtime, and analysis-builder boundaries are in place.
+
 ## Current recovery worktrees
 The hidden git work that had been stashed is now surfaced in isolated review worktrees so it can be compared safely:
 - `../Syndicate-recover-migration`
 - `../Syndicate-recover-intelligence`
 - `../Syndicate-recover-manifests`
 
-See `tmp_hidden_work_inventory_2026-06-05.md` for the stash mapping and duplicate-retry notes.
-See `tmp_recovered_intelligence_delta_2026-06-05.md` for the current-versus-recovered intelligence comparison.
+The highest-value remaining intelligence recovery work is still in `../Syndicate-recover-intelligence`, especially deeper sport-specific reasoning and any additional parlay-correlation slices that are worth porting into tested runtime code.

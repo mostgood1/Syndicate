@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 from syndicate.app import create_app
 from syndicate.features.intelligence import _build_parlays
+from syndicate.features.intelligence import _parlay_matches_preferences
+from syndicate.features.intelligence import _parlay_rank_score
 from syndicate.features.intelligence import _query_preferences
 
 
@@ -25,6 +27,10 @@ def _sample_overview() -> list[dict[str, object]]:
                             "market": "PTS",
                             "pick": "Over 28.5",
                             "matchup": "BOS at NYK",
+                            "team_pace_signal": 1.08,
+                            "usage_rate_advanced": 1.14,
+                            "shot_profile_advanced": 1.06,
+                            "minutes_role_advanced": 1.03,
                             "projected": 31.8,
                             "line": 28.5,
                             "odds": "+102",
@@ -44,6 +50,10 @@ def _sample_overview() -> list[dict[str, object]]:
                             "market": "3PM",
                             "pick": "Over 4.5",
                             "matchup": "CLE at IND",
+                            "team_pace_signal": 1.08,
+                            "usage_rate_advanced": 1.14,
+                            "shot_profile_advanced": 1.06,
+                            "minutes_role_advanced": 1.03,
                             "projected": 4.9,
                             "live_projection": 5.8,
                             "actual": 3,
@@ -205,6 +215,8 @@ def _sample_mlb_market_overview() -> list[dict[str, object]]:
                             "market": "Pitcher Strikeouts",
                             "pick": "Over 7.5",
                             "matchup": "ATL at NYM",
+                            "batter_id": 592450,
+                            "opponent_pitcher_id": 519242,
                             "projected": 8.4,
                             "line": 7.5,
                             "odds": "+102",
@@ -219,6 +231,8 @@ def _sample_mlb_market_overview() -> list[dict[str, object]]:
                             "market": "Hitter Total Bases",
                             "pick": "Over 1.5",
                             "matchup": "LAD at SD",
+                            "batter_id": 518692,
+                            "opponent_pitcher_id": 543037,
                             "projected": 2.1,
                             "line": 1.5,
                             "odds": "+115",
@@ -231,6 +245,85 @@ def _sample_mlb_market_overview() -> list[dict[str, object]]:
                     ],
                 },
                 "live": {"title": "Top Live Props", "items": []},
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        }
+    ]
+
+
+def _sample_nfl_market_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "nfl",
+            "name": "NFL",
+            "context_label": "2026-09-10",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {
+                    "title": "Pregame props",
+                    "items": [
+                        {
+                            "name": "CeeDee Lamb Over 86.5 Receiving Yards",
+                            "market": "Receiving Yards",
+                            "pick": "Over 86.5",
+                            "matchup": "DAL at PHI",
+                            "off_epa_advanced": 1.11,
+                            "target_share_advanced": 0.29,
+                            "pass_rate_advanced": 1.07,
+                            "air_yards_advanced": 1.13,
+                            "projected": 94.1,
+                            "line": 86.5,
+                            "odds": "+105",
+                            "confidence": "61%",
+                            "edge": "+4.4%",
+                            "writeup": "Target share and matchup support the receiving ceiling.",
+                            "display_pills": ["Line 86.5", "Odds +105"],
+                            "href": "/nfl/props?date=2026-09-10",
+                        }
+                    ],
+                },
+                "live": {"title": "Top Live Props", "items": []},
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        }
+    ]
+
+
+def _sample_nhl_market_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "nhl",
+            "name": "NHL",
+            "context_label": "2026-06-04",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {"title": "Pregame props", "items": []},
+                "live": {
+                    "title": "Top Live Props",
+                    "items": [
+                        {
+                            "name": "Nathan MacKinnon Over 4.5 Shots",
+                            "market": "Shots",
+                            "pick": "Over 4.5",
+                            "matchup": "COL at EDM",
+                            "projected": 5.2,
+                            "live_projection": 5.8,
+                            "actual": 3,
+                            "line": 4.5,
+                            "odds": "+110",
+                            "confidence": "60%",
+                            "edge": "+3.7%",
+                            "writeup": "Volume is holding even after the live move.",
+                            "display_pills": ["Line 4.5", "Odds +110", "Live Proj 5.8"],
+                            "is_live": True,
+                            "href": "/nhl/live?date=2026-06-04",
+                        }
+                    ],
+                },
                 "compact": {"items": []},
             },
             "dashboard_games": [],
@@ -459,6 +552,201 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("pitcher_hr_mult", first_row)
         self.assertIn("why", first_row)
 
+    def test_intelligence_query_builds_basketball_analysis_views(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Usage", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the best NBA matchup targets today with a table and chart.",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "basketball_matchups")
+        self.assertTrue((analysis_views.get("table") or {}).get("rows"))
+        self.assertTrue((analysis_views.get("chart") or {}).get("rows"))
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertIn("market_fit_score", first_row)
+        self.assertEqual(first_row.get("pace_signal"), 1.08)
+        self.assertEqual(first_row.get("usage_signal"), 1.14)
+        self.assertEqual(first_row.get("shot_profile_signal"), 1.06)
+        self.assertIn("why", first_row)
+
+    def test_intelligence_query_builds_football_analysis_views(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Weekly recommendation snapshot",
+                "metrics": ["EPA", "Pace", "Target share"],
+                "path": "data/nfl_source/data/processed/recommendations_2026_wk1.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_nfl_market_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the best NFL receiving yards targets today with a table and chart.",
+                            "date": "2026-09-10",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "football_markets")
+        self.assertTrue((analysis_views.get("table") or {}).get("rows"))
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertEqual(first_row.get("market_label"), "Receiving yards")
+        self.assertEqual(first_row.get("off_epa_signal"), 1.11)
+        self.assertEqual(first_row.get("target_share_signal"), 0.29)
+        self.assertEqual(first_row.get("pass_rate_signal"), 1.07)
+
+    def test_intelligence_query_builds_hockey_analysis_views(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Props recommendation layer",
+                "metrics": ["Shot volume", "Game state", "Market depth"],
+                "path": "data/nhl_source/data/processed/props_recommendations_2026-06-04.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_nhl_market_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the best live NHL shots targets with a table and chart.",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "hockey_props")
+        self.assertTrue((analysis_views.get("table") or {}).get("rows"))
+
+    def test_intelligence_query_builds_mlb_strikeout_analysis_views(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Statcast batter and pitcher features",
+                "metrics": ["Whiff shape", "Pitch mix", "xwOBA"],
+                "path": "data/mlb_source/data/statcast/features/player_features_latest.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        statcast_payload = {
+            "meta": {"generated_at": "2026-06-04T10:00:00Z"},
+            "batters": {
+                "592450": {
+                    "overall": {"xwoba": 0.301},
+                    "mult_overall": {"k": 1.19},
+                }
+            },
+            "pitchers": {
+                "519242": {
+                    "overall": {"xwoba": 0.284},
+                    "mult_overall": {"k": 1.27},
+                    "pitch_mix": {"FF": 0.46, "SL": 0.31, "CH": 0.15},
+                }
+            },
+        }
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    with patch("syndicate.features.intelligence._mlb_statcast_feature_payload", return_value=statcast_payload):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "Explain the best MLB strikeout matchups today with a table and chart.",
+                                "date": "2026-06-04",
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "mlb_props")
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertEqual(first_row.get("market_key"), "strikeouts")
+        self.assertEqual(first_row.get("pitcher_k_mult"), 1.27)
+        self.assertEqual(first_row.get("batter_k_mult"), 1.19)
+        self.assertIn("pitch mix", first_row.get("why") or "")
+
+    def test_intelligence_query_builds_mlb_total_bases_analysis_views(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Statcast batter and pitcher features",
+                "metrics": ["Exit velocity", "Hard-hit rate", "xwOBA"],
+                "path": "data/mlb_source/data/statcast/features/player_features_latest.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        statcast_payload = {
+            "meta": {"generated_at": "2026-06-04T10:00:00Z"},
+            "batters": {
+                "518692": {
+                    "overall": {"ev_mean": 92.8, "hardhit_rate": 0.487, "xwoba": 0.391},
+                    "mult_overall": {"inplay": 1.14},
+                }
+            },
+            "pitchers": {
+                "543037": {
+                    "overall": {"xwoba": 0.347},
+                    "mult_overall": {"inplay": 1.08},
+                    "pitch_mix": {"SI": 0.37, "SL": 0.29, "CH": 0.18},
+                }
+            },
+        }
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    with patch("syndicate.features.intelligence._mlb_statcast_feature_payload", return_value=statcast_payload):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "Explain the best MLB total bases targets today with a table and chart.",
+                                "date": "2026-06-04",
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "mlb_props")
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertEqual(first_row.get("market_key"), "total_bases")
+        self.assertEqual(first_row.get("batter_inplay_mult"), 1.14)
+        self.assertEqual(first_row.get("pitcher_inplay_mult"), 1.08)
+        self.assertEqual(first_row.get("batter_hardhit_rate"), 48.7)
+        self.assertIn("in-play mult", first_row.get("why") or "")
+
     def test_intelligence_query_returns_market_specific_board(self) -> None:
         advanced_rows = [
             {
@@ -611,6 +899,172 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(len(parlays), 3)
         self.assertTrue(all(parlay.get("suggested_total_exposure") == 5.0 for parlay in parlays))
         self.assertTrue(all(parlay.get("suggested_stake") == 1.67 for parlay in parlays))
+
+    def test_build_parlays_uses_market_fit_for_market_constrained_ranking(self) -> None:
+        preferences = _query_preferences("Build me a two-leg turnovers parlay")
+        candidates = [
+            {
+                "candidate_type": "prop",
+                "sport": "NBA",
+                "sport_slug": "nba",
+                "matchup": "IND at CLE",
+                "market": "Turnovers",
+                "pick": "Over 2.5",
+                "name": "Haliburton Over 2.5 Turnovers",
+                "surface_title": "Pregame props",
+                "odds": "+112",
+                "score": 82.0,
+                "market_fit": {"market_key": "turnovers", "market_label": "Turnovers", "market_shape": "volume_prop", "market_fit_score": 15.0},
+                "market_context": {"decimal_odds": 2.12, "american_odds": 112, "implied_probability": 47.17},
+            },
+            {
+                "candidate_type": "prop",
+                "sport": "NBA",
+                "sport_slug": "nba",
+                "matchup": "BOS at NYK",
+                "market": "Turnovers",
+                "pick": "Over 3.5",
+                "name": "Brunson Over 3.5 Turnovers",
+                "surface_title": "Pregame props",
+                "odds": "+108",
+                "score": 81.5,
+                "market_fit": {"market_key": "turnovers", "market_label": "Turnovers", "market_shape": "volume_prop", "market_fit_score": 14.0},
+                "market_context": {"decimal_odds": 2.08, "american_odds": 108, "implied_probability": 48.08},
+            },
+            {
+                "candidate_type": "prop",
+                "sport": "NBA",
+                "sport_slug": "nba",
+                "matchup": "PHX at SAC",
+                "market": "Turnovers",
+                "pick": "Over 2.5",
+                "name": "Booker Over 2.5 Turnovers",
+                "surface_title": "Pregame props",
+                "odds": "+106",
+                "score": 88.0,
+                "market_fit": {"market_key": "turnovers", "market_label": "Turnovers", "market_shape": "volume_prop", "market_fit_score": 4.0},
+                "market_context": {"decimal_odds": 2.06, "american_odds": 106, "implied_probability": 48.54},
+            },
+        ]
+
+        parlays = _build_parlays(candidates, limit=3, preferences=preferences)
+
+        self.assertTrue(parlays)
+        first_parlay = parlays[0]
+        self.assertEqual(first_parlay.get("market_labels"), ["Turnovers"])
+        self.assertEqual(first_parlay.get("market_shapes"), ["volume_prop"])
+        self.assertGreater(first_parlay.get("combined_market_fit_score") or 0.0, 10.0)
+        leg_names = [leg.get("name") for leg in (first_parlay.get("legs") or [])]
+        self.assertIn("Haliburton Over 2.5 Turnovers", leg_names)
+        self.assertIn("Brunson Over 3.5 Turnovers", leg_names)
+
+    def test_low_correlation_same_game_rejects_duplicate_market_shapes(self) -> None:
+        preferences = _query_preferences("Build me a same game three-leg parlay with low correlation")
+        legs = (
+            {"candidate_type": "prop", "sport_slug": "nba", "matchup": "BOS at NYK", "market": "PTS", "market_shape": "counting_prop", "pick": "Over 28.5"},
+            {"candidate_type": "prop", "sport_slug": "nba", "matchup": "BOS at NYK", "market": "AST", "market_shape": "counting_prop", "pick": "Over 6.5"},
+            {"candidate_type": "prop", "sport_slug": "nba", "matchup": "BOS at NYK", "market": "3PM", "market_shape": "counting_prop", "pick": "Over 2.5"},
+        )
+
+        self.assertFalse(_parlay_matches_preferences(legs, preferences))
+
+    def test_explicit_medium_correlation_allows_three_mlb_volume_props(self) -> None:
+        preferences = _query_preferences("Build me a same game three-leg parlay with medium correlation")
+        legs = (
+            {"candidate_type": "prop", "sport_slug": "mlb", "matchup": "ATL at NYM", "market": "Pitcher Strikeouts", "market_shape": "volume_prop", "pick": "Over 7.5"},
+            {"candidate_type": "prop", "sport_slug": "mlb", "matchup": "ATL at NYM", "market": "Hitter Total Bases", "market_shape": "volume_prop", "pick": "Over 1.5"},
+            {"candidate_type": "prop", "sport_slug": "mlb", "matchup": "ATL at NYM", "market": "Hits", "market_shape": "volume_prop", "pick": "Over 1.5"},
+        )
+
+        self.assertTrue(_parlay_matches_preferences(legs, preferences))
+
+    def test_explicit_medium_correlation_blocks_points_assists_pair_but_allows_points_threes(self) -> None:
+        preferences = _query_preferences("Build me a same game two-leg parlay with medium correlation")
+        points_assists_legs = (
+            {"candidate_type": "prop", "sport_slug": "nba", "matchup": "BOS at NYK", "market": "PTS", "market_key": "points", "market_shape": "counting_prop", "pick": "Over 28.5"},
+            {"candidate_type": "prop", "sport_slug": "nba", "matchup": "BOS at NYK", "market": "AST", "market_key": "assists", "market_shape": "counting_prop", "pick": "Over 6.5"},
+        )
+        points_threes_legs = (
+            {"candidate_type": "prop", "sport_slug": "nba", "matchup": "BOS at NYK", "market": "PTS", "market_key": "points", "market_shape": "counting_prop", "pick": "Over 28.5"},
+            {"candidate_type": "prop", "sport_slug": "nba", "matchup": "BOS at NYK", "market": "3PM", "market_key": "threes", "market_shape": "counting_prop", "pick": "Over 2.5"},
+        )
+
+        self.assertFalse(_parlay_matches_preferences(points_assists_legs, preferences))
+        self.assertTrue(_parlay_matches_preferences(points_threes_legs, preferences))
+
+    def test_build_parlays_applies_soft_pair_penalty_to_allowed_same_game_pairs(self) -> None:
+        preferences = _query_preferences("Build me a same game two-leg parlay with medium correlation")
+        candidates = [
+            {
+                "candidate_type": "prop",
+                "sport": "NBA",
+                "sport_slug": "nba",
+                "matchup": "BOS at NYK",
+                "market": "PTS",
+                "market_key": "points",
+                "market_shape": "counting_prop",
+                "pick": "Over 28.5",
+                "name": "Tatum Over 28.5",
+                "surface_title": "Pregame props",
+                "odds": "+102",
+                "score": 84.0,
+                "market_fit": {"market_key": "points", "market_label": "Points", "market_shape": "counting_prop", "market_fit_score": 12.0},
+                "market_context": {"decimal_odds": 2.02, "american_odds": 102, "implied_probability": 49.5},
+            },
+            {
+                "candidate_type": "prop",
+                "sport": "NBA",
+                "sport_slug": "nba",
+                "matchup": "BOS at NYK",
+                "market": "REB",
+                "market_key": "rebounds",
+                "market_shape": "counting_prop",
+                "pick": "Over 8.5",
+                "name": "Tatum Over 8.5 Reb",
+                "surface_title": "Pregame props",
+                "odds": "+104",
+                "score": 84.0,
+                "market_fit": {"market_key": "rebounds", "market_label": "Rebounds", "market_shape": "counting_prop", "market_fit_score": 12.0},
+                "market_context": {"decimal_odds": 2.04, "american_odds": 104, "implied_probability": 49.02},
+            },
+            {
+                "candidate_type": "prop",
+                "sport": "NBA",
+                "sport_slug": "nba",
+                "matchup": "BOS at NYK",
+                "market": "3PM",
+                "market_key": "threes",
+                "market_shape": "counting_prop",
+                "pick": "Over 2.5",
+                "name": "Tatum Over 2.5 3PM",
+                "surface_title": "Pregame props",
+                "odds": "+104",
+                "score": 84.0,
+                "market_fit": {"market_key": "threes", "market_label": "Threes", "market_shape": "counting_prop", "market_fit_score": 12.0},
+                "market_context": {"decimal_odds": 2.04, "american_odds": 104, "implied_probability": 49.02},
+            },
+        ]
+
+        parlays = _build_parlays(candidates, limit=3, preferences=preferences)
+
+        self.assertTrue(parlays)
+        parlay_by_keys = {
+            tuple(sorted(leg.get("market_key") for leg in (parlay.get("legs") or []))): parlay
+            for parlay in parlays
+        }
+        clean_parlay = parlay_by_keys[("rebounds", "threes")]
+        lighter_penalty_parlay = parlay_by_keys[("points", "threes")]
+        heavier_penalty_parlay = parlay_by_keys[("points", "rebounds")]
+
+        self.assertEqual(tuple(sorted(leg.get("market_key") for leg in (parlays[0].get("legs") or []))), ("rebounds", "threes"))
+        self.assertEqual(clean_parlay.get("pair_correlation_penalty"), 0.0)
+        self.assertEqual(lighter_penalty_parlay.get("pair_correlation_penalty"), 1.5)
+        self.assertEqual(heavier_penalty_parlay.get("pair_correlation_penalty"), 3.0)
+        self.assertIn("Points + Threes correlation penalty 1.5", lighter_penalty_parlay.get("rationale") or "")
+        self.assertGreater(
+            _parlay_rank_score(lighter_penalty_parlay, preferences),
+            _parlay_rank_score(heavier_penalty_parlay, preferences),
+        )
 
     def test_intelligence_query_surfaces_raw_statcast_profile_context(self) -> None:
         advanced_rows = [

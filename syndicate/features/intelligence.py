@@ -23,6 +23,16 @@ from syndicate.features.nhl.sources import processed_path as nhl_processed_path
 from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_props_lines_snapshot_path
 from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
+from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
+from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_key as _runtime_parlay_leg_market_key
+from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_shape as _runtime_parlay_leg_market_shape
+from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
+from syndicate.features.intelligence_parlay_correlation import parlay_pair_penalty as _runtime_parlay_pair_penalty
+from syndicate.features.intelligence_parlay_runtime import build_parlay_payload as _runtime_build_parlay_payload
+from syndicate.features.intelligence_parlay_runtime import build_parlays as _runtime_build_parlays
+from syndicate.features.intelligence_parlay_runtime import build_round_robin_parlays as _runtime_build_round_robin_parlays
+from syndicate.features.intelligence_parlay_runtime import parlay_rank_score as _runtime_parlay_rank_score
+from syndicate.features.intelligence_router import analysis_focus_from_question as _runtime_analysis_focus_from_question
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
@@ -122,6 +132,161 @@ _MARKET_FOCUS_LABELS = {
     "turnovers": "Turnovers",
     "steals": "Steals",
     "blocks": "Blocks",
+}
+_MARKET_FALLBACK_STOPWORDS = {
+    "alt",
+    "alternate",
+    "batter",
+    "bet",
+    "bets",
+    "game",
+    "games",
+    "hitter",
+    "live",
+    "market",
+    "markets",
+    "pitcher",
+    "player",
+    "players",
+    "pregame",
+    "prop",
+    "props",
+    "team",
+}
+_BINARY_CEILING_MARKETS = {"home_runs", "touchdowns"}
+_VOLUME_PROP_MARKETS = {"strikeouts", "total_bases", "turnovers", "steals", "blocks", "hits", "rbi", "shots", "saves", "goals"}
+_COUNTING_PROP_MARKETS = {"points", "rebounds", "assists", "threes", "pra", "passing_yards", "rushing_yards", "receiving_yards"}
+_GAME_SIDE_MARKETS = {"moneyline", "spread", "total"}
+_MEDIUM_CORRELATION_SHAPE_LIMITS = {
+    "binary_ceiling_prop": 1,
+    "game_market": 1,
+    "counting_prop": 2,
+    "volume_prop": 3,
+    "general_market": 2,
+}
+_MEDIUM_CORRELATION_SPORT_SHAPE_LIMITS = {
+    ("nba", "volume_prop"): 2,
+    ("wnba", "volume_prop"): 2,
+    ("ncaab", "volume_prop"): 2,
+    ("nhl", "volume_prop"): 2,
+}
+_MEDIUM_CORRELATION_SPORT_MARKET_LIMITS = {
+    ("mlb", "strikeouts"): 2,
+    ("mlb", "total_bases"): 1,
+}
+_MEDIUM_CORRELATION_SPORT_MARKET_PAIR_BLOCKS = {
+    ("nba", ("assists", "points")),
+    ("wnba", ("assists", "points")),
+    ("ncaab", ("assists", "points")),
+}
+_PARLAY_SPORT_MARKET_PAIR_PENALTIES = {
+    ("mlb", ("hits", "total_bases")): 1.0,
+    ("mlb", ("hits", "home_runs")): 1.2,
+    ("mlb", ("hits", "rbi")): 1.15,
+    ("mlb", ("home_runs", "total_bases")): 1.35,
+    ("mlb", ("rbi", "total_bases")): 1.2,
+    ("mlb", ("home_runs", "rbi")): 1.25,
+    ("ncaaf", ("passing_yards", "rushing_yards")): 1.1,
+    ("ncaaf", ("passing_yards", "receiving_yards")): 1.25,
+    ("ncaaf", ("passing_yards", "touchdowns")): 1.3,
+    ("ncaaf", ("receiving_yards", "rushing_yards")): 1.0,
+    ("ncaaf", ("receiving_yards", "touchdowns")): 1.2,
+    ("ncaaf", ("rushing_yards", "touchdowns")): 1.15,
+    ("nfl", ("passing_yards", "rushing_yards")): 1.1,
+    ("nfl", ("passing_yards", "receiving_yards")): 1.25,
+    ("nfl", ("passing_yards", "touchdowns")): 1.3,
+    ("nfl", ("receiving_yards", "rushing_yards")): 1.0,
+    ("nfl", ("receiving_yards", "touchdowns")): 1.2,
+    ("nfl", ("rushing_yards", "touchdowns")): 1.15,
+    ("nhl", ("assists", "goals")): 1.15,
+    ("nhl", ("assists", "shots")): 1.1,
+    ("nhl", ("goals", "shots")): 1.25,
+    ("nba", ("assists", "rebounds")): 1.6,
+    ("nba", ("points", "rebounds")): 3.0,
+    ("nba", ("points", "threes")): 1.5,
+    ("wnba", ("assists", "rebounds")): 1.6,
+    ("wnba", ("points", "rebounds")): 3.0,
+    ("wnba", ("points", "threes")): 1.5,
+    ("ncaab", ("assists", "rebounds")): 1.45,
+    ("ncaab", ("points", "rebounds")): 2.5,
+    ("ncaab", ("points", "threes")): 1.25,
+}
+_MARKET_SCRIPT_CLUSTERS = {
+    "home_runs": "batter_production",
+    "points": "usage",
+    "assists": "usage",
+    "threes": "usage",
+    "turnovers": "usage",
+    "passing_yards": "football_production",
+    "rushing_yards": "football_production",
+    "receiving_yards": "football_production",
+    "touchdowns": "football_production",
+    "total_bases": "batter_production",
+    "hits": "batter_production",
+    "rbi": "batter_production",
+    "shots": "usage",
+    "goals": "usage",
+    "rebounds": "possession",
+    "blocks": "possession",
+    "steals": "possession",
+}
+_EXPLICIT_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS = {
+    ("nba", ("possession", "usage")): 1.02,
+    ("nba", ("usage", "usage")): 1.05,
+    ("wnba", ("possession", "usage")): 1.02,
+    ("wnba", ("usage", "usage")): 1.05,
+    ("ncaab", ("possession", "usage")): 1.02,
+    ("ncaab", ("usage", "usage")): 1.04,
+}
+_SCRIPT_CLUSTER_OPPOSING_DIRECTION_MULTIPLIERS = {
+    ("mlb", ("batter_production", "batter_production")): 0.45,
+    ("ncaaf", ("football_production", "football_production")): 0.45,
+    ("nfl", ("football_production", "football_production")): 0.45,
+}
+_SCRIPT_CLUSTER_PAIR_FALLBACK_PENALTIES = {
+    ("ncaaf", ("football_production", "football_production")): 1.0,
+    ("nfl", ("football_production", "football_production")): 1.0,
+    ("mlb", ("batter_production", "batter_production")): 1.0,
+    ("nhl", ("usage", "usage")): 1.1,
+    ("nba", ("possession", "possession")): 1.0,
+    ("nba", ("usage", "usage")): 1.2,
+    ("wnba", ("possession", "possession")): 1.0,
+    ("wnba", ("usage", "usage")): 1.2,
+    ("ncaab", ("possession", "possession")): 0.9,
+    ("ncaab", ("usage", "usage")): 1.1,
+}
+_LIVE_PARLAY_PAIR_PENALTY_MULTIPLIER = 1.5
+_MIXED_TIMING_PARLAY_PAIR_PENALTY_MULTIPLIER = 1.2
+_OPPOSING_DIRECTION_PARLAY_PAIR_PENALTY_MULTIPLIER = 0.65
+_DIFFERENT_SUBJECT_PARLAY_PAIR_PENALTY_MULTIPLIER = 0.75
+_OPPOSING_TEAM_PARLAY_PAIR_PENALTY_MULTIPLIER = 0.75
+_SAME_TEAM_SPORT_MARKET_PAIR_PENALTY_MULTIPLIERS = {
+    ("nba", ("assists", "rebounds")): 1.05,
+    ("nba", ("points", "rebounds")): 1.15,
+    ("nba", ("points", "threes")): 1.1,
+    ("wnba", ("assists", "rebounds")): 1.05,
+    ("wnba", ("points", "rebounds")): 1.15,
+    ("wnba", ("points", "threes")): 1.1,
+    ("ncaab", ("assists", "rebounds")): 1.05,
+    ("ncaab", ("points", "rebounds")): 1.1,
+    ("ncaab", ("points", "threes")): 1.05,
+}
+_SAME_TEAM_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS = {
+    ("ncaaf", ("football_production", "football_production")): 1.05,
+    ("nfl", ("football_production", "football_production")): 1.05,
+    ("nhl", ("usage", "usage")): 1.05,
+    ("mlb", ("batter_production", "batter_production")): 1.05,
+}
+_OPPOSING_TEAM_SPORT_MARKET_PAIR_PENALTY_MULTIPLIERS = {
+    ("nba", ("points", "threes")): 0.65,
+    ("wnba", ("points", "threes")): 0.65,
+    ("ncaab", ("points", "threes")): 0.7,
+}
+_OPPOSING_TEAM_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS = {
+    ("ncaaf", ("football_production", "football_production")): 0.6,
+    ("nfl", ("football_production", "football_production")): 0.6,
+    ("nhl", ("usage", "usage")): 0.6,
+    ("mlb", ("batter_production", "batter_production")): 0.6,
 }
 _MARKET_DEFAULT_SPORTS: dict[str, tuple[str, ...]] = {
     "home_runs": ("mlb",),
@@ -266,13 +431,25 @@ def _text_has_market_alias(text: str, alias: str) -> bool:
     return f" {normalized_alias} " in f" {normalized_text} "
 
 
-def _market_key_from_text(text: Any) -> str | None:
+def _fallback_market_key(text: Any) -> str | None:
+    normalized = _normalized_market_text(text)
+    if not normalized:
+        return None
+    tokens = [token for token in normalized.split() if token not in _MARKET_FALLBACK_STOPWORDS]
+    if not tokens or len(tokens) > 3:
+        return None
+    return "_".join(tokens)
+
+
+def _market_key_from_text(text: Any, *, allow_fallback: bool = False) -> str | None:
     normalized = _normalized_market_text(text)
     if not normalized:
         return None
     for key, aliases in _MARKET_FOCUS_ALIASES.items():
         if any(_text_has_market_alias(normalized, alias) for alias in aliases):
             return key
+    if allow_fallback:
+        return _fallback_market_key(normalized)
     return None
 
 
@@ -283,6 +460,8 @@ def _market_label(key: str | None) -> str:
     label = _MARKET_FOCUS_LABELS.get(value)
     if label:
         return label
+    if value.isupper() and len(value) <= 4:
+        return value
     return value.replace("_", " ").title()
 
 
@@ -293,6 +472,74 @@ def _market_focus_labels(keys: list[str] | tuple[str, ...] | None) -> list[str]:
         if label:
             labels.append(label)
     return labels
+
+
+def _market_shape_profile(market_key: str | None, *, candidate_type: str) -> dict[str, Any]:
+    key = str(market_key or "").strip().lower()
+    if candidate_type == "game" or key in _GAME_SIDE_MARKETS:
+        return {
+            "shape": "game_market",
+            "margin_weight": 3.5,
+            "normalized_margin_weight": 10.0,
+            "edge_weight": 0.7,
+            "confidence_weight": 0.06,
+            "confidence_baseline": 50.0,
+            "margin_cap": 5.0,
+            "normalized_margin_cap": 0.35,
+            "price_edge_weight": 0.7,
+            "plus_money_bonus": 0.0,
+        }
+    if key in _BINARY_CEILING_MARKETS:
+        return {
+            "shape": "binary_ceiling_prop",
+            "margin_weight": 7.5,
+            "normalized_margin_weight": 12.0,
+            "edge_weight": 0.85,
+            "confidence_weight": 0.05,
+            "confidence_baseline": 22.0 if key == "home_runs" else 30.0,
+            "margin_cap": 1.5,
+            "normalized_margin_cap": 1.0,
+            "price_edge_weight": 0.5,
+            "plus_money_bonus": 2.0,
+        }
+    if key in _VOLUME_PROP_MARKETS:
+        return {
+            "shape": "volume_prop",
+            "margin_weight": 5.5,
+            "normalized_margin_weight": 16.0,
+            "edge_weight": 0.55,
+            "confidence_weight": 0.07,
+            "confidence_baseline": 54.0,
+            "margin_cap": 5.0,
+            "normalized_margin_cap": 0.5,
+            "price_edge_weight": 0.4,
+            "plus_money_bonus": 1.25,
+        }
+    if key in _COUNTING_PROP_MARKETS:
+        return {
+            "shape": "counting_prop",
+            "margin_weight": 4.0,
+            "normalized_margin_weight": 12.0,
+            "edge_weight": 0.45,
+            "confidence_weight": 0.08,
+            "confidence_baseline": 55.0,
+            "margin_cap": 6.0,
+            "normalized_margin_cap": 0.35,
+            "price_edge_weight": 0.35,
+            "plus_money_bonus": 1.0,
+        }
+    return {
+        "shape": "general_market",
+        "margin_weight": 4.5,
+        "normalized_margin_weight": 14.0,
+        "edge_weight": 0.45,
+        "confidence_weight": 0.07,
+        "confidence_baseline": 54.0 if candidate_type != "game" else 50.0,
+        "margin_cap": 5.0,
+        "normalized_margin_cap": 0.4,
+        "price_edge_weight": 0.35,
+        "plus_money_bonus": 1.0 if candidate_type != "game" else 0.0,
+    }
 
 
 def _market_context(candidate: dict[str, Any]) -> dict[str, Any]:
@@ -430,6 +677,26 @@ def _question_requests_chart(question: str) -> bool:
     return any(token in lowered for token in _CHART_REQUEST_TOKENS)
 
 
+def _question_requests_explainer(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(token in lowered for token in ("why", "matchup", "matchups", "analysis", "breakdown", "explain"))
+
+
+def _analysis_focus_from_question(
+    question: str,
+    requested_sports: list[str] | tuple[str, ...] | None,
+    requested_markets: list[str] | tuple[str, ...] | None,
+) -> str | None:
+    return _runtime_analysis_focus_from_question(
+        question,
+        requested_sports,
+        requested_markets,
+        question_targets_mlb_home_runs=_question_targets_mlb_home_runs,
+        question_requests_table=_question_requests_table,
+        question_requests_chart=_question_requests_chart,
+    )
+
+
 @lru_cache(maxsize=1)
 def _mlb_statcast_feature_payload() -> dict[str, Any]:
     path = _mlb_repo_artifact_path("data", "statcast", "features", "player_features_latest.json")
@@ -479,6 +746,8 @@ def _mlb_statcast_profile_from_ids(batter_id: int | None, pitcher_id: int | None
             "xwoba": _numeric_hint(batter_overall.get("xwoba")),
             "pulled_air_rate": _numeric_hint(batter_overall.get("pulled_air_rate")),
             "hr_mult": _numeric_hint(batter_mult.get("hr")),
+            "k_mult": _numeric_hint(batter_mult.get("k")),
+            "inplay_mult": _numeric_hint(batter_mult.get("inplay")),
         },
         "pitcher": {
             "ev_mean_allowed": _numeric_hint(pitcher_overall.get("ev_mean")),
@@ -487,6 +756,8 @@ def _mlb_statcast_profile_from_ids(batter_id: int | None, pitcher_id: int | None
             "hr_per_bip_allowed": _numeric_hint(pitcher_overall.get("hr_per_bip")),
             "xwoba_allowed": _numeric_hint(pitcher_overall.get("xwoba")),
             "hr_mult": _numeric_hint(pitcher_mult.get("hr")),
+            "k_mult": _numeric_hint(pitcher_mult.get("k")),
+            "inplay_mult": _numeric_hint(pitcher_mult.get("inplay")),
             "top_pitch_mix": [
                 {"pitch_type": pitch_type, "share": round(share, 3)}
                 for pitch_type, share in top_pitch_mix
@@ -523,6 +794,45 @@ def _mlb_statcast_profile_text(profile: dict[str, Any] | None) -> str:
     if pitcher_hr_per_bip is not None:
         fragments.append(f"pitcher HR/BIP allowed {float(pitcher_hr_per_bip) * 100.0:.1f}%")
     return "; ".join(fragments[:4])
+
+
+def _mlb_statcast_market_text(profile: dict[str, Any] | None, market_key: str) -> str:
+    if not isinstance(profile, dict):
+        return ""
+    batter = profile.get("batter") if isinstance(profile.get("batter"), dict) else {}
+    pitcher = profile.get("pitcher") if isinstance(profile.get("pitcher"), dict) else {}
+    normalized_market = _safe_text(market_key, "general_market").lower()
+    fragments: list[str] = []
+    if normalized_market == "strikeouts":
+        if pitcher.get("k_mult") is not None:
+            fragments.append(f"pitcher K mult {float(pitcher.get('k_mult')):.2f}")
+        if batter.get("k_mult") is not None:
+            fragments.append(f"batter K mult {float(batter.get('k_mult')):.2f}")
+        pitch_mix = pitcher.get("top_pitch_mix") if isinstance(pitcher.get("top_pitch_mix"), list) else []
+        if pitch_mix:
+            fragments.append(
+                "pitch mix " + ", ".join(
+                    f"{_safe_text(item.get('pitch_type'), '?')} {float(item.get('share') or 0.0) * 100.0:.0f}%"
+                    for item in pitch_mix[:3]
+                    if isinstance(item, dict)
+                )
+            )
+        if pitcher.get("xwoba_allowed") is not None:
+            fragments.append(f"pitcher xwOBA allowed {float(pitcher.get('xwoba_allowed')):.3f}")
+        return "; ".join(fragments[:4])
+    if normalized_market in {"total_bases", "hits", "rbis", "runs_scored"}:
+        if batter.get("xwoba") is not None:
+            fragments.append(f"batter xwOBA {float(batter.get('xwoba')):.3f}")
+        if batter.get("ev_mean") is not None:
+            fragments.append(f"EV {float(batter.get('ev_mean')):.1f}")
+        if batter.get("hardhit_rate") is not None:
+            fragments.append(f"hard-hit {float(batter.get('hardhit_rate')) * 100.0:.1f}%")
+        if batter.get("inplay_mult") is not None:
+            fragments.append(f"in-play mult {float(batter.get('inplay_mult')):.2f}")
+        if pitcher.get("xwoba_allowed") is not None:
+            fragments.append(f"pitcher xwOBA allowed {float(pitcher.get('xwoba_allowed')):.3f}")
+        return "; ".join(fragments[:5])
+    return _mlb_statcast_profile_text(profile)
 
 
 def _mlb_home_run_analysis_views(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
@@ -623,6 +933,138 @@ def _mlb_home_run_analysis_views(candidates: list[dict[str, Any]], preferences: 
             "rows": chart_rows,
         },
     }
+
+
+def _candidate_analysis_row(candidate: dict[str, Any], index: int) -> dict[str, Any]:
+    market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
+    market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
+    why = (
+        _safe_text(market_fit.get("market_fit_note"), "")
+        or _advanced_signal_text(candidate, limit=3)
+        or _safe_text(candidate.get("writeup"), "")
+        or _safe_text(candidate.get("detail"), "")
+        or _safe_text(candidate.get("summary"), "")
+    )
+    return {
+        "rank": index,
+        "label": _safe_text(candidate.get("name"), "Play"),
+        "sport": _safe_text(candidate.get("sport"), "Sport"),
+        "matchup": _safe_text(candidate.get("matchup"), "-"),
+        "market": _safe_text(candidate.get("market"), "Market"),
+        "market_label": _safe_text(market_fit.get("market_label"), "Market"),
+        "market_shape": _safe_text(market_fit.get("market_shape"), "general_market"),
+        "pick": _safe_text(candidate.get("pick"), "-"),
+        "line": _safe_text(candidate.get("line"), "-"),
+        "projected": _safe_text(candidate.get("projected"), "-"),
+        "live_projection": _safe_text(candidate.get("live_projection"), "-"),
+        "actual": _safe_text(candidate.get("actual"), "-"),
+        "odds": _safe_text(candidate.get("odds"), "-"),
+        "confidence": _safe_text(candidate.get("confidence"), "-"),
+        "edge": _safe_text(candidate.get("edge"), "-"),
+        "score": round(float(candidate.get("score") or 0.0), 2),
+        "market_fit_score": round(float(market_fit.get("market_fit_score") or 0.0), 2),
+        "price_edge_pct": market_context.get("price_edge_pct"),
+        "implied_probability": market_context.get("implied_probability"),
+        "why": why or "Local board and model context support this angle.",
+    }
+
+
+def _analysis_candidate_rows(
+    candidates: list[dict[str, Any]],
+    *,
+    sports: set[str],
+    preferences: dict[str, Any],
+) -> list[dict[str, Any]]:
+    requested_markets = {str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()}
+    filtered = [candidate for candidate in candidates if _safe_text(candidate.get("sport_slug"), "").lower() in sports]
+    if requested_markets:
+        filtered = [candidate for candidate in filtered if _candidate_market_focuses(candidate) & requested_markets]
+    top_rows = filtered[: min(int(preferences.get("limit") or 5), 10)]
+    return [_candidate_analysis_row(candidate, index) for index, candidate in enumerate(top_rows, start=1)]
+
+
+def _basketball_matchup_analysis_views(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
+    if preferences.get("analysis_focus") != "basketball_matchups":
+        return None
+    table_rows = _analysis_candidate_rows(candidates, sports={"nba", "wnba", "ncaab"}, preferences=preferences)
+    if not table_rows:
+        return None
+    return {
+        "focus": "basketball_matchups",
+        "title": "Top basketball matchup targets",
+        "table": {
+            "title": "Top matchup-backed basketball targets",
+            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "why"],
+            "rows": table_rows,
+        },
+        "chart": {
+            "title": "Basketball matchup score grid",
+            "type": "bar",
+            "x_key": "label",
+            "series": ["score", "market_fit_score", "price_edge_pct"],
+            "rows": table_rows,
+        },
+    }
+
+
+def _football_market_analysis_views(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
+    if preferences.get("analysis_focus") != "football_markets":
+        return None
+    table_rows = _analysis_candidate_rows(candidates, sports={"nfl", "ncaaf"}, preferences=preferences)
+    if not table_rows:
+        return None
+    return {
+        "focus": "football_markets",
+        "title": "Top football market targets",
+        "table": {
+            "title": "Top football market targets",
+            "columns": ["rank", "label", "sport", "matchup", "market_label", "pick", "line", "projected", "odds", "score", "market_fit_score", "implied_probability", "why"],
+            "rows": table_rows,
+        },
+        "chart": {
+            "title": "Football market score grid",
+            "type": "bar",
+            "x_key": "label",
+            "series": ["score", "market_fit_score", "implied_probability"],
+            "rows": table_rows,
+        },
+    }
+
+
+def _hockey_prop_analysis_views(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
+    if preferences.get("analysis_focus") != "hockey_props":
+        return None
+    table_rows = _analysis_candidate_rows(candidates, sports={"nhl"}, preferences=preferences)
+    if not table_rows:
+        return None
+    return {
+        "focus": "hockey_props",
+        "title": "Top hockey prop targets",
+        "table": {
+            "title": "Top hockey prop targets",
+            "columns": ["rank", "label", "matchup", "market_label", "pick", "line", "live_projection", "odds", "score", "market_fit_score", "why"],
+            "rows": table_rows,
+        },
+        "chart": {
+            "title": "Hockey prop score grid",
+            "type": "bar",
+            "x_key": "label",
+            "series": ["score", "market_fit_score", "price_edge_pct"],
+            "rows": table_rows,
+        },
+    }
+
+
+def _analysis_views_for_query(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
+    return _runtime_build_analysis_views(
+        candidates,
+        preferences,
+        build_mlb_home_run_analysis_views=_mlb_home_run_analysis_views,
+        mlb_statcast_market_text=_mlb_statcast_market_text,
+        safe_text=_safe_text,
+        candidate_market_focuses=_candidate_market_focuses,
+        advanced_signal_text=_advanced_signal_text,
+    )
 
 
 def _extract_american_odds_range(text: str, *, require_parlay_context: bool = False) -> tuple[int | None, int | None]:
@@ -750,6 +1192,8 @@ def _extract_market_focuses(text: str) -> list[str]:
     for key, aliases in _MARKET_FOCUS_ALIASES.items():
         if any(_text_has_market_alias(text, alias) for alias in aliases):
             matches.append(key)
+    if "total_bases" in matches and "total" in matches:
+        matches = [key for key in matches if key != "total"]
     return matches
 
 
@@ -897,6 +1341,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
             requested_sports.add(slug)
 
     requested_markets = _extract_market_focuses(lowered)
+    requested_market_set = set(requested_markets)
     if not requested_sports:
         for market_key in requested_markets:
             for slug in _MARKET_DEFAULT_SPORTS.get(market_key, ()): 
@@ -918,8 +1363,12 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         live_only = False
         pregame_only = False
 
-    include_props = any(keyword in lowered for keyword in _PROP_MARKET_KEYWORDS)
+    prop_market_requested = bool(requested_market_set - _GAME_SIDE_MARKETS)
+    game_market_requested = bool(requested_market_set & _GAME_SIDE_MARKETS)
+    include_props = any(keyword in lowered for keyword in _PROP_MARKET_KEYWORDS) or prop_market_requested
     include_games = any(keyword in lowered for keyword in _GAME_MARKET_KEYWORDS)
+    if prop_market_requested and not game_market_requested:
+        include_games = False
     if explicit_mode in {"game", "games"}:
         include_games = True
     if explicit_mode in {"prop", "props"}:
@@ -953,9 +1402,9 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
 
     parlay_odds_min, parlay_odds_max = _extract_american_odds_range(lowered, require_parlay_context=True)
     parlay_leg_min, parlay_leg_max = _extract_parlay_leg_preferences(lowered)
-    analysis_focus = "mlb_home_runs" if _question_targets_mlb_home_runs(question) else None
-    wants_table = _question_requests_table(question) or analysis_focus == "mlb_home_runs"
-    wants_chart = _question_requests_chart(question) or analysis_focus == "mlb_home_runs"
+    analysis_focus = _analysis_focus_from_question(question, sorted(requested_sports), requested_markets)
+    wants_table = _question_requests_table(question) or analysis_focus is not None
+    wants_chart = _question_requests_chart(question) or analysis_focus is not None
 
     return {
         "intent": intent,
@@ -1579,7 +2028,227 @@ def _candidate_is_final(candidate: dict[str, Any]) -> bool:
     return any(token in terminal_text for token in ("final", "game over", "completed"))
 
 
+def _candidate_market_focuses(candidate: dict[str, Any]) -> set[str]:
+    market_text = " ".join(
+        [
+            _safe_text(candidate.get("market"), ""),
+            _safe_text(candidate.get("name"), ""),
+            _safe_text(candidate.get("pick"), ""),
+        ]
+    )
+    focuses: set[str] = set()
+    for key, aliases in _MARKET_FOCUS_ALIASES.items():
+        if any(_text_has_market_alias(market_text, alias) for alias in aliases):
+            focuses.add(key)
+    fallback_market = _market_key_from_text(candidate.get("market"), allow_fallback=True)
+    if fallback_market:
+        focuses.add(fallback_market)
+    return focuses
+
+
+def _candidate_market_aliases(candidate: dict[str, Any]) -> set[str]:
+    aliases: set[str] = set()
+    market_text = _safe_text(candidate.get("market"), "")
+    normalized_market = _normalized_market_text(market_text)
+    if normalized_market:
+        aliases.add(normalized_market)
+    for key in _candidate_market_focuses(candidate):
+        aliases.add(_normalized_market_text(_market_label(key)))
+        for alias in _MARKET_FOCUS_ALIASES.get(key, ()): 
+            aliases.add(_normalized_market_text(alias))
+    return {alias for alias in aliases if alias and alias not in _MARKET_FALLBACK_STOPWORDS}
+
+
+def _resolved_requested_markets(
+    question: str,
+    candidates: list[dict[str, Any]],
+    requested_markets: list[str] | tuple[str, ...] | None,
+) -> list[str]:
+    resolved: list[str] = []
+    seen: set[str] = set()
+    for item in requested_markets or []:
+        key = str(item or "").strip().lower()
+        if key and key not in seen:
+            resolved.append(key)
+            seen.add(key)
+
+    normalized_question = _normalized_market_text(question)
+    if not normalized_question:
+        return resolved
+
+    padded_question = f" {normalized_question} "
+    for candidate in candidates:
+        candidate_keys = sorted(_candidate_market_focuses(candidate))
+        if not candidate_keys:
+            continue
+        aliases = _candidate_market_aliases(candidate)
+        if not aliases:
+            continue
+        if not any(f" {alias} " in padded_question for alias in aliases):
+            continue
+        for key in candidate_keys:
+            if key not in seen:
+                resolved.append(key)
+                seen.add(key)
+    if "total_bases" in seen and "total" in seen:
+        resolved = [key for key in resolved if key != "total"]
+    return resolved
+
+
+def _filter_candidates_to_requested_markets(
+    candidates: list[dict[str, Any]],
+    requested_markets: list[str] | tuple[str, ...] | None,
+) -> list[dict[str, Any]]:
+    requested_market_set = {str(item).strip().lower() for item in (requested_markets or []) if str(item).strip()}
+    if not requested_market_set:
+        return list(candidates)
+    return [row for row in candidates if _candidate_market_focuses(row) & requested_market_set]
+
+
+def _preferred_market_focus(candidate: dict[str, Any], preferences: dict[str, Any]) -> str | None:
+    candidate_focuses = _candidate_market_focuses(candidate)
+    if not candidate_focuses:
+        return None
+    requested_markets = [str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()]
+    for key in requested_markets:
+        if key in candidate_focuses:
+            return key
+    return sorted(candidate_focuses)[0] if candidate_focuses else None
+
+
+def _candidate_selection_direction(candidate: dict[str, Any]) -> int:
+    selection_text = _normalized_market_text(
+        " ".join(
+            [
+                _safe_text(candidate.get("pick"), ""),
+                _safe_text(candidate.get("name"), ""),
+            ]
+        )
+    )
+    if " under " in f" {selection_text} ":
+        return -1
+    if " over " in f" {selection_text} ":
+        return 1
+    return 0
+
+
+def _candidate_subject_key(candidate: dict[str, Any]) -> str | None:
+    if _safe_text(candidate.get("candidate_type"), "candidate") != "prop":
+        return None
+    name_text = _normalized_market_text(_safe_text(candidate.get("name"), ""))
+    if not name_text:
+        return None
+    for marker in (" over ", " under "):
+        if marker in f" {name_text} ":
+            subject = name_text.split(marker, 1)[0].strip()
+            return subject or None
+    pick_text = _normalized_market_text(_safe_text(candidate.get("pick"), ""))
+    if pick_text and name_text.endswith(pick_text):
+        subject = name_text[: -len(pick_text)].strip()
+        if subject:
+            return subject
+    return None
+
+
+def _candidate_team_key(candidate: dict[str, Any]) -> str | None:
+    for field in ("team_key", "team", "team_abbr", "team_slug", "player_team"):
+        value = _normalized_market_text(_safe_text(candidate.get(field), ""))
+        if value:
+            return value
+    return None
+
+
+def _candidate_market_margin(candidate: dict[str, Any]) -> tuple[float | None, float | None]:
+    live_projection = _numeric_hint(candidate.get("live_projection"))
+    projected_value = live_projection if live_projection is not None else _numeric_hint(candidate.get("projected"))
+    line_value = _numeric_hint(candidate.get("line"))
+    if projected_value is None or line_value is None:
+        return (None, None)
+    direction = _candidate_selection_direction(candidate)
+    margin = projected_value - line_value
+    if direction < 0:
+        margin *= -1.0
+    elif direction == 0:
+        margin = abs(margin)
+    scale_base = max(abs(line_value), 1.0)
+    return (margin, margin / scale_base)
+
+
+def _candidate_market_fit(candidate: dict[str, Any], market_context: dict[str, Any]) -> dict[str, Any]:
+    market_keys = sorted(_candidate_market_focuses(candidate))
+    market_key = market_keys[0] if market_keys else _market_key_from_text(candidate.get("market"), allow_fallback=True)
+    candidate_type = _safe_text(candidate.get("candidate_type"), "candidate")
+    profile = _market_shape_profile(market_key, candidate_type=candidate_type)
+    margin, normalized_margin = _candidate_market_margin(candidate)
+    price_edge_pct = market_context.get("price_edge_pct")
+    confidence_pct = _pct_hint(candidate.get("confidence"))
+    fit_score = 0.0
+    note_parts: list[str] = []
+    if margin is not None:
+        fit_score += min(max(0.0, margin), float(profile["margin_cap"])) * float(profile["margin_weight"])
+        note_parts.append(f"Projection gap {margin:+.2f} versus the current line")
+    if normalized_margin is not None:
+        fit_score += min(max(0.0, normalized_margin), float(profile["normalized_margin_cap"])) * float(profile["normalized_margin_weight"])
+    if price_edge_pct is not None:
+        fit_score += max(-5.0, min(6.0, float(price_edge_pct) * float(profile["price_edge_weight"])))
+        note_parts.append(f"model-versus-price edge {float(price_edge_pct):+.2f} pts")
+    else:
+        edge_pct = _pct_hint(candidate.get("edge"))
+        if edge_pct is not None:
+            fit_score += max(-5.0, min(6.0, float(edge_pct) * float(profile["edge_weight"])))
+            note_parts.append(f"stored edge {float(edge_pct):+.2f}%")
+    if confidence_pct is not None:
+        fit_score += max(
+            -3.0,
+            min(4.0, (float(confidence_pct) - float(profile["confidence_baseline"])) * float(profile["confidence_weight"])),
+        )
+    note_parts.append(f"shape {str(profile['shape']).replace('_', ' ')}")
+    return {
+        "market_key": market_key,
+        "market_label": _market_label(market_key),
+        "market_shape": profile["shape"],
+        "market_fit_score": round(fit_score, 2),
+        "market_fit_note": "; ".join(note_parts) if note_parts else None,
+    }
+
+
+def _market_specific_score_adjustment(candidate: dict[str, Any], preferences: dict[str, Any], market_context: dict[str, Any]) -> float:
+    requested_markets = [str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()]
+    if not requested_markets:
+        return 0.0
+    focus = _preferred_market_focus(candidate, preferences)
+    if focus is None:
+        return 0.0
+    margin, normalized_margin = _candidate_market_margin(candidate)
+    candidate_type = _safe_text(candidate.get("candidate_type"), "candidate")
+    profile = _market_shape_profile(focus, candidate_type=candidate_type)
+    confidence_pct = _pct_hint(candidate.get("confidence")) or 0.0
+    edge_pct = _pct_hint(candidate.get("edge"))
+    if edge_pct is None:
+        edge_pct = float(market_context.get("price_edge_pct") or 0.0)
+    price_edge_pct = market_context.get("price_edge_pct")
+    american_odds = market_context.get("american_odds")
+
+    adjustment = 0.0
+    if margin is not None:
+        adjustment += min(max(0.0, margin), float(profile["margin_cap"])) * float(profile["margin_weight"])
+    if normalized_margin is not None:
+        adjustment += min(max(0.0, normalized_margin), float(profile["normalized_margin_cap"])) * float(profile["normalized_margin_weight"])
+    if candidate_type == "game" and price_edge_pct is not None:
+        adjustment += max(0.0, float(price_edge_pct)) * float(profile["price_edge_weight"])
+    adjustment += max(0.0, float(edge_pct)) * float(profile["edge_weight"])
+    adjustment += max(0.0, confidence_pct - float(profile["confidence_baseline"])) * float(profile["confidence_weight"])
+    if candidate_type == "game" and preferences.get("live_only") and bool(candidate.get("is_live")):
+        adjustment += 4.0
+    if candidate_type != "game" and american_odds is not None and float(american_odds) >= 100.0 and float(price_edge_pct or 0.0) > 0.0:
+        adjustment += float(profile["plus_money_bonus"])
+    return round(adjustment, 3)
+
+
 def _candidate_market_key(candidate: dict[str, Any]) -> str | None:
+    market_focuses = sorted(_candidate_market_focuses(candidate))
+    if market_focuses:
+        return market_focuses[0]
     combined = " ".join(
         [
             _safe_text(candidate.get("market"), ""),
@@ -1587,15 +2256,14 @@ def _candidate_market_key(candidate: dict[str, Any]) -> str | None:
             _safe_text(candidate.get("name"), ""),
         ]
     )
-    return _market_key_from_text(combined)
+    return _market_key_from_text(combined, allow_fallback=True)
 
 
 def _candidate_matches_requested_markets(candidate: dict[str, Any], preferences: dict[str, Any]) -> bool:
     requested_markets = [str(key).strip().lower() for key in (preferences.get("requested_markets") or []) if str(key).strip()]
     if not requested_markets:
         return True
-    market_key = _candidate_market_key(candidate)
-    return bool(market_key and market_key in requested_markets)
+    return bool(_candidate_market_focuses(candidate) & set(requested_markets))
 
 
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1638,10 +2306,10 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             candidates.extend(game_candidates)
 
     candidates = [row for row in candidates if not _candidate_is_final(row)]
+    candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
     candidates = [
         row for row in candidates if _american_odds_match(_american_odds_value(row.get("odds")), preferences)
     ]
-    candidates = [row for row in candidates if _candidate_matches_requested_markets(row, preferences)]
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -1660,19 +2328,33 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     return deduped
 
 
-def _apply_advanced_context_to_candidates(candidates: list[dict[str, Any]], advanced_by_sport: dict[str, list[dict[str, Any]]]) -> None:
+def _apply_advanced_context_to_candidates(
+    candidates: list[dict[str, Any]],
+    advanced_by_sport: dict[str, list[dict[str, Any]]],
+    preferences: dict[str, Any],
+) -> None:
     for candidate in candidates:
         sport_slug = _safe_text(candidate.get("sport_slug"), "sport").lower()
         advanced_context = advanced_by_sport.get(sport_slug, [])
         readiness_summary = _advanced_readiness_summary(advanced_context)
         market_context = _market_context(candidate)
+        market_focuses = sorted(_candidate_market_focuses(candidate))
+        market_fit = _candidate_market_fit(candidate, market_context)
         statcast_profile = _candidate_mlb_statcast_profile(candidate)
         candidate["advanced_context"] = advanced_context
         candidate["advanced_gate"] = readiness_summary
         candidate["market_context"] = market_context
+        candidate["market_focuses"] = market_focuses
+        candidate["market_fit"] = market_fit
         candidate["mlb_statcast_profile"] = statcast_profile
         candidate["advanced_signal_score"] = _candidate_advanced_signal_score(candidate)
-        candidate["score"] = float(candidate.get("score") or 0.0) + _advanced_score_adjustment(readiness_summary) + _market_score_adjustment(market_context) + float(candidate.get("advanced_signal_score") or 0.0)
+        candidate["score"] = (
+            float(candidate.get("score") or 0.0)
+            + _advanced_score_adjustment(readiness_summary)
+            + _market_score_adjustment(market_context)
+            + _market_specific_score_adjustment(candidate, preferences, market_context)
+            + float(candidate.get("advanced_signal_score") or 0.0)
+        )
 
 
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
@@ -1680,6 +2362,7 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
     advanced_driver_text = _advanced_driver_text(advanced_context)
     advanced_gate = candidate.get("advanced_gate") if isinstance(candidate.get("advanced_gate"), dict) else {}
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
+    market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
     if _safe_text(candidate.get("candidate_type"), "") == "game":
         notes: list[str] = []
         if _safe_text(candidate.get("edge"), "-") != "-":
@@ -1716,6 +2399,8 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         notes.append(f"Market implied probability is {market_context.get('implied_probability')}%.")
     if market_context.get("price_edge_pct") is not None:
         notes.append(f"Model versus price edge is {market_context.get('price_edge_pct')} points.")
+    if _safe_text(market_fit.get("market_fit_note"), ""):
+        notes.append(f"Market fit: {market_fit.get('market_fit_note')}.")
     if _safe_text(candidate.get("live_total"), "-") != "-":
         notes.append(f"Game context currently points to a live total of {candidate.get('live_total')}.")
     if advanced_driver_text:
@@ -1740,6 +2425,7 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
 
 def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
+    market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
     market_key = _candidate_market_key(candidate)
     output = {
         "candidate_type": _safe_text(candidate.get("candidate_type"), "candidate"),
@@ -1747,7 +2433,11 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "sport_slug": _safe_text(candidate.get("sport_slug"), "sport"),
         "matchup": _safe_text(candidate.get("matchup"), "-"),
         "market": _safe_text(candidate.get("market"), "Market"),
-        "market_key": market_key,
+        "market_key": market_fit.get("market_key") or market_key,
+        "market_label": market_fit.get("market_label"),
+        "market_shape": market_fit.get("market_shape"),
+        "market_fit_score": market_fit.get("market_fit_score"),
+        "market_fit_note": market_fit.get("market_fit_note"),
         "pick": _safe_text(candidate.get("pick"), _safe_text(candidate.get("name"), "Play")),
         "name": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
         "surface": _safe_text(candidate.get("surface_title"), _safe_text(candidate.get("surface"), "Board")),
@@ -1797,6 +2487,9 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
             if isinstance(item, dict)
         ],
         "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
+        "selection_direction": _candidate_selection_direction(candidate),
+        "subject_key": _candidate_subject_key(candidate),
+        "team_key": _candidate_team_key(candidate),
         "mlb_statcast_profile": candidate.get("mlb_statcast_profile") if isinstance(candidate.get("mlb_statcast_profile"), dict) else None,
     }
     pills = candidate.get("display_pills") if isinstance(candidate.get("display_pills"), list) else []
@@ -1818,6 +2511,232 @@ def _parlay_rationale(legs: list[dict[str, Any]]) -> str:
 
 def _parlay_identity(leg: dict[str, Any]) -> str:
     return f"{_safe_text(leg.get('sport_slug'), 'sport')}::{_safe_text(leg.get('pick'), 'pick')}::{_safe_text(leg.get('market'), 'market')}::{_safe_text(leg.get('matchup'), 'matchup')}"
+
+
+def _parlay_leg_market_shape(leg: dict[str, Any]) -> str:
+    return _runtime_parlay_leg_market_shape(
+        leg,
+        safe_text=_safe_text,
+        market_shape_profile=_market_shape_profile,
+        market_key_from_text=_market_key_from_text,
+    )
+
+
+def _parlay_leg_market_key(leg: dict[str, Any]) -> str:
+    return _runtime_parlay_leg_market_key(
+        leg,
+        safe_text=_safe_text,
+        market_key_from_text=_market_key_from_text,
+    )
+
+
+def _medium_correlation_pair_blocked(sport_slug: str, first_market_key: str, second_market_key: str) -> bool:
+    normalized_sport = _safe_text(sport_slug, "").lower()
+    normalized_pair = tuple(sorted((_safe_text(first_market_key, "general_market").lower(), _safe_text(second_market_key, "general_market").lower())))
+    return (normalized_sport, normalized_pair) in _MEDIUM_CORRELATION_SPORT_MARKET_PAIR_BLOCKS
+
+
+def _parlay_market_pair_penalty(sport_slug: str, first_market_key: str, second_market_key: str) -> float:
+    normalized_sport = _safe_text(sport_slug, "").lower()
+    normalized_pair = tuple(sorted((_safe_text(first_market_key, "general_market").lower(), _safe_text(second_market_key, "general_market").lower())))
+    return float(_PARLAY_SPORT_MARKET_PAIR_PENALTIES.get((normalized_sport, normalized_pair), 0.0))
+
+
+def _market_script_cluster(market_key: str) -> str | None:
+    return _MARKET_SCRIPT_CLUSTERS.get(_safe_text(market_key, "general_market").lower())
+
+
+def _parlay_script_cluster_pair_penalty(sport_slug: str, first_market_key: str, second_market_key: str) -> tuple[float, str | None]:
+    normalized_sport = _safe_text(sport_slug, "").lower()
+    first_cluster = _market_script_cluster(first_market_key)
+    second_cluster = _market_script_cluster(second_market_key)
+    if not first_cluster or not second_cluster:
+        return 0.0, None
+    cluster_pair = tuple(sorted((first_cluster, second_cluster)))
+    penalty = _SCRIPT_CLUSTER_PAIR_FALLBACK_PENALTIES.get((normalized_sport, cluster_pair))
+    if penalty is None:
+        return 0.0, None
+    cluster_label = first_cluster if first_cluster == second_cluster else f"{first_cluster}/{second_cluster}"
+    return float(penalty), f"shared {cluster_label} script"
+
+
+def _parlay_script_cluster_penalty_multiplier(first_leg: dict[str, Any], second_leg: dict[str, Any]) -> tuple[float, str | None]:
+    first_team = _candidate_team_key(first_leg)
+    second_team = _candidate_team_key(second_leg)
+    first_subject = _candidate_subject_key(first_leg)
+    second_subject = _candidate_subject_key(second_leg)
+    if not (first_team and second_team and first_subject and second_subject and first_subject != second_subject):
+        return 1.0, None
+    sport_slug = _safe_text(first_leg.get("sport_slug"), "sport").lower()
+    first_cluster = _market_script_cluster(_parlay_leg_market_key(first_leg))
+    second_cluster = _market_script_cluster(_parlay_leg_market_key(second_leg))
+    if not first_cluster or not second_cluster:
+        return 1.0, None
+    cluster_pair = tuple(sorted((first_cluster, second_cluster)))
+    multiplier = _EXPLICIT_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS.get((sport_slug, cluster_pair))
+    if multiplier is None:
+        return 1.0, None
+    cluster_label = first_cluster if first_cluster == second_cluster else f"{first_cluster}/{second_cluster}"
+    return float(multiplier), f"shared {cluster_label} script"
+
+
+def _parlay_leg_is_live(leg: dict[str, Any]) -> bool:
+    if leg.get("is_live") is True:
+        return True
+    surface_title = _safe_text(leg.get("surface_title"), "").lower()
+    return "live" in surface_title
+
+
+def _parlay_pair_penalty_multiplier(first_leg: dict[str, Any], second_leg: dict[str, Any]) -> tuple[float, str | None]:
+    first_live = _parlay_leg_is_live(first_leg)
+    second_live = _parlay_leg_is_live(second_leg)
+    if first_live and second_live:
+        return _LIVE_PARLAY_PAIR_PENALTY_MULTIPLIER, "live"
+    if first_live or second_live:
+        return _MIXED_TIMING_PARLAY_PAIR_PENALTY_MULTIPLIER, "mixed timing"
+    return 1.0, None
+
+
+def _parlay_pair_direction_multiplier(first_leg: dict[str, Any], second_leg: dict[str, Any]) -> tuple[float, str | None]:
+    first_direction = _candidate_selection_direction(first_leg)
+    second_direction = _candidate_selection_direction(second_leg)
+    if first_direction != 0 and second_direction != 0 and first_direction != second_direction:
+        sport_slug = _safe_text(first_leg.get("sport_slug"), "sport").lower()
+        first_cluster = _market_script_cluster(_parlay_leg_market_key(first_leg))
+        second_cluster = _market_script_cluster(_parlay_leg_market_key(second_leg))
+        if first_cluster and second_cluster:
+            cluster_pair = tuple(sorted((first_cluster, second_cluster)))
+            override = _SCRIPT_CLUSTER_OPPOSING_DIRECTION_MULTIPLIERS.get((sport_slug, cluster_pair))
+            if override is not None:
+                return float(override), "opposing directions"
+        return _OPPOSING_DIRECTION_PARLAY_PAIR_PENALTY_MULTIPLIER, "opposing directions"
+    return 1.0, None
+
+
+def _parlay_pair_subject_multiplier(first_leg: dict[str, Any], second_leg: dict[str, Any]) -> tuple[float, str | None]:
+    first_subject = _candidate_subject_key(first_leg)
+    second_subject = _candidate_subject_key(second_leg)
+    if first_subject and second_subject and first_subject != second_subject:
+        return _DIFFERENT_SUBJECT_PARLAY_PAIR_PENALTY_MULTIPLIER, "different players"
+    return 1.0, None
+
+
+def _parlay_pair_team_multiplier(first_leg: dict[str, Any], second_leg: dict[str, Any]) -> tuple[float, str | None]:
+    first_team = _candidate_team_key(first_leg)
+    second_team = _candidate_team_key(second_leg)
+    first_subject = _candidate_subject_key(first_leg)
+    second_subject = _candidate_subject_key(second_leg)
+    if first_team and second_team and first_subject and second_subject and first_subject != second_subject:
+        sport_slug = _safe_text(first_leg.get("sport_slug"), "sport").lower()
+        market_pair = tuple(sorted((_parlay_leg_market_key(first_leg), _parlay_leg_market_key(second_leg))))
+        cluster_pair = tuple(sorted(filter(None, (_market_script_cluster(market_pair[0]), _market_script_cluster(market_pair[1])))))
+        if first_team == second_team:
+            override = _SAME_TEAM_SPORT_MARKET_PAIR_PENALTY_MULTIPLIERS.get((sport_slug, market_pair))
+            if override is not None:
+                return float(override), "same team"
+            cluster_override = _SAME_TEAM_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS.get((sport_slug, cluster_pair))
+            if cluster_override is not None:
+                return float(cluster_override), "same team"
+            return 1.0, None
+        override = _OPPOSING_TEAM_SPORT_MARKET_PAIR_PENALTY_MULTIPLIERS.get((sport_slug, market_pair))
+        if override is not None:
+            return float(override), "opposing teams"
+        cluster_override = _OPPOSING_TEAM_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS.get((sport_slug, cluster_pair))
+        if cluster_override is not None:
+            return float(cluster_override), "opposing teams"
+        return _OPPOSING_TEAM_PARLAY_PAIR_PENALTY_MULTIPLIER, "opposing teams"
+    return 1.0, None
+
+
+def _format_pair_penalty_value(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _parlay_pair_feature_profile(
+    first_leg: dict[str, Any],
+    second_leg: dict[str, Any],
+    *,
+    penalty_source: str,
+    script_context: str | None,
+) -> dict[str, Any]:
+    first_market_key = _parlay_leg_market_key(first_leg)
+    second_market_key = _parlay_leg_market_key(second_leg)
+    first_cluster = _market_script_cluster(first_market_key)
+    second_cluster = _market_script_cluster(second_market_key)
+    first_team = _candidate_team_key(first_leg)
+    second_team = _candidate_team_key(second_leg)
+    first_subject = _candidate_subject_key(first_leg)
+    second_subject = _candidate_subject_key(second_leg)
+    first_direction = _candidate_selection_direction(first_leg)
+    second_direction = _candidate_selection_direction(second_leg)
+
+    team_relationship = None
+    if first_team and second_team:
+        team_relationship = "same_team" if first_team == second_team else "opposing_teams"
+
+    subject_relationship = None
+    if first_subject and second_subject:
+        subject_relationship = "same_player" if first_subject == second_subject else "different_players"
+
+    direction_relationship = None
+    if first_direction != 0 and second_direction != 0:
+        direction_relationship = "same_direction" if first_direction == second_direction else "opposing_directions"
+
+    cluster_pair = None
+    if first_cluster and second_cluster:
+        cluster_pair = [first_cluster, second_cluster]
+
+    return {
+        "penalty_source": penalty_source,
+        "same_game": _safe_text(first_leg.get("matchup"), "") == _safe_text(second_leg.get("matchup"), ""),
+        "team_relationship": team_relationship,
+        "subject_relationship": subject_relationship,
+        "direction_relationship": direction_relationship,
+        "market_keys": [first_market_key, second_market_key],
+        "script_cluster_pair": cluster_pair,
+        "script_context": script_context,
+    }
+
+
+def _parlay_pair_penalty(legs: tuple[dict[str, Any], ...] | list[dict[str, Any]]) -> dict[str, Any]:
+    return _runtime_parlay_pair_penalty(
+        legs,
+        safe_text=_safe_text,
+        market_label=_market_label,
+        candidate_team_key=_candidate_team_key,
+        candidate_subject_key=_candidate_subject_key,
+        candidate_selection_direction=_candidate_selection_direction,
+        market_script_clusters=_MARKET_SCRIPT_CLUSTERS,
+        pair_penalties=_PARLAY_SPORT_MARKET_PAIR_PENALTIES,
+        script_cluster_pair_fallback_penalties=_SCRIPT_CLUSTER_PAIR_FALLBACK_PENALTIES,
+        explicit_script_cluster_penalty_multipliers=_EXPLICIT_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS,
+        script_cluster_opposing_direction_multipliers=_SCRIPT_CLUSTER_OPPOSING_DIRECTION_MULTIPLIERS,
+        same_team_sport_market_pair_penalty_multipliers=_SAME_TEAM_SPORT_MARKET_PAIR_PENALTY_MULTIPLIERS,
+        same_team_script_cluster_penalty_multipliers=_SAME_TEAM_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS,
+        opposing_team_sport_market_pair_penalty_multipliers=_OPPOSING_TEAM_SPORT_MARKET_PAIR_PENALTY_MULTIPLIERS,
+        opposing_team_script_cluster_penalty_multipliers=_OPPOSING_TEAM_SCRIPT_CLUSTER_PENALTY_MULTIPLIERS,
+        live_multiplier=_LIVE_PARLAY_PAIR_PENALTY_MULTIPLIER,
+        mixed_timing_multiplier=_MIXED_TIMING_PARLAY_PAIR_PENALTY_MULTIPLIER,
+        opposing_direction_multiplier=_OPPOSING_DIRECTION_PARLAY_PAIR_PENALTY_MULTIPLIER,
+        different_subject_multiplier=_DIFFERENT_SUBJECT_PARLAY_PAIR_PENALTY_MULTIPLIER,
+        opposing_team_multiplier=_OPPOSING_TEAM_PARLAY_PAIR_PENALTY_MULTIPLIER,
+        parlay_leg_market_key_fn=_parlay_leg_market_key,
+    )
+
+
+def _medium_correlation_shape_limit(shape: str, sport_slug: str | None = None, market_key: str | None = None) -> int:
+    sport_key = _safe_text(sport_slug, "").lower()
+    market_key_value = _safe_text(market_key, "").lower()
+    normalized = _safe_text(shape, "general_market") or "general_market"
+    if sport_key and market_key_value:
+        market_override = _MEDIUM_CORRELATION_SPORT_MARKET_LIMITS.get((sport_key, market_key_value))
+        if market_override is not None:
+            return int(market_override)
+    if sport_key:
+        override = _MEDIUM_CORRELATION_SPORT_SHAPE_LIMITS.get((sport_key, normalized))
+        if override is not None:
+            return int(override)
+    return int(_MEDIUM_CORRELATION_SHAPE_LIMITS.get(normalized, _MEDIUM_CORRELATION_SHAPE_LIMITS["general_market"]))
 
 
 def _parlay_type_label(parlay_type: str | None) -> str:
@@ -1913,178 +2832,79 @@ def _has_tight_exposure_cap(preferences: dict[str, Any]) -> bool:
 
 
 def _parlay_matches_preferences(legs: tuple[dict[str, Any], ...], preferences: dict[str, Any]) -> bool:
-    matchups = {_safe_text(leg.get("matchup"), "") for leg in legs}
-    sports = {_safe_text(leg.get("sport_slug"), "sport") for leg in legs}
-    markets = {_safe_text(leg.get("market"), "market") for leg in legs}
-    parlay_type = _safe_text(preferences.get("parlay_type"), "standard")
-    correlation_tolerance = _safe_text(preferences.get("correlation_tolerance"), "medium")
-
-    if parlay_type == "same_game" and len(matchups) != 1:
-        return False
-    if parlay_type != "same_game" and correlation_tolerance in {"low", "medium"} and len(matchups) < len(legs):
-        return False
-    if preferences.get("cross_sport_required") and len(sports) < 2:
-        return False
-    if correlation_tolerance == "low" and len(markets) < len(legs):
-        return False
-    return True
+    return _runtime_parlay_matches_preferences(
+        legs,
+        preferences,
+        safe_text=_safe_text,
+        sport_market_pair_blocks=_MEDIUM_CORRELATION_SPORT_MARKET_PAIR_BLOCKS,
+        medium_correlation_shape_limits=_MEDIUM_CORRELATION_SHAPE_LIMITS,
+        medium_correlation_sport_shape_limits=_MEDIUM_CORRELATION_SPORT_SHAPE_LIMITS,
+        medium_correlation_sport_market_limits=_MEDIUM_CORRELATION_SPORT_MARKET_LIMITS,
+        parlay_leg_market_shape_fn=_parlay_leg_market_shape,
+        parlay_leg_market_key_fn=_parlay_leg_market_key,
+    )
 
 
 def _build_parlay_payload(legs: tuple[dict[str, Any], ...], preferences: dict[str, Any], *, round_robin: bool = False, ticket_index: int | None = None, ticket_total: int | None = None, anchor_legs: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
-    summary_legs = [_candidate_summary(leg) for leg in legs]
-    avg_score = sum(float(leg.get("score") or 0.0) for leg in legs) / float(len(legs))
-    decimal_prices = [
-        float((leg.get("market_context") or {}).get("decimal_odds"))
-        for leg in legs
-        if isinstance(leg.get("market_context"), dict) and (leg.get("market_context") or {}).get("decimal_odds") is not None
-    ]
-    combined_decimal_odds = None
-    combined_american_odds = None
-    combined_implied_probability = None
-    if len(decimal_prices) == len(legs) and decimal_prices:
-        combined_decimal_odds = 1.0
-        for price in decimal_prices:
-            combined_decimal_odds *= price
-        combined_decimal_odds = round(combined_decimal_odds, 3)
-        combined_american_odds = _decimal_to_american(combined_decimal_odds)
-        if combined_decimal_odds > 1.0:
-            combined_implied_probability = round((1.0 / combined_decimal_odds) * 100.0, 2)
-    if not _american_odds_match(_american_odds_value(combined_american_odds), preferences, parlay=True):
-        return None
-
-    sports = sorted({_safe_text(leg.get("sport"), "Sport") for leg in summary_legs})
-    stake_plan = _parlay_stake_plan(preferences, ticket_total=ticket_total if round_robin else None)
-    rationale = _parlay_rationale(summary_legs)
-    if stake_plan.get("stake_note"):
-        rationale = f"{rationale} {stake_plan['stake_note']}"
-    payload = {
-        "label": _parlay_label(legs, preferences, round_robin=round_robin, ticket_index=ticket_index, ticket_total=ticket_total),
-        "legs": summary_legs,
-        "leg_count": len(legs),
-        "combined_score": round(avg_score, 2),
-        "combined_decimal_odds": combined_decimal_odds,
-        "combined_odds": combined_american_odds,
-        "combined_implied_probability": combined_implied_probability,
-        "rationale": rationale,
-        "parlay_type": _safe_text(preferences.get("parlay_type"), "standard"),
-        "risk_profile": _safe_text(preferences.get("risk_profile"), "balanced"),
-        "correlation_tolerance": _safe_text(preferences.get("correlation_tolerance"), "medium"),
-        "cross_sport": len(sports) > 1,
-        "sports": sports,
-        "bankroll_amount": preferences.get("bankroll_amount"),
-        "max_exposure_pct": preferences.get("max_exposure_pct"),
-        "max_exposure_amount": preferences.get("max_exposure_amount"),
-        "suggested_stake": stake_plan.get("suggested_stake"),
-        "suggested_total_exposure": stake_plan.get("suggested_total_exposure"),
-        "exposure_cap_amount": stake_plan.get("exposure_cap_amount"),
-        "exposure_cap_source": stake_plan.get("exposure_cap_source"),
-    }
-    if round_robin:
-        payload["round_robin_unit"] = preferences.get("round_robin_unit") or len(legs)
-        if anchor_legs:
-            payload["round_robin_group"] = anchor_legs
-            payload["round_robin_group_size"] = len(anchor_legs)
-    return payload
+    return _runtime_build_parlay_payload(
+        legs,
+        preferences,
+        round_robin=round_robin,
+        ticket_index=ticket_index,
+        ticket_total=ticket_total,
+        anchor_legs=anchor_legs,
+        candidate_summary=_candidate_summary,
+        parlay_pair_penalty_fn=_parlay_pair_penalty,
+        decimal_to_american=_decimal_to_american,
+        american_odds_value=_american_odds_value,
+        american_odds_match=_american_odds_match,
+        safe_text=_safe_text,
+        parlay_stake_plan=_parlay_stake_plan,
+        parlay_rationale=_parlay_rationale,
+        parlay_label=_parlay_label,
+    )
 
 
 def _parlay_rank_score(parlay: dict[str, Any], preferences: dict[str, Any]) -> float:
-    score = float(parlay.get("combined_score") or 0.0)
-    implied = float(parlay.get("combined_implied_probability") or 0.0)
-    leg_count = int(parlay.get("leg_count") or 0)
-    american = _american_odds_value(parlay.get("combined_odds")) or 0.0
-    risk_profile = _safe_text(preferences.get("risk_profile"), "balanced")
-    if risk_profile == "conservative":
-        return implied + (score * 0.35) - max(0, leg_count - 2) * 6.0
-    if risk_profile == "aggressive":
-        return (score * 0.4) + max(0.0, american) / 25.0 + leg_count * 8.0
-    return score + implied * 0.15 + (3.0 if parlay.get("cross_sport") else 0.0)
+    parlay_with_numeric_odds = dict(parlay)
+    parlay_with_numeric_odds["combined_odds"] = _american_odds_value(parlay.get("combined_odds")) or 0.0
+    return _runtime_parlay_rank_score(parlay_with_numeric_odds, preferences)
 
 
 def _build_round_robin_parlays(candidate_pool: list[dict[str, Any]], *, limit: int, preferences: dict[str, Any], min_leg_count: int, max_leg_count: int) -> list[dict[str, Any]]:
-    anchor_size = max(3, min(5, max_leg_count))
-    if _has_tight_exposure_cap(preferences):
-        anchor_size = min(anchor_size, 3)
-    if anchor_size > len(candidate_pool):
-        return []
-    anchor_groups: list[tuple[dict[str, Any], ...]] = []
-    seen_groups: set[tuple[str, ...]] = set()
-    for legs in combinations(candidate_pool, anchor_size):
-        if not _parlay_matches_preferences(legs, preferences):
-            continue
-        identity = tuple(sorted(_parlay_identity(leg) for leg in legs))
-        if identity in seen_groups:
-            continue
-        seen_groups.add(identity)
-        anchor_groups.append(legs)
-    if not anchor_groups:
-        return []
-
-    best_anchor = sorted(
-        anchor_groups,
-        key=lambda legs: sum(float(leg.get("score") or 0.0) for leg in legs) / float(len(legs)),
-        reverse=True,
-    )[0]
-    ticket_size = preferences.get("round_robin_unit") or 2
-    ticket_size = max(2, min(ticket_size, anchor_size))
-    tickets: list[dict[str, Any]] = []
-    anchor_summary = [_candidate_summary(leg) for leg in best_anchor]
-    raw_tickets = list(combinations(best_anchor, ticket_size))
-    for index, legs in enumerate(raw_tickets, start=1):
-        if not _parlay_matches_preferences(legs, preferences):
-            continue
-        payload = _build_parlay_payload(
-            legs,
-            preferences,
-            round_robin=True,
-            ticket_index=index,
-            ticket_total=len(raw_tickets),
-            anchor_legs=anchor_summary,
-        )
-        if payload is not None:
-            tickets.append(payload)
-    tickets = sorted(tickets, key=lambda parlay: _parlay_rank_score(parlay, preferences), reverse=True)
-    return tickets[:limit]
+    return _runtime_build_round_robin_parlays(
+        candidate_pool,
+        limit=limit,
+        preferences=preferences,
+        max_leg_count=max_leg_count,
+        has_tight_exposure_cap=_has_tight_exposure_cap,
+        parlay_matches_preferences_fn=_parlay_matches_preferences,
+        parlay_identity=_parlay_identity,
+        build_parlay_payload_fn=_build_parlay_payload,
+        candidate_summary=_candidate_summary,
+        parlay_rank_score_fn=_parlay_rank_score,
+    )
 
 
 def _build_parlays(candidates: list[dict[str, Any]], *, limit: int, preferences: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    resolved_preferences = preferences or {}
-    usable = [candidate for candidate in candidates if _safe_text(candidate.get("odds"), "-") != "-"]
-    if len(usable) < 2:
-        usable = list(candidates)
-    leg_min = resolved_preferences.get("parlay_leg_min")
-    leg_max = resolved_preferences.get("parlay_leg_max")
-    min_leg_count = max(2, min(5, int(leg_min))) if leg_min is not None else 2
-    max_leg_count = max(2, min(5, int(leg_max))) if leg_max is not None else 3
-    if min_leg_count > max_leg_count:
-        min_leg_count, max_leg_count = max_leg_count, min_leg_count
-    if _safe_text(resolved_preferences.get("parlay_type"), "standard") == "standard" and _has_tight_exposure_cap(resolved_preferences):
-        max_leg_count = min(max_leg_count, 2)
-        min_leg_count = min(min_leg_count, max_leg_count)
-    candidate_pool = usable[: max(8, min(len(usable), max_leg_count + 4))]
-    if resolved_preferences.get("parlay_type") == "round_robin":
-        return _build_round_robin_parlays(
+    return _runtime_build_parlays(
+        candidates,
+        limit=limit,
+        preferences=preferences,
+        safe_text=_safe_text,
+        has_tight_exposure_cap=_has_tight_exposure_cap,
+        parlay_matches_preferences_fn=_parlay_matches_preferences,
+        parlay_identity=_parlay_identity,
+        build_parlay_payload_fn=_build_parlay_payload,
+        build_round_robin_parlays_fn=lambda candidate_pool, *, limit, preferences, max_leg_count: _build_round_robin_parlays(
             candidate_pool,
             limit=limit,
-            preferences=resolved_preferences,
-            min_leg_count=min_leg_count,
+            preferences=preferences,
+            min_leg_count=2,
             max_leg_count=max_leg_count,
-        )
-
-    parlays: list[dict[str, Any]] = []
-    seen: set[tuple[str, ...]] = set()
-    for leg_count in range(min_leg_count, max_leg_count + 1):
-        for legs in combinations(candidate_pool, leg_count):
-            if not _parlay_matches_preferences(legs, resolved_preferences):
-                continue
-            identity = tuple(sorted(_parlay_identity(leg) for leg in legs))
-            if identity in seen:
-                continue
-            seen.add(identity)
-            payload = _build_parlay_payload(legs, resolved_preferences)
-            if payload is not None:
-                parlays.append(payload)
-    parlays = sorted(parlays, key=lambda parlay: _parlay_rank_score(parlay, resolved_preferences), reverse=True)
-    return parlays[:limit]
+        ),
+        parlay_rank_score_fn=_parlay_rank_score,
+    )
 
 
 def run_intelligence_query(
@@ -2106,12 +2926,16 @@ def run_intelligence_query(
         if isinstance(sport_row, dict)
     }
     candidates = _collect_candidates(overview, preferences)
-    _apply_advanced_context_to_candidates(candidates, advanced_by_sport)
+    resolved_requested_markets = _resolved_requested_markets(question, candidates, preferences.get("requested_markets") or [])
+    if resolved_requested_markets != (preferences.get("requested_markets") or []):
+        preferences = {**preferences, "requested_markets": resolved_requested_markets}
+        candidates = _filter_candidates_to_requested_markets(candidates, resolved_requested_markets)
+    _apply_advanced_context_to_candidates(candidates, advanced_by_sport, preferences)
     candidates = sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
     recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
     parlays = _build_parlays(candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
-    analysis_views = _mlb_home_run_analysis_views(candidates, preferences)
+    analysis_views = _analysis_views_for_query(candidates, preferences)
 
     live_rows = sum(1 for candidate in candidates if bool(candidate.get("is_live")))
     pregame_rows = sum(1 for candidate in candidates if not bool(candidate.get("is_live")))

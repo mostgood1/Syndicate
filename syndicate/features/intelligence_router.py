@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+
+def question_requests_explainer(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(token in lowered for token in ("why", "matchup", "matchups", "analysis", "breakdown", "explain"))
+
+
+def analysis_focus_from_question(
+    question: str,
+    requested_sports: list[str] | tuple[str, ...] | None,
+    requested_markets: list[str] | tuple[str, ...] | None,
+    *,
+    question_targets_mlb_home_runs,
+    question_requests_table,
+    question_requests_chart,
+) -> str | None:
+    lowered_question = str(question or "").lower()
+    if question_targets_mlb_home_runs(question):
+        return "mlb_home_runs"
+
+    lowered_sports = {str(item).strip().lower() for item in (requested_sports or []) if str(item).strip()}
+    lowered_markets = {str(item).strip().lower() for item in (requested_markets or []) if str(item).strip()}
+    analysis_requested = question_requests_explainer(question) or question_requests_table(question) or question_requests_chart(question)
+    if not analysis_requested:
+        return None
+
+    basketball_sports = {"nba", "wnba", "ncaab"}
+    football_sports = {"nfl", "ncaaf"}
+    hockey_sports = {"nhl"}
+    mlb_sports = {"mlb"}
+    basketball_markets = {"points", "rebounds", "assists", "threes", "pra", "turnovers", "steals", "blocks"}
+    football_markets = {"passing_yards", "rushing_yards", "receiving_yards", "touchdowns"}
+    hockey_markets = {"shots", "goals", "assists", "saves"}
+    mlb_markets = {"home_runs", "strikeouts", "hits", "total_bases", "rbis", "runs_scored"}
+
+    if "mlb" in lowered_question and any(
+        token in lowered_question
+        for token in ("strikeout", "strikeouts", "total base", "total bases", " hits", " rbi", "rbis", "runs scored", "statcast")
+    ):
+        return "mlb_props"
+
+    if lowered_sports & mlb_sports or lowered_markets & mlb_markets:
+        return "mlb_props"
+
+    if lowered_sports & basketball_sports or lowered_markets & basketball_markets:
+        return "basketball_matchups"
+    if lowered_sports & football_sports or lowered_markets & football_markets:
+        return "football_markets"
+    if lowered_sports & hockey_sports or lowered_markets & hockey_markets:
+        return "hockey_props"
+    return None
