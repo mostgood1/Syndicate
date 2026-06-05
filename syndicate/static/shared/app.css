@@ -66,12 +66,12 @@ body {
 .syndicate-title-lockup {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 0;
   min-width: 0;
 }
 
 .syndicate-title-lockup__logo {
-  width: clamp(156px, 18vw, 228px);
+  width: clamp(188px, 22vw, 300px);
   height: auto;
   display: block;
   flex: 0 0 auto;

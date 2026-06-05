@@ -1,0 +1,311 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Intelligence Status{% endblock %}
+{% block page_title %}Intelligence Status{% endblock %}
+
+{% block extra_head %}
+  <style>
+    :root {
+      --intel-status-bg: linear-gradient(180deg, rgba(11, 24, 38, 0.95), rgba(7, 16, 27, 0.98));
+      --intel-status-panel: rgba(14, 28, 44, 0.82);
+      --intel-status-border: rgba(126, 162, 194, 0.18);
+      --intel-status-ink: var(--cards-text);
+      --intel-status-soft: var(--cards-text-soft);
+      --intel-status-accent: #7dd3fc;
+      --intel-status-good: #6ee7b7;
+      --intel-status-warn: #fbbf24;
+    }
+
+    .intel-status-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .intel-status-hero,
+    .intel-status-card {
+      background: var(--intel-status-bg);
+      border: 1px solid var(--intel-status-border);
+      border-radius: 24px;
+      box-shadow: var(--cards-shadow);
+    }
+
+    .intel-status-hero {
+      padding: 24px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .intel-status-topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .intel-status-kicker {
+      font-size: 0.78rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--intel-status-accent);
+    }
+
+    .intel-status-title {
+      margin: 0;
+      color: var(--intel-status-ink);
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+      letter-spacing: -0.03em;
+    }
+
+    .intel-status-subtitle {
+      margin: 0;
+      max-width: 56rem;
+      color: var(--intel-status-soft);
+      line-height: 1.6;
+    }
+
+    .intel-status-linkbar,
+    .intel-status-chip-row,
+    .intel-status-metric-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .intel-status-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 14px;
+      border-radius: 999px;
+      text-decoration: none;
+      color: var(--intel-status-ink);
+      border: 1px solid rgba(126, 162, 194, 0.18);
+      background: rgba(8, 18, 30, 0.74);
+    }
+
+    .intel-status-link.is-primary {
+      background: linear-gradient(135deg, rgba(125, 211, 252, 0.2), rgba(110, 231, 183, 0.16));
+      border-color: rgba(125, 211, 252, 0.3);
+    }
+
+    .intel-status-summary-grid,
+    .intel-status-sports {
+      display: grid;
+      gap: 16px;
+    }
+
+    .intel-status-summary-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .intel-status-card {
+      padding: 20px;
+    }
+
+    .intel-status-stat {
+      display: grid;
+      gap: 6px;
+    }
+
+    .intel-status-stat strong {
+      color: var(--intel-status-ink);
+      font-size: 1.8rem;
+      letter-spacing: -0.03em;
+    }
+
+    .intel-status-stat span,
+    .intel-status-card p,
+    .intel-status-path {
+      color: var(--intel-status-soft);
+    }
+
+    .intel-status-sports {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .intel-status-sport {
+      display: grid;
+      gap: 14px;
+      background: var(--intel-status-panel);
+      border: 1px solid rgba(126, 162, 194, 0.14);
+      border-radius: 20px;
+      padding: 18px;
+    }
+
+    .intel-status-sport h2,
+    .intel-status-sport h3,
+    .intel-status-detail strong {
+      margin: 0;
+      color: var(--intel-status-ink);
+    }
+
+    .intel-status-chip {
+      border-radius: 999px;
+      padding: 6px 10px;
+      border: 1px solid rgba(126, 162, 194, 0.14);
+      background: rgba(8, 18, 30, 0.74);
+      color: var(--intel-status-soft);
+      font-size: 0.84rem;
+    }
+
+    .intel-status-chip.is-good {
+      background: rgba(110, 231, 183, 0.12);
+      color: #c9ffe9;
+    }
+
+    .intel-status-chip.is-warn {
+      background: rgba(251, 191, 36, 0.14);
+      color: #fde6a0;
+    }
+
+    .intel-status-chip.is-live {
+      background: rgba(125, 211, 252, 0.14);
+      color: #cceeff;
+    }
+
+    .intel-status-detail {
+      display: grid;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(126, 162, 194, 0.1);
+    }
+
+    .intel-status-block {
+      display: grid;
+      gap: 8px;
+    }
+
+    .intel-status-path {
+      font-size: 0.92rem;
+      word-break: break-word;
+    }
+
+    @media (max-width: 1080px) {
+      .intel-status-summary-grid,
+      .intel-status-sports {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block header_meta %}
+  <p class="cards-header-meta">Coverage, readiness, and tracked-artifact status for the local Syndicate intelligence engine.</p>
+{% endblock %}
+
+{% block content %}
+  {% set readiness_gate = status_report.readiness_gate if status_report.readiness_gate is defined else {'ready': false, 'ready_sports': [], 'partial_sports': [], 'blocked_sports': [], 'inactive_sports': []} %}
+  <div class="intel-status-shell">
+    <section class="intel-status-hero">
+      <div class="intel-status-topline">
+        <div>
+          <div class="intel-status-kicker">Coverage and readiness</div>
+          <h1 class="intel-status-title">The Syndicate data coverage page</h1>
+        </div>
+        <div class="intel-status-linkbar">
+          <a class="intel-status-link is-primary" href="{{ url_for('syndicate_intelligence.intelligence_home', date=selected_date) }}">Back to intelligence engine</a>
+          <a class="intel-status-link" href="{{ url_for('syndicate_intelligence.intelligence_status_api', date=selected_date, refresh=1) }}">Open status JSON</a>
+        </div>
+      </div>
+      <p class="intel-status-subtitle">This page is only for artifact coverage and readiness details. The query engine itself now lives on its own page, so the intelligence surface can stay focused on prompts, recommendations, tables, and charts.</p>
+      <div class="intel-status-linkbar">
+        <span class="intel-status-chip{% if readiness_gate.ready %} is-good{% else %} is-warn{% endif %}">{% if readiness_gate.ready %}Gate ready{% else %}Gate blocked{% endif %}</span>
+        <span class="intel-status-chip">Date {{ selected_date }}</span>
+        <span class="intel-status-chip">Local-first only</span>
+      </div>
+    </section>
+
+    <section class="intel-status-summary-grid">
+      <article class="intel-status-card intel-status-stat">
+        <span>Tracked artifacts</span>
+        <strong>{{ status_report.tracked_summary.tracked_ok }}/{{ status_report.tracked_summary.tracked_total }}</strong>
+      </article>
+      <article class="intel-status-card intel-status-stat">
+        <span>Advanced inputs</span>
+        <strong>{{ status_report.advanced_summary.tracked_ok }}/{{ status_report.advanced_summary.tracked_total }}</strong>
+      </article>
+      <article class="intel-status-card intel-status-stat">
+        <span>Ready sports</span>
+        <strong>{{ readiness_gate.ready_sports|length }}</strong>
+      </article>
+      <article class="intel-status-card intel-status-stat">
+        <span>Blocked sports</span>
+        <strong>{{ readiness_gate.blocked_sports|length }}</strong>
+      </article>
+    </section>
+
+    <section class="intel-status-sports">
+      {% for sport in status_report.sports %}
+        {% set sport_gate = sport.advanced_gate if sport.advanced_gate is defined else {'ready': false, 'missing_inputs': [], 'publish_missing_inputs': []} %}
+        <article class="intel-status-sport">
+          <div>
+            <div class="intel-status-kicker">{{ sport.context_label }}</div>
+            <h2>{{ sport.name }}</h2>
+            <p>{{ sport.data_health|capitalize }}{% if sport.data_warnings %} · {{ sport.data_warnings|join(' | ') }}{% endif %}</p>
+          </div>
+          <div class="intel-status-chip-row">
+            <span class="intel-status-chip{% if sport.tracked_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.tracked_ready %}Tracked{% else %}Needs publish check{% endif %}</span>
+            <span class="intel-status-chip{% if sport.advanced_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.advanced_ready %}Advanced ready{% else %}Advanced incomplete{% endif %}</span>
+            <span class="intel-status-chip{% if sport.active_today %} is-live{% endif %}">{% if sport.active_today %}Active today{% else %}Inactive today{% endif %}</span>
+            <span class="intel-status-chip{% if sport_gate.ready %} is-good{% else %} is-warn{% endif %}">Gate {{ 'ready' if sport_gate.ready else 'partial/blocking' }}</span>
+          </div>
+
+          {% if sport_gate.missing_inputs %}
+            <div class="intel-status-block">
+              <strong>Missing advanced inputs</strong>
+              <div class="intel-status-metric-list">
+                {% for missing in sport_gate.missing_inputs[:6] %}
+                  <span class="intel-status-chip is-warn">{{ missing.label }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if sport_gate.publish_missing_inputs %}
+            <div class="intel-status-block">
+              <strong>Unpublished advanced inputs</strong>
+              <div class="intel-status-metric-list">
+                {% for missing in sport_gate.publish_missing_inputs[:6] %}
+                  <span class="intel-status-chip">{{ missing.label }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if sport.advanced_inputs %}
+            <div class="intel-status-detail">
+              {% for advanced in sport.advanced_inputs %}
+                <div class="intel-status-block">
+                  <strong>{{ advanced.label }}</strong>
+                  <div class="intel-status-path">{{ advanced.path }}</div>
+                  <div class="intel-status-metric-list">
+                    {% for metric in advanced.metrics %}
+                      <span class="intel-status-chip">{{ metric }}</span>
+                    {% endfor %}
+                    <span class="intel-status-chip{% if advanced.exists %} is-good{% else %} is-warn{% endif %}">{% if advanced.exists %}Exists{% else %}Missing{% endif %}</span>
+                    <span class="intel-status-chip{% if advanced.tracked %} is-good{% else %} is-warn{% endif %}">{% if advanced.tracked %}Tracked{% else %}Untracked{% endif %}</span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="intel-status-detail">
+            {% for artifact in sport.artifacts %}
+              <div class="intel-status-block">
+                <strong>{{ artifact.label }}</strong>
+                <div class="intel-status-path">{{ artifact.path }}</div>
+                <div class="intel-status-metric-list">
+                  <span class="intel-status-chip{% if artifact.exists %} is-good{% else %} is-warn{% endif %}">{% if artifact.exists %}Exists{% else %}Missing{% endif %}</span>
+                  <span class="intel-status-chip{% if artifact.tracked %} is-good{% else %} is-warn{% endif %}">{% if artifact.tracked %}Tracked{% else %}Untracked{% endif %}</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+  </div>
+{% endblock %}

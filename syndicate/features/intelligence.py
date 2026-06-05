@@ -1606,6 +1606,51 @@ def build_intelligence_overview(*, selected_date: str | None = None, force_refre
     return overview
 
 
+def _status_context_label_for_sport(slug: str, effective_date: str) -> str:
+    slug = str(slug or "").strip().lower()
+    if slug in {"mlb", "nba", "wnba", "nhl", "ncaab"}:
+        return effective_date
+    if slug == "nfl":
+        tracked_week = nfl_sources.tracked_week() or {}
+        season_value = tracked_week.get("season")
+        week_value = tracked_week.get("week")
+        if isinstance(season_value, int) and isinstance(week_value, int):
+            return f"{season_value} Week {week_value}"
+        season_value = nfl_sources.latest_season()
+        week_value = nfl_sources.default_week(season_value)
+        return f"{season_value} Week {week_value}"
+    if slug == "ncaaf":
+        week_summaries = ncaaf_sources.week_summaries()
+        if week_summaries:
+            latest = week_summaries[-1]
+            return f"{int(latest.get('season') or ncaaf_sources.default_season())} Week {int(latest.get('week') or ncaaf_sources.default_week())}"
+        return f"{ncaaf_sources.default_season()} Week {ncaaf_sources.default_week()}"
+    return effective_date
+
+
+def _status_overview_rows(*, selected_date: str | None = None) -> list[dict[str, Any]]:
+    effective_date = _effective_date(selected_date)
+    sports = current_app.config.get("SYNDICATE_SPORTS", [])
+    overview: list[dict[str, Any]] = []
+    for sport in sports:
+        if not isinstance(sport, dict):
+            continue
+        slug = _safe_text(sport.get("slug"), "sport").lower()
+        context_label = _status_context_label_for_sport(slug, effective_date)
+        overview.append(
+            {
+                **sport,
+                "slug": slug,
+                "name": _safe_text(sport.get("name"), slug.upper()),
+                "context_label": context_label,
+                "data_health": "status",
+                "data_warnings": [],
+                "active_today": context_label == effective_date,
+            }
+        )
+    return overview
+
+
 def _artifact_specs_for_sport(sport: dict[str, Any]) -> list[tuple[str, Path]]:
     slug = str(sport.get("slug") or "").strip().lower()
     context_label = str(sport.get("context_label") or "").strip()
@@ -2041,7 +2086,7 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
 def build_intelligence_status(*, selected_date: str | None = None, force_refresh: bool = False) -> dict[str, Any]:
     if force_refresh:
         _tracked_repo_files.cache_clear()
-    overview = build_intelligence_overview(selected_date=selected_date, force_refresh=force_refresh)
+    overview = _status_overview_rows(selected_date=selected_date)
     tracked = _tracked_repo_files()
     sports_status: list[dict[str, Any]] = []
     tracked_ok_count = 0
@@ -2071,16 +2116,24 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
                 if status["tracked"]:
                     advanced_ready_count += 1
 
+        artifact_exists = any(bool(row.get("exists")) for row in artifact_rows)
+        advanced_exists = any(bool(row.get("exists")) for row in advanced_rows)
+        active_today = bool(sport.get("active_today")) or artifact_exists or advanced_exists
+        data_warnings = [str(item).strip() for item in (sport.get("data_warnings") or []) if str(item).strip()]
+        if not artifact_exists and not advanced_exists:
+            data_warnings.append("No tracked artifacts or advanced inputs found for this sport context.")
+        data_health = "ready" if (artifact_exists or advanced_exists) else "missing"
+
         sports_status.append(
             {
                 "slug": _safe_text(sport.get("slug"), "sport").lower(),
                 "name": _safe_text(sport.get("name"), "Sport"),
                 "context_label": _safe_text(sport.get("context_label"), _effective_date(selected_date)),
-                "data_health": _safe_text(sport.get("data_health"), "unknown"),
-                "data_warnings": [str(item).strip() for item in (sport.get("data_warnings") or []) if str(item).strip()],
+                "data_health": data_health,
+                "data_warnings": data_warnings,
                 "artifacts": artifact_rows,
                 "advanced_inputs": advanced_rows,
-                "active_today": bool(sport.get("active_today")),
+                "active_today": active_today,
                 "tracked_ready": all(row.get("tracked") for row in artifact_rows if row.get("inside_repo")) if artifact_rows else False,
                 "advanced_ready": all(row.get("exists") for row in advanced_rows if row.get("inside_repo")) if advanced_rows else False,
                 "advanced_gate": _advanced_readiness_summary(advanced_rows),

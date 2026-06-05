@@ -6,92 +6,135 @@
 {% block extra_head %}
   <style>
     :root {
-      --intel-ink: var(--cards-text);
-      --intel-ink-soft: var(--cards-text-soft);
-      --intel-ink-dim: var(--cards-text-dim);
-      --intel-accent: #4ecdc4;
-      --intel-accent-strong: #9af3de;
-      --intel-live: #ffbf69;
-      --intel-good: #68d391;
-      --intel-warn: #f6c453;
-      --intel-surface: linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
-      --intel-panel: rgba(15, 30, 47, 0.78);
-      --intel-panel-strong: rgba(10, 22, 35, 0.92);
-      --intel-border: rgba(132, 166, 196, 0.18);
+      --intel-ink: #ecf4fb;
+      --intel-soft: #b9c8d8;
+      --intel-dim: #88a0b8;
+      --intel-border: rgba(125, 152, 178, 0.18);
+      --intel-panel: rgba(9, 21, 34, 0.92);
+      --intel-accent: #8bd3ff;
+      --intel-good: #89e2a8;
+      --intel-live: #f7b267;
+      --intel-warn: #f2cb6b;
+      --intel-danger: #ff8f8f;
     }
 
     .syndicate-intelligence-page .syndicate-header {
       background:
-        radial-gradient(circle at top left, rgba(78, 205, 196, 0.16), transparent 34%),
-        radial-gradient(circle at top right, rgba(255, 191, 105, 0.12), transparent 28%),
-        linear-gradient(180deg, rgba(13, 27, 43, 0.92), rgba(8, 18, 30, 0.98));
+        radial-gradient(circle at top left, rgba(139, 211, 255, 0.12), transparent 32%),
+        radial-gradient(circle at top right, rgba(247, 178, 103, 0.12), transparent 24%),
+        linear-gradient(180deg, rgba(11, 24, 38, 0.95), rgba(7, 17, 28, 0.99));
       border-color: var(--intel-border);
     }
 
-    .intel-grid {
+    .intel-shell {
       display: grid;
-      gap: 20px;
-      grid-template-columns: minmax(320px, 1.15fr) minmax(280px, 0.85fr);
-      align-items: start;
+      gap: 22px;
     }
 
     .intel-panel {
-      background: var(--intel-surface);
+      background: linear-gradient(180deg, rgba(13, 27, 43, 0.94), rgba(8, 18, 30, 0.98));
       border: 1px solid var(--intel-border);
-      border-radius: 24px;
+      border-radius: 26px;
       box-shadow: var(--cards-shadow);
-      padding: 22px;
+      padding: 24px;
     }
 
-    .intel-brand-hero {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 18px;
-      padding: 16px 18px;
-      border-radius: 22px;
-      border: 1px solid rgba(132, 166, 196, 0.16);
-      background:
-        radial-gradient(circle at left center, rgba(78, 205, 196, 0.14), transparent 28%),
-        linear-gradient(135deg, rgba(9, 17, 29, 0.98), rgba(15, 24, 39, 0.94));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-    }
-
-    .intel-brand-hero__logo {
-      width: min(320px, 52vw);
-      max-width: 100%;
-      display: block;
-      filter: drop-shadow(0 12px 28px rgba(0,0,0,0.22));
-    }
-
-    .intel-brand-hero__copy {
+    .intel-hero {
       display: grid;
-      gap: 6px;
-      color: var(--intel-ink);
+      gap: 18px;
+      background:
+        radial-gradient(circle at top left, rgba(139, 211, 255, 0.12), transparent 28%),
+        linear-gradient(145deg, rgba(10, 20, 33, 0.98), rgba(15, 29, 46, 0.95));
     }
 
-    .intel-brand-hero__copy strong {
-      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
-      font-size: clamp(1.15rem, 2.2vw, 1.5rem);
-      letter-spacing: -0.02em;
+    .intel-hero__top,
+    .intel-toolbar,
+    .intel-chip-row,
+    .intel-summary-grid,
+    .intel-rec-grid,
+    .intel-chart-grid,
+    .intel-metric-grid,
+    .intel-quick-asks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
-    .intel-brand-hero__copy span {
-      color: var(--intel-ink-soft);
-      max-width: 30rem;
+    .intel-hero__top {
+      justify-content: space-between;
+      align-items: flex-start;
     }
 
     .intel-kicker {
+      color: var(--intel-accent);
       font-size: 0.78rem;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--intel-accent-strong);
-      margin-bottom: 10px;
+    }
+
+    .intel-hero h2,
+    .intel-panel h2,
+    .intel-panel h3,
+    .intel-panel h4 {
+      margin: 0;
+      color: var(--intel-ink);
+    }
+
+    .intel-hero h2 {
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      letter-spacing: -0.04em;
+      line-height: 0.95;
+      max-width: 12ch;
+    }
+
+    .intel-subtitle,
+    .intel-panel p,
+    .intel-empty,
+    .intel-meta,
+    .intel-inline-note,
+    .intel-table-note,
+    .intel-board-notes details,
+    .intel-board-notes p {
+      color: var(--intel-soft);
+    }
+
+    .intel-toolbar {
+      align-items: center;
+    }
+
+    .intel-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 999px;
+      text-decoration: none;
+      color: var(--intel-ink);
+      border: 1px solid rgba(125, 152, 178, 0.18);
+      background: rgba(8, 18, 30, 0.76);
+    }
+
+    .intel-link.is-primary {
+      background: linear-gradient(135deg, rgba(139, 211, 255, 0.18), rgba(137, 226, 168, 0.14));
+      border-color: rgba(139, 211, 255, 0.32);
+    }
+
+    .intel-query-card {
+      display: grid;
+      gap: 16px;
     }
 
     .intel-form {
       display: grid;
-      gap: 12px;
+      gap: 16px;
+    }
+
+    .intel-form label {
+      display: grid;
+      gap: 8px;
+      color: var(--intel-soft);
     }
 
     .intel-form textarea,
@@ -99,231 +142,292 @@
     .intel-form select {
       width: 100%;
       border-radius: 16px;
-      border: 1px solid rgba(132, 166, 196, 0.2);
-      background: rgba(6, 16, 26, 0.88);
+      border: 1px solid rgba(125, 152, 178, 0.2);
+      background: rgba(6, 16, 26, 0.9);
       padding: 12px 14px;
       color: var(--intel-ink);
       font: inherit;
     }
 
+    .intel-form textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+
     .intel-form textarea::placeholder {
-      color: var(--intel-ink-dim);
+      color: var(--intel-dim);
     }
 
     .intel-form textarea:focus,
     .intel-form input:focus,
     .intel-form select:focus {
-      outline: 2px solid rgba(78, 205, 196, 0.2);
-      outline-offset: 1px;
-      border-color: rgba(154, 243, 222, 0.42);
-      box-shadow: 0 0 0 4px rgba(78, 205, 196, 0.08);
-    }
-
-    .intel-form textarea {
-      min-height: 140px;
-      resize: vertical;
+      outline: 2px solid rgba(139, 211, 255, 0.18);
+      outline-offset: 2px;
+      border-color: rgba(139, 211, 255, 0.35);
+      box-shadow: 0 0 0 4px rgba(139, 211, 255, 0.08);
     }
 
     .intel-form-row {
       display: grid;
-      gap: 12px;
+      gap: 14px;
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .intel-quick-asks {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .intel-status-list,
-    .intel-response-list,
-    .intel-parlay-list {
-      display: grid;
-      gap: 12px;
-      margin-top: 14px;
-    }
-
-    .intel-card {
-      background: var(--intel-panel);
-      border: 1px solid rgba(132, 166, 196, 0.14);
-      border-radius: 18px;
-      padding: 16px;
-    }
-
-    .intel-card h3,
-    .intel-card h4,
-    .intel-panel h2,
-    .intel-panel h3 {
-      margin: 0;
-      color: var(--intel-ink);
-    }
-
-    .intel-meta,
-    .intel-card p,
-    .intel-panel p,
-    .intel-inline-note {
-      color: var(--intel-ink-soft);
-    }
-
-    .intel-chip-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .intel-chip {
+    .intel-chip,
+    .intel-metric-pill {
       border-radius: 999px;
       padding: 6px 10px;
-      border: 1px solid rgba(132, 166, 196, 0.14);
+      border: 1px solid rgba(125, 152, 178, 0.14);
       background: rgba(8, 18, 30, 0.72);
-      color: var(--intel-ink-soft);
-      font-size: 0.85rem;
+      color: var(--intel-soft);
+      font-size: 0.84rem;
+      white-space: nowrap;
     }
 
     .intel-chip.is-live {
-      background: rgba(255, 191, 105, 0.16);
-      color: #ffd7a6;
+      color: #ffe2bf;
+      background: rgba(247, 178, 103, 0.14);
     }
 
     .intel-chip.is-good {
-      background: rgba(104, 211, 145, 0.16);
-      color: #bff4cf;
+      color: #d8ffe3;
+      background: rgba(137, 226, 168, 0.16);
     }
 
     .intel-chip.is-warn {
-      background: rgba(246, 196, 83, 0.16);
-      color: #ffe2a0;
+      color: #fff0c6;
+      background: rgba(242, 203, 107, 0.16);
     }
 
-    .intel-leg-list {
+    .intel-chip.is-danger {
+      color: #ffd9d9;
+      background: rgba(255, 143, 143, 0.14);
+    }
+
+    .intel-response-stack,
+    .intel-analysis-stack,
+    .intel-parlay-stack {
       display: grid;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .intel-metric-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
+      gap: 18px;
+      margin-top: 18px;
     }
 
     .intel-empty {
-      padding: 20px;
-      border-radius: 18px;
-      border: 1px dashed rgba(132, 166, 196, 0.22);
-      background: rgba(10, 22, 35, 0.68);
-      color: var(--intel-ink-soft);
+      padding: 28px;
+      border-radius: 20px;
+      border: 1px dashed rgba(125, 152, 178, 0.22);
+      background: rgba(10, 22, 35, 0.72);
     }
 
-    .intel-analysis-grid {
+    .intel-brief-card,
+    .intel-top-card,
+    .intel-analysis-card,
+    .intel-rec-card,
+    .intel-parlay-card,
+    .intel-board-notes {
+      background: rgba(10, 22, 35, 0.72);
+      border: 1px solid rgba(125, 152, 178, 0.14);
+      border-radius: 20px;
+      padding: 18px;
+    }
+
+    .intel-brief-card {
       display: grid;
       gap: 12px;
-      margin-top: 14px;
+    }
+
+    .intel-summary-grid {
+      margin-top: 2px;
+    }
+
+    .intel-metric-pill {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      padding: 10px 12px;
+      background: rgba(6, 16, 26, 0.84);
+    }
+
+    .intel-metric-pill strong {
+      color: var(--intel-ink);
+      font-size: 0.95rem;
+    }
+
+    .intel-top-card {
+      display: grid;
+      gap: 14px;
+      background:
+        radial-gradient(circle at top right, rgba(139, 211, 255, 0.12), transparent 30%),
+        linear-gradient(145deg, rgba(7, 17, 28, 0.98), rgba(13, 27, 43, 0.92));
+    }
+
+    .intel-top-card__grid,
+    .intel-rec-grid,
+    .intel-chart-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .intel-top-card__grid {
+      grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+    }
+
+    .intel-top-card__score {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(6, 16, 26, 0.84);
+      border: 1px solid rgba(125, 152, 178, 0.14);
+    }
+
+    .intel-top-card__score strong {
+      color: var(--intel-ink);
+      font-size: 2.4rem;
+      letter-spacing: -0.04em;
+    }
+
+    .intel-metric-grid {
+      gap: 8px;
+    }
+
+    .intel-analysis-card {
+      display: grid;
+      gap: 12px;
     }
 
     .intel-analysis-table-wrap {
       overflow-x: auto;
       border-radius: 16px;
-      border: 1px solid rgba(132, 166, 196, 0.14);
-      background: rgba(8, 18, 30, 0.56);
+      border: 1px solid rgba(125, 152, 178, 0.12);
+      background: rgba(6, 16, 26, 0.72);
     }
 
     .intel-analysis-table {
       width: 100%;
+      min-width: 940px;
       border-collapse: collapse;
-      min-width: 980px;
     }
 
     .intel-analysis-table th,
     .intel-analysis-table td {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(132, 166, 196, 0.1);
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(125, 152, 178, 0.09);
       text-align: left;
       vertical-align: top;
-      color: var(--intel-ink-soft);
+      color: var(--intel-soft);
       font-size: 0.92rem;
     }
 
     .intel-analysis-table th {
       position: sticky;
       top: 0;
-      background: rgba(10, 22, 35, 0.96);
+      background: rgba(7, 17, 28, 0.98);
       color: var(--intel-ink);
-      letter-spacing: 0.04em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
     }
 
-    .intel-chart-list {
+    .intel-analysis-table tr:nth-child(odd) td {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
+    .intel-chart-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .intel-chart-card {
       display: grid;
       gap: 10px;
-      margin-top: 12px;
-    }
-
-    .intel-chart-row {
-      display: grid;
-      gap: 8px;
-      padding: 10px 12px;
-      border-radius: 14px;
-      background: rgba(8, 18, 30, 0.52);
-      border: 1px solid rgba(132, 166, 196, 0.12);
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(6, 16, 26, 0.78);
+      border: 1px solid rgba(125, 152, 178, 0.12);
     }
 
     .intel-bar-track {
-      height: 10px;
+      height: 12px;
       border-radius: 999px;
-      background: rgba(132, 166, 196, 0.12);
+      background: rgba(125, 152, 178, 0.12);
       overflow: hidden;
     }
 
     .intel-bar-fill {
       height: 100%;
       border-radius: 999px;
-      background: linear-gradient(90deg, rgba(78, 205, 196, 0.72), rgba(154, 243, 222, 0.96));
+      background: linear-gradient(90deg, rgba(139, 211, 255, 0.82), rgba(137, 226, 168, 0.92));
+    }
+
+    .intel-rec-grid {
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .intel-rec-card,
+    .intel-parlay-card {
+      display: grid;
+      gap: 12px;
+    }
+
+    .intel-card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .intel-board-notes details {
+      cursor: pointer;
+    }
+
+    .intel-board-notes summary {
+      color: var(--intel-ink);
+      font-weight: 600;
     }
 
     @media (max-width: 980px) {
-      .intel-grid,
-      .intel-form-row {
+      .intel-form-row,
+      .intel-top-card__grid {
         grid-template-columns: 1fr;
-      }
-
-      .intel-brand-hero {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .intel-brand-hero__logo {
-        width: min(280px, 100%);
       }
     }
   </style>
 {% endblock %}
 
 {% block header_meta %}
-  <p class="cards-header-meta">Local-first synthesis layer for cross-sport bets, live board reads, and parlay construction using the same Syndicate artifact-backed rails that drive the homepage.</p>
+  <p class="cards-header-meta">The Syndicate intelligence engine surfaces on-the-fly local recommendations with supporting charts, tables, and rationale built from the same artifact-backed rails that power the app.</p>
 {% endblock %}
 
 {% block content %}
-  <div class="intel-grid">
-    <section class="intel-panel">
-      <div class="intel-brand-hero">
-        <img class="intel-brand-hero__logo" src="{{ url_for('static', filename='shared/syndicate-logo.svg') }}" alt="Syndicate logo" />
-        <div class="intel-brand-hero__copy">
-          <strong>The Syndicate</strong>
-          <span>Cross-sport synthesis for live reads, ranked bets, and parlay construction from the same artifact-backed betting rails that power the app.</span>
+  <section class="intel-shell">
+    <article class="intel-panel intel-hero">
+      <div class="intel-hero__top">
+        <div>
+          <div class="intel-kicker">The Syndicate intelligence engine</div>
+          <h2>Ask for the board you want, then read the returned case.</h2>
+        </div>
+        <div class="intel-toolbar">
+          <a class="intel-link is-primary" id="intel-status-link" href="{{ url_for('syndicate_intelligence.intelligence_status_page', date=selected_date) }}">View data coverage page</a>
         </div>
       </div>
-      <div class="intel-kicker">Query console</div>
-      <h2>Ask The Syndicate for best bets, live angles, or parlays</h2>
-      <p class="intel-inline-note">This first build is local synthesis only. It works from the pushed artifact-backed board state already inside Syndicate, without any external LLM dependency.</p>
+      <p class="intel-subtitle">This page is only for The Syndicate engine and the results it returns. Ask for targets, explainers, same-game builds, or cross-sport value, and the page will render the recommendations with the supporting chart and table views the runtime generates on the fly.</p>
+      <div class="intel-chip-row">
+        <span class="intel-chip is-good">Engine only</span>
+        <span class="intel-chip">Local-first</span>
+        <span class="intel-chip">Charts and tables on demand</span>
+      </div>
+    </article>
+
+    <article class="intel-panel intel-query-card">
+      <div>
+        <div class="intel-kicker">Query console</div>
+        <h2>Prompt The Syndicate</h2>
+        <p class="intel-inline-note">Ask the engine directly. The response area below is reserved for returned recommendations, not system coverage metadata.</p>
+      </div>
       <form id="intel-query-form" class="intel-form">
         <label>
           <span class="intel-kicker">Question</span>
-          <textarea id="intel-question" name="question" placeholder="Build me a two-leg live parlay from the strongest edges across NBA and MLB."></textarea>
+          <textarea id="intel-question" name="question" placeholder="What are the best home run matchups today and why? Build a top 10 table and chart."></textarea>
         </label>
         <div class="intel-form-row">
           <label>
@@ -358,108 +462,12 @@
           <button class="cards-nav-pill is-active" type="submit">Run The Syndicate</button>
         </div>
       </form>
-      <div id="intel-response" class="intel-response-list">
-        <div class="intel-empty">Run a query to generate sportsbook-facing rationales, ranked local plays, and optional parlay constructions.</div>
-      </div>
-    </section>
+    </article>
 
-    <aside class="intel-panel">
-      {% set readiness_gate = status_report.readiness_gate if status_report.readiness_gate is defined else {'ready': false, 'ready_sports': [], 'partial_sports': [], 'blocked_sports': [], 'inactive_sports': []} %}
-      <div class="intel-kicker">Data coverage</div>
-      <h2>Advanced artifact status</h2>
-      <p class="intel-inline-note">Representative pushed artifacts are checked per sport so the local agent can tell you which boards are fully backed by tracked data before this goes to deployment.</p>
-      <div class="intel-chip-row">
-        <span class="intel-chip is-good">Tracked {{ status_report.tracked_summary.tracked_ok }}/{{ status_report.tracked_summary.tracked_total }}</span>
-        <span class="intel-chip{% if status_report.advanced_summary.tracked_ok == status_report.advanced_summary.tracked_total and status_report.advanced_summary.tracked_total %} is-good{% else %} is-warn{% endif %}">Advanced {{ status_report.advanced_summary.tracked_ok }}/{{ status_report.advanced_summary.tracked_total }}</span>
-        <span class="intel-chip{% if readiness_gate.ready %} is-good{% else %} is-warn{% endif %}">{% if readiness_gate.ready %}Gate ready{% else %}Gate blocked{% endif %}</span>
-        <span class="intel-chip">Local-first only</span>
-      </div>
-      <div class="intel-leg-list">
-        <div>
-          <strong>Readiness gate</strong>
-          <div class="intel-chip-row">
-            <span class="intel-chip{% if readiness_gate.ready_sports %} is-good{% endif %}">Ready {{ readiness_gate.ready_sports|length }}</span>
-            <span class="intel-chip{% if readiness_gate.partial_sports %} is-warn{% endif %}">Partial {{ readiness_gate.partial_sports|length }}</span>
-            <span class="intel-chip{% if readiness_gate.blocked_sports %} is-warn{% endif %}">Blocked {{ readiness_gate.blocked_sports|length }}</span>
-            <span class="intel-chip">Inactive {{ readiness_gate.inactive_sports|length }}</span>
-          </div>
-        </div>
-      </div>
-      <div id="intel-status" class="intel-status-list">
-        {% for sport in status_report.sports %}
-          {% set sport_gate = sport.advanced_gate if sport.advanced_gate is defined else {'ready': false, 'missing_inputs': [], 'publish_missing_inputs': []} %}
-          <article class="intel-card">
-            <h3>{{ sport.name }}</h3>
-            <p class="intel-meta">{{ sport.context_label }} · {{ sport.data_health|capitalize }}</p>
-            <div class="intel-chip-row">
-              <span class="intel-chip{% if sport.tracked_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.tracked_ready %}Tracked{% else %}Needs publish check{% endif %}</span>
-              <span class="intel-chip{% if sport.advanced_ready %} is-good{% else %} is-warn{% endif %}">{% if sport.advanced_ready %}Advanced inputs tracked{% else %}Advanced inputs incomplete{% endif %}</span>
-              <span class="intel-chip{% if sport.active_today %} is-live{% endif %}">{% if sport.active_today %}Active today{% else %}Inactive today{% endif %}</span>
-              <span class="intel-chip{% if sport_gate.ready %} is-good{% else %} is-warn{% endif %}">Gate {{ 'ready' if sport_gate.ready else 'partial/blocking' }}</span>
-            </div>
-            {% if sport.data_warnings %}
-              <p>{{ sport.data_warnings|join(' | ') }}</p>
-            {% endif %}
-            {% if sport_gate.missing_inputs %}
-              <div class="intel-leg-list">
-                <div>
-                  <strong>Missing advanced inputs</strong>
-                  <div class="intel-metric-list">
-                    {% for missing in sport_gate.missing_inputs[:4] %}
-                      <span class="intel-chip is-warn">{{ missing.label }}</span>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
-            {% endif %}
-            {% if sport_gate.publish_missing_inputs %}
-              <div class="intel-leg-list">
-                <div>
-                  <strong>Unpublished advanced inputs</strong>
-                  <div class="intel-metric-list">
-                    {% for missing in sport_gate.publish_missing_inputs[:4] %}
-                      <span class="intel-chip">{{ missing.label }}</span>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
-            {% endif %}
-            {% if sport.advanced_inputs %}
-              <div class="intel-leg-list">
-                {% for advanced in sport.advanced_inputs %}
-                  <div>
-                    <strong>{{ advanced.label }}</strong>
-                    <div class="intel-meta">{{ advanced.path }}</div>
-                    <div class="intel-metric-list">
-                      {% for metric in advanced.metrics %}
-                        <span class="intel-chip">{{ metric }}</span>
-                      {% endfor %}
-                    </div>
-                    <div class="intel-chip-row">
-                      <span class="intel-chip{% if advanced.exists %} is-good{% else %} is-warn{% endif %}">{% if advanced.exists %}Exists{% else %}Missing{% endif %}</span>
-                      <span class="intel-chip{% if advanced.tracked %} is-good{% else %} is-warn{% endif %}">{% if advanced.tracked %}Tracked{% else %}Untracked{% endif %}</span>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% endif %}
-            <div class="intel-leg-list">
-              {% for artifact in sport.artifacts %}
-                <div>
-                  <strong>{{ artifact.label }}</strong>
-                  <div class="intel-meta">{{ artifact.path }}</div>
-                  <div class="intel-chip-row">
-                    <span class="intel-chip{% if artifact.exists %} is-good{% else %} is-warn{% endif %}">{% if artifact.exists %}Exists{% else %}Missing{% endif %}</span>
-                    <span class="intel-chip{% if artifact.tracked %} is-good{% else %} is-warn{% endif %}">{% if artifact.tracked %}Tracked{% else %}Untracked{% endif %}</span>
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
-          </article>
-        {% endfor %}
-      </div>
-    </aside>
-  </div>
+    <section id="intel-response" class="intel-response-stack">
+      <div class="intel-empty">Run a query to render The Syndicate response here. Returned charts, tables, recommendation cards, and parlays will appear in this area only.</div>
+    </section>
+  </section>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -471,11 +479,7 @@
       const modeEl = document.getElementById('intel-mode');
       const sportEl = document.getElementById('intel-sport');
       const responseRoot = document.getElementById('intel-response');
-      const statusRoot = document.getElementById('intel-status');
-
-      function renderMetricChips(metrics) {
-        return (Array.isArray(metrics) ? metrics : []).map((metric) => chip(metric)).join('');
-      }
+      const statusLink = document.getElementById('intel-status-link');
 
       function escapeHtml(value) {
         return String(value ?? '')
@@ -486,18 +490,105 @@
           .replace(/'/g, '&#39;');
       }
 
+      function prettyLabel(value) {
+        return String(value || '').replace(/_/g, ' ');
+      }
+
       function chip(label, extraClass = '') {
         return `<span class="intel-chip ${extraClass}">${escapeHtml(label)}</span>`;
+      }
+
+      function metricPill(label, value) {
+        return `<span class="intel-metric-pill"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></span>`;
       }
 
       function formatCell(value) {
         if (value === null || value === undefined || value === '') {
           return '—';
         }
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          return String(value);
-        }
         return escapeHtml(value);
+      }
+
+      function updateStatusLink() {
+        if (!statusLink) {
+          return;
+        }
+        const url = new URL(statusLink.href, window.location.origin);
+        if (dateEl.value) {
+          url.searchParams.set('date', dateEl.value);
+        } else {
+          url.searchParams.delete('date');
+        }
+        statusLink.href = url.toString();
+      }
+
+      function buildSummaryMetrics(response, recommendations, parlays) {
+        const metrics = [];
+        if (recommendations.length) {
+          metrics.push(metricPill('Recommendations', recommendations.length));
+        }
+        if (parlays.length) {
+          metrics.push(metricPill('Parlays', parlays.length));
+        }
+        if (response.analysis_views?.focus) {
+          metrics.push(metricPill('Analysis', prettyLabel(response.analysis_views.focus)));
+        }
+        const top = recommendations[0] || null;
+        if (top?.confidence && top.confidence !== '-') {
+          metrics.push(metricPill('Top confidence', top.confidence));
+        }
+        if (top?.market_label) {
+          metrics.push(metricPill('Primary market', top.market_label));
+        }
+        return metrics.join('');
+      }
+
+      function renderTopRecommendation(item) {
+        if (!item) {
+          return '';
+        }
+
+        const statPills = [
+          item.score !== null && item.score !== undefined ? metricPill('Score', item.score) : '',
+          item.confidence && item.confidence !== '-' ? metricPill('Confidence', item.confidence) : '',
+          item.market_fit_score !== null && item.market_fit_score !== undefined ? metricPill('Market fit', item.market_fit_score) : '',
+          item.price_edge_pct !== null && item.price_edge_pct !== undefined ? metricPill('Price edge', `${item.price_edge_pct}%`) : '',
+          item.implied_probability !== null && item.implied_probability !== undefined ? metricPill('Implied', `${item.implied_probability}%`) : '',
+          item.projected && item.projected !== '-' ? metricPill('Projection', item.projected) : '',
+          item.line && item.line !== '-' ? metricPill('Line', item.line) : '',
+          item.odds && item.odds !== '-' ? metricPill('Odds', item.odds) : ''
+        ].filter(Boolean).join('');
+
+        const chips = [
+          item.sport ? chip(item.sport) : '',
+          chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
+          item.market ? chip(item.market) : '',
+          item.surface ? chip(item.surface) : ''
+        ].filter(Boolean).join('');
+
+        const displayPills = Array.isArray(item.display_pills) ? item.display_pills.map((entry) => chip(entry)).join('') : '';
+        const cta = item.href ? `<a class="intel-link is-primary" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
+
+        return `
+          <article class="intel-top-card">
+            <div>
+              <div class="intel-kicker">Top returned recommendation</div>
+              <h3>${escapeHtml(item.name || item.pick || 'Top target')}</h3>
+              <p class="intel-meta">${escapeHtml(item.matchup || '-')}${item.market ? ` · ${escapeHtml(item.market)}` : ''}${item.surface ? ` · ${escapeHtml(item.surface)}` : ''}</p>
+            </div>
+            <div class="intel-top-card__grid">
+              <div>
+                <div class="intel-chip-row">${chips}${displayPills}</div>
+                <p>${escapeHtml(item.rationale || '')}</p>
+                <div class="intel-card-actions">${cta}</div>
+              </div>
+              <div class="intel-top-card__score">
+                <span class="intel-kicker">Returned case</span>
+                <strong>${escapeHtml(item.score ?? '—')}</strong>
+                <div class="intel-metric-grid">${statPills}</div>
+              </div>
+            </div>
+          </article>`;
       }
 
       function renderAnalysisViews(response) {
@@ -505,19 +596,25 @@
         if (!analysis || typeof analysis !== 'object') {
           return '';
         }
+
         const table = analysis.table || {};
         const chart = analysis.chart || {};
         const columns = Array.isArray(table.columns) ? table.columns : [];
         const rows = Array.isArray(table.rows) ? table.rows : [];
         const chartRows = Array.isArray(chart.rows) ? chart.rows : [];
+        const scoreMax = chartRows.reduce((max, row) => Math.max(max, Number(row?.score || 0)), 0) || 1;
+
         const tableMarkup = columns.length && rows.length ? `
-          <article class="intel-card">
-            <div class="intel-kicker">Analysis table</div>
-            <h3>${escapeHtml(table.title || 'Analysis table')}</h3>
+          <article class="intel-analysis-card">
+            <div>
+              <div class="intel-kicker">Analysis table</div>
+              <h3>${escapeHtml(table.title || 'Returned table')}</h3>
+              <p class="intel-table-note">The table below is rendered directly from the intelligence response contract for this query.</p>
+            </div>
             <div class="intel-analysis-table-wrap">
               <table class="intel-analysis-table">
                 <thead>
-                  <tr>${columns.map((column) => `<th>${escapeHtml(String(column).replace(/_/g, ' '))}</th>`).join('')}</tr>
+                  <tr>${columns.map((column) => `<th>${escapeHtml(prettyLabel(column))}</th>`).join('')}</tr>
                 </thead>
                 <tbody>
                   ${rows.map((row) => `<tr>${columns.map((column) => `<td>${formatCell(row?.[column])}</td>`).join('')}</tr>`).join('')}
@@ -525,39 +622,123 @@
               </table>
             </div>
           </article>` : '';
-        const scoreMax = chartRows.reduce((max, row) => Math.max(max, Number(row?.score || 0)), 0) || 1;
+
         const chartMarkup = chartRows.length ? `
-          <article class="intel-card">
-            <div class="intel-kicker">Chart view</div>
-            <h3>${escapeHtml(chart.title || 'Chart')}</h3>
-            <div class="intel-chart-list">
+          <article class="intel-analysis-card">
+            <div>
+              <div class="intel-kicker">Chart view</div>
+              <h3>${escapeHtml(chart.title || 'Returned chart')}</h3>
+            </div>
+            <div class="intel-chart-grid">
               ${chartRows.map((row) => {
                 const score = Number(row?.score || 0);
-                const widthPct = Math.max(8, Math.min(100, (score / scoreMax) * 100));
+                const widthPct = Math.max(10, Math.min(100, (score / scoreMax) * 100));
+                const metrics = [
+                  row?.score !== null && row?.score !== undefined ? metricPill('Score', row.score) : '',
+                  row?.advanced_signal_score !== null && row?.advanced_signal_score !== undefined ? metricPill('Advanced', row.advanced_signal_score) : '',
+                  row?.confidence !== null && row?.confidence !== undefined ? metricPill('Conf', `${row.confidence}%`) : '',
+                  row?.batter_hr_mult !== null && row?.batter_hr_mult !== undefined ? metricPill('Batter HR', `x${row.batter_hr_mult}`) : '',
+                  row?.pitcher_hr_mult !== null && row?.pitcher_hr_mult !== undefined ? metricPill('Pitcher HR', `x${row.pitcher_hr_mult}`) : '',
+                  row?.barrel_rate !== null && row?.barrel_rate !== undefined ? metricPill('Barrel', `${row.barrel_rate}%`) : '',
+                  row?.ev_mean !== null && row?.ev_mean !== undefined ? metricPill('EV', row.ev_mean) : ''
+                ].filter(Boolean).join('');
+
                 return `
-                  <div class="intel-chart-row">
+                  <div class="intel-chart-card">
                     <strong>${escapeHtml(row?.label || 'Target')}</strong>
                     <div class="intel-bar-track"><div class="intel-bar-fill" style="width:${widthPct.toFixed(1)}%"></div></div>
-                    <div class="intel-chip-row">
-                      ${row?.score !== null && row?.score !== undefined ? chip(`Score ${row.score}`, 'is-good') : ''}
-                      ${row?.advanced_signal_score !== null && row?.advanced_signal_score !== undefined ? chip(`Advanced ${row.advanced_signal_score}`) : ''}
-                      ${row?.confidence !== null && row?.confidence !== undefined ? chip(`Conf ${row.confidence}%`) : ''}
-                      ${row?.batter_hr_mult !== null && row?.batter_hr_mult !== undefined ? chip(`Batter HR x${row.batter_hr_mult}`) : ''}
-                      ${row?.pitcher_hr_mult !== null && row?.pitcher_hr_mult !== undefined ? chip(`Pitcher HR x${row.pitcher_hr_mult}`) : ''}
-                      ${row?.barrel_rate !== null && row?.barrel_rate !== undefined ? chip(`Barrel ${row.barrel_rate}%`) : ''}
-                      ${row?.ev_mean !== null && row?.ev_mean !== undefined ? chip(`EV ${row.ev_mean}`) : ''}
-                    </div>
+                    <div class="intel-metric-grid">${metrics}</div>
                   </div>`;
               }).join('')}
             </div>
           </article>` : '';
+
         if (!tableMarkup && !chartMarkup) {
           return '';
         }
-        return `<section class="intel-analysis-grid">${tableMarkup}${chartMarkup}</section>`;
+
+        return `<section class="intel-analysis-stack">${tableMarkup}${chartMarkup}</section>`;
       }
 
-      function renderRecommendations(payload) {
+      function renderRecommendationCards(recommendations) {
+        const secondary = recommendations.slice(1);
+        if (!secondary.length) {
+          return '';
+        }
+
+        return `
+          <section class="intel-rec-grid">
+            ${secondary.map((item) => {
+              const chips = [
+                item.sport ? chip(item.sport) : '',
+                chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
+                item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
+                item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
+                item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : ''
+              ].filter(Boolean).join('');
+
+              const cta = item.href ? `<a class="intel-link" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
+
+              return `
+                <article class="intel-rec-card">
+                  <div>
+                    <h4>${escapeHtml(item.name || item.pick || 'Target')}</h4>
+                    <p class="intel-meta">${escapeHtml(item.matchup || '-')}${item.market ? ` · ${escapeHtml(item.market)}` : ''}${item.surface ? ` · ${escapeHtml(item.surface)}` : ''}</p>
+                  </div>
+                  <div class="intel-chip-row">${chips}</div>
+                  <p>${escapeHtml(item.rationale || '')}</p>
+                  <div class="intel-card-actions">${cta}</div>
+                </article>`;
+            }).join('')}
+          </section>`;
+      }
+
+      function renderParlays(parlays) {
+        if (!parlays.length) {
+          return '';
+        }
+
+        return `
+          <section class="intel-parlay-stack">
+            ${parlays.map((parlay) => `
+              <article class="intel-parlay-card">
+                <div>
+                  <div class="intel-kicker">Returned parlay</div>
+                  <h3>${escapeHtml(parlay.label || 'Parlay')}</h3>
+                </div>
+                <div class="intel-chip-row">
+                  ${parlay.combined_score !== null && parlay.combined_score !== undefined ? chip(`Score ${parlay.combined_score}`, 'is-good') : ''}
+                  ${parlay.combined_odds ? chip(`Combined ${parlay.combined_odds}`) : ''}
+                  ${parlay.combined_implied_probability ? chip(`Implied ${parlay.combined_implied_probability}%`) : ''}
+                  ${parlay.ticket_count ? chip(`Tickets ${parlay.ticket_count}`) : ''}
+                </div>
+                <p>${escapeHtml(parlay.rationale || '')}</p>
+                <div class="intel-rec-grid">
+                  ${(Array.isArray(parlay.legs) ? parlay.legs : []).map((leg) => `
+                    <div class="intel-rec-card">
+                      <strong>${escapeHtml(leg.name || leg.pick || 'Leg')}</strong>
+                      <p class="intel-meta">${escapeHtml(leg.sport || '')}${leg.matchup ? ` · ${escapeHtml(leg.matchup)}` : ''}${leg.market ? ` · ${escapeHtml(leg.market)}` : ''}</p>
+                    </div>`).join('')}
+                </div>
+              </article>`).join('')}
+          </section>`;
+      }
+
+      function renderBoardNotes(notes) {
+        if (!notes.length) {
+          return '';
+        }
+
+        return `
+          <article class="intel-board-notes">
+            <details>
+              <summary>Board notes</summary>
+              <p>${escapeHtml(notes.join(' | '))}</p>
+            </details>
+          </article>`;
+      }
+
+      function renderResponse(payload) {
         const response = payload?.response || {};
         const recommendations = Array.isArray(response.recommendations) ? response.recommendations : [];
         const parlays = Array.isArray(response.parlays) ? response.parlays : [];
@@ -569,145 +750,32 @@
           return;
         }
 
-        const recMarkup = recommendations.map((item) => {
-          const chips = [
-            chip(item.sport),
-            chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
-            item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : '',
-            item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
-            item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
-            item.implied_probability ? chip(`Imp ${item.implied_probability}%`) : '',
-            item.price_edge_pct ? chip(`Price edge ${item.price_edge_pct}%`, item.price_edge_pct > 0 ? 'is-good' : 'is-warn') : '',
-          ].filter(Boolean).join('');
-          const pills = Array.isArray(item.display_pills) ? item.display_pills.slice(0, 5).map((entry) => chip(entry)).join('') : '';
-          const cta = item.href ? `<a class="cards-nav-pill" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
-          return `
-            <article class="intel-card">
-              <h3>${escapeHtml(item.name || item.pick)}</h3>
-              <p class="intel-meta">${escapeHtml(item.matchup)} · ${escapeHtml(item.market)} · ${escapeHtml(item.surface)}</p>
-              <div class="intel-chip-row">${chips}${pills}</div>
-              <p>${escapeHtml(item.rationale || '')}</p>
-              ${cta}
-            </article>`;
-        }).join('');
+        const parsedRequestMarkup = Array.isArray(parsedRequest.chips) && parsedRequest.chips.length
+          ? `<div class="intel-chip-row">${parsedRequest.chips.map((entry) => chip(entry)).join('')}</div>`
+          : '';
 
-        const parlayMarkup = parlays.length ? `
-          <section>
-            <div class="intel-kicker">Parlays</div>
-            <div class="intel-parlay-list">
-              ${parlays.map((parlay) => `
-                <article class="intel-card">
-                  <h3>${escapeHtml(parlay.label)}</h3>
-                  <p>${escapeHtml(parlay.rationale || '')}</p>
-                  <div class="intel-chip-row">
-                    ${chip(`Score ${parlay.combined_score || '-'}`)}
-                    ${parlay.combined_odds ? chip(`Combined ${parlay.combined_odds}`, 'is-good') : ''}
-                    ${parlay.combined_decimal_odds ? chip(`Decimal ${parlay.combined_decimal_odds}`) : ''}
-                    ${parlay.combined_implied_probability ? chip(`Imp ${parlay.combined_implied_probability}%`) : ''}
-                    ${parlay.ticket_count ? chip(`Tickets ${parlay.ticket_count}`) : ''}
-                    ${Array.isArray(parlay.ticket_odds_range) && parlay.ticket_odds_range.length === 2 ? chip(`Ticket odds ${parlay.ticket_odds_range[0]} to ${parlay.ticket_odds_range[1]}`) : ''}
-                  </div>
-                  <div class="intel-leg-list">
-                    ${(Array.isArray(parlay.legs) ? parlay.legs : []).map((leg) => `
-                      <div>
-                        <strong>${escapeHtml(leg.name || leg.pick)}</strong>
-                        <div class="intel-meta">${escapeHtml(leg.sport)} · ${escapeHtml(leg.matchup)} · ${escapeHtml(leg.market)}</div>
-                      </div>`).join('')}
-                  </div>
-                  ${Array.isArray(parlay.tickets) && parlay.tickets.length ? `
-                    <div class="intel-leg-list">
-                      ${(parlay.tickets || []).map((ticket) => `
-                        <div>
-                          <strong>${escapeHtml(ticket.label || 'Round robin ticket')}</strong>
-                          <div class="intel-meta">${escapeHtml((ticket.legs || []).map((leg) => leg.name || leg.pick).join(' | '))}</div>
-                        </div>`).join('')}
-                    </div>` : ''}
-                </article>`).join('')}
-            </div>
-          </section>` : '';
-
-        const notesMarkup = notes.length ? `<article class="intel-card"><h3>Board notes</h3><p>${escapeHtml(notes.join(' | '))}</p></article>` : '';
-        const parsedRequestMarkup = Array.isArray(parsedRequest.chips) && parsedRequest.chips.length ? `
-          <div class="intel-chip-row">${parsedRequest.chips.map((entry) => chip(entry)).join('')}</div>` : '';
-        const analysisMarkup = renderAnalysisViews(response);
-
-        responseRoot.innerHTML = `
-          <article class="intel-card">
+        const briefMarkup = `
+          <article class="intel-brief-card">
             <div class="intel-kicker">${escapeHtml(response.headline || 'The Syndicate brief')}</div>
             <h3>${escapeHtml(payload.query || '')}</h3>
             <p>${escapeHtml(response.summary || '')}</p>
             ${parsedRequestMarkup}
-          </article>
-          ${analysisMarkup}
-          ${recMarkup}
-          ${parlayMarkup}
-          ${notesMarkup}`;
-      }
+            <div class="intel-summary-grid">${buildSummaryMetrics(response, recommendations, parlays)}</div>
+          </article>`;
 
-      async function refreshStatus() {
-        const date = dateEl.value;
-        const result = await fetch(`/api/intelligence/status?date=${encodeURIComponent(date)}&refresh=1`);
-        const payload = await result.json();
-        const sports = Array.isArray(payload.sports) ? payload.sports : [];
-        statusRoot.innerHTML = sports.map((sport) => `
-          <article class="intel-card">
-            <h3>${escapeHtml(sport.name)}</h3>
-            <p class="intel-meta">${escapeHtml(sport.context_label)} · ${escapeHtml(sport.data_health)}</p>
-            ${Array.isArray(sport.data_warnings) && sport.data_warnings.length ? `<p>${escapeHtml(sport.data_warnings.join(' | '))}</p>` : ''}
-            <div class="intel-chip-row">
-              ${chip(sport.tracked_ready ? 'Artifacts tracked' : 'Artifacts need publish check', sport.tracked_ready ? 'is-good' : 'is-warn')}
-              ${chip(sport.advanced_ready ? 'Advanced inputs tracked' : 'Advanced inputs incomplete', sport.advanced_ready ? 'is-good' : 'is-warn')}
-              ${chip(sport.active_today ? 'Active today' : 'Inactive today', sport.active_today ? 'is-live' : '')}
-              ${chip((sport.advanced_gate || {}).ready ? 'Gate ready' : 'Gate partial/blocking', (sport.advanced_gate || {}).ready ? 'is-good' : 'is-warn')}
-            </div>
-            ${Array.isArray((sport.advanced_gate || {}).missing_inputs) && (sport.advanced_gate || {}).missing_inputs.length ? `
-              <div class="intel-leg-list">
-                <div>
-                  <strong>Missing advanced inputs</strong>
-                  <div class="intel-metric-list">
-                    ${((sport.advanced_gate || {}).missing_inputs || []).slice(0, 4).map((missing) => chip(missing.label, 'is-warn')).join('')}
-                  </div>
-                </div>
-              </div>` : ''}
-            ${Array.isArray((sport.advanced_gate || {}).publish_missing_inputs) && (sport.advanced_gate || {}).publish_missing_inputs.length ? `
-              <div class="intel-leg-list">
-                <div>
-                  <strong>Unpublished advanced inputs</strong>
-                  <div class="intel-metric-list">
-                    ${((sport.advanced_gate || {}).publish_missing_inputs || []).slice(0, 4).map((missing) => chip(missing.label)).join('')}
-                  </div>
-                </div>
-              </div>` : ''}
-            ${Array.isArray(sport.advanced_inputs) && sport.advanced_inputs.length ? `
-              <div class="intel-leg-list">
-                ${sport.advanced_inputs.map((advanced) => `
-                  <div>
-                    <strong>${escapeHtml(advanced.label)}</strong>
-                    <div class="intel-meta">${escapeHtml(advanced.path)}</div>
-                    <div class="intel-metric-list">${renderMetricChips(advanced.metrics)}</div>
-                    <div class="intel-chip-row">
-                      ${chip(advanced.exists ? 'Exists' : 'Missing', advanced.exists ? 'is-good' : 'is-warn')}
-                      ${chip(advanced.tracked ? 'Tracked' : 'Untracked', advanced.tracked ? 'is-good' : 'is-warn')}
-                    </div>
-                  </div>`).join('')}
-              </div>` : ''}
-            <div class="intel-leg-list">
-              ${(Array.isArray(sport.artifacts) ? sport.artifacts : []).map((artifact) => `
-                <div>
-                  <strong>${escapeHtml(artifact.label)}</strong>
-                  <div class="intel-meta">${escapeHtml(artifact.path)}</div>
-                  <div class="intel-chip-row">
-                    ${chip(artifact.exists ? 'Exists' : 'Missing', artifact.exists ? 'is-good' : 'is-warn')}
-                    ${chip(artifact.tracked ? 'Tracked' : 'Untracked', artifact.tracked ? 'is-good' : 'is-warn')}
-                  </div>
-                </div>`).join('')}
-            </div>
-          </article>`).join('');
+        responseRoot.innerHTML = `
+          ${briefMarkup}
+          ${renderTopRecommendation(recommendations[0] || null)}
+          ${renderAnalysisViews(response)}
+          ${renderRecommendationCards(recommendations)}
+          ${renderParlays(parlays)}
+          ${renderBoardNotes(notes)}`;
       }
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         responseRoot.innerHTML = '<div class="intel-empty">Running The Syndicate...</div>';
+
         const result = await fetch('/api/intelligence/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -718,13 +786,14 @@
             sport: sportEl.value,
           }),
         });
+
         const payload = await result.json();
         if (!payload.ok) {
           responseRoot.innerHTML = `<div class="intel-empty">${escapeHtml(payload.error || 'The Syndicate query failed.')}</div>`;
           return;
         }
-        renderRecommendations(payload);
-        refreshStatus().catch(() => {});
+
+        renderResponse(payload);
       });
 
       document.querySelectorAll('[data-question]').forEach((button) => {
@@ -733,9 +802,8 @@
         });
       });
 
-      dateEl.addEventListener('change', () => {
-        refreshStatus().catch(() => {});
-      });
+      dateEl.addEventListener('change', updateStatusLink);
+      updateStatusLink();
     })();
   </script>
 {% endblock %}

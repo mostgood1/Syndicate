@@ -1,9 +1,7 @@
 <header class="standalone-app-header" aria-label="Syndicate app navigation">
   <div class="standalone-app-header__inner">
     <div class="standalone-app-header__brand">
-      <div class="standalone-app-header__eyebrow">Syndicate</div>
-      <div class="standalone-app-header__title">{{ active_sport_name }} main cards</div>
-      <div class="standalone-app-header__meta">Cards-first workflow with the same multi-sport app chrome.</div>
+      <img class="standalone-app-header__logo" src="{{ url_for('static', filename='shared/syndicate-logo.png') }}" alt="Syndicate logo" />
     </div>
     <nav class="standalone-app-header__nav" aria-label="Sports">
       <a class="standalone-app-header__link{% if active_sport_slug == 'home' %} standalone-app-header__link--active{% endif %}" href="/">Home</a>
