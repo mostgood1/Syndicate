@@ -262,6 +262,68 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertNotIn("Jalen Brunson Over 6.5 Assists", recommendation_names)
         self.assertIn("Donovan Mitchell Over 4.5 3PM", recommendation_names)
 
+    def test_intelligence_query_supports_plus_money_only_filter(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Give me the best NBA props plus money only",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        result = payload.get("response") or {}
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertTrue(all((item.get("american_odds") or 0) >= 100 for item in recommendations))
+
+    def test_intelligence_query_supports_target_parlay_odds_range(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Build me a two-leg parlay between +300 and +500 from the best NBA edges",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        result = payload.get("response") or {}
+        parlays = result.get("parlays") or []
+        self.assertTrue(parlays)
+        for parlay in parlays:
+            combined_odds = str(parlay.get("combined_odds") or "")
+            self.assertTrue(combined_odds.startswith("+"))
+            self.assertGreaterEqual(int(combined_odds), 300)
+            self.assertLessEqual(int(combined_odds), 500)
+
     def test_intelligence_query_requires_question(self) -> None:
         response = self.client.post("/api/intelligence/query", json={"date": "2026-06-04"})
 
