@@ -174,6 +174,65 @@ def _market_score_adjustment(market_context: dict[str, Any]) -> float:
     return adjustment
 
 
+def _extract_american_odds_range(text: str, *, require_parlay_context: bool = False) -> tuple[int | None, int | None]:
+    patterns = [
+        r"between\s*([+-]\d+)\s*(?:and|to|through)\s*([+-]\d+)",
+        r"([+-]\d+)\s*(?:to|through|-)\s*([+-]\d+)",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            span_start = max(0, match.start() - 32)
+            span_end = min(len(text), match.end() + 32)
+            window = text[span_start:span_end]
+            if require_parlay_context and not any(token in window for token in ("parlay", "combined", "same ticket")):
+                continue
+            try:
+                first = int(match.group(1))
+                second = int(match.group(2))
+            except Exception:
+                continue
+            return (min(first, second), max(first, second))
+    return (None, None)
+
+
+def _american_odds_match(american_odds: float | int | None, preferences: dict[str, Any], *, parlay: bool = False) -> bool:
+    if american_odds is None:
+        return not any(
+            preferences.get(key) is not None or preferences.get(key) is True
+            for key in (
+                "plus_money_only",
+                "candidate_odds_min",
+                "candidate_odds_max",
+                "favorite_floor",
+                "parlay_odds_min",
+                "parlay_odds_max",
+            )
+        )
+
+    value = float(american_odds)
+    if parlay:
+        parlay_min = preferences.get("parlay_odds_min")
+        parlay_max = preferences.get("parlay_odds_max")
+        if parlay_min is not None and value < float(parlay_min):
+            return False
+        if parlay_max is not None and value > float(parlay_max):
+            return False
+        return True
+
+    if preferences.get("plus_money_only") and value < 100.0:
+        return False
+    favorite_floor = preferences.get("favorite_floor")
+    if favorite_floor is not None and value < float(favorite_floor):
+        return False
+    candidate_min = preferences.get("candidate_odds_min")
+    if candidate_min is not None and value < float(candidate_min):
+        return False
+    candidate_max = preferences.get("candidate_odds_max")
+    if candidate_max is not None and value > float(candidate_max):
+        return False
+    return True
+
+
 @lru_cache(maxsize=1)
 def _tracked_repo_files() -> set[str]:
     try:
@@ -232,6 +291,23 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
     if requested_limit <= 0:
         requested_limit = 5
 
+    plus_money_only = any(token in lowered for token in ("plus money", "plus-money", "plus odds"))
+    favorite_floor = None
+    favorite_cap_match = re.search(r"(?:under|below|up to|max(?:imum)?|no worse than|better than)\s*(-\d+)", lowered)
+    if favorite_cap_match:
+        favorite_floor = int(favorite_cap_match.group(1))
+
+    candidate_odds_min = None
+    candidate_odds_max = None
+    min_match = re.search(r"(?:over|above|at least|min(?:imum)?)\s*(\+\d+)", lowered)
+    if min_match:
+        candidate_odds_min = int(min_match.group(1))
+    max_match = re.search(r"(?:under|below|up to|max(?:imum)?)\s*(\+\d+)", lowered)
+    if max_match:
+        candidate_odds_max = int(max_match.group(1))
+
+    parlay_odds_min, parlay_odds_max = _extract_american_odds_range(lowered, require_parlay_context=True)
+
     return {
         "intent": intent,
         "requested_sports": sorted(requested_sports),
@@ -239,6 +315,12 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         "include_games": include_games,
         "live_only": live_only,
         "pregame_only": pregame_only,
+        "plus_money_only": plus_money_only,
+        "favorite_floor": favorite_floor,
+        "candidate_odds_min": candidate_odds_min,
+        "candidate_odds_max": candidate_odds_max,
+        "parlay_odds_min": parlay_odds_min,
+        "parlay_odds_max": parlay_odds_max,
         "limit": max(1, min(requested_limit, 8)),
         "question": str(question or "").strip(),
     }
@@ -868,6 +950,9 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             candidates.extend(game_candidates)
 
     candidates = [row for row in candidates if not _candidate_is_final(row)]
+    candidates = [
+        row for row in candidates if _american_odds_match(_american_odds_value(row.get("odds")), preferences)
+    ]
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -1020,7 +1105,8 @@ def _parlay_rationale(legs: list[dict[str, Any]]) -> str:
     return "This parlay keeps the legs inside the highest-scoring local recommendations while avoiding duplicate market exposure."
 
 
-def _build_parlays(candidates: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+def _build_parlays(candidates: list[dict[str, Any]], *, limit: int, preferences: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    resolved_preferences = preferences or {}
     usable = [candidate for candidate in candidates if _safe_text(candidate.get("odds"), "-") != "-"]
     if len(usable) < 2:
         usable = list(candidates)
@@ -1053,6 +1139,8 @@ def _build_parlays(candidates: list[dict[str, Any]], *, limit: int) -> list[dict
                 combined_american_odds = _decimal_to_american(combined_decimal_odds)
                 if combined_decimal_odds > 1.0:
                     combined_implied_probability = round((1.0 / combined_decimal_odds) * 100.0, 2)
+            if not _american_odds_match(_american_odds_value(combined_american_odds), resolved_preferences, parlay=True):
+                continue
             parlays.append(
                 {
                     "label": f"{leg_count}-leg {'live' if any(leg.get('is_live') for leg in legs) else 'pregame'} parlay",
@@ -1091,7 +1179,7 @@ def run_intelligence_query(
     _apply_advanced_context_to_candidates(candidates, advanced_by_sport)
     candidates = sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
     recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]
-    parlays = _build_parlays(candidates, limit=min(3, preferences["limit"])) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
+    parlays = _build_parlays(candidates, limit=min(3, preferences["limit"]), preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
 
     live_rows = sum(1 for candidate in candidates if bool(candidate.get("is_live")))
     pregame_rows = sum(1 for candidate in candidates if not bool(candidate.get("is_live")))
