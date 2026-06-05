@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+from datetime import timedelta
 from functools import lru_cache
 from itertools import combinations
 from pathlib import Path
@@ -1481,6 +1483,7 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
         for subject in (preferences.get("requested_subjects") or [])
         if str(subject).strip()
     ]
+    requested_date = _safe_text(preferences.get("requested_date"), "")
     board_scope: list[str] = []
     if preferences.get("include_props"):
         board_scope.append("Props")
@@ -1513,6 +1516,8 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
         chips.append("/".join(requested_sports))
     chips.extend(requested_markets)
     chips.extend(requested_subjects[:3])
+    if requested_date:
+        chips.append(requested_date)
     if leg_window:
         chips.append(leg_window)
     if preferences.get("cross_sport_required"):
@@ -1534,6 +1539,7 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
         "sports": requested_sports,
         "requested_markets": requested_markets,
         "requested_subjects": requested_subjects,
+        "requested_date": requested_date or None,
         "timing": timing,
         "board_scope": board_scope,
         "parlay_type": parlay_type,
@@ -1638,6 +1644,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
 
     parlay_odds_min, parlay_odds_max = _extract_american_odds_range(lowered, require_parlay_context=True)
     parlay_leg_min, parlay_leg_max = _extract_parlay_leg_preferences(lowered)
+    requested_date = _question_requested_date(question)
     analysis_focus = _analysis_focus_from_question(question, sorted(requested_sports), requested_markets)
     comparison_requested = _question_requests_comparison(question)
     wants_table = _question_requests_table(question) or analysis_focus is not None
@@ -1671,6 +1678,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         "analysis_focus": analysis_focus,
         "comparison_requested": comparison_requested,
         "requested_subjects": [],
+        "requested_date": requested_date,
         "wants_table": wants_table,
         "wants_chart": wants_chart,
         "limit": max(1, min(requested_limit, 10)),
@@ -1852,6 +1860,23 @@ def _coerce_date_token(value: str) -> str | None:
     if re.fullmatch(r"\d{8}", token):
         return f"{token[:4]}-{token[4:6]}-{token[6:8]}"
     return token
+
+
+def _question_requested_date(question: str) -> str | None:
+    lowered = str(question or "").strip().lower()
+    if not lowered:
+        return None
+    explicit = _coerce_date_token(lowered)
+    if explicit:
+        return explicit
+    today_value = central_today_iso()
+    if re.search(r"\btoday\b", lowered):
+        return today_value
+    if re.search(r"\btomorrow\b", lowered):
+        return (date.fromisoformat(today_value) + timedelta(days=1)).isoformat()
+    if re.search(r"\byesterday\b", lowered):
+        return (date.fromisoformat(today_value) - timedelta(days=1)).isoformat()
+    return None
 
 
 def _latest_matching_path(directory: Path, pattern: str, *, requested_date: str | None = None) -> Path | None:
@@ -3447,8 +3472,8 @@ def run_intelligence_query(
     limit: int | None = None,
     force_refresh: bool = False,
 ) -> dict[str, Any]:
-    effective_date = _effective_date(selected_date)
     preferences = _query_preferences(question, mode=mode, sport=sport, limit=limit)
+    effective_date = _effective_date(selected_date or preferences.get("requested_date"))
     overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
     tracked = _tracked_repo_files()
     advanced_by_sport = {

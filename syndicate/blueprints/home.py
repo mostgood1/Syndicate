@@ -2431,7 +2431,10 @@ def _pregame_prop_rows_from_mlb_recommendations(
             fallback_matchup = " @ ".join(part for part in [away_label, home_label] if part) or f"Game {game_pk}"
             
             # Add pitcher props
-            pitcher_props = markets.get("pitcherProps") or []
+            pitcher_props = [
+                *([row for row in (markets.get("pitcherProps") or []) if isinstance(row, dict)]),
+                *([row for row in (markets.get("extraPitcherProps") or []) if isinstance(row, dict)]),
+            ]
             if isinstance(pitcher_props, list):
                 for prop in pitcher_props:
                     if not isinstance(prop, dict):
@@ -2522,7 +2525,10 @@ def _pregame_prop_rows_from_mlb_recommendations(
                         return rows[:limit]
             
             # Add hitter props
-            hitter_props = markets.get("hitterProps") or []
+            hitter_props = [
+                *([row for row in (markets.get("hitterProps") or []) if isinstance(row, dict)]),
+                *([row for row in (markets.get("extraHitterProps") or []) if isinstance(row, dict)]),
+            ]
             if isinstance(hitter_props, list):
                 for prop in hitter_props:
                     if not isinstance(prop, dict):

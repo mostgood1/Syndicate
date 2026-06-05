@@ -12,6 +12,7 @@ from syndicate.features.intelligence import _candidate_market_fit
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
 from syndicate.features.intelligence import _query_preferences
+from syndicate.features.intelligence import run_intelligence_query
 
 
 def _sample_overview() -> list[dict[str, object]]:
@@ -535,6 +536,21 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(preferences.get("include_props"))
         self.assertFalse(preferences.get("include_games"))
         self.assertEqual(preferences.get("limit"), 3)
+
+    def test_query_preferences_extracts_requested_date(self) -> None:
+        preferences = _query_preferences("Who are the top 3 strikeout targets for 20260604?")
+
+        self.assertEqual(preferences.get("requested_date"), "2026-06-04")
+
+    def test_run_intelligence_query_uses_question_date_when_date_not_passed(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()) as build_overview:
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    result = run_intelligence_query("Who are the top 3 strikeout targets for 2026-06-04?")
+
+        self.assertEqual(result.get("selected_date"), "2026-06-04")
+        build_overview.assert_called_once()
+        self.assertEqual(build_overview.call_args.kwargs.get("selected_date"), "2026-06-04")
 
     def test_query_preferences_does_not_infer_nba_from_wnba_token(self) -> None:
         preferences = _query_preferences("Explain the best WNBA matchup targets today with a table and chart.")
@@ -1697,6 +1713,48 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(rows[0].get("name"), "Aaron Judge")
         self.assertTrue(rows[0].get("is_live"))
         self.assertEqual(rows[0].get("href"), "/mlb/live-lens?date=2026-06-05")
+
+    def test_mlb_pregame_rows_include_extra_pitcher_props(self) -> None:
+        from syndicate.blueprints.home import _pregame_prop_rows_from_mlb_recommendations
+
+        payload = {
+            123: {
+                "markets": {
+                    "pitcherProps": [],
+                    "extraPitcherProps": [
+                        {
+                            "pitcher_name": "Zebby Matthews",
+                            "pitcher_id": 700001,
+                            "prop": "strikeouts",
+                            "market_line": 5.5,
+                            "selection": "over",
+                            "model_prob_over": 0.58,
+                            "projection": 6.2,
+                            "odds": "+130",
+                            "edge": 0.061,
+                            "away_abbr": "MIN",
+                            "home_abbr": "SEA",
+                        }
+                    ],
+                    "hitterProps": [],
+                    "extraHitterProps": [],
+                },
+                "away": {"abbr": "MIN", "team_id": 142},
+                "home": {"abbr": "SEA", "team_id": 136},
+            }
+        }
+
+        with patch("syndicate.features.mlb.cards._cards_recommendation_payload_by_game", return_value=payload):
+            rows = _pregame_prop_rows_from_mlb_recommendations(
+                "2026-06-05",
+                limit=18,
+                fallback_href="/mlb/cards?date=2026-06-05",
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].get("name"), "Zebby Matthews")
+        self.assertEqual(rows[0].get("market"), "Pitcher Strikeouts")
+        self.assertEqual(rows[0].get("pick"), "OVER")
 
     def test_intelligence_query_supports_plus_money_only_filter(self) -> None:
         advanced_rows = [
