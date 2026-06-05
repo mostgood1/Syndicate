@@ -1410,6 +1410,55 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertNotIn("Jalen Brunson Over 6.5 Assists", recommendation_names)
         self.assertIn("Donovan Mitchell Over 4.5 3PM", recommendation_names)
 
+    def test_mlb_live_prop_rows_do_not_depend_on_home_game_live_gate(self) -> None:
+        from syndicate.blueprints.home import _load_home_live_prop_items
+
+        scheduled_home_games = [
+            {
+                "away": {"abbr": "NYY", "name": "Yankees"},
+                "home": {"abbr": "BOS", "name": "Red Sox"},
+                "status": {"abstract": "Scheduled", "detailed": "7:10 PM ET"},
+                "detail": "7:10 PM ET",
+            }
+        ]
+        live_lens_games = [
+            {
+                "gamePk": 123,
+                "away": {"abbr": "NYY", "name": "Yankees"},
+                "home": {"abbr": "BOS", "name": "Red Sox"},
+                "status": {"abstract": "Scheduled", "detailed": "7:10 PM ET"},
+                "detail": "7:10 PM ET",
+                "href": "/mlb/live-lens?date=2026-06-05",
+                "liveProps": [
+                    {
+                        "playerName": "Aaron Judge",
+                        "playerId": 592450,
+                        "playerPhoto": "https://example.com/judge.png",
+                        "marketLabel": "Hits",
+                        "selection": "over",
+                        "line": 1.5,
+                        "estimatedWinProb": 0.61,
+                        "modelMean": 1.9,
+                        "liveProjection": 2.1,
+                        "odds": "+110",
+                    }
+                ],
+            }
+        ]
+
+        with patch("syndicate.features.mlb.live_lens.build_live_lens_page_context", return_value={"games": live_lens_games}):
+            rows = _load_home_live_prop_items(
+                "mlb",
+                context_label="2026-06-05",
+                home_games=scheduled_home_games,
+                is_active_today=True,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].get("name"), "Aaron Judge")
+        self.assertTrue(rows[0].get("is_live"))
+        self.assertEqual(rows[0].get("href"), "/mlb/live-lens?date=2026-06-05")
+
     def test_intelligence_query_supports_plus_money_only_filter(self) -> None:
         advanced_rows = [
             {

@@ -3087,15 +3087,29 @@ def _load_home_live_prop_items(
     week: int | None = None,
     is_active_today: bool,
 ) -> list[dict[str, Any]]:
-    if not is_active_today or not _home_games_have_live_action(home_games):
+    if not is_active_today:
         return []
     try:
         if slug == "mlb":
             from syndicate.features.mlb.live_lens import build_live_lens_page_context
 
             live_games = list(build_live_lens_page_context(context_label).get("games") or [])
-            live_games = [game for game in live_games if isinstance(game, dict) and _is_liveish(*(_scoreboard_state(game).get(key) for key in ["status_badge", "status_line"]))]
-            return _prop_rows_from_mlb_live_games(live_games)
+            live_games = [game for game in live_games if isinstance(game, dict)]
+            if not live_games:
+                return []
+            liveish_games = [
+                game
+                for game in live_games
+                if _is_liveish(*(_scoreboard_state(game).get(key) for key in ["status_badge", "status_line"]))
+            ]
+            prop_backed_games = [
+                game
+                for game in (liveish_games or live_games)
+                if isinstance(game.get("liveProps"), list) or isinstance(game.get("archivedLiveProps"), list)
+            ]
+            return _prop_rows_from_mlb_live_games(prop_backed_games)
+        if not _home_games_have_live_action(home_games):
+            return []
         if slug == "nhl":
             from syndicate.features.nhl.cards import build_props_cards_payload
 
