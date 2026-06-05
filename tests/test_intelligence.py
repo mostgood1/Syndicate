@@ -673,6 +673,12 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(first_row.get("usage_signal"), 1.14)
         self.assertEqual(first_row.get("shot_profile_signal"), 1.06)
         self.assertIn("why", first_row)
+        concrete_nba_writeups = {
+            "Projection is clearing the number with usage and minutes support.",
+            "The live model is still above the book after the in-game adjustment.",
+        }
+        self.assertTrue(any(text in (first_row.get("why") or "") for text in concrete_nba_writeups))
+        self.assertTrue(any(text in ((result.get("recommendations") or [])[0].get("rationale") or "") for text in concrete_nba_writeups))
 
     def test_intelligence_query_builds_wnba_analysis_views(self) -> None:
         advanced_rows = [
@@ -711,6 +717,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(first_row.get("team_environment_signal"), 1.12)
         self.assertEqual(first_row.get("possession_profile_signal"), 1.05)
         self.assertEqual(first_row.get("matchup_pressure_signal"), 1.09)
+        self.assertIn("Projection is clearing the number with stable volume.", first_row.get("why") or "")
+        self.assertIn("Projection is clearing the number with stable volume.", recommendations[0].get("rationale") or "")
 
     def test_basketball_market_fit_scoring_diverges_by_league(self) -> None:
         market_context = {

@@ -24,11 +24,11 @@ def candidate_analysis_row(candidate: dict[str, Any], index: int, *, safe_text, 
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
     why = (
-        safe_text(market_fit.get("market_fit_note"), "")
-        or advanced_signal_text(candidate, limit=3)
-        or safe_text(candidate.get("writeup"), "")
+        safe_text(candidate.get("writeup"), "")
         or safe_text(candidate.get("detail"), "")
         or safe_text(candidate.get("summary"), "")
+        or safe_text(market_fit.get("market_fit_note"), "")
+        or advanced_signal_text(candidate, limit=3)
     )
     return {
         "rank": index,

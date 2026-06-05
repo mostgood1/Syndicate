@@ -2591,8 +2591,15 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
     advanced_gate = candidate.get("advanced_gate") if isinstance(candidate.get("advanced_gate"), dict) else {}
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
+    source_summary = (
+        _safe_text(candidate.get("writeup"), "")
+        or _safe_text(candidate.get("detail"), "")
+        or _safe_text(candidate.get("summary"), "")
+    )
     if _safe_text(candidate.get("candidate_type"), "") == "game":
         notes: list[str] = []
+        if source_summary:
+            notes.append(source_summary if source_summary.endswith(".") else f"{source_summary}.")
         if _safe_text(candidate.get("edge"), "-") != "-":
             notes.append(f"Model edge is {candidate.get('edge')} against the current book price.")
         if _safe_text(candidate.get("confidence"), "-") != "-":
@@ -2608,12 +2615,11 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate.get("missing_inputs"), list) else []
         if missing_inputs:
             notes.append(f"Readiness is partial because {len(missing_inputs)} advanced inputs are missing or unpublished.")
-        detail = _safe_text(candidate.get("detail"), "")
-        if detail:
-            notes.append(detail if detail.endswith(".") else f"{detail}.")
         return " ".join(notes) or "The game board shows a playable sportsbook edge with support from the current model snapshot."
 
     notes = []
+    if source_summary:
+        notes.append(source_summary if source_summary.endswith(".") else f"{source_summary}.")
     if _safe_text(candidate.get("projected"), "-") != "-" and _safe_text(candidate.get("line"), "-") != "-":
         notes.append(f"Model projection is {candidate.get('projected')} versus a book line of {candidate.get('line')}.")
     if bool(candidate.get("is_live")) and _safe_text(candidate.get("live_projection"), "-") != "-":
@@ -2642,12 +2648,6 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
     missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate.get("missing_inputs"), list) else []
     if missing_inputs:
         notes.append(f"Readiness is partial because {len(missing_inputs)} advanced inputs are missing or unpublished.")
-    if _safe_text(candidate.get("writeup"), ""):
-        writeup = _safe_text(candidate.get("writeup"), "")
-        notes.append(writeup if writeup.endswith(".") else f"{writeup}.")
-    elif _safe_text(candidate.get("detail"), ""):
-        detail = _safe_text(candidate.get("detail"), "")
-        notes.append(detail if detail.endswith(".") else f"{detail}.")
     return " ".join(notes) or "The prop sits above the local model threshold with enough context to justify a sportsbook-facing recommendation."
 
 
