@@ -405,7 +405,7 @@ def _scoreboard_state(game: dict[str, Any]) -> dict[str, Any]:
         or _score_value(live_state.get("home_pts"))
     )
 
-    is_live = bool(status.get("is_live") or status.get("in_progress") or live_state.get("in_progress"))
+    is_live = bool(game.get("shared_is_live") or status.get("is_live") or status.get("in_progress") or live_state.get("in_progress"))
     is_final = bool(status.get("is_final") or status.get("final") or live_state.get("final"))
     suppress_zero_zero = not is_live and not is_final and away_score == "0" and home_score == "0"
     has_scores = bool(away_score and home_score and not suppress_zero_zero)

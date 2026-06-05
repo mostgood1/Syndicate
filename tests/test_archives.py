@@ -32,6 +32,7 @@ from syndicate.features.mlb.cards import _apply_source_live_prop_ranking_scores
 from syndicate.features.mlb.sources import daily_artifact_path
 from syndicate.features.mlb.sources import daily_sim_artifact_path
 from syndicate.features.mlb.sources import available_daily_summary_dates
+from syndicate.features.mlb.sources import live_lens_report_path
 from syndicate.features.mlb.sources import raw_feed_live_path
 from syndicate.features.nba.cards import build_cards_api_payload as build_nba_cards_api_payload
 from syndicate.features.nba.cards import build_cards_page_context as build_nba_cards_page_context
@@ -2486,7 +2487,9 @@ class HomeBoardTests(unittest.TestCase):
 
             context = build_wnba_cards_page_context("1900-01-01")
 
-        self.assertNotEqual(context.get("date"), "1900-01-01")
+        self.assertEqual(context.get("date"), "1900-01-01")
+        self.assertEqual(context.get("requested_date"), "1900-01-01")
+        self.assertFalse(context.get("lookahead_applied"))
         self.assertEqual(context.get("games"), [])
         self.assertEqual(context.get("scoreboard_items"), [])
         self.assertFalse(context.get("using_sample_data"))
@@ -2989,12 +2992,14 @@ class HomeBoardTests(unittest.TestCase):
 
             context = build_mlb_live_lens_page_context("1900-01-01")
 
+        report_path = live_lens_report_path("1900-01-01")
+
         self.assertEqual(context.get("games"), [])
         self.assertEqual(context.get("scoreboard_items"), [])
         self.assertFalse(context.get("using_sample_data"))
         self.assertEqual(context.get("source_title"), "MLB live lens unavailable")
-        self.assertEqual(context.get("dataRoot"), "data")
-        self.assertEqual(context.get("liveLensDir"), "data/live_lens")
+        self.assertTrue(_paths_match(context.get("dataRoot"), report_path.parent.parent))
+        self.assertTrue(_paths_match(context.get("liveLensDir"), report_path.parent))
         self.assertEqual(
             context.get("counts"),
             {"archivedLiveProps": 0, "final": 0, "games": 0, "live": 0, "pregame": 0, "props": 0},
@@ -3846,7 +3851,7 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn(f"/mlb/cards?date={today_date}", mlb_hub)
         self.assertIn(f"/mlb/archive?date={today_date}", mlb_hub)
         self.assertIn("daily archive", mlb_hub.lower())
-        self.assertIn("Cross-sport daily board", home)
+        self.assertIn("Active sports", home)
         self.assertIn(f"/ncaab/cards?date={today_date}", ncaab_hub)
         self.assertIn(f"/ncaab/archive?date={ncaab_season_launch_date}", ncaab_hub)
         self.assertIn("daily archive", ncaab_hub.lower())
@@ -3876,13 +3881,13 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertRegex(nhl_hub, r"/nhl/live-lens\?date=\d{4}-\d{2}-\d{2}")
         self.assertIn("Recent NHL recommendation snapshots", nhl_hub)
         self.assertRegex(nhl_hub, r"/nhl/season/\d{4}/betting-card\?date=\d{4}-\d{2}-\d{2}")
-        self.assertIn("Cross-sport daily board", home)
-        self.assertIn("Cross-sport betting dashboard with ranked game reads, prop surfaces, and per-sport action counts.", home)
-        self.assertIn("Artifact-backed", home)
-        self.assertIn("cards + picks", home)
-        self.assertIn("Artifact-backed shared board + picks + props + live audit lanes", home)
+        self.assertIn("Jump to each live rail with games, props, freshness, and data health.", home)
+        self.assertIn("Board Date", home)
+        self.assertIn("Live slate", home)
+        self.assertIn("Compact rail", home)
+        self.assertIn("Pregame only", home)
         self.assertIn("Open Live Lens", home)
-        self.assertIn("Open Prop Live Lens", home)
+        self.assertIn("Live only", home)
 
     def test_nfl_hub_prefers_latest_mirrored_week_for_launch_links(self) -> None:
         with patch(

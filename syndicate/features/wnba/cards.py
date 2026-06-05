@@ -2393,7 +2393,8 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
 
     for candidate_payload in candidate_payloads:
         if isinstance(candidate_payload, dict) and isinstance(candidate_payload.get("games"), list) and bool(candidate_payload.get("games")):
-            if candidate_payload.get("source") == "espn" or is_today:
+            source_name = str(candidate_payload.get("source") or "").strip().lower()
+            if source_name.startswith("espn") or is_today:
                 public_payload = candidate_payload
             else:
                 return _attach_odds_refresh_timestamp(candidate_payload)

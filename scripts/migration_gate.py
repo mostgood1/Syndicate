@@ -6,9 +6,11 @@ import os
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from tempfile import TemporaryDirectory
 from typing import Sequence
 from unittest.mock import patch
@@ -829,12 +831,24 @@ def evaluate_protected_source_shell_routes() -> list[dict[str, object]]:
     return violations
 
 
-def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
+def _load_intelligence_status_for_migration_gate() -> tuple[str | None, dict[str, object] | None, Exception | None]:
     try:
         from syndicate.app import create_app
         from syndicate.features.intelligence import build_intelligence_status
         from syndicate.features.shared.timezone import central_today_iso
     except Exception as error:
+        return None, None, error
+
+    selected_date = central_today_iso()
+    app = create_app()
+    with app.app_context():
+        payload = build_intelligence_status(selected_date=selected_date, force_refresh=True)
+    return selected_date, payload if isinstance(payload, dict) else {}, None
+
+
+def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
+    selected_date, payload, error = _load_intelligence_status_for_migration_gate()
+    if error is not None:
         return {
             "ok": False,
             "selected_date": None,
@@ -849,20 +863,18 @@ def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
             ],
         }
 
-    selected_date = central_today_iso()
-    app = create_app()
-    with app.app_context():
-        payload = build_intelligence_status(selected_date=selected_date, force_refresh=True)
-
     sports = payload.get("sports") if isinstance(payload, dict) else []
     active_sports = []
     for sport in sports:
         if not isinstance(sport, dict):
             continue
+        slug = str(sport.get("slug") or "").strip().lower()
         readiness_gate = sport.get("readiness_gate") if isinstance(sport.get("readiness_gate"), dict) else {}
         if str(readiness_gate.get("state") or "").strip().lower() == "inactive":
             continue
         if not bool(sport.get("active_today")):
+            continue
+        if not _sport_counts_as_active_for_advanced_readiness(slug, selected_date):
             continue
         active_sports.append(sport)
     violations: list[dict[str, object]] = []
@@ -906,6 +918,77 @@ def evaluate_active_sport_advanced_readiness() -> dict[str, object]:
         "active_sports": summaries,
         "violations": violations,
     }
+
+
+def _sport_counts_as_active_for_advanced_readiness(slug: str, selected_date: str) -> bool:
+    if not _sport_in_season_for_date(slug, selected_date):
+        return False
+    if slug not in {"nba", "wnba", "nhl"}:
+        return True
+    known, count = _scheduled_game_count(slug, selected_date)
+    if known:
+        return count > 0
+    return True
+
+
+def _sport_in_season_for_date(slug: str, selected_date: str) -> bool:
+    try:
+        month = date.fromisoformat(selected_date).month
+    except Exception:
+        return True
+    if slug == "mlb":
+        return 3 <= month <= 10
+    if slug in {"nba", "nhl"}:
+        return month >= 10 or month <= 6
+    if slug == "wnba":
+        return 5 <= month <= 10
+    if slug == "nfl":
+        return month >= 8 or month <= 2
+    if slug == "ncaaf":
+        return month >= 8 or month <= 1
+    if slug == "ncaab":
+        return month >= 11 or month <= 4
+    return True
+
+
+def _scheduled_game_count(slug: str, selected_date: str) -> tuple[bool, int]:
+    if slug == "nba":
+        payload = _load_schedule_payload(
+            f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={selected_date.replace('-', '')}"
+        )
+        if payload is None:
+            return False, 0
+        return True, len(payload.get("events") or [])
+    if slug == "wnba":
+        payload = _load_schedule_payload(
+            f"https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates={selected_date.replace('-', '')}"
+        )
+        if payload is None:
+            return False, 0
+        return True, len(payload.get("events") or [])
+    if slug == "nhl":
+        payload = _load_schedule_payload(f"https://api-web.nhle.com/v1/schedule/{selected_date}")
+        if payload is None:
+            return False, 0
+        count = 0
+        for week in payload.get("gameWeek") or []:
+            if not isinstance(week, dict):
+                continue
+            if str(week.get("date") or "").strip() != selected_date:
+                continue
+            count += len(week.get("games") or [])
+        return True, count
+    return False, 0
+
+
+def _load_schedule_payload(url: str) -> dict[str, object] | None:
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.load(response)
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def render_text_report(report: dict[str, object]) -> str:
