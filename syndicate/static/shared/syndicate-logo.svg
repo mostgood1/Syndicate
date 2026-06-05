@@ -1,0 +1,24 @@
+<svg width="900" height="240" viewBox="0 0 900 240" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Syndicate logo</title>
+  <desc id="desc">Syndicate wordmark with a green and blue stylized S mark.</desc>
+  <defs>
+    <linearGradient id="greenSweep" x1="28" y1="44" x2="264" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17C44A"/>
+      <stop offset="1" stop-color="#6AE051"/>
+    </linearGradient>
+    <linearGradient id="blueSweep" x1="28" y1="196" x2="232" y2="126" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2FC0F0"/>
+      <stop offset="1" stop-color="#1F7DFF"/>
+    </linearGradient>
+    <linearGradient id="shadowSweep" x1="42" y1="84" x2="238" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#98A2B3" stop-opacity="0.58"/>
+      <stop offset="1" stop-color="#495261" stop-opacity="0.16"/>
+    </linearGradient>
+  </defs>
+  <path d="M240 36C210 73 176 88 128 88C88 88 62 97 42 120C60 83 91 65 141 65H240V36Z" fill="url(#greenSweep)"/>
+  <path d="M252 47C227 84 192 106 143 106C119 106 103 111 89 120C101 99 125 88 160 88C197 88 227 76 252 47Z" fill="url(#shadowSweep)"/>
+  <path d="M28 178C65 140 110 125 168 125C193 125 208 118 221 106C214 132 193 147 159 156C120 166 87 174 68 196L28 206L28 178Z" fill="url(#blueSweep)"/>
+  <path d="M58 110C80 92 104 85 140 85C163 85 180 88 196 94C166 96 139 101 114 114C95 123 80 135 68 150C72 132 78 122 58 110Z" fill="#FFFFFF"/>
+  <path d="M44 116C67 139 98 151 144 151C174 151 198 142 217 124C203 153 173 171 128 171C87 171 60 154 44 116Z" fill="#08131F" fill-opacity="0.9"/>
+  <text x="294" y="152" fill="#D7DAE0" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="700" letter-spacing="4">SYNDICATE</text>
+</svg>
