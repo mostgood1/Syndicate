@@ -2828,10 +2828,10 @@ def _infer_period_clock_from_status_text(status_text: Any) -> tuple[int | None, 
     text = str(status_text or "").strip()
     if not text:
         return None, ""
-    match = re.search(r"(?P<clock>\d{1,2}:\d{2})\s*-\s*(?P<period>(?:1st|2nd|3rd|4th|OT|\d+OT))", text, re.IGNORECASE)
+    match = re.search(r"(?P<clock>\d{1,2}:\d{2}|\d{1,2}(?:\.\d)?)\s*-\s*(?P<period>(?:1st|2nd|3rd|4th|OT|\d+OT))", text, re.IGNORECASE)
     if not match:
         return None, ""
-    clock = str(match.group("clock") or "").strip()
+    clock = _normalize_status_clock_text(match.group("clock"))
     period_label = str(match.group("period") or "").strip().upper()
     if period_label == "1ST":
         return 1, clock
@@ -2848,3 +2848,18 @@ def _infer_period_clock_from_status_text(status_text: Any) -> tuple[int | None, 
         overtime_index = int(overtime_match.group(1) or 1)
         return max(5, 4 + overtime_index), clock
     return None, clock
+
+
+def _normalize_status_clock_text(clock_text: Any) -> str:
+    raw = str(clock_text or "").strip()
+    if not raw:
+        return ""
+    if re.fullmatch(r"\d{1,2}:\d{2}", raw):
+        return raw
+    seconds_value = _safe_float(raw)
+    if seconds_value is None:
+        return raw
+    whole_seconds = max(0, int(math.floor(seconds_value)))
+    minutes = whole_seconds // 60
+    seconds = whole_seconds % 60
+    return f"{minutes}:{seconds:02d}"

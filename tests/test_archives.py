@@ -1371,6 +1371,7 @@ class DateArchiveHelperTests(unittest.TestCase):
 
         self.assertEqual(_infer_period_clock_from_status_text("1:18 - 4th"), (4, "1:18"))
         self.assertEqual(_infer_period_clock_from_status_text("7:59 - 1st"), (1, "7:59"))
+        self.assertEqual(_infer_period_clock_from_status_text("45.8 - 4th"), (4, "0:45"))
         self.assertEqual(_infer_period_clock_from_status_text("2:34 - OT"), (5, "2:34"))
         self.assertEqual(_infer_period_clock_from_status_text("1:07 - 2OT"), (6, "1:07"))
         self.assertEqual(_infer_period_clock_from_status_text("Halftime"), (None, ""))
