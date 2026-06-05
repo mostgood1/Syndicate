@@ -1,7 +1,7 @@
 {% extends "shared/base.html" %}
 
-{% block title %}Syndicate | Intelligence{% endblock %}
-{% block page_title %}Sports Intelligence{% endblock %}
+{% block title %}Syndicate | The Syndicate{% endblock %}
+{% block page_title %}The Syndicate{% endblock %}
 
 {% block extra_head %}
   <style>
@@ -174,7 +174,7 @@
   <div class="intel-grid">
     <section class="intel-panel">
       <div class="intel-kicker">Query console</div>
-      <h2>Ask for best bets, live angles, or parlays</h2>
+      <h2>Ask The Syndicate for best bets, live angles, or parlays</h2>
       <p class="intel-inline-note">This first build is local synthesis only. It works from the pushed artifact-backed board state already inside Syndicate, without any external LLM dependency.</p>
       <form id="intel-query-form" class="intel-form">
         <label>
@@ -211,7 +211,7 @@
           {% for prompt in default_questions %}
             <button class="cards-nav-pill" type="button" data-question="{{ prompt }}">{{ prompt }}</button>
           {% endfor %}
-          <button class="cards-nav-pill is-active" type="submit">Run intelligence</button>
+          <button class="cards-nav-pill is-active" type="submit">Run The Syndicate</button>
         </div>
       </form>
       <div id="intel-response" class="intel-response-list">
@@ -364,6 +364,8 @@
             item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : '',
             item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
             item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
+            item.implied_probability ? chip(`Imp ${item.implied_probability}%`) : '',
+            item.price_edge_pct ? chip(`Price edge ${item.price_edge_pct}%`, item.price_edge_pct > 0 ? 'is-good' : 'is-warn') : '',
           ].filter(Boolean).join('');
           const pills = Array.isArray(item.display_pills) ? item.display_pills.slice(0, 5).map((entry) => chip(entry)).join('') : '';
           const cta = item.href ? `<a class="cards-nav-pill" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
@@ -385,7 +387,12 @@
                 <article class="intel-card">
                   <h3>${escapeHtml(parlay.label)}</h3>
                   <p>${escapeHtml(parlay.rationale || '')}</p>
-                  <div class="intel-chip-row">${chip(`Score ${parlay.combined_score || '-'}`)}</div>
+                  <div class="intel-chip-row">
+                    ${chip(`Score ${parlay.combined_score || '-'}`)}
+                    ${parlay.combined_odds ? chip(`Combined ${parlay.combined_odds}`, 'is-good') : ''}
+                    ${parlay.combined_decimal_odds ? chip(`Decimal ${parlay.combined_decimal_odds}`) : ''}
+                    ${parlay.combined_implied_probability ? chip(`Imp ${parlay.combined_implied_probability}%`) : ''}
+                  </div>
                   <div class="intel-leg-list">
                     ${(Array.isArray(parlay.legs) ? parlay.legs : []).map((leg) => `
                       <div>
@@ -401,7 +408,7 @@
 
         responseRoot.innerHTML = `
           <article class="intel-card">
-            <div class="intel-kicker">${escapeHtml(response.headline || 'Local sports intelligence brief')}</div>
+            <div class="intel-kicker">${escapeHtml(response.headline || 'The Syndicate brief')}</div>
             <h3>${escapeHtml(payload.query || '')}</h3>
             <p>${escapeHtml(response.summary || '')}</p>
           </article>
@@ -473,7 +480,7 @@
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        responseRoot.innerHTML = '<div class="intel-empty">Running local intelligence...</div>';
+        responseRoot.innerHTML = '<div class="intel-empty">Running The Syndicate...</div>';
         const result = await fetch('/api/intelligence/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -486,7 +493,7 @@
         });
         const payload = await result.json();
         if (!payload.ok) {
-          responseRoot.innerHTML = `<div class="intel-empty">${escapeHtml(payload.error || 'The local intelligence query failed.')}</div>`;
+          responseRoot.innerHTML = `<div class="intel-empty">${escapeHtml(payload.error || 'The Syndicate query failed.')}</div>`;
           return;
         }
         renderRecommendations(payload);

@@ -103,6 +103,77 @@ def _pct_hint(value: Any) -> float | None:
     return float(number)
 
 
+def _american_odds_value(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text or text == "-":
+        return None
+    match = re.search(r"([+-]?\d+(?:\.\d+)?)", text)
+    if not match:
+        return None
+    try:
+        number = float(match.group(1))
+    except Exception:
+        return None
+    if number == 0:
+        return None
+    return number
+
+
+def _american_to_decimal(value: float | None) -> float | None:
+    if value is None:
+        return None
+    if value > 0:
+        return 1.0 + (value / 100.0)
+    return 1.0 + (100.0 / abs(value))
+
+
+def _american_implied_probability(value: float | None) -> float | None:
+    if value is None:
+        return None
+    if value > 0:
+        return 100.0 / (value + 100.0)
+    return abs(value) / (abs(value) + 100.0)
+
+
+def _decimal_to_american(value: float | None) -> str | None:
+    if value is None or value <= 1.0:
+        return None
+    profit_multiple = float(value) - 1.0
+    if profit_multiple >= 1.0:
+        american = int(round(profit_multiple * 100.0))
+        return f"+{american}"
+    american = int(round(-100.0 / profit_multiple))
+    return str(american)
+
+
+def _market_context(candidate: dict[str, Any]) -> dict[str, Any]:
+    american_odds = _american_odds_value(candidate.get("odds"))
+    decimal_odds = _american_to_decimal(american_odds)
+    implied_probability = _american_implied_probability(american_odds)
+    model_probability_pct = _pct_hint(candidate.get("confidence"))
+    price_edge_pct = None
+    if implied_probability is not None and model_probability_pct is not None:
+        price_edge_pct = model_probability_pct - (implied_probability * 100.0)
+    return {
+        "american_odds": int(american_odds) if american_odds is not None and float(american_odds).is_integer() else american_odds,
+        "decimal_odds": round(decimal_odds, 3) if decimal_odds is not None else None,
+        "implied_probability": round(implied_probability * 100.0, 2) if implied_probability is not None else None,
+        "model_probability": round(model_probability_pct, 2) if model_probability_pct is not None else None,
+        "price_edge_pct": round(price_edge_pct, 2) if price_edge_pct is not None else None,
+    }
+
+
+def _market_score_adjustment(market_context: dict[str, Any]) -> float:
+    price_edge_pct = market_context.get("price_edge_pct")
+    american_odds = market_context.get("american_odds")
+    if price_edge_pct is None:
+        return 2.0 if american_odds is not None else 0.0
+    adjustment = max(-10.0, min(12.0, float(price_edge_pct) * 0.6))
+    if american_odds is not None and float(american_odds) >= 100.0 and float(price_edge_pct) > 0.0:
+        adjustment += 1.5
+    return adjustment
+
+
 @lru_cache(maxsize=1)
 def _tracked_repo_files() -> set[str]:
     try:
@@ -820,15 +891,18 @@ def _apply_advanced_context_to_candidates(candidates: list[dict[str, Any]], adva
         sport_slug = _safe_text(candidate.get("sport_slug"), "sport").lower()
         advanced_context = advanced_by_sport.get(sport_slug, [])
         readiness_summary = _advanced_readiness_summary(advanced_context)
+        market_context = _market_context(candidate)
         candidate["advanced_context"] = advanced_context
         candidate["advanced_gate"] = readiness_summary
-        candidate["score"] = float(candidate.get("score") or 0.0) + _advanced_score_adjustment(readiness_summary)
+        candidate["market_context"] = market_context
+        candidate["score"] = float(candidate.get("score") or 0.0) + _advanced_score_adjustment(readiness_summary) + _market_score_adjustment(market_context)
 
 
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
     advanced_context = candidate.get("advanced_context") if isinstance(candidate.get("advanced_context"), list) else []
     advanced_driver_text = _advanced_driver_text(advanced_context)
     advanced_gate = candidate.get("advanced_gate") if isinstance(candidate.get("advanced_gate"), dict) else {}
+    market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     if _safe_text(candidate.get("candidate_type"), "") == "game":
         notes: list[str] = []
         if _safe_text(candidate.get("edge"), "-") != "-":
@@ -837,6 +911,10 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
             notes.append(f"Win-rate confidence sits at {candidate.get('confidence')}.")
         if _safe_text(candidate.get("odds"), "-") != "-":
             notes.append(f"The quoted book number is {candidate.get('odds')} on {candidate.get('pick')}.")
+        if market_context.get("implied_probability") is not None:
+            notes.append(f"Market implied probability is {market_context.get('implied_probability')}%.")
+        if market_context.get("price_edge_pct") is not None:
+            notes.append(f"Model versus price edge is {market_context.get('price_edge_pct')} points.")
         if advanced_driver_text:
             notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
         missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate.get("missing_inputs"), list) else []
@@ -857,6 +935,10 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         notes.append(f"The stored edge reads {candidate.get('edge')}.")
     if _safe_text(candidate.get("confidence"), "-") != "-":
         notes.append(f"Sim confidence is {candidate.get('confidence')}.")
+    if market_context.get("implied_probability") is not None:
+        notes.append(f"Market implied probability is {market_context.get('implied_probability')}%.")
+    if market_context.get("price_edge_pct") is not None:
+        notes.append(f"Model versus price edge is {market_context.get('price_edge_pct')} points.")
     if _safe_text(candidate.get("live_total"), "-") != "-":
         notes.append(f"Game context currently points to a live total of {candidate.get('live_total')}.")
     if advanced_driver_text:
@@ -874,6 +956,7 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
 
 
 def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
+    market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     output = {
         "candidate_type": _safe_text(candidate.get("candidate_type"), "candidate"),
         "sport": _safe_text(candidate.get("sport"), "Sport"),
@@ -886,6 +969,11 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "is_live": bool(candidate.get("is_live")),
         "line": _safe_text(candidate.get("line"), "-"),
         "odds": _safe_text(candidate.get("odds"), "-"),
+        "american_odds": market_context.get("american_odds"),
+        "decimal_odds": market_context.get("decimal_odds"),
+        "implied_probability": market_context.get("implied_probability"),
+        "model_probability": market_context.get("model_probability"),
+        "price_edge_pct": market_context.get("price_edge_pct"),
         "edge": _safe_text(candidate.get("edge"), "-"),
         "confidence": _safe_text(candidate.get("confidence"), "-"),
         "projected": _safe_text(candidate.get("projected"), "-"),
@@ -949,11 +1037,30 @@ def _build_parlays(candidates: list[dict[str, Any]], *, limit: int) -> list[dict
             seen.add(identity)
             summary_legs = [_candidate_summary(leg) for leg in legs]
             avg_score = sum(float(leg.get("score") or 0.0) for leg in legs) / float(len(legs))
+            decimal_prices = [
+                float((leg.get("market_context") or {}).get("decimal_odds"))
+                for leg in legs
+                if isinstance(leg.get("market_context"), dict) and (leg.get("market_context") or {}).get("decimal_odds") is not None
+            ]
+            combined_decimal_odds = None
+            combined_american_odds = None
+            combined_implied_probability = None
+            if len(decimal_prices) == len(legs) and decimal_prices:
+                combined_decimal_odds = 1.0
+                for price in decimal_prices:
+                    combined_decimal_odds *= price
+                combined_decimal_odds = round(combined_decimal_odds, 3)
+                combined_american_odds = _decimal_to_american(combined_decimal_odds)
+                if combined_decimal_odds > 1.0:
+                    combined_implied_probability = round((1.0 / combined_decimal_odds) * 100.0, 2)
             parlays.append(
                 {
                     "label": f"{leg_count}-leg {'live' if any(leg.get('is_live') for leg in legs) else 'pregame'} parlay",
                     "legs": summary_legs,
                     "combined_score": round(avg_score, 2),
+                    "combined_decimal_odds": combined_decimal_odds,
+                    "combined_odds": combined_american_odds,
+                    "combined_implied_probability": combined_implied_probability,
                     "rationale": _parlay_rationale(summary_legs),
                 }
             )
@@ -1005,13 +1112,13 @@ def run_intelligence_query(
 
     readiness_gate = _build_readiness_gate(overview, tracked)
 
-    headline = "Local sports intelligence brief"
+    headline = "The Syndicate brief"
     if preferences["intent"] == "parlay":
-        headline = "Local parlay builder"
+        headline = "The Syndicate parlay builder"
     elif preferences["intent"] == "live_bets":
-        headline = "Local live board brief"
+        headline = "The Syndicate live board brief"
     elif preferences["intent"] == "pregame_bets":
-        headline = "Local pregame board brief"
+        headline = "The Syndicate pregame board brief"
 
     summary = (
         f"Scanned {len(candidates)} board candidates across {len([sport_row for sport_row in overview if _sport_matches_preferences(sport_row, preferences)]) or len(overview)} sports. "
