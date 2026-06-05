@@ -80,8 +80,18 @@ _PARLAY_LEG_WORDS = {
     "4": 4,
     "5": 5,
 }
-_CONSERVATIVE_RISK_TOKENS = ("conservative", "safer", "safe", "low risk", "lower risk")
-_AGGRESSIVE_RISK_TOKENS = ("aggressive", "longshot", "long shot", "high risk", "ceiling", "upside")
+_CONSERVATIVE_RISK_TOKENS = (
+    "conservative",
+    "safer",
+    "safe",
+    "safest",
+    "low risk",
+    "lower risk",
+    "high confidence",
+    "highest confidence",
+    "most likely",
+)
+_AGGRESSIVE_RISK_TOKENS = ("aggressive", "longshot", "long shot", "high risk", "ceiling", "upside", "highest-upside")
 _LOW_CORRELATION_TOKENS = ("low correlation", "uncorrelated", "independent", "diversified")
 _MEDIUM_CORRELATION_TOKENS = ("medium correlation", "moderate correlation", "balanced correlation")
 _HIGH_CORRELATION_TOKENS = ("high correlation", "correlated", "stacked", "stack", "same game", "same-game", "sgp")
@@ -1370,10 +1380,15 @@ def _extract_parlay_structure_preferences(text: str) -> dict[str, Any]:
 
     cross_sport_required = bool(re.search(r"\b(?:cross[-\s]?sport|multi[-\s]?sport|across sports?)\b", lowered))
 
+    has_conservative_risk = any(token in lowered for token in _CONSERVATIVE_RISK_TOKENS)
+    has_aggressive_risk = any(token in lowered for token in _AGGRESSIVE_RISK_TOKENS)
+
     risk_profile = "balanced"
-    if any(token in lowered for token in _CONSERVATIVE_RISK_TOKENS):
+    if has_conservative_risk and has_aggressive_risk and re.search(r"\b(?:compare|vs\.?|versus)\b", lowered):
+        risk_profile = "balanced"
+    elif has_conservative_risk:
         risk_profile = "conservative"
-    elif any(token in lowered for token in _AGGRESSIVE_RISK_TOKENS):
+    elif has_aggressive_risk:
         risk_profile = "aggressive"
 
     correlation_tolerance = "medium"
@@ -2597,6 +2612,41 @@ def _market_specific_score_adjustment(candidate: dict[str, Any], preferences: di
     return round(adjustment, 3)
 
 
+def _risk_profile_score_adjustment(candidate: dict[str, Any], preferences: dict[str, Any], market_context: dict[str, Any]) -> float:
+    risk_profile = _safe_text(preferences.get("risk_profile"), "balanced").lower()
+    if risk_profile not in {"conservative", "aggressive"}:
+        return 0.0
+
+    confidence_pct = _pct_hint(candidate.get("confidence")) or 0.0
+    edge_pct = market_context.get("price_edge_pct")
+    if edge_pct is None:
+        edge_pct = _pct_hint(candidate.get("edge")) or 0.0
+    american_odds = market_context.get("american_odds")
+    market_key = _candidate_market_key(candidate)
+    candidate_type = _safe_text(candidate.get("candidate_type"), "candidate")
+
+    adjustment = 0.0
+    if risk_profile == "conservative":
+        adjustment += min(4.5, max(0.0, float(confidence_pct) - 54.0) * 0.24)
+        adjustment += min(2.5, max(0.0, float(edge_pct)) * 0.14)
+        if american_odds is not None and float(american_odds) >= 100.0:
+            adjustment -= min(3.5, (float(american_odds) - 100.0) / 60.0)
+        if candidate_type != "game" and market_key in _BINARY_CEILING_MARKETS:
+            adjustment -= 1.75
+        return round(adjustment, 3)
+
+    if american_odds is not None and float(american_odds) >= 100.0:
+        adjustment += min(4.5, (float(american_odds) - 100.0) / 55.0)
+    elif american_odds is not None and float(american_odds) < 0.0:
+        adjustment -= min(1.5, abs(float(american_odds)) / 220.0)
+    adjustment += min(2.5, max(0.0, float(edge_pct)) * 0.16)
+    if candidate_type != "game" and market_key in _BINARY_CEILING_MARKETS:
+        adjustment += 1.75
+    if confidence_pct > 0.0:
+        adjustment -= min(1.5, max(0.0, 55.0 - float(confidence_pct)) * 0.04)
+    return round(adjustment, 3)
+
+
 def _candidate_market_key(candidate: dict[str, Any]) -> str | None:
     market_focuses = sorted(_candidate_market_focuses(candidate))
     if market_focuses:
@@ -2710,6 +2760,7 @@ def _apply_advanced_context_to_candidates(
             + _advanced_score_adjustment(readiness_summary)
             + _market_score_adjustment(market_context)
             + _market_specific_score_adjustment(candidate, preferences, market_context)
+            + _risk_profile_score_adjustment(candidate, preferences, market_context)
             + float(candidate.get("advanced_signal_score") or 0.0)
         )
 

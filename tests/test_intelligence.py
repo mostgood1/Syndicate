@@ -261,6 +261,56 @@ def _sample_mlb_market_overview() -> list[dict[str, object]]:
     ]
 
 
+def _sample_mlb_risk_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "mlb",
+            "name": "MLB",
+            "context_label": "2026-06-04",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {
+                    "title": "Pregame props",
+                    "items": [
+                        {
+                            "name": "Freddie Freeman Over 1.5 Total Bases",
+                            "market": "Hitter Total Bases",
+                            "pick": "Over 1.5",
+                            "matchup": "LAD at SD",
+                            "projected": 2.0,
+                            "line": 1.5,
+                            "odds": "-135",
+                            "confidence": "64%",
+                            "edge": "+2.5%",
+                            "score": 88.0,
+                            "writeup": "High-contact shape and lineup spot support the floor.",
+                            "href": "/mlb/prop-ladders?date=2026-06-04",
+                        },
+                        {
+                            "name": "Aaron Judge Over 0.5 Home Runs",
+                            "market": "Hitter Home Runs",
+                            "pick": "Over 0.5",
+                            "matchup": "NYY at BOS",
+                            "projected": 0.62,
+                            "line": 0.5,
+                            "odds": "+320",
+                            "confidence": "38%",
+                            "edge": "+12.8%",
+                            "score": 87.0,
+                            "writeup": "Barrel rate and pull-side lift create the ceiling case.",
+                            "href": "/mlb/prop-ladders?date=2026-06-04",
+                        },
+                    ],
+                },
+                "live": {"title": "Top Live Props", "items": []},
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        }
+    ]
+
+
 def _sample_nfl_market_overview() -> list[dict[str, object]]:
     return [
         {
@@ -1006,6 +1056,51 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         recommendations = result.get("recommendations") or []
         self.assertTrue(recommendations)
         self.assertTrue(all("strikeout" in str(item.get("market") or "").lower() for item in recommendations))
+
+    def test_query_preferences_treats_high_confidence_as_conservative(self) -> None:
+        preferences = _query_preferences("Show me the highest confidence live MLB props today")
+
+        self.assertEqual(preferences.get("risk_profile"), "conservative")
+        self.assertTrue(preferences.get("live_only"))
+        self.assertEqual(preferences.get("requested_sports"), ["mlb"])
+
+    def test_intelligence_query_prioritizes_conservative_non_parlay_props(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_risk_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Show me the highest confidence MLB props today",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertEqual(recommendations[0].get("name"), "Freddie Freeman Over 1.5 Total Bases")
+        self.assertEqual((result.get("parsed_request") or {}).get("risk_profile"), "conservative")
+
+    def test_intelligence_query_prioritizes_aggressive_non_parlay_props(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_risk_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Show me the highest-upside MLB props today",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertEqual(recommendations[0].get("name"), "Aaron Judge Over 0.5 Home Runs")
+        self.assertEqual((result.get("parsed_request") or {}).get("risk_profile"), "aggressive")
 
     def test_build_parlays_limits_standard_leg_count_for_tight_exposure_caps(self) -> None:
         preferences = _query_preferences(
