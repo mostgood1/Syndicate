@@ -648,6 +648,14 @@
     if (!value) {
       return null;
     }
+    const secondsMatch = value.match(/^\d{1,2}(?:\.\d)?$/);
+    if (secondsMatch) {
+      const secondsValue = Number(value);
+      if (!Number.isFinite(secondsValue)) {
+        return null;
+      }
+      return Math.max(0, secondsValue) / 60;
+    }
     const match = value.match(/^(\d{1,2}):(\d{2})$/);
     if (!match) {
       return null;
