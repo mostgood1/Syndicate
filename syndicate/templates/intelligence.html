@@ -428,6 +428,7 @@
         const recommendations = Array.isArray(response.recommendations) ? response.recommendations : [];
         const parlays = Array.isArray(response.parlays) ? response.parlays : [];
         const notes = Array.isArray(response.board_notes) ? response.board_notes : [];
+        const parsedRequest = response.parsed_request || {};
 
         if (!recommendations.length && !parlays.length) {
           responseRoot.innerHTML = '<div class="intel-empty">No actionable candidates were surfaced from the current board state for that request.</div>';
@@ -469,6 +470,8 @@
                     ${parlay.combined_odds ? chip(`Combined ${parlay.combined_odds}`, 'is-good') : ''}
                     ${parlay.combined_decimal_odds ? chip(`Decimal ${parlay.combined_decimal_odds}`) : ''}
                     ${parlay.combined_implied_probability ? chip(`Imp ${parlay.combined_implied_probability}%`) : ''}
+                    ${parlay.ticket_count ? chip(`Tickets ${parlay.ticket_count}`) : ''}
+                    ${Array.isArray(parlay.ticket_odds_range) && parlay.ticket_odds_range.length === 2 ? chip(`Ticket odds ${parlay.ticket_odds_range[0]} to ${parlay.ticket_odds_range[1]}`) : ''}
                   </div>
                   <div class="intel-leg-list">
                     ${(Array.isArray(parlay.legs) ? parlay.legs : []).map((leg) => `
@@ -477,17 +480,28 @@
                         <div class="intel-meta">${escapeHtml(leg.sport)} · ${escapeHtml(leg.matchup)} · ${escapeHtml(leg.market)}</div>
                       </div>`).join('')}
                   </div>
+                  ${Array.isArray(parlay.tickets) && parlay.tickets.length ? `
+                    <div class="intel-leg-list">
+                      ${(parlay.tickets || []).map((ticket) => `
+                        <div>
+                          <strong>${escapeHtml(ticket.label || 'Round robin ticket')}</strong>
+                          <div class="intel-meta">${escapeHtml((ticket.legs || []).map((leg) => leg.name || leg.pick).join(' | '))}</div>
+                        </div>`).join('')}
+                    </div>` : ''}
                 </article>`).join('')}
             </div>
           </section>` : '';
 
         const notesMarkup = notes.length ? `<article class="intel-card"><h3>Board notes</h3><p>${escapeHtml(notes.join(' | '))}</p></article>` : '';
+        const parsedRequestMarkup = Array.isArray(parsedRequest.chips) && parsedRequest.chips.length ? `
+          <div class="intel-chip-row">${parsedRequest.chips.map((entry) => chip(entry)).join('')}</div>` : '';
 
         responseRoot.innerHTML = `
           <article class="intel-card">
             <div class="intel-kicker">${escapeHtml(response.headline || 'The Syndicate brief')}</div>
             <h3>${escapeHtml(payload.query || '')}</h3>
             <p>${escapeHtml(response.summary || '')}</p>
+            ${parsedRequestMarkup}
           </article>
           ${recMarkup}
           ${parlayMarkup}

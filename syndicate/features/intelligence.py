@@ -58,6 +58,20 @@ _PROP_MARKET_KEYWORDS = {
 
 _GAME_MARKET_KEYWORDS = {"moneyline", "ml", "spread", "side", "total", "game bet", "puck line"}
 _DATE_TOKEN_RE = re.compile(r"(?P<date>\d{4}-\d{2}-\d{2}|\d{8})")
+_PARLAY_LEG_WORDS = {
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "2": 2,
+    "3": 3,
+    "4": 4,
+    "5": 5,
+}
+_CONSERVATIVE_RISK_TOKENS = ("conservative", "safer", "safe", "low risk", "lower risk")
+_AGGRESSIVE_RISK_TOKENS = ("aggressive", "longshot", "long shot", "high risk", "ceiling", "upside")
+_LOW_CORRELATION_TOKENS = ("low correlation", "uncorrelated", "independent", "diversified")
+_HIGH_CORRELATION_TOKENS = ("high correlation", "correlated", "stacked", "stack", "same game", "same-game", "sgp")
 
 
 def _repo_root() -> Path:
@@ -233,6 +247,136 @@ def _american_odds_match(american_odds: float | int | None, preferences: dict[st
     return True
 
 
+def _parse_parlay_leg_token(value: str | None) -> int | None:
+    token = str(value or "").strip().lower()
+    count = _PARLAY_LEG_WORDS.get(token)
+    if count is None:
+        return None
+    return max(2, min(5, int(count)))
+
+
+def _extract_parlay_leg_preferences(text: str) -> tuple[int | None, int | None]:
+    lowered = str(text or "").lower()
+    range_match = re.search(
+        r"\b(?P<first>two|three|four|five|[2-5])\s*(?:-|to|through|and)\s*(?P<second>two|three|four|five|[2-5])\s*[-\s]*(?:leg|legs|legger)\b",
+        lowered,
+    )
+    if range_match:
+        first = _parse_parlay_leg_token(range_match.group("first"))
+        second = _parse_parlay_leg_token(range_match.group("second"))
+        if first is not None and second is not None:
+            return (min(first, second), max(first, second))
+
+    exact_match = re.search(r"\b(?P<count>two|three|four|five|[2-5])\s*[-\s]?(?:leg|legs|legger)\b", lowered)
+    if exact_match:
+        count = _parse_parlay_leg_token(exact_match.group("count"))
+        if count is not None:
+            return (count, count)
+    return (None, None)
+
+
+def _extract_round_robin_unit(text: str) -> int | None:
+    lowered = str(text or "").lower()
+    match = re.search(r"\b(?P<count>[2-4])s\s+round robin\b", lowered)
+    if not match:
+        match = re.search(r"\bround robin(?:\s+by\s+|\s+using\s+)(?P<count>[2-4])s\b", lowered)
+    if not match:
+        return None
+    return max(2, min(4, int(match.group("count"))))
+
+
+def _extract_parlay_structure_preferences(text: str) -> dict[str, Any]:
+    lowered = str(text or "").lower()
+    parlay_type = "standard"
+    if "round robin" in lowered:
+        parlay_type = "round_robin"
+    elif re.search(r"\b(?:same game|same-game|sgp)\b", lowered):
+        parlay_type = "same_game"
+
+    cross_sport_required = bool(re.search(r"\b(?:cross[-\s]?sport|multi[-\s]?sport|across sports?)\b", lowered))
+
+    risk_profile = "balanced"
+    if any(token in lowered for token in _CONSERVATIVE_RISK_TOKENS):
+        risk_profile = "conservative"
+    elif any(token in lowered for token in _AGGRESSIVE_RISK_TOKENS):
+        risk_profile = "aggressive"
+
+    correlation_tolerance = "medium"
+    if any(token in lowered for token in _LOW_CORRELATION_TOKENS):
+        correlation_tolerance = "low"
+    elif any(token in lowered for token in _HIGH_CORRELATION_TOKENS) or parlay_type == "same_game":
+        correlation_tolerance = "high"
+
+    round_robin_unit = _extract_round_robin_unit(lowered) if parlay_type == "round_robin" else None
+    if parlay_type == "round_robin" and round_robin_unit is None:
+        round_robin_unit = 2
+
+    return {
+        "parlay_type": parlay_type,
+        "cross_sport_required": cross_sport_required,
+        "risk_profile": risk_profile,
+        "correlation_tolerance": correlation_tolerance,
+        "round_robin_unit": round_robin_unit,
+    }
+
+
+def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
+    requested_sports = [str(slug).upper() for slug in (preferences.get("requested_sports") or []) if str(slug).strip()]
+    board_scope: list[str] = []
+    if preferences.get("include_props"):
+        board_scope.append("Props")
+    if preferences.get("include_games"):
+        board_scope.append("Games")
+
+    timing = "Live + pregame"
+    if preferences.get("live_only"):
+        timing = "Live only"
+    elif preferences.get("pregame_only"):
+        timing = "Pregame only"
+
+    leg_min = preferences.get("parlay_leg_min")
+    leg_max = preferences.get("parlay_leg_max")
+    leg_window = None
+    if leg_min is not None and leg_max is not None:
+        leg_window = f"{leg_min} legs" if int(leg_min) == int(leg_max) else f"{leg_min}-{leg_max} legs"
+
+    parlay_type = _safe_text(preferences.get("parlay_type"), "standard")
+    type_label = {
+        "standard": "Standard parlay",
+        "same_game": "Same-game parlay",
+        "round_robin": "Round robin",
+    }.get(parlay_type, "Standard parlay")
+
+    chips = [type_label, timing]
+    if board_scope:
+        chips.extend(board_scope)
+    if requested_sports:
+        chips.append("/".join(requested_sports))
+    if leg_window:
+        chips.append(leg_window)
+    if preferences.get("cross_sport_required"):
+        chips.append("Cross-sport")
+    chips.append(f"{_safe_text(preferences.get('risk_profile'), 'balanced').capitalize()} risk")
+    chips.append(f"{_safe_text(preferences.get('correlation_tolerance'), 'medium').capitalize()} correlation")
+    if preferences.get("parlay_type") == "round_robin":
+        unit = preferences.get("round_robin_unit") or 2
+        chips.append(f"{unit}-leg tickets")
+
+    return {
+        "intent": _safe_text(preferences.get("intent"), "best_bets"),
+        "sports": requested_sports,
+        "timing": timing,
+        "board_scope": board_scope,
+        "parlay_type": parlay_type,
+        "leg_window": leg_window,
+        "cross_sport_required": bool(preferences.get("cross_sport_required")),
+        "risk_profile": _safe_text(preferences.get("risk_profile"), "balanced"),
+        "correlation_tolerance": _safe_text(preferences.get("correlation_tolerance"), "medium"),
+        "round_robin_unit": preferences.get("round_robin_unit"),
+        "chips": chips,
+    }
+
+
 @lru_cache(maxsize=1)
 def _tracked_repo_files() -> set[str]:
     try:
@@ -251,6 +395,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
     lowered = str(question or "").lower()
     explicit_mode = str(mode or "").strip().lower()
     explicit_sport = str(sport or "").strip().lower()
+    parlay_structure = _extract_parlay_structure_preferences(lowered)
 
     requested_sports = set()
     if explicit_sport:
@@ -260,7 +405,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
             requested_sports.add(slug)
 
     intent = "best_bets"
-    if explicit_mode in {"parlay", "parlays"} or "parlay" in lowered:
+    if explicit_mode in {"parlay", "parlays"} or "parlay" in lowered or parlay_structure.get("parlay_type") != "standard":
         intent = "parlay"
     elif explicit_mode in {"live", "live_bets"} or "live bet" in lowered or "in-game" in lowered or "live board" in lowered:
         intent = "live_bets"
@@ -307,6 +452,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         candidate_odds_max = int(max_match.group(1))
 
     parlay_odds_min, parlay_odds_max = _extract_american_odds_range(lowered, require_parlay_context=True)
+    parlay_leg_min, parlay_leg_max = _extract_parlay_leg_preferences(lowered)
 
     return {
         "intent": intent,
@@ -321,6 +467,13 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         "candidate_odds_max": candidate_odds_max,
         "parlay_odds_min": parlay_odds_min,
         "parlay_odds_max": parlay_odds_max,
+        "parlay_leg_min": parlay_leg_min,
+        "parlay_leg_max": parlay_leg_max,
+        "parlay_type": parlay_structure["parlay_type"],
+        "cross_sport_required": parlay_structure["cross_sport_required"],
+        "risk_profile": parlay_structure["risk_profile"],
+        "correlation_tolerance": parlay_structure["correlation_tolerance"],
+        "round_robin_unit": parlay_structure["round_robin_unit"],
         "limit": max(1, min(requested_limit, 8)),
         "question": str(question or "").strip(),
     }
@@ -1105,56 +1258,188 @@ def _parlay_rationale(legs: list[dict[str, Any]]) -> str:
     return "This parlay keeps the legs inside the highest-scoring local recommendations while avoiding duplicate market exposure."
 
 
+def _parlay_identity(leg: dict[str, Any]) -> str:
+    return f"{_safe_text(leg.get('sport_slug'), 'sport')}::{_safe_text(leg.get('pick'), 'pick')}::{_safe_text(leg.get('market'), 'market')}::{_safe_text(leg.get('matchup'), 'matchup')}"
+
+
+def _parlay_type_label(parlay_type: str | None) -> str:
+    value = _safe_text(parlay_type, "standard")
+    return {
+        "same_game": "same-game",
+        "round_robin": "round robin",
+    }.get(value, "standard")
+
+
+def _parlay_label(legs: tuple[dict[str, Any], ...], preferences: dict[str, Any], *, round_robin: bool = False, ticket_index: int | None = None, ticket_total: int | None = None) -> str:
+    leg_count = len(legs)
+    if round_robin:
+        unit = preferences.get("round_robin_unit") or leg_count
+        sequence = f" ({ticket_index}/{ticket_total})" if ticket_index is not None and ticket_total is not None else ""
+        return f"Round robin {unit}-leg ticket{sequence}"
+    if preferences.get("parlay_type") == "same_game":
+        return f"{leg_count}-leg same-game parlay"
+    if preferences.get("cross_sport_required"):
+        return f"{leg_count}-leg cross-sport parlay"
+    return f"{leg_count}-leg {'live' if any(leg.get('is_live') for leg in legs) else 'pregame'} parlay"
+
+
+def _parlay_matches_preferences(legs: tuple[dict[str, Any], ...], preferences: dict[str, Any]) -> bool:
+    matchups = {_safe_text(leg.get("matchup"), "") for leg in legs}
+    sports = {_safe_text(leg.get("sport_slug"), "sport") for leg in legs}
+    markets = {_safe_text(leg.get("market"), "market") for leg in legs}
+    parlay_type = _safe_text(preferences.get("parlay_type"), "standard")
+    correlation_tolerance = _safe_text(preferences.get("correlation_tolerance"), "medium")
+
+    if parlay_type == "same_game" and len(matchups) != 1:
+        return False
+    if parlay_type != "same_game" and correlation_tolerance in {"low", "medium"} and len(matchups) < len(legs):
+        return False
+    if preferences.get("cross_sport_required") and len(sports) < 2:
+        return False
+    if correlation_tolerance == "low" and len(markets) < len(legs):
+        return False
+    return True
+
+
+def _build_parlay_payload(legs: tuple[dict[str, Any], ...], preferences: dict[str, Any], *, round_robin: bool = False, ticket_index: int | None = None, ticket_total: int | None = None, anchor_legs: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+    summary_legs = [_candidate_summary(leg) for leg in legs]
+    avg_score = sum(float(leg.get("score") or 0.0) for leg in legs) / float(len(legs))
+    decimal_prices = [
+        float((leg.get("market_context") or {}).get("decimal_odds"))
+        for leg in legs
+        if isinstance(leg.get("market_context"), dict) and (leg.get("market_context") or {}).get("decimal_odds") is not None
+    ]
+    combined_decimal_odds = None
+    combined_american_odds = None
+    combined_implied_probability = None
+    if len(decimal_prices) == len(legs) and decimal_prices:
+        combined_decimal_odds = 1.0
+        for price in decimal_prices:
+            combined_decimal_odds *= price
+        combined_decimal_odds = round(combined_decimal_odds, 3)
+        combined_american_odds = _decimal_to_american(combined_decimal_odds)
+        if combined_decimal_odds > 1.0:
+            combined_implied_probability = round((1.0 / combined_decimal_odds) * 100.0, 2)
+    if not _american_odds_match(_american_odds_value(combined_american_odds), preferences, parlay=True):
+        return None
+
+    sports = sorted({_safe_text(leg.get("sport"), "Sport") for leg in summary_legs})
+    payload = {
+        "label": _parlay_label(legs, preferences, round_robin=round_robin, ticket_index=ticket_index, ticket_total=ticket_total),
+        "legs": summary_legs,
+        "leg_count": len(legs),
+        "combined_score": round(avg_score, 2),
+        "combined_decimal_odds": combined_decimal_odds,
+        "combined_odds": combined_american_odds,
+        "combined_implied_probability": combined_implied_probability,
+        "rationale": _parlay_rationale(summary_legs),
+        "parlay_type": _safe_text(preferences.get("parlay_type"), "standard"),
+        "risk_profile": _safe_text(preferences.get("risk_profile"), "balanced"),
+        "correlation_tolerance": _safe_text(preferences.get("correlation_tolerance"), "medium"),
+        "cross_sport": len(sports) > 1,
+        "sports": sports,
+    }
+    if round_robin:
+        payload["round_robin_unit"] = preferences.get("round_robin_unit") or len(legs)
+        if anchor_legs:
+            payload["round_robin_group"] = anchor_legs
+            payload["round_robin_group_size"] = len(anchor_legs)
+    return payload
+
+
+def _parlay_rank_score(parlay: dict[str, Any], preferences: dict[str, Any]) -> float:
+    score = float(parlay.get("combined_score") or 0.0)
+    implied = float(parlay.get("combined_implied_probability") or 0.0)
+    leg_count = int(parlay.get("leg_count") or 0)
+    american = _american_odds_value(parlay.get("combined_odds")) or 0.0
+    risk_profile = _safe_text(preferences.get("risk_profile"), "balanced")
+    if risk_profile == "conservative":
+        return implied + (score * 0.35) - max(0, leg_count - 2) * 6.0
+    if risk_profile == "aggressive":
+        return (score * 0.4) + max(0.0, american) / 25.0 + leg_count * 8.0
+    return score + implied * 0.15 + (3.0 if parlay.get("cross_sport") else 0.0)
+
+
+def _build_round_robin_parlays(candidate_pool: list[dict[str, Any]], *, limit: int, preferences: dict[str, Any], min_leg_count: int, max_leg_count: int) -> list[dict[str, Any]]:
+    anchor_size = max(3, min(5, max_leg_count))
+    if anchor_size > len(candidate_pool):
+        return []
+    anchor_groups: list[tuple[dict[str, Any], ...]] = []
+    seen_groups: set[tuple[str, ...]] = set()
+    for legs in combinations(candidate_pool, anchor_size):
+        if not _parlay_matches_preferences(legs, preferences):
+            continue
+        identity = tuple(sorted(_parlay_identity(leg) for leg in legs))
+        if identity in seen_groups:
+            continue
+        seen_groups.add(identity)
+        anchor_groups.append(legs)
+    if not anchor_groups:
+        return []
+
+    best_anchor = sorted(
+        anchor_groups,
+        key=lambda legs: sum(float(leg.get("score") or 0.0) for leg in legs) / float(len(legs)),
+        reverse=True,
+    )[0]
+    ticket_size = preferences.get("round_robin_unit") or 2
+    ticket_size = max(2, min(ticket_size, anchor_size))
+    tickets: list[dict[str, Any]] = []
+    anchor_summary = [_candidate_summary(leg) for leg in best_anchor]
+    raw_tickets = list(combinations(best_anchor, ticket_size))
+    for index, legs in enumerate(raw_tickets, start=1):
+        if not _parlay_matches_preferences(legs, preferences):
+            continue
+        payload = _build_parlay_payload(
+            legs,
+            preferences,
+            round_robin=True,
+            ticket_index=index,
+            ticket_total=len(raw_tickets),
+            anchor_legs=anchor_summary,
+        )
+        if payload is not None:
+            tickets.append(payload)
+    tickets = sorted(tickets, key=lambda parlay: _parlay_rank_score(parlay, preferences), reverse=True)
+    return tickets[:limit]
+
+
 def _build_parlays(candidates: list[dict[str, Any]], *, limit: int, preferences: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     resolved_preferences = preferences or {}
     usable = [candidate for candidate in candidates if _safe_text(candidate.get("odds"), "-") != "-"]
     if len(usable) < 2:
         usable = list(candidates)
+    leg_min = resolved_preferences.get("parlay_leg_min")
+    leg_max = resolved_preferences.get("parlay_leg_max")
+    min_leg_count = max(2, min(5, int(leg_min))) if leg_min is not None else 2
+    max_leg_count = max(2, min(5, int(leg_max))) if leg_max is not None else 3
+    if min_leg_count > max_leg_count:
+        min_leg_count, max_leg_count = max_leg_count, min_leg_count
+    candidate_pool = usable[: max(8, min(len(usable), max_leg_count + 4))]
+    if resolved_preferences.get("parlay_type") == "round_robin":
+        return _build_round_robin_parlays(
+            candidate_pool,
+            limit=limit,
+            preferences=resolved_preferences,
+            min_leg_count=min_leg_count,
+            max_leg_count=max_leg_count,
+        )
+
     parlays: list[dict[str, Any]] = []
     seen: set[tuple[str, ...]] = set()
-    for leg_count in (2, 3):
-        for legs in combinations(usable[:6], leg_count):
-            matchups = {_safe_text(leg.get("matchup"), "") for leg in legs}
-            if len(matchups) < len(legs):
+    for leg_count in range(min_leg_count, max_leg_count + 1):
+        for legs in combinations(candidate_pool, leg_count):
+            if not _parlay_matches_preferences(legs, resolved_preferences):
                 continue
-            identity = tuple(sorted(f"{_safe_text(leg.get('sport_slug'), 'sport')}::{_safe_text(leg.get('pick'), 'pick')}::{_safe_text(leg.get('market'), 'market')}" for leg in legs))
+            identity = tuple(sorted(_parlay_identity(leg) for leg in legs))
             if identity in seen:
                 continue
             seen.add(identity)
-            summary_legs = [_candidate_summary(leg) for leg in legs]
-            avg_score = sum(float(leg.get("score") or 0.0) for leg in legs) / float(len(legs))
-            decimal_prices = [
-                float((leg.get("market_context") or {}).get("decimal_odds"))
-                for leg in legs
-                if isinstance(leg.get("market_context"), dict) and (leg.get("market_context") or {}).get("decimal_odds") is not None
-            ]
-            combined_decimal_odds = None
-            combined_american_odds = None
-            combined_implied_probability = None
-            if len(decimal_prices) == len(legs) and decimal_prices:
-                combined_decimal_odds = 1.0
-                for price in decimal_prices:
-                    combined_decimal_odds *= price
-                combined_decimal_odds = round(combined_decimal_odds, 3)
-                combined_american_odds = _decimal_to_american(combined_decimal_odds)
-                if combined_decimal_odds > 1.0:
-                    combined_implied_probability = round((1.0 / combined_decimal_odds) * 100.0, 2)
-            if not _american_odds_match(_american_odds_value(combined_american_odds), resolved_preferences, parlay=True):
-                continue
-            parlays.append(
-                {
-                    "label": f"{leg_count}-leg {'live' if any(leg.get('is_live') for leg in legs) else 'pregame'} parlay",
-                    "legs": summary_legs,
-                    "combined_score": round(avg_score, 2),
-                    "combined_decimal_odds": combined_decimal_odds,
-                    "combined_odds": combined_american_odds,
-                    "combined_implied_probability": combined_implied_probability,
-                    "rationale": _parlay_rationale(summary_legs),
-                }
-            )
-            if len(parlays) >= limit:
-                return parlays
-    return parlays
+            payload = _build_parlay_payload(legs, resolved_preferences)
+            if payload is not None:
+                parlays.append(payload)
+    parlays = sorted(parlays, key=lambda parlay: _parlay_rank_score(parlay, resolved_preferences), reverse=True)
+    return parlays[:limit]
 
 
 def run_intelligence_query(
@@ -1179,7 +1464,8 @@ def run_intelligence_query(
     _apply_advanced_context_to_candidates(candidates, advanced_by_sport)
     candidates = sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
     recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]
-    parlays = _build_parlays(candidates, limit=min(3, preferences["limit"]), preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
+    parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
+    parlays = _build_parlays(candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
 
     live_rows = sum(1 for candidate in candidates if bool(candidate.get("is_live")))
     pregame_rows = sum(1 for candidate in candidates if not bool(candidate.get("is_live")))
@@ -1218,6 +1504,7 @@ def run_intelligence_query(
         "preferences": preferences,
         "headline": headline,
         "summary": summary,
+        "parsed_request": _parlay_request_summary(preferences),
         "recommendations": recommendations,
         "parlays": parlays,
         "board_notes": data_notes[:8],

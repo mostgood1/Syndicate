@@ -5334,26 +5334,79 @@ class ArchiveRouteTests(unittest.TestCase):
             ],
         }
         scoreboard_index = {
-            (
-                "Toronto Maple Leafs",
-                "Montreal Canadiens",
-            ): {
+            ("gamepk", "1"): {
                 "away": "Toronto Maple Leafs",
                 "home": "Montreal Canadiens",
                 "away_goals": "2",
                 "home_goals": "1",
                 "gameState": "LIVE",
+                "period": "2",
+                "clock": "08:13",
             }
+        }
+        team_odds_index = {
+            ("tor", "mtl"): [
+                {
+                    "home": "Montreal Canadiens",
+                    "away": "Toronto Maple Leafs",
+                    "bookmaker_key": "draftkings",
+                    "bookmaker": "DraftKings",
+                    "book_last_update": "2026-05-16T23:11:00Z",
+                    "market": "h2h",
+                    "outcome_name": "Toronto Maple Leafs",
+                    "outcome_price": "+102",
+                },
+                {
+                    "home": "Montreal Canadiens",
+                    "away": "Toronto Maple Leafs",
+                    "bookmaker_key": "draftkings",
+                    "bookmaker": "DraftKings",
+                    "book_last_update": "2026-05-16T23:11:00Z",
+                    "market": "h2h",
+                    "outcome_name": "Montreal Canadiens",
+                    "outcome_price": "-122",
+                },
+                {
+                    "home": "Montreal Canadiens",
+                    "away": "Toronto Maple Leafs",
+                    "bookmaker_key": "draftkings",
+                    "bookmaker": "DraftKings",
+                    "book_last_update": "2026-05-16T23:11:00Z",
+                    "market": "totals",
+                    "outcome_name": "Over",
+                    "outcome_price": "-115",
+                    "outcome_point": "5.5",
+                },
+                {
+                    "home": "Montreal Canadiens",
+                    "away": "Toronto Maple Leafs",
+                    "bookmaker_key": "draftkings",
+                    "bookmaker": "DraftKings",
+                    "book_last_update": "2026-05-16T23:11:00Z",
+                    "market": "totals",
+                    "outcome_name": "Under",
+                    "outcome_price": "-105",
+                    "outcome_point": "5.5",
+                },
+            ]
         }
 
         with patch("syndicate.features.nhl.live_lens.build_cards_page_context", return_value=cards_context), patch(
             "syndicate.features.nhl.live_lens._load_scoreboard_index", return_value=scoreboard_index
-        ), patch("syndicate.features.nhl.live_lens.slate_summaries", return_value=[{"date": "2026-05-16"}]):
+        ), patch("syndicate.features.nhl.live_lens._load_team_odds_index", return_value=(team_odds_index, "2026-05-16T23:11:00Z")), patch("syndicate.features.nhl.live_lens.slate_summaries", return_value=[{"date": "2026-05-16"}]):
             context = build_nhl_live_lens_page_context("2026-05-16")
 
         self.assertEqual(context.get("source_title"), "NHL shared cards + scoreboard lens")
         self.assertEqual((context.get("header_stats") or [None, None, None])[2], {"label": "Live", "value": "1"})
         self.assertEqual((context.get("warning_panel") or {}).get("title"), "NHL live lens runs on the shared Syndicate game board artifacts")
+        rank_cards = context.get("rank_cards") or []
+        self.assertTrue(rank_cards)
+        metrics = rank_cards[0].get("metrics") or []
+        self.assertTrue(any(metric.get("label") == "Live ML" for metric in metrics))
+        self.assertTrue(any(metric.get("label") == "Live total" for metric in metrics))
+        self.assertIn("P2", rank_cards[0].get("meta") or "")
+        self.assertEqual(rank_cards[0].get("odds_refreshed_at"), "2026-05-16T23:11:00Z")
+        self.assertEqual(context.get("odds_refreshed_at"), "2026-05-16T23:11:00Z")
 
     def test_nhl_live_lens_page_renders_rank_board_instead_of_redirecting(self) -> None:
         response = self.client.get("/nhl/live-lens?date=2026-05-16")
