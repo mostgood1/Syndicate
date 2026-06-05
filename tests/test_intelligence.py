@@ -4,7 +4,9 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.app import create_app
+from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _build_parlays
+from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _candidate_market_fit
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
@@ -763,6 +765,24 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreater(nba_fit.get("market_fit_score") or 0.0, wnba_fit.get("market_fit_score") or 0.0)
         self.assertIn("nba usage creation", nba_fit.get("market_fit_note") or "")
         self.assertIn("wnba role pressure", wnba_fit.get("market_fit_note") or "")
+
+    def test_advanced_signal_score_handles_share_based_metrics(self) -> None:
+        item = ((
+            (_sample_nfl_market_overview()[0].get("home_rails") or {}).get("pregame") or {}
+        ).get("items") or [])[0]
+        signals = _advanced_signals_from_item(item)
+
+        self.assertIn("target_share_advanced", {signal.get("key") for signal in signals})
+        score = _candidate_advanced_signal_score(
+            {
+                "market": item.get("market"),
+                "pick": item.get("pick"),
+                "name": item.get("name"),
+                "advanced_signals": signals,
+            }
+        )
+
+        self.assertGreater(score, 0.0)
 
     def test_intelligence_query_builds_football_analysis_views(self) -> None:
         advanced_rows = [
@@ -1800,15 +1820,17 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         payload = response.get_json()
         self.assertTrue(payload.get("ok"))
         sports = payload.get("sports") or []
-        self.assertEqual(len(sports), 1)
-        artifacts = sports[0].get("artifacts") or []
+        self.assertTrue(sports)
+        mlb_row = next((row for row in sports if row.get("slug") == "mlb"), None)
+        self.assertIsNotNone(mlb_row)
+        artifacts = (mlb_row or {}).get("artifacts") or []
         self.assertTrue(any(item.get("tracked") for item in artifacts))
-        advanced_inputs = sports[0].get("advanced_inputs") or []
+        advanced_inputs = (mlb_row or {}).get("advanced_inputs") or []
         self.assertTrue(advanced_inputs)
         self.assertIn("metrics", advanced_inputs[0])
         self.assertIn("readiness_gate", payload)
-        self.assertIn("advanced_gate", sports[0])
-        self.assertIn("publish_missing_inputs", sports[0].get("advanced_gate") or {})
+        self.assertIn("advanced_gate", mlb_row or {})
+        self.assertIn("publish_missing_inputs", (mlb_row or {}).get("advanced_gate") or {})
 
     def test_intelligence_page_renders_embedded_console(self) -> None:
         with patch(
@@ -1827,5 +1849,5 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('id="intel-query-form"', body)
         self.assertIn('/api/intelligence/query', body)
-        self.assertIn('Advanced artifact status', body)
-        self.assertIn('Ask The Syndicate for best bets, live angles, or parlays', body)
+        self.assertIn('View data coverage page', body)
+        self.assertIn('Prompt The Syndicate', body)

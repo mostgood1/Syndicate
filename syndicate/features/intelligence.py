@@ -426,6 +426,7 @@ _ADVANCED_SIGNAL_TOKENS = (
     "xg",
     "epa",
     "pace",
+    "share",
 )
 _TABLE_REQUEST_TOKENS = ("table", "grid", "matrix", "tabular")
 _CHART_REQUEST_TOKENS = ("chart", "graph", "plot", "visual")
@@ -768,17 +769,42 @@ def _relevant_advanced_signals(candidate: dict[str, Any]) -> list[dict[str, Any]
     return matched or [signal for signal in signals if isinstance(signal, dict)]
 
 
+def _advanced_signal_delta(signal: dict[str, Any]) -> float | None:
+    key = _safe_text(signal.get("key"), "").lower()
+    value = signal.get("value")
+    if not key or not isinstance(value, (int, float)):
+        return None
+    numeric_value = float(value)
+    if key.endswith("_mult"):
+        return (numeric_value - 1.0) / 0.12
+    if "target_share" in key or key.endswith("_share") or "share_" in key:
+        return (numeric_value - 0.18) / 0.08
+    if "barrel_rate" in key:
+        return (numeric_value - 0.08) / 0.03
+    if "hardhit_rate" in key or "hard_hit_rate" in key:
+        return (numeric_value - 0.35) / 0.1
+    if "hr_per_bip" in key:
+        return (numeric_value - 0.06) / 0.025
+    if "xwoba" in key:
+        return (numeric_value - 0.32) / 0.04
+    if 0.0 <= numeric_value <= 1.0:
+        return None
+    return (numeric_value - 1.0) / 0.12
+
+
 def _candidate_advanced_signal_score(candidate: dict[str, Any]) -> float:
-    numeric_signals = []
+    normalized_deltas: list[float] = []
     for signal in _relevant_advanced_signals(candidate):
-        value = signal.get("value") if isinstance(signal, dict) else None
-        if isinstance(value, (int, float)):
-            numeric_signals.append(float(value))
-    if not numeric_signals:
+        if not isinstance(signal, dict):
+            continue
+        delta = _advanced_signal_delta(signal)
+        if delta is not None:
+            normalized_deltas.append(delta)
+    if not normalized_deltas:
         return 0.0
     direction = -1.0 if "under" in _safe_text(candidate.get("pick"), "").lower() else 1.0
-    avg_delta = sum(value - 1.0 for value in numeric_signals) / float(len(numeric_signals))
-    return max(-6.0, min(6.0, avg_delta * 24.0 * direction))
+    avg_delta = sum(normalized_deltas) / float(len(normalized_deltas))
+    return max(-6.0, min(6.0, avg_delta * 2.5 * direction))
 
 
 def _advanced_signal_text(candidate: dict[str, Any], *, limit: int = 2) -> str:
