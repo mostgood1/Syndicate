@@ -323,6 +323,11 @@
   }
 
   function liveRowFreshnessText(row, fallbackLabel) {
+    const oddsRefreshedAt = row?.oddsRefreshedAt || row?.odds_refreshed_at || '';
+    const refreshedAt = oddsRefreshedAt ? formatTimestampShort(oddsRefreshedAt) : '';
+    if (refreshedAt && refreshedAt !== '-') {
+      return `Odds refreshed ${refreshedAt}`;
+    }
     const updatedAt = row?.lastSeenAt ? formatTimestampShort(row.lastSeenAt) : '';
     if (updatedAt && updatedAt !== '-') {
       return `Updated ${updatedAt}`;
@@ -2282,7 +2287,7 @@
     }
     const player = String(item?.player || 'This player').trim() || 'This player';
     const actual = item?.actual != null && Number.isFinite(Number(item.actual)) ? Number(item.actual) : null;
-    const paceProj = Number(item?.pace_proj);
+    const paceProj = finiteFirst(item?.live_projection, item?.liveProjection, item?.pace_proj);
     const line = Number(item?.line);
     if (Number.isFinite(actual) && Number.isFinite(paceProj) && Number.isFinite(line)) {
       const edge = paceProj - line;
@@ -2323,7 +2328,7 @@
     }
     const player = String(item?.player || 'This player').trim() || 'This player';
     const actual = item?.actual != null && Number.isFinite(Number(item.actual)) ? Number(item.actual) : null;
-    const paceProj = Number(item?.pace_proj);
+    const paceProj = finiteFirst(item?.live_projection, item?.liveProjection, item?.pace_proj);
     const line = Number(item?.line);
     const side = livePropPrimarySide(item) || String(item?.side || '').trim().toUpperCase();
     const lineSource = String(item?.line_source || '').trim().toLowerCase();
@@ -2673,7 +2678,7 @@
   }
 
   function livePropPrimarySide(item) {
-    const paceEdge = Number(item?.pace_vs_line);
+    const paceEdge = finiteFirst(item?.live_edge, item?.liveEdge, item?.pace_vs_line);
     if (Number.isFinite(paceEdge) && Math.abs(paceEdge) > 0.01) {
       return paceEdge >= 0 ? 'OVER' : 'UNDER';
     }
@@ -2686,7 +2691,7 @@
   }
 
   function livePropPrimaryEdge(item) {
-    const paceEdge = Number(item?.pace_vs_line);
+    const paceEdge = finiteFirst(item?.live_edge, item?.liveEdge, item?.pace_vs_line);
     if (Number.isFinite(paceEdge)) {
       return Math.abs(paceEdge);
     }
@@ -2713,10 +2718,10 @@
         probRank: -1,
       };
     }
-    const paceProj = Number(item?.pace_proj);
+    const paceProj = finiteFirst(item?.live_projection, item?.liveProjection, item?.pace_proj);
     const simValue = finiteFirst(item?.sim_mu_adjusted, item?.sim_mu);
     const line = Number(item?.line);
-    const paceEdge = Number(item?.pace_vs_line);
+    const paceEdge = finiteFirst(item?.live_edge, item?.liveEdge, item?.pace_vs_line);
     const simEdge = finiteFirst(item?.sim_vs_line_adjusted, item?.sim_vs_line);
     const strength = Number(item?.strength);
     const bettableScore = Number(item?.score_adj ?? item?.bettable_score);
@@ -2928,8 +2933,15 @@
       const price = Number(safeItem.price);
       const evPct = Number(safeItem.ev_pct);
       const winProb = Number(safeItem.probability ?? safeItem.prob_calib);
-      const cardTarget = resolveStripCardTarget(safeItem);
       const isLiveStrip = String(state.propsStripPayload?.mode || '') === 'live' || isLivePropItem(safeItem);
+      const liveEdge = finiteFirst(
+        safeItem?.live_edge,
+        safeItem?.liveEdge,
+        safeItem?.pace_vs_line,
+        (Number.isFinite(Number(line)) ? (finiteFirst(safeItem?.live_projection, safeItem?.liveProjection, safeItem?.pace_proj) - Number(line)) : null),
+      );
+      const freshnessText = isLiveStrip ? liveRowFreshnessText(safeItem, safeItem.status_label || 'Live') : '';
+      const cardTarget = resolveStripCardTarget(safeItem);
       const actionLabel = isLiveStrip
         ? String(safeItem.klass || '').trim().toUpperCase()
         : String(safeItem.tier || '').trim().toUpperCase();
@@ -2960,8 +2972,10 @@
             <div class="cards-strip-pills">
               ${actionLabel ? `<span class="cards-chip ${actionClass}">${escapeHtml(actionLabel)}</span>` : ''}
               ${Number.isFinite(price) ? `<span class="cards-chip">${escapeHtml(fmtAmerican(price))}</span>` : ''}
+              ${isLiveStrip && Number.isFinite(liveEdge) ? `<span class="cards-chip ${liveEdge >= 0 ? 'cards-chip--accent' : ''}">Live edge ${escapeHtml(fmtSigned(liveEdge, 1))}</span>` : ''}
               ${Number.isFinite(evPct) ? `<span class="cards-chip cards-chip--accent">EV ${escapeHtml(fmtPercentValue(evPct))}</span>` : ''}
               ${Number.isFinite(winProb) ? `<span class="cards-chip">${escapeHtml(isLiveStrip ? fmtPercent(winProb, 0) : fmtPercentValue(winProb))}</span>` : ''}
+              ${isLiveStrip && freshnessText ? `<span class="cards-chip">${escapeHtml(freshnessText)}</span>` : ''}
             </div>
           </div>
           ${cardTarget ? `<button class="cards-props-strip-card__jump" type="button" data-jump-card="${escapeHtml(cardTarget)}">Jump to game</button>` : ''}
@@ -3018,6 +3032,7 @@
             <span class="cards-source-meta-pill ${isLiveStrip ? 'is-live' : 'is-soft'}">${escapeHtml(String(renderedItems.length))} shown</span>
             ${isLiveStrip ? `<span class="cards-source-meta-pill is-soft">${escapeHtml(String(filteredItems.length))} match</span>` : ''}
             ${isLiveStrip ? `<span class="cards-source-meta-pill is-soft">${escapeHtml(String(sortedItems.length))} in pool</span>` : ''}
+            ${isLiveStrip && payload?.odds_refreshed_at ? `<span class="cards-source-meta-pill is-soft">${escapeHtml(`Odds ${formatTimestampShort(payload.odds_refreshed_at)}`)}</span>` : ''}
             <span class="cards-source-meta-pill">${escapeHtml(String(payload?.date || state.date || ''))}</span>
           </div>
         </div>
@@ -3041,9 +3056,17 @@
       const gameItems = safeArray(game?.rows)
         .filter((row) => row && row.player && row.team_tri)
         .filter((row) => row.line_source && row.line_source !== 'model')
-        .filter((row) => row.pace_proj != null || row.sim_mu_adjusted != null || row.sim_mu != null || row.ev_side || row.lean)
+        .filter((row) => row.live_projection != null || row.liveProjection != null || row.live_edge != null || row.liveEdge != null || row.pace_proj != null || row.sim_mu_adjusted != null || row.sim_mu != null || row.ev_side || row.lean)
         .map((row) => {
           try {
+            const projection = finiteFirst(row?.live_projection, row?.liveProjection, row?.pace_proj, row?.sim_mu_adjusted, row?.sim_mu);
+            const lineValue = row?.line_live ?? row?.line;
+            const liveEdge = finiteFirst(
+              row?.live_edge,
+              row?.liveEdge,
+              row?.pace_vs_line,
+              (Number.isFinite(Number(projection)) && Number.isFinite(Number(lineValue))) ? (Number(projection) - Number(lineValue)) : null,
+            );
             return {
               away_tri: game?.away,
               home_tri: game?.home,
@@ -3073,8 +3096,12 @@
               line_source: row?.line_source,
               status_label: status?.final ? 'Final' : (status?.in_progress ? `Q${status?.period || '-'} ${status?.clock || ''}`.trim() : 'Live'),
               actual: row?.actual,
-              pace_proj: row?.pace_proj,
-              pace_vs_line: row?.pace_vs_line,
+              live_projection: projection,
+              liveProjection: projection,
+              live_edge: liveEdge,
+              liveEdge: liveEdge,
+              pace_proj: projection,
+              pace_vs_line: liveEdge,
               strength: row?.strength,
               score_adj: row?.bettable_score ?? row?.strength ?? row?.ev,
               sim_mu: row?.sim_mu,
@@ -3584,8 +3611,13 @@
     const market = String(item?.market || '').trim().toLowerCase();
     const side = livePropPrimarySide(item) || String(item?.side || '').trim().toUpperCase();
     const klass = String(item?.klass || '').trim().toUpperCase();
-    const projection = Number(item?.pace_proj);
-    const liveEdge = Number(item?.pace_vs_line);
+    const projection = finiteFirst(item?.live_projection, item?.liveProjection, item?.pace_proj, item?.sim_mu_adjusted, item?.sim_mu);
+    const liveEdge = finiteFirst(
+      item?.live_edge,
+      item?.liveEdge,
+      item?.pace_vs_line,
+      (Number.isFinite(Number(projection)) && Number.isFinite(Number(item?.line))) ? (Number(projection) - Number(item?.line)) : null,
+    );
     if (actionableOnly && klass !== 'BET' && klass !== 'WATCH') {
       return null;
     }
@@ -3628,6 +3660,7 @@
       liveEdge: Number.isFinite(liveEdge) ? liveEdge : null,
       firstSeenAt: item?.first_seen_at,
       lastSeenAt: item?.last_seen_at,
+      oddsRefreshedAt: item?.odds_refreshed_at || item?.oddsRefreshedAt || null,
     };
   }
 
