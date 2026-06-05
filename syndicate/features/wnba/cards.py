@@ -1742,6 +1742,22 @@ def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _payload_has_live_boxscore_players(payload: dict[str, Any] | None) -> bool:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    return any(
+        isinstance(game, dict) and isinstance(game.get("players"), list) and bool(game.get("players"))
+        for game in games
+    )
+
+
+def _payload_has_live_lens_rows(payload: dict[str, Any] | None) -> bool:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    return any(
+        isinstance(game, dict) and isinstance(game.get("rows"), list) and bool(game.get("rows"))
+        for game in games
+    )
+
+
 def _parse_payload_timestamp(value: Any) -> datetime | None:
     text = str(value or "").strip()
     if not text:
@@ -1845,6 +1861,37 @@ def _resolve_games_for_event_ids(selected_date: str, event_ids: list[str]) -> di
         for game in [by_event.get(event_id)]
         if isinstance(game, dict)
     }
+
+
+def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: bool = True) -> list[str]:
+    live_payload = build_live_state_payload(
+        selected_date,
+        ttl=12,
+        allow_stored_date_fallback=allow_stored_date_fallback,
+    )
+    games = live_payload.get("games") if isinstance(live_payload, dict) else []
+    event_ids: list[str] = []
+    for game in games if isinstance(games, list) else []:
+        if not isinstance(game, dict):
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        if bool(game.get("in_progress")) and not bool(game.get("final")):
+            event_ids.append(event_id)
+    if event_ids:
+        return list(dict.fromkeys(event_ids))
+
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    context_games = context.get("games") if isinstance(context.get("games"), list) else []
+    for game in context_games:
+        if not isinstance(game, dict):
+            continue
+        status = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+        event_id = str(game.get("event_id") or "").strip()
+        if event_id and bool(status.get("in_progress")) and not bool(status.get("final")):
+            event_ids.append(event_id)
+    return list(dict.fromkeys(event_ids))
 
 
 def _player_sim_stat(player_row: dict[str, Any], market: str) -> float | None:
@@ -2426,10 +2473,15 @@ def build_live_player_boxscore_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        normalized_event_ids = _default_live_event_ids(
+            selected_date,
+            allow_stored_date_fallback=allow_stored_date_fallback,
+        )
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+    if _payload_has_live_boxscore_players(local_payload):
         return _attach_odds_refresh_timestamp(local_payload)
 
     if _remote_source_fallback_enabled():
@@ -2438,11 +2490,11 @@ def build_live_player_boxscore_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
+        if _payload_has_live_boxscore_players(remote_payload):
             return _attach_odds_refresh_timestamp(remote_payload)
 
     public_payload = _public_live_player_boxscore_payload(resolved_date, normalized_event_ids)
-    if isinstance(public_payload, dict) and isinstance(public_payload.get("games"), list) and bool(public_payload.get("games")):
+    if _payload_has_live_boxscore_players(public_payload):
         return _attach_odds_refresh_timestamp(public_payload)
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
@@ -2481,6 +2533,11 @@ def build_live_player_lens_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        normalized_event_ids = _default_live_event_ids(
+            selected_date,
+            allow_stored_date_fallback=allow_stored_date_fallback,
+        )
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
@@ -2505,7 +2562,7 @@ def build_live_player_lens_payload(
             if any(isinstance(game, dict) and bool(game.get("rows")) for game in (hydrated_remote_payload.get("games") if isinstance(hydrated_remote_payload.get("games"), list) else [])):
                 return _attach_odds_refresh_timestamp(hydrated_remote_payload)
 
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+    if _payload_has_live_lens_rows(local_payload):
         return _hydrate_live_player_lens_payload(
             _attach_odds_refresh_timestamp(local_payload),
             resolved_date,

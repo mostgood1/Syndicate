@@ -77,6 +77,7 @@ from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.wnba.live_game_accuracy import build_live_game_accuracy_payload as build_wnba_live_game_accuracy_payload
 from syndicate.features.wnba.live_prop_accuracy import build_live_prop_accuracy_payload as build_wnba_live_prop_accuracy_payload
 from syndicate.features.wnba.live_prop_audit import build_live_prop_audit_payload as build_wnba_live_prop_audit_payload
+from syndicate.features.wnba.cards import build_live_player_boxscore_payload as build_wnba_live_player_boxscore_payload
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
 from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
@@ -1248,6 +1249,85 @@ class DateArchiveHelperTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), local_payload)
+
+    def test_wnba_api_live_player_boxscore_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-05-21",
+            "games": [{"event_id": "evt-1", "players": [{"player": "Test Player", "team_tri": "LAS"}]}],
+        }
+
+        with patch(
+            "syndicate.blueprints.wnba.build_live_player_boxscore_payload",
+            return_value=local_payload,
+        ) as build_mock, patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for live player boxscore"),
+        ):
+            response = client.get("/wnba/api/live_player_boxscore?date=2026-05-21")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-05-21", []))
+        self.assertEqual(kwargs["ttl"], 20)
+
+    def test_wnba_api_live_player_lens_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-05-21",
+            "games": [{"event_id": "evt-1", "rows": [{"player": "Test Player", "stat": "pts"}]}],
+        }
+
+        with patch(
+            "syndicate.blueprints.wnba.build_live_player_lens_payload",
+            return_value=local_payload,
+        ) as build_mock, patch(
+            "syndicate.features.wnba.source_proxy.source_web_text",
+            side_effect=AssertionError("WNBA source proxy assets should not be used for live player lens"),
+        ):
+            response = client.get("/wnba/api/live_player_lens?date=2026-05-21")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-05-21", []))
+        self.assertEqual(kwargs["ttl"], 20)
+
+    def test_wnba_live_player_boxscore_ignores_empty_local_shell_payload(self) -> None:
+        public_payload = {
+            "ok": True,
+            "date": "2026-05-21",
+            "source": "espn_summary_boxscore_fallback",
+            "games": [{"event_id": "evt-1", "players": [{"player": "Test Player", "team_tri": "LAS"}]}],
+        }
+
+        with patch(
+            "syndicate.features.wnba.cards._default_live_event_ids",
+            return_value=["evt-1"],
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-05-21", "games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value={"ok": True, "date": "2026-05-21", "games": [{"event_id": "evt-1", "players": []}]},
+        ), patch(
+            "syndicate.features.wnba.cards._public_live_player_boxscore_payload",
+            return_value=public_payload,
+        ):
+            payload = build_wnba_live_player_boxscore_payload("2026-05-21", [])
+
+        self.assertEqual(payload.get("source"), "espn_summary_boxscore_fallback")
+        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual(len((payload.get("games") or [{}])[0].get("players") or []), 1)
 
     def test_wnba_api_source_team_logo_fetches_official_logo_without_source_proxy(self) -> None:
         app = create_app()

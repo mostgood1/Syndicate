@@ -1726,7 +1726,7 @@
           ),
           fetchApiJson(`${API_BASE_PATH}/live_lens_tuning?ttl=300`, 'Failed to load live lens tuning.', { retries: 1 }),
           fetchApiJson(
-            `${API_BASE_PATH}/live_player_boxscore?event_ids=${encodeURIComponent(eventIds.join(','))}`,
+            `${API_BASE_PATH}/live_player_boxscore?date=${encodeURIComponent(dateValue)}&event_ids=${encodeURIComponent(eventIds.join(','))}`,
             'Failed to load live player boxscore.',
             { retries: silent ? 2 : 1 }
           ),
