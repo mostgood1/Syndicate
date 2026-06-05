@@ -1366,6 +1366,15 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(((payload.get("games") or [{}])[0].get("lines") or {}).get("total"), 174.0)
         self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_totals") or {}).get("q1"), 41.707)
 
+    def test_wnba_live_state_status_text_infers_period_and_clock(self) -> None:
+        from syndicate.features.wnba.cards import _infer_period_clock_from_status_text
+
+        self.assertEqual(_infer_period_clock_from_status_text("1:18 - 4th"), (4, "1:18"))
+        self.assertEqual(_infer_period_clock_from_status_text("7:59 - 1st"), (1, "7:59"))
+        self.assertEqual(_infer_period_clock_from_status_text("2:34 - OT"), (5, "2:34"))
+        self.assertEqual(_infer_period_clock_from_status_text("1:07 - 2OT"), (6, "1:07"))
+        self.assertEqual(_infer_period_clock_from_status_text("Halftime"), (None, ""))
+
     def test_wnba_cards_live_state_supplement_sets_event_id_on_merged_game(self) -> None:
         artifact_game = {
             "gamePk": "ATL@IND",

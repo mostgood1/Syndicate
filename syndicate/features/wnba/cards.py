@@ -1618,6 +1618,11 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
             or str(status_type.get("description") or "").strip()
             or "Scheduled"
         )
+        inferred_period, inferred_clock = _infer_period_clock_from_status_text(status_text)
+        if period is None and inferred_period is not None:
+            period = inferred_period
+        if not clock and inferred_clock:
+            clock = inferred_clock
         normalized_status = _normalized_game_status(
             status_text=status_text,
             detail_text=status_text,
@@ -2817,3 +2822,29 @@ def build_live_lens_tuning_payload(ttl: int = 300) -> dict[str, Any]:
             "player_prop": {"watch": 2.0, "bet": 4.0},
         },
     }
+
+
+def _infer_period_clock_from_status_text(status_text: Any) -> tuple[int | None, str]:
+    text = str(status_text or "").strip()
+    if not text:
+        return None, ""
+    match = re.search(r"(?P<clock>\d{1,2}:\d{2})\s*-\s*(?P<period>(?:1st|2nd|3rd|4th|OT|\d+OT))", text, re.IGNORECASE)
+    if not match:
+        return None, ""
+    clock = str(match.group("clock") or "").strip()
+    period_label = str(match.group("period") or "").strip().upper()
+    if period_label == "1ST":
+        return 1, clock
+    if period_label == "2ND":
+        return 2, clock
+    if period_label == "3RD":
+        return 3, clock
+    if period_label == "4TH":
+        return 4, clock
+    if period_label == "OT":
+        return 5, clock
+    overtime_match = re.fullmatch(r"(\d+)OT", period_label)
+    if overtime_match:
+        overtime_index = int(overtime_match.group(1) or 1)
+        return max(5, 4 + overtime_index), clock
+    return None, clock
