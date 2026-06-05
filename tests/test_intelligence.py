@@ -1533,6 +1533,86 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(all(item.get("subject_key") == "aaron judge" for item in recommendations))
         self.assertTrue(all(item.get("is_live") for item in recommendations))
 
+    def test_intelligence_query_uses_mlb_top_props_artifact_for_requested_pitcher_subject(self) -> None:
+        overview = _sample_mlb_market_overview()
+        overview[0]["context_label"] = "2026-06-05"
+
+        def _mock_mlb_load_json_file(path):
+            text = str(path).replace("\\", "/").lower()
+            if text.endswith("daily/top_props/daily_top_props_2026_06_05.json"):
+                return {
+                    "groups": {
+                        "pitcher": {
+                            "sections": [
+                                {
+                                    "stat": "strikeouts",
+                                    "rows": [
+                                        {
+                                            "stat": "strikeouts",
+                                            "statLabel": "Strikeouts",
+                                            "group": "pitcher",
+                                            "ownerId": 687064,
+                                            "ownerName": "Brandon Young",
+                                            "playerName": "Brandon Young",
+                                            "team": "BAL",
+                                            "opponent": "TOR",
+                                            "matchup": "BAL @ TOR",
+                                            "mean": 5.327,
+                                            "line": 3.5,
+                                            "marketLine": 3.5,
+                                            "selection": "over",
+                                            "selectionLabel": "Over",
+                                            "simProb": 0.819,
+                                            "marketProb": 0.5665,
+                                            "rawEdge": 0.2525,
+                                            "odds": -155,
+                                            "rank": 3,
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    }
+                }
+            if text.endswith("daily/snapshots/2026-06-05/oddsapi_pitcher_props_2026_06_05.json"):
+                return {
+                    "pitcher_props": {
+                        "brandon young": {
+                            "strikeouts": {
+                                "line": 4.5,
+                                "over_odds": "+124",
+                                "under_odds": "-166",
+                                "alternates": [{"line": 3.5, "over_odds": "-170", "under_odds": "+130"}],
+                            }
+                        }
+                    }
+                }
+            return {}
+
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    with patch("syndicate.features.intelligence.mlb_load_json_file", side_effect=_mock_mlb_load_json_file):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "What is Brandon Young strikeouts projection today?",
+                                "date": "2026-06-05",
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        parsed_request = result.get("parsed_request") or {}
+        self.assertEqual(parsed_request.get("requested_subjects"), ["Brandon Young"])
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertEqual(recommendations[0].get("subject_key"), "brandon young")
+        self.assertEqual(recommendations[0].get("projected"), "5.3")
+        self.assertEqual(recommendations[0].get("line"), "4.5")
+        self.assertEqual(recommendations[0].get("odds"), "+124")
+        self.assertIn("Projection 5.3 versus line 4.5", recommendations[0].get("rationale") or "")
+
     def test_build_parlays_limits_standard_leg_count_for_tight_exposure_caps(self) -> None:
         preferences = _query_preferences(
             "Build an aggressive 2 to 3 leg parlay from the best NBA edges with a $100 bankroll and max 3% exposure"

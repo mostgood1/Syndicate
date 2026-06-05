@@ -15,6 +15,8 @@ from syndicate.blueprints.home import _build_prop_dashboard_row
 from syndicate.blueprints.home import _build_sport_overview
 from syndicate.blueprints.home import _game_bet_candidates_from_game
 from syndicate.features.mlb.sources import daily_artifact_path as mlb_daily_artifact_path
+from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path as mlb_daily_snapshot_oddsapi_pitcher_props_path
+from syndicate.features.mlb.sources import daily_top_props_path as mlb_daily_top_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.mlb.sources import load_json_file as mlb_load_json_file
 from syndicate.features.nba.sources import live_snapshot_path as nba_live_snapshot_path
@@ -2583,6 +2585,135 @@ def _mlb_home_run_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[s
     return candidates
 
 
+def _mlb_subject_prop_candidates_from_artifact(
+    sport: dict[str, Any],
+    *,
+    question: str,
+    preferences: dict[str, Any],
+) -> list[dict[str, Any]]:
+    if _safe_text(sport.get("slug"), "").lower() != "mlb":
+        return []
+    selected_date = _safe_text(sport.get("context_label"), "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
+        return []
+    normalized_question = _normalized_market_text(question)
+    if not normalized_question:
+        return []
+    requested_markets = {
+        str(item).strip().lower()
+        for item in (preferences.get("requested_markets") or [])
+        if str(item).strip()
+    }
+    top_props = mlb_load_json_file(mlb_daily_top_props_path(selected_date))
+    rows: list[dict[str, Any]] = []
+    groups = top_props.get("groups") if isinstance((top_props or {}).get("groups"), dict) else {}
+    pitcher_group = groups.get("pitcher") if isinstance(groups.get("pitcher"), dict) else {}
+    sections = pitcher_group.get("sections") if isinstance(pitcher_group.get("sections"), list) else []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        section_rows = section.get("rows") if isinstance(section.get("rows"), list) else []
+        for row in section_rows:
+            if isinstance(row, dict):
+                rows.append(row)
+    pitcher_snapshot = mlb_load_json_file(mlb_daily_snapshot_oddsapi_pitcher_props_path(selected_date))
+    pitcher_market_rows = pitcher_snapshot.get("pitcher_props") if isinstance((pitcher_snapshot or {}).get("pitcher_props"), dict) else {}
+    candidates: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str]] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        player_name = _safe_text(row.get("ownerName") or row.get("playerName"), "")
+        normalized_name = _normalized_market_text(player_name)
+        if not normalized_name:
+            continue
+        if not re.search(rf"(?<![a-z0-9]){re.escape(normalized_name)}(?![a-z0-9])", normalized_question):
+            continue
+        market_key = _market_key_from_text(row.get("stat") or row.get("statLabel"), allow_fallback=True)
+        if not market_key:
+            continue
+        if requested_markets and market_key not in requested_markets:
+            continue
+        dedupe_key = (normalized_name, market_key)
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+
+        snapshot_player = pitcher_market_rows.get(normalized_name) if isinstance(pitcher_market_rows, dict) else None
+        snapshot_market = snapshot_player.get(market_key) if isinstance((snapshot_player or {}).get(market_key), dict) else {}
+        line_value = _numeric_hint(snapshot_market.get("line"))
+        if line_value is None:
+            line_value = _numeric_hint(row.get("marketLine") or row.get("line"))
+        mean_value = _numeric_hint(row.get("mean"))
+        sim_prob = _numeric_hint(row.get("simProb"))
+        raw_edge = _numeric_hint(row.get("rawEdge"))
+        selection_label = _safe_text(row.get("selectionLabel"), "Over") or "Over"
+        selection_direction = 1 if selection_label.lower() == "over" else -1 if selection_label.lower() == "under" else 0
+        odds_text = _safe_text(
+            snapshot_market.get("over_odds") if selection_direction >= 0 else snapshot_market.get("under_odds"),
+            "",
+        )
+        if not odds_text:
+            odds_value = _american_odds_value(row.get("odds"))
+            if odds_value is not None:
+                odds_text = f"+{int(odds_value)}" if odds_value > 0 else str(int(odds_value))
+        matchup = _safe_text(row.get("matchup"), "-")
+        market_label = _safe_text(row.get("statLabel"), "") or _market_label(market_key)
+        pick = f"{selection_label} {line_value:.1f}" if line_value is not None else selection_label
+        projected_text = f"{mean_value:.1f}" if mean_value is not None else "-"
+        confidence_text = f"{sim_prob * 100.0:.1f}%" if sim_prob is not None else "-"
+        edge_text = f"{raw_edge * 100.0:.1f}%" if raw_edge is not None else "-"
+        detail_bits = []
+        if mean_value is not None and line_value is not None:
+            detail_bits.append(f"Projection {mean_value:.1f} versus line {line_value:.1f}")
+        if sim_prob is not None:
+            detail_bits.append(f"Sim win probability {sim_prob * 100.0:.1f}%")
+        if raw_edge is not None:
+            detail_bits.append(f"Raw edge {raw_edge * 100.0:.1f}%")
+        score = float(sim_prob or 0.0) * 100.0 + max(0.0, float(raw_edge or 0.0) * 100.0)
+        rank_value = _safe_int(row.get("rank"))
+        if rank_value is not None:
+            score += max(0.0, 15.0 - float(rank_value))
+        candidates.append(
+            {
+                "candidate_type": "prop",
+                "sport": _safe_text(sport.get("name"), "MLB"),
+                "sport_slug": "mlb",
+                "surface_key": "pregame",
+                "surface_title": "Top props artifact",
+                "name": f"{player_name} {selection_label} {line_value:.1f} {market_label}" if line_value is not None else f"{player_name} {selection_label} {market_label}",
+                "market": f"Pitcher {market_label}" if _safe_text(row.get("group"), "").lower() == "pitcher" else market_label,
+                "market_key": market_key,
+                "pick": pick,
+                "matchup": matchup,
+                "team": _safe_text(row.get("team"), "-"),
+                "team_key": _normalized_market_text(_safe_text(row.get("team"), "")) or None,
+                "player_team": _safe_text(row.get("team"), "-"),
+                "line": f"{line_value:.1f}" if line_value is not None else "-",
+                "odds": odds_text or "-",
+                "projected": projected_text,
+                "confidence": confidence_text,
+                "edge": edge_text,
+                "score": score,
+                "href": f"/mlb/cards?date={selected_date}",
+                "href_label": "Open board",
+                "writeup": ". ".join(detail_bits) if detail_bits else f"Artifact-backed {market_label.lower()} view for {player_name}.",
+                "display_pills": [
+                    pill
+                    for pill in (
+                        f"Proj {projected_text}" if projected_text != "-" else "",
+                        f"Line {line_value:.1f}" if line_value is not None else "",
+                        f"Sim% {confidence_text}" if confidence_text != "-" else "",
+                    )
+                    if pill
+                ],
+                "owner_id": _safe_int(row.get("ownerId")),
+                "selection_direction": selection_direction,
+            }
+        )
+    return candidates
+
+
 def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
     candidates: list[dict[str, Any]] = []
@@ -3627,6 +3758,24 @@ def run_intelligence_query(
                 continue
             candidates.extend(_mlb_home_run_candidates_from_artifact(sport_row))
             break
+    for sport_row in overview:
+        if not isinstance(sport_row, dict):
+            continue
+        extra_subject_candidates = _mlb_subject_prop_candidates_from_artifact(
+            sport_row,
+            question=question,
+            preferences=preferences,
+        )
+        for candidate in extra_subject_candidates:
+            candidate_subject = _candidate_subject_key(candidate)
+            candidate_market = _candidate_market_key(candidate)
+            if any(
+                _candidate_subject_key(existing) == candidate_subject
+                and _candidate_market_key(existing) == candidate_market
+                for existing in candidates
+            ):
+                continue
+            candidates.append(candidate)
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}
