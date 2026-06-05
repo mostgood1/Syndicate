@@ -311,6 +311,103 @@ def _sample_mlb_risk_overview() -> list[dict[str, object]]:
     ]
 
 
+def _sample_mlb_compare_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "mlb",
+            "name": "MLB",
+            "context_label": "2026-06-04",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {
+                    "title": "Pregame props",
+                    "items": [
+                        {
+                            "name": "Aaron Judge Over 0.5 Home Runs",
+                            "market": "Hitter Home Runs",
+                            "pick": "Over 0.5",
+                            "matchup": "NYY at BOS",
+                            "projected": 0.64,
+                            "line": 0.5,
+                            "odds": "+310",
+                            "confidence": "27%",
+                            "edge": "+3.2%",
+                            "writeup": "Barrel rate and park lift the HR ceiling.",
+                            "href": "/mlb/prop-ladders?date=2026-06-04",
+                        },
+                        {
+                            "name": "Shohei Ohtani Over 0.5 Home Runs",
+                            "market": "Hitter Home Runs",
+                            "pick": "Over 0.5",
+                            "matchup": "LAD at SD",
+                            "projected": 0.58,
+                            "line": 0.5,
+                            "odds": "+295",
+                            "confidence": "25%",
+                            "edge": "+2.7%",
+                            "writeup": "Pulled-air damage and lift support the HR path.",
+                            "href": "/mlb/prop-ladders?date=2026-06-04",
+                        },
+                        {
+                            "name": "Freddie Freeman Over 1.5 Total Bases",
+                            "market": "Hitter Total Bases",
+                            "pick": "Over 1.5",
+                            "matchup": "LAD at SD",
+                            "projected": 2.1,
+                            "line": 1.5,
+                            "odds": "+115",
+                            "confidence": "58%",
+                            "edge": "+3.6%",
+                            "writeup": "Contact quality and lineup spot support extra-base upside.",
+                            "href": "/mlb/prop-ladders?date=2026-06-04",
+                        },
+                    ],
+                },
+                "live": {
+                    "title": "Top Live Props",
+                    "items": [
+                        {
+                            "name": "Aaron Judge Over 1.5 Hits",
+                            "market": "Hits",
+                            "pick": "Over 1.5",
+                            "matchup": "NYY at BOS",
+                            "projected": 1.8,
+                            "live_projection": 2.0,
+                            "actual": 1,
+                            "line": 1.5,
+                            "odds": "+125",
+                            "confidence": "57%",
+                            "edge": "+4.1%",
+                            "writeup": "Live contact shape still favors another knock.",
+                            "is_live": True,
+                            "href": "/mlb/live-lens?date=2026-06-04",
+                        },
+                        {
+                            "name": "Mookie Betts Over 1.5 Hits",
+                            "market": "Hits",
+                            "pick": "Over 1.5",
+                            "matchup": "LAD at SD",
+                            "projected": 1.7,
+                            "live_projection": 1.9,
+                            "actual": 1,
+                            "line": 1.5,
+                            "odds": "+118",
+                            "confidence": "55%",
+                            "edge": "+3.4%",
+                            "writeup": "Ball-in-play quality is still carrying the lane.",
+                            "is_live": True,
+                            "href": "/mlb/live-lens?date=2026-06-04",
+                        },
+                    ],
+                },
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        }
+    ]
+
+
 def _sample_nfl_market_overview() -> list[dict[str, object]]:
     return [
         {
@@ -1101,6 +1198,53 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(recommendations)
         self.assertEqual(recommendations[0].get("name"), "Aaron Judge Over 0.5 Home Runs")
         self.assertEqual((result.get("parsed_request") or {}).get("risk_profile"), "aggressive")
+
+    def test_intelligence_query_builds_subject_comparison_view(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_compare_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Compare Judge vs Ohtani home run outlook today",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        self.assertIn("Judge", result.get("headline") or "")
+        parsed_request = result.get("parsed_request") or {}
+        self.assertEqual(parsed_request.get("requested_subjects"), ["Aaron Judge", "Shohei Ohtani"])
+        recommendations = result.get("recommendations") or []
+        self.assertEqual(len(recommendations), 2)
+        self.assertEqual({item.get("subject_key") for item in recommendations}, {"aaron judge", "shohei ohtani"})
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "subject_comparison")
+        table_rows = ((analysis_views.get("table") or {}).get("rows") or [])
+        self.assertEqual(len(table_rows), 2)
+        self.assertEqual([row.get("subject") for row in table_rows], ["Aaron Judge", "Shohei Ohtani"])
+
+    def test_intelligence_query_filters_live_props_to_requested_subject(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_compare_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Show me the best live props for Judge right now",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        parsed_request = result.get("parsed_request") or {}
+        self.assertEqual(parsed_request.get("requested_subjects"), ["Aaron Judge"])
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertTrue(all(item.get("subject_key") == "aaron judge" for item in recommendations))
+        self.assertTrue(all(item.get("is_live") for item in recommendations))
 
     def test_build_parlays_limits_standard_leg_count_for_tight_exposure_caps(self) -> None:
         preferences = _query_preferences(

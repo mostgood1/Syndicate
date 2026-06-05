@@ -855,6 +855,11 @@ def _question_requests_explainer(question: str) -> bool:
     return any(token in lowered for token in ("why", "matchup", "matchups", "analysis", "breakdown", "explain"))
 
 
+def _question_requests_comparison(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return bool(re.search(r"\b(?:compare|vs\.?|versus)\b", lowered))
+
+
 def _analysis_focus_from_question(
     question: str,
     requested_sports: list[str] | tuple[str, ...] | None,
@@ -1228,7 +1233,53 @@ def _hockey_prop_analysis_views(candidates: list[dict[str, Any]], preferences: d
     }
 
 
+def _comparison_analysis_views(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
+    requested_subjects = [str(item).strip().lower() for item in (preferences.get("requested_subjects") or []) if str(item).strip()]
+    if not preferences.get("comparison_requested") or len(requested_subjects) < 2:
+        return None
+
+    table_rows: list[dict[str, Any]] = []
+    chart_rows: list[dict[str, Any]] = []
+    for index, subject_key in enumerate(requested_subjects[:6], start=1):
+        candidate = next((item for item in candidates if _candidate_subject_key(item) == subject_key), None)
+        if not isinstance(candidate, dict):
+            continue
+        row = _candidate_analysis_row(candidate, index)
+        row["subject"] = " ".join(part.capitalize() for part in subject_key.split())
+        table_rows.append(row)
+        chart_rows.append(
+            {
+                "label": row["subject"],
+                "score": row.get("score"),
+                "market_fit_score": row.get("market_fit_score"),
+                "price_edge_pct": row.get("price_edge_pct"),
+            }
+        )
+    if len(table_rows) < 2:
+        return None
+
+    return {
+        "focus": "subject_comparison",
+        "title": "Target comparison",
+        "table": {
+            "title": "Side-by-side comparison",
+            "columns": ["rank", "subject", "sport", "matchup", "market", "pick", "line", "odds", "confidence", "score", "market_fit_score", "why"],
+            "rows": table_rows,
+        },
+        "chart": {
+            "title": "Comparison score grid",
+            "type": "bar",
+            "x_key": "label",
+            "series": ["score", "market_fit_score", "price_edge_pct"],
+            "rows": chart_rows,
+        },
+    }
+
+
 def _analysis_views_for_query(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
+    comparison_view = _comparison_analysis_views(candidates, preferences)
+    if comparison_view is not None:
+        return comparison_view
     return _runtime_build_analysis_views(
         candidates,
         preferences,
@@ -1384,7 +1435,7 @@ def _extract_parlay_structure_preferences(text: str) -> dict[str, Any]:
     has_aggressive_risk = any(token in lowered for token in _AGGRESSIVE_RISK_TOKENS)
 
     risk_profile = "balanced"
-    if has_conservative_risk and has_aggressive_risk and re.search(r"\b(?:compare|vs\.?|versus)\b", lowered):
+    if has_conservative_risk and has_aggressive_risk and _question_requests_comparison(lowered):
         risk_profile = "balanced"
     elif has_conservative_risk:
         risk_profile = "conservative"
@@ -1425,6 +1476,11 @@ def _extract_parlay_structure_preferences(text: str) -> dict[str, Any]:
 def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
     requested_sports = [str(slug).upper() for slug in (preferences.get("requested_sports") or []) if str(slug).strip()]
     requested_markets = _market_focus_labels(preferences.get("requested_markets") or [])
+    requested_subjects = [
+        " ".join(part.capitalize() for part in str(subject).split())
+        for subject in (preferences.get("requested_subjects") or [])
+        if str(subject).strip()
+    ]
     board_scope: list[str] = []
     if preferences.get("include_props"):
         board_scope.append("Props")
@@ -1456,6 +1512,7 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
     if requested_sports:
         chips.append("/".join(requested_sports))
     chips.extend(requested_markets)
+    chips.extend(requested_subjects[:3])
     if leg_window:
         chips.append(leg_window)
     if preferences.get("cross_sport_required"):
@@ -1476,6 +1533,7 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
         "intent": _safe_text(preferences.get("intent"), "best_bets"),
         "sports": requested_sports,
         "requested_markets": requested_markets,
+        "requested_subjects": requested_subjects,
         "timing": timing,
         "board_scope": board_scope,
         "parlay_type": parlay_type,
@@ -1581,6 +1639,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
     parlay_odds_min, parlay_odds_max = _extract_american_odds_range(lowered, require_parlay_context=True)
     parlay_leg_min, parlay_leg_max = _extract_parlay_leg_preferences(lowered)
     analysis_focus = _analysis_focus_from_question(question, sorted(requested_sports), requested_markets)
+    comparison_requested = _question_requests_comparison(question)
     wants_table = _question_requests_table(question) or analysis_focus is not None
     wants_chart = _question_requests_chart(question) or analysis_focus is not None
 
@@ -1610,6 +1669,8 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         "max_exposure_pct": parlay_structure["max_exposure_pct"],
         "max_exposure_amount": parlay_structure["max_exposure_amount"],
         "analysis_focus": analysis_focus,
+        "comparison_requested": comparison_requested,
+        "requested_subjects": [],
         "wants_table": wants_table,
         "wants_chart": wants_chart,
         "limit": max(1, min(requested_limit, 10)),
@@ -2513,6 +2574,52 @@ def _candidate_subject_key(candidate: dict[str, Any]) -> str | None:
     return None
 
 
+def _candidate_subject_aliases(candidate: dict[str, Any]) -> set[str]:
+    subject_key = _candidate_subject_key(candidate)
+    if not subject_key:
+        return set()
+    aliases = {subject_key}
+    parts = [part for part in subject_key.split() if part]
+    if len(parts) >= 2:
+        aliases.add(parts[-1])
+    if len(parts) >= 3:
+        aliases.add(" ".join(parts[-2:]))
+    return {alias for alias in aliases if len(alias) >= 3}
+
+
+def _resolved_requested_subjects(question: str, candidates: list[dict[str, Any]]) -> list[str]:
+    normalized_question = _normalized_market_text(question)
+    if not normalized_question:
+        return []
+    matches: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        subject_key = _candidate_subject_key(candidate)
+        if not subject_key or subject_key in seen:
+            continue
+        for alias in sorted(_candidate_subject_aliases(candidate), key=len, reverse=True):
+            match = re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", normalized_question)
+            if not match:
+                continue
+            seen.add(subject_key)
+            matches.append((match.start(), subject_key))
+            break
+    return [subject for _, subject in sorted(matches, key=lambda item: item[0])]
+
+
+def _filter_candidates_to_requested_subjects(
+    candidates: list[dict[str, Any]],
+    requested_subjects: list[str] | tuple[str, ...] | None,
+) -> list[dict[str, Any]]:
+    wanted = {str(item).strip().lower() for item in (requested_subjects or []) if str(item).strip()}
+    if not wanted:
+        return candidates
+    filtered = [candidate for candidate in candidates if (_candidate_subject_key(candidate) or "") in wanted]
+    return filtered or candidates
+
+
 def _candidate_team_key(candidate: dict[str, Any]) -> str | None:
     for field in ("team_key", "team", "team_abbr", "team_slug", "player_team"):
         value = _normalized_market_text(_safe_text(candidate.get(field), ""))
@@ -3358,6 +3465,10 @@ def run_intelligence_query(
                 continue
             candidates.extend(_mlb_home_run_candidates_from_artifact(sport_row))
             break
+    resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
+    if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
+        preferences = {**preferences, "requested_subjects": resolved_requested_subjects}
+        candidates = _filter_candidates_to_requested_subjects(candidates, resolved_requested_subjects)
     resolved_requested_markets = _resolved_requested_markets(question, candidates, preferences.get("requested_markets") or [])
     if resolved_requested_markets != (preferences.get("requested_markets") or []):
         preferences = {**preferences, "requested_markets": resolved_requested_markets}
@@ -3395,6 +3506,9 @@ def run_intelligence_query(
         headline = "The Syndicate live board brief"
     elif preferences["intent"] == "pregame_bets":
         headline = "The Syndicate pregame board brief"
+    elif preferences.get("comparison_requested") and len(preferences.get("requested_subjects") or []) >= 2:
+        compared = [" ".join(part.capitalize() for part in str(subject).split()) for subject in (preferences.get("requested_subjects") or [])[:2]]
+        headline = f"The Syndicate comparison: {compared[0]} vs {compared[1]}"
     elif preferences.get("requested_markets"):
         first_market = _market_label((preferences.get("requested_markets") or [None])[0]).lower()
         headline = f"The Syndicate {first_market} board"
