@@ -74,6 +74,13 @@ def scoreboard_snapshot_path(date_str: str) -> Path:
     return Path(__file__).resolve().parents[3] / "data" / "nhl_source" / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv"
 
 
+def team_odds_snapshot_path(date_str: str) -> Path:
+    roots = _data_roots()
+    if roots:
+        return roots[0] / "odds" / "team" / f"date={date_str}" / "oddsapi.csv"
+    return Path(__file__).resolve().parents[3] / "data" / "nhl_source" / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.csv"
+
+
 def props_lines_snapshot_path(date_str: str) -> Path:
     roots = _data_roots()
     if roots:
