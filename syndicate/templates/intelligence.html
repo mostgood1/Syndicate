@@ -363,6 +363,107 @@
       background: rgba(255, 255, 255, 0.01);
     }
 
+    .intel-smart-cell {
+      min-width: 150px;
+    }
+
+    .intel-smart-cell strong,
+    .intel-smart-cell summary {
+      color: var(--intel-ink);
+    }
+
+    .intel-smart-cell--subject {
+      min-width: 220px;
+    }
+
+    .intel-smart-subject {
+      display: grid;
+      gap: 6px;
+    }
+
+    .intel-smart-subject strong {
+      font-size: 0.95rem;
+    }
+
+    .intel-smart-stack,
+    .intel-detail-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .intel-smart-stack {
+      min-width: 180px;
+    }
+
+    .intel-smart-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .intel-smart-line span:first-child,
+    .intel-detail-grid span:first-child {
+      color: var(--intel-dim);
+    }
+
+    .intel-signal-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 220px;
+    }
+
+    .intel-signal-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(125, 152, 178, 0.14);
+      background: rgba(139, 211, 255, 0.08);
+      color: var(--intel-ink);
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .intel-signal-pill strong {
+      color: var(--intel-ink);
+      font-size: 0.82rem;
+    }
+
+    .intel-rationale-cell {
+      min-width: 260px;
+      line-height: 1.45;
+    }
+
+    .intel-detail-wrap {
+      min-width: 220px;
+    }
+
+    .intel-detail-wrap details {
+      cursor: pointer;
+    }
+
+    .intel-detail-wrap summary {
+      list-style: none;
+    }
+
+    .intel-detail-wrap summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .intel-detail-grid {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(125, 152, 178, 0.12);
+    }
+
+    .intel-detail-row {
+      display: grid;
+      gap: 4px;
+    }
+
     .intel-chart-grid {
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
@@ -623,6 +724,115 @@
           </article>`;
       }
 
+      function hasRenderableValue(value) {
+        return !(value === null || value === undefined || value === '');
+      }
+
+      function orderedUnique(keys) {
+        return Array.from(new Set((Array.isArray(keys) ? keys : []).filter(Boolean)));
+      }
+
+      function preferredRowLabel(row) {
+        return row?.label || row?.player || row?.name || row?.pick || 'Target';
+      }
+
+      function buildSignalPills(row, chartSeries) {
+        const keys = (Array.isArray(chartSeries) ? chartSeries : []).filter((key) => !['score', 'market_fit_score'].includes(key));
+        return keys.map((key) => {
+          const value = row?.[key];
+          if (!hasRenderableValue(value)) {
+            return '';
+          }
+          return `<span class="intel-signal-pill"><span>${escapeHtml(prettyLabel(key))}</span><strong>${escapeHtml(formatMetricValue(key, value))}</strong></span>`;
+        }).filter(Boolean).join('');
+      }
+
+      function renderSmartDetailRows(row, columns, visibleKeys) {
+        const hiddenKeys = (Array.isArray(columns) ? columns : []).filter((key) => !visibleKeys.has(key) && hasRenderableValue(row?.[key]));
+        if (!hiddenKeys.length) {
+          return '<span class="intel-meta">No extra contract fields on this row.</span>';
+        }
+        return hiddenKeys.map((key) => `
+          <div class="intel-detail-row">
+            <span>${escapeHtml(prettyLabel(key))}</span>
+            <strong>${formatCell(row?.[key])}</strong>
+          </div>`).join('');
+      }
+
+      function renderSmartAnalysisTable(table, rows, chartSeries) {
+        const columns = Array.isArray(table?.columns) ? table.columns : [];
+        const visibleKeys = new Set(orderedUnique([
+          'rank', 'label', 'player', 'name', 'matchup', 'market', 'pick', 'line', 'projected', 'live_projection', 'odds', 'score', 'market_fit_score', 'analysis_shape', 'why',
+          ...(Array.isArray(chartSeries) ? chartSeries : [])
+        ]));
+
+        return `
+          <article class="intel-analysis-card">
+            <div>
+              <div class="intel-kicker">Analysis table</div>
+              <h3>${escapeHtml(table?.title || 'Returned table')}</h3>
+              <p class="intel-table-note">This table is prioritized around board context, case strength, active analysis signals, and rationale. Each row still exposes the remaining response-contract fields in the detail drawer.</p>
+            </div>
+            <div class="intel-analysis-table-wrap">
+              <table class="intel-analysis-table">
+                <thead>
+                  <tr>
+                    <th>Target</th>
+                    <th>Market</th>
+                    <th>Case</th>
+                    <th>Score</th>
+                    <th>Signals</th>
+                    <th>Rationale</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map((row) => {
+                    const subject = preferredRowLabel(row);
+                    const matchup = row?.matchup ? `<span class="intel-meta">${escapeHtml(row.matchup)}</span>` : '';
+                    const marketBits = [row?.market, row?.pick].filter(Boolean).map((value) => chip(value)).join('');
+                    const caseBits = [
+                      hasRenderableValue(row?.line) ? `<div class="intel-smart-line"><span>Line</span><strong>${formatCell(row.line)}</strong></div>` : '',
+                      hasRenderableValue(row?.projected) ? `<div class="intel-smart-line"><span>Proj</span><strong>${formatCell(row.projected)}</strong></div>` : '',
+                      hasRenderableValue(row?.live_projection) ? `<div class="intel-smart-line"><span>Live proj</span><strong>${formatCell(row.live_projection)}</strong></div>` : '',
+                      hasRenderableValue(row?.odds) ? `<div class="intel-smart-line"><span>Odds</span><strong>${formatCell(row.odds)}</strong></div>` : ''
+                    ].filter(Boolean).join('');
+                    const scoreBits = [
+                      hasRenderableValue(row?.score) ? metricPill('Score', formatMetricValue('score', row.score)) : '',
+                      hasRenderableValue(row?.market_fit_score) ? metricPill('Market fit', formatMetricValue('market_fit_score', row.market_fit_score)) : '',
+                      hasRenderableValue(row?.analysis_shape) ? chip(prettyLabel(row.analysis_shape)) : ''
+                    ].filter(Boolean).join('');
+                    const signals = buildSignalPills(row, chartSeries) || '<span class="intel-meta">No active signals returned.</span>';
+                    const rationale = compactText(row?.why || '', 260) || '—';
+                    const detailRows = renderSmartDetailRows(row, columns, visibleKeys);
+
+                    return `
+                      <tr>
+                        <td class="intel-smart-cell intel-smart-cell--subject">
+                          <div class="intel-smart-subject">
+                            <strong>${escapeHtml(subject)}</strong>
+                            ${matchup}
+                          </div>
+                        </td>
+                        <td class="intel-smart-cell">${marketBits || '—'}</td>
+                        <td class="intel-smart-cell"><div class="intel-smart-stack">${caseBits || '—'}</div></td>
+                        <td class="intel-smart-cell"><div class="intel-metric-grid">${scoreBits || '—'}</div></td>
+                        <td class="intel-smart-cell"><div class="intel-signal-stack">${signals}</div></td>
+                        <td class="intel-smart-cell intel-rationale-cell">${escapeHtml(rationale)}</td>
+                        <td class="intel-smart-cell intel-detail-wrap">
+                          <details>
+                            <summary>Open contract row</summary>
+                            <div class="intel-detail-grid">${detailRows}</div>
+                          </details>
+                        </td>
+                      </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </article>`;
+      }
+
       function updateStatusLink() {
         if (!statusLink) {
           return;
@@ -720,24 +930,7 @@
         const scoreMax = chartRows.reduce((max, row) => Math.max(max, Number(row?.score || 0)), 0) || 1;
         const overviewMarkup = rows.length || chartSeries.length ? renderAnalysisOverview(analysis, rows, chartSeries) : '';
 
-        const tableMarkup = columns.length && rows.length ? `
-          <article class="intel-analysis-card">
-            <div>
-              <div class="intel-kicker">Analysis table</div>
-              <h3>${escapeHtml(table.title || 'Returned table')}</h3>
-              <p class="intel-table-note">The table below is rendered directly from the intelligence response contract for this query.</p>
-            </div>
-            <div class="intel-analysis-table-wrap">
-              <table class="intel-analysis-table">
-                <thead>
-                  <tr>${columns.map((column) => `<th>${escapeHtml(prettyLabel(column))}</th>`).join('')}</tr>
-                </thead>
-                <tbody>
-                  ${rows.map((row) => `<tr>${columns.map((column) => `<td>${formatCell(row?.[column])}</td>`).join('')}</tr>`).join('')}
-                </tbody>
-              </table>
-            </div>
-          </article>` : '';
+        const tableMarkup = columns.length && rows.length ? renderSmartAnalysisTable(table, rows, chartSeries) : '';
 
         const chartMarkup = chartRows.length ? `
           <article class="intel-analysis-card">
