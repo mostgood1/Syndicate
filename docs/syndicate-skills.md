@@ -39,7 +39,7 @@ The VS Code skills are still developer-side playbooks, but Syndicate runtime int
 
 The current runtime path supports:
 - candidate-driven market inference instead of relying only on hardcoded query aliases
-- market-shape-aware recommendation scoring
+- market-shape-aware recommendation scoring, including league-specific basketball fit profiles so NBA, WNBA, and NCAAB props no longer share one generic counting-prop scoring curve
 - medium-correlation and pair-penalty-aware parlay filtering and ranking
 - structured analysis views for MLB HR plus strikeout/total-bases explainer asks, NBA matchup asks with pace/usage/shot-profile context, WNBA matchup asks with team-environment and matchup-pressure context, NCAAB matchup asks with tempo/volatility context, football market asks with EPA/target-share/pass-rate context, and hockey prop asks
 

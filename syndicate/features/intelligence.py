@@ -157,6 +157,113 @@ _BINARY_CEILING_MARKETS = {"home_runs", "touchdowns"}
 _VOLUME_PROP_MARKETS = {"strikeouts", "total_bases", "turnovers", "steals", "blocks", "hits", "rbi", "shots", "saves", "goals"}
 _COUNTING_PROP_MARKETS = {"points", "rebounds", "assists", "threes", "pra", "passing_yards", "rushing_yards", "receiving_yards"}
 _GAME_SIDE_MARKETS = {"moneyline", "spread", "total"}
+_SPORT_MARKET_SHAPE_OVERRIDES: dict[tuple[str, str], dict[str, Any]] = {
+    ("nba", "points"): {
+        "shape_detail": "nba_usage_creation",
+        "margin_weight": 4.3,
+        "normalized_margin_weight": 12.8,
+        "confidence_baseline": 55.5,
+        "plus_money_bonus": 1.15,
+    },
+    ("nba", "assists"): {
+        "shape_detail": "nba_playmaking_network",
+        "margin_weight": 4.4,
+        "normalized_margin_weight": 13.2,
+        "confidence_baseline": 55.0,
+        "plus_money_bonus": 1.2,
+    },
+    ("nba", "threes"): {
+        "shape_detail": "nba_usage_creation",
+        "margin_weight": 4.5,
+        "normalized_margin_weight": 13.5,
+        "confidence_baseline": 55.0,
+        "plus_money_bonus": 1.25,
+    },
+    ("nba", "pra"): {
+        "shape_detail": "nba_usage_creation",
+        "margin_weight": 4.2,
+        "normalized_margin_weight": 12.6,
+        "confidence_baseline": 56.0,
+        "plus_money_bonus": 1.1,
+    },
+    ("nba", "rebounds"): {
+        "shape_detail": "nba_rebound_environment",
+        "margin_weight": 4.15,
+        "normalized_margin_weight": 12.4,
+        "confidence_baseline": 55.0,
+        "plus_money_bonus": 1.05,
+    },
+    ("wnba", "points"): {
+        "shape_detail": "wnba_role_pressure",
+        "margin_weight": 3.75,
+        "normalized_margin_weight": 11.4,
+        "confidence_baseline": 57.0,
+        "plus_money_bonus": 0.9,
+    },
+    ("wnba", "assists"): {
+        "shape_detail": "wnba_creation_stability",
+        "margin_weight": 3.85,
+        "normalized_margin_weight": 11.8,
+        "confidence_baseline": 57.0,
+        "plus_money_bonus": 0.95,
+    },
+    ("wnba", "threes"): {
+        "shape_detail": "wnba_creation_stability",
+        "margin_weight": 3.7,
+        "normalized_margin_weight": 11.2,
+        "confidence_baseline": 57.5,
+        "plus_money_bonus": 0.85,
+    },
+    ("wnba", "pra"): {
+        "shape_detail": "wnba_role_pressure",
+        "margin_weight": 3.65,
+        "normalized_margin_weight": 11.0,
+        "confidence_baseline": 57.5,
+        "plus_money_bonus": 0.85,
+    },
+    ("wnba", "rebounds"): {
+        "shape_detail": "wnba_possession_pressure",
+        "margin_weight": 3.95,
+        "normalized_margin_weight": 12.1,
+        "confidence_baseline": 56.5,
+        "plus_money_bonus": 0.95,
+    },
+    ("ncaab", "points"): {
+        "shape_detail": "ncaab_tempo_volatility",
+        "margin_weight": 3.7,
+        "normalized_margin_weight": 11.3,
+        "confidence_baseline": 58.0,
+        "plus_money_bonus": 0.8,
+    },
+    ("ncaab", "assists"): {
+        "shape_detail": "ncaab_tempo_volatility",
+        "margin_weight": 3.75,
+        "normalized_margin_weight": 11.5,
+        "confidence_baseline": 58.0,
+        "plus_money_bonus": 0.8,
+    },
+    ("ncaab", "threes"): {
+        "shape_detail": "ncaab_tempo_volatility",
+        "margin_weight": 3.6,
+        "normalized_margin_weight": 11.0,
+        "confidence_baseline": 58.5,
+        "plus_money_bonus": 0.75,
+    },
+    ("ncaab", "pra"): {
+        "shape_detail": "ncaab_tempo_volatility",
+        "margin_weight": 3.55,
+        "normalized_margin_weight": 10.8,
+        "confidence_baseline": 58.5,
+        "plus_money_bonus": 0.7,
+    },
+    ("ncaab", "rebounds"): {
+        "shape_detail": "ncaab_tempo_volatility",
+        "margin_weight": 3.8,
+        "normalized_margin_weight": 11.7,
+        "confidence_baseline": 57.5,
+        "plus_money_bonus": 0.85,
+    },
+}
 _MEDIUM_CORRELATION_SHAPE_LIMITS = {
     "binary_ceiling_prop": 1,
     "game_market": 1,
@@ -474,11 +581,13 @@ def _market_focus_labels(keys: list[str] | tuple[str, ...] | None) -> list[str]:
     return labels
 
 
-def _market_shape_profile(market_key: str | None, *, candidate_type: str) -> dict[str, Any]:
+def _market_shape_profile(market_key: str | None, *, candidate_type: str, sport_slug: str | None = None) -> dict[str, Any]:
     key = str(market_key or "").strip().lower()
+    sport = str(sport_slug or "").strip().lower()
     if candidate_type == "game" or key in _GAME_SIDE_MARKETS:
         return {
             "shape": "game_market",
+            "shape_detail": "game_market",
             "margin_weight": 3.5,
             "normalized_margin_weight": 10.0,
             "edge_weight": 0.7,
@@ -492,6 +601,7 @@ def _market_shape_profile(market_key: str | None, *, candidate_type: str) -> dic
     if key in _BINARY_CEILING_MARKETS:
         return {
             "shape": "binary_ceiling_prop",
+            "shape_detail": "binary_ceiling_prop",
             "margin_weight": 7.5,
             "normalized_margin_weight": 12.0,
             "edge_weight": 0.85,
@@ -503,8 +613,9 @@ def _market_shape_profile(market_key: str | None, *, candidate_type: str) -> dic
             "plus_money_bonus": 2.0,
         }
     if key in _VOLUME_PROP_MARKETS:
-        return {
+        profile = {
             "shape": "volume_prop",
+            "shape_detail": "volume_prop",
             "margin_weight": 5.5,
             "normalized_margin_weight": 16.0,
             "edge_weight": 0.55,
@@ -515,9 +626,18 @@ def _market_shape_profile(market_key: str | None, *, candidate_type: str) -> dic
             "price_edge_weight": 0.4,
             "plus_money_bonus": 1.25,
         }
+        if sport in {"nba", "wnba", "ncaab"}:
+            detail_by_sport = {
+                "nba": "nba_rebound_environment",
+                "wnba": "wnba_possession_pressure",
+                "ncaab": "ncaab_tempo_volatility",
+            }
+            profile["shape_detail"] = detail_by_sport.get(sport, profile["shape_detail"])
+        return profile
     if key in _COUNTING_PROP_MARKETS:
-        return {
+        profile = {
             "shape": "counting_prop",
+            "shape_detail": "counting_prop",
             "margin_weight": 4.0,
             "normalized_margin_weight": 12.0,
             "edge_weight": 0.45,
@@ -528,8 +648,13 @@ def _market_shape_profile(market_key: str | None, *, candidate_type: str) -> dic
             "price_edge_weight": 0.35,
             "plus_money_bonus": 1.0,
         }
+        override = _SPORT_MARKET_SHAPE_OVERRIDES.get((sport, key))
+        if override:
+            profile.update(override)
+        return profile
     return {
         "shape": "general_market",
+        "shape_detail": "general_market",
         "margin_weight": 4.5,
         "normalized_margin_weight": 14.0,
         "edge_weight": 0.45,
@@ -2178,7 +2303,8 @@ def _candidate_market_fit(candidate: dict[str, Any], market_context: dict[str, A
     market_keys = sorted(_candidate_market_focuses(candidate))
     market_key = market_keys[0] if market_keys else _market_key_from_text(candidate.get("market"), allow_fallback=True)
     candidate_type = _safe_text(candidate.get("candidate_type"), "candidate")
-    profile = _market_shape_profile(market_key, candidate_type=candidate_type)
+    sport_slug = _safe_text(candidate.get("sport_slug"), "").lower() or None
+    profile = _market_shape_profile(market_key, candidate_type=candidate_type, sport_slug=sport_slug)
     margin, normalized_margin = _candidate_market_margin(candidate)
     price_edge_pct = market_context.get("price_edge_pct")
     confidence_pct = _pct_hint(candidate.get("confidence"))
@@ -2202,11 +2328,13 @@ def _candidate_market_fit(candidate: dict[str, Any], market_context: dict[str, A
             -3.0,
             min(4.0, (float(confidence_pct) - float(profile["confidence_baseline"])) * float(profile["confidence_weight"])),
         )
-    note_parts.append(f"shape {str(profile['shape']).replace('_', ' ')}")
+    shape_note = str(profile.get("shape_detail") or profile["shape"]).replace("_", " ")
+    note_parts.append(f"shape {shape_note}")
     return {
         "market_key": market_key,
         "market_label": _market_label(market_key),
         "market_shape": profile["shape"],
+        "market_shape_detail": profile.get("shape_detail") or profile["shape"],
         "market_fit_score": round(fit_score, 2),
         "market_fit_note": "; ".join(note_parts) if note_parts else None,
     }
@@ -2221,7 +2349,8 @@ def _market_specific_score_adjustment(candidate: dict[str, Any], preferences: di
         return 0.0
     margin, normalized_margin = _candidate_market_margin(candidate)
     candidate_type = _safe_text(candidate.get("candidate_type"), "candidate")
-    profile = _market_shape_profile(focus, candidate_type=candidate_type)
+    sport_slug = _safe_text(candidate.get("sport_slug"), "").lower() or None
+    profile = _market_shape_profile(focus, candidate_type=candidate_type, sport_slug=sport_slug)
     confidence_pct = _pct_hint(candidate.get("confidence")) or 0.0
     edge_pct = _pct_hint(candidate.get("edge"))
     if edge_pct is None:

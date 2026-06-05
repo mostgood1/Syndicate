@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from syndicate.app import create_app
 from syndicate.features.intelligence import _build_parlays
+from syndicate.features.intelligence import _candidate_market_fit
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
 from syndicate.features.intelligence import _query_preferences
@@ -625,6 +626,50 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(first_row.get("team_environment_signal"), 1.12)
         self.assertEqual(first_row.get("possession_profile_signal"), 1.05)
         self.assertEqual(first_row.get("matchup_pressure_signal"), 1.09)
+
+    def test_basketball_market_fit_scoring_diverges_by_league(self) -> None:
+        market_context = {
+            "american_odds": 102,
+            "decimal_odds": 2.02,
+            "implied_probability": 49.5,
+            "model_probability": 63.0,
+            "price_edge_pct": 13.5,
+        }
+        shared_fields = {
+            "candidate_type": "prop",
+            "market": "PTS",
+            "pick": "Over 24.5",
+            "line": 24.5,
+            "projected": 28.1,
+            "odds": "+102",
+            "confidence": "63%",
+            "edge": "+5.4%",
+        }
+
+        nba_fit = _candidate_market_fit(
+            {
+                **shared_fields,
+                "sport_slug": "nba",
+                "name": "Jayson Tatum Over 24.5",
+            },
+            market_context,
+        )
+        wnba_fit = _candidate_market_fit(
+            {
+                **shared_fields,
+                "sport_slug": "wnba",
+                "name": "A'ja Wilson Over 24.5",
+            },
+            market_context,
+        )
+
+        self.assertEqual(nba_fit.get("market_shape"), "counting_prop")
+        self.assertEqual(wnba_fit.get("market_shape"), "counting_prop")
+        self.assertEqual(nba_fit.get("market_shape_detail"), "nba_usage_creation")
+        self.assertEqual(wnba_fit.get("market_shape_detail"), "wnba_role_pressure")
+        self.assertGreater(nba_fit.get("market_fit_score") or 0.0, wnba_fit.get("market_fit_score") or 0.0)
+        self.assertIn("nba usage creation", nba_fit.get("market_fit_note") or "")
+        self.assertIn("wnba role pressure", wnba_fit.get("market_fit_note") or "")
 
     def test_intelligence_query_builds_football_analysis_views(self) -> None:
         advanced_rows = [
