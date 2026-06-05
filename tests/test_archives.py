@@ -1329,6 +1329,43 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(len(payload.get("games") or []), 1)
         self.assertEqual(len((payload.get("games") or [{}])[0].get("players") or []), 1)
 
+    def test_wnba_live_lines_fallback_preserves_requested_event_id(self) -> None:
+        fallback_game = {
+            "betting": {
+                "total": 174.0,
+                "home_spread": -1.0,
+                "away_spread": 1.0,
+                "home_ml": -108.0,
+                "away_ml": 108.0,
+            },
+            "sim": {
+                "periods": {
+                    "q1": {"total_mean": 41.707, "margin_mean": 0.233},
+                    "q2": {"total_mean": 41.707, "margin_mean": 0.233},
+                    "q3": {"total_mean": 43.409, "margin_mean": 0.242},
+                    "q4": {"total_mean": 43.409, "margin_mean": 0.242},
+                }
+            },
+        }
+
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-05-21", "games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+            return_value={"evt-1": fallback_game},
+        ):
+            from syndicate.features.wnba.cards import build_live_lines_payload as build_wnba_live_lines_payload
+
+            payload = build_wnba_live_lines_payload("2026-05-21", ["evt-1"], include_period_totals=True)
+
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "evt-1")
+        self.assertEqual(((payload.get("games") or [{}])[0].get("lines") or {}).get("total"), 174.0)
+        self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_totals") or {}).get("q1"), 41.707)
+
     def test_wnba_api_source_team_logo_fetches_official_logo_without_source_proxy(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)

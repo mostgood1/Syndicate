@@ -2067,7 +2067,12 @@ def _hydrate_live_player_lens_payload(
     return hydrated_payload
 
 
-def _fallback_live_lines_game(game: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
+def _fallback_live_lines_game(
+    game: dict[str, Any],
+    *,
+    event_id: str | None = None,
+    include_period_totals: bool,
+) -> dict[str, Any]:
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     sim_periods = _source_sim_periods({"sim": game.get("sim")}) if isinstance(game.get("sim"), dict) else {}
     period_totals: dict[str, float] = {}
@@ -2100,7 +2105,7 @@ def _fallback_live_lines_game(game: dict[str, Any], *, include_period_totals: bo
         period_spreads.setdefault("h2", round(s3 + s4, 3))
 
     return {
-        "event_id": game.get("event_id"),
+        "event_id": event_id or game.get("event_id"),
         "found": True,
         "lines": {
             "total": _safe_float(betting.get("total")),
@@ -2684,7 +2689,7 @@ def build_live_lines_payload(
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
-        _fallback_live_lines_game(game, include_period_totals=bool(include_period_totals))
+        _fallback_live_lines_game(game, event_id=event_id, include_period_totals=bool(include_period_totals))
         for event_id in normalized_event_ids
         for game in [game_index.get(event_id)]
         if isinstance(game, dict)
