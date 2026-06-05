@@ -71,7 +71,90 @@ _PARLAY_LEG_WORDS = {
 _CONSERVATIVE_RISK_TOKENS = ("conservative", "safer", "safe", "low risk", "lower risk")
 _AGGRESSIVE_RISK_TOKENS = ("aggressive", "longshot", "long shot", "high risk", "ceiling", "upside")
 _LOW_CORRELATION_TOKENS = ("low correlation", "uncorrelated", "independent", "diversified")
+_MEDIUM_CORRELATION_TOKENS = ("medium correlation", "moderate correlation", "balanced correlation")
 _HIGH_CORRELATION_TOKENS = ("high correlation", "correlated", "stacked", "stack", "same game", "same-game", "sgp")
+_MARKET_FOCUS_ALIASES: dict[str, tuple[str, ...]] = {
+    "home_runs": ("home runs", "home run", "homers", "homer", "hr"),
+    "strikeouts": ("strikeouts", "strikeout", "pitcher strikeouts", "ks", "k props"),
+    "total_bases": ("total bases", "total base", "batter total bases", "tb"),
+    "moneyline": ("moneyline", "ml"),
+    "spread": ("spread", "puck line"),
+    "total": ("total", "game total", "totals"),
+    "points": ("points", "point", "pts"),
+    "rebounds": ("rebounds", "rebound", "rebs", "reb"),
+    "assists": ("assists", "assist", "asts", "ast"),
+    "threes": ("threes", "three pointers", "three pointer", "3pm", "3 pointers", "3s"),
+    "pra": ("pra", "points rebounds assists"),
+    "shots": ("shots", "shots on goal", "sog"),
+    "saves": ("saves", "save"),
+    "goals": ("goals", "goal"),
+    "hits": ("hits", "hit"),
+    "rbi": ("rbi", "runs batted in"),
+    "touchdowns": ("touchdowns", "touchdown", "td"),
+    "passing_yards": ("passing yards",),
+    "rushing_yards": ("rushing yards",),
+    "receiving_yards": ("receiving yards",),
+    "turnovers": ("turnovers", "turnover"),
+    "steals": ("steals", "steal"),
+    "blocks": ("blocks", "block"),
+}
+_MARKET_FOCUS_LABELS = {
+    "home_runs": "Home runs",
+    "strikeouts": "Strikeouts",
+    "total_bases": "Total bases",
+    "moneyline": "Moneyline",
+    "spread": "Spread",
+    "total": "Total",
+    "points": "Points",
+    "rebounds": "Rebounds",
+    "assists": "Assists",
+    "threes": "Threes",
+    "pra": "PRA",
+    "shots": "Shots",
+    "saves": "Saves",
+    "goals": "Goals",
+    "hits": "Hits",
+    "rbi": "RBI",
+    "touchdowns": "Touchdowns",
+    "passing_yards": "Passing yards",
+    "rushing_yards": "Rushing yards",
+    "receiving_yards": "Receiving yards",
+    "turnovers": "Turnovers",
+    "steals": "Steals",
+    "blocks": "Blocks",
+}
+_MARKET_DEFAULT_SPORTS: dict[str, tuple[str, ...]] = {
+    "home_runs": ("mlb",),
+    "strikeouts": ("mlb",),
+    "total_bases": ("mlb",),
+    "hits": ("mlb",),
+    "rbi": ("mlb",),
+}
+_ADVANCED_SIGNAL_LABELS = {
+    "batter_statcast_bb_mult": "Batter Statcast walk multiplier",
+    "batter_statcast_hr_mult": "Batter Statcast home-run multiplier",
+    "batter_statcast_inplay_mult": "Batter Statcast in-play multiplier",
+    "batter_statcast_k_mult": "Batter Statcast strikeout multiplier",
+    "pitcher_statcast_bb_mult": "Pitcher Statcast walk multiplier",
+    "pitcher_statcast_hr_mult": "Pitcher Statcast home-run multiplier",
+    "pitcher_statcast_inplay_mult": "Pitcher Statcast in-play multiplier",
+    "pitcher_statcast_k_mult": "Pitcher Statcast strikeout multiplier",
+    "bvp_history_source": "BvP history source",
+}
+_ADVANCED_SIGNAL_TOKENS = (
+    "statcast",
+    "advanced",
+    "barrel",
+    "exit_velocity",
+    "launch_angle",
+    "hard_hit",
+    "pitch_mix",
+    "xg",
+    "epa",
+    "pace",
+)
+_TABLE_REQUEST_TOKENS = ("table", "grid", "matrix", "tabular")
+_CHART_REQUEST_TOKENS = ("chart", "graph", "plot", "visual")
 
 
 def _repo_root() -> Path:
@@ -93,6 +176,16 @@ def _relative_repo_path(path: Path) -> str:
         return path.resolve().relative_to(_repo_root()).as_posix()
     except Exception:
         return str(path)
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        return int(float(text))
+    except Exception:
+        return None
 
 
 def _numeric_hint(value: Any) -> float | None:
@@ -160,6 +253,48 @@ def _decimal_to_american(value: float | None) -> str | None:
     return str(american)
 
 
+def _normalized_market_text(value: Any) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+    return re.sub(r"\s+", " ", normalized)
+
+
+def _text_has_market_alias(text: str, alias: str) -> bool:
+    normalized_text = _normalized_market_text(text)
+    normalized_alias = _normalized_market_text(alias)
+    if not normalized_text or not normalized_alias:
+        return False
+    return f" {normalized_alias} " in f" {normalized_text} "
+
+
+def _market_key_from_text(text: Any) -> str | None:
+    normalized = _normalized_market_text(text)
+    if not normalized:
+        return None
+    for key, aliases in _MARKET_FOCUS_ALIASES.items():
+        if any(_text_has_market_alias(normalized, alias) for alias in aliases):
+            return key
+    return None
+
+
+def _market_label(key: str | None) -> str:
+    value = str(key or "").strip().lower()
+    if not value:
+        return "Market"
+    label = _MARKET_FOCUS_LABELS.get(value)
+    if label:
+        return label
+    return value.replace("_", " ").title()
+
+
+def _market_focus_labels(keys: list[str] | tuple[str, ...] | None) -> list[str]:
+    labels: list[str] = []
+    for key in keys or []:
+        label = _market_label(str(key).strip().lower())
+        if label:
+            labels.append(label)
+    return labels
+
+
 def _market_context(candidate: dict[str, Any]) -> dict[str, Any]:
     american_odds = _american_odds_value(candidate.get("odds"))
     decimal_odds = _american_to_decimal(american_odds)
@@ -186,6 +321,308 @@ def _market_score_adjustment(market_context: dict[str, Any]) -> float:
     if american_odds is not None and float(american_odds) >= 100.0 and float(price_edge_pct) > 0.0:
         adjustment += 1.5
     return adjustment
+
+
+def _humanize_signal_key(key: str) -> str:
+    return _ADVANCED_SIGNAL_LABELS.get(key, key.replace("_", " ").strip().title())
+
+
+def _advanced_signals_from_item(item: dict[str, Any]) -> list[dict[str, Any]]:
+    signals: list[dict[str, Any]] = []
+    for raw_key, raw_value in item.items():
+        key = str(raw_key or "").strip().lower()
+        if not key:
+            continue
+        if key == "bvp_history_source":
+            value = str(raw_value or "").strip()
+            if value:
+                signals.append({"key": key, "label": _humanize_signal_key(key), "value": value})
+            continue
+        numeric_value = _numeric_hint(raw_value)
+        if numeric_value is None:
+            continue
+        if key.endswith("_mult") or any(token in key for token in _ADVANCED_SIGNAL_TOKENS):
+            signals.append(
+                {
+                    "key": key,
+                    "label": _humanize_signal_key(key),
+                    "value": round(float(numeric_value), 3),
+                }
+            )
+    return signals
+
+
+def _market_signal_suffixes(candidate: dict[str, Any]) -> tuple[str, ...]:
+    market = " ".join(
+        [
+            _safe_text(candidate.get("market"), "").lower(),
+            _safe_text(candidate.get("pick"), "").lower(),
+            _safe_text(candidate.get("name"), "").lower(),
+        ]
+    )
+    if any(token in market for token in ("strikeout", "strike out", " ks", "k ")):
+        return ("_k_mult",)
+    if any(token in market for token in ("home run", " hr", "hr ")):
+        return ("_hr_mult",)
+    if any(token in market for token in ("walk", " bb", "bb ")):
+        return ("_bb_mult",)
+    if any(token in market for token in ("hit", "total bases", "tb", "rbi")):
+        return ("_inplay_mult", "_hr_mult")
+    return ()
+
+
+def _relevant_advanced_signals(candidate: dict[str, Any]) -> list[dict[str, Any]]:
+    signals = candidate.get("advanced_signals") if isinstance(candidate.get("advanced_signals"), list) else []
+    suffixes = _market_signal_suffixes(candidate)
+    if not suffixes:
+        return [signal for signal in signals if isinstance(signal, dict)]
+    matched = [
+        signal
+        for signal in signals
+        if isinstance(signal, dict) and any(str(signal.get("key") or "").endswith(suffix) for suffix in suffixes)
+    ]
+    return matched or [signal for signal in signals if isinstance(signal, dict)]
+
+
+def _candidate_advanced_signal_score(candidate: dict[str, Any]) -> float:
+    numeric_signals = []
+    for signal in _relevant_advanced_signals(candidate):
+        value = signal.get("value") if isinstance(signal, dict) else None
+        if isinstance(value, (int, float)):
+            numeric_signals.append(float(value))
+    if not numeric_signals:
+        return 0.0
+    direction = -1.0 if "under" in _safe_text(candidate.get("pick"), "").lower() else 1.0
+    avg_delta = sum(value - 1.0 for value in numeric_signals) / float(len(numeric_signals))
+    return max(-6.0, min(6.0, avg_delta * 24.0 * direction))
+
+
+def _advanced_signal_text(candidate: dict[str, Any], *, limit: int = 2) -> str:
+    fragments: list[str] = []
+    for signal in _relevant_advanced_signals(candidate):
+        if not isinstance(signal, dict):
+            continue
+        label = _safe_text(signal.get("label"), "signal")
+        value = signal.get("value")
+        if isinstance(value, (int, float)):
+            fragments.append(f"{label} {float(value):.2f}")
+        else:
+            text_value = _safe_text(value, "")
+            if text_value:
+                fragments.append(f"{label} {text_value}")
+        if len(fragments) >= limit:
+            break
+    return "; ".join(fragments)
+
+
+def _question_targets_mlb_home_runs(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(token in lowered for token in ("home run", "home runs", "homer", "homers", "hr target", "hr targets", "hr matchup", "hr matchups"))
+
+
+def _question_requests_table(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(token in lowered for token in _TABLE_REQUEST_TOKENS)
+
+
+def _question_requests_chart(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(token in lowered for token in _CHART_REQUEST_TOKENS)
+
+
+@lru_cache(maxsize=1)
+def _mlb_statcast_feature_payload() -> dict[str, Any]:
+    path = _mlb_repo_artifact_path("data", "statcast", "features", "player_features_latest.json")
+    try:
+        payload = path.read_text(encoding="utf-8")
+    except Exception:
+        return {}
+    try:
+        import json
+
+        data = json.loads(payload)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _mlb_statcast_profile_from_ids(batter_id: int | None, pitcher_id: int | None) -> dict[str, Any] | None:
+    payload = _mlb_statcast_feature_payload()
+    if not payload:
+        return None
+    batters = payload.get("batters") if isinstance(payload.get("batters"), dict) else {}
+    pitchers = payload.get("pitchers") if isinstance(payload.get("pitchers"), dict) else {}
+    batter = batters.get(str(int(batter_id))) if batter_id is not None and isinstance(batters.get(str(int(batter_id))), dict) else None
+    pitcher = pitchers.get(str(int(pitcher_id))) if pitcher_id is not None and isinstance(pitchers.get(str(int(pitcher_id))), dict) else None
+    if not batter and not pitcher:
+        return None
+
+    batter_overall = batter.get("overall") if isinstance((batter or {}).get("overall"), dict) else {}
+    batter_mult = batter.get("mult_overall") if isinstance((batter or {}).get("mult_overall"), dict) else {}
+    pitcher_overall = pitcher.get("overall") if isinstance((pitcher or {}).get("overall"), dict) else {}
+    pitcher_mult = pitcher.get("mult_overall") if isinstance((pitcher or {}).get("mult_overall"), dict) else {}
+    pitcher_mix = pitcher.get("pitch_mix") if isinstance((pitcher or {}).get("pitch_mix"), dict) else {}
+    top_pitch_mix = sorted(
+        ((str(key), float(value)) for key, value in pitcher_mix.items() if _numeric_hint(value) is not None),
+        key=lambda item: item[1],
+        reverse=True,
+    )[:3]
+    return {
+        "batter_id": batter_id,
+        "pitcher_id": pitcher_id,
+        "batter": {
+            "ev_mean": _numeric_hint(batter_overall.get("ev_mean")),
+            "la_mean": _numeric_hint(batter_overall.get("la_mean")),
+            "barrel_rate": _numeric_hint(batter_overall.get("barrel_rate")),
+            "hardhit_rate": _numeric_hint(batter_overall.get("hardhit_rate")),
+            "hr_per_bip": _numeric_hint(batter_overall.get("hr_per_bip")),
+            "xwoba": _numeric_hint(batter_overall.get("xwoba")),
+            "pulled_air_rate": _numeric_hint(batter_overall.get("pulled_air_rate")),
+            "hr_mult": _numeric_hint(batter_mult.get("hr")),
+        },
+        "pitcher": {
+            "ev_mean_allowed": _numeric_hint(pitcher_overall.get("ev_mean")),
+            "barrel_rate_allowed": _numeric_hint(pitcher_overall.get("barrel_rate")),
+            "hardhit_rate_allowed": _numeric_hint(pitcher_overall.get("hardhit_rate")),
+            "hr_per_bip_allowed": _numeric_hint(pitcher_overall.get("hr_per_bip")),
+            "xwoba_allowed": _numeric_hint(pitcher_overall.get("xwoba")),
+            "hr_mult": _numeric_hint(pitcher_mult.get("hr")),
+            "top_pitch_mix": [
+                {"pitch_type": pitch_type, "share": round(share, 3)}
+                for pitch_type, share in top_pitch_mix
+            ],
+        },
+        "generated_at": ((payload.get("meta") or {}).get("generated_at") if isinstance(payload.get("meta"), dict) else None),
+    }
+
+
+def _candidate_mlb_statcast_profile(candidate: dict[str, Any]) -> dict[str, Any] | None:
+    if _safe_text(candidate.get("sport_slug"), "").lower() != "mlb":
+        return None
+    batter_id = _safe_int(candidate.get("batter_id"))
+    pitcher_id = _safe_int(candidate.get("opponent_pitcher_id") or candidate.get("pitcher_id"))
+    return _mlb_statcast_profile_from_ids(batter_id, pitcher_id)
+
+
+def _mlb_statcast_profile_text(profile: dict[str, Any] | None) -> str:
+    if not isinstance(profile, dict):
+        return ""
+    batter = profile.get("batter") if isinstance(profile.get("batter"), dict) else {}
+    pitcher = profile.get("pitcher") if isinstance(profile.get("pitcher"), dict) else {}
+    fragments: list[str] = []
+    barrel_rate = batter.get("barrel_rate")
+    ev_mean = batter.get("ev_mean")
+    hr_per_bip = batter.get("hr_per_bip")
+    pitcher_hr_per_bip = pitcher.get("hr_per_bip_allowed")
+    if barrel_rate is not None:
+        fragments.append(f"barrel {float(barrel_rate) * 100.0:.1f}%")
+    if ev_mean is not None:
+        fragments.append(f"EV {float(ev_mean):.1f}")
+    if hr_per_bip is not None:
+        fragments.append(f"batter HR/BIP {float(hr_per_bip) * 100.0:.1f}%")
+    if pitcher_hr_per_bip is not None:
+        fragments.append(f"pitcher HR/BIP allowed {float(pitcher_hr_per_bip) * 100.0:.1f}%")
+    return "; ".join(fragments[:4])
+
+
+def _mlb_home_run_analysis_views(candidates: list[dict[str, Any]], preferences: dict[str, Any]) -> dict[str, Any] | None:
+    if preferences.get("analysis_focus") != "mlb_home_runs":
+        return None
+    hr_candidates = [
+        candidate
+        for candidate in candidates
+        if _safe_text(candidate.get("sport_slug"), "").lower() == "mlb"
+        and any(
+            token in " ".join([_safe_text(candidate.get("market"), "").lower(), _safe_text(candidate.get("name"), "").lower()])
+            for token in ("home run", " hr", "hr ")
+        )
+    ]
+    if not hr_candidates:
+        return None
+
+    def _signal_value(candidate: dict[str, Any], key: str) -> float | None:
+        for signal in candidate.get("advanced_signals") or []:
+            if isinstance(signal, dict) and _safe_text(signal.get("key"), "") == key:
+                value = signal.get("value")
+                if isinstance(value, (int, float)):
+                    return round(float(value), 3)
+        return None
+
+    top_rows = hr_candidates[: min(int(preferences.get("limit") or 5), 10)]
+    table_rows: list[dict[str, Any]] = []
+    chart_rows: list[dict[str, Any]] = []
+    for index, candidate in enumerate(top_rows, start=1):
+        batter_hr_mult = _signal_value(candidate, "batter_statcast_hr_mult")
+        pitcher_hr_mult = _signal_value(candidate, "pitcher_statcast_hr_mult")
+        statcast_profile = candidate.get("mlb_statcast_profile") if isinstance(candidate.get("mlb_statcast_profile"), dict) else {}
+        batter_profile = statcast_profile.get("batter") if isinstance(statcast_profile.get("batter"), dict) else {}
+        pitcher_profile = statcast_profile.get("pitcher") if isinstance(statcast_profile.get("pitcher"), dict) else {}
+        table_rows.append(
+            {
+                "rank": index,
+                "player": _safe_text(candidate.get("name"), "Play"),
+                "matchup": _safe_text(candidate.get("matchup"), "-"),
+                "pick": _safe_text(candidate.get("pick"), "-"),
+                "odds": _safe_text(candidate.get("odds"), "-"),
+                "confidence": _safe_text(candidate.get("confidence"), "-"),
+                "edge": _safe_text(candidate.get("edge"), "-"),
+                "score": round(float(candidate.get("score") or 0.0), 2),
+                "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
+                "batter_hr_mult": batter_hr_mult,
+                "pitcher_hr_mult": pitcher_hr_mult,
+                "barrel_rate": round(float(batter_profile.get("barrel_rate") or 0.0) * 100.0, 1) if batter_profile.get("barrel_rate") is not None else None,
+                "ev_mean": round(float(batter_profile.get("ev_mean") or 0.0), 1) if batter_profile.get("ev_mean") is not None else None,
+                "batter_hr_per_bip": round(float(batter_profile.get("hr_per_bip") or 0.0) * 100.0, 1) if batter_profile.get("hr_per_bip") is not None else None,
+                "pitcher_hr_per_bip_allowed": round(float(pitcher_profile.get("hr_per_bip_allowed") or 0.0) * 100.0, 1) if pitcher_profile.get("hr_per_bip_allowed") is not None else None,
+                "why": _mlb_statcast_profile_text(statcast_profile) or _advanced_signal_text(candidate, limit=3) or _safe_text(candidate.get("writeup"), "-"),
+            }
+        )
+        chart_rows.append(
+            {
+                "label": _safe_text(candidate.get("name"), "Play"),
+                "score": round(float(candidate.get("score") or 0.0), 2),
+                "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
+                "confidence": _pct_hint(candidate.get("confidence")),
+                "batter_hr_mult": batter_hr_mult,
+                "pitcher_hr_mult": pitcher_hr_mult,
+                "barrel_rate": round(float(batter_profile.get("barrel_rate") or 0.0) * 100.0, 1) if batter_profile.get("barrel_rate") is not None else None,
+                "ev_mean": round(float(batter_profile.get("ev_mean") or 0.0), 1) if batter_profile.get("ev_mean") is not None else None,
+            }
+        )
+
+    return {
+        "focus": "mlb_home_runs",
+        "title": "Top MLB home run targets",
+        "table": {
+            "title": "Top 10 likely HR targets",
+            "columns": [
+                "rank",
+                "player",
+                "matchup",
+                "pick",
+                "odds",
+                "confidence",
+                "edge",
+                "score",
+                "advanced_signal_score",
+                "batter_hr_mult",
+                "pitcher_hr_mult",
+                "barrel_rate",
+                "ev_mean",
+                "batter_hr_per_bip",
+                "pitcher_hr_per_bip_allowed",
+                "why",
+            ],
+            "rows": table_rows,
+        },
+        "chart": {
+            "title": "HR target score grid",
+            "type": "bar",
+            "x_key": "label",
+            "series": ["score", "advanced_signal_score", "confidence", "batter_hr_mult", "pitcher_hr_mult", "barrel_rate", "ev_mean"],
+            "rows": chart_rows,
+        },
+    }
 
 
 def _extract_american_odds_range(text: str, *, require_parlay_context: bool = False) -> tuple[int | None, int | None]:
@@ -285,6 +722,37 @@ def _extract_round_robin_unit(text: str) -> int | None:
     return max(2, min(4, int(match.group("count"))))
 
 
+def _extract_bankroll_amount(text: str) -> int | None:
+    lowered = str(text or "").lower()
+    match = re.search(r"\b(?:bankroll|roll|budget)\s*(?:of|is)?\s*\$\s*(?P<amount>\d{2,6})\b", lowered)
+    if not match:
+        match = re.search(r"\$\s*(?P<amount>\d{2,6})\s*(?:bankroll|roll|budget)\b", lowered)
+    if not match:
+        return None
+    return int(match.group("amount"))
+
+
+def _extract_max_exposure_preferences(text: str) -> tuple[int | None, int | None]:
+    lowered = str(text or "").lower()
+    pct_match = re.search(r"\b(?:max(?:imum)?|cap|limit)\s*(?:exposure|risk)\s*(?:of|at)?\s*(?P<pct>\d{1,2})\s*%", lowered)
+    if not pct_match:
+        pct_match = re.search(r"\b(?P<pct>\d{1,2})\s*%\s*(?:max(?:imum)?\s*)?(?:exposure|risk)\b", lowered)
+    amount_match = re.search(r"\b(?:max(?:imum)?|cap|limit)\s*(?:exposure|risk)\s*(?:of|at)?\s*\$\s*(?P<amount>\d{1,6})", lowered)
+    if not amount_match:
+        amount_match = re.search(r"\$\s*(?P<amount>\d{1,6})\s*(?:max(?:imum)?\s*)?(?:exposure|risk)\b", lowered)
+    max_pct = int(pct_match.group("pct")) if pct_match else None
+    max_amount = int(amount_match.group("amount")) if amount_match else None
+    return (max_pct, max_amount)
+
+
+def _extract_market_focuses(text: str) -> list[str]:
+    matches: list[str] = []
+    for key, aliases in _MARKET_FOCUS_ALIASES.items():
+        if any(_text_has_market_alias(text, alias) for alias in aliases):
+            matches.append(key)
+    return matches
+
+
 def _extract_parlay_structure_preferences(text: str) -> dict[str, Any]:
     lowered = str(text or "").lower()
     parlay_type = "standard"
@@ -302,26 +770,39 @@ def _extract_parlay_structure_preferences(text: str) -> dict[str, Any]:
         risk_profile = "aggressive"
 
     correlation_tolerance = "medium"
+    correlation_explicit = False
     if any(token in lowered for token in _LOW_CORRELATION_TOKENS):
         correlation_tolerance = "low"
+        correlation_explicit = True
+    elif any(token in lowered for token in _MEDIUM_CORRELATION_TOKENS):
+        correlation_tolerance = "medium"
+        correlation_explicit = True
     elif any(token in lowered for token in _HIGH_CORRELATION_TOKENS) or parlay_type == "same_game":
         correlation_tolerance = "high"
+        correlation_explicit = True
 
     round_robin_unit = _extract_round_robin_unit(lowered) if parlay_type == "round_robin" else None
     if parlay_type == "round_robin" and round_robin_unit is None:
         round_robin_unit = 2
+    bankroll_amount = _extract_bankroll_amount(lowered)
+    max_exposure_pct, max_exposure_amount = _extract_max_exposure_preferences(lowered)
 
     return {
         "parlay_type": parlay_type,
         "cross_sport_required": cross_sport_required,
         "risk_profile": risk_profile,
         "correlation_tolerance": correlation_tolerance,
+        "correlation_explicit": correlation_explicit,
         "round_robin_unit": round_robin_unit,
+        "bankroll_amount": bankroll_amount,
+        "max_exposure_pct": max_exposure_pct,
+        "max_exposure_amount": max_exposure_amount,
     }
 
 
 def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
     requested_sports = [str(slug).upper() for slug in (preferences.get("requested_sports") or []) if str(slug).strip()]
+    requested_markets = _market_focus_labels(preferences.get("requested_markets") or [])
     board_scope: list[str] = []
     if preferences.get("include_props"):
         board_scope.append("Props")
@@ -352,6 +833,7 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
         chips.extend(board_scope)
     if requested_sports:
         chips.append("/".join(requested_sports))
+    chips.extend(requested_markets)
     if leg_window:
         chips.append(leg_window)
     if preferences.get("cross_sport_required"):
@@ -361,10 +843,17 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
     if preferences.get("parlay_type") == "round_robin":
         unit = preferences.get("round_robin_unit") or 2
         chips.append(f"{unit}-leg tickets")
+    if preferences.get("bankroll_amount") is not None:
+        chips.append(f"${int(preferences.get('bankroll_amount'))} bankroll")
+    if preferences.get("max_exposure_pct") is not None:
+        chips.append(f"Max {int(preferences.get('max_exposure_pct'))}% exposure")
+    if preferences.get("max_exposure_amount") is not None:
+        chips.append(f"Max ${int(preferences.get('max_exposure_amount'))} exposure")
 
     return {
         "intent": _safe_text(preferences.get("intent"), "best_bets"),
         "sports": requested_sports,
+        "requested_markets": requested_markets,
         "timing": timing,
         "board_scope": board_scope,
         "parlay_type": parlay_type,
@@ -373,6 +862,9 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
         "risk_profile": _safe_text(preferences.get("risk_profile"), "balanced"),
         "correlation_tolerance": _safe_text(preferences.get("correlation_tolerance"), "medium"),
         "round_robin_unit": preferences.get("round_robin_unit"),
+        "bankroll_amount": preferences.get("bankroll_amount"),
+        "max_exposure_pct": preferences.get("max_exposure_pct"),
+        "max_exposure_amount": preferences.get("max_exposure_amount"),
         "chips": chips,
     }
 
@@ -404,6 +896,12 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         if any(keyword in lowered for keyword in keywords):
             requested_sports.add(slug)
 
+    requested_markets = _extract_market_focuses(lowered)
+    if not requested_sports:
+        for market_key in requested_markets:
+            for slug in _MARKET_DEFAULT_SPORTS.get(market_key, ()): 
+                requested_sports.add(slug)
+
     intent = "best_bets"
     if explicit_mode in {"parlay", "parlays"} or "parlay" in lowered or parlay_structure.get("parlay_type") != "standard":
         intent = "parlay"
@@ -412,8 +910,10 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
     elif explicit_mode in {"pregame", "pregame_bets"} or "pregame" in lowered:
         intent = "pregame_bets"
 
-    live_only = intent == "live_bets"
-    pregame_only = intent == "pregame_bets"
+    live_requested = bool(re.search(r"\b(?:live|in-game|in game|live board)\b", lowered)) or explicit_mode in {"live", "live_bets"}
+    pregame_requested = "pregame" in lowered or explicit_mode in {"pregame", "pregame_bets"}
+    live_only = intent == "live_bets" or (live_requested and not pregame_requested)
+    pregame_only = intent == "pregame_bets" or (pregame_requested and not live_requested)
     if "live and pregame" in lowered or "pregame and live" in lowered:
         live_only = False
         pregame_only = False
@@ -453,10 +953,14 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
 
     parlay_odds_min, parlay_odds_max = _extract_american_odds_range(lowered, require_parlay_context=True)
     parlay_leg_min, parlay_leg_max = _extract_parlay_leg_preferences(lowered)
+    analysis_focus = "mlb_home_runs" if _question_targets_mlb_home_runs(question) else None
+    wants_table = _question_requests_table(question) or analysis_focus == "mlb_home_runs"
+    wants_chart = _question_requests_chart(question) or analysis_focus == "mlb_home_runs"
 
     return {
         "intent": intent,
         "requested_sports": sorted(requested_sports),
+        "requested_markets": requested_markets,
         "include_props": include_props,
         "include_games": include_games,
         "live_only": live_only,
@@ -473,8 +977,15 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         "cross_sport_required": parlay_structure["cross_sport_required"],
         "risk_profile": parlay_structure["risk_profile"],
         "correlation_tolerance": parlay_structure["correlation_tolerance"],
+        "correlation_explicit": parlay_structure["correlation_explicit"],
         "round_robin_unit": parlay_structure["round_robin_unit"],
-        "limit": max(1, min(requested_limit, 8)),
+        "bankroll_amount": parlay_structure["bankroll_amount"],
+        "max_exposure_pct": parlay_structure["max_exposure_pct"],
+        "max_exposure_amount": parlay_structure["max_exposure_amount"],
+        "analysis_focus": analysis_focus,
+        "wants_table": wants_table,
+        "wants_chart": wants_chart,
+        "limit": max(1, min(requested_limit, 10)),
         "question": str(question or "").strip(),
     }
 
@@ -1021,6 +1532,7 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
     line_value = _numeric_hint(row.get("line"))
     if projected_value is not None and line_value is not None:
         row["score"] = float(row.get("score", 0.0)) + abs(projected_value - line_value) * 3.0
+    advanced_signals = _advanced_signals_from_item(item)
     row.update(
         {
             "candidate_type": "prop",
@@ -1033,6 +1545,10 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
             "hero_live_box": item.get("hero_live_box") if isinstance(item.get("hero_live_box"), dict) else None,
             "hero_sim_box": item.get("hero_sim_box") if isinstance(item.get("hero_sim_box"), dict) else None,
             "display_pills": item.get("display_pills") if isinstance(item.get("display_pills"), list) else [],
+            "batter_id": _safe_int(item.get("batter_id")),
+            "pitcher_id": _safe_int(item.get("pitcher_id")),
+            "opponent_pitcher_id": _safe_int(item.get("opponent_pitcher_id")),
+            "advanced_signals": advanced_signals,
         }
     )
     return row
@@ -1061,6 +1577,25 @@ def _candidate_is_final(candidate: dict[str, Any]) -> bool:
         for field in ("status_badge", "status_line", "status_display", "status_context", "detail", "summary", "score_kind")
     ).lower()
     return any(token in terminal_text for token in ("final", "game over", "completed"))
+
+
+def _candidate_market_key(candidate: dict[str, Any]) -> str | None:
+    combined = " ".join(
+        [
+            _safe_text(candidate.get("market"), ""),
+            _safe_text(candidate.get("pick"), ""),
+            _safe_text(candidate.get("name"), ""),
+        ]
+    )
+    return _market_key_from_text(combined)
+
+
+def _candidate_matches_requested_markets(candidate: dict[str, Any], preferences: dict[str, Any]) -> bool:
+    requested_markets = [str(key).strip().lower() for key in (preferences.get("requested_markets") or []) if str(key).strip()]
+    if not requested_markets:
+        return True
+    market_key = _candidate_market_key(candidate)
+    return bool(market_key and market_key in requested_markets)
 
 
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1106,6 +1641,7 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
     candidates = [
         row for row in candidates if _american_odds_match(_american_odds_value(row.get("odds")), preferences)
     ]
+    candidates = [row for row in candidates if _candidate_matches_requested_markets(row, preferences)]
 
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str, str]] = set()
@@ -1130,10 +1666,13 @@ def _apply_advanced_context_to_candidates(candidates: list[dict[str, Any]], adva
         advanced_context = advanced_by_sport.get(sport_slug, [])
         readiness_summary = _advanced_readiness_summary(advanced_context)
         market_context = _market_context(candidate)
+        statcast_profile = _candidate_mlb_statcast_profile(candidate)
         candidate["advanced_context"] = advanced_context
         candidate["advanced_gate"] = readiness_summary
         candidate["market_context"] = market_context
-        candidate["score"] = float(candidate.get("score") or 0.0) + _advanced_score_adjustment(readiness_summary) + _market_score_adjustment(market_context)
+        candidate["mlb_statcast_profile"] = statcast_profile
+        candidate["advanced_signal_score"] = _candidate_advanced_signal_score(candidate)
+        candidate["score"] = float(candidate.get("score") or 0.0) + _advanced_score_adjustment(readiness_summary) + _market_score_adjustment(market_context) + float(candidate.get("advanced_signal_score") or 0.0)
 
 
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
@@ -1181,6 +1720,12 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         notes.append(f"Game context currently points to a live total of {candidate.get('live_total')}.")
     if advanced_driver_text:
         notes.append(f"Advanced drivers in play: {advanced_driver_text}.")
+    signal_text = _advanced_signal_text(candidate)
+    if signal_text:
+        notes.append(f"Candidate-level advanced signals: {signal_text}.")
+    statcast_text = _mlb_statcast_profile_text(candidate.get("mlb_statcast_profile") if isinstance(candidate.get("mlb_statcast_profile"), dict) else None)
+    if statcast_text:
+        notes.append(f"Raw Statcast context: {statcast_text}.")
     missing_inputs = advanced_gate.get("missing_inputs") if isinstance(advanced_gate.get("missing_inputs"), list) else []
     if missing_inputs:
         notes.append(f"Readiness is partial because {len(missing_inputs)} advanced inputs are missing or unpublished.")
@@ -1195,12 +1740,14 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
 
 def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
+    market_key = _candidate_market_key(candidate)
     output = {
         "candidate_type": _safe_text(candidate.get("candidate_type"), "candidate"),
         "sport": _safe_text(candidate.get("sport"), "Sport"),
         "sport_slug": _safe_text(candidate.get("sport_slug"), "sport"),
         "matchup": _safe_text(candidate.get("matchup"), "-"),
         "market": _safe_text(candidate.get("market"), "Market"),
+        "market_key": market_key,
         "pick": _safe_text(candidate.get("pick"), _safe_text(candidate.get("name"), "Play")),
         "name": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
         "surface": _safe_text(candidate.get("surface_title"), _safe_text(candidate.get("surface"), "Board")),
@@ -1240,6 +1787,17 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
             for item in (candidate.get("advanced_context") or [])[:2]
             if isinstance(item, dict)
         ],
+        "advanced_signals": [
+            {
+                "key": _safe_text(item.get("key"), "signal"),
+                "label": _safe_text(item.get("label"), "Advanced signal"),
+                "value": item.get("value"),
+            }
+            for item in (candidate.get("advanced_signals") or [])[:6]
+            if isinstance(item, dict)
+        ],
+        "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
+        "mlb_statcast_profile": candidate.get("mlb_statcast_profile") if isinstance(candidate.get("mlb_statcast_profile"), dict) else None,
     }
     pills = candidate.get("display_pills") if isinstance(candidate.get("display_pills"), list) else []
     output["display_pills"] = [str(item).strip() for item in pills if str(item).strip()][:6]
@@ -1283,6 +1841,77 @@ def _parlay_label(legs: tuple[dict[str, Any], ...], preferences: dict[str, Any],
     return f"{leg_count}-leg {'live' if any(leg.get('is_live') for leg in legs) else 'pregame'} parlay"
 
 
+def _risk_profile_stake_fraction(preferences: dict[str, Any]) -> float:
+    risk_profile = _safe_text(preferences.get("risk_profile"), "balanced")
+    if risk_profile == "conservative":
+        return 0.02
+    if risk_profile == "aggressive":
+        return 0.06
+    return 0.04
+
+
+def _parlay_stake_plan(preferences: dict[str, Any], *, ticket_total: int | None = None) -> dict[str, Any]:
+    bankroll_amount = preferences.get("bankroll_amount")
+    max_exposure_pct = preferences.get("max_exposure_pct")
+    max_exposure_amount = preferences.get("max_exposure_amount")
+    bankroll_value = float(bankroll_amount) if bankroll_amount is not None else None
+    pct_cap_amount = None
+    if bankroll_value is not None and max_exposure_pct is not None:
+        pct_cap_amount = round(bankroll_value * (float(max_exposure_pct) / 100.0), 2)
+
+    effective_cap = None
+    cap_source = None
+    explicit_caps = [
+        value
+        for value in (pct_cap_amount, float(max_exposure_amount) if max_exposure_amount is not None else None)
+        if value is not None
+    ]
+    if explicit_caps:
+        effective_cap = round(min(explicit_caps), 2)
+        cap_source = "requested_exposure_cap"
+    elif bankroll_value is not None:
+        effective_cap = round(bankroll_value * _risk_profile_stake_fraction(preferences), 2)
+        cap_source = "risk_profile_bankroll"
+
+    suggested_stake = effective_cap
+    if effective_cap is not None and ticket_total and ticket_total > 1:
+        suggested_stake = round(effective_cap / float(ticket_total), 2)
+
+    stake_note = None
+    if effective_cap is not None and ticket_total and ticket_total > 1:
+        stake_note = f"Suggested stake ${suggested_stake:.2f} per ticket keeps the full set within a ${effective_cap:.2f} exposure cap."
+    elif effective_cap is not None and cap_source == "requested_exposure_cap":
+        stake_note = f"Suggested stake ${effective_cap:.2f} respects the requested exposure cap."
+    elif effective_cap is not None and cap_source == "risk_profile_bankroll":
+        stake_note = f"Suggested stake ${effective_cap:.2f} comes from the stated bankroll and {_safe_text(preferences.get('risk_profile'), 'balanced')} risk profile."
+
+    return {
+        "suggested_stake": suggested_stake,
+        "suggested_total_exposure": effective_cap,
+        "exposure_cap_amount": effective_cap,
+        "exposure_cap_source": cap_source,
+        "stake_note": stake_note,
+    }
+
+
+def _has_tight_exposure_cap(preferences: dict[str, Any]) -> bool:
+    max_exposure_pct = preferences.get("max_exposure_pct")
+    if max_exposure_pct is not None and float(max_exposure_pct) <= 5.0:
+        return True
+    bankroll_amount = preferences.get("bankroll_amount")
+    max_exposure_amount = preferences.get("max_exposure_amount")
+    if bankroll_amount is None or max_exposure_amount is None:
+        return False
+    try:
+        bankroll_value = float(bankroll_amount)
+        exposure_value = float(max_exposure_amount)
+    except Exception:
+        return False
+    if bankroll_value <= 0.0:
+        return False
+    return (exposure_value / bankroll_value) <= 0.05
+
+
 def _parlay_matches_preferences(legs: tuple[dict[str, Any], ...], preferences: dict[str, Any]) -> bool:
     matchups = {_safe_text(leg.get("matchup"), "") for leg in legs}
     sports = {_safe_text(leg.get("sport_slug"), "sport") for leg in legs}
@@ -1324,6 +1953,10 @@ def _build_parlay_payload(legs: tuple[dict[str, Any], ...], preferences: dict[st
         return None
 
     sports = sorted({_safe_text(leg.get("sport"), "Sport") for leg in summary_legs})
+    stake_plan = _parlay_stake_plan(preferences, ticket_total=ticket_total if round_robin else None)
+    rationale = _parlay_rationale(summary_legs)
+    if stake_plan.get("stake_note"):
+        rationale = f"{rationale} {stake_plan['stake_note']}"
     payload = {
         "label": _parlay_label(legs, preferences, round_robin=round_robin, ticket_index=ticket_index, ticket_total=ticket_total),
         "legs": summary_legs,
@@ -1332,12 +1965,19 @@ def _build_parlay_payload(legs: tuple[dict[str, Any], ...], preferences: dict[st
         "combined_decimal_odds": combined_decimal_odds,
         "combined_odds": combined_american_odds,
         "combined_implied_probability": combined_implied_probability,
-        "rationale": _parlay_rationale(summary_legs),
+        "rationale": rationale,
         "parlay_type": _safe_text(preferences.get("parlay_type"), "standard"),
         "risk_profile": _safe_text(preferences.get("risk_profile"), "balanced"),
         "correlation_tolerance": _safe_text(preferences.get("correlation_tolerance"), "medium"),
         "cross_sport": len(sports) > 1,
         "sports": sports,
+        "bankroll_amount": preferences.get("bankroll_amount"),
+        "max_exposure_pct": preferences.get("max_exposure_pct"),
+        "max_exposure_amount": preferences.get("max_exposure_amount"),
+        "suggested_stake": stake_plan.get("suggested_stake"),
+        "suggested_total_exposure": stake_plan.get("suggested_total_exposure"),
+        "exposure_cap_amount": stake_plan.get("exposure_cap_amount"),
+        "exposure_cap_source": stake_plan.get("exposure_cap_source"),
     }
     if round_robin:
         payload["round_robin_unit"] = preferences.get("round_robin_unit") or len(legs)
@@ -1362,6 +2002,8 @@ def _parlay_rank_score(parlay: dict[str, Any], preferences: dict[str, Any]) -> f
 
 def _build_round_robin_parlays(candidate_pool: list[dict[str, Any]], *, limit: int, preferences: dict[str, Any], min_leg_count: int, max_leg_count: int) -> list[dict[str, Any]]:
     anchor_size = max(3, min(5, max_leg_count))
+    if _has_tight_exposure_cap(preferences):
+        anchor_size = min(anchor_size, 3)
     if anchor_size > len(candidate_pool):
         return []
     anchor_groups: list[tuple[dict[str, Any], ...]] = []
@@ -1415,6 +2057,9 @@ def _build_parlays(candidates: list[dict[str, Any]], *, limit: int, preferences:
     max_leg_count = max(2, min(5, int(leg_max))) if leg_max is not None else 3
     if min_leg_count > max_leg_count:
         min_leg_count, max_leg_count = max_leg_count, min_leg_count
+    if _safe_text(resolved_preferences.get("parlay_type"), "standard") == "standard" and _has_tight_exposure_cap(resolved_preferences):
+        max_leg_count = min(max_leg_count, 2)
+        min_leg_count = min(min_leg_count, max_leg_count)
     candidate_pool = usable[: max(8, min(len(usable), max_leg_count + 4))]
     if resolved_preferences.get("parlay_type") == "round_robin":
         return _build_round_robin_parlays(
@@ -1466,6 +2111,7 @@ def run_intelligence_query(
     recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
     parlays = _build_parlays(candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
+    analysis_views = _mlb_home_run_analysis_views(candidates, preferences)
 
     live_rows = sum(1 for candidate in candidates if bool(candidate.get("is_live")))
     pregame_rows = sum(1 for candidate in candidates if not bool(candidate.get("is_live")))
@@ -1493,6 +2139,9 @@ def run_intelligence_query(
         headline = "The Syndicate live board brief"
     elif preferences["intent"] == "pregame_bets":
         headline = "The Syndicate pregame board brief"
+    elif preferences.get("requested_markets"):
+        first_market = _market_label((preferences.get("requested_markets") or [None])[0]).lower()
+        headline = f"The Syndicate {first_market} board"
 
     summary = (
         f"Scanned {len(candidates)} board candidates across {len([sport_row for sport_row in overview if _sport_matches_preferences(sport_row, preferences)]) or len(overview)} sports. "
@@ -1507,6 +2156,7 @@ def run_intelligence_query(
         "parsed_request": _parlay_request_summary(preferences),
         "recommendations": recommendations,
         "parlays": parlays,
+        "analysis_views": analysis_views,
         "board_notes": data_notes[:8],
         "readiness_gate": readiness_gate,
         "local_only": True,
