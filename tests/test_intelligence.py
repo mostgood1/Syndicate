@@ -386,6 +386,11 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertFalse(preferences.get("include_games"))
         self.assertEqual(preferences.get("limit"), 3)
 
+    def test_query_preferences_does_not_infer_nba_from_wnba_token(self) -> None:
+        preferences = _query_preferences("Explain the best WNBA matchup targets today with a table and chart.")
+
+        self.assertEqual(preferences.get("requested_sports"), ["wnba"])
+
     def test_intelligence_query_returns_ranked_recommendations_and_parlays(self) -> None:
         advanced_rows = [
             {
@@ -558,6 +563,81 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("pitcher_hr_mult", first_row)
         self.assertIn("why", first_row)
 
+    def test_intelligence_query_uses_mlb_hr_artifact_candidates_when_home_rails_are_empty(self) -> None:
+        overview = [
+            {
+                "slug": "mlb",
+                "name": "MLB",
+                "context_label": "2026-06-05",
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {"title": "Pregame props", "items": []},
+                    "live": {"title": "Top Live Props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            }
+        ]
+        hr_candidates = [
+            {
+                "candidate_type": "prop",
+                "sport": "MLB",
+                "sport_slug": "mlb",
+                "surface_key": "pregame",
+                "surface_title": "HR targets",
+                "name": "Aaron Judge",
+                "market": "Home Runs",
+                "market_key": "home_runs",
+                "pick": "Over 0.5",
+                "matchup": "NYY at BOS",
+                "line": "0.5",
+                "odds": "-",
+                "projected": "-",
+                "confidence": "24.1%",
+                "edge": "-",
+                "score": 91.0,
+                "href": "/mlb/hr-targets?date=2026-06-05",
+                "href_label": "Open HR board",
+                "writeup": "Expected opportunity is strong and the handedness split is favorable.",
+                "display_pills": ["HR Prob 24.1%", "Support 67"],
+                "advanced_signals": [
+                    {"key": "batter_statcast_hr_mult", "label": "Batter Statcast home-run multiplier", "value": 1.24},
+                    {"key": "pitcher_statcast_hr_mult", "label": "Pitcher Statcast home-run multiplier", "value": 1.11},
+                ],
+                "batter_id": 608324,
+                "opponent_pitcher_id": 605400,
+            }
+        ]
+        advanced_rows = [
+            {
+                "label": "Statcast batter and pitcher features",
+                "metrics": ["Launch angle", "Exit velocity", "Barrel rate", "Pitch mix"],
+                "path": "data/mlb_source/data/statcast/features/player_features_latest.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    with patch("syndicate.features.intelligence._mlb_home_run_candidates_from_artifact", return_value=hr_candidates):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "What are the best home run matchups today and why? Build a top 10 table and chart.",
+                                "date": "2026-06-05",
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        self.assertEqual(result.get("headline"), "The Syndicate home runs board")
+        self.assertTrue(result.get("recommendations"))
+        self.assertEqual((result.get("recommendations") or [])[0].get("sport_slug"), "mlb")
+        self.assertEqual(((result.get("analysis_views") or {}).get("table") or {}).get("rows")[0].get("player"), "Aaron Judge")
+
     def test_intelligence_query_builds_nba_analysis_views(self) -> None:
         advanced_rows = [
             {
@@ -619,9 +699,14 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = (response.get_json() or {}).get("response") or {}
         analysis_views = result.get("analysis_views") or {}
+        parsed_request = result.get("parsed_request") or {}
+        recommendations = result.get("recommendations") or []
         self.assertEqual(analysis_views.get("focus"), "wnba_matchups")
+        self.assertEqual(parsed_request.get("sports"), ["WNBA"])
         self.assertTrue((analysis_views.get("table") or {}).get("rows"))
         first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertTrue(recommendations)
+        self.assertEqual(recommendations[0].get("sport_slug"), "wnba")
         self.assertEqual(first_row.get("analysis_shape"), "wnba_role_pressure")
         self.assertEqual(first_row.get("team_environment_signal"), 1.12)
         self.assertEqual(first_row.get("possession_profile_signal"), 1.05)

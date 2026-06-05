@@ -12,7 +12,9 @@ from flask import current_app
 from syndicate.blueprints.home import _build_prop_dashboard_row
 from syndicate.blueprints.home import _build_sport_overview
 from syndicate.blueprints.home import _game_bet_candidates_from_game
+from syndicate.features.mlb.sources import daily_artifact_path as mlb_daily_artifact_path
 from syndicate.features.mlb.sources import default_mlb_source_root
+from syndicate.features.mlb.sources import load_json_file as mlb_load_json_file
 from syndicate.features.nba.sources import live_snapshot_path as nba_live_snapshot_path
 from syndicate.features.nba.sources import processed_path as nba_processed_path
 from syndicate.features.nba.sources import season_betting_card_day_path as nba_season_betting_card_day_path
@@ -441,6 +443,16 @@ def _effective_date(selected_date: str | None = None) -> str:
 def _safe_text(value: Any, fallback: str = "-") -> str:
     text = str(value or "").strip()
     return text or fallback
+
+
+def _text_contains_keyword(text: str, keyword: str) -> bool:
+    normalized_text = str(text or "").lower()
+    normalized_keyword = str(keyword or "").strip().lower()
+    if not normalized_text or not normalized_keyword:
+        return False
+    if re.fullmatch(r"[a-z0-9_+-]+", normalized_keyword):
+        return bool(re.search(rf"(?<![a-z0-9]){re.escape(normalized_keyword)}(?![a-z0-9])", normalized_text))
+    return normalized_keyword in normalized_text
 
 
 def _relative_repo_path(path: Path) -> str:
@@ -1462,7 +1474,7 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
     if explicit_sport:
         requested_sports.add(explicit_sport)
     for slug, keywords in _SPORT_KEYWORDS.items():
-        if any(keyword in lowered for keyword in keywords):
+        if any(_text_contains_keyword(lowered, keyword) for keyword in keywords):
             requested_sports.add(slug)
 
     requested_markets = _extract_market_focuses(lowered)
@@ -2128,6 +2140,85 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
     return row
 
 
+def _mlb_home_run_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[str, Any]]:
+    if _safe_text(sport.get("slug"), "").lower() != "mlb":
+        return []
+    selected_date = _safe_text(sport.get("context_label"), "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
+        return []
+    summary = mlb_load_json_file(mlb_daily_artifact_path(selected_date, suffix="_hr_targets"))
+    rows = summary.get("rows") if isinstance((summary or {}).get("rows"), list) else []
+    candidates: list[dict[str, Any]] = []
+    for index, row in enumerate(rows[:10], start=1):
+        if not isinstance(row, dict):
+            continue
+        hr_probability = _numeric_hint(row.get("p_hr_1plus"))
+        support_score = _numeric_hint(row.get("hr_support_raw_score") or row.get("hr_support_score"))
+        player_name = _safe_text(row.get("player_name"), "Unknown hitter")
+        reasons = [str(item).strip() for item in (row.get("hr_target_reasons") or []) if str(item).strip()]
+        writeup = _safe_text(row.get("hr_target_summary"), "") or " ".join(reasons[:2])
+        display_pills: list[str] = []
+        if hr_probability is not None:
+            display_pills.append(f"HR Prob {hr_probability * 100.0:.1f}%")
+        if support_score is not None:
+            display_pills.append(f"Support {support_score:.0f}")
+        lineup_order = _safe_int(row.get("lineup_order"))
+        if lineup_order is not None:
+            display_pills.append(f"Lineup {lineup_order}")
+        advanced_signals = [
+            {
+                "key": "batter_statcast_hr_mult",
+                "label": _humanize_signal_key("batter_statcast_hr_mult"),
+                "value": round(float(row.get("batter_platoon_hr_mult")), 3),
+            }
+            for _ in [0]
+            if _numeric_hint(row.get("batter_platoon_hr_mult")) is not None
+        ]
+        if _numeric_hint(row.get("pitcher_platoon_hr_mult")) is not None:
+            advanced_signals.append(
+                {
+                    "key": "pitcher_statcast_hr_mult",
+                    "label": _humanize_signal_key("pitcher_statcast_hr_mult"),
+                    "value": round(float(_numeric_hint(row.get("pitcher_platoon_hr_mult")) or 0.0), 3),
+                }
+            )
+        score = float(hr_probability or 0.0) * 100.0 + float(support_score or 0.0) + max(0.0, 12.0 - float(index))
+        candidates.append(
+            {
+                "candidate_type": "prop",
+                "sport": _safe_text(sport.get("name"), "MLB"),
+                "sport_slug": "mlb",
+                "surface_key": "pregame",
+                "surface_title": "HR targets",
+                "name": player_name,
+                "market": "Home Runs",
+                "market_key": "home_runs",
+                "pick": "Over 0.5",
+                "matchup": _safe_text(row.get("matchup"), "-"),
+                "team": _safe_text(row.get("team"), "-"),
+                "team_key": _safe_text(row.get("team"), "").lower() or None,
+                "player_team": _safe_text(row.get("team"), "-"),
+                "line": "0.5",
+                "odds": "-",
+                "projected": "-",
+                "confidence": f"{hr_probability * 100.0:.1f}%" if hr_probability is not None else "-",
+                "edge": "-",
+                "score": score,
+                "href": f"/mlb/hr-targets?date={selected_date}",
+                "href_label": "Open HR board",
+                "writeup": writeup,
+                "display_pills": display_pills,
+                "advanced_signals": advanced_signals,
+                "batter_id": _safe_int(row.get("batter_id")),
+                "opponent_pitcher_id": _safe_int(row.get("opponent_pitcher_id")),
+                "lineup_order": lineup_order,
+                "hr_support_score": support_score,
+                "hr_probability": hr_probability,
+            }
+        )
+    return candidates
+
+
 def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
     candidates: list[dict[str, Any]] = []
@@ -2162,6 +2253,9 @@ def _candidate_market_focuses(candidate: dict[str, Any]) -> set[str]:
         ]
     )
     focuses: set[str] = set()
+    explicit_market_key = _safe_text(candidate.get("market_key"), "").lower()
+    if explicit_market_key:
+        focuses.add(explicit_market_key)
     for key, aliases in _MARKET_FOCUS_ALIASES.items():
         if any(_text_has_market_alias(market_text, alias) for alias in aliases):
             focuses.add(key)
@@ -2397,6 +2491,9 @@ def _candidate_matches_requested_markets(candidate: dict[str, Any], preferences:
 
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
+    wants_mlb_hr_targets = preferences.get("analysis_focus") == "mlb_home_runs" or "home_runs" in {
+        str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()
+    }
     for sport in overview:
         if not isinstance(sport, dict) or not _sport_matches_preferences(sport, preferences):
             continue
@@ -2433,6 +2530,8 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             if preferences.get("pregame_only"):
                 game_candidates = [row for row in game_candidates if not bool(row.get("is_live")) and "live" not in _safe_text(row.get("market"), "").lower()]
             candidates.extend(game_candidates)
+        if wants_mlb_hr_targets and not preferences.get("live_only"):
+            candidates.extend(_mlb_home_run_candidates_from_artifact(sport))
 
     candidates = [row for row in candidates if not _candidate_is_final(row)]
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
@@ -3036,6 +3135,22 @@ def _build_parlays(candidates: list[dict[str, Any]], *, limit: int, preferences:
     )
 
 
+def _query_needs_mlb_home_run_candidates(preferences: dict[str, Any]) -> bool:
+    requested_markets = {
+        str(item).strip().lower()
+        for item in (preferences.get("requested_markets") or [])
+        if str(item).strip()
+    }
+    return preferences.get("analysis_focus") == "mlb_home_runs" or "home_runs" in requested_markets
+
+
+def _has_mlb_home_run_candidates(candidates: list[dict[str, Any]]) -> bool:
+    return any(
+        _safe_text(candidate.get("sport_slug"), "").lower() == "mlb" and "home_runs" in _candidate_market_focuses(candidate)
+        for candidate in candidates
+    )
+
+
 def run_intelligence_query(
     question: str,
     *,
@@ -3055,6 +3170,14 @@ def run_intelligence_query(
         if isinstance(sport_row, dict)
     }
     candidates = _collect_candidates(overview, preferences)
+    if _query_needs_mlb_home_run_candidates(preferences) and not _has_mlb_home_run_candidates(candidates):
+        for sport_row in overview:
+            if not isinstance(sport_row, dict):
+                continue
+            if _safe_text(sport_row.get("slug"), "").lower() != "mlb":
+                continue
+            candidates.extend(_mlb_home_run_candidates_from_artifact(sport_row))
+            break
     resolved_requested_markets = _resolved_requested_markets(question, candidates, preferences.get("requested_markets") or [])
     if resolved_requested_markets != (preferences.get("requested_markets") or []):
         preferences = {**preferences, "requested_markets": resolved_requested_markets}
