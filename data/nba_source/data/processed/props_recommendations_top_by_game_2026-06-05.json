@@ -4,6 +4,48 @@
     {
       "game_key": "NYK@SAS",
       "game_id": "1",
+      "player": "Jose Alvarado",
+      "team": "NYK",
+      "team_tricode": "NYK",
+      "opponent": "SAS",
+      "score": 76.25858495832668,
+      "score_adj": 76.25858495832668,
+      "tier": "High",
+      "model": {
+        "pts": 10.89,
+        "reb": 3.43,
+        "ast": 4.359999999999999,
+        "threes": 1.9,
+        "stl": 0.4932399999999999,
+        "blk": 0.4035599999999999,
+        "tov": 1.3451999999999995,
+        "pra": 18.68,
+        "pr": 14.32,
+        "pa": 15.25,
+        "ra": 7.789999999999999
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 0.5,
+        "price": -109.0,
+        "edge": 0.3977122373424693,
+        "ev": 0.7625858495832668,
+        "ev_pct": 76.25858495832668,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 76.3%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.9 vs line 0.5 (+1.4)"
+    },
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
       "player": "Victor Wembanyama",
       "team": "SAS",
       "team_tricode": "SAS",
@@ -51,8 +93,8 @@
       "team": "SAS",
       "team_tricode": "SAS",
       "opponent": "NYK",
-      "score": 63.30892295690032,
-      "score_adj": 63.30892295690032,
+      "score": 64.02237390909299,
+      "score_adj": 64.02237390909299,
       "tier": "High",
       "model": {
         "pts": 8.969999999999999,
@@ -71,63 +113,21 @@
         "market": "threes",
         "side": "UNDER",
         "line": 2.5,
-        "price": -110.0,
-        "edge": 0.33161816786947784,
-        "ev": 0.6330892295690032,
-        "ev_pct": 63.30892295690032,
+        "price": -109.0,
+        "edge": 0.33389659120053283,
+        "ev": 0.6402237390909299,
+        "ev_pct": 64.02237390909299,
         "book": "betrivers",
         "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 63.3%",
+        "EV 64.0%",
         "Regular price range (-150 to +150)",
         "Consensus: 5 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 1.4 vs line 2.5 (-1.1)"
-    },
-    {
-      "game_key": "NYK@SAS",
-      "game_id": "1",
-      "player": "Luke Kornet",
-      "team": "SAS",
-      "team_tricode": "SAS",
-      "opponent": "NYK",
-      "score": 61.9122451318848,
-      "score_adj": 61.9122451318848,
-      "tier": "High",
-      "model": {
-        "pts": 5.74,
-        "reb": 5.409999999999999,
-        "ast": 2.33,
-        "threes": 0.0,
-        "stl": 0.4527599999999999,
-        "blk": 0.3704399999999999,
-        "tov": 1.2348,
-        "pra": 13.48,
-        "pr": 11.149999999999999,
-        "pa": 8.07,
-        "ra": 7.739999999999999
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "OVER",
-        "line": 2.5,
-        "price": 125.0,
-        "edge": 0.27516553391948806,
-        "ev": 0.619122451318848,
-        "ev_pct": 61.9122451318848,
-        "book": "bovada",
-        "p_win": 1.0,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 61.9%",
-        "Regular price range (-150 to +150)",
-        "Best line available"
-      ],
-      "basketball_summary": "model 5.7 vs line 2.5 (+3.2)"
     }
   ]
 }
