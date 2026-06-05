@@ -1824,11 +1824,34 @@ def _resolve_nba_live_context_path(context_label: str) -> Path:
     return _latest_matching_path(direct.parent, "live_lens_projections_*.jsonl", requested_date=context_label) or direct
 
 
+def _resolve_nba_live_pbp_context_path(context_label: str) -> Path:
+    direct = nba_live_snapshot_path(f"live_pbp_stats_{context_label}.jsonl")
+    if direct.exists():
+        return direct
+    return _latest_matching_path(direct.parent, "live_pbp_stats_*.jsonl", requested_date=context_label) or direct
+
+
 def _resolve_wnba_live_context_path(context_label: str) -> Path:
     direct = _wnba_live_lens_path(f"live_lens_projections_{context_label}.jsonl")
     if direct.exists():
         return direct
     return _latest_matching_path(direct.parent, "live_lens_projections_*.jsonl", requested_date=context_label) or direct
+
+
+def _resolve_wnba_live_pbp_context_path(context_label: str) -> Path:
+    direct = wnba_live_snapshot_path(f"live_pbp_stats_{context_label}.jsonl")
+    if direct.exists():
+        return direct
+    return _latest_matching_path(direct.parent, "live_pbp_stats_*.jsonl", requested_date=context_label) or direct
+
+
+def _resolve_ncaab_live_pbp_context_path(context_label: str) -> Path:
+    root = ncaab_sources._source_roots()[0]
+    by_date_root = root / "raw_outputs" / "by_date"
+    direct = by_date_root / context_label / f"live_features_{context_label}.csv"
+    if direct.exists():
+        return direct
+    return _latest_matching_path(by_date_root, "*/live_features_*.csv", requested_date=context_label) or direct
 
 
 def _resolve_nhl_scoreboard_context_path(context_label: str) -> Path:
@@ -1837,6 +1860,13 @@ def _resolve_nhl_scoreboard_context_path(context_label: str) -> Path:
         return direct
     games_root = direct.parents[1]
     return _latest_matching_path(games_root, "date=*/scoreboard.csv", requested_date=context_label) or direct
+
+
+def _resolve_nhl_shift_context_path(context_label: str) -> Path:
+    direct = nhl_processed_path(f"shifts_{context_label}.csv")
+    if direct.exists():
+        return direct
+    return _latest_matching_path(direct.parent, "shifts_*.csv", requested_date=context_label) or direct
 
 
 def _advanced_input_rows_for_sport(sport: dict[str, Any], tracked: set[str]) -> list[dict[str, Any]]:
@@ -1997,6 +2027,11 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
                 "path": nba_processed_path(f"team_advanced_stats_{season}.csv"),
             },
             {
+                "label": "Play-by-play live recap",
+                "metrics": ["Recent scoring run", "Possession estimate", "Shot mix", "Quarter scoring", "Live sequence pressure"],
+                "path": _resolve_nba_live_pbp_context_path(context_label),
+            },
+            {
                 "label": "Player prop model outputs",
                 "metrics": ["Usage context", "Minute expectation", "Prop mean", "Edge vs line", "Calibration"],
                 "path": _resolve_nba_props_predictions_path(context_label),
@@ -2015,6 +2050,11 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
                 "path": wnba_processed_path(f"recommendations_slate_{context_label}.json"),
             },
             {
+                "label": "Play-by-play live recap",
+                "metrics": ["Recent scoring run", "Possession estimate", "Shot mix", "Quarter scoring", "Live sequence pressure"],
+                "path": _resolve_wnba_live_pbp_context_path(context_label),
+            },
+            {
                 "label": "Player prop model outputs",
                 "metrics": ["Usage context", "Minute expectation", "Prop mean", "Edge vs line", "Calibration"],
                 "path": wnba_processed_path(f"props_recommendations_{context_label}.csv"),
@@ -2031,6 +2071,11 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
                 "label": "Game recommendation layer",
                 "metrics": ["xG proxy last 10", "Goal pace per 60", "SOG pace per 60", "Pressure flags", "Score effects"],
                 "path": nhl_recommendation_path(context_label),
+            },
+            {
+                "label": "Shift and on-ice sequence recap",
+                "metrics": ["Shift deployment", "On-ice tempo", "Line matching", "Rest state", "TOI pressure"],
+                "path": _resolve_nhl_shift_context_path(context_label),
             },
             {
                 "label": "Props recommendation layer",
@@ -2094,6 +2139,11 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
                 "label": "Recommendations mirror",
                 "metrics": ["Spread edge", "Total edge", "Confidence", "Board ranking", "Availability"],
                 "path": root / "api" / "recommendations" / f"recommendations_{context_label}.json",
+            },
+            {
+                "label": "Play-by-play derived live recap",
+                "metrics": ["Possession estimate", "Points per possession", "Turnover pressure", "Rebound pressure", "Live fetch freshness"],
+                "path": _resolve_ncaab_live_pbp_context_path(context_label),
             },
             {
                 "label": "Live state mirror",

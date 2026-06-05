@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from syndicate.app import create_app
 from syndicate.features.intelligence import _advanced_signals_from_item
+from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _build_parlays
 from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _candidate_market_fit
@@ -783,6 +784,36 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         )
 
         self.assertGreater(score, 0.0)
+
+    def test_advanced_input_rows_include_basketball_pbp_recap(self) -> None:
+        rows = _advanced_input_rows_for_sport(
+            {
+                "slug": "nba",
+                "name": "NBA",
+                "context_label": "2026-05-28",
+            },
+            set(),
+        )
+
+        pbp_row = next((row for row in rows if row.get("label") == "Play-by-play live recap"), None)
+        self.assertIsNotNone(pbp_row)
+        self.assertTrue((pbp_row or {}).get("exists"))
+        self.assertIn("Recent scoring run", (pbp_row or {}).get("metrics") or [])
+
+    def test_advanced_input_rows_include_ncaab_pbp_recap(self) -> None:
+        rows = _advanced_input_rows_for_sport(
+            {
+                "slug": "ncaab",
+                "name": "NCAAB",
+                "context_label": "2026-04-06",
+            },
+            set(),
+        )
+
+        pbp_row = next((row for row in rows if row.get("label") == "Play-by-play derived live recap"), None)
+        self.assertIsNotNone(pbp_row)
+        self.assertTrue((pbp_row or {}).get("exists"))
+        self.assertIn("Points per possession", (pbp_row or {}).get("metrics") or [])
 
     def test_intelligence_query_builds_football_analysis_views(self) -> None:
         advanced_rows = [
