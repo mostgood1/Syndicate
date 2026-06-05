@@ -150,12 +150,12 @@ ROUTE_SPECS: tuple[RouteSpec, ...] = (
     RouteSpec(
         name="Syndicate home",
         path="/",
-        header_selector=".home-controls__title",
+        header_selector=".home-active-strip__meta",
         board_selector="#syndicate-home-sport-stack",
         header_loading_text="",
         board_loading_text="",
-        extra_required_selectors=(".home-controls", ".home-topbar__date-form", ".sport-stack-card"),
-        extra_required_nonempty_selectors=(".home-controls__title", '.sport-stack-card h3'),
+        extra_required_selectors=(".home-active-strip", ".home-topbar__date-form", ".sport-stack-card"),
+        extra_required_nonempty_selectors=(".home-active-strip__meta", ".sport-stack-card h3"),
     ),
     RouteSpec(
         name="MLB source cards",

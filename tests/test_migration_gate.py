@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from scripts.migration_gate import evaluate_active_sport_advanced_readiness
 from scripts.migration_gate import evaluate_protected_mirror_assets
 from scripts.migration_gate import evaluate_protected_runtime_contracts
 from scripts.migration_gate import evaluate_protected_local_resolvers
@@ -124,6 +125,61 @@ class MigrationGateRuntimeDependencyTests(unittest.TestCase):
         self.assertIn("Runtime dependency: PASS", rendered)
         self.assertIn("Lowest ownership modules:", rendered)
         self.assertIn("nba: score=53; tier=mixed_local_and_source", rendered)
+
+    def test_evaluate_active_sport_advanced_readiness_skips_out_of_season_and_no_games(self) -> None:
+        sports = [
+            {
+                "slug": "ncaab",
+                "name": "NCAAB",
+                "active_today": True,
+                "advanced_ready": False,
+                "readiness_gate": {"state": "ready"},
+                "advanced_gate": {
+                    "required_total": 3,
+                    "exists_count": 0,
+                    "tracked_count": 0,
+                    "missing_inputs": [{"label": "Recommendations mirror"}],
+                    "publish_missing_inputs": [],
+                },
+            },
+            {
+                "slug": "nhl",
+                "name": "NHL",
+                "active_today": True,
+                "advanced_ready": False,
+                "readiness_gate": {"state": "ready"},
+                "advanced_gate": {
+                    "required_total": 3,
+                    "exists_count": 1,
+                    "tracked_count": 0,
+                    "missing_inputs": [{"label": "Recommendations"}],
+                    "publish_missing_inputs": [{"label": "Scoreboard snapshot"}],
+                },
+            },
+            {
+                "slug": "wnba",
+                "name": "WNBA",
+                "active_today": True,
+                "advanced_ready": True,
+                "readiness_gate": {"state": "ready"},
+                "advanced_gate": {
+                    "required_total": 3,
+                    "exists_count": 3,
+                    "tracked_count": 3,
+                    "missing_inputs": [],
+                    "publish_missing_inputs": [],
+                },
+            },
+        ]
+
+        with patch("scripts.migration_gate._load_intelligence_status_for_migration_gate", return_value=("2026-06-05", {"sports": sports}, None)), \
+             patch("scripts.migration_gate._scheduled_game_count", side_effect=[(True, 0), (True, 2)]):
+            result = evaluate_active_sport_advanced_readiness()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["active_sport_count"], 1)
+        self.assertEqual([item["slug"] for item in result["active_sports"]], ["wnba"])
+        self.assertEqual(result["violations"], [])
 
     def test_evaluate_protected_mirror_assets_flags_missing_mlb_live_prop_assets(self) -> None:
         with TemporaryDirectory() as temp_dir:
