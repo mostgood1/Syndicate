@@ -146,6 +146,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(payload.get("ok"))
         result = payload.get("response") or {}
         self.assertEqual(result.get("selected_date"), "2026-06-04")
+        self.assertEqual(result.get("headline"), "The Syndicate parlay builder")
         self.assertGreaterEqual(len(result.get("recommendations") or []), 2)
         self.assertGreaterEqual(len(result.get("parlays") or []), 1)
         first = (result.get("recommendations") or [])[0]
@@ -155,6 +156,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(first.get("advanced_inputs"))
         self.assertIn("readiness_gate", result)
         self.assertTrue(first.get("advanced_ready"))
+        self.assertIsNotNone(first.get("decimal_odds"))
+        self.assertIsNotNone(first.get("implied_probability"))
+
+        first_parlay = (result.get("parlays") or [])[0]
+        self.assertIsNotNone(first_parlay.get("combined_odds"))
+        self.assertIsNotNone(first_parlay.get("combined_decimal_odds"))
+        self.assertIsNotNone(first_parlay.get("combined_implied_probability"))
 
     def test_intelligence_query_prioritizes_ready_advanced_inputs(self) -> None:
         advanced_by_sport = {
@@ -311,3 +319,4 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn('id="intel-query-form"', body)
         self.assertIn('/api/intelligence/query', body)
         self.assertIn('Advanced artifact status', body)
+        self.assertIn('Ask The Syndicate for best bets, live angles, or parlays', body)
