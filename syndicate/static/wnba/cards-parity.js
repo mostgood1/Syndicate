@@ -1111,7 +1111,11 @@
       const projectionValue = Number(projection);
       const lineValue = Number(line);
       const parts = [];
-      if (Number.isFinite(projectionValue) && Number.isFinite(lineValue)) {
+      if (key === 'ml' || key === 'half_ml' || key === 'quarter_ml') {
+        if (Number.isFinite(projectionValue) && Number.isFinite(lineValue)) {
+          parts.push(`Model ${fmtPercent(projectionValue, 0)} vs market ${fmtPercent(lineValue, 0)}`);
+        }
+      } else if (Number.isFinite(projectionValue) && Number.isFinite(lineValue)) {
         parts.push(`Proj ${fmtNumber(projectionValue, 1)} vs ${fmtNumber(lineValue, 1)}`);
       }
       if (extraDetail) {
@@ -1124,6 +1128,7 @@
         side,
         edge: Number.isFinite(edgeValue) ? edgeValue : null,
         line: Number.isFinite(lineValue) ? lineValue : null,
+        projection: Number.isFinite(projectionValue) ? projectionValue : null,
         score: 0,
         detail: parts.join(' · '),
         compactLabel: klass === 'NONE' ? `${label} —` : `${label} ${klass} ${sideLabel}${key === 'ml' ? fmtSigned(edgeValue * 100, 1) + 'pp' : fmtSigned(edgeValue, 1)}`.trim(),
@@ -1587,7 +1592,7 @@
         const pickHome = Math.abs(homeEdge) >= Math.abs(awayEdge);
         const edge = pickHome ? homeEdge : awayEdge;
         const side = pickHome ? game?.home_tri : game?.away_tri;
-        const line = pickHome ? homeMl : awayMl;
+        const line = pickHome ? pHomeImplied : pAwayImplied;
         const projection = pickHome ? pHomeModel : (1 - pHomeModel);
         const klass = classifyLens(Math.abs(edge), thresholds.ml.watch, thresholds.ml.bet);
         const priorDetail = Number.isFinite(pregameHomeWin) ? `Prior ${fmtPercent(pickHome ? pregameHomeWin : (1 - pregameHomeWin), 0)}` : null;
@@ -4212,7 +4217,7 @@
         oddsRefreshedAt: liveLens?.oddsRefreshedAt || null,
         projection: null,
         modelHomeWinProb: liveMoneylineHomeProb(game, signals?.quarter_ml),
-        baselineHomeWinProb: null,
+        baselineHomeWinProb: signals?.quarter_ml?.line != null ? 0.5 : null,
         markets: {
           moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.quarter_ml),
           spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.quarter_ats),
@@ -4228,7 +4233,7 @@
         oddsRefreshedAt: liveLens?.oddsRefreshedAt || null,
         projection: null,
         modelHomeWinProb: liveMoneylineHomeProb(game, signals?.half_ml),
-        baselineHomeWinProb: null,
+        baselineHomeWinProb: signals?.half_ml?.line != null ? 0.5 : null,
         markets: {
           moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.half_ml),
           spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.half_ats),
@@ -4244,7 +4249,7 @@
         oddsRefreshedAt: liveLens?.oddsRefreshedAt || null,
         projection: null,
         modelHomeWinProb: liveMoneylineHomeProb(game, signals?.ml),
-        baselineHomeWinProb: null,
+        baselineHomeWinProb: baselineHomeWinProb(game, 'full'),
         markets: {
           moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.ml),
           spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.ats),
