@@ -1,0 +1,46 @@
+{
+  "date": "2026-06-05",
+  "season": 2026,
+  "generated_at": "2026-06-04T10:55:00.073150",
+  "tool": "tools/daily_update_multi_profile.py",
+  "locked": true,
+  "source_profile": "game_recos",
+  "source_sim_dir": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-05",
+  "thresholds": {
+    "nrfi_min_prob": 0.55,
+    "nrfi_max_mean_runs": 0.8,
+    "yrfi_max_nrfi_prob": 0.5,
+    "yrfi_min_mean_runs": 0.95,
+    "yrfi_min_side_lead_prob": 0.24
+  },
+  "counts": {
+    "rows": 1,
+    "games": 1
+  },
+  "signals": [
+    {
+      "game_pk": 824350,
+      "date": "2026-06-05",
+      "away": "Milwaukee Brewers",
+      "home": "Colorado Rockies",
+      "away_abbr": "MIL",
+      "home_abbr": "COL",
+      "away_team_id": 158,
+      "home_team_id": 115,
+      "starter_names": {
+        "away": "Brandon Sproat",
+        "home": "Ryan Feltner"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.21 | side lead 26.8%",
+        "detail": "Season filter qualified: only 49.7% simulated NRFI, 1.21 expected first-inning runs, and one side reaches a 26.8% chance to be ahead after one.",
+        "nrfiProb": 0.497,
+        "yrfiProb": 0.503,
+        "meanTotalRuns": 1.212,
+        "maxSideLeadProb": 0.268
+      }
+    }
+  ]
+}
