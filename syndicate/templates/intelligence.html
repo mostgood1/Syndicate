@@ -131,6 +131,19 @@
       gap: 16px;
     }
 
+    .intel-control-stack,
+    .intel-pill-group {
+      display: grid;
+      gap: 10px;
+    }
+
+    .intel-pill-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
     .intel-form label {
       display: grid;
       gap: 8px;
@@ -181,7 +194,63 @@
       background: rgba(8, 18, 30, 0.72);
       color: var(--intel-soft);
       font-size: 0.84rem;
-      white-space: nowrap;
+      line-height: 1.25;
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .intel-filter-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(125, 152, 178, 0.18);
+      background: rgba(8, 18, 30, 0.72);
+      color: var(--intel-soft);
+      font: inherit;
+      cursor: pointer;
+      transition: border-color 120ms ease, background 120ms ease, color 120ms ease, transform 120ms ease;
+    }
+
+    .intel-filter-pill:hover {
+      border-color: rgba(139, 211, 255, 0.28);
+      color: var(--intel-ink);
+      transform: translateY(-1px);
+    }
+
+    .intel-filter-pill.is-active {
+      background: linear-gradient(135deg, rgba(139, 211, 255, 0.18), rgba(137, 226, 168, 0.12));
+      border-color: rgba(139, 211, 255, 0.32);
+      color: var(--intel-ink);
+    }
+
+    .intel-filter-pill.is-live.is-active {
+      background: linear-gradient(135deg, rgba(247, 178, 103, 0.18), rgba(139, 211, 255, 0.12));
+      border-color: rgba(247, 178, 103, 0.34);
+    }
+
+    .intel-limit-field {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(125, 152, 178, 0.18);
+      background: rgba(8, 18, 30, 0.72);
+    }
+
+    .intel-limit-field input {
+      width: 82px;
+      min-width: 82px;
+      padding: 8px 10px;
+      border-radius: 12px;
+    }
+
+    .intel-filter-summary {
+      min-height: 20px;
     }
 
     .intel-chip.is-live {
@@ -321,6 +390,35 @@
       gap: 8px;
     }
 
+    .intel-brief-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .intel-brief-body {
+      color: var(--intel-soft);
+      line-height: 1.6;
+      font-size: 0.98rem;
+    }
+
+    .intel-brief-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .intel-brief-list-item {
+      display: grid;
+      gap: 4px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(125, 152, 178, 0.12);
+      background: rgba(6, 16, 26, 0.68);
+    }
+
+    .intel-brief-list-item strong {
+      color: var(--intel-ink);
+    }
+
     .intel-analysis-series .intel-chip {
       background: rgba(139, 211, 255, 0.08);
       color: var(--intel-ink);
@@ -424,7 +522,7 @@
       background: rgba(139, 211, 255, 0.08);
       color: var(--intel-ink);
       font-size: 0.8rem;
-      white-space: nowrap;
+      white-space: normal;
     }
 
     .intel-signal-pill strong {
@@ -578,14 +676,12 @@
             <input id="intel-date" name="date" type="date" value="{{ selected_date }}" />
           </label>
           <label>
-            <span class="intel-kicker">Mode</span>
+            <span class="intel-kicker">Intent override</span>
             <select id="intel-mode" name="mode">
               <option value="">Auto-detect</option>
               <option value="live">Live</option>
               <option value="pregame">Pregame</option>
               <option value="parlay">Parlay</option>
-              <option value="props">Props</option>
-              <option value="game">Game bets</option>
             </select>
           </label>
           <label>
@@ -597,6 +693,48 @@
               {% endfor %}
             </select>
           </label>
+        </div>
+        <input id="intel-timing" name="timing" type="hidden" value="" />
+        <input id="intel-board-scope" name="board_scope" type="hidden" value="all" />
+        <div class="intel-control-stack">
+          <div class="intel-pill-group">
+            <div>
+              <div class="intel-kicker">Timing pills</div>
+              <p class="intel-inline-note">Force live only, pregame only, or keep the response mixed.</p>
+            </div>
+            <div class="intel-pill-toolbar">
+              <button class="intel-filter-pill is-active" type="button" data-timing="">Live + pregame</button>
+              <button class="intel-filter-pill is-live" type="button" data-timing="live">Live</button>
+              <button class="intel-filter-pill" type="button" data-timing="pregame">Pregame</button>
+            </div>
+          </div>
+          <div class="intel-pill-group">
+            <div>
+              <div class="intel-kicker">Board scope pills</div>
+              <p class="intel-inline-note">Guide the response toward prop-only, game-only, or mixed boards without rewriting the prompt.</p>
+            </div>
+            <div class="intel-pill-toolbar">
+              <button class="intel-filter-pill is-active" type="button" data-board-scope="all">Props + games</button>
+              <button class="intel-filter-pill" type="button" data-board-scope="props">Props</button>
+              <button class="intel-filter-pill" type="button" data-board-scope="games">Game plays</button>
+            </div>
+          </div>
+          <div class="intel-pill-group">
+            <div>
+              <div class="intel-kicker">Returned candidates</div>
+              <p class="intel-inline-note">Set a hard cap here when you want more than the default board brief.</p>
+            </div>
+            <div class="intel-pill-toolbar">
+              <button class="intel-filter-pill" type="button" data-limit="3">Top 3</button>
+              <button class="intel-filter-pill is-active" type="button" data-limit="5">Top 5</button>
+              <button class="intel-filter-pill" type="button" data-limit="10">Top 10</button>
+              <label class="intel-limit-field">
+                <span class="intel-meta">Custom</span>
+                <input id="intel-limit" name="limit" type="number" min="1" max="10" step="1" value="5" />
+              </label>
+            </div>
+          </div>
+          <div class="intel-chip-row intel-filter-summary" id="intel-filter-summary"></div>
         </div>
         <div class="intel-quick-asks">
           {% for prompt in default_questions %}
@@ -621,6 +759,10 @@
       const dateEl = document.getElementById('intel-date');
       const modeEl = document.getElementById('intel-mode');
       const sportEl = document.getElementById('intel-sport');
+      const timingEl = document.getElementById('intel-timing');
+      const boardScopeEl = document.getElementById('intel-board-scope');
+      const limitEl = document.getElementById('intel-limit');
+      const filterSummaryEl = document.getElementById('intel-filter-summary');
       const responseRoot = document.getElementById('intel-response');
       const statusLink = document.getElementById('intel-status-link');
 
@@ -646,6 +788,59 @@
 
       function chip(label, extraClass = '') {
         return `<span class="intel-chip ${extraClass}">${escapeHtml(label)}</span>`;
+      }
+
+      function sanitizeLimit(rawValue) {
+        const numeric = Number.parseInt(String(rawValue ?? '').trim(), 10);
+        if (!Number.isFinite(numeric)) {
+          return 5;
+        }
+        return Math.max(1, Math.min(10, numeric));
+      }
+
+      function scopeFlags(scopeValue) {
+        if (scopeValue === 'props') {
+          return { includeProps: true, includeGames: false };
+        }
+        if (scopeValue === 'games') {
+          return { includeProps: false, includeGames: true };
+        }
+        return { includeProps: true, includeGames: true };
+      }
+
+      function updateFilterSummary() {
+        if (!filterSummaryEl) {
+          return;
+        }
+        const timingLabel = timingEl?.value === 'live'
+          ? 'Live only'
+          : timingEl?.value === 'pregame'
+            ? 'Pregame only'
+            : 'Live + pregame';
+        const scopeLabel = boardScopeEl?.value === 'props'
+          ? 'Props only'
+          : boardScopeEl?.value === 'games'
+            ? 'Game plays only'
+            : 'Props + games';
+        const limitLabel = `Top ${sanitizeLimit(limitEl?.value)}`;
+        filterSummaryEl.innerHTML = [chip(timingLabel, timingEl?.value === 'live' ? 'is-live' : ''), chip(scopeLabel), chip(limitLabel, 'is-good')].join('');
+      }
+
+      function syncPillState() {
+        const timingValue = timingEl?.value || '';
+        const boardScopeValue = boardScopeEl?.value || 'all';
+        const limitValue = String(sanitizeLimit(limitEl?.value));
+
+        document.querySelectorAll('[data-timing]').forEach((button) => {
+          button.classList.toggle('is-active', (button.getAttribute('data-timing') || '') === timingValue);
+        });
+        document.querySelectorAll('[data-board-scope]').forEach((button) => {
+          button.classList.toggle('is-active', (button.getAttribute('data-board-scope') || 'all') === boardScopeValue);
+        });
+        document.querySelectorAll('[data-limit]').forEach((button) => {
+          button.classList.toggle('is-active', (button.getAttribute('data-limit') || '') === limitValue);
+        });
+        updateFilterSummary();
       }
 
       function metricPill(label, value) {
@@ -934,6 +1129,55 @@
         return `<section class="intel-analysis-stack">${sectionMarkup}</section>`;
       }
 
+      function renderAnalysisBrief(response) {
+        const brief = response?.analysis_brief;
+        const sections = Array.isArray(brief?.sections) ? brief.sections : [];
+        if (!sections.length) {
+          return '';
+        }
+
+        const sectionMarkup = sections.map((section) => {
+          if (!section || typeof section !== 'object') {
+            return '';
+          }
+          if (section.kind === 'narrative') {
+            return `
+              <article class="intel-analysis-card">
+                <div>
+                  <div class="intel-kicker">Reasoning brief</div>
+                  <h3>${escapeHtml(section.title || 'Matchup case')}</h3>
+                </div>
+                <div class="intel-brief-body">${escapeHtml(section.body || '')}</div>
+              </article>`;
+          }
+
+          const items = Array.isArray(section.items) ? section.items : [];
+          if (!items.length) {
+            return '';
+          }
+          return `
+            <article class="intel-analysis-card">
+              <div>
+                <div class="intel-kicker">Reasoning brief</div>
+                <h3>${escapeHtml(section.title || 'Analysis details')}</h3>
+              </div>
+              <div class="intel-brief-list">
+                ${items.map((item) => `
+                  <div class="intel-brief-list-item">
+                    <strong>${escapeHtml(item?.label || 'Detail')}</strong>
+                    <span class="intel-meta">${escapeHtml(item?.detail || '—')}</span>
+                  </div>`).join('')}
+              </div>
+            </article>`;
+        }).filter(Boolean).join('');
+
+        if (!sectionMarkup) {
+          return '';
+        }
+
+        return `<section class="intel-analysis-stack"><article class="intel-analysis-card intel-analysis-overview"><div><div class="intel-kicker">Reasoning contract</div><h3>${escapeHtml(brief?.title || 'Returned analysis brief')}</h3><p class="intel-table-note">This layer converts the artifact-backed board, advanced metrics, and live-context inputs into a readable cross-sport analysis brief before the deeper evidence grid and chart views.</p></div><div class="intel-analysis-overview__stats"><div class="intel-kicker">Sections</div><div class="intel-metric-grid">${metricPill('Brief sections', sections.length)}${brief?.focus ? metricPill('Focus', prettyLabel(brief.focus)) : ''}</div></div></article>${sectionMarkup}</section>`;
+      }
+
       function renderTopRecommendation(item) {
         if (!item) {
           return '';
@@ -1138,6 +1382,7 @@
         responseRoot.innerHTML = `
           ${briefMarkup}
           ${renderTopRecommendation(recommendations[0] || null)}
+          ${renderAnalysisBrief(response)}
           ${renderSupportingEvidence(response)}
           ${renderAnalysisViews(response)}
           ${renderRecommendationCards(recommendations)}
@@ -1148,6 +1393,11 @@
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         responseRoot.innerHTML = '<div class="intel-empty">Running The Syndicate...</div>';
+        const normalizedLimit = sanitizeLimit(limitEl?.value);
+        if (limitEl) {
+          limitEl.value = String(normalizedLimit);
+        }
+        const flags = scopeFlags(boardScopeEl?.value || 'all');
 
         const result = await fetch('/api/intelligence/query', {
           method: 'POST',
@@ -1157,6 +1407,10 @@
             date: dateEl.value,
             mode: modeEl.value,
             sport: sportEl.value,
+            timing: timingEl?.value || '',
+            limit: normalizedLimit,
+            include_props: flags.includeProps,
+            include_games: flags.includeGames,
           }),
         });
 
@@ -1175,7 +1429,53 @@
         });
       });
 
+      document.querySelectorAll('[data-timing]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (timingEl) {
+            timingEl.value = button.getAttribute('data-timing') || '';
+          }
+          if (modeEl && ['live', 'pregame'].includes(modeEl.value) && modeEl.value !== (timingEl?.value || '')) {
+            modeEl.value = '';
+          }
+          syncPillState();
+        });
+      });
+
+      document.querySelectorAll('[data-board-scope]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (boardScopeEl) {
+            boardScopeEl.value = button.getAttribute('data-board-scope') || 'all';
+          }
+          syncPillState();
+        });
+      });
+
+      document.querySelectorAll('[data-limit]').forEach((button) => {
+        button.addEventListener('click', () => {
+          if (limitEl) {
+            limitEl.value = button.getAttribute('data-limit') || '5';
+          }
+          syncPillState();
+        });
+      });
+
+      modeEl.addEventListener('change', () => {
+        if (!timingEl) {
+          return;
+        }
+        if (modeEl.value === 'live' || modeEl.value === 'pregame') {
+          timingEl.value = modeEl.value;
+        }
+        syncPillState();
+      });
+
+      limitEl.addEventListener('change', () => {
+        limitEl.value = String(sanitizeLimit(limitEl.value));
+        syncPillState();
+      });
+
       dateEl.addEventListener('change', updateStatusLink);
+      syncPillState();
       updateStatusLink();
     })();
   </script>

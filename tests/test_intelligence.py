@@ -744,6 +744,22 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(preferences.get("requested_date"), "2026-06-04")
 
+    def test_query_preferences_applies_explicit_timing_scope_and_limit_overrides(self) -> None:
+        preferences = _query_preferences(
+            "Show me the strongest board targets today.",
+            timing="live",
+            include_props=True,
+            include_games=False,
+            limit=7,
+        )
+
+        self.assertEqual(preferences.get("intent"), "live_bets")
+        self.assertTrue(preferences.get("live_only"))
+        self.assertFalse(preferences.get("pregame_only"))
+        self.assertTrue(preferences.get("include_props"))
+        self.assertFalse(preferences.get("include_games"))
+        self.assertEqual(preferences.get("limit"), 7)
+
     def test_run_intelligence_query_uses_question_date_when_date_not_passed(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()) as build_overview:
             with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
@@ -815,6 +831,142 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(parsed_request.get("chips"))
         self.assertIn("$100 bankroll", parsed_request.get("chips") or [])
         self.assertIn("Max 20% exposure", parsed_request.get("chips") or [])
+
+    def test_intelligence_query_api_respects_explicit_filters_and_limit(self) -> None:
+        overview = _sample_overview_with_secondary_sport()
+        nba_live_bucket = ((overview[0].get("home_rails") or {}).get("live") or {})
+        wnba_live_bucket = ((overview[1].get("home_rails") or {}).get("live") or {})
+        nba_live_bucket["items"] = list(nba_live_bucket.get("items") or [])
+        wnba_live_bucket["items"] = list(wnba_live_bucket.get("items") or [])
+        nba_live_items = nba_live_bucket["items"]
+        wnba_live_items = wnba_live_bucket["items"]
+
+        nba_live_items.extend(
+            [
+                {
+                    "name": "Darius Garland Over 7.5 Assists",
+                    "market": "AST",
+                    "pick": "Over 7.5",
+                    "matchup": "CLE at IND",
+                    "projected": 8.3,
+                    "live_projection": 8.8,
+                    "line": 7.5,
+                    "odds": "+106",
+                    "confidence": "60%",
+                    "edge": "+3.7%",
+                    "team_pace_signal": 1.07,
+                    "usage_rate_advanced": 1.09,
+                    "shot_profile_advanced": 1.01,
+                    "minutes_role_advanced": 1.04,
+                    "writeup": "The live role is still generating clean volume after the market move.",
+                    "display_pills": ["Line 7.5", "Odds +106", "Live Proj 8.8"],
+                    "is_live": True,
+                    "href": "/nba/season/2026/live-lens?date=2026-06-04",
+                },
+                {
+                    "name": "Evan Mobley Over 9.5 Rebounds",
+                    "market": "REB",
+                    "pick": "Over 9.5",
+                    "matchup": "CLE at IND",
+                    "projected": 10.4,
+                    "live_projection": 10.9,
+                    "line": 9.5,
+                    "odds": "+104",
+                    "confidence": "59%",
+                    "edge": "+3.1%",
+                    "team_pace_signal": 1.06,
+                    "usage_rate_advanced": 1.02,
+                    "shot_profile_advanced": 1.03,
+                    "minutes_role_advanced": 1.05,
+                    "writeup": "Rebounding volume is holding above the live number.",
+                    "display_pills": ["Line 9.5", "Odds +104", "Live Proj 10.9"],
+                    "is_live": True,
+                    "href": "/nba/season/2026/live-lens?date=2026-06-04",
+                },
+            ]
+        )
+        wnba_live_items.extend(
+            [
+                {
+                    "name": "Chelsea Gray Over 17.5 PA",
+                    "market": "PA",
+                    "pick": "Over 17.5",
+                    "matchup": "LVA at SEA",
+                    "projected": 18.6,
+                    "live_projection": 19.1,
+                    "line": 17.5,
+                    "odds": "+100",
+                    "confidence": "58%",
+                    "edge": "+2.8%",
+                    "team_environment_advanced": 1.08,
+                    "possession_profile_advanced": 1.04,
+                    "matchup_pressure_advanced": 1.07,
+                    "rotation_pressure_advanced": 1.02,
+                    "live_shift_advanced": 1.03,
+                    "writeup": "Live creation volume remains above the adjusted line.",
+                    "display_pills": ["Line 17.5", "Odds +100", "Live Proj 19.1"],
+                    "is_live": True,
+                    "href": "/wnba/live-lens?date=2026-06-04",
+                },
+                {
+                    "name": "Jackie Young Over 2.5 Threes",
+                    "market": "3PM",
+                    "pick": "Over 2.5",
+                    "matchup": "LVA at SEA",
+                    "projected": 3.1,
+                    "live_projection": 3.4,
+                    "line": 2.5,
+                    "odds": "+108",
+                    "confidence": "57%",
+                    "edge": "+2.6%",
+                    "team_environment_advanced": 1.09,
+                    "possession_profile_advanced": 1.03,
+                    "matchup_pressure_advanced": 1.06,
+                    "rotation_pressure_advanced": 1.01,
+                    "live_shift_advanced": 1.02,
+                    "writeup": "Three-point volume is still tracking above the live reset.",
+                    "display_pills": ["Line 2.5", "Odds +108", "Live Proj 3.4"],
+                    "is_live": True,
+                    "href": "/wnba/live-lens?date=2026-06-04",
+                },
+            ]
+        )
+
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Usage", "Matchup pressure"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Rank the strongest in-session board targets right now.",
+                            "date": "2026-06-04",
+                            "timing": "live",
+                            "include_props": True,
+                            "include_games": False,
+                            "limit": 4,
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        recommendations = result.get("recommendations") or []
+        parsed_request = result.get("parsed_request") or {}
+        self.assertEqual(len(recommendations), 4)
+        self.assertTrue(all(item.get("is_live") for item in recommendations))
+        self.assertTrue(all(item.get("candidate_type") == "prop" for item in recommendations))
+        self.assertEqual(parsed_request.get("timing"), "Live only")
+        self.assertEqual(parsed_request.get("board_scope"), ["Props"])
+        self.assertIn("Top 4", parsed_request.get("chips") or [])
 
     def test_intelligence_query_prioritizes_ready_advanced_inputs(self) -> None:
         advanced_by_sport = {
@@ -1052,6 +1204,11 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
         self.assertTrue(any(text in (first_row.get("why") or "") for text in concrete_nba_writeups))
         self.assertTrue(any(text in ((result.get("recommendations") or [])[0].get("rationale") or "") for text in concrete_nba_writeups))
+        analysis_brief = result.get("analysis_brief") or {}
+        brief_sections = analysis_brief.get("sections") or []
+        self.assertTrue(brief_sections)
+        self.assertEqual((brief_sections[0] or {}).get("title"), "Matchup case")
+        self.assertTrue(any((section.get("title") == "Data inputs") for section in brief_sections if isinstance(section, dict)))
         supporting_evidence = result.get("supporting_evidence") or {}
         sections = supporting_evidence.get("sections") or []
         self.assertTrue(sections)
@@ -1330,6 +1487,29 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreater(over_score, 0.0)
         self.assertLess(under_score, 0.0)
 
+    def test_basketball_source_summary_score_rewards_matchup_specific_context(self) -> None:
+        baseline = _basketball_source_summary_score(
+            {
+                "candidate_type": "prop",
+                "sport_slug": "wnba",
+                "pick": "Over 18.5",
+                "line": 18.5,
+                "summary": "Recent form is already clearing this number with a last-five average of 22.2. The last-10 sample is still above this number at 21.7, so the over is not just riding a short heater.",
+            }
+        )
+        matchup_score = _basketball_source_summary_score(
+            {
+                "candidate_type": "prop",
+                "sport_slug": "wnba",
+                "pick": "Over 18.5",
+                "line": 18.5,
+                "summary": "Recent form is already clearing this number with a last-five average of 22.2. The last-10 sample is still above this number at 21.7, so the over is not just riding a short heater. Opponent is allowing efficient pull-up attempts and the defense is yielding clean looks.",
+                "why_explain": "Primary creator workload remains intact in this favorable matchup.",
+            }
+        )
+
+        self.assertGreater(matchup_score, baseline)
+
     def test_advanced_signals_extract_basketball_summary_deltas(self) -> None:
         signals = _advanced_signals_from_item(
             {
@@ -1504,7 +1684,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = (response.get_json() or {}).get("response") or {}
         analysis_views = result.get("analysis_views") or {}
+        analysis_brief = result.get("analysis_brief") or {}
         self.assertEqual(analysis_views.get("focus"), "football_markets")
+        self.assertTrue(any((section.get("title") == "Game script context") for section in (analysis_brief.get("sections") or []) if isinstance(section, dict)))
         self.assertTrue((analysis_views.get("table") or {}).get("rows"))
         first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
         self.assertEqual(first_row.get("market_label"), "Receiving yards")
@@ -1537,7 +1719,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = (response.get_json() or {}).get("response") or {}
         analysis_views = result.get("analysis_views") or {}
+        analysis_brief = result.get("analysis_brief") or {}
         self.assertEqual(analysis_views.get("focus"), "hockey_props")
+        self.assertTrue(any((section.get("title") == "Shot and market context") for section in (analysis_brief.get("sections") or []) if isinstance(section, dict)))
         self.assertTrue((analysis_views.get("table") or {}).get("rows"))
 
     def test_intelligence_query_builds_mlb_strikeout_analysis_views(self) -> None:
@@ -1674,6 +1858,47 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(first.get("market_key"), "total")
         self.assertIn("Live model projection is 228.5 versus a current line of 221.5.", first.get("rationale") or "")
         self.assertGreater(first.get("market_fit_score") or 0.0, 0.0)
+
+    def test_intelligence_query_adds_live_pbp_reasoning_signals_for_live_basketball_props(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Play-by-play live recap",
+                "metrics": ["Recent scoring run", "Possession estimate", "Shot mix"],
+                "path": "data/nba/live/live_pbp_stats_2026-06-04.jsonl",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            },
+            {
+                "label": "Live state and pace context",
+                "metrics": ["Live pace", "Game state", "Board pressure"],
+                "path": "data/nba/live/live_context_2026-06-04.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            },
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    result = run_intelligence_query(
+                        question="Break down the best live NBA props today",
+                        selected_date="2026-06-04",
+                        timing="live",
+                    )
+
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        first = recommendations[0]
+        signal_keys = {
+            str(item.get("key") or "")
+            for item in (first.get("advanced_signals") or [])
+            if isinstance(item, dict)
+        }
+        self.assertIn("live_sequence_pressure_advanced", signal_keys)
+        self.assertIn("projection_shift_advanced", signal_keys)
+        analysis_brief = result.get("analysis_brief") or {}
+        self.assertTrue(any((section.get("title") == "Play-by-play context") for section in (analysis_brief.get("sections") or []) if isinstance(section, dict)))
 
     def test_intelligence_query_returns_market_specific_board(self) -> None:
         advanced_rows = [
@@ -1878,6 +2103,115 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(recommendations[0].get("line"), "4.5")
         self.assertEqual(recommendations[0].get("odds"), "+124")
         self.assertIn("Projection 5.3 versus line 4.5", recommendations[0].get("rationale") or "")
+
+    def test_intelligence_query_builds_subject_mlb_matchup_analysis_views_without_explicit_market(self) -> None:
+        overview = [
+            {
+                "slug": "mlb",
+                "name": "MLB",
+                "context_label": "2026-06-05",
+                "data_health": "healthy",
+                "data_warnings": [],
+                "home_rails": {
+                    "pregame": {"title": "Pregame props", "items": []},
+                    "live": {"title": "Live props", "items": []},
+                    "compact": {"items": []},
+                },
+                "dashboard_games": [],
+            }
+        ]
+
+        def _mock_mlb_load_json_file(text_path: str):
+            text = str(text_path).replace("\\", "/")
+            if text.endswith("daily/top_props/daily_top_props_2026_06_05.json"):
+                return {
+                    "groups": {
+                        "pitcher": {
+                            "sections": [
+                                {
+                                    "stat": "strikeouts",
+                                    "rows": [
+                                        {
+                                            "stat": "strikeouts",
+                                            "statLabel": "Strikeouts",
+                                            "group": "pitcher",
+                                            "ownerId": 687064,
+                                            "ownerName": "Brandon Young",
+                                            "playerName": "Brandon Young",
+                                            "team": "BAL",
+                                            "opponent": "TOR",
+                                            "matchup": "BAL @ TOR",
+                                            "mean": 5.327,
+                                            "line": 3.5,
+                                            "marketLine": 3.5,
+                                            "selection": "over",
+                                            "selectionLabel": "Over",
+                                            "simProb": 0.819,
+                                            "marketProb": 0.5665,
+                                            "rawEdge": 0.2525,
+                                            "odds": -155,
+                                            "rank": 3,
+                                        }
+                                    ],
+                                }
+                            ]
+                        }
+                    }
+                }
+            if text.endswith("daily/snapshots/2026-06-05/oddsapi_pitcher_props_2026_06_05.json"):
+                return {
+                    "pitcher_props": {
+                        "brandon young": {
+                            "strikeouts": {
+                                "line": 4.5,
+                                "over_odds": "+124",
+                                "under_odds": "-166",
+                            }
+                        }
+                    }
+                }
+            return {}
+
+        advanced_rows = [
+            {
+                "label": "Pitch model context",
+                "metrics": ["Pitch mix", "Opponent K rate", "Swing/miss profile"],
+                "path": "data/mlb_source/data/processed/top_props_2026-06-05.json",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    with patch("syndicate.features.intelligence.mlb_load_json_file", side_effect=_mock_mlb_load_json_file):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "What does Brandon Young's matchup today look like and how do his stats project against betting lines?",
+                                "date": "2026-06-05",
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        analysis_views = result.get("analysis_views") or {}
+        analysis_brief = result.get("analysis_brief") or {}
+        supporting_evidence = result.get("supporting_evidence") or {}
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertEqual((result.get("parsed_request") or {}).get("requested_subjects"), ["Brandon Young"])
+        self.assertEqual(analysis_views.get("focus"), "mlb_props")
+        self.assertTrue(analysis_brief.get("sections"))
+        self.assertTrue(any((section.get("title") == "Data inputs") for section in (analysis_brief.get("sections") or []) if isinstance(section, dict)))
+        self.assertTrue((analysis_views.get("table") or {}).get("rows"))
+        self.assertTrue((analysis_views.get("chart") or {}).get("rows"))
+        self.assertTrue((supporting_evidence.get("sections") or []))
+        first_row = ((analysis_views.get("table") or {}).get("rows") or [])[0]
+        self.assertEqual(first_row.get("label"), "Brandon Young Over 4.5 Strikeouts")
+        self.assertIn("Projection 5.3 versus line 4.5", first_row.get("why") or "")
 
     def test_intelligence_query_filters_stale_live_mlb_pitcher_props_when_starter_is_out(self) -> None:
         actual_payload = {

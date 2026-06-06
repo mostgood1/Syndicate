@@ -10,6 +10,17 @@ from syndicate.features.shared.timezone import central_today_iso
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
 
 
+def _optional_bool(value):
+    if isinstance(value, bool):
+        return value
+    normalized = str(value or "").strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
@@ -57,7 +68,10 @@ def intelligence_query_api():
     selected_date = str(payload.get("date") or request.form.get("date") or "").strip() or None
     mode = str(payload.get("mode") or request.form.get("mode") or "").strip() or None
     sport = str(payload.get("sport") or request.form.get("sport") or "").strip() or None
+    timing = str(payload.get("timing") or request.form.get("timing") or "").strip() or None
     limit_value = payload.get("limit") or request.form.get("limit")
+    include_props = _optional_bool(payload.get("include_props") if "include_props" in payload else request.form.get("include_props"))
+    include_games = _optional_bool(payload.get("include_games") if "include_games" in payload else request.form.get("include_games"))
 
     if not question:
         return jsonify({"ok": False, "error": "question is required"}), 400
@@ -68,6 +82,9 @@ def intelligence_query_api():
         mode=mode,
         sport=sport,
         limit=int(limit_value) if str(limit_value or "").strip() else None,
+        timing=timing,
+        include_props=include_props,
+        include_games=include_games,
         force_refresh=True,
     )
     return jsonify({"ok": True, "query": question, "response": result})

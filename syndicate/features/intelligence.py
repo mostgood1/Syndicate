@@ -35,6 +35,7 @@ from syndicate.features.intelligence_parlay_correlation import parlay_leg_market
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_shape as _runtime_parlay_leg_market_shape
 from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
 from syndicate.features.intelligence_parlay_correlation import parlay_pair_penalty as _runtime_parlay_pair_penalty
+from syndicate.features.intelligence_reasoning import build_analysis_brief as _runtime_build_analysis_brief
 from syndicate.features.intelligence_parlay_runtime import build_parlay_payload as _runtime_build_parlay_payload
 from syndicate.features.intelligence_parlay_runtime import build_parlays as _runtime_build_parlays
 from syndicate.features.intelligence_parlay_runtime import build_round_robin_parlays as _runtime_build_round_robin_parlays
@@ -559,6 +560,7 @@ def _decimal_to_american(value: float | None) -> str | None:
 
 def _normalized_market_text(value: Any) -> str:
     lowered = str(value or "").lower()
+    lowered = re.sub(r"([a-z0-9])['’]s\b", r"\1", lowered)
     lowered = re.sub(r"\b3\s*pt\s*m\b", " 3pm ", lowered)
     lowered = re.sub(r"\b3\s*point\s*makes?\b", " 3pm ", lowered)
     lowered = re.sub(r"\bthree\s+point\s+makes?\b", " 3pm ", lowered)
@@ -905,12 +907,88 @@ def _candidate_advanced_signal_score(candidate: dict[str, Any]) -> float:
             continue
         delta = _advanced_signal_delta(signal)
         if delta is not None:
+            key = _safe_text(signal.get("key"), "").lower()
+            if any(token in key for token in ("history", "matchup", "opponent", "allowed", "bvp")):
+                delta *= 1.2
+            elif any(token in key for token in ("pace", "usage", "shot", "role", "environment", "possession", "pressure")):
+                delta *= 1.1
             normalized_deltas.append(delta)
     if not normalized_deltas:
         return 0.0
     direction = -1.0 if "under" in _safe_text(candidate.get("pick"), "").lower() else 1.0
     avg_delta = sum(normalized_deltas) / float(len(normalized_deltas))
     return max(-6.0, min(6.0, avg_delta * 2.5 * direction))
+
+
+def _context_driven_advanced_signals(candidate: dict[str, Any], advanced_context: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not bool(candidate.get("is_live")) or not advanced_context:
+        return []
+
+    line_value = _numeric_hint(candidate.get("line"))
+    live_projection = _numeric_hint(candidate.get("live_projection"))
+    projected_value = _numeric_hint(candidate.get("projected"))
+    direction = _candidate_selection_direction(candidate) or 1
+
+    labels = " ".join(
+        f"{_safe_text(item.get('label'), '').lower()} {' '.join(str(metric).strip().lower() for metric in (item.get('metrics') or []) if str(metric).strip())}"
+        for item in advanced_context
+        if isinstance(item, dict)
+    )
+    signals: list[dict[str, Any]] = []
+    if not labels:
+        return signals
+
+    def _signal_value_from_margin(reference_value: float | None) -> float | None:
+        if reference_value is None or line_value is None:
+            return None
+        margin = (float(reference_value) - float(line_value)) * float(direction)
+        normalized = margin / max(abs(float(line_value)), 1.0)
+        return round(max(0.75, min(1.25, 1.0 + normalized)), 3)
+
+    live_margin_value = _signal_value_from_margin(live_projection)
+    projection_shift_value = None
+    if live_projection is not None and projected_value is not None:
+        shift = (float(live_projection) - float(projected_value)) * float(direction)
+        normalized_shift = shift / max(abs(float(projected_value)), 1.0)
+        projection_shift_value = round(max(0.75, min(1.25, 1.0 + normalized_shift)), 3)
+
+    if any(token in labels for token in ("play-by-play", "pbp", "live recap", "scoring run", "sequence")):
+        if live_margin_value is not None:
+            signals.append(
+                {
+                    "key": "live_sequence_pressure_advanced",
+                    "label": "Live sequence pressure",
+                    "value": live_margin_value,
+                }
+            )
+        if projection_shift_value is not None:
+            signals.append(
+                {
+                    "key": "projection_shift_advanced",
+                    "label": "Projection shift",
+                    "value": projection_shift_value,
+                }
+            )
+
+    if any(token in labels for token in ("shift and on-ice sequence recap", "shift deployment", "on-ice tempo", "toi pressure")):
+        if live_margin_value is not None:
+            signals.append(
+                {
+                    "key": "shift_pressure_advanced",
+                    "label": "Shift pressure",
+                    "value": live_margin_value,
+                }
+            )
+
+    unique: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for signal in signals:
+        key = _safe_text(signal.get("key"), "")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(signal)
+    return unique
 
 
 def _basketball_source_summary_score(candidate: dict[str, Any]) -> float:
@@ -930,6 +1008,7 @@ def _basketball_source_summary_score(candidate: dict[str, Any]) -> float:
 
     direction = -1.0 if "under" in _safe_text(candidate.get("pick"), "").lower() else 1.0
     adjustments: list[float] = []
+    matchup_bonus = 0.0
     structured_signals = {
         _safe_text(signal.get("key"), ""): float(signal.get("value") or 0.0)
         for signal in (candidate.get("advanced_signals") or [])
@@ -946,16 +1025,49 @@ def _basketball_source_summary_score(candidate: dict[str, Any]) -> float:
         ):
             if key in structured_signals:
                 adjustments.append(direction * structured_signals[key] * 8.0)
+        for key, value in structured_signals.items():
+            if key.startswith("basketball_") and any(
+                token in key
+                for token in (
+                    "pace",
+                    "usage",
+                    "shot",
+                    "role",
+                    "environment",
+                    "possession",
+                    "pressure",
+                    "rotation",
+                    "live_shift",
+                )
+            ):
+                adjustments.append(direction * (value - 1.0) * 6.0)
+
+    if direction > 0.0:
+        positive_matchup_phrases = {
+            "opponent is allowing": 0.55,
+            "defense is yielding": 0.55,
+            "yielding clean looks": 0.5,
+            "efficient pull-up attempts": 0.45,
+            "favorable matchup": 0.5,
+            "matchup pressure": 0.35,
+            "stable volume": 0.35,
+            "primary creator workload": 0.35,
+            "projected role remains unchanged": 0.25,
+            "projected role stays intact": 0.25,
+        }
+        for phrase, weight in positive_matchup_phrases.items():
+            if phrase in text:
+                matchup_bonus += weight
 
     if "not just riding a short heater" in text:
         adjustments.append(0.8 * direction)
     if "supports the lower-volume case" in text or "leans under" in text:
         adjustments.append(-0.8 * direction)
 
-    if not adjustments:
+    if not adjustments and matchup_bonus == 0.0:
         return 0.0
-    average_adjustment = sum(adjustments) / float(len(adjustments))
-    return max(-3.0, min(3.0, average_adjustment))
+    average_adjustment = sum(adjustments) / float(len(adjustments)) if adjustments else 0.0
+    return max(-3.0, min(3.0, average_adjustment + matchup_bonus))
 
 
 def _advanced_signal_text(candidate: dict[str, Any], *, limit: int = 2) -> str:
@@ -1014,6 +1126,56 @@ def _analysis_focus_from_question(
         question_requests_table=_question_requests_table,
         question_requests_chart=_question_requests_chart,
     )
+
+
+def _analysis_focus_from_resolved_candidates(
+    question: str,
+    candidates: list[dict[str, Any]],
+    preferences: dict[str, Any],
+) -> str | None:
+    if preferences.get("analysis_focus"):
+        return _safe_text(preferences.get("analysis_focus"), "") or None
+    if preferences.get("comparison_requested") and len(preferences.get("requested_subjects") or []) >= 2:
+        return None
+    if not (
+        _question_requests_explainer(question)
+        or _question_requests_table(question)
+        or _question_requests_chart(question)
+    ):
+        return None
+
+    valid_candidates = [candidate for candidate in candidates if isinstance(candidate, dict)]
+    if not valid_candidates:
+        return None
+
+    sports = {
+        _safe_text(candidate.get("sport_slug"), "").lower()
+        for candidate in valid_candidates
+        if _safe_text(candidate.get("sport_slug"), "").strip()
+    }
+    candidate_types = {
+        _safe_text(candidate.get("candidate_type"), "").lower()
+        for candidate in valid_candidates
+        if _safe_text(candidate.get("candidate_type"), "").strip()
+    }
+
+    if len(sports) != 1:
+        return None
+
+    sport_slug = next(iter(sports))
+    if sport_slug == "mlb" and "prop" in candidate_types:
+        return "mlb_props"
+    if sport_slug == "wnba":
+        return "wnba_matchups"
+    if sport_slug == "nba":
+        return "nba_matchups"
+    if sport_slug == "ncaab":
+        return "ncaab_matchups"
+    if sport_slug in {"nfl", "ncaaf"}:
+        return "football_markets"
+    if sport_slug == "nhl":
+        return "hockey_props"
+    return None
 
 
 @lru_cache(maxsize=1)
@@ -1651,6 +1813,9 @@ def _parlay_request_summary(preferences: dict[str, Any]) -> dict[str, Any]:
     chips = [type_label, timing]
     if board_scope:
         chips.extend(board_scope)
+    limit_value = int(preferences.get("limit") or 0)
+    if limit_value > 0:
+        chips.append(f"Top {limit_value}")
     if requested_sports:
         chips.append("/".join(requested_sports))
     chips.extend(requested_markets)
@@ -1708,10 +1873,22 @@ def _tracked_repo_files() -> set[str]:
     return {line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()}
 
 
-def _query_preferences(question: str, *, mode: str | None = None, sport: str | None = None, limit: int | None = None) -> dict[str, Any]:
+def _query_preferences(
+    question: str,
+    *,
+    mode: str | None = None,
+    sport: str | None = None,
+    limit: int | None = None,
+    timing: str | None = None,
+    include_props: bool | None = None,
+    include_games: bool | None = None,
+) -> dict[str, Any]:
     lowered = str(question or "").lower()
     explicit_mode = str(mode or "").strip().lower()
     explicit_sport = str(sport or "").strip().lower()
+    explicit_timing = str(timing or "").strip().lower()
+    explicit_include_props = include_props
+    explicit_include_games = include_games
     parlay_structure = _extract_parlay_structure_preferences(lowered)
 
     requested_sports = set()
@@ -1743,6 +1920,19 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
     if "live and pregame" in lowered or "pregame and live" in lowered:
         live_only = False
         pregame_only = False
+    if explicit_timing == "live":
+        if intent != "parlay":
+            intent = "live_bets"
+        live_only = True
+        pregame_only = False
+    elif explicit_timing == "pregame":
+        if intent != "parlay":
+            intent = "pregame_bets"
+        live_only = False
+        pregame_only = True
+    elif explicit_timing in {"all", "both", "mixed"}:
+        live_only = False
+        pregame_only = False
 
     prop_market_requested = bool(requested_market_set - _GAME_SIDE_MARKETS)
     game_market_requested = bool(requested_market_set & _GAME_SIDE_MARKETS)
@@ -1752,8 +1942,14 @@ def _query_preferences(question: str, *, mode: str | None = None, sport: str | N
         include_games = False
     if explicit_mode in {"game", "games"}:
         include_games = True
+        include_props = False
     if explicit_mode in {"prop", "props"}:
         include_props = True
+        include_games = False
+    if explicit_include_props is not None:
+        include_props = bool(explicit_include_props)
+    if explicit_include_games is not None:
+        include_games = bool(explicit_include_games)
     if not include_props and not include_games:
         include_props = True
         include_games = True
@@ -3289,12 +3485,20 @@ def _apply_advanced_context_to_candidates(
         market_focuses = sorted(_candidate_market_focuses(candidate))
         market_fit = _candidate_market_fit(candidate, market_context)
         statcast_profile = _candidate_mlb_statcast_profile(candidate)
+        existing_signals = [signal for signal in (candidate.get("advanced_signals") or []) if isinstance(signal, dict)]
+        existing_signal_keys = {_safe_text(signal.get("key"), "") for signal in existing_signals}
+        inferred_signals = [
+            signal
+            for signal in _context_driven_advanced_signals(candidate, advanced_context)
+            if _safe_text(signal.get("key"), "") not in existing_signal_keys
+        ]
         candidate["advanced_context"] = advanced_context
         candidate["advanced_gate"] = readiness_summary
         candidate["market_context"] = market_context
         candidate["market_focuses"] = market_focuses
         candidate["market_fit"] = market_fit
         candidate["mlb_statcast_profile"] = statcast_profile
+        candidate["advanced_signals"] = inferred_signals + existing_signals
         candidate["advanced_signal_score"] = _candidate_advanced_signal_score(candidate)
         candidate["source_summary_score"] = _basketball_source_summary_score(candidate)
         candidate["score"] = (
@@ -3544,7 +3748,12 @@ def _recent_form_supporting_evidence_table(analysis_views: dict[str, Any]) -> di
     }
 
 
-def _build_supporting_evidence(recommendations: list[dict[str, Any]], analysis_views: dict[str, Any] | None) -> dict[str, Any] | None:
+def _build_supporting_evidence(
+    recommendations: list[dict[str, Any]],
+    analysis_views: dict[str, Any] | None,
+    *,
+    display_limit: int | None = None,
+) -> dict[str, Any] | None:
     if not recommendations:
         return None
 
@@ -3586,7 +3795,8 @@ def _build_supporting_evidence(recommendations: list[dict[str, Any]], analysis_v
 
     source_items: list[dict[str, Any]] = []
     seen_sources: set[str] = set()
-    for recommendation in recommendations[:3]:
+    recommendation_limit = max(3, min(len(recommendations), int(display_limit or len(recommendations) or 3)))
+    for recommendation in recommendations[:recommendation_limit]:
         if not isinstance(recommendation, dict):
             continue
         for item in (recommendation.get("advanced_inputs") or [])[:3]:
@@ -3617,6 +3827,23 @@ def _build_supporting_evidence(recommendations: list[dict[str, Any]], analysis_v
         "focus": analysis_views.get("focus") if isinstance(analysis_views, dict) else None,
         "sections": sections,
     }
+
+
+def _build_analysis_brief(
+    recommendations: list[dict[str, Any]],
+    analysis_views: dict[str, Any] | None,
+    supporting_evidence: dict[str, Any] | None,
+    *,
+    preferences: dict[str, Any],
+) -> dict[str, Any] | None:
+    return _runtime_build_analysis_brief(
+        recommendations,
+        analysis_views,
+        supporting_evidence,
+        preferences=preferences,
+        safe_text=_safe_text,
+        humanize_signal_key=_humanize_signal_key,
+    )
 
 
 def _parlay_rationale(legs: list[dict[str, Any]]) -> str:
@@ -4052,9 +4279,20 @@ def run_intelligence_query(
     mode: str | None = None,
     sport: str | None = None,
     limit: int | None = None,
+    timing: str | None = None,
+    include_props: bool | None = None,
+    include_games: bool | None = None,
     force_refresh: bool = False,
 ) -> dict[str, Any]:
-    preferences = _query_preferences(question, mode=mode, sport=sport, limit=limit)
+    preferences = _query_preferences(
+        question,
+        mode=mode,
+        sport=sport,
+        limit=limit,
+        timing=timing,
+        include_props=include_props,
+        include_games=include_games,
+    )
     effective_date = _effective_date(selected_date or preferences.get("requested_date"))
     overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
     tracked = _tracked_repo_files()
@@ -4098,6 +4336,9 @@ def run_intelligence_query(
     if resolved_requested_markets != (preferences.get("requested_markets") or []):
         preferences = {**preferences, "requested_markets": resolved_requested_markets}
         candidates = _filter_candidates_to_requested_markets(candidates, resolved_requested_markets)
+    resolved_analysis_focus = _analysis_focus_from_resolved_candidates(question, candidates, preferences)
+    if resolved_analysis_focus and resolved_analysis_focus != preferences.get("analysis_focus"):
+        preferences = {**preferences, "analysis_focus": resolved_analysis_focus}
     _apply_live_state_context_to_candidates(candidates)
     candidates = [row for row in candidates if not _candidate_is_final(row)]
     candidates = [row for row in candidates if not bool(row.get("state_invalid"))]
@@ -4107,7 +4348,13 @@ def run_intelligence_query(
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
     parlays = _build_parlays(candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
     analysis_views = _analysis_views_for_query(candidates, preferences)
-    supporting_evidence = _build_supporting_evidence(recommendations, analysis_views)
+    supporting_evidence = _build_supporting_evidence(recommendations, analysis_views, display_limit=preferences["limit"])
+    analysis_brief = _build_analysis_brief(
+        recommendations,
+        analysis_views,
+        supporting_evidence,
+        preferences=preferences,
+    )
 
     live_rows = sum(1 for candidate in candidates if bool(candidate.get("is_live")))
     pregame_rows = sum(1 for candidate in candidates if not bool(candidate.get("is_live")))
@@ -4118,7 +4365,7 @@ def run_intelligence_query(
             data_notes.append(f"{_safe_text(sport_row.get('name'), 'Sport')}: {'; '.join(warnings)}")
         sport_slug = _safe_text(sport_row.get("slug"), "sport").lower()
         advanced_rows = [row for row in advanced_by_sport.get(sport_slug, []) if bool(row.get("exists"))]
-        advanced_driver_text = _advanced_driver_text(advanced_rows, limit_groups=1, limit_metrics=3)
+        advanced_driver_text = _advanced_driver_text(advanced_rows, limit_groups=1, limit_metrics=4)
         if advanced_driver_text:
             data_notes.append(f"{_safe_text(sport_row.get('name'), 'Sport')} advanced inputs: {advanced_driver_text}")
         readiness = _advanced_readiness_summary(advanced_by_sport.get(sport_slug, []))
@@ -4156,6 +4403,7 @@ def run_intelligence_query(
         "recommendations": recommendations,
         "parlays": parlays,
         "analysis_views": analysis_views,
+        "analysis_brief": analysis_brief,
         "supporting_evidence": supporting_evidence,
         "board_notes": data_notes[:8],
         "readiness_gate": readiness_gate,
