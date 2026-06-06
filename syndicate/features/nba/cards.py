@@ -968,6 +968,192 @@ def _attach_odds_refresh_timestamp(payload: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _payload_has_live_boxscore_players(payload: dict[str, Any] | None) -> bool:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    return any(
+        isinstance(game, dict) and isinstance(game.get("players"), list) and bool(game.get("players"))
+        for game in games
+    )
+
+
+def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: bool = True) -> list[str]:
+    live_payload = build_live_state_payload(
+        selected_date,
+        ttl=12,
+        allow_stored_date_fallback=allow_stored_date_fallback,
+    )
+    games = live_payload.get("games") if isinstance(live_payload, dict) else []
+    event_ids: list[str] = []
+    for game in games if isinstance(games, list) else []:
+        if not isinstance(game, dict):
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        if bool(game.get("in_progress")) and not bool(game.get("final")):
+            event_ids.append(event_id)
+    if event_ids:
+        return list(dict.fromkeys(event_ids))
+
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    context_games = context.get("games") if isinstance(context.get("games"), list) else []
+    for game in context_games:
+        if not isinstance(game, dict):
+            continue
+        status = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+        event_id = str(game.get("event_id") or "").strip()
+        if event_id and bool(status.get("in_progress")) and not bool(status.get("final")):
+            event_ids.append(event_id)
+    return list(dict.fromkeys(event_ids))
+
+
+def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str]) -> dict[str, Any] | None:
+    normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        return None
+
+    out_games: list[dict[str, Any]] = []
+    for event_id in normalized_event_ids:
+        request_url = (
+            "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+            f"?event={urllib_parse.quote(event_id)}"
+        )
+        request_obj = urllib_request.Request(
+            request_url,
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json,text/plain,*/*",
+            },
+        )
+        try:
+            with urllib_request.urlopen(request_obj, timeout=6) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            continue
+
+        boxscore = payload.get("boxscore") if isinstance(payload, dict) else {}
+        team_blocks = boxscore.get("players") if isinstance(boxscore, dict) and isinstance(boxscore.get("players"), list) else []
+        players_out: list[dict[str, Any]] = []
+        for team_block in team_blocks:
+            if not isinstance(team_block, dict):
+                continue
+            team_info = team_block.get("team") if isinstance(team_block.get("team"), dict) else {}
+            team_tri = _canonical_nba_tri(
+                str(
+                    team_info.get("abbreviation")
+                    or team_info.get("shortDisplayName")
+                    or team_info.get("displayName")
+                    or team_info.get("name")
+                    or ""
+                ).strip().upper()
+            )
+            if not team_tri:
+                continue
+
+            stat_groups = team_block.get("statistics") if isinstance(team_block.get("statistics"), list) else []
+            for group in stat_groups:
+                if not isinstance(group, dict):
+                    continue
+                keys = [str(key or "").strip().upper() for key in (group.get("keys") or [])]
+                athletes = group.get("athletes") if isinstance(group.get("athletes"), list) else []
+                for athlete_row in athletes:
+                    if not isinstance(athlete_row, dict):
+                        continue
+                    athlete_info = athlete_row.get("athlete") if isinstance(athlete_row.get("athlete"), dict) else {}
+                    player_name = str(athlete_info.get("displayName") or athlete_info.get("shortName") or "").strip()
+                    if not player_name:
+                        continue
+                    athlete_position = athlete_info.get("position") if isinstance(athlete_info.get("position"), dict) else {}
+                    raw_position = str(
+                        athlete_position.get("abbreviation")
+                        or athlete_position.get("displayName")
+                        or athlete_position.get("name")
+                        or athlete_row.get("position")
+                        or ""
+                    ).strip().upper()
+                    stat_values = athlete_row.get("stats") if isinstance(athlete_row.get("stats"), list) else []
+                    stat_map: dict[str, Any] = {}
+                    for idx, key in enumerate(keys):
+                        if not key or idx >= len(stat_values):
+                            continue
+                        stat_map[key] = stat_values[idx]
+
+                    def _first_stat(*aliases: str) -> Any:
+                        for alias in aliases:
+                            key = str(alias or "").strip().upper()
+                            if key and key in stat_map:
+                                return stat_map.get(key)
+                        return None
+
+                    minutes_value = _first_stat("MIN", "MINUTES")
+                    points = _safe_float(_first_stat("PTS", "POINTS"))
+                    rebounds = _safe_float(_first_stat("REB", "REBOUNDS"))
+                    assists = _safe_float(_first_stat("AST", "ASSISTS"))
+                    steals = _safe_float(_first_stat("STL", "STEALS"))
+                    blocks = _safe_float(_first_stat("BLK", "BLOCKS"))
+                    turnovers = _safe_float(_first_stat("TO", "TOV", "TURNOVERS"))
+                    threes_made = _safe_float(_first_stat("3PM", "FG3M"))
+                    if threes_made is None:
+                        threes_text = str(
+                            _first_stat(
+                                "3PT",
+                                "FG3",
+                                "THREEPOINTFIELDGOALSMADE-THREEPOINTFIELDGOALSATTEMPTED",
+                            )
+                            or ""
+                        ).strip()
+                        if threes_text:
+                            threes_made = _safe_float(threes_text.split("-", 1)[0].strip())
+
+                    has_box_stats = any(
+                        value is not None
+                        for value in (points, rebounds, assists, steals, blocks, turnovers, threes_made)
+                    )
+                    if not has_box_stats and not str(minutes_value or "").strip():
+                        continue
+
+                    players_out.append(
+                        {
+                            "player": player_name,
+                            "team_tri": team_tri,
+                            "pos": raw_position or None,
+                            "mp": minutes_value,
+                            "pts": points,
+                            "reb": rebounds,
+                            "ast": assists,
+                            "stl": steals,
+                            "blk": blocks,
+                            "tov": turnovers,
+                            "threes_made": threes_made,
+                        }
+                    )
+
+        if players_out:
+            out_games.append({"event_id": event_id, "players": players_out})
+
+    if not out_games:
+        return None
+    return {
+        "ok": True,
+        "ttl": 20,
+        "date": selected_date,
+        "requested_date": selected_date,
+        "lookahead_applied": False,
+        "source": "espn_summary_boxscore_fallback",
+        "games": out_games,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+
+
+def _fallback_live_player_boxscore_game(
+    game: dict[str, Any],
+    *,
+    event_id: str | None = None,
+    selected_date: str | None = None,
+) -> dict[str, Any]:
+    return {"event_id": event_id or game.get("event_id"), "players": []}
+
+
 def _normalize_player_key(value: Any) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9\s]", " ", str(value or "").upper())).strip()
 
@@ -2033,10 +2219,15 @@ def build_live_player_boxscore_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        normalized_event_ids = _default_live_event_ids(
+            selected_date,
+            allow_stored_date_fallback=allow_stored_date_fallback,
+        )
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_boxscore", resolved_date, normalized_event_ids)
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+    if _payload_has_live_boxscore_players(local_payload):
         return _attach_odds_refresh_timestamp(local_payload)
     if _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -2044,8 +2235,28 @@ def build_live_player_boxscore_payload(
             selected_date=resolved_date,
             event_ids=normalized_event_ids,
         )
-        if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
+        if _payload_has_live_boxscore_players(remote_payload):
             return _attach_odds_refresh_timestamp(remote_payload)
+    public_payload = _public_live_player_boxscore_payload(resolved_date, normalized_event_ids)
+    if _payload_has_live_boxscore_players(public_payload):
+        return _attach_odds_refresh_timestamp(public_payload)
+    game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
+    fallback_games = [
+        _fallback_live_player_boxscore_game(game, event_id=event_id, selected_date=resolved_date)
+        for event_id in normalized_event_ids
+        for game in [game_index.get(event_id)]
+        if isinstance(game, dict)
+    ]
+    if fallback_games:
+        return _attach_odds_refresh_timestamp({
+            "ok": True,
+            "ttl": int(ttl),
+            "date": resolved_date or None,
+            "requested_date": selected_date,
+            "lookahead_applied": bool(resolved_date != selected_date),
+            "games": fallback_games,
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        })
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),

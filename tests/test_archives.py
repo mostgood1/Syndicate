@@ -1330,6 +1330,35 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(len(payload.get("games") or []), 1)
         self.assertEqual(len((payload.get("games") or [{}])[0].get("players") or []), 1)
 
+    def test_nba_live_player_boxscore_ignores_empty_local_shell_payload(self) -> None:
+        from syndicate.features.nba.cards import build_live_player_boxscore_payload as build_nba_live_player_boxscore_payload
+
+        public_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "source": "espn_summary_boxscore_fallback",
+            "games": [{"event_id": "401859964", "players": [{"player": "Test Player", "team_tri": "NYK"}]}],
+        }
+
+        with patch(
+            "syndicate.features.nba.cards._default_live_event_ids",
+            return_value=["401859964"],
+        ), patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value={"ok": True, "date": "2026-06-05", "games": [{"event_id": "401859964", "players": []}]},
+        ), patch(
+            "syndicate.features.nba.cards._public_live_player_boxscore_payload",
+            return_value=public_payload,
+        ):
+            payload = build_nba_live_player_boxscore_payload("2026-06-05", [])
+
+        self.assertEqual(payload.get("source"), "espn_summary_boxscore_fallback")
+        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual(len((payload.get("games") or [{}])[0].get("players") or []), 1)
+
     def test_wnba_live_lines_fallback_preserves_requested_event_id(self) -> None:
         fallback_game = {
             "betting": {
