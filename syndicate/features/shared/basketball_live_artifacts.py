@@ -206,6 +206,13 @@ def build_live_player_lens_payload_from_artifacts(
                 opponent_tri = away_tri if is_home else home_tri
         stat = _canonical_stat(row.get("stat"))
         line_value = _safe_float(row.get("line") if row.get("line") is not None else row.get("live_line"))
+        price_over = _safe_float(row.get("price_over"))
+        price_under = _safe_float(row.get("price_under"))
+        price_value = _safe_float(row.get("price"))
+        if line_value is not None and abs(line_value) < 0.001 and not any(
+            value is not None and abs(value) > 0.001 for value in (price_over, price_under, price_value)
+        ):
+            continue
         live_projection = _safe_float(
             row.get("live_projection")
             if row.get("live_projection") is not None
@@ -228,9 +235,9 @@ def build_live_player_lens_payload_from_artifacts(
             "line_source": "live_lens_projection_artifact",
             "lean": str(row.get("side") or row.get("selection") or "").strip().upper() or None,
             "ev_side": str(row.get("side") or row.get("selection") or "").strip().upper() or None,
-            "price_over": _safe_float(row.get("price_over")),
-            "price_under": _safe_float(row.get("price_under")),
-            "price": _safe_float(row.get("price")),
+            "price_over": price_over,
+            "price_under": price_under,
+            "price": price_value,
             "ev": _safe_float(row.get("ev")),
             "win_prob": _safe_float(row.get("win_prob") if row.get("win_prob") is not None else row.get("p_win")),
             "recommendation_priority_score": _safe_float(

@@ -439,6 +439,42 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual((((game.get("lines") or {}).get("period_totals") or {}).get("q1")), 40.5)
         self.assertEqual(payload.get("source"), "syndicate_live_lens_signals_artifact")
 
+    def test_live_player_lens_payload_skips_zero_line_projection_artifact_placeholders(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "live_lens_projections_2026-05-21.jsonl").write_text(
+                json.dumps(
+                    {
+                        "player": "A'ja Wilson",
+                        "team": "LVA",
+                        "opponent": "GSV",
+                        "stat": "pts",
+                        "line": 0.0,
+                        "proj": 27.1,
+                        "sim_mu": 25.5,
+                        "klass": "WATCH",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+                "syndicate.features.wnba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+                return_value={"evt-2": {"event_id": "evt-2", "gamePk": "0401", "away_tri": "GSV", "home_tri": "LVA"}},
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+                _local_live_snapshot_payload.cache_clear()
+
+        rows = ((payload.get("games") or [{}])[0].get("rows") or [])
+        self.assertEqual(rows, [])
+
     def test_live_player_lens_payload_hydrates_prices_from_processed_oddsapi_props(self) -> None:
         with patch(
             "syndicate.features.wnba.cards.build_cards_page_context",
