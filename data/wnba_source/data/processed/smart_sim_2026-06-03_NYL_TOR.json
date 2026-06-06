@@ -2,38 +2,38 @@
   "date": "2026-06-03",
   "home": "NYL",
   "away": "TOR",
-  "market_total": 163.5,
-  "market_home_spread": -10.5,
+  "market_total": 162.5,
+  "market_home_spread": -9.5,
   "quarters": [
     {
       "q": 1,
-      "home_pts_mu": 20.947276218749995,
+      "home_pts_mu": 20.74515121875,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 18.503401218749996,
+      "away_pts_mu": 18.534026218749997,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 2,
-      "home_pts_mu": 20.947276218749995,
+      "home_pts_mu": 20.74515121875,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 18.503401218749996,
+      "away_pts_mu": 18.534026218749997,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 3,
-      "home_pts_mu": 21.802267084821427,
+      "home_pts_mu": 21.591892084821428,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 19.258642084821428,
+      "away_pts_mu": 19.290517084821428,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     },
     {
       "q": 4,
-      "home_pts_mu": 21.802267084821427,
+      "home_pts_mu": 21.591892084821428,
       "home_pts_sigma": 6.0,
-      "away_pts_mu": 19.258642084821428,
+      "away_pts_mu": 19.290517084821428,
       "away_pts_sigma": 6.0,
       "corr": 0.25
     }

@@ -70,14 +70,14 @@
           "display_pick": "New York Liberty -9.5",
           "selection": "New York Liberty",
           "price": -110.0,
-          "score": 19.475,
-          "ev_pct": 19.475,
-          "win_prob": 0.71856,
-          "p_win": 0.71856,
-          "basketball_summary": "Model margin 10.0 vs market -9.5",
+          "score": 18.525,
+          "ev_pct": 18.525,
+          "win_prob": 0.70906,
+          "p_win": 0.70906,
+          "basketball_summary": "Model margin 9.0 vs market -9.5",
           "top_play_reasons": [
-            "Edge 19.5",
-            "EV 19.5%"
+            "Edge 18.5",
+            "EV 18.5%"
           ],
           "matchup": "TOR @ NYL"
         },
@@ -87,14 +87,14 @@
           "display_pick": "Under 162.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -1.476827,
-          "ev_pct": 1.4768,
-          "win_prob": 0.538578,
-          "p_win": 0.538578,
-          "basketball_summary": "Model total 161.0 vs line 162.5",
+          "score": -2.176827,
+          "ev_pct": 2.1768,
+          "win_prob": 0.545578,
+          "p_win": 0.545578,
+          "basketball_summary": "Model total 160.3 vs line 162.5",
           "top_play_reasons": [
-            "Edge -1.5",
-            "EV 1.5%"
+            "Edge -2.2",
+            "EV 2.2%"
           ],
           "matchup": "TOR @ NYL"
         }
