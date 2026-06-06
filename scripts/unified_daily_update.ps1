@@ -957,6 +957,8 @@ function Get-ForcedPublishArtifactPaths {
         [bool]$SkipNBA,
         [bool]$SkipNHL,
         [bool]$SkipWNBA,
+        [bool]$SkipNFL,
+        [bool]$SkipNCAAF,
         [bool]$SkipNCAAB
     )
 
@@ -1250,6 +1252,48 @@ function Get-ForcedPublishArtifactPaths {
         }
     }
 
+    if (-not $SkipNFL) {
+        foreach ($relativePath in @(
+            'data/nfl_source/current_week.json',
+            'data/nfl_source/calibration_active.json',
+            'data/nfl_source/prob_calibration.json',
+            'data/nfl_source/sigma_calibration.json',
+            'data/nfl_source/totals_calibration.json',
+            'data/nfl_source/source_artifacts/current_week.json',
+            'data/nfl_source/source_artifacts/calibration_active.json',
+            'data/nfl_source/source_artifacts/prob_calibration.json',
+            'data/nfl_source/source_artifacts/sigma_calibration.json',
+            'data/nfl_source/source_artifacts/totals_calibration.json'
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
+
+        Add-PathsByPattern -RelativePattern 'data/nfl_source/upcoming_recs_*.csv'
+        Add-PathsByPattern -RelativePattern 'data/nfl_source/oddsapi_player_props_*.csv'
+        Add-PathsByPattern -RelativePattern 'data/nfl_source/source_artifacts/upcoming_recs_*.csv'
+        Add-PathsByPattern -RelativePattern 'data/nfl_source/source_artifacts/oddsapi_player_props_*.csv'
+        Add-PathsUnderRoot -RelativeRoot 'data/nfl_source/manifests'
+        Add-PathsUnderRoot -RelativeRoot 'data/nfl_source/source_artifacts/manifests'
+    }
+
+    if (-not $SkipNCAAF) {
+        foreach ($relativePath in @(
+            'data/ncaaf_source/data/recommendations_latest.json',
+            'data/ncaaf_source/source_artifacts/recommendations_latest.json'
+        )) {
+            Add-PathIfPresent -RelativePath $relativePath
+        }
+
+        Add-PathsByPattern -RelativePattern 'data/ncaaf_source/data/recommendations_summary/*.json'
+        Add-PathsByPattern -RelativePattern 'data/ncaaf_source/source_artifacts/recommendations_summary/*.json'
+        Add-PathsByPattern -RelativePattern 'data/ncaaf_source/data/college_football_schedule_*_predicted_totals_enhanced*.csv'
+        Add-PathsByPattern -RelativePattern 'data/ncaaf_source/source_artifacts/college_football_schedule_*_predicted_totals_enhanced*.csv'
+        Add-PathsByPattern -RelativePattern 'data/ncaaf_source/data/recommendations_*.csv'
+        Add-PathsByPattern -RelativePattern 'data/ncaaf_source/source_artifacts/recommendations_*.csv'
+        Add-PathsUnderRoot -RelativeRoot 'data/ncaaf_source/data/manifests'
+        Add-PathsUnderRoot -RelativeRoot 'data/ncaaf_source/source_artifacts/manifests'
+    }
+
     if (-not $SkipNCAAB) {
         foreach ($relativePath in @(
             "data/ncaab_source/api/recommendations/recommendations_${DateValue}.json",
@@ -1376,11 +1420,87 @@ function Invoke-GitPublish {
     }
 }
 
+function Assert-IntelligenceSportReady {
+    param(
+        [string]$Sport,
+        [string]$DateValue,
+        [string]$RepoRoot
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Sport) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($RepoRoot)) {
+        return
+    }
+
+    $pythonExe = Resolve-Python $RepoRoot
+    $script = @'
+import json
+import sys
+
+from syndicate.app import create_app
+from syndicate.features.intelligence import build_intelligence_status
+
+sport_slug = str(sys.argv[1] or "").strip().lower()
+selected_date = str(sys.argv[2] or "").strip()
+app = create_app()
+with app.app_context():
+    payload = build_intelligence_status(selected_date=selected_date, force_refresh=True)
+
+row = {}
+for sport in payload.get("sports") or []:
+    if not isinstance(sport, dict):
+        continue
+    if str(sport.get("slug") or "").strip().lower() == sport_slug:
+        row = sport
+        break
+
+gate = row.get("advanced_gate") if isinstance(row.get("advanced_gate"), dict) else {}
+missing = [str(item.get("label") or "input").strip() for item in (gate.get("missing_inputs") or []) if isinstance(item, dict)]
+unpublished = [str(item.get("label") or "input").strip() for item in (gate.get("publish_missing_inputs") or []) if isinstance(item, dict)]
+state = str((row.get("readiness_gate") or {}).get("state") or "").strip().lower()
+result = {
+    "sport": sport_slug,
+    "state": state,
+    "active_today": bool(row.get("active_today")),
+    "missing_inputs": missing,
+    "publish_missing_inputs": unpublished,
+    "ok": not missing and not unpublished,
+}
+print(json.dumps(result))
+'@
+
+    Push-Location $RepoRoot
+    try {
+        $rawOutput = & $pythonExe -c $script $Sport $DateValue
+        if ($LASTEXITCODE -ne 0) {
+            throw "intelligence status builder exited with code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    try {
+        $audit = ($rawOutput | Out-String | ConvertFrom-Json -ErrorAction Stop)
+    }
+    catch {
+        throw "Intelligence readiness audit failed for $Sport: unable to parse status payload"
+    }
+
+    if (-not $audit.ok) {
+        $missingLabels = @($audit.missing_inputs) + @($audit.publish_missing_inputs)
+        $detail = ($missingLabels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ', '
+        if ([string]::IsNullOrWhiteSpace($detail)) {
+            $detail = 'unknown intelligence readiness mismatch'
+        }
+        throw "Intelligence readiness audit failed for $Sport: $detail"
+    }
+}
+
 $sourceSteps = @()
 $publishRepos = @()
 $preferLocalMirrorArtifactsForGate = $false
 $resolveForcedPublishArtifactPaths = {
-    Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNCAAB ([bool]$SkipNCAAB)
+    Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
 }
 $sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
 $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')
@@ -1751,6 +1871,7 @@ try {
 
             if (-not $DryRun -and -not $hasLaterStepForSport) {
                 Assert-AdvancedDataReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RunDir $runDir
+                Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot
             }
 
             if (-not $SkipGitPush) {

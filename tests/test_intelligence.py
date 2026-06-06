@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.app import create_app
@@ -397,6 +399,71 @@ def _sample_mlb_market_overview() -> list[dict[str, object]]:
             },
             "dashboard_games": [],
         }
+    ]
+
+
+def _sample_multi_sport_points_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "nba",
+            "name": "NBA",
+            "context_label": "2026-06-04",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {
+                    "title": "Pregame props",
+                    "items": [
+                        {
+                            "name": "Jayson Tatum Over 28.5",
+                            "market": "Points",
+                            "pick": "Over 28.5",
+                            "matchup": "BOS at NYK",
+                            "projected": 31.8,
+                            "line": 28.5,
+                            "odds": "+102",
+                            "confidence": "63%",
+                            "edge": "+5.4%",
+                            "writeup": "Usage and shot quality keep the points ceiling live.",
+                            "href": "/nba/prop-ladders?date=2026-06-04",
+                        }
+                    ],
+                },
+                "live": {"title": "Top Live Props", "items": []},
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        },
+        {
+            "slug": "wnba",
+            "name": "WNBA",
+            "context_label": "2026-06-04",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {
+                    "title": "Pregame props",
+                    "items": [
+                        {
+                            "name": "A'ja Wilson Over 22.5",
+                            "market": "Points",
+                            "pick": "Over 22.5",
+                            "matchup": "LVA at PHX",
+                            "projected": 25.1,
+                            "line": 22.5,
+                            "odds": "+100",
+                            "confidence": "61%",
+                            "edge": "+4.1%",
+                            "writeup": "Role pressure and stable usage support the points path.",
+                            "href": "/wnba/prop-ladders?date=2026-06-04",
+                        }
+                    ],
+                },
+                "live": {"title": "Top Live Props", "items": []},
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        },
     ]
 
 
@@ -1659,6 +1726,74 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue((pbp_row or {}).get("exists"))
         self.assertIn("Points per possession", (pbp_row or {}).get("metrics") or [])
 
+    def test_advanced_signals_from_item_prefers_structured_basketball_recent_form_fields(self) -> None:
+        signals = _advanced_signals_from_item(
+            {
+                "line": 28.5,
+                "last5_average": 31.2,
+                "last10_average": 30.1,
+                "last_game_value": 33.0,
+                "projected_minutes": 36.0,
+                "last10_workload": 34.0,
+                "basketball_summary": "Projection is clearing the number with usage support.",
+            }
+        )
+
+        by_key = {str(signal.get("key")): signal.get("value") for signal in signals if isinstance(signal, dict)}
+        self.assertEqual(by_key.get("basketball_last5_average"), 31.2)
+        self.assertAlmostEqual(float(by_key.get("basketball_last5_delta") or 0.0), 0.095, places=3)
+        self.assertEqual(by_key.get("basketball_last10_average"), 30.1)
+        self.assertEqual(by_key.get("basketball_last_game_value"), 33.0)
+        self.assertEqual(by_key.get("basketball_projected_minutes"), 36.0)
+        self.assertEqual(by_key.get("basketball_last10_workload"), 34.0)
+        self.assertAlmostEqual(float(by_key.get("basketball_minutes_workload_delta") or 0.0), 0.059, places=3)
+
+    def test_advanced_input_rows_use_source_artifact_fallback_for_nfl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "source_artifacts").mkdir(parents=True, exist_ok=True)
+            (root / "source_artifacts" / "current_week.json").write_text('{"season": 2026, "week": 3}', encoding="utf-8")
+            (root / "source_artifacts" / "upcoming_recs_2026_wk3.csv").write_text("player\nA\n", encoding="utf-8")
+            (root / "source_artifacts" / "oddsapi_player_props_2026_wk3.csv").write_text("player\nA\n", encoding="utf-8")
+
+            with patch("syndicate.features.intelligence.nfl_sources.default_nfl_source_root", return_value=root):
+                with patch("syndicate.features.intelligence.nfl_sources.tracked_week", return_value={"season": 2026, "week": 3}):
+                    rows = _advanced_input_rows_for_sport(
+                        {
+                            "slug": "nfl",
+                            "name": "NFL",
+                            "context_label": "2026 Week 3",
+                        },
+                        set(),
+                    )
+
+        self.assertTrue(rows)
+        self.assertTrue(all(bool(row.get("exists")) for row in rows))
+        self.assertTrue(any(str(row.get("path") or "").replace("\\", "/").endswith("current_week.json") for row in rows))
+
+    def test_advanced_input_rows_use_source_artifact_fallback_for_ncaaf(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            rec_root = root / "source_artifacts" / "recommendations_summary"
+            rec_root.mkdir(parents=True, exist_ok=True)
+            (rec_root / "index.json").write_text('{"weeks": [{"week": 7, "season": 2025, "count": 4}]}', encoding="utf-8")
+            (rec_root / "week_7.json").write_text('{"games": []}', encoding="utf-8")
+            (root / "source_artifacts" / "college_football_schedule_2025_predicted_totals_enhanced_20251123T161637Z.csv").write_text("game\nA\n", encoding="utf-8")
+
+            with patch("syndicate.features.intelligence.ncaaf_sources.default_ncaaf_source_root", return_value=root):
+                rows = _advanced_input_rows_for_sport(
+                    {
+                        "slug": "ncaaf",
+                        "name": "NCAAF",
+                        "context_label": "2025 Week 7",
+                    },
+                    set(),
+                )
+
+        self.assertTrue(rows)
+        self.assertTrue(all(bool(row.get("exists")) for row in rows))
+        self.assertTrue(any(str(row.get("path") or "").replace("\\", "/").endswith("recommendations_summary/index.json") for row in rows))
+
     def test_intelligence_query_builds_football_analysis_views(self) -> None:
         advanced_rows = [
             {
@@ -1931,6 +2066,123 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         recommendations = result.get("recommendations") or []
         self.assertTrue(recommendations)
         self.assertTrue(all("strikeout" in str(item.get("market") or "").lower() for item in recommendations))
+
+    def test_intelligence_query_backfills_mlb_strikeout_board_from_top_props_artifact(self) -> None:
+        top_props = {
+            "groups": {
+                "pitcher": {
+                    "sections": [
+                        {
+                            "rows": [
+                                {
+                                    "ownerName": "Chris Sale",
+                                    "stat": "strikeouts",
+                                    "statLabel": "Strikeouts",
+                                    "selectionLabel": "Over",
+                                    "marketLine": 7.5,
+                                    "mean": 8.6,
+                                    "simProb": 0.61,
+                                    "rawEdge": 0.048,
+                                    "matchup": "ATL at NYM",
+                                    "team": "ATL",
+                                    "rank": 2,
+                                    "group": "pitcher",
+                                },
+                                {
+                                    "ownerName": "Spencer Strider",
+                                    "stat": "strikeouts",
+                                    "statLabel": "Strikeouts",
+                                    "selectionLabel": "Over",
+                                    "marketLine": 8.5,
+                                    "mean": 9.4,
+                                    "simProb": 0.58,
+                                    "rawEdge": 0.044,
+                                    "matchup": "PHI at ATL",
+                                    "team": "ATL",
+                                    "rank": 3,
+                                    "group": "pitcher",
+                                },
+                                {
+                                    "ownerName": "Tarik Skubal",
+                                    "stat": "strikeouts",
+                                    "statLabel": "Strikeouts",
+                                    "selectionLabel": "Over",
+                                    "marketLine": 7.5,
+                                    "mean": 8.3,
+                                    "simProb": 0.56,
+                                    "rawEdge": 0.039,
+                                    "matchup": "DET at CLE",
+                                    "team": "DET",
+                                    "rank": 4,
+                                    "group": "pitcher",
+                                },
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+        pitcher_snapshot = {
+            "pitcher_props": {
+                "chris sale": {"strikeouts": {"line": 7.5, "over_odds": "+102"}},
+                "spencer strider": {"strikeouts": {"line": 8.5, "over_odds": "+108"}},
+                "tarik skubal": {"strikeouts": {"line": 7.5, "over_odds": "+110"}},
+            }
+        }
+
+        def _mock_mlb_json(path: object) -> dict[str, object]:
+            text = str(path).lower()
+            if "top" in text and "props" in text:
+                return top_props
+            if "pitcher" in text and "props" in text:
+                return pitcher_snapshot
+            return {}
+
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    with patch("syndicate.features.intelligence._mlb_statcast_profile_from_ids", return_value=None):
+                        with patch("syndicate.features.intelligence.mlb_load_json_file", side_effect=_mock_mlb_json):
+                            response = self.client.post(
+                                "/api/intelligence/query",
+                                json={
+                                    "question": "Who are the top 5 strikeout targets for today?",
+                                    "date": "2026-06-04",
+                                },
+                            )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        self.assertEqual(result.get("headline"), "The Syndicate strikeouts board")
+        recommendations = result.get("recommendations") or []
+        self.assertGreaterEqual(len(recommendations), 3)
+        self.assertTrue(all("strikeout" in str(item.get("market") or "").lower() for item in recommendations[:3]))
+        recommendation_names = [str(item.get("name") or "") for item in recommendations]
+        self.assertTrue(any("Spencer Strider" in name for name in recommendation_names))
+        self.assertTrue(any("Tarik Skubal" in name for name in recommendation_names))
+
+    def test_intelligence_query_builds_generic_multi_sport_market_board(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_multi_sport_points_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Explain the best points targets across NBA and WNBA today with a table and chart.",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        self.assertEqual(result.get("headline"), "The Syndicate points board")
+        analysis_views = result.get("analysis_views") or {}
+        self.assertEqual(analysis_views.get("focus"), "market_board")
+        rows = ((analysis_views.get("table") or {}).get("rows") or [])
+        self.assertGreaterEqual(len(rows), 2)
+        sports = {str(row.get("sport_slug") or "") for row in rows[:2]}
+        self.assertEqual(sports, {"nba", "wnba"})
+        self.assertTrue(all(str(row.get("market_key") or "") == "points" for row in rows[:2]))
 
     def test_query_preferences_treats_high_confidence_as_conservative(self) -> None:
         preferences = _query_preferences("Show me the highest confidence live MLB props today")

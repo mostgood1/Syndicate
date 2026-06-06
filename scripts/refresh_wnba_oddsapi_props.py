@@ -753,6 +753,52 @@ def _load_local_props_recommendations(*, processed_root: Path, date_str: str) ->
     return rows_out
 
 
+def _basketball_recent_form_fields(row: dict[str, object], *, line_value: float | None = None) -> dict[str, float]:
+    sources: list[dict[str, object]] = [row]
+    for key in ("top_play", "model"):
+        nested = row.get(key)
+        if isinstance(nested, dict):
+            sources.append(nested)
+
+    def first_numeric(*names: str) -> float | None:
+        for source in sources:
+            for name in names:
+                value = _float_or_none(source.get(name))
+                if value is not None:
+                    return float(value)
+        return None
+
+    payload: dict[str, float] = {}
+    scalar_fields = (
+        (("basketball_last5_average", "last5_average", "last_5_average", "last5_avg"), "last5_average"),
+        (("basketball_last10_average", "last10_average", "last_10_average", "last10_avg"), "last10_average"),
+        (("basketball_last_game_value", "last_game_value", "last_game", "last_game_stat"), "last_game_value"),
+        (("basketball_projected_minutes", "projected_minutes"), "projected_minutes"),
+        (("basketball_last10_workload", "last10_workload", "last_10_workload"), "last10_workload"),
+        (("basketball_last5_delta", "last5_delta_signal", "last5_delta"), "last5_delta_signal"),
+        (("basketball_last10_delta", "last10_delta_signal", "last10_delta"), "last10_delta_signal"),
+        (("basketball_last_game_delta", "last_game_delta_signal", "last_game_delta"), "last_game_delta_signal"),
+        (("basketball_minutes_workload_delta", "workload_delta_signal", "minutes_workload_delta"), "workload_delta_signal"),
+    )
+    for candidate_names, output_name in scalar_fields:
+        value = first_numeric(*candidate_names)
+        if value is not None:
+            payload[output_name] = round(float(value), 3)
+
+    if line_value is not None and line_value > 0:
+        for raw_key, delta_key in (("last5_average", "last5_delta_signal"), ("last10_average", "last10_delta_signal"), ("last_game_value", "last_game_delta_signal")):
+            if delta_key in payload or raw_key not in payload:
+                continue
+            payload[delta_key] = round((float(payload[raw_key]) - line_value) / max(line_value, 8.0), 3)
+
+    if "workload_delta_signal" not in payload and "projected_minutes" in payload and "last10_workload" in payload:
+        payload["workload_delta_signal"] = round(
+            (float(payload["projected_minutes"]) - float(payload["last10_workload"])) / max(float(payload["last10_workload"]), 12.0),
+            3,
+        )
+    return payload
+
+
 def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
     rows, _, by_names = _local_game_cards_index(processed_root=processed_root, date_str=date_str)
     recommendations_path = processed_root / f"recommendations_{date_str}.csv"
@@ -847,23 +893,24 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
         stat_label = stat.replace("_", " ").title() if stat else "Prop"
         display_pick = f"{player_name} {selection}".strip()
         summary = f"{stat_label} projection {_format_plain_line(_float_or_none(top_play.get('proj')))}"
+        recent_form_fields = _basketball_recent_form_fields(row, line_value=line_value)
 
-        grouped.setdefault(game_key, []).append(
-            {
-                "market": "PROPS",
-                "team": team_tri,
-                "display_pick": display_pick,
-                "selection": selection,
-                "price": _float_or_none(top_play.get("price")),
-                "score": ev_pct,
-                "ev_pct": ev_pct,
-                "win_prob": win_prob,
-                "p_win": win_prob,
-                "basketball_summary": summary,
-                "top_play_reasons": row.get("top_play_reasons") if isinstance(row.get("top_play_reasons"), list) else [],
-                "matchup": f"{away_tri} @ {home_tri}",
-            }
-        )
+        grouped_pick = {
+            "market": "PROPS",
+            "team": team_tri,
+            "display_pick": display_pick,
+            "selection": selection,
+            "price": _float_or_none(top_play.get("price")),
+            "score": ev_pct,
+            "ev_pct": ev_pct,
+            "win_prob": win_prob,
+            "p_win": win_prob,
+            "basketball_summary": summary,
+            "top_play_reasons": row.get("top_play_reasons") if isinstance(row.get("top_play_reasons"), list) else [],
+            "matchup": f"{away_tri} @ {home_tri}",
+        }
+        grouped_pick.update(recent_form_fields)
+        grouped.setdefault(game_key, []).append(grouped_pick)
         per_game_prop_counts[game_key] = int(per_game_prop_counts.get(game_key, 0) + 1)
 
     per_game: list[dict[str, object]] = []
@@ -915,25 +962,26 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
         ev_pct = _float_or_none(top_play.get("ev_pct"))
         win_prob = _clamp_probability((_american_price_to_prob(top_play.get("price")) or 0.5) + (_float_or_none(top_play.get("ev")) or 0.0))
         enriched_top_play = dict(top_play)
+        enriched_top_play.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         enriched_top_play["p_win"] = win_prob
         enriched_top_play["snapshot_ts"] = None
-        rows_out.append(
-            {
-                "game_key": game_key,
-                "game_id": meta.get("game_id"),
-                "player": str(row.get("player") or "").strip(),
-                "team": team_tri,
-                "team_tricode": team_tri,
-                "opponent": str(meta.get("opponent") or "").strip().upper(),
-                "score": ev_pct,
-                "score_adj": ev_pct,
-                "tier": _local_props_tier(ev_pct),
-                "model": row.get("model") if isinstance(row.get("model"), dict) else {},
-                "top_play": enriched_top_play,
-                "top_play_reasons": row.get("top_play_reasons") if isinstance(row.get("top_play_reasons"), list) else [],
-                "basketball_summary": str(row.get("top_play_explain") or "").strip() or None,
-            }
-        )
+        row_out = {
+            "game_key": game_key,
+            "game_id": meta.get("game_id"),
+            "player": str(row.get("player") or "").strip(),
+            "team": team_tri,
+            "team_tricode": team_tri,
+            "opponent": str(meta.get("opponent") or "").strip().upper(),
+            "score": ev_pct,
+            "score_adj": ev_pct,
+            "tier": _local_props_tier(ev_pct),
+            "model": row.get("model") if isinstance(row.get("model"), dict) else {},
+            "top_play": enriched_top_play,
+            "top_play_reasons": row.get("top_play_reasons") if isinstance(row.get("top_play_reasons"), list) else [],
+            "basketball_summary": str(row.get("top_play_explain") or "").strip() or None,
+        }
+        row_out.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
+        rows_out.append(row_out)
         per_game_counts[game_key] = int(per_game_counts.get(game_key, 0) + 1)
         if len(rows_out) >= 25:
             break
@@ -972,6 +1020,7 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
         ev_pct = _float_or_none(top_play.get("ev_pct"))
         win_prob = _clamp_probability((_american_price_to_prob(top_play.get("price")) or 0.5) + (_float_or_none(top_play.get("ev")) or 0.0))
         base_pick = dict(top_play)
+        base_pick.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         base_pick["player"] = str(row.get("player") or "").strip()
         base_pick["team"] = team_tri
         base_pick["opponent"] = str(meta.get("opponent") or "").strip().upper()

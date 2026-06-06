@@ -34,6 +34,11 @@ def analysis_focus_from_question(
     hockey_markets = {"shots", "goals", "assists", "saves"}
     mlb_markets = {"home_runs", "strikeouts", "hits", "total_bases", "rbis", "runs_scored"}
 
+    if len(lowered_sports) > 1:
+        if lowered_sports <= football_sports:
+            return "football_markets"
+        return "market_board"
+
     if "mlb" in lowered_question and any(
         token in lowered_question
         for token in ("strikeout", "strikeouts", "total base", "total bases", " hits", " rbi", "rbis", "runs scored", "statcast")
@@ -55,4 +60,6 @@ def analysis_focus_from_question(
         return "football_markets"
     if lowered_sports & hockey_sports or lowered_markets & hockey_markets:
         return "hockey_props"
+    if lowered_markets or lowered_sports:
+        return "market_board"
     return None

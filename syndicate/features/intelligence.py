@@ -817,16 +817,93 @@ def _basketball_summary_signals_from_text(item: dict[str, Any]) -> list[dict[str
     return signals
 
 
-def _advanced_signals_from_item(item: dict[str, Any]) -> list[dict[str, Any]]:
+def _basketball_summary_signals_from_fields(item: dict[str, Any]) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = [item]
+    for key in ("top_play", "best", "model"):
+        nested = item.get(key)
+        if isinstance(nested, dict):
+            sources.append(nested)
+
+    def first_numeric(*names: str) -> float | None:
+        for source in sources:
+            for name in names:
+                numeric_value = _numeric_hint(source.get(name))
+                if numeric_value is not None:
+                    return float(numeric_value)
+        return None
+
+    def append_signal(target: list[dict[str, Any]], key: str, value: float) -> None:
+        target.append(
+            {
+                "key": key,
+                "label": _humanize_signal_key(key),
+                "value": round(float(value), 3),
+            }
+        )
+
+    line_value = first_numeric("line")
     signals: list[dict[str, Any]] = []
+    recent_values = (
+        (
+            first_numeric("basketball_last5_average", "last5_average", "last_5_average", "last5_avg"),
+            "basketball_last5_average",
+            first_numeric("basketball_last5_delta", "last5_delta_signal", "last5_delta"),
+            "basketball_last5_delta",
+        ),
+        (
+            first_numeric("basketball_last10_average", "last10_average", "last_10_average", "last10_avg"),
+            "basketball_last10_average",
+            first_numeric("basketball_last10_delta", "last10_delta_signal", "last10_delta"),
+            "basketball_last10_delta",
+        ),
+        (
+            first_numeric("basketball_last_game_value", "last_game_value", "last_game", "last_game_stat"),
+            "basketball_last_game_value",
+            first_numeric("basketball_last_game_delta", "last_game_delta_signal", "last_game_delta"),
+            "basketball_last_game_delta",
+        ),
+    )
+    for raw_value, raw_key, delta_value, delta_key in recent_values:
+        if raw_value is None:
+            continue
+        append_signal(signals, raw_key, raw_value)
+        if delta_value is None and line_value is not None and line_value > 0:
+            delta_value = (raw_value - line_value) / max(line_value, 8.0)
+        if delta_value is not None:
+            append_signal(signals, delta_key, delta_value)
+
+    projected_minutes = first_numeric("basketball_projected_minutes", "projected_minutes")
+    workload_minutes = first_numeric("basketball_last10_workload", "last10_workload", "last_10_workload")
+    workload_delta = first_numeric(
+        "basketball_minutes_workload_delta",
+        "workload_delta_signal",
+        "minutes_workload_delta",
+    )
+    if projected_minutes is not None:
+        append_signal(signals, "basketball_projected_minutes", projected_minutes)
+    if workload_minutes is not None:
+        append_signal(signals, "basketball_last10_workload", workload_minutes)
+    if workload_delta is None and projected_minutes is not None and workload_minutes is not None:
+        workload_delta = (projected_minutes - workload_minutes) / max(workload_minutes, 12.0)
+    if workload_delta is not None:
+        append_signal(signals, "basketball_minutes_workload_delta", workload_delta)
+    return signals
+
+
+def _advanced_signals_from_item(item: dict[str, Any]) -> list[dict[str, Any]]:
+    signals = _basketball_summary_signals_from_fields(item)
+    seen_keys = {str(signal.get("key") or "").strip().lower() for signal in signals}
     for raw_key, raw_value in item.items():
         key = str(raw_key or "").strip().lower()
         if not key:
+            continue
+        if key in seen_keys:
             continue
         if key == "bvp_history_source":
             value = str(raw_value or "").strip()
             if value:
                 signals.append({"key": key, "label": _humanize_signal_key(key), "value": value})
+                seen_keys.add(key)
             continue
         numeric_value = _numeric_hint(raw_value)
         if numeric_value is None:
@@ -839,7 +916,13 @@ def _advanced_signals_from_item(item: dict[str, Any]) -> list[dict[str, Any]]:
                     "value": round(float(numeric_value), 3),
                 }
             )
-    signals.extend(_basketball_summary_signals_from_text(item))
+            seen_keys.add(key)
+    for signal in _basketball_summary_signals_from_text(item):
+        key = str(signal.get("key") or "").strip().lower()
+        if not key or key in seen_keys:
+            continue
+        signals.append(signal)
+        seen_keys.add(key)
     return signals
 
 
@@ -1158,9 +1241,12 @@ def _analysis_focus_from_resolved_candidates(
         for candidate in valid_candidates
         if _safe_text(candidate.get("candidate_type"), "").strip()
     }
+    requested_markets = [str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()]
 
     if len(sports) != 1:
-        return None
+        if sports <= {"nfl", "ncaaf"}:
+            return "football_markets"
+        return "market_board"
 
     sport_slug = next(iter(sports))
     if sport_slug == "mlb" and "prop" in candidate_types:
@@ -1175,6 +1261,8 @@ def _analysis_focus_from_resolved_candidates(
         return "football_markets"
     if sport_slug == "nhl":
         return "hockey_props"
+    if requested_markets or sport_slug:
+        return "market_board"
     return None
 
 
@@ -2281,6 +2369,69 @@ def _resolve_wnba_live_pbp_context_path(context_label: str) -> Path:
     return _latest_matching_path(direct.parent, "live_pbp_stats_*.jsonl", requested_date=context_label) or direct
 
 
+def _resolve_nfl_current_week_path() -> Path:
+    direct = nfl_sources.data_path("current_week.json")
+    if direct.exists():
+        return direct
+    fallback = nfl_sources.data_path("source_artifacts", "current_week.json")
+    if fallback.exists():
+        return fallback
+    return direct
+
+
+def _resolve_nfl_recommendation_context_path(week_value: int, *, season_value: int) -> Path:
+    direct = nfl_sources.recommendation_path(week_value, season=season_value)
+    if direct.exists():
+        return direct
+    for candidate in (
+        nfl_sources.data_path("source_artifacts", f"upcoming_recs_{season_value}_wk{week_value}.csv"),
+        nfl_sources.data_path("source_artifacts", f"upcoming_recs_{season_value}_wk{week_value}_publish.csv"),
+    ):
+        if candidate.exists():
+            return candidate
+    return direct
+
+
+def _resolve_nfl_player_props_path(*, season_value: int, week_value: int) -> Path:
+    direct = nfl_sources.data_path(f"oddsapi_player_props_{season_value}_wk{week_value}.csv")
+    if direct.exists():
+        return direct
+    fallback = nfl_sources.data_path("source_artifacts", f"oddsapi_player_props_{season_value}_wk{week_value}.csv")
+    if fallback.exists():
+        return fallback
+    return direct
+
+
+def _resolve_ncaaf_summary_context_path(week_value: int) -> Path:
+    direct = ncaaf_sources.summary_path(week_value)
+    if direct.exists():
+        return direct
+    fallback = ncaaf_sources.default_ncaaf_source_root() / "source_artifacts" / "recommendations_summary" / f"week_{week_value}.json"
+    if fallback.exists():
+        return fallback
+    return direct
+
+
+def _resolve_ncaaf_summary_index_path() -> Path:
+    direct = ncaaf_sources.data_path("recommendations_summary", "index.json")
+    if direct.exists():
+        return direct
+    fallback = ncaaf_sources.default_ncaaf_source_root() / "source_artifacts" / "recommendations_summary" / "index.json"
+    if fallback.exists():
+        return fallback
+    return direct
+
+
+def _resolve_ncaaf_enhanced_totals_path(*, season_value: int) -> Path:
+    root = ncaaf_sources.default_ncaaf_source_root()
+    pattern = f"college_football_schedule_{season_value}_predicted_totals_enhanced*.csv"
+    for directory in (root / "data", root / "source_artifacts"):
+        resolved = _latest_matching_path(directory, pattern)
+        if resolved is not None:
+            return resolved
+    return root / "data" / f"college_football_schedule_{season_value}_predicted_totals_enhanced.csv"
+
+
 def _resolve_ncaab_live_pbp_context_path(context_label: str) -> Path:
     root = ncaab_sources._source_roots()[0]
     by_date_root = root / "raw_outputs" / "by_date"
@@ -2533,17 +2684,17 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
                 {
                     "label": "Weekly recommendation snapshot",
                     "metrics": ["Off EPA", "Def EPA", "Pace", "Pass rate", "Market edge"],
-                    "path": nfl_sources.recommendation_path(week_value, season=season_value),
+                    "path": _resolve_nfl_recommendation_context_path(week_value, season_value=season_value),
                 },
                 {
                     "label": "Current week context",
                     "metrics": ["Season", "Week", "Publish state", "Board freshness", "Routing context"],
-                    "path": nfl_sources.data_path("current_week.json"),
+                    "path": _resolve_nfl_current_week_path(),
                 },
                 {
                     "label": "Player props mirror",
                     "metrics": ["Passing yards", "Rushing yards", "Receiving yards", "TD market context", "Book coverage"],
-                    "path": nfl_sources.data_path(f"oddsapi_player_props_{season_value}_wk{week_value}.csv"),
+                    "path": _resolve_nfl_player_props_path(season_value=season_value, week_value=week_value),
                 },
             ]
     if slug == "ncaaf":
@@ -2555,17 +2706,17 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
                 {
                     "label": "Weekly recommendation summary",
                     "metrics": ["Model spread", "Model total", "Market edge", "Confidence", "Slate coverage"],
-                    "path": ncaaf_sources.summary_path(week),
+                    "path": _resolve_ncaaf_summary_context_path(week),
                 },
                 {
                     "label": "Recommendation index",
                     "metrics": ["Week availability", "Fetch health", "Artifact coverage", "Season routing", "Publish context"],
-                    "path": ncaaf_sources.data_path("recommendations_summary", "index.json"),
+                    "path": _resolve_ncaaf_summary_index_path(),
                 },
                 {
                     "label": "Enhanced totals export",
                     "metrics": ["Projected total", "Schedule context", "Enhanced totals layer", "Game metadata", "Output freshness"],
-                    "path": _repo_root().parent / "NCAAFCompare" / "data" / f"college_football_schedule_{season_value}_predicted_totals_enhanced_20251123T161637Z.csv",
+                    "path": _resolve_ncaaf_enhanced_totals_path(season_value=season_value),
                 },
             ]
     if slug == "ncaab" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", context_label):
@@ -2795,6 +2946,159 @@ def _mlb_home_run_candidates_from_artifact(sport: dict[str, Any]) -> list[dict[s
     return candidates
 
 
+def _mlb_top_props_rows_from_artifact(selected_date: str) -> list[dict[str, Any]]:
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
+        return []
+    top_props = mlb_load_json_file(mlb_daily_top_props_path(selected_date))
+    groups = top_props.get("groups") if isinstance((top_props or {}).get("groups"), dict) else {}
+    rows: list[dict[str, Any]] = []
+    for group in groups.values():
+        if not isinstance(group, dict):
+            continue
+        sections = group.get("sections") if isinstance(group.get("sections"), list) else []
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            section_rows = section.get("rows") if isinstance(section.get("rows"), list) else []
+            for row in section_rows:
+                if isinstance(row, dict):
+                    rows.append(row)
+    return rows
+
+
+def _mlb_prop_candidate_from_artifact_row(
+    sport: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    selected_date: str,
+    pitcher_market_rows: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    player_name = _safe_text(row.get("ownerName") or row.get("playerName"), "")
+    if not player_name:
+        return None
+    market_key = _market_key_from_text(row.get("stat") or row.get("statLabel"), allow_fallback=True)
+    if not market_key:
+        return None
+
+    normalized_name = _normalized_market_text(player_name)
+    snapshot_player = pitcher_market_rows.get(normalized_name) if isinstance(pitcher_market_rows, dict) else None
+    snapshot_market = snapshot_player.get(market_key) if isinstance((snapshot_player or {}).get(market_key), dict) else {}
+    line_value = _numeric_hint(snapshot_market.get("line"))
+    if line_value is None:
+        line_value = _numeric_hint(row.get("marketLine") or row.get("line"))
+    mean_value = _numeric_hint(row.get("mean"))
+    sim_prob = _numeric_hint(row.get("simProb"))
+    raw_edge = _numeric_hint(row.get("rawEdge"))
+    selection_label = _safe_text(row.get("selectionLabel"), "Over") or "Over"
+    selection_direction = 1 if selection_label.lower() == "over" else -1 if selection_label.lower() == "under" else 0
+    odds_text = _safe_text(
+        snapshot_market.get("over_odds") if selection_direction >= 0 else snapshot_market.get("under_odds"),
+        "",
+    )
+    if not odds_text:
+        odds_value = _american_odds_value(row.get("odds"))
+        if odds_value is not None:
+            odds_text = f"+{int(odds_value)}" if odds_value > 0 else str(int(odds_value))
+    matchup = _safe_text(row.get("matchup"), "-")
+    market_label = _safe_text(row.get("statLabel"), "") or _market_label(market_key)
+    pick = f"{selection_label} {line_value:.1f}" if line_value is not None else selection_label
+    projected_text = f"{mean_value:.1f}" if mean_value is not None else "-"
+    confidence_text = f"{sim_prob * 100.0:.1f}%" if sim_prob is not None else "-"
+    edge_text = f"{raw_edge * 100.0:.1f}%" if raw_edge is not None else "-"
+    detail_bits = []
+    if mean_value is not None and line_value is not None:
+        detail_bits.append(f"Projection {mean_value:.1f} versus line {line_value:.1f}")
+    if sim_prob is not None:
+        detail_bits.append(f"Sim win probability {sim_prob * 100.0:.1f}%")
+    if raw_edge is not None:
+        detail_bits.append(f"Raw edge {raw_edge * 100.0:.1f}%")
+    score = float(sim_prob or 0.0) * 70.0 + max(0.0, float(raw_edge or 0.0) * 50.0)
+    rank_value = _safe_int(row.get("rank"))
+    if rank_value is not None:
+        score += max(0.0, 8.0 - float(rank_value))
+    return {
+        "candidate_type": "prop",
+        "sport": _safe_text(sport.get("name"), "MLB"),
+        "sport_slug": "mlb",
+        "surface_key": "pregame",
+        "surface_title": "Top props artifact",
+        "name": f"{player_name} {selection_label} {line_value:.1f} {market_label}" if line_value is not None else f"{player_name} {selection_label} {market_label}",
+        "market": f"Pitcher {market_label}" if _safe_text(row.get("group"), "").lower() == "pitcher" else market_label,
+        "market_key": market_key,
+        "pick": pick,
+        "matchup": matchup,
+        "team": _safe_text(row.get("team"), "-"),
+        "team_key": _normalized_market_text(_safe_text(row.get("team"), "")) or None,
+        "player_team": _safe_text(row.get("team"), "-"),
+        "line": f"{line_value:.1f}" if line_value is not None else "-",
+        "odds": odds_text or "-",
+        "projected": projected_text,
+        "confidence": confidence_text,
+        "edge": edge_text,
+        "score": score,
+        "href": f"/mlb/cards?date={selected_date}",
+        "href_label": "Open board",
+        "writeup": ". ".join(detail_bits) if detail_bits else f"Artifact-backed {market_label.lower()} view for {player_name}.",
+        "display_pills": [
+            pill
+            for pill in (
+                f"Proj {projected_text}" if projected_text != "-" else "",
+                f"Line {line_value:.1f}" if line_value is not None else "",
+                f"Sim% {confidence_text}" if confidence_text != "-" else "",
+            )
+            if pill
+        ],
+        "owner_id": _safe_int(row.get("ownerId")),
+        "selection_direction": selection_direction,
+    }
+
+
+def _mlb_market_prop_candidates_from_artifact(sport: dict[str, Any], preferences: dict[str, Any]) -> list[dict[str, Any]]:
+    if _safe_text(sport.get("slug"), "").lower() != "mlb":
+        return []
+    selected_date = _safe_text(sport.get("context_label"), "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", selected_date):
+        return []
+    requested_markets = {
+        str(item).strip().lower()
+        for item in (preferences.get("requested_markets") or [])
+        if str(item).strip()
+    }
+    requested_markets.discard("home_runs")
+    if not requested_markets:
+        return []
+
+    rows = _mlb_top_props_rows_from_artifact(selected_date)
+    pitcher_snapshot = mlb_load_json_file(mlb_daily_snapshot_oddsapi_pitcher_props_path(selected_date))
+    pitcher_market_rows = pitcher_snapshot.get("pitcher_props") if isinstance((pitcher_snapshot or {}).get("pitcher_props"), dict) else {}
+    candidates: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        candidate = _mlb_prop_candidate_from_artifact_row(
+            sport,
+            row,
+            selected_date=selected_date,
+            pitcher_market_rows=pitcher_market_rows,
+        )
+        if not isinstance(candidate, dict):
+            continue
+        market_key = _candidate_market_key(candidate)
+        if market_key not in requested_markets:
+            continue
+        dedupe_key = (
+            _normalized_market_text(_safe_text(row.get("ownerName") or row.get("playerName"), "")),
+            _safe_text(market_key, ""),
+            _safe_text(candidate.get("pick"), ""),
+        )
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+        candidates.append(candidate)
+    return candidates
+
+
 def _mlb_subject_prop_candidates_from_artifact(
     sport: dict[str, Any],
     *,
@@ -2814,18 +3118,7 @@ def _mlb_subject_prop_candidates_from_artifact(
         for item in (preferences.get("requested_markets") or [])
         if str(item).strip()
     }
-    top_props = mlb_load_json_file(mlb_daily_top_props_path(selected_date))
-    rows: list[dict[str, Any]] = []
-    groups = top_props.get("groups") if isinstance((top_props or {}).get("groups"), dict) else {}
-    pitcher_group = groups.get("pitcher") if isinstance(groups.get("pitcher"), dict) else {}
-    sections = pitcher_group.get("sections") if isinstance(pitcher_group.get("sections"), list) else []
-    for section in sections:
-        if not isinstance(section, dict):
-            continue
-        section_rows = section.get("rows") if isinstance(section.get("rows"), list) else []
-        for row in section_rows:
-            if isinstance(row, dict):
-                rows.append(row)
+    rows = _mlb_top_props_rows_from_artifact(selected_date)
     pitcher_snapshot = mlb_load_json_file(mlb_daily_snapshot_oddsapi_pitcher_props_path(selected_date))
     pitcher_market_rows = pitcher_snapshot.get("pitcher_props") if isinstance((pitcher_snapshot or {}).get("pitcher_props"), dict) else {}
     candidates: list[dict[str, Any]] = []
@@ -2848,79 +3141,14 @@ def _mlb_subject_prop_candidates_from_artifact(
         if dedupe_key in seen_keys:
             continue
         seen_keys.add(dedupe_key)
-
-        snapshot_player = pitcher_market_rows.get(normalized_name) if isinstance(pitcher_market_rows, dict) else None
-        snapshot_market = snapshot_player.get(market_key) if isinstance((snapshot_player or {}).get(market_key), dict) else {}
-        line_value = _numeric_hint(snapshot_market.get("line"))
-        if line_value is None:
-            line_value = _numeric_hint(row.get("marketLine") or row.get("line"))
-        mean_value = _numeric_hint(row.get("mean"))
-        sim_prob = _numeric_hint(row.get("simProb"))
-        raw_edge = _numeric_hint(row.get("rawEdge"))
-        selection_label = _safe_text(row.get("selectionLabel"), "Over") or "Over"
-        selection_direction = 1 if selection_label.lower() == "over" else -1 if selection_label.lower() == "under" else 0
-        odds_text = _safe_text(
-            snapshot_market.get("over_odds") if selection_direction >= 0 else snapshot_market.get("under_odds"),
-            "",
+        candidate = _mlb_prop_candidate_from_artifact_row(
+            sport,
+            row,
+            selected_date=selected_date,
+            pitcher_market_rows=pitcher_market_rows,
         )
-        if not odds_text:
-            odds_value = _american_odds_value(row.get("odds"))
-            if odds_value is not None:
-                odds_text = f"+{int(odds_value)}" if odds_value > 0 else str(int(odds_value))
-        matchup = _safe_text(row.get("matchup"), "-")
-        market_label = _safe_text(row.get("statLabel"), "") or _market_label(market_key)
-        pick = f"{selection_label} {line_value:.1f}" if line_value is not None else selection_label
-        projected_text = f"{mean_value:.1f}" if mean_value is not None else "-"
-        confidence_text = f"{sim_prob * 100.0:.1f}%" if sim_prob is not None else "-"
-        edge_text = f"{raw_edge * 100.0:.1f}%" if raw_edge is not None else "-"
-        detail_bits = []
-        if mean_value is not None and line_value is not None:
-            detail_bits.append(f"Projection {mean_value:.1f} versus line {line_value:.1f}")
-        if sim_prob is not None:
-            detail_bits.append(f"Sim win probability {sim_prob * 100.0:.1f}%")
-        if raw_edge is not None:
-            detail_bits.append(f"Raw edge {raw_edge * 100.0:.1f}%")
-        score = float(sim_prob or 0.0) * 100.0 + max(0.0, float(raw_edge or 0.0) * 100.0)
-        rank_value = _safe_int(row.get("rank"))
-        if rank_value is not None:
-            score += max(0.0, 15.0 - float(rank_value))
-        candidates.append(
-            {
-                "candidate_type": "prop",
-                "sport": _safe_text(sport.get("name"), "MLB"),
-                "sport_slug": "mlb",
-                "surface_key": "pregame",
-                "surface_title": "Top props artifact",
-                "name": f"{player_name} {selection_label} {line_value:.1f} {market_label}" if line_value is not None else f"{player_name} {selection_label} {market_label}",
-                "market": f"Pitcher {market_label}" if _safe_text(row.get("group"), "").lower() == "pitcher" else market_label,
-                "market_key": market_key,
-                "pick": pick,
-                "matchup": matchup,
-                "team": _safe_text(row.get("team"), "-"),
-                "team_key": _normalized_market_text(_safe_text(row.get("team"), "")) or None,
-                "player_team": _safe_text(row.get("team"), "-"),
-                "line": f"{line_value:.1f}" if line_value is not None else "-",
-                "odds": odds_text or "-",
-                "projected": projected_text,
-                "confidence": confidence_text,
-                "edge": edge_text,
-                "score": score,
-                "href": f"/mlb/cards?date={selected_date}",
-                "href_label": "Open board",
-                "writeup": ". ".join(detail_bits) if detail_bits else f"Artifact-backed {market_label.lower()} view for {player_name}.",
-                "display_pills": [
-                    pill
-                    for pill in (
-                        f"Proj {projected_text}" if projected_text != "-" else "",
-                        f"Line {line_value:.1f}" if line_value is not None else "",
-                        f"Sim% {confidence_text}" if confidence_text != "-" else "",
-                    )
-                    if pill
-                ],
-                "owner_id": _safe_int(row.get("ownerId")),
-                "selection_direction": selection_direction,
-            }
-        )
+        if isinstance(candidate, dict):
+            candidates.append(candidate)
     return candidates
 
 
@@ -3408,9 +3636,13 @@ def _candidate_matches_requested_markets(candidate: dict[str, Any], preferences:
 
 def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
+    question_text = _safe_text(preferences.get("question"), "").lower()
     wants_mlb_hr_targets = preferences.get("analysis_focus") == "mlb_home_runs" or "home_runs" in {
         str(item).strip().lower() for item in (preferences.get("requested_markets") or []) if str(item).strip()
     }
+    wants_ranked_mlb_market_backfill = bool(
+        re.search(r"\b(?:top|best)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b", question_text)
+    )
     for sport in overview:
         if not isinstance(sport, dict) or not _sport_matches_preferences(sport, preferences):
             continue
@@ -3449,6 +3681,19 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             candidates.extend(game_candidates)
         if wants_mlb_hr_targets and not preferences.get("live_only"):
             candidates.extend(_mlb_home_run_candidates_from_artifact(sport))
+        if wants_ranked_mlb_market_backfill and not preferences.get("live_only"):
+            for artifact_candidate in _mlb_market_prop_candidates_from_artifact(sport, preferences):
+                artifact_subject = _candidate_subject_key(artifact_candidate)
+                artifact_market = _candidate_market_key(artifact_candidate)
+                artifact_pick = _safe_text(artifact_candidate.get("pick"), "")
+                if any(
+                    _candidate_subject_key(existing) == artifact_subject
+                    and _candidate_market_key(existing) == artifact_market
+                    and _safe_text(existing.get("pick"), "") == artifact_pick
+                    for existing in candidates
+                ):
+                    continue
+                candidates.append(artifact_candidate)
 
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
     candidates = [

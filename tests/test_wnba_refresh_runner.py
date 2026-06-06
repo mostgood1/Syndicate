@@ -259,6 +259,11 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                 "top_play_reasons",
                 "top_play_consensus",
                 "top_play_line_adv",
+                "last5_average",
+                "last10_average",
+                "last_game_value",
+                "projected_minutes",
+                "last10_workload",
             ]
             with (processed_root / f"props_recommendations_{date_str}.csv").open("w", encoding="utf-8", newline="") as handle:
                 writer = csv.DictWriter(handle, fieldnames=prop_columns)
@@ -278,6 +283,11 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
                         "top_play_reasons": str(["EV 8.0%", "Regular price range (-150 to +150)"]),
                         "top_play_consensus": "0.5",
                         "top_play_line_adv": "1.0",
+                        "last5_average": "12.4",
+                        "last10_average": "11.7",
+                        "last_game_value": "13.0",
+                        "projected_minutes": "34.5",
+                        "last10_workload": "32.0",
                     }
                 )
 
@@ -295,9 +305,12 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
 
         self.assertEqual(slate_payload["counts"]["games"], 1)
         self.assertEqual(slate_payload["per_game"][0]["home"], "CHI")
+        self.assertTrue(any(float(pick.get("last5_average") or 0.0) == 12.4 for pick in (slate_payload["per_game"][0]["picks"] or []) if isinstance(pick, dict)))
         self.assertEqual(props_payload["games"][0]["prop_recommendations"]["home"][0]["player"], "Angel Reese")
+        self.assertEqual(props_payload["games"][0]["prop_recommendations"]["home"][0]["last10_workload"], 32.0)
         self.assertEqual(top_payload["data"][0]["team_tricode"], "CHI")
         self.assertEqual(top_payload["data"][0]["top_play"]["market"], "reb")
+        self.assertEqual(top_payload["data"][0]["top_play"]["projected_minutes"], 34.5)
 
     def test_recon_games_export_uses_local_boxscores_and_game_cards(self) -> None:
         module = self._load_module()
