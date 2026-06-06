@@ -1987,6 +1987,22 @@ def _normalize_player_key(value: Any) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9\s]", " ", str(value or "").upper())).strip()
 
 
+def _live_player_row_key(row: dict[str, Any], event_id: str | None = None) -> tuple[str, str, str, str, str, str]:
+    normalized_event_id = str(event_id or row.get("event_id") or "").strip()
+    team_tri = str(row.get("team_tri") or "").strip().upper()
+    player_key = _normalize_player_key(row.get("player"))
+    stat_key = str(row.get("stat") or row.get("market") or "").strip().lower()
+    side_key = str(row.get("ev_side") or row.get("lean") or row.get("side") or "").strip().upper()
+    line_value = _safe_float(row.get("line_live") if row.get("line_live") is not None else row.get("line"))
+    line_key = "" if line_value is None else f"{line_value:.4f}"
+    return (normalized_event_id, team_tri, player_key, stat_key, side_key, line_key)
+
+
+def _price_is_usable(value: Any) -> bool:
+    price = _safe_float(value)
+    return price is not None and price != 0
+
+
 def _median(values: list[float]) -> float | None:
     cleaned = sorted(float(value) for value in values if value is not None)
     if not cleaned:
@@ -2166,6 +2182,16 @@ def _hydrate_live_player_lens_payload(
         and str(game.get("event_id") or "").strip()
         and isinstance(game.get("status"), dict)
     }
+    fallback_games_by_event = _resolve_games_for_event_ids(selected_date, event_ids)
+    fallback_rows_by_key: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
+    for fallback_event_id, fallback_game in fallback_games_by_event.items():
+        if not isinstance(fallback_game, dict):
+            continue
+        fallback_payload_game = _fallback_live_player_lens_game(fallback_game, event_id=fallback_event_id)
+        for fallback_row in fallback_payload_game.get("rows") if isinstance(fallback_payload_game.get("rows"), list) else []:
+            if not isinstance(fallback_row, dict):
+                continue
+            fallback_rows_by_key[_live_player_row_key(fallback_row, fallback_event_id)] = fallback_row
 
     hydrated_games: list[dict[str, Any]] = []
     for game in games:
@@ -2249,6 +2275,32 @@ def _hydrate_live_player_lens_payload(
                 hydrated_row.setdefault("quarter", status_period)
             if status_clock:
                 hydrated_row.setdefault("clock", status_clock)
+            fallback_row = fallback_rows_by_key.get(_live_player_row_key(hydrated_row, event_id))
+            if isinstance(fallback_row, dict):
+                fallback_price_over = _safe_float(fallback_row.get("price_over"))
+                fallback_price_under = _safe_float(fallback_row.get("price_under"))
+                fallback_price = _safe_float(fallback_row.get("price"))
+                repaired_price = False
+                if not _price_is_usable(hydrated_row.get("price_over")) and _price_is_usable(fallback_price_over):
+                    hydrated_row["price_over"] = fallback_price_over
+                    repaired_price = True
+                if not _price_is_usable(hydrated_row.get("price_under")) and _price_is_usable(fallback_price_under):
+                    hydrated_row["price_under"] = fallback_price_under
+                    repaired_price = True
+                if not _price_is_usable(hydrated_row.get("price")):
+                    side_value = str(hydrated_row.get("ev_side") or hydrated_row.get("lean") or "").strip().upper()
+                    selected_price = fallback_price_under if side_value == "UNDER" else fallback_price_over
+                    if not _price_is_usable(selected_price):
+                        selected_price = fallback_price
+                    if _price_is_usable(selected_price):
+                        hydrated_row["price"] = selected_price
+                        repaired_price = True
+                if repaired_price:
+                    fallback_book = str(fallback_row.get("book") or "").strip()
+                    if fallback_book and not str(hydrated_row.get("book") or "").strip():
+                        hydrated_row["book"] = fallback_book
+                    if str(hydrated_row.get("line_source") or "").strip().lower() == "live_lens_projection_artifact":
+                        hydrated_row["line_source"] = str(fallback_row.get("line_source") or "cards_fallback").strip() or "cards_fallback"
             rows.append(hydrated_row)
         hydrated_game["rows"] = rows
         hydrated_games.append(hydrated_game)
@@ -2491,6 +2543,7 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
                     "line_source": "cards_fallback",
                     "lean": side_value,
                     "ev_side": side_value,
+                    "book": str(pick.get("book") or "").strip() or None,
                     "price_over": price_over,
                     "price_under": price_under,
                     "price": selected_price,

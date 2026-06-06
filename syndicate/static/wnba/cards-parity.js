@@ -287,7 +287,7 @@
 
   function fmtAmerican(value) {
     const number = toFiniteNumber(value);
-    if (!Number.isFinite(number)) {
+    if (!Number.isFinite(number) || number === 0) {
       return '--';
     }
     return number > 0 ? `+${Math.round(number)}` : `${Math.round(number)}`;
@@ -1025,8 +1025,8 @@
     const pregameTotal = finiteFirst(pregamePrior?.pred_total_adjusted, pregamePrior?.pred_total, score.total_mean);
     const pregameMargin = finiteFirst(pregamePrior?.pred_margin_adjusted, pregamePrior?.pred_margin, score.margin_mean);
     const pregameHomeWin = finiteFirst(pregamePrior?.home_win_prob_adjusted, pregamePrior?.home_win_prob, betting.p_home_win);
-    const lineTotal = Number(liveLines?.lines?.total);
-    const homeSpread = Number(liveLines?.lines?.home_spread);
+    const lineTotal = finiteFirst(liveLines?.lines?.total, betting.total);
+    const homeSpread = finiteFirst(liveLines?.lines?.home_spread, betting.home_spread);
     const homeMl = Number(liveLines?.lines?.home_ml);
     const awayMl = Number(liveLines?.lines?.away_ml);
     const totalGate = Number(thresholds.adjustments?.game_total?.min_elapsed_min);
