@@ -1,0 +1,161 @@
+{
+  "ok": false,
+  "generated_at": "2026-06-05T15:25:00.363255+00:00",
+  "audit": {
+    "ok": true,
+    "parse_error": null,
+    "allowed_count": 4,
+    "actual_count": 6,
+    "unexpected_findings": [],
+    "missing_allowed_findings": []
+  },
+  "runtime_dependency": {
+    "ok": false,
+    "parse_error": null,
+    "allowed_count": 0,
+    "actual_count": 0,
+    "unexpected_findings": [],
+    "missing_allowed_findings": [],
+    "protected_contract_count": 7,
+    "protected_contract_violations": [],
+    "protected_mirror_asset_count": 5,
+    "protected_mirror_asset_violations": [],
+    "allowed_protected_mirror_asset_violation_count": 2,
+    "allowed_protected_mirror_asset_violations": [],
+    "unexpected_protected_mirror_asset_violations": [],
+    "protected_local_resolver_count": 15,
+    "protected_local_resolver_violations": [],
+    "protected_source_shell_count": 4,
+    "protected_source_shell_violations": [],
+    "lowest_ownership_modules": [
+      {
+        "slug": "nba",
+        "name": "NBA",
+        "ownership_score": 90,
+        "dependency_tier": "artifact_backed",
+        "fallback_surfaces": []
+      },
+      {
+        "slug": "ncaab",
+        "name": "NCAAB",
+        "ownership_score": 90,
+        "dependency_tier": "artifact_backed",
+        "fallback_surfaces": []
+      },
+      {
+        "slug": "ncaaf",
+        "name": "NCAAF",
+        "ownership_score": 90,
+        "dependency_tier": "artifact_backed",
+        "fallback_surfaces": []
+      }
+    ]
+  },
+  "advanced_readiness": {
+    "ok": false,
+    "selected_date": "2026-06-05",
+    "active_sport_count": 5,
+    "active_sports": [
+      {
+        "slug": "mlb",
+        "name": "MLB",
+        "state": "",
+        "advanced_ready": true,
+        "required_total": 2,
+        "exists_count": 2,
+        "tracked_count": 2
+      },
+      {
+        "slug": "nba",
+        "name": "NBA",
+        "state": "",
+        "advanced_ready": true,
+        "required_total": 3,
+        "exists_count": 3,
+        "tracked_count": 3
+      },
+      {
+        "slug": "nhl",
+        "name": "NHL",
+        "state": "",
+        "advanced_ready": false,
+        "required_total": 3,
+        "exists_count": 1,
+        "tracked_count": 0
+      },
+      {
+        "slug": "wnba",
+        "name": "WNBA",
+        "state": "",
+        "advanced_ready": true,
+        "required_total": 3,
+        "exists_count": 3,
+        "tracked_count": 3
+      },
+      {
+        "slug": "ncaab",
+        "name": "NCAAB",
+        "state": "",
+        "advanced_ready": false,
+        "required_total": 3,
+        "exists_count": 0,
+        "tracked_count": 0
+      }
+    ],
+    "violations": [
+      {
+        "slug": "nhl",
+        "issue": "missing_advanced_inputs",
+        "missing_labels": [
+          "Game recommendation layer",
+          "Props recommendation layer"
+        ]
+      },
+      {
+        "slug": "nhl",
+        "issue": "unpublished_advanced_inputs",
+        "missing_labels": [
+          "Odds and scoreboard context"
+        ]
+      },
+      {
+        "slug": "ncaab",
+        "issue": "missing_advanced_inputs",
+        "missing_labels": [
+          "Recommendations mirror",
+          "Live state mirror",
+          "Pace and live-line context"
+        ]
+      }
+    ]
+  },
+  "commands": [
+    {
+      "name": "audit",
+      "command": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+        "scripts/audit_migration.py",
+        "--format",
+        "json"
+      ],
+      "ok": true,
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_excerpt": "[\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/mlb.py\",\n    \"line\": 300,\n    \"summary\": \"Source shell route points at mlb/cards_source.js.\",\n    \"detail\": \"Use these routes as the primary client-parity audit surface.\"\n  },\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/nba.py\",\n    \"line\": 150,\n    \"summary\": \"Source shell route points at nba/cards_source.html.\",\n    \"detail\": \"Use these routes as the primary client-parity audit surface.\"\n  },\n  {\n    \"category\": \"source_shell_route\",\n    \"path\": \"syndicate/blueprints/nba.py\",\n    ...",
+      "stderr_excerpt": ""
+    },
+    {
+      "name": "module_tracker",
+      "command": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Programs\\Python\\Python311-arm64\\python.exe",
+        "scripts/module_tracker_snapshot.py",
+        "--json"
+      ],
+      "ok": true,
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_excerpt": "{\n  \"generated_at\": \"2026-06-05T15:24:31.263065+00:00\",\n  \"reference_module\": \"mlb\",\n  \"reference_surfaces\": [\n    \"cards\",\n    \"game\",\n    \"live-lens\",\n    \"daily archive\",\n    \"season betting-card\",\n    \"hub\"\n  ],\n  \"modules\": [\n    {\n      \"slug\": \"mlb\",\n      \"name\": \"MLB\",\n      \"status\": \"Phase-1 complete\",\n      \"phase\": \"Reference module\",\n      \"summary\": \"Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked ML...",
+      "stderr_excerpt": ""
+    }
+  ]
+}

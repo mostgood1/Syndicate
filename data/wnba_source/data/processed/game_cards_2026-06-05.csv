@@ -1,3 +1,3 @@
 date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
-2026-06-05,1,Portland Fire,Phoenix Mercury,2026-06-06T02:06:43Z,138.97116960853032,-138.97116960853026,2.5,-2.5,143.5,oddsapi_consensus,POR,PHX
-2026-06-05,2,Los Angeles Sparks,Dallas Wings,2026-06-06T02:06:04Z,-100.59590091279983,100.59590091279979,-1.5,1.5,203.5,oddsapi_consensus,LAS,DAL
+2026-06-05,1,Los Angeles Sparks,Dallas Wings,2026-06-06T02:06:04Z,,,,,,oddsapi_consensus,LAS,DAL
+2026-06-05,2,Portland Fire,Phoenix Mercury,2026-06-06T02:06:43Z,,,,,,oddsapi_consensus,POR,PHX

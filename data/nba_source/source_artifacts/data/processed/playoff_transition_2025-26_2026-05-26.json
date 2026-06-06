@@ -1,0 +1,113 @@
+{
+  "season": "2025-26",
+  "regular_season_start": "2025-10-21",
+  "regular_season_end": "2026-04-12",
+  "regular_season_days": 174,
+  "games_trained": 1225,
+  "props_feature_rows": 26651,
+  "props_models": [
+    "t_ast",
+    "t_blk",
+    "t_dreb",
+    "t_fg_pct",
+    "t_fga",
+    "t_fgm",
+    "t_ft_pct",
+    "t_fta",
+    "t_ftm",
+    "t_oreb",
+    "t_pa",
+    "t_pf",
+    "t_plus_minus",
+    "t_pr",
+    "t_pra",
+    "t_pts",
+    "t_ra",
+    "t_reb",
+    "t_stl",
+    "t_stocks",
+    "t_threes",
+    "t_tov"
+  ],
+  "game_metrics": {
+    "features_used": 56,
+    "games_trained": 1225,
+    "win_logloss_cv_mean": 0.6423332603714744,
+    "margin_rmse_cv_mean": 15.271033063331581,
+    "total_rmse_cv_mean": 20.756094830721242,
+    "best_C": 0.05,
+    "best_alpha_margin": 10.0,
+    "best_alpha_total": 10.0,
+    "halves_models": 0,
+    "quarters_models": 0,
+    "sample_weight_min": 0.35
+  },
+  "game_probability_calibration": {
+    "command": [
+      "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\tools\\calibrate_games_probability.py",
+      "--days",
+      "174",
+      "--end",
+      "2026-04-12"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"ok\": true,\n  \"bins_csv\": \"C:\\\\Users\\\\mostg\\\\OneDrive\\\\Coding\\\\NBA-Betting\\\\data\\\\processed\\\\reliability_games_174.csv\",\n  \"json\": \"C:\\\\Users\\\\mostg\\\\OneDrive\\\\Coding\\\\NBA-Betting\\\\data\\\\processed\\\\games_prob_calibration_174.json\",\n  \"bins_csv_default\": \"C:\\\\Users\\\\mostg\\\\OneDrive\\\\Coding\\\\NBA-Betting\\\\data\\\\processed\\\\reliability_games.csv\",\n  \"json_default\": \"C:\\\\Users\\\\mostg\\\\OneDrive\\\\Coding\\\\NBA-Betting\\\\data\\\\processed\\\\games_prob_calibration.json\"\n}",
+    "stderr": ""
+  },
+  "game_market_blend": {
+    "command": [
+      "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\tools\\games_blend.py",
+      "--train-days",
+      "174",
+      "--end",
+      "2026-04-12"
+    ],
+    "returncode": 0,
+    "stdout": "OK:alpha=0.0",
+    "stderr": ""
+  },
+  "props_probability_calibration": {
+    "command": [
+      "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\tools\\calibrate_props_probability_by_stat.py",
+      "--days",
+      "174",
+      "--end",
+      "2026-04-12"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"ok\": true,\n  \"out\": \"C:\\\\Users\\\\mostg\\\\OneDrive\\\\Coding\\\\NBA-Betting\\\\data\\\\processed\\\\props_prob_calibration_by_stat.json\",\n  \"per_stat\": [\n    \"ast\",\n    \"pa\",\n    \"pr\",\n    \"pra\",\n    \"pts\",\n    \"ra\",\n    \"reb\",\n    \"threes\"\n  ]\n}",
+    "stderr": ""
+  },
+  "props_calibration_alpha_sweep": {
+    "command": [
+      "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\tools\\sweep_props_prob_calib_alpha.py",
+      "--days",
+      "174",
+      "--end",
+      "2026-04-12"
+    ],
+    "returncode": 0,
+    "stdout": "rows=191635 window_days=174 end=2026-04-12 step=0.05\nraw:  logloss=1.000097 brier=0.332319\ncal1: logloss=0.769051 brier=0.283117\nbest_alpha(identity_vs_curve)=1.000 best_logloss=0.769051",
+    "stderr": ""
+  },
+  "live_lens_retune": {
+    "command": [
+      "C:\\Users\\mostg\\OneDrive\\Coding\\Syndicate\\.venv\\Scripts\\python.exe",
+      "C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\tools\\daily_live_lens_tune.py",
+      "--end",
+      "2026-04-12",
+      "--lookback-days",
+      "174",
+      "--props-lookback-days",
+      "174",
+      "--write-override"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"ok\": true,\n  \"window\": {\n    \"start\": \"2025-10-21\",\n    \"end\": \"2026-04-12\"\n  },\n  \"present_signal_days\": [\n    \"2025-11-10\",\n    \"2026-02-08\",\n    \"2026-02-09\",\n    \"2026-02-10\",\n    \"2026-02-11\",\n    \"2026-02-12\",\n    \"2026-02-19\",\n    \"2026-02-20\",\n    \"2026-02-21\",\n    \"2026-02-22\",\n    \"2026-02-23\",\n    \"2026-02-25\",\n    \"2026-02-26\",\n    \"2026-02-27\",\n    \"2026-03-01\",\n    \"2026-03-03\",\n    \"2026-03-04\",\n    \"2026-03-05\",\n    \"2026-03-06\",\n    \"2026-03-07\",\n    \"2026-03-08\",\n    \"2026-03-09\",\n    \"2026-03-10\",\n    \"2026-03-11\",\n    \"2026-03-12\",\n    \"2026-03-13\",\n    \"2026-03-14\",\n    \"2026-03-15\",\n    \"2026-03-16\",\n    \"2026-03-17\",\n    \"2026-03-18\",\n    \"2026-03-19\",\n    \"2026-03-20\",\n    \"2026-03-21\",\n    \"2026-03-22\",\n    \"2026-03-23\",\n    \"2026-03-24\",\n    \"2026-03-25\",\n    \"2026-03-26\",\n    \"2026-03-27\",\n    \"2026-03-28\",\n    \"2026-03-29\",\n    \"2026-03-30\",\n    \"2026-03-31\",\n    \"2026-04-01\",\n    \"2026-04-02\",\n    \"2026-04-03\",\n    \"2026-04-04\"\n  ],\n  \"missing_signal_days\": [\n    \"2025-10-21\",\n    \"2025-10-22\",\n    \"2025-10-23\",\n    \"2025-10-24\",\n    \"2025-10-25\",\n    \"2025-10-26\",\n    \"2025-10-27\",\n    \"2025-10-28\",\n    \"2025-10-29\",\n    \"2025-10-30\",\n    \"2025-10-31\",\n    \"2025-11-01\",\n    \"2025-11-02\",\n    \"2025-11-03\",\n    \"2025-11-04\",\n    \"2025-11-05\",\n    \"2025-11-06\",\n    \"2025-11-07\",\n    \"2025-11-08\",\n    \"2025-11-09\",\n    \"2025-11-11\",\n    \"2025-11-12\",\n    \"2025-11-13\",\n    \"2025-11-14\",\n    \"2025-11-15\",\n    \"2025-11-16\",\n    \"2025-11-17\",\n    \"2025-11-18\",\n    \"2025-11-19\",\n    \"2025-11-20\",\n    \"2025-11-21\",\n    \"2025-11-22\",\n    \"2025-11-23\",\n    \"2025-11-24\",\n    \"2025-11-25\",\n    \"2025-11-26\",\n    \"2025-11-27\",\n    \"2025-11-28\",\n    \"2025-11-29\",\n    \"2025-11-30\",\n    \"2025-12-01\",\n    \"2025-12-02\",\n    \"2025-12-03\",\n    \"2025-12-04\",\n    \"2025-12-05\",\n    \"2025-12-06\",\n    \"2025-12-07\",\n    \"2025-12-08\",\n    \"2025-12-09\",\n    \"2025-12-10\",\n    \"2025-12-11\",\n    \"2025-12-12\",\n    \"2025-12-13\",\n    \"2025-12-14\",\n    \"2025-12-15\",\n    \"2025-12-16\",\n    \"2025-12-17\",\n    \"2025-12-18\",\n    \"2025-12-19\",\n    \"2025-12-20\",\n    \"2025-12-21\",\n    \"2025-12-22\",\n    \"2025-12-23\",\n    \"2025-12-24\",\n    \"2025-12-25\",\n    \"2025-12-26\",\n    \"2025-12-27\",\n    \"2025-12-28\",\n    \"2025-12-29\",\n    \"2025-12-30\",\n    \"2025-12-31\",\n    \"2026-01-01\",\n    \"2026-01-02\",\n    \"2026-01-03\",\n    \"2026-01-04\",\n    \"2026-01-05\",\n    \"2026-01-06\",\n    \"2026-01-07\",\n    \"2026-01-08\",\n    \"2026-01-09\",\n    \"2026-01-10\",\n    \"2026-01-11\",\n    \"2026-01-12\",\n    \"2026-01-13\",\n    \"2026-01-14\",\n    \"2026-01-15\",\n    \"2026-01-16\",\n    \"2026-01-17\",\n    \"2026-01-18\",\n    \"2026-01-19\",\n    \"2026-01-20\",\n    \"2026-01-21\",\n    \"2026-01-22\",\n    \"2026-01-23\",\n    \"2026-01-24\",\n    \"2026-01-25\",\n    \"2026-01-26\",\n    \"2026-01-27\",\n    \"2026-01-28\",\n    \"2026-01-29\",\n    \"2026-01-30\",\n    \"2026-01-31\",\n    \"2026-02-01\",\n    \"2026-02-02\",\n    \"2026-02-03\",\n    \"2026-02-04\",\n    \"2026-02-05\",\n    \"2026-02-06\",\n    \"2026-02-07\",\n    \"2026-02-13\",\n    \"2026-02-14\",\n    \"2026-02-15\",\n    \"2026-02-16\",\n    \"2026-02-17\",\n    \"2026-02-18\",\n    \"2026-02-24\",\n    \"2026-02-28\",\n    \"2026-03-02\",\n    \"2026-04-05\",\n    \"2026-04-06\",\n    \"2026-04-07\",\n    \"2026-04-08\",\n    \"2026-04-09\",\n    \"2026-04-10\",\n    \"2026-04-11\",\n    \"2026-04-12\"\n  ],\n  \"base_logged\": {\n    \"bets\": 242,\n    \"win\": 141,\n    \"loss\": 98,\n    \"push\": 3,\n    \"profit\": 30.181818181818176,\n    \"roi_per_bet\": 0.12471825694966189\n  },\n  \"dropped_missing_fields\": 2378,\n  \"dropped_bad_line\": 12,\n  \"dropped_no_actual\": 2,\n  \"assumptions\": {\n    \"juice\": 110.0,\n    \"bet_threshold\": 6.0,\n    \"min_bets\": 25,\n    \"focus_endgame\": false,\n    \"note\": \"This simulates which bets would have fired from logged snapshots (WATCH+BET), and counts at most one bet per game (earliest qualifying snapshot) to avoid overcounting repeated logs.\"\n  },\n  \"best\": {\n    \"params\": {\n      \"pace_weight\": 0.25,\n      \"eff_weight\": 0.25,\n      \"pace_cap_points\": 3.0,\n      \"eff_cap_points\": 6.0,\n      \"min_elapsed_min\": 0.0,\n      \"endgame_min_sec_left\": 180.0,\n      \"endgame_min_abs_margin\": 1.0,\n      \"endgame_max_abs_margin\": 12.0,\n      \"endgame_max_abs_points\": 6.0,\n      \"endgame_points_at_full_intensity\": 6.0,\n      \"endgame_under_edge_reversion_frac\": 0.5,\n      \"endgame_under_edge_reversion_cap_points\": 4.0\n    },\n    \"bets\": 251,\n    \"win\": 149,\n    \"loss\": 101,\n    \"push\": 1,\n    \"profit\": 34.45454545454545,\n    \"roi_per_bet\": 0.13726910539659543\n  },\n  \"generated_at\": \"2026-05-26T18:06:18Z\"\n}\nWrote: C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\data\\processed\\live_lens_adjustments_optimized_2025-10-21_2026-04-12.json\nWrote override: C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\data\\processed\\live_lens_tuning_override.json\nBest (raw strength): {'metric': 'strength', 'watch': 1.5, 'bet': 2.5, 'bets': 134143, 'wins': 88829, 'losses': 43807, 'pushes': 1507, 'profit_u': 95720.6792, 'roi_u_per_bet': 0.7136, 'win_rate': 0.6697, 'stat_scope': 'ALL'}\nBest (sigma ALL): {'metric': 'strength_sigma', 'watch': 0.45, 'bet': 1.3, 'bets': 33097, 'wins': 23159, 'losses': 9554, 'pushes': 384, 'profit_u': 27930.7907, 'roi_u_per_bet': 0.8439, 'win_rate': 0.7079, 'stat_scope': 'ALL'}\nBest (sigma per-stat): {'ast': {'watch': 0.45, 'bet': 1.0}, 'blk': {'watch': 0.45, 'bet': 0.7}, 'pra': {'watch': 0.45, 'bet': 1.3}, 'pts': {'watch': 0.45, 'bet': 1.3}, 'reb': {'watch': 0.45, 'bet': 1.0}, 'stl': {'watch': 0.45, 'bet': 0.7}, 'threes': {'watch': 0.45, 'bet': 1.3}}\nWrote: C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\data\\processed\\live_lens_player_prop_thresholds_2025-10-21_2026-04-12.csv\nWrote override: C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\data\\processed\\live_lens_tuning_override.json\nWrote: C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\data\\processed\\live_lens_player_prop_bettability_2025-10-21_2026-04-12.csv rows=29733\nBest bettability threshold:\n{\n  \"bets\": 27068,\n  \"losses\": 9997,\n  \"min_score\": 0.55,\n  \"profit_u\": 4905.8761,\n  \"pushes\": 445,\n  \"roi_u_per_bet\": 0.1812,\n  \"win_rate\": 0.6245,\n  \"wins\": 16626\n}\nMerged into override: C:\\Users\\mostg\\OneDrive\\Coding\\NBA-Betting\\data\\processed\\live_lens_tuning_override.json\nLive Lens daily tune: totals=2025-10-21..2026-04-12 props=2025-10-21..2026-04-12 write_override=True",
+    "stderr": ""
+  }
+}

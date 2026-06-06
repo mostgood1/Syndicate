@@ -1,0 +1,601 @@
+{
+  "counts": {
+    "games": 1,
+    "markets": 2
+  },
+  "date": "2026-05-26",
+  "meta": {
+    "inputs": {
+      "props_recommendations": "props_recommendations_2026-05-26.csv",
+      "smart_sim_files": 1
+    },
+    "policy": {
+      "allowed_markets": [
+        "pa",
+        "ra"
+      ],
+      "combo_weights": null,
+      "dedupe_player": true,
+      "max_per_player": 1,
+      "max_plus_odds": 125,
+      "min_ev": null,
+      "min_prob": null,
+      "n_game": 3,
+      "n_market": 4,
+      "p_shrink": 1.0,
+      "rank": "sim_ev",
+      "sim_model": "smart_sim_normal_approx",
+      "version": "slate_prob_v2",
+      "view": "slate"
+    }
+  },
+  "per_game": [
+    {
+      "away": "SAS",
+      "game_id": "2026-05-26:SAS@OKC",
+      "game_key": "2026-05-26:SAS@OKC",
+      "home": "OKC",
+      "matchup": "SAS @ OKC",
+      "picks": [
+        {
+          "away": "SAS",
+          "basketball_priority_score": 88.0,
+          "basketball_reasons": [
+            "Recent form is already clearing this number with a last-five average of 16.6.",
+            "The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+            "The last game landed at 19.0, which is already above this line.",
+            "He has averaged 14.8 points + assists in 5 recent games against OKC.",
+            "On the road, he is averaging 14.0 points + assists over his last 42 games in that split."
+          ],
+          "basketball_summary": "Recent form is already clearing this number with a last-five average of 16.6. The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+          "book": "bovada",
+          "display_pick": "Keldon Johnson Over 7.5 PA",
+          "ev": 1.0836802127623981,
+          "ev_pct": 108.37,
+          "game_id": null,
+          "game_key": "2026-05-26:SAS@OKC",
+          "home": "OKC",
+          "implied_prob": 0.4762,
+          "line": 7.5,
+          "market": "pa",
+          "market_reasons": [
+            "Projected value is +108.4% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 51.4 points."
+          ],
+          "matchup": "San Antonio Spurs @ Oklahoma City Thunder",
+          "model_baseline": 17.84,
+          "model_reasons": [
+            "The model baseline sits at 17.8 against a 7.5 line.",
+            "That leaves roughly +2.42 standard deviations of cushion.",
+            "Win probability grades at 99.0%."
+          ],
+          "model_sd": 4.273643059498536,
+          "p_win": 0.99,
+          "player": "Keldon Johnson",
+          "price": 110.0,
+          "prob_edge": 0.5138,
+          "reasons": [
+            "Recent form is already clearing this number with a last-five average of 16.6.",
+            "The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+            "The last game landed at 19.0, which is already above this line.",
+            "He has averaged 14.8 points + assists in 5 recent games against OKC.",
+            "On the road, he is averaging 14.0 points + assists over his last 42 games in that split.",
+            "The model baseline sits at 17.8 against a 7.5 line.",
+            "That leaves roughly +2.42 standard deviations of cushion.",
+            "Win probability grades at 99.0%.",
+            "Projected value is +108.4% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 51.4 points."
+          ],
+          "recommendation_priority_score": 91.6,
+          "score": 1.0836802127623981,
+          "sd_rel": 0.5698190745998047,
+          "selection": "OVER",
+          "side": "OVER",
+          "sim_mean": 17.84,
+          "sim_reasons": [
+            "The model baseline sits at 17.8 against a 7.5 line.",
+            "That leaves roughly +2.42 standard deviations of cushion.",
+            "Win probability grades at 99.0%."
+          ],
+          "sim_sd": 4.273643059498536,
+          "sim_support_score": 100.0,
+          "team": "SAS",
+          "top_play_reasons": [
+            "Recent form is already clearing this number with a last-five average of 16.6.",
+            "The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+            "The last game landed at 19.0, which is already above this line.",
+            "He has averaged 14.8 points + assists in 5 recent games against OKC.",
+            "On the road, he is averaging 14.0 points + assists over his last 42 games in that split.",
+            "The model baseline sits at 17.8 against a 7.5 line.",
+            "That leaves roughly +2.42 standard deviations of cushion.",
+            "Win probability grades at 99.0%.",
+            "Projected value is +108.4% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 51.4 points."
+          ],
+          "value_reasons": [
+            "Projected value is +108.4% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 51.4 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.9922286727439991,
+          "win_prob_raw": 0.9922286727439991,
+          "z": 2.4194814251083674
+        },
+        {
+          "away": "SAS",
+          "basketball_priority_score": 94.0,
+          "basketball_reasons": [
+            "Recent form is already clearing this number with a last-five average of 16.8.",
+            "The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+            "The last game landed at 20.0, which is already above this line.",
+            "The minute load looks stable around 32.0.",
+            "Projected minutes (32.0) sit above his last-10 workload (30.0), which strengthens the volume path.",
+            "This is a cleaner rest spot without a back-to-back tax."
+          ],
+          "basketball_summary": "Recent form is already clearing this number with a last-five average of 16.8. The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+          "book": "bovada",
+          "display_pick": "Stephon Castle Over 12.5 RA",
+          "ev": 1.0012125210889318,
+          "ev_pct": 100.12,
+          "game_id": null,
+          "game_key": "2026-05-26:SAS@OKC",
+          "home": "OKC",
+          "implied_prob": 0.4762,
+          "line": 12.5,
+          "market": "ra",
+          "market_reasons": [
+            "Projected value is +100.1% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 47.7 points."
+          ],
+          "matchup": "San Antonio Spurs @ Oklahoma City Thunder",
+          "model_baseline": 17.78,
+          "model_reasons": [
+            "The model baseline sits at 17.8 against a 12.5 line.",
+            "That leaves roughly +1.67 standard deviations of cushion.",
+            "Win probability grades at 95.3%."
+          ],
+          "model_sd": 3.153668498748719,
+          "p_win": 0.953,
+          "player": "Stephon Castle",
+          "price": 110.0,
+          "prob_edge": 0.4768,
+          "reasons": [
+            "Recent form is already clearing this number with a last-five average of 16.8.",
+            "The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+            "The last game landed at 20.0, which is already above this line.",
+            "The minute load looks stable around 32.0.",
+            "Projected minutes (32.0) sit above his last-10 workload (30.0), which strengthens the volume path.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 17.8 against a 12.5 line.",
+            "That leaves roughly +1.67 standard deviations of cushion.",
+            "Win probability grades at 95.3%.",
+            "Projected value is +100.1% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 47.7 points."
+          ],
+          "recommendation_priority_score": 94.3,
+          "score": 1.0012125210889318,
+          "sd_rel": 0.25229347989989753,
+          "selection": "OVER",
+          "side": "OVER",
+          "sim_mean": 17.78,
+          "sim_reasons": [
+            "The model baseline sits at 17.8 against a 12.5 line.",
+            "That leaves roughly +1.67 standard deviations of cushion.",
+            "Win probability grades at 95.3%."
+          ],
+          "sim_sd": 3.153668498748719,
+          "sim_support_score": 100.0,
+          "team": "SAS",
+          "top_play_reasons": [
+            "Recent form is already clearing this number with a last-five average of 16.8.",
+            "The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+            "The last game landed at 20.0, which is already above this line.",
+            "The minute load looks stable around 32.0.",
+            "Projected minutes (32.0) sit above his last-10 workload (30.0), which strengthens the volume path.",
+            "This is a cleaner rest spot without a back-to-back tax.",
+            "The model baseline sits at 17.8 against a 12.5 line.",
+            "That leaves roughly +1.67 standard deviations of cushion.",
+            "Win probability grades at 95.3%.",
+            "Projected value is +100.1% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 47.7 points."
+          ],
+          "value_reasons": [
+            "Projected value is +100.1% per unit risked.",
+            "The price stays workable at +110.",
+            "Model probability clears the market by 47.7 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.9529583433756819,
+          "win_prob_raw": 0.9529583433756819,
+          "z": 1.674240650878476
+        },
+        {
+          "away": "SAS",
+          "basketball_priority_score": 100.0,
+          "basketball_reasons": [
+            "Recent form has stayed below this line with a last-five average of 6.0.",
+            "The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+            "The last game landed at 2.0, which stayed under this line.",
+            "Projected minutes sit in a softer band around 13.9.",
+            "Projected minutes (13.9) are lighter than his last-10 workload (15.8), which leans under.",
+            "At home, he is averaging only 8.9 points + assists over his last 29 games in that split.",
+            "A healthy OKC rotation keeps touches spread out across the lineup.",
+            "The back-to-back spot adds efficiency and minute downside."
+          ],
+          "basketball_summary": "Recent form has stayed below this line with a last-five average of 6.0. The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+          "book": "fanduel",
+          "display_pick": "Alex Caruso Under 10.5 PA",
+          "ev": 0.9998856694731848,
+          "ev_pct": 99.99,
+          "game_id": null,
+          "game_key": "2026-05-26:SAS@OKC",
+          "home": "OKC",
+          "implied_prob": 0.5,
+          "line": 10.5,
+          "market": "pa",
+          "market_reasons": [
+            "Projected value is +100.0% per unit risked.",
+            "The price stays workable at +100.",
+            "Model probability clears the market by 49.0 points."
+          ],
+          "matchup": "San Antonio Spurs @ Oklahoma City Thunder",
+          "model_baseline": 5.0440000000000005,
+          "model_reasons": [
+            "The model baseline sits at 5.0 against a 10.5 line.",
+            "That leaves roughly +3.86 standard deviations of cushion.",
+            "Win probability grades at 99.0%."
+          ],
+          "model_sd": 1.4142135623730951,
+          "p_win": 0.99,
+          "player": "Alex Caruso",
+          "price": 100.0,
+          "prob_edge": 0.49,
+          "reasons": [
+            "Recent form has stayed below this line with a last-five average of 6.0.",
+            "The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+            "The last game landed at 2.0, which stayed under this line.",
+            "Projected minutes sit in a softer band around 13.9.",
+            "Projected minutes (13.9) are lighter than his last-10 workload (15.8), which leans under.",
+            "At home, he is averaging only 8.9 points + assists over his last 29 games in that split.",
+            "A healthy OKC rotation keeps touches spread out across the lineup.",
+            "The back-to-back spot adds efficiency and minute downside.",
+            "The model baseline sits at 5.0 against a 10.5 line.",
+            "That leaves roughly +3.86 standard deviations of cushion.",
+            "Win probability grades at 99.0%.",
+            "Projected value is +100.0% per unit risked.",
+            "The price stays workable at +100.",
+            "Model probability clears the market by 49.0 points."
+          ],
+          "recommendation_priority_score": 97.0,
+          "score": 0.9998856694731848,
+          "sd_rel": 0.13468700594029479,
+          "selection": "UNDER",
+          "side": "UNDER",
+          "sim_mean": 5.0440000000000005,
+          "sim_reasons": [
+            "The model baseline sits at 5.0 against a 10.5 line.",
+            "That leaves roughly +3.86 standard deviations of cushion.",
+            "Win probability grades at 99.0%."
+          ],
+          "sim_sd": 1.4142135623730951,
+          "sim_support_score": 100.0,
+          "team": "OKC",
+          "top_play_reasons": [
+            "Recent form has stayed below this line with a last-five average of 6.0.",
+            "The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+            "The last game landed at 2.0, which stayed under this line.",
+            "Projected minutes sit in a softer band around 13.9.",
+            "Projected minutes (13.9) are lighter than his last-10 workload (15.8), which leans under.",
+            "At home, he is averaging only 8.9 points + assists over his last 29 games in that split.",
+            "A healthy OKC rotation keeps touches spread out across the lineup.",
+            "The back-to-back spot adds efficiency and minute downside.",
+            "The model baseline sits at 5.0 against a 10.5 line.",
+            "That leaves roughly +3.86 standard deviations of cushion.",
+            "Win probability grades at 99.0%.",
+            "Projected value is +100.0% per unit risked.",
+            "The price stays workable at +100.",
+            "Model probability clears the market by 49.0 points."
+          ],
+          "value_reasons": [
+            "Projected value is +100.0% per unit risked.",
+            "The price stays workable at +100.",
+            "Model probability clears the market by 49.0 points."
+          ],
+          "value_support_score": 85.0,
+          "win_prob": 0.9999428347365924,
+          "win_prob_raw": 0.9999428347365924,
+          "z": 3.8579745981538025
+        }
+      ]
+    }
+  ],
+  "per_market": {
+    "pa": [
+      {
+        "away": "SAS",
+        "basketball_priority_score": 88.0,
+        "basketball_reasons": [
+          "Recent form is already clearing this number with a last-five average of 16.6.",
+          "The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+          "The last game landed at 19.0, which is already above this line.",
+          "He has averaged 14.8 points + assists in 5 recent games against OKC.",
+          "On the road, he is averaging 14.0 points + assists over his last 42 games in that split."
+        ],
+        "basketball_summary": "Recent form is already clearing this number with a last-five average of 16.6. The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+        "book": "bovada",
+        "display_pick": "Keldon Johnson Over 7.5 PA",
+        "ev": 1.0836802127623981,
+        "ev_pct": 108.37,
+        "game_id": null,
+        "game_key": "2026-05-26:SAS@OKC",
+        "home": "OKC",
+        "implied_prob": 0.4762,
+        "line": 7.5,
+        "market": "pa",
+        "market_reasons": [
+          "Projected value is +108.4% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 51.4 points."
+        ],
+        "matchup": "San Antonio Spurs @ Oklahoma City Thunder",
+        "model_baseline": 17.84,
+        "model_reasons": [
+          "The model baseline sits at 17.8 against a 7.5 line.",
+          "That leaves roughly +2.42 standard deviations of cushion.",
+          "Win probability grades at 99.0%."
+        ],
+        "model_sd": 4.273643059498536,
+        "p_win": 0.99,
+        "player": "Keldon Johnson",
+        "price": 110.0,
+        "prob_edge": 0.5138,
+        "reasons": [
+          "Recent form is already clearing this number with a last-five average of 16.6.",
+          "The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+          "The last game landed at 19.0, which is already above this line.",
+          "He has averaged 14.8 points + assists in 5 recent games against OKC.",
+          "On the road, he is averaging 14.0 points + assists over his last 42 games in that split.",
+          "The model baseline sits at 17.8 against a 7.5 line.",
+          "That leaves roughly +2.42 standard deviations of cushion.",
+          "Win probability grades at 99.0%.",
+          "Projected value is +108.4% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 51.4 points."
+        ],
+        "recommendation_priority_score": 91.6,
+        "score": 1.0836802127623981,
+        "sd_rel": 0.5698190745998047,
+        "selection": "OVER",
+        "side": "OVER",
+        "sim_mean": 17.84,
+        "sim_reasons": [
+          "The model baseline sits at 17.8 against a 7.5 line.",
+          "That leaves roughly +2.42 standard deviations of cushion.",
+          "Win probability grades at 99.0%."
+        ],
+        "sim_sd": 4.273643059498536,
+        "sim_support_score": 100.0,
+        "team": "SAS",
+        "top_play_reasons": [
+          "Recent form is already clearing this number with a last-five average of 16.6.",
+          "The last-10 sample is still above this number at 16.4, so the over is not just riding a short heater.",
+          "The last game landed at 19.0, which is already above this line.",
+          "He has averaged 14.8 points + assists in 5 recent games against OKC.",
+          "On the road, he is averaging 14.0 points + assists over his last 42 games in that split.",
+          "The model baseline sits at 17.8 against a 7.5 line.",
+          "That leaves roughly +2.42 standard deviations of cushion.",
+          "Win probability grades at 99.0%.",
+          "Projected value is +108.4% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 51.4 points."
+        ],
+        "value_reasons": [
+          "Projected value is +108.4% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 51.4 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.9922286727439991,
+        "win_prob_raw": 0.9922286727439991,
+        "z": 2.4194814251083674
+      },
+      {
+        "away": "SAS",
+        "basketball_priority_score": 100.0,
+        "basketball_reasons": [
+          "Recent form has stayed below this line with a last-five average of 6.0.",
+          "The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+          "The last game landed at 2.0, which stayed under this line.",
+          "Projected minutes sit in a softer band around 13.9.",
+          "Projected minutes (13.9) are lighter than his last-10 workload (15.8), which leans under.",
+          "At home, he is averaging only 8.9 points + assists over his last 29 games in that split.",
+          "A healthy OKC rotation keeps touches spread out across the lineup.",
+          "The back-to-back spot adds efficiency and minute downside."
+        ],
+        "basketball_summary": "Recent form has stayed below this line with a last-five average of 6.0. The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+        "book": "fanduel",
+        "display_pick": "Alex Caruso Under 10.5 PA",
+        "ev": 0.9998856694731848,
+        "ev_pct": 99.99,
+        "game_id": null,
+        "game_key": "2026-05-26:SAS@OKC",
+        "home": "OKC",
+        "implied_prob": 0.5,
+        "line": 10.5,
+        "market": "pa",
+        "market_reasons": [
+          "Projected value is +100.0% per unit risked.",
+          "The price stays workable at +100.",
+          "Model probability clears the market by 49.0 points."
+        ],
+        "matchup": "San Antonio Spurs @ Oklahoma City Thunder",
+        "model_baseline": 5.0440000000000005,
+        "model_reasons": [
+          "The model baseline sits at 5.0 against a 10.5 line.",
+          "That leaves roughly +3.86 standard deviations of cushion.",
+          "Win probability grades at 99.0%."
+        ],
+        "model_sd": 1.4142135623730951,
+        "p_win": 0.99,
+        "player": "Alex Caruso",
+        "price": 100.0,
+        "prob_edge": 0.49,
+        "reasons": [
+          "Recent form has stayed below this line with a last-five average of 6.0.",
+          "The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+          "The last game landed at 2.0, which stayed under this line.",
+          "Projected minutes sit in a softer band around 13.9.",
+          "Projected minutes (13.9) are lighter than his last-10 workload (15.8), which leans under.",
+          "At home, he is averaging only 8.9 points + assists over his last 29 games in that split.",
+          "A healthy OKC rotation keeps touches spread out across the lineup.",
+          "The back-to-back spot adds efficiency and minute downside.",
+          "The model baseline sits at 5.0 against a 10.5 line.",
+          "That leaves roughly +3.86 standard deviations of cushion.",
+          "Win probability grades at 99.0%.",
+          "Projected value is +100.0% per unit risked.",
+          "The price stays workable at +100.",
+          "Model probability clears the market by 49.0 points."
+        ],
+        "recommendation_priority_score": 97.0,
+        "score": 0.9998856694731848,
+        "sd_rel": 0.13468700594029479,
+        "selection": "UNDER",
+        "side": "UNDER",
+        "sim_mean": 5.0440000000000005,
+        "sim_reasons": [
+          "The model baseline sits at 5.0 against a 10.5 line.",
+          "That leaves roughly +3.86 standard deviations of cushion.",
+          "Win probability grades at 99.0%."
+        ],
+        "sim_sd": 1.4142135623730951,
+        "sim_support_score": 100.0,
+        "team": "OKC",
+        "top_play_reasons": [
+          "Recent form has stayed below this line with a last-five average of 6.0.",
+          "The last-10 sample is holding under this line at 6.5, which supports the lower-volume case.",
+          "The last game landed at 2.0, which stayed under this line.",
+          "Projected minutes sit in a softer band around 13.9.",
+          "Projected minutes (13.9) are lighter than his last-10 workload (15.8), which leans under.",
+          "At home, he is averaging only 8.9 points + assists over his last 29 games in that split.",
+          "A healthy OKC rotation keeps touches spread out across the lineup.",
+          "The back-to-back spot adds efficiency and minute downside.",
+          "The model baseline sits at 5.0 against a 10.5 line.",
+          "That leaves roughly +3.86 standard deviations of cushion.",
+          "Win probability grades at 99.0%.",
+          "Projected value is +100.0% per unit risked.",
+          "The price stays workable at +100.",
+          "Model probability clears the market by 49.0 points."
+        ],
+        "value_reasons": [
+          "Projected value is +100.0% per unit risked.",
+          "The price stays workable at +100.",
+          "Model probability clears the market by 49.0 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.9999428347365924,
+        "win_prob_raw": 0.9999428347365924,
+        "z": 3.8579745981538025
+      }
+    ],
+    "ra": [
+      {
+        "away": "SAS",
+        "basketball_priority_score": 94.0,
+        "basketball_reasons": [
+          "Recent form is already clearing this number with a last-five average of 16.8.",
+          "The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+          "The last game landed at 20.0, which is already above this line.",
+          "The minute load looks stable around 32.0.",
+          "Projected minutes (32.0) sit above his last-10 workload (30.0), which strengthens the volume path.",
+          "This is a cleaner rest spot without a back-to-back tax."
+        ],
+        "basketball_summary": "Recent form is already clearing this number with a last-five average of 16.8. The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+        "book": "bovada",
+        "display_pick": "Stephon Castle Over 12.5 RA",
+        "ev": 1.0012125210889318,
+        "ev_pct": 100.12,
+        "game_id": null,
+        "game_key": "2026-05-26:SAS@OKC",
+        "home": "OKC",
+        "implied_prob": 0.4762,
+        "line": 12.5,
+        "market": "ra",
+        "market_reasons": [
+          "Projected value is +100.1% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 47.7 points."
+        ],
+        "matchup": "San Antonio Spurs @ Oklahoma City Thunder",
+        "model_baseline": 17.78,
+        "model_reasons": [
+          "The model baseline sits at 17.8 against a 12.5 line.",
+          "That leaves roughly +1.67 standard deviations of cushion.",
+          "Win probability grades at 95.3%."
+        ],
+        "model_sd": 3.153668498748719,
+        "p_win": 0.953,
+        "player": "Stephon Castle",
+        "price": 110.0,
+        "prob_edge": 0.4768,
+        "reasons": [
+          "Recent form is already clearing this number with a last-five average of 16.8.",
+          "The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+          "The last game landed at 20.0, which is already above this line.",
+          "The minute load looks stable around 32.0.",
+          "Projected minutes (32.0) sit above his last-10 workload (30.0), which strengthens the volume path.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 17.8 against a 12.5 line.",
+          "That leaves roughly +1.67 standard deviations of cushion.",
+          "Win probability grades at 95.3%.",
+          "Projected value is +100.1% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 47.7 points."
+        ],
+        "recommendation_priority_score": 94.3,
+        "score": 1.0012125210889318,
+        "sd_rel": 0.25229347989989753,
+        "selection": "OVER",
+        "side": "OVER",
+        "sim_mean": 17.78,
+        "sim_reasons": [
+          "The model baseline sits at 17.8 against a 12.5 line.",
+          "That leaves roughly +1.67 standard deviations of cushion.",
+          "Win probability grades at 95.3%."
+        ],
+        "sim_sd": 3.153668498748719,
+        "sim_support_score": 100.0,
+        "team": "SAS",
+        "top_play_reasons": [
+          "Recent form is already clearing this number with a last-five average of 16.8.",
+          "The last-10 sample is still above this number at 16.0, so the over is not just riding a short heater.",
+          "The last game landed at 20.0, which is already above this line.",
+          "The minute load looks stable around 32.0.",
+          "Projected minutes (32.0) sit above his last-10 workload (30.0), which strengthens the volume path.",
+          "This is a cleaner rest spot without a back-to-back tax.",
+          "The model baseline sits at 17.8 against a 12.5 line.",
+          "That leaves roughly +1.67 standard deviations of cushion.",
+          "Win probability grades at 95.3%.",
+          "Projected value is +100.1% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 47.7 points."
+        ],
+        "value_reasons": [
+          "Projected value is +100.1% per unit risked.",
+          "The price stays workable at +110.",
+          "Model probability clears the market by 47.7 points."
+        ],
+        "value_support_score": 85.0,
+        "win_prob": 0.9529583433756819,
+        "win_prob_raw": 0.9529583433756819,
+        "z": 1.674240650878476
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ML,New York Liberty,New York Liberty,Phoenix Mercury,2026-05-27,0.11784105103755244,-188.23427254041192,0.6530599948485325,,,,,,High
+ATS,New York Liberty,New York Liberty,Phoenix Mercury,2026-05-27,0.9090889999999999,-110.0,0.5238095238095238,65.0909972128216,-5.0,70.0909972128216,5.0,,High
+TOTAL,Under,New York Liberty,Phoenix Mercury,2026-05-27,0.9087927396087541,-110.0,0.5238095238095238,-57.677137586851686,171.5,,,113.82286241314831,High

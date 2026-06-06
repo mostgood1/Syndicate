@@ -1,0 +1,71 @@
+﻿Migration gate: FAIL
+
+Audit: PASS
+  Allowed findings: 4
+  Actual findings: 6
+
+Runtime dependency: FAIL
+  Allowed findings: 0
+  Actual findings: 0
+  Lowest ownership modules:
+    - nba: score=90; tier=artifact_backed
+    - ncaab: score=90; tier=artifact_backed
+    - ncaaf: score=90; tier=artifact_backed
+
+Advanced readiness: FAIL
+  Selected date: 2026-06-05
+  Active sports checked: 5
+  Active sport summaries:
+    - mlb: state=-; exists=2/2; tracked=2/2
+    - nba: state=-; exists=3/3; tracked=3/3
+    - nhl: state=-; exists=1/3; tracked=0/3
+    - wnba: state=-; exists=3/3; tracked=3/3
+    - ncaab: state=-; exists=0/3; tracked=0/3
+  Violations:
+    - nhl: missing_advanced_inputs; Game recommendation layer, Props recommendation layer
+    - nhl: unpublished_advanced_inputs; Odds and scoreboard context
+    - ncaab: missing_advanced_inputs; Recommendations mirror, Live state mirror, Pace and live-line context
+
+audit: PASS
+  Command: C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe scripts/audit_migration.py --format json
+  Output: [
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/mlb.py",
+    "line": 300,
+    "summary": "Source shell route points at mlb/cards_source.js.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nba.py",
+    "line": 150,
+    "summary": "Source shell route points at nba/cards_source.html.",
+    "detail": "Use these routes as the primary client-parity audit surface."
+  },
+  {
+    "category": "source_shell_route",
+    "path": "syndicate/blueprints/nba.py",
+    ...
+
+module_tracker: PASS
+  Command: C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe scripts/module_tracker_snapshot.py --json
+  Output: {
+  "generated_at": "2026-06-05T15:24:31.263065+00:00",
+  "reference_module": "mlb",
+  "reference_surfaces": [
+    "cards",
+    "game",
+    "live-lens",
+    "daily archive",
+    "season betting-card",
+    "hub"
+  ],
+  "modules": [
+    {
+      "slug": "mlb",
+      "name": "MLB",
+      "status": "Phase-1 complete",
+      "phase": "Reference module",
+      "summary": "Phase-1 complete reference module for the shared Syndicate board contract with cards, game detail, live lens, a daily archive, season betting-card surfaces, and stabilized shared rank-board API transport across the main ranked ML...
+

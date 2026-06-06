@@ -1,0 +1,5239 @@
+{
+  "available_profiles": [
+    "retuned"
+  ],
+  "days": [
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-01-17",
+      "month": "2025-01",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-04-13",
+      "month": "2025-04",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-02",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-03",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-04",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-05",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-06",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-07",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-08",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-09",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-11",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-12",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-13",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 32,
+          "n": 41,
+          "profit_u": -5.486,
+          "pushes": 0,
+          "roi": -0.1338,
+          "stake_u": 41.0,
+          "wins": 9
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-14",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 32,
+          "n": 41,
+          "profit_u": -5.486,
+          "pushes": 0,
+          "roi": -0.1338,
+          "stake_u": 41.0,
+          "wins": 9
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 17,
+          "profit_u": 10.0,
+          "pushes": 0,
+          "roi": 0.5882,
+          "stake_u": 17.0,
+          "wins": 3
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-15",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 17,
+          "profit_u": 10.0,
+          "pushes": 0,
+          "roi": 0.5882,
+          "stake_u": 17.0,
+          "wins": 3
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 12,
+          "n": 17,
+          "profit_u": 16.182,
+          "pushes": 0,
+          "roi": 0.9519,
+          "stake_u": 17.0,
+          "wins": 5
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-16",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 12,
+          "n": 17,
+          "profit_u": 16.182,
+          "pushes": 0,
+          "roi": 0.9519,
+          "stake_u": 17.0,
+          "wins": 5
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 18,
+          "n": 24,
+          "profit_u": 16.517,
+          "pushes": 0,
+          "roi": 0.6882,
+          "stake_u": 24.0,
+          "wins": 6
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-17",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 18,
+          "n": 24,
+          "profit_u": 16.517,
+          "pushes": 0,
+          "roi": 0.6882,
+          "stake_u": 24.0,
+          "wins": 6
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-18",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-20",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 8,
+          "n": 12,
+          "profit_u": -3.842,
+          "pushes": 0,
+          "roi": -0.3202,
+          "stake_u": 12.0,
+          "wins": 4
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-21",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 8,
+          "n": 12,
+          "profit_u": -3.842,
+          "pushes": 0,
+          "roi": -0.3202,
+          "stake_u": 12.0,
+          "wins": 4
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 16,
+          "n": 27,
+          "profit_u": -2.951,
+          "pushes": 0,
+          "roi": -0.1093,
+          "stake_u": 27.0,
+          "wins": 11
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-22",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 16,
+          "n": 27,
+          "profit_u": -2.951,
+          "pushes": 0,
+          "roi": -0.1093,
+          "stake_u": 27.0,
+          "wins": 11
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 5,
+          "n": 5,
+          "profit_u": -5.0,
+          "pushes": 0,
+          "roi": -1.0,
+          "stake_u": 5.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-23",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 5,
+          "n": 5,
+          "profit_u": -5.0,
+          "pushes": 0,
+          "roi": -1.0,
+          "stake_u": 5.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 27,
+          "profit_u": -0.324,
+          "pushes": 0,
+          "roi": -0.012,
+          "stake_u": 27.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-24",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 27,
+          "profit_u": -0.324,
+          "pushes": 0,
+          "roi": -0.012,
+          "stake_u": 27.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 9,
+          "n": 22,
+          "profit_u": 6.14,
+          "pushes": 0,
+          "roi": 0.2791,
+          "stake_u": 22.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-25",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 9,
+          "n": 22,
+          "profit_u": 6.14,
+          "pushes": 0,
+          "roi": 0.2791,
+          "stake_u": 22.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 30,
+          "profit_u": 7.281,
+          "pushes": 0,
+          "roi": 0.2427,
+          "stake_u": 30.0,
+          "wins": 17
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-26",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 30,
+          "profit_u": 7.281,
+          "pushes": 0,
+          "roi": 0.2427,
+          "stake_u": 30.0,
+          "wins": 17
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 24,
+          "profit_u": -1.638,
+          "pushes": 0,
+          "roi": -0.0682,
+          "stake_u": 24.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-27",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 24,
+          "profit_u": -1.638,
+          "pushes": 0,
+          "roi": -0.0682,
+          "stake_u": 24.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 6,
+          "n": 9,
+          "profit_u": -3.513,
+          "pushes": 0,
+          "roi": -0.3903,
+          "stake_u": 9.0,
+          "wins": 3
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-28",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 6,
+          "n": 9,
+          "profit_u": -3.513,
+          "pushes": 0,
+          "roi": -0.3903,
+          "stake_u": 9.0,
+          "wins": 3
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 21,
+          "n": 34,
+          "profit_u": -5.347,
+          "pushes": 0,
+          "roi": -0.1573,
+          "stake_u": 34.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-29",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 21,
+          "n": 34,
+          "profit_u": -5.347,
+          "pushes": 0,
+          "roi": -0.1573,
+          "stake_u": 34.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 10,
+          "n": 26,
+          "profit_u": 8.222,
+          "pushes": 0,
+          "roi": 0.3162,
+          "stake_u": 26.0,
+          "wins": 16
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-30",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 10,
+          "n": 26,
+          "profit_u": 8.222,
+          "pushes": 0,
+          "roi": 0.3162,
+          "stake_u": 26.0,
+          "wins": 16
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 24,
+          "profit_u": -2.691,
+          "pushes": 0,
+          "roi": -0.1121,
+          "stake_u": 24.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-10-31",
+      "month": "2025-10",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 24,
+          "profit_u": -2.691,
+          "pushes": 0,
+          "roi": -0.1121,
+          "stake_u": 24.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-01",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 18,
+          "n": 29,
+          "profit_u": -4.673,
+          "pushes": 0,
+          "roi": -0.1611,
+          "stake_u": 29.0,
+          "wins": 11
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-02",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 18,
+          "n": 29,
+          "profit_u": -4.673,
+          "pushes": 0,
+          "roi": -0.1611,
+          "stake_u": 29.0,
+          "wins": 11
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 22,
+          "profit_u": -3.09,
+          "pushes": 0,
+          "roi": -0.1405,
+          "stake_u": 22.0,
+          "wins": 9
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-03",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 22,
+          "profit_u": -3.09,
+          "pushes": 0,
+          "roi": -0.1405,
+          "stake_u": 22.0,
+          "wins": 9
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 16,
+          "n": 24,
+          "profit_u": -6.755,
+          "pushes": 0,
+          "roi": -0.2815,
+          "stake_u": 24.0,
+          "wins": 8
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-04",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 16,
+          "n": 24,
+          "profit_u": -6.755,
+          "pushes": 0,
+          "roi": -0.2815,
+          "stake_u": 24.0,
+          "wins": 8
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 18,
+          "n": 31,
+          "profit_u": -1.945,
+          "pushes": 0,
+          "roi": -0.0627,
+          "stake_u": 31.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-05",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 18,
+          "n": 31,
+          "profit_u": -1.945,
+          "pushes": 0,
+          "roi": -0.0627,
+          "stake_u": 31.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 10,
+          "n": 14,
+          "profit_u": -5.165,
+          "pushes": 0,
+          "roi": -0.3689,
+          "stake_u": 14.0,
+          "wins": 4
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-06",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 10,
+          "n": 14,
+          "profit_u": -5.165,
+          "pushes": 0,
+          "roi": -0.3689,
+          "stake_u": 14.0,
+          "wins": 4
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 20,
+          "n": 33,
+          "profit_u": -6.285,
+          "pushes": 0,
+          "roi": -0.1905,
+          "stake_u": 33.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-07",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 20,
+          "n": 33,
+          "profit_u": -6.285,
+          "pushes": 0,
+          "roi": -0.1905,
+          "stake_u": 33.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 17,
+          "n": 33,
+          "profit_u": 0.983,
+          "pushes": 0,
+          "roi": 0.0298,
+          "stake_u": 33.0,
+          "wins": 16
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-08",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 17,
+          "n": 33,
+          "profit_u": 0.983,
+          "pushes": 0,
+          "roi": 0.0298,
+          "stake_u": 33.0,
+          "wins": 16
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 26,
+          "profit_u": 0.508,
+          "pushes": 0,
+          "roi": 0.0195,
+          "stake_u": 26.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-09",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 26,
+          "profit_u": 0.508,
+          "pushes": 0,
+          "roi": 0.0195,
+          "stake_u": 26.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 21,
+          "n": 30,
+          "profit_u": -9.004,
+          "pushes": 0,
+          "roi": -0.3001,
+          "stake_u": 30.0,
+          "wins": 9
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-10",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 21,
+          "n": 30,
+          "profit_u": -9.004,
+          "pushes": 0,
+          "roi": -0.3001,
+          "stake_u": 30.0,
+          "wins": 9
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 10,
+          "n": 22,
+          "profit_u": 4.032,
+          "pushes": 0,
+          "roi": 0.1833,
+          "stake_u": 22.0,
+          "wins": 12
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-11",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 10,
+          "n": 22,
+          "profit_u": 4.032,
+          "pushes": 0,
+          "roi": 0.1833,
+          "stake_u": 22.0,
+          "wins": 12
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 21,
+          "profit_u": -3.8,
+          "pushes": 0,
+          "roi": -0.181,
+          "stake_u": 21.0,
+          "wins": 8
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-12",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 21,
+          "profit_u": -3.8,
+          "pushes": 0,
+          "roi": -0.181,
+          "stake_u": 21.0,
+          "wins": 8
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 12,
+          "n": 25,
+          "profit_u": 1.749,
+          "pushes": 0,
+          "roi": 0.07,
+          "stake_u": 25.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-13",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 12,
+          "n": 25,
+          "profit_u": 1.749,
+          "pushes": 0,
+          "roi": 0.07,
+          "stake_u": 25.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 18,
+          "n": 30,
+          "profit_u": -4.884,
+          "pushes": 0,
+          "roi": -0.1628,
+          "stake_u": 30.0,
+          "wins": 12
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-14",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 18,
+          "n": 30,
+          "profit_u": -4.884,
+          "pushes": 0,
+          "roi": -0.1628,
+          "stake_u": 30.0,
+          "wins": 12
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 24,
+          "n": 28,
+          "profit_u": -19.27,
+          "pushes": 0,
+          "roi": -0.6882,
+          "stake_u": 28.0,
+          "wins": 4
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-15",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 24,
+          "n": 28,
+          "profit_u": -19.27,
+          "pushes": 0,
+          "roi": -0.6882,
+          "stake_u": 28.0,
+          "wins": 4
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 22,
+          "n": 30,
+          "profit_u": -13.035,
+          "pushes": 0,
+          "roi": -0.4345,
+          "stake_u": 30.0,
+          "wins": 8
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-16",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 22,
+          "n": 30,
+          "profit_u": -13.035,
+          "pushes": 0,
+          "roi": -0.4345,
+          "stake_u": 30.0,
+          "wins": 8
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 24,
+          "profit_u": -2.907,
+          "pushes": 0,
+          "roi": -0.1211,
+          "stake_u": 24.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-17",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 24,
+          "profit_u": -2.907,
+          "pushes": 0,
+          "roi": -0.1211,
+          "stake_u": 24.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 19,
+          "n": 28,
+          "profit_u": -9.057,
+          "pushes": 0,
+          "roi": -0.3235,
+          "stake_u": 28.0,
+          "wins": 9
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-18",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 19,
+          "n": 28,
+          "profit_u": -9.057,
+          "pushes": 0,
+          "roi": -0.3235,
+          "stake_u": 28.0,
+          "wins": 9
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 22,
+          "n": 32,
+          "profit_u": -11.684,
+          "pushes": 0,
+          "roi": -0.3651,
+          "stake_u": 32.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-19",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 22,
+          "n": 32,
+          "profit_u": -11.684,
+          "pushes": 0,
+          "roi": -0.3651,
+          "stake_u": 32.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 28,
+          "profit_u": 6.422,
+          "pushes": 0,
+          "roi": 0.2294,
+          "stake_u": 28.0,
+          "wins": 15
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-20",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 28,
+          "profit_u": 6.422,
+          "pushes": 0,
+          "roi": 0.2294,
+          "stake_u": 28.0,
+          "wins": 15
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 22,
+          "n": 33,
+          "profit_u": -3.811,
+          "pushes": 0,
+          "roi": -0.1155,
+          "stake_u": 33.0,
+          "wins": 11
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-21",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 22,
+          "n": 33,
+          "profit_u": -3.811,
+          "pushes": 0,
+          "roi": -0.1155,
+          "stake_u": 33.0,
+          "wins": 11
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 29,
+          "profit_u": 7.445,
+          "pushes": 0,
+          "roi": 0.2567,
+          "stake_u": 29.0,
+          "wins": 16
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-22",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 29,
+          "profit_u": 7.445,
+          "pushes": 0,
+          "roi": 0.2567,
+          "stake_u": 29.0,
+          "wins": 16
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 17,
+          "n": 30,
+          "profit_u": -3.573,
+          "pushes": 0,
+          "roi": -0.1191,
+          "stake_u": 30.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-23",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 17,
+          "n": 30,
+          "profit_u": -3.573,
+          "pushes": 0,
+          "roi": -0.1191,
+          "stake_u": 30.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 21,
+          "n": 32,
+          "profit_u": -7.042,
+          "pushes": 0,
+          "roi": -0.2201,
+          "stake_u": 32.0,
+          "wins": 11
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-24",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 21,
+          "n": 32,
+          "profit_u": -7.042,
+          "pushes": 0,
+          "roi": -0.2201,
+          "stake_u": 32.0,
+          "wins": 11
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 5,
+          "n": 23,
+          "profit_u": 16.118,
+          "pushes": 0,
+          "roi": 0.7008,
+          "stake_u": 23.0,
+          "wins": 18
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-25",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 5,
+          "n": 23,
+          "profit_u": 16.118,
+          "pushes": 0,
+          "roi": 0.7008,
+          "stake_u": 23.0,
+          "wins": 18
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 32,
+          "profit_u": 12.935,
+          "pushes": 0,
+          "roi": 0.4042,
+          "stake_u": 32.0,
+          "wins": 18
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-26",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 32,
+          "profit_u": 12.935,
+          "pushes": 0,
+          "roi": 0.4042,
+          "stake_u": 32.0,
+          "wins": 18
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-27",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 22,
+          "n": 31,
+          "profit_u": -10.7,
+          "pushes": 0,
+          "roi": -0.3452,
+          "stake_u": 31.0,
+          "wins": 9
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-28",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 22,
+          "n": 31,
+          "profit_u": -10.7,
+          "pushes": 0,
+          "roi": -0.3452,
+          "stake_u": 31.0,
+          "wins": 9
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 15,
+          "n": 31,
+          "profit_u": 5.167,
+          "pushes": 0,
+          "roi": 0.1667,
+          "stake_u": 31.0,
+          "wins": 16
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-29",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 15,
+          "n": 31,
+          "profit_u": 5.167,
+          "pushes": 0,
+          "roi": 0.1667,
+          "stake_u": 31.0,
+          "wins": 16
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 30,
+          "profit_u": 4.614,
+          "pushes": 0,
+          "roi": 0.1538,
+          "stake_u": 30.0,
+          "wins": 16
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-11-30",
+      "month": "2025-11",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 30,
+          "profit_u": 4.614,
+          "pushes": 0,
+          "roi": 0.1538,
+          "stake_u": 30.0,
+          "wins": 16
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 10,
+          "n": 30,
+          "profit_u": 25.15,
+          "pushes": 0,
+          "roi": 0.8383,
+          "stake_u": 30.0,
+          "wins": 20
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-01",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 10,
+          "n": 30,
+          "profit_u": 25.15,
+          "pushes": 0,
+          "roi": 0.8383,
+          "stake_u": 30.0,
+          "wins": 20
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 18,
+          "n": 28,
+          "profit_u": -7.87,
+          "pushes": 0,
+          "roi": -0.2811,
+          "stake_u": 28.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-02",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 18,
+          "n": 28,
+          "profit_u": -7.87,
+          "pushes": 0,
+          "roi": -0.2811,
+          "stake_u": 28.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 17,
+          "n": 30,
+          "profit_u": 0.097,
+          "pushes": 0,
+          "roi": 0.0032,
+          "stake_u": 30.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-03",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 17,
+          "n": 30,
+          "profit_u": 0.097,
+          "pushes": 0,
+          "roi": 0.0032,
+          "stake_u": 30.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 12,
+          "n": 22,
+          "profit_u": 0.25,
+          "pushes": 0,
+          "roi": 0.0114,
+          "stake_u": 22.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-04",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 12,
+          "n": 22,
+          "profit_u": 0.25,
+          "pushes": 0,
+          "roi": 0.0114,
+          "stake_u": 22.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 19,
+          "n": 34,
+          "profit_u": -1.853,
+          "pushes": 0,
+          "roi": -0.0545,
+          "stake_u": 34.0,
+          "wins": 15
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-05",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 19,
+          "n": 34,
+          "profit_u": -1.853,
+          "pushes": 0,
+          "roi": -0.0545,
+          "stake_u": 34.0,
+          "wins": 15
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 18,
+          "n": 29,
+          "profit_u": -1.517,
+          "pushes": 0,
+          "roi": -0.0523,
+          "stake_u": 29.0,
+          "wins": 11
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-06",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 18,
+          "n": 29,
+          "profit_u": -1.517,
+          "pushes": 0,
+          "roi": -0.0523,
+          "stake_u": 29.0,
+          "wins": 11
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 28,
+          "profit_u": -0.391,
+          "pushes": 0,
+          "roi": -0.014,
+          "stake_u": 28.0,
+          "wins": 14
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-07",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 28,
+          "profit_u": -0.391,
+          "pushes": 0,
+          "roi": -0.014,
+          "stake_u": 28.0,
+          "wins": 14
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 14,
+          "n": 27,
+          "profit_u": 0.487,
+          "pushes": 0,
+          "roi": 0.018,
+          "stake_u": 27.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-08",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 14,
+          "n": 27,
+          "profit_u": 0.487,
+          "pushes": 0,
+          "roi": 0.018,
+          "stake_u": 27.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 19,
+          "profit_u": -7.003,
+          "pushes": 0,
+          "roi": -0.3686,
+          "stake_u": 19.0,
+          "wins": 6
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-09",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 19,
+          "profit_u": -7.003,
+          "pushes": 0,
+          "roi": -0.3686,
+          "stake_u": 19.0,
+          "wins": 6
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 11,
+          "n": 21,
+          "profit_u": -1.935,
+          "pushes": 0,
+          "roi": -0.0921,
+          "stake_u": 21.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-10",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 11,
+          "n": 21,
+          "profit_u": -1.935,
+          "pushes": 0,
+          "roi": -0.0921,
+          "stake_u": 21.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 10,
+          "n": 23,
+          "profit_u": 2.865,
+          "pushes": 0,
+          "roi": 0.1246,
+          "stake_u": 23.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-11",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 10,
+          "n": 23,
+          "profit_u": 2.865,
+          "pushes": 0,
+          "roi": 0.1246,
+          "stake_u": 23.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 21,
+          "n": 30,
+          "profit_u": -11.439,
+          "pushes": 0,
+          "roi": -0.3813,
+          "stake_u": 30.0,
+          "wins": 9
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-12",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 21,
+          "n": 30,
+          "profit_u": -11.439,
+          "pushes": 0,
+          "roi": -0.3813,
+          "stake_u": 30.0,
+          "wins": 9
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 10,
+          "n": 18,
+          "profit_u": -2.182,
+          "pushes": 0,
+          "roi": -0.1212,
+          "stake_u": 18.0,
+          "wins": 8
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-13",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 10,
+          "n": 18,
+          "profit_u": -2.182,
+          "pushes": 0,
+          "roi": -0.1212,
+          "stake_u": 18.0,
+          "wins": 8
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 11,
+          "n": 32,
+          "profit_u": 10.241,
+          "pushes": 0,
+          "roi": 0.32,
+          "stake_u": 32.0,
+          "wins": 21
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-14",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 11,
+          "n": 32,
+          "profit_u": 10.241,
+          "pushes": 0,
+          "roi": 0.32,
+          "stake_u": 32.0,
+          "wins": 21
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 10,
+          "n": 23,
+          "profit_u": 2.449,
+          "pushes": 0,
+          "roi": 0.1065,
+          "stake_u": 23.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-15",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 10,
+          "n": 23,
+          "profit_u": 2.449,
+          "pushes": 0,
+          "roi": 0.1065,
+          "stake_u": 23.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 1,
+          "n": 7,
+          "profit_u": 4.724,
+          "pushes": 0,
+          "roi": 0.6749,
+          "stake_u": 7.0,
+          "wins": 6
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-16",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 1,
+          "n": 7,
+          "profit_u": 4.724,
+          "pushes": 0,
+          "roi": 0.6749,
+          "stake_u": 7.0,
+          "wins": 6
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 8,
+          "n": 18,
+          "profit_u": 2.959,
+          "pushes": 0,
+          "roi": 0.1644,
+          "stake_u": 18.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-17",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 8,
+          "n": 18,
+          "profit_u": 2.959,
+          "pushes": 0,
+          "roi": 0.1644,
+          "stake_u": 18.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 11,
+          "n": 22,
+          "profit_u": 0.953,
+          "pushes": 0,
+          "roi": 0.0433,
+          "stake_u": 22.0,
+          "wins": 11
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-18",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 11,
+          "n": 22,
+          "profit_u": 0.953,
+          "pushes": 0,
+          "roi": 0.0433,
+          "stake_u": 22.0,
+          "wins": 11
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 16,
+          "n": 26,
+          "profit_u": -3.593,
+          "pushes": 0,
+          "roi": -0.1382,
+          "stake_u": 26.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-19",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 16,
+          "n": 26,
+          "profit_u": -3.593,
+          "pushes": 0,
+          "roi": -0.1382,
+          "stake_u": 26.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 15,
+          "n": 32,
+          "profit_u": 6.68,
+          "pushes": 0,
+          "roi": 0.2087,
+          "stake_u": 32.0,
+          "wins": 17
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-20",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 15,
+          "n": 32,
+          "profit_u": 6.68,
+          "pushes": 0,
+          "roi": 0.2087,
+          "stake_u": 32.0,
+          "wins": 17
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 12,
+          "n": 22,
+          "profit_u": -1.896,
+          "pushes": 0,
+          "roi": -0.0862,
+          "stake_u": 22.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-21",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 12,
+          "n": 22,
+          "profit_u": -1.896,
+          "pushes": 0,
+          "roi": -0.0862,
+          "stake_u": 22.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 26,
+          "profit_u": -0.421,
+          "pushes": 0,
+          "roi": -0.0162,
+          "stake_u": 26.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-22",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 26,
+          "profit_u": -0.421,
+          "pushes": 0,
+          "roi": -0.0162,
+          "stake_u": 26.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 18,
+          "n": 34,
+          "profit_u": 2.217,
+          "pushes": 0,
+          "roi": 0.0652,
+          "stake_u": 34.0,
+          "wins": 16
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-23",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 18,
+          "n": 34,
+          "profit_u": 2.217,
+          "pushes": 0,
+          "roi": 0.0652,
+          "stake_u": 34.0,
+          "wins": 16
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-24",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 0,
+          "n": 0,
+          "profit_u": 0.0,
+          "pushes": 0,
+          "roi": null,
+          "stake_u": 0.0,
+          "wins": 0
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 12,
+          "n": 24,
+          "profit_u": 2.631,
+          "pushes": 0,
+          "roi": 0.1096,
+          "stake_u": 24.0,
+          "wins": 12
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-25",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 12,
+          "n": 24,
+          "profit_u": 2.631,
+          "pushes": 0,
+          "roi": 0.1096,
+          "stake_u": 24.0,
+          "wins": 12
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 13,
+          "n": 33,
+          "profit_u": 9.839,
+          "pushes": 0,
+          "roi": 0.2982,
+          "stake_u": 33.0,
+          "wins": 20
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-26",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 13,
+          "n": 33,
+          "profit_u": 9.839,
+          "pushes": 0,
+          "roi": 0.2982,
+          "stake_u": 33.0,
+          "wins": 20
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 20,
+          "n": 31,
+          "profit_u": 2.821,
+          "pushes": 0,
+          "roi": 0.091,
+          "stake_u": 31.0,
+          "wins": 11
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-27",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 20,
+          "n": 31,
+          "profit_u": 2.821,
+          "pushes": 0,
+          "roi": 0.091,
+          "stake_u": 31.0,
+          "wins": 11
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 20,
+          "n": 29,
+          "profit_u": -9.432,
+          "pushes": 0,
+          "roi": -0.3252,
+          "stake_u": 29.0,
+          "wins": 9
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-28",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 20,
+          "n": 29,
+          "profit_u": -9.432,
+          "pushes": 0,
+          "roi": -0.3252,
+          "stake_u": 29.0,
+          "wins": 9
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 23,
+          "n": 33,
+          "profit_u": -11.601,
+          "pushes": 0,
+          "roi": -0.3515,
+          "stake_u": 33.0,
+          "wins": 10
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-29",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 23,
+          "n": 33,
+          "profit_u": -11.601,
+          "pushes": 0,
+          "roi": -0.3515,
+          "stake_u": 33.0,
+          "wins": 10
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 15,
+          "n": 28,
+          "profit_u": 0.248,
+          "pushes": 0,
+          "roi": 0.0089,
+          "stake_u": 28.0,
+          "wins": 13
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-30",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 15,
+          "n": 28,
+          "profit_u": 0.248,
+          "pushes": 0,
+          "roi": 0.0089,
+          "stake_u": 28.0,
+          "wins": 13
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    },
+    {
+      "all_results": {
+        "combined": {
+          "losses": 17,
+          "n": 31,
+          "profit_u": -1.571,
+          "pushes": 0,
+          "roi": -0.0507,
+          "stake_u": 31.0,
+          "wins": 14
+        }
+      },
+      "all_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "all_unresolved_breakdown": {},
+      "all_unresolved_n": 0,
+      "date": "2025-12-31",
+      "month": "2025-12",
+      "playable_results": {
+        "combined": {}
+      },
+      "playable_selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "playable_unresolved_breakdown": {},
+      "playable_unresolved_n": 0,
+      "results": {
+        "combined": {
+          "losses": 17,
+          "n": 31,
+          "profit_u": -1.571,
+          "pushes": 0,
+          "roi": -0.0507,
+          "stake_u": 31.0,
+          "wins": 14
+        }
+      },
+      "selected_counts": {
+        "combined": 0,
+        "ml": 0,
+        "player_props": 0,
+        "spreads": 0,
+        "totals": 0
+      },
+      "unresolved_n": 0
+    }
+  ],
+  "meta": {
+    "first_date": "2025-01-17",
+    "last_date": "2025-12-31",
+    "partial": false
+  },
+  "months": [
+    {
+      "days": 1,
+      "month": "2025-01"
+    },
+    {
+      "days": 1,
+      "month": "2025-04"
+    },
+    {
+      "days": 28,
+      "month": "2025-10"
+    },
+    {
+      "days": 30,
+      "month": "2025-11"
+    },
+    {
+      "days": 31,
+      "month": "2025-12"
+    }
+  ],
+  "profile": "retuned",
+  "season": 2025,
+  "summary": {
+    "all_results": {
+      "combined": {
+        "losses": 1084,
+        "n": 1910,
+        "profit_u": -21.25,
+        "pushes": 0,
+        "roi": -0.0111,
+        "stake_u": 1910.0,
+        "wins": 826
+      }
+    },
+    "all_selected_counts": {
+      "combined": 0,
+      "ml": 0,
+      "player_props": 0,
+      "spreads": 0,
+      "totals": 0
+    },
+    "all_settled_recommendations": 1910,
+    "all_unresolved_breakdown": {},
+    "all_unresolved_recommendations": 0,
+    "cards": 91,
+    "combined": {
+      "losses": 1084,
+      "n": 1910,
+      "profit_u": -21.25,
+      "pushes": 0,
+      "roi": -0.0111,
+      "stake_u": 1910.0,
+      "wins": 826
+    },
+    "daily": {
+      "best_day": {
+        "date": "2025-12-01",
+        "profit_u": 25.15
+      },
+      "mean_u": -0.234,
+      "median_u": 0.0,
+      "worst_day": {
+        "date": "2025-11-15",
+        "profit_u": -19.27
+      }
+    },
+    "playable_results": {
+      "combined": {
+        "losses": 0,
+        "n": 0,
+        "profit_u": 0.0,
+        "pushes": 0,
+        "roi": null,
+        "stake_u": 0.0,
+        "wins": 0
+      }
+    },
+    "playable_selected_counts": {
+      "combined": 0,
+      "ml": 0,
+      "player_props": 0,
+      "spreads": 0,
+      "totals": 0
+    },
+    "playable_settled_recommendations": 0,
+    "playable_unresolved_breakdown": {},
+    "playable_unresolved_recommendations": 0,
+    "results": {
+      "combined": {
+        "losses": 1084,
+        "n": 1910,
+        "profit_u": -21.25,
+        "pushes": 0,
+        "roi": -0.0111,
+        "stake_u": 1910.0,
+        "wins": 826
+      }
+    },
+    "selected_counts": {
+      "combined": 0,
+      "ml": 0,
+      "player_props": 0,
+      "spreads": 0,
+      "totals": 0
+    },
+    "settled_recommendations": 1910,
+    "unresolved_recommendations": 0
+  }
+}

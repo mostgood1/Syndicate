@@ -1,0 +1,164 @@
+{
+  "date": "2026-05-29",
+  "counts": {
+    "games": 3,
+    "picks": 8
+  },
+  "per_game": [
+    {
+      "home": "NYL",
+      "away": "PHX",
+      "matchup": "PHX @ NYL",
+      "picks": [
+        {
+          "market": "ATS",
+          "team": "New York Liberty",
+          "display_pick": "New York Liberty +5.5",
+          "selection": "New York Liberty",
+          "price": -110.0,
+          "score": 54.57222198530588,
+          "ev_pct": 90.90857317133725,
+          "win_prob": 1.0,
+          "p_win": 1.0,
+          "basketball_summary": "Model margin 60.1 vs market +5.5",
+          "top_play_reasons": [
+            "Edge 54.6",
+            "EV 90.9%"
+          ],
+          "matchup": "PHX @ NYL"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 170.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -54.11400624290238,
+          "ev_pct": 90.84043302702838,
+          "win_prob": 1.0,
+          "p_win": 1.0,
+          "basketball_summary": "Model total 116.4 vs line 170.5",
+          "top_play_reasons": [
+            "Edge -54.1",
+            "EV 90.8%"
+          ],
+          "matchup": "PHX @ NYL"
+        },
+        {
+          "market": "ML",
+          "team": "Total",
+          "display_pick": "New York Liberty -",
+          "selection": "New York Liberty",
+          "price": -197.11064729302237,
+          "score": 9.998957292613554,
+          "ev_pct": 9.998957292613554,
+          "win_prob": 0.7634146271572753,
+          "p_win": 0.7634146271572753,
+          "basketball_summary": "Model total - vs line -",
+          "top_play_reasons": [
+            "EV 10.0%"
+          ],
+          "matchup": "PHX @ NYL"
+        }
+      ]
+    },
+    {
+      "home": "WSH",
+      "away": "LAS",
+      "matchup": "LAS @ WSH",
+      "picks": [
+        {
+          "market": "ATS",
+          "team": "Washington Mystics",
+          "display_pick": "Washington Mystics +2.5",
+          "selection": "Washington Mystics",
+          "price": -110.0,
+          "score": 52.91487227694783,
+          "ev_pct": 90.90810224065157,
+          "win_prob": 1.0,
+          "p_win": 1.0,
+          "basketball_summary": "Model margin 55.4 vs market +2.5",
+          "top_play_reasons": [
+            "Edge 52.9",
+            "EV 90.9%"
+          ],
+          "matchup": "LAS @ WSH"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 166.0",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -48.18464513324318,
+          "ev_pct": 90.66097984188417,
+          "win_prob": 1.0,
+          "p_win": 1.0,
+          "basketball_summary": "Model total 117.8 vs line 166.0",
+          "top_play_reasons": [
+            "Edge -48.2",
+            "EV 90.7%"
+          ],
+          "matchup": "LAS @ WSH"
+        },
+        {
+          "market": "ML",
+          "team": "Total",
+          "display_pick": "Washington Mystics -",
+          "selection": "Washington Mystics",
+          "price": -126.74077047435982,
+          "score": 15.432214967445667,
+          "ev_pct": 15.432214967445667,
+          "win_prob": 0.713289865137397,
+          "p_win": 0.713289865137397,
+          "basketball_summary": "Model total - vs line -",
+          "top_play_reasons": [
+            "EV 15.4%"
+          ],
+          "matchup": "LAS @ WSH"
+        }
+      ]
+    },
+    {
+      "home": "CHI",
+      "away": "MIN",
+      "matchup": "MIN @ CHI",
+      "picks": [
+        {
+          "market": "ATS",
+          "team": "Chicago Sky",
+          "display_pick": "Chicago Sky -4.5",
+          "selection": "Chicago Sky",
+          "price": -110.0,
+          "score": 74.63203413881116,
+          "ev_pct": 90.90889999999999,
+          "win_prob": 1.0,
+          "p_win": 1.0,
+          "basketball_summary": "Model margin 70.1 vs market -4.5",
+          "top_play_reasons": [
+            "Edge 74.6",
+            "EV 90.9%"
+          ],
+          "matchup": "MIN @ CHI"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 172.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -58.70892544408947,
+          "ev_pct": 90.88587559319359,
+          "win_prob": 1.0,
+          "p_win": 1.0,
+          "basketball_summary": "Model total 113.8 vs line 172.5",
+          "top_play_reasons": [
+            "Edge -58.7",
+            "EV 90.9%"
+          ],
+          "matchup": "MIN @ CHI"
+        }
+      ]
+    }
+  ]
+}

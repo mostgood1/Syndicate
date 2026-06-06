@@ -1,0 +1,1718 @@
+{
+  "date": "2026-05-26",
+  "home": "OKC",
+  "away": "SAS",
+  "market_total": 217.5,
+  "market_home_spread": -4.0,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 28.232853321690705,
+      "home_pts_sigma": 5.372951108590838,
+      "away_pts_mu": 26.6173132878473,
+      "away_pts_sigma": 5.372951108590838,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 28.350599780860758,
+      "home_pts_sigma": 5.2911647956099594,
+      "away_pts_mu": 26.885176497935966,
+      "away_pts_sigma": 5.2911647956099594,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 28.03970393089626,
+      "home_pts_sigma": 5.551688447550963,
+      "away_pts_mu": 27.593439592641335,
+      "away_pts_sigma": 5.551688447550963,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 26.76241842722395,
+      "home_pts_sigma": 5.674132635911193,
+      "away_pts_mu": 26.5910839967369,
+      "away_pts_sigma": 5.674132635911193,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Shai Gilgeous-Alexander",
+        "player_id": 1628983,
+        "pts_mean": 24.347,
+        "reb_mean": 2.5899,
+        "ast_mean": 7.8279,
+        "threes_mean": 1.7751,
+        "pra_mean": 34.764799999999994,
+        "stl_mean": 0.6348649999999998,
+        "blk_mean": 0.5194349999999999,
+        "tov_mean": 1.7314499999999995,
+        "pts_sd": 6.08675,
+        "reb_sd": 1.0,
+        "ast_sd": 1.956975,
+        "threes_sd": 1.0,
+        "pra_sd": 8.691199999999998,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Chet Holmgren",
+        "player_id": 1631096,
+        "pts_mean": 19.6716,
+        "reb_mean": 9.5642,
+        "ast_mean": 2.0564,
+        "threes_mean": 2.1631,
+        "pra_mean": 31.2922,
+        "stl_mean": 0.5544131999999999,
+        "blk_mean": 0.4536107999999999,
+        "tov_mean": 1.5120359999999995,
+        "pts_sd": 4.9179,
+        "reb_sd": 2.39105,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 7.82305,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Jalen Williams",
+        "player_id": 1631114,
+        "pts_mean": 16.15,
+        "reb_mean": 5.1,
+        "ast_mean": 6.15,
+        "threes_mean": 0.38,
+        "pra_mean": 27.4,
+        "stl_mean": 0.5999399999999999,
+        "blk_mean": 0.4908599999999999,
+        "tov_mean": 1.6361999999999997,
+        "pts_sd": 4.0375,
+        "reb_sd": 1.275,
+        "ast_sd": 1.5375,
+        "threes_sd": 1.0,
+        "pra_sd": 6.85,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Branden Carlson",
+        "player_id": 1642382,
+        "pts_mean": 16.26,
+        "reb_mean": 6.86,
+        "ast_mean": 1.61,
+        "threes_mean": 2.57,
+        "pra_mean": 24.73,
+        "stl_mean": 0.5513199999999998,
+        "blk_mean": 0.4510799999999998,
+        "tov_mean": 1.5035999999999996,
+        "pts_sd": 4.065,
+        "reb_sd": 1.715,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.1825,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Nikola Topi\u0107",
+        "player_id": 1642260,
+        "pts_mean": 9.46,
+        "reb_mean": 2.45,
+        "ast_mean": 8.16,
+        "threes_mean": 1.1,
+        "pra_mean": 20.07,
+        "stl_mean": 0.5590199999999999,
+        "blk_mean": 0.4573799999999999,
+        "tov_mean": 1.5245999999999995,
+        "pts_sd": 2.365,
+        "reb_sd": 1.0,
+        "ast_sd": 2.04,
+        "threes_sd": 1.0,
+        "pra_sd": 5.0175,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Kenrich Williams",
+        "player_id": 1629026,
+        "pts_mean": 8.53,
+        "reb_mean": 6.08,
+        "ast_mean": 3.1499999999999995,
+        "threes_mean": 1.09,
+        "pra_mean": 17.759999999999998,
+        "stl_mean": 0.4527599999999999,
+        "blk_mean": 0.3704399999999999,
+        "tov_mean": 1.2348,
+        "pts_sd": 2.1325,
+        "reb_sd": 1.52,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.4399999999999995,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Isaiah Joe",
+        "player_id": 1630198,
+        "pts_mean": 14.9671,
+        "reb_mean": 1.6781,
+        "ast_mean": 0.9215,
+        "threes_mean": 3.7054,
+        "pra_mean": 17.566699999999997,
+        "stl_mean": 0.3868941999999999,
+        "blk_mean": 0.3165497999999999,
+        "tov_mean": 1.0551659999999998,
+        "pts_sd": 3.741775,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.391674999999999,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Isaiah Hartenstein",
+        "player_id": 1628392,
+        "pts_mean": 6.8773,
+        "reb_mean": 7.5272,
+        "ast_mean": 2.0564,
+        "threes_mean": 0.0,
+        "pra_mean": 16.4609,
+        "stl_mean": 0.393723,
+        "blk_mean": 0.3221369999999999,
+        "tov_mean": 1.07379,
+        "pts_sd": 1.719325,
+        "reb_sd": 1.8818,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.115225,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Payton Sandfort",
+        "player_id": 1642362,
+        "pts_mean": 11.4625,
+        "reb_mean": 2.875,
+        "ast_mean": 0.0,
+        "threes_mean": 2.3125,
+        "pra_mean": 14.3375,
+        "stl_mean": 0.410575,
+        "blk_mean": 0.335925,
+        "tov_mean": 1.11975,
+        "pts_sd": 2.865625,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.584375,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Ajay Mitchell",
+        "player_id": 1642349,
+        "pts_mean": 8.419599999999999,
+        "reb_mean": 1.8527,
+        "ast_mean": 3.5114,
+        "threes_mean": 0.6402,
+        "pra_mean": 13.7837,
+        "stl_mean": 0.4839911999999999,
+        "blk_mean": 0.3959927999999999,
+        "tov_mean": 1.3199759999999998,
+        "pts_sd": 2.1048999999999998,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.445925,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Jared McCain",
+        "player_id": 1642272,
+        "pts_mean": 8.71,
+        "reb_mean": 1.98,
+        "ast_mean": 1.39,
+        "threes_mean": 0.93,
+        "pra_mean": 12.080000000000002,
+        "stl_mean": 0.3973199999999999,
+        "blk_mean": 0.32508,
+        "tov_mean": 1.0836,
+        "pts_sd": 2.1775,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.0200000000000005,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Cason Wallace",
+        "player_id": 1641717,
+        "pts_mean": 7.158599999999999,
+        "reb_mean": 2.6384,
+        "ast_mean": 1.5035,
+        "threes_mean": 1.649,
+        "pra_mean": 11.3005,
+        "stl_mean": 0.472681,
+        "blk_mean": 0.386739,
+        "tov_mean": 1.28913,
+        "pts_sd": 1.7896499999999997,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.825125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Jaylin Williams",
+        "player_id": 1631119,
+        "pts_mean": 4.345599999999999,
+        "reb_mean": 4.9373,
+        "ast_mean": 1.9206,
+        "threes_mean": 1.0476,
+        "pra_mean": 11.203499999999998,
+        "stl_mean": 0.3265019999999999,
+        "blk_mean": 0.267138,
+        "tov_mean": 0.8904599999999999,
+        "pts_sd": 1.0863999999999998,
+        "reb_sd": 1.234325,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.8008749999999996,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Luguentz Dort",
+        "player_id": 1629652,
+        "pts_mean": 6.92,
+        "reb_mean": 1.98,
+        "ast_mean": 0.99,
+        "threes_mean": 1.92,
+        "pra_mean": 9.89,
+        "stl_mean": 0.45232,
+        "blk_mean": 0.37008,
+        "tov_mean": 1.2336,
+        "pts_sd": 1.73,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.4725,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Aaron Wiggins",
+        "player_id": 1630598,
+        "pts_mean": 5.49,
+        "reb_mean": 1.76,
+        "ast_mean": 2.4,
+        "threes_mean": 1.02,
+        "pra_mean": 9.65,
+        "stl_mean": 0.41074,
+        "blk_mean": 0.33606,
+        "tov_mean": 1.1202,
+        "pts_sd": 1.3725,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.4125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Brooks Barnhizer",
+        "player_id": 1642964,
+        "pts_mean": 4.78,
+        "reb_mean": 3.33,
+        "ast_mean": 0.85,
+        "threes_mean": 0.53,
+        "pra_mean": 8.959999999999999,
+        "stl_mean": 0.39468,
+        "blk_mean": 0.32292,
+        "tov_mean": 1.0764,
+        "pts_sd": 1.195,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.2399999999999998,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Alex Caruso",
+        "player_id": 1627936,
+        "pts_mean": 3.9188,
+        "reb_mean": 2.7742,
+        "ast_mean": 1.1252,
+        "threes_mean": 0.8341999999999999,
+        "pra_mean": 7.818199999999999,
+        "stl_mean": 0.3068691999999999,
+        "blk_mean": 0.2510748,
+        "tov_mean": 0.8369159999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.9545499999999998,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "OKC",
+        "opponent": "SAS",
+        "player_name": "Buddy Boeheim",
+        "player_id": 1631205,
+        "pts_mean": 1.125,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.375,
+        "pra_mean": 1.125,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "away": [
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Victor Wembanyama",
+        "player_id": 1641705,
+        "pts_mean": 33.11,
+        "reb_mean": 13.15,
+        "ast_mean": 4.25,
+        "threes_mean": 1.8,
+        "pra_mean": 50.51,
+        "stl_mean": 0.6091799999999999,
+        "blk_mean": 0.4984199999999999,
+        "tov_mean": 1.6613999999999998,
+        "pts_sd": 8.2775,
+        "reb_sd": 3.2875,
+        "ast_sd": 1.0625,
+        "threes_sd": 1.0,
+        "pra_sd": 12.6275,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Stephon Castle",
+        "player_id": 1642264,
+        "pts_mean": 15.56,
+        "reb_mean": 8.16,
+        "ast_mean": 9.62,
+        "threes_mean": 1.48,
+        "pra_mean": 33.34,
+        "stl_mean": 0.70334,
+        "blk_mean": 0.57546,
+        "tov_mean": 1.9182,
+        "pts_sd": 3.89,
+        "reb_sd": 2.04,
+        "ast_sd": 2.405,
+        "threes_sd": 1.0,
+        "pra_sd": 8.335,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "De'Aaron Fox",
+        "player_id": 1628368,
+        "pts_mean": 20.08,
+        "reb_mean": 3.92,
+        "ast_mean": 6.19,
+        "threes_mean": 2.46,
+        "pra_mean": 30.19,
+        "stl_mean": 0.69872,
+        "blk_mean": 0.57168,
+        "tov_mean": 1.9056,
+        "pts_sd": 5.02,
+        "reb_sd": 1.0,
+        "ast_sd": 1.5475,
+        "threes_sd": 1.0,
+        "pra_sd": 7.5475,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Keldon Johnson",
+        "player_id": 1629640,
+        "pts_mean": 16.62,
+        "reb_mean": 6.050000000000001,
+        "ast_mean": 1.22,
+        "threes_mean": 1.12,
+        "pra_mean": 23.89,
+        "stl_mean": 0.5238200000000001,
+        "blk_mean": 0.42858,
+        "tov_mean": 1.4286,
+        "pts_sd": 4.155,
+        "reb_sd": 1.5125000000000002,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.9725,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Devin Vassell",
+        "player_id": 1630170,
+        "pts_mean": 13.76,
+        "reb_mean": 4.67,
+        "ast_mean": 2.0700000000000003,
+        "threes_mean": 2.2299999999999995,
+        "pra_mean": 20.5,
+        "stl_mean": 0.68662,
+        "blk_mean": 0.56178,
+        "tov_mean": 1.8726,
+        "pts_sd": 3.44,
+        "reb_sd": 1.1675,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 5.125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Dylan Harper",
+        "player_id": 1642844,
+        "pts_mean": 11.989999999999998,
+        "reb_mean": 3.78,
+        "ast_mean": 3.29,
+        "threes_mean": 0.78,
+        "pra_mean": 19.06,
+        "stl_mean": 0.5277799999999999,
+        "blk_mean": 0.4318199999999999,
+        "tov_mean": 1.4393999999999998,
+        "pts_sd": 2.9974999999999996,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.765,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Carter Bryant",
+        "player_id": 1642868,
+        "pts_mean": 10.6,
+        "reb_mean": 3.89,
+        "ast_mean": 2.99,
+        "threes_mean": 1.95,
+        "pra_mean": 17.480000000000004,
+        "stl_mean": 0.495,
+        "blk_mean": 0.4049999999999999,
+        "tov_mean": 1.35,
+        "pts_sd": 2.65,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.370000000000001,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Julian Champagnie",
+        "player_id": 1630577,
+        "pts_mean": 8.969999999999999,
+        "reb_mean": 5.33,
+        "ast_mean": 1.6800000000000002,
+        "threes_mean": 1.44,
+        "pra_mean": 15.98,
+        "stl_mean": 0.58916,
+        "blk_mean": 0.4820399999999999,
+        "tov_mean": 1.6068,
+        "pts_sd": 2.2424999999999997,
+        "reb_sd": 1.3325,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.995,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Luke Kornet",
+        "player_id": 1628436,
+        "pts_mean": 5.74,
+        "reb_mean": 5.409999999999999,
+        "ast_mean": 2.33,
+        "threes_mean": 0.0,
+        "pra_mean": 13.48,
+        "stl_mean": 0.4527599999999999,
+        "blk_mean": 0.3704399999999999,
+        "tov_mean": 1.2348,
+        "pts_sd": 1.435,
+        "reb_sd": 1.3524999999999998,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.37,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Harrison Barnes",
+        "player_id": 203084,
+        "pts_mean": 10.2,
+        "reb_mean": 1.48,
+        "ast_mean": 1.16,
+        "threes_mean": 1.4,
+        "pra_mean": 12.84,
+        "stl_mean": 0.53042,
+        "blk_mean": 0.43398,
+        "tov_mean": 1.4466,
+        "pts_sd": 2.55,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.21,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Kelly Olynyk",
+        "player_id": 203482,
+        "pts_mean": 2.32,
+        "reb_mean": 1.52,
+        "ast_mean": 1.07,
+        "threes_mean": 0.2299999999999999,
+        "pra_mean": 4.91,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.2275,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Mason Plumlee",
+        "player_id": 203486,
+        "pts_mean": 1.3299999999999998,
+        "reb_mean": 2.47,
+        "ast_mean": 0.91,
+        "threes_mean": 0.0,
+        "pra_mean": 4.71,
+        "stl_mean": 0.2320999999999999,
+        "blk_mean": 0.1898999999999999,
+        "tov_mean": 0.6329999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.1775,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Jordan McLaughlin",
+        "player_id": 1629162,
+        "pts_mean": 2.21,
+        "reb_mean": 1.16,
+        "ast_mean": 0.65,
+        "threes_mean": 0.25,
+        "pra_mean": 4.0200000000000005,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0050000000000001,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "David Jones Garcia",
+        "player_id": 1642357,
+        "pts_mean": 2.07,
+        "reb_mean": 0.73,
+        "ast_mean": 1.17,
+        "threes_mean": 0.3999999999999999,
+        "pra_mean": 3.97,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Lindy Waters III",
+        "player_id": 1630322,
+        "pts_mean": 2.76,
+        "reb_mean": 0.72,
+        "ast_mean": 0.47,
+        "threes_mean": 0.8299999999999998,
+        "pra_mean": 3.95,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Bismack Biyombo",
+        "player_id": 202687,
+        "pts_mean": 1.16,
+        "reb_mean": 1.5,
+        "ast_mean": 0.02,
+        "threes_mean": 0.0,
+        "pra_mean": 2.68,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Stanley Umude",
+        "player_id": 1630649,
+        "pts_mean": 1.15,
+        "reb_mean": 0.0,
+        "ast_mean": 0.575,
+        "threes_mean": 0.0,
+        "pra_mean": 1.725,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "team": "SAS",
+        "opponent": "OKC",
+        "player_name": "Harrison Ingram",
+        "player_id": 1631127,
+        "pts_mean": 1.2742857142857142,
+        "reb_mean": 0.2257142857142857,
+        "ast_mean": 0.1985714285714285,
+        "threes_mean": 0.0285714285714285,
+        "pra_mean": 1.6985714285714286,
+        "stl_mean": 0.176,
+        "blk_mean": 0.144,
+        "tov_mean": 0.48,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 178.59310000000002,
+  "away_team_total_pts_mean": 160.90428571428572,
+  "excluded_player_keys_by_team": {
+    "OKC": [],
+    "SAS": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 104.5216,
+    "away_pace": 102.26333333333334,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 150
+}

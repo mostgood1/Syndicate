@@ -1,0 +1,6 @@
+[2026-06-06T18:24:46] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-06-05 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\nba_source\source_artifacts\data\raw\odds_nba_player_props_2026-06-05.csv' --regions us
+ERROR: No player props fetched for 2026-06-05 and no same-day snapshot exists to preserve
+[2026-06-06T18:24:48] Skipping local props recommendations export for 2026-06-05: props predictions were not refreshed
+[2026-06-06T18:24:48] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m source_artifacts.cli export-game-cards --date 2026-06-05
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'source_artifacts.cli' (ModuleNotFoundError: No module named 'source_artifacts')
+[2026-06-06T18:24:48] Local game_cards build skipped for 2026-06-05: no raw team odds snapshot found

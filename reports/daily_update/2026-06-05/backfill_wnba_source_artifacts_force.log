@@ -1,0 +1,27 @@
+[2026-06-06T18:37:12] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-06-05 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-06-05.csv' --regions us
+WARNING: No player props fetched for 2026-06-05; preserving existing snapshot at C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\raw\odds_wnba_player_props_2026-06-05.csv
+[2026-06-06T18:37:13] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\oddsapi_player_props_2026-06-05.csv (rows=280)
+[2026-06-06T18:37:13] Generating required game predictions artifact via source bootstrap: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\predictions_2026-06-05.csv
+[2026-06-06T18:37:13] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-06T18:37:14] Seeded fallback game odds slate from props snapshot: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\game_odds_2026-06-05.csv (rows=2)
+[2026-06-06T18:37:14] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-06-05
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-06T18:37:14] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-06-06T18:37:14] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli daily-update --date 2026-06-05 --no-npu --no-git-push
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-06T18:37:14] Rebuilt predictions slate from local game odds for 2026-06-05: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\predictions_2026-06-05.csv (rows=2)
+[2026-06-06T18:37:14] Generated game predictions at C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\predictions_2026-06-05.csv (rows=2)
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_features.py:56: DtypeWarning: Columns (0: STARTER, 1: teamCity, 2: teamName, 3: teamTricode, 4: teamSlug, 5: firstName, 6: familyName, 7: nameI, 8: playerSlug, 9: position, 10: comment, 11: minutes) have mixed types. Specify dtype option on import or set low_memory=False.
+  return pd.read_csv(path)
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\syndicate\features\shared\basketball_props_onnx.py:146: DtypeWarning: Columns (0: STARTER, 1: teamCity, 2: teamName, 3: teamTricode, 4: teamSlug, 5: firstName, 6: familyName, 7: nameI, 8: playerSlug, 9: position, 10: comment, 11: minutes) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(csv_path)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-06-06T18:37:45] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-06T18:37:45] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-06-05
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-06T18:37:45] predict-date failed with exit code 1; retrying via CPU daily-update fallback
+[2026-06-06T18:37:45] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli daily-update --date 2026-06-05 --no-npu --no-git-push
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'wnba_betting.cli' (ModuleNotFoundError: No module named 'wnba_betting')
+[2026-06-06T18:37:45] Built local game_cards from game_odds fallback: C:\Users\tempadmin\OneDrive\Coding\Syndicate\data\wnba_source\data\processed\game_cards_2026-06-05.csv (rows=2)

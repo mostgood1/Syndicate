@@ -1,0 +1,9 @@
+[2026-06-05T15:20:24] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-06-05 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-06-05.csv' --regions us
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-06-05.csv with 1940 rows.
+[2026-06-05T15:20:25] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\oddsapi_player_props_2026-06-05.csv (rows=1940)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-06-05T15:20:43] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting_repo.cli export-game-cards --date 2026-06-05
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'nba_betting_repo.cli' (ModuleNotFoundError: No module named 'nba_betting_repo')
+[2026-06-05T15:20:43] Built local game_cards from game_odds fallback: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\processed\game_cards_2026-06-05.csv (rows=1)

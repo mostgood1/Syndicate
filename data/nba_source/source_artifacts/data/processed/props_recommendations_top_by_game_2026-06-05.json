@@ -1,0 +1,133 @@
+{
+  "date": "2026-06-05",
+  "data": [
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
+      "player": "Jose Alvarado",
+      "team": "NYK",
+      "team_tricode": "NYK",
+      "opponent": "SAS",
+      "score": 76.25858495832668,
+      "score_adj": 76.25858495832668,
+      "tier": "High",
+      "model": {
+        "pts": 10.89,
+        "reb": 3.43,
+        "ast": 4.359999999999999,
+        "threes": 1.9,
+        "stl": 0.4932399999999999,
+        "blk": 0.4035599999999999,
+        "tov": 1.3451999999999995,
+        "pra": 18.68,
+        "pr": 14.32,
+        "pa": 15.25,
+        "ra": 7.789999999999999
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 0.5,
+        "price": -109.0,
+        "edge": 0.3977122373424693,
+        "ev": 0.7625858495832668,
+        "ev_pct": 76.25858495832668,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 76.3%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.9 vs line 0.5 (+1.4)"
+    },
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
+      "player": "Victor Wembanyama",
+      "team": "SAS",
+      "team_tricode": "SAS",
+      "opponent": "NYK",
+      "score": 74.0,
+      "score_adj": 74.0,
+      "tier": "High",
+      "model": {
+        "pts": 33.11,
+        "reb": 13.15,
+        "ast": 4.25,
+        "threes": 1.8,
+        "stl": 0.6091799999999999,
+        "blk": 0.4984199999999999,
+        "tov": 1.6613999999999998,
+        "pra": 50.51,
+        "pr": 46.26,
+        "pa": 37.36,
+        "ra": 17.4
+      },
+      "top_play": {
+        "market": "blk",
+        "side": "UNDER",
+        "line": 3.5,
+        "price": -132.0,
+        "edge": 0.42103448275862065,
+        "ev": 0.74,
+        "ev_pct": 74.0,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 74.0%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.5 vs line 3.5 (-3.0)"
+    },
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
+      "player": "Julian Champagnie",
+      "team": "SAS",
+      "team_tricode": "SAS",
+      "opponent": "NYK",
+      "score": 64.02237390909299,
+      "score_adj": 64.02237390909299,
+      "tier": "High",
+      "model": {
+        "pts": 8.969999999999999,
+        "reb": 5.33,
+        "ast": 1.6800000000000002,
+        "threes": 1.44,
+        "stl": 0.58916,
+        "blk": 0.4820399999999999,
+        "tov": 1.6068,
+        "pra": 15.98,
+        "pr": 14.299999999999999,
+        "pa": 10.649999999999999,
+        "ra": 7.01
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 2.5,
+        "price": -109.0,
+        "edge": 0.33389659120053283,
+        "ev": 0.6402237390909299,
+        "ev_pct": 64.02237390909299,
+        "book": "betrivers",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 64.0%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 5 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.4 vs line 2.5 (-1.1)"
+    }
+  ]
+}
