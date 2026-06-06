@@ -859,6 +859,14 @@ def _merge_games_with_live_state(games: list[dict[str, Any]], selected_date: str
 
         merged = dict(game)
         live_state_row = live_game.get("live_state") if isinstance(live_game.get("live_state"), dict) else {}
+        live_event_id = str(
+            live_game.get("event_id")
+            or live_state_row.get("event_id")
+            or merged.get("event_id")
+            or ""
+        ).strip()
+        if live_event_id:
+            merged["event_id"] = live_event_id
         if live_state_row:
             merged["live_state"] = dict(live_state_row)
 

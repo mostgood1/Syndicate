@@ -1415,6 +1415,44 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((games or [{}])[0].get("event_id"), "401856961")
         self.assertEqual((((games or [{}])[0].get("live_state") or {}).get("event_id")), "401856961")
 
+    def test_nba_cards_live_state_supplement_sets_event_id_on_merged_game(self) -> None:
+        artifact_game = {
+            "gamePk": "1",
+            "away_tri": "NYK",
+            "home_tri": "SAS",
+            "away": {"abbr": "NYK"},
+            "home": {"abbr": "SAS"},
+            "status": "Scheduled",
+            "detail": "Scheduled",
+            "live_state": {},
+        }
+        live_game = {
+            "event_id": "401859964",
+            "away_tri": "NYK",
+            "home_tri": "SAS",
+            "status": "Live",
+            "detail": "10:12 - 2nd",
+            "live_state": {
+                "event_id": "401859964",
+                "away_pts": 28,
+                "home_pts": 37,
+                "in_progress": True,
+                "final": False,
+                "status": "10:12 - 2nd",
+            },
+        }
+
+        with patch(
+            "syndicate.features.nba.cards._games_from_live_state_fallback",
+            return_value=([live_game], "live_state_2026-06-05.jsonl"),
+        ):
+            from syndicate.features.nba.cards import _merge_games_with_live_state
+
+            games, _path, _extras, _updated = _merge_games_with_live_state([artifact_game], "2026-06-05")
+
+        self.assertEqual((games or [{}])[0].get("event_id"), "401859964")
+        self.assertEqual((((games or [{}])[0].get("live_state") or {}).get("event_id")), "401859964")
+
     def test_wnba_api_source_team_logo_fetches_official_logo_without_source_proxy(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
