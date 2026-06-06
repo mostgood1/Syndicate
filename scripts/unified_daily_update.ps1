@@ -408,7 +408,9 @@ function Resolve-Python {
         (Join-Path $RepoPath '.venv_x64\Scripts\python.exe'),
         (Join-Path $RepoPath '.venv\Scripts\python.exe'),
         (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311\python.exe'),
-        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe')
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311-arm64\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312-arm64\python.exe')
     )
     foreach ($candidate in $candidatePaths) {
         if ((Test-Path $candidate) -and (Test-PythonExecutable -Executable $candidate)) {

@@ -52,7 +52,9 @@ function Resolve-Python {
         (Join-Path $RepoPath '.venv_x64\Scripts\python.exe'),
         (Join-Path $RepoPath '.venv\Scripts\python.exe'),
         (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311\python.exe'),
-        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe')
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python311-arm64\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312-arm64\python.exe')
     )
 
     foreach ($candidate in $candidatePaths) {
@@ -274,7 +276,7 @@ try {
     $gateCommand += @('--smoke-timeout-sec', [string][Math]::Max(1, $GateSmokeTimeoutSec))
     $gateCommand += @('--write-dir', $runArtifactsDir)
 
-    $gateOutput = Invoke-Step -Name 'Migration gate' -Command $gateCommand -ArtifactName 'migration_gate_console.txt'
+    Invoke-Step -Name 'Migration gate' -Command $gateCommand -ArtifactName 'migration_gate_console.txt' | Out-Null
     $runSummary = [pscustomobject]@{
         date = $Date
         runStamp = $runStamp
