@@ -1914,7 +1914,47 @@ class DateArchiveHelperTests(unittest.TestCase):
 
         self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "evt-1")
         self.assertEqual(((payload.get("games") or [{}])[0].get("lines") or {}).get("total"), 174.0)
-        self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_totals") or {}).get("q1"), 41.707)
+        self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_totals") or {}), {})
+        self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_spreads") or {}), {})
+
+    def test_nba_live_lines_fallback_does_not_synthesize_interval_lines_from_sim(self) -> None:
+        fallback_game = {
+            "event_id": "401859964",
+            "betting": {
+                "total": 216.0,
+                "home_spread": -6.0,
+                "away_spread": 6.0,
+                "home_ml": -200.0,
+                "away_ml": 200.0,
+            },
+            "sim": {
+                "periods": {
+                    "q1": {"total_mean": 54.0, "margin_mean": 1.5},
+                    "q2": {"total_mean": 54.0, "margin_mean": 1.5},
+                    "q3": {"total_mean": 54.0, "margin_mean": 1.5},
+                    "q4": {"total_mean": 54.0, "margin_mean": 1.5},
+                }
+            },
+        }
+
+        with patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.nba.cards._resolve_games_for_event_ids",
+            return_value={"401859964": fallback_game},
+        ):
+            from syndicate.features.nba.cards import build_live_lines_payload as build_nba_live_lines_payload
+
+            payload = build_nba_live_lines_payload("2026-06-05", ["401859964"], include_period_totals=True)
+
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401859964")
+        self.assertEqual(((payload.get("games") or [{}])[0].get("lines") or {}).get("total"), 216.0)
+        self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_totals") or {}), {})
+        self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_spreads") or {}), {})
 
     def test_wnba_live_state_status_text_infers_period_and_clock(self) -> None:
         from syndicate.features.wnba.cards import _infer_period_clock_from_status_text

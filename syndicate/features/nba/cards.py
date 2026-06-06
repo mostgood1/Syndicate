@@ -1542,36 +1542,6 @@ def _source_sim_periods(sim_game: dict[str, Any] | None) -> dict[str, dict[str, 
 
 def _fallback_live_lines_game(game: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
-    sim_periods = _source_sim_periods({"sim": game.get("sim")}) if isinstance(game.get("sim"), dict) else {}
-    period_totals: dict[str, float] = {}
-    period_spreads: dict[str, float] = {}
-    for period_key, period_payload in sim_periods.items():
-        if not isinstance(period_payload, dict):
-            continue
-        total_mean = _safe_float(period_payload.get("total_mean"))
-        margin_mean = _safe_float(period_payload.get("margin_mean"))
-        if total_mean is not None:
-            period_totals[period_key] = round(total_mean, 3)
-        if margin_mean is not None:
-            period_spreads[period_key] = round(-margin_mean, 3)
-
-    q1 = _safe_float(period_totals.get("q1"))
-    q2 = _safe_float(period_totals.get("q2"))
-    q3 = _safe_float(period_totals.get("q3"))
-    q4 = _safe_float(period_totals.get("q4"))
-    if q1 is not None and q2 is not None:
-        period_totals.setdefault("h1", round(q1 + q2, 3))
-    if q3 is not None and q4 is not None:
-        period_totals.setdefault("h2", round(q3 + q4, 3))
-    s1 = _safe_float(period_spreads.get("q1"))
-    s2 = _safe_float(period_spreads.get("q2"))
-    s3 = _safe_float(period_spreads.get("q3"))
-    s4 = _safe_float(period_spreads.get("q4"))
-    if s1 is not None and s2 is not None:
-        period_spreads.setdefault("h1", round(s1 + s2, 3))
-    if s3 is not None and s4 is not None:
-        period_spreads.setdefault("h2", round(s3 + s4, 3))
-
     return {
         "event_id": game.get("event_id"),
         "found": True,
@@ -1581,8 +1551,8 @@ def _fallback_live_lines_game(game: dict[str, Any], *, include_period_totals: bo
             "away_spread": _safe_float(betting.get("away_spread")),
             "home_ml": _safe_float(betting.get("home_ml")),
             "away_ml": _safe_float(betting.get("away_ml")),
-            "period_totals": period_totals if include_period_totals else {},
-            "period_spreads": period_spreads,
+            "period_totals": {} if include_period_totals else {},
+            "period_spreads": {},
         },
     }
 
