@@ -1043,6 +1043,47 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl")
             self.assertEqual((((payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Aneesah Morrow")
 
+    def test_export_live_snapshot_artifacts_skips_empty_shells_without_replacement(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            source_snapshots = source_root / "data" / "processed" / "live_snapshots"
+            source_snapshots.mkdir(parents=True, exist_ok=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            module._write_live_snapshot_payload(
+                source_snapshots / "live_state_2026-06-05.jsonl",
+                {"ok": True, "games": [{"event_id": "401856963", "status": "Live"}]},
+            )
+            module._write_live_snapshot_payload(
+                source_snapshots / "live_lines_2026-06-05.jsonl",
+                {"ok": True, "games": [{"event_id": "401856963", "found": False, "lines": {}}]},
+            )
+            module._write_live_snapshot_payload(
+                source_snapshots / "live_player_lens_2026-06-05.jsonl",
+                {"ok": True, "games": [{"event_id": "401856963", "rows": []}]},
+            )
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+                module,
+                "_build_local_live_snapshot_payload",
+                return_value=None,
+            ):
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str="2026-06-05",
+                    processed_root=processed_root,
+                )
+
+            self.assertIn("live_state_path", copied)
+            self.assertNotIn("live_lines_path", copied)
+            self.assertNotIn("live_player_lens_path", copied)
+            self.assertFalse((processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl").exists())
+            self.assertFalse((processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl").exists())
+
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 

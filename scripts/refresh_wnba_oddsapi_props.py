@@ -177,6 +177,11 @@ def _payload_has_snapshot_content(kind: str, payload: dict[str, object] | None) 
     return True
 
 
+def _snapshot_artifact_has_meaningful_content(kind: str, path: Path | None) -> bool:
+    payload = _read_live_snapshot_payload(path) if path is not None else None
+    return _payload_has_snapshot_content(kind, payload)
+
+
 def _build_local_live_snapshot_payload(*, kind: str, date_str: str, event_ids: list[str]) -> dict[str, object] | None:
     normalized_kind = str(kind or "").strip().lower()
     try:
@@ -335,6 +340,11 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             state_payload = local_state_payload
     if _payload_has_snapshot_content("live_state", state_payload) and _write_live_snapshot_payload(state_destination, state_payload):
         copied["live_state_path"] = str(state_destination)
+    elif existing_state and not _snapshot_artifact_has_meaningful_content("live_state", state_destination):
+        try:
+            state_destination.unlink(missing_ok=True)
+        except Exception:
+            pass
 
     event_ids = [
         str(game.get("event_id") or "").strip()
@@ -359,12 +369,18 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             payload = _fetch_json(query)
         if not _payload_has_snapshot_content(kind, payload):
             payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
-        if isinstance(payload, dict) and (_payload_has_snapshot_content(kind, payload) or existing is None) and _write_live_snapshot_payload(destination, payload):
+        if isinstance(payload, dict) and _payload_has_snapshot_content(kind, payload) and _write_live_snapshot_payload(destination, payload):
             if copied_key:
                 copied[copied_key] = str(destination)
             continue
-        if existing and copied_key:
+        if existing and _snapshot_artifact_has_meaningful_content(kind, destination) and copied_key:
             copied[copied_key] = existing
+            continue
+        if existing:
+            try:
+                destination.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     return copied
 
