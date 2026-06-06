@@ -1030,6 +1030,8 @@
     const homeMl = Number(liveLines?.lines?.home_ml);
     const awayMl = Number(liveLines?.lines?.away_ml);
     const totalGate = Number(thresholds.adjustments?.game_total?.min_elapsed_min);
+    const homeMlImplied = impliedProbFromAmerican(homeMl);
+    const awayMlImplied = impliedProbFromAmerican(awayMl);
     const recentWindow = pbpStats?.pbp_recent || {};
     const currentPeriod = Number(liveState?.period);
     const periodTotals = liveLinesPeriodTotals(liveLines);
@@ -1269,7 +1271,9 @@
 
     let halfSignal = null;
     if (liveState.in_progress && lensHalfKey) {
-      const halfLine = Number(periodTotals?.[lensHalfKey]);
+      const halfLineFromPeriod = Number(periodTotals?.[lensHalfKey]);
+      const useGameHalfTotalLine = !Number.isFinite(halfLineFromPeriod) && Number.isFinite(lineTotal);
+      const halfLine = Number.isFinite(halfLineFromPeriod) ? halfLineFromPeriod : lineTotal;
       const halfActual = useUpcomingHalf ? 0 : halfTotalSoFar(liveState, currentTotal);
       const halfSim = simPeriodMean(game, lensHalfKey);
       const halfMinutesElapsed = lensHalfMinutesElapsed;
@@ -1285,7 +1289,18 @@
         const edge = projection - halfLine;
         const side = edge > 1 ? 'Over' : (edge < -1 ? 'Under' : 'No edge');
         const klass = classifyLens(Math.abs(edge), thresholds.half_total.watch, thresholds.half_total.bet);
-        halfSignal = buildSignal('half_total', lensHalfLabel, klass, side, edge, halfLine, projection, halfMinutesElapsed > 0 ? `Total ${fmtInteger(halfActual)}` : 'Opening live half line');
+        halfSignal = buildSignal(
+          'half_total',
+          lensHalfLabel,
+          klass,
+          side,
+          edge,
+          halfLine,
+          projection,
+          [halfMinutesElapsed > 0 ? `Total ${fmtInteger(halfActual)}` : 'Opening live half line', useGameHalfTotalLine ? 'Using current game total' : '']
+            .filter(Boolean)
+            .join(' · ')
+        );
         halfSignal.score = signalScore(Math.abs(edge), thresholds.half_total.bet);
 
         const halfTotalShapeReasons = [];
@@ -1315,7 +1330,9 @@
 
     let quarterSignal = null;
     if (liveState.in_progress && lensQuarterKey) {
-      const quarterLine = Number(periodTotals?.[lensQuarterKey]);
+      const quarterLineFromPeriod = Number(periodTotals?.[lensQuarterKey]);
+      const useGameQuarterTotalLine = !Number.isFinite(quarterLineFromPeriod) && Number.isFinite(lineTotal);
+      const quarterLine = Number.isFinite(quarterLineFromPeriod) ? quarterLineFromPeriod : lineTotal;
       const quarterActual = useUpcomingQuarter
         ? 0
         : currentQuarterTotal(liveState, currentTotal, lensQuarterKey);
@@ -1333,7 +1350,18 @@
         const edge = projection - quarterLine;
         const side = edge > 1 ? 'Over' : (edge < -1 ? 'Under' : 'No edge');
         const klass = classifyLens(Math.abs(edge), thresholds.quarter_total.watch, thresholds.quarter_total.bet);
-        quarterSignal = buildSignal('quarter_total', lensQuarterLabel, klass, side, edge, quarterLine, projection, quarterMinutesElapsed > 0 ? `Total ${fmtInteger(quarterActual)}` : 'Opening live period line');
+        quarterSignal = buildSignal(
+          'quarter_total',
+          lensQuarterLabel,
+          klass,
+          side,
+          edge,
+          quarterLine,
+          projection,
+          [quarterMinutesElapsed > 0 ? `Total ${fmtInteger(quarterActual)}` : 'Opening live period line', useGameQuarterTotalLine ? 'Using current game total' : '']
+            .filter(Boolean)
+            .join(' · ')
+        );
         quarterSignal.score = signalScore(Math.abs(edge), thresholds.quarter_total.bet);
 
         const quarterTotalShapeReasons = [];
@@ -1364,7 +1392,9 @@
     let halfAtsSignal = null;
     let halfMlSignal = null;
     if (liveState.in_progress && lensHalfKey) {
-      const halfSpread = Number(liveLines?.lines?.period_spreads?.[lensHalfKey]);
+      const halfSpreadFromPeriod = Number(liveLines?.lines?.period_spreads?.[lensHalfKey]);
+      const useGameHalfSpread = !Number.isFinite(halfSpreadFromPeriod) && Number.isFinite(homeSpread);
+      const halfSpread = Number.isFinite(halfSpreadFromPeriod) ? halfSpreadFromPeriod : homeSpread;
       const actualHalfMargin = Number.isFinite(currentMargin)
         ? (useUpcomingHalf ? 0 : (lensHalfKey === 'h2' ? currentMargin - completedMarginBeforePeriod(liveState, 3) : currentMargin))
         : null;
@@ -1386,7 +1416,18 @@
           const line = pickHome ? halfSpread : -halfSpread;
           const projection = pickHome ? projectedHalfMargin : -projectedHalfMargin;
           const klass = classifyLens(Math.abs(edge), thresholds.ats.watch, thresholds.ats.bet);
-          halfAtsSignal = buildSignal('half_ats', `${lensHalfLabel} ATS`, klass, side, edge, line, projection, halfMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedHalfMargin, 1)}` : 'Opening live half spread');
+          halfAtsSignal = buildSignal(
+            'half_ats',
+            `${lensHalfLabel} ATS`,
+            klass,
+            side,
+            edge,
+            line,
+            projection,
+            [halfMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedHalfMargin, 1)}` : 'Opening live half spread', useGameHalfSpread ? 'Using current game spread' : '']
+              .filter(Boolean)
+              .join(' · ')
+          );
           halfAtsSignal.score = signalScore(Math.abs(edge), thresholds.ats.bet);
 
           const halfAtsShapeReasons = [];
@@ -1415,11 +1456,25 @@
           const homeEdge = pHomeHalf - 0.5;
           const awayEdge = (1 - pHomeHalf) - 0.5;
           const pickHome = Math.abs(homeEdge) >= Math.abs(awayEdge);
-          const edge = pickHome ? homeEdge : awayEdge;
+          const lineReference = pickHome
+            ? (Number.isFinite(homeMlImplied) ? homeMlImplied : 0.5)
+            : (Number.isFinite(awayMlImplied) ? awayMlImplied : 0.5);
+          const edge = (pickHome ? pHomeHalf : (1 - pHomeHalf)) - lineReference;
           const side = pickHome ? game?.home_tri : game?.away_tri;
           const projection = pickHome ? pHomeHalf : (1 - pHomeHalf);
           const klass = classifyLens(Math.abs(edge), halfMlThresholds.watch, halfMlThresholds.bet);
-          halfMlSignal = buildSignal('half_ml', `${lensHalfLabel} ML`, klass, side, edge, 0.5, projection, `Model ${fmtPercent(projection, 0)}`);
+          halfMlSignal = buildSignal(
+            'half_ml',
+            `${lensHalfLabel} ML`,
+            klass,
+            side,
+            edge,
+            lineReference,
+            projection,
+            [Number.isFinite(homeMlImplied) && Number.isFinite(awayMlImplied) ? 'Using current game moneyline' : '', `Model ${fmtPercent(projection, 0)}`]
+              .filter(Boolean)
+              .join(' · ')
+          );
           halfMlSignal.score = signalScore(Math.abs(edge), halfMlThresholds.bet);
 
           const baselineHalfProb = Number.isFinite(simHalfMargin)
@@ -1450,7 +1505,9 @@
     let quarterAtsSignal = null;
     let quarterMlSignal = null;
     if (liveState.in_progress && lensQuarterKey) {
-      const quarterSpread = Number(liveLines?.lines?.period_spreads?.[lensQuarterKey]);
+      const quarterSpreadFromPeriod = Number(liveLines?.lines?.period_spreads?.[lensQuarterKey]);
+      const useGameQuarterSpread = !Number.isFinite(quarterSpreadFromPeriod) && Number.isFinite(homeSpread);
+      const quarterSpread = Number.isFinite(quarterSpreadFromPeriod) ? quarterSpreadFromPeriod : homeSpread;
       const actualQuarterMargin = useUpcomingQuarter ? 0 : currentQuarterMargin(liveState, currentMargin, lensQuarterKey);
       const simQuarterMargin = simPeriodMargin(game, lensQuarterKey);
       const quarterMinutesElapsed = lensQuarterMinutesElapsed;
@@ -1470,7 +1527,18 @@
           const line = pickHome ? quarterSpread : -quarterSpread;
           const projection = pickHome ? projectedQuarterMargin : -projectedQuarterMargin;
           const klass = classifyLens(Math.abs(edge), thresholds.ats.watch, thresholds.ats.bet);
-          quarterAtsSignal = buildSignal('quarter_ats', `${lensQuarterLabel} ATS`, klass, side, edge, line, projection, quarterMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedQuarterMargin, 1)}` : 'Opening live period spread');
+          quarterAtsSignal = buildSignal(
+            'quarter_ats',
+            `${lensQuarterLabel} ATS`,
+            klass,
+            side,
+            edge,
+            line,
+            projection,
+            [quarterMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedQuarterMargin, 1)}` : 'Opening live period spread', useGameQuarterSpread ? 'Using current game spread' : '']
+              .filter(Boolean)
+              .join(' · ')
+          );
           quarterAtsSignal.score = signalScore(Math.abs(edge), thresholds.ats.bet);
 
           const quarterAtsShapeReasons = [];
@@ -1499,11 +1567,25 @@
           const homeEdge = pHomeQuarter - 0.5;
           const awayEdge = (1 - pHomeQuarter) - 0.5;
           const pickHome = Math.abs(homeEdge) >= Math.abs(awayEdge);
-          const edge = pickHome ? homeEdge : awayEdge;
+          const lineReference = pickHome
+            ? (Number.isFinite(homeMlImplied) ? homeMlImplied : 0.5)
+            : (Number.isFinite(awayMlImplied) ? awayMlImplied : 0.5);
+          const edge = (pickHome ? pHomeQuarter : (1 - pHomeQuarter)) - lineReference;
           const side = pickHome ? game?.home_tri : game?.away_tri;
           const projection = pickHome ? pHomeQuarter : (1 - pHomeQuarter);
           const klass = classifyLens(Math.abs(edge), quarterMlThresholds.watch, quarterMlThresholds.bet);
-          quarterMlSignal = buildSignal('quarter_ml', `${lensQuarterLabel} ML`, klass, side, edge, 0.5, projection, `Model ${fmtPercent(projection, 0)}`);
+          quarterMlSignal = buildSignal(
+            'quarter_ml',
+            `${lensQuarterLabel} ML`,
+            klass,
+            side,
+            edge,
+            lineReference,
+            projection,
+            [Number.isFinite(homeMlImplied) && Number.isFinite(awayMlImplied) ? 'Using current game moneyline' : '', `Model ${fmtPercent(projection, 0)}`]
+              .filter(Boolean)
+              .join(' · ')
+          );
           quarterMlSignal.score = signalScore(Math.abs(edge), quarterMlThresholds.bet);
 
           const baselineQuarterProb = Number.isFinite(simQuarterMargin)
@@ -1597,15 +1679,13 @@
       const pHomeModel = Number.isFinite(pregameHomeWin)
         ? ((1 - blendWeight) * pregameHomeWin) + (blendWeight * scoreProb)
         : scoreProb;
-      const pHomeImplied = impliedProbFromAmerican(homeMl);
-      const pAwayImplied = impliedProbFromAmerican(awayMl);
-      if (Number.isFinite(pHomeImplied) && Number.isFinite(pAwayImplied)) {
-        const homeEdge = pHomeModel - pHomeImplied;
-        const awayEdge = (1 - pHomeModel) - pAwayImplied;
+      if (Number.isFinite(homeMlImplied) && Number.isFinite(awayMlImplied)) {
+        const homeEdge = pHomeModel - homeMlImplied;
+        const awayEdge = (1 - pHomeModel) - awayMlImplied;
         const pickHome = Math.abs(homeEdge) >= Math.abs(awayEdge);
         const edge = pickHome ? homeEdge : awayEdge;
         const side = pickHome ? game?.home_tri : game?.away_tri;
-        const line = pickHome ? pHomeImplied : pAwayImplied;
+        const line = pickHome ? homeMlImplied : awayMlImplied;
         const projection = pickHome ? pHomeModel : (1 - pHomeModel);
         const klass = classifyLens(Math.abs(edge), thresholds.ml.watch, thresholds.ml.bet);
         const priorDetail = Number.isFinite(pregameHomeWin) ? `Prior ${fmtPercent(pickHome ? pregameHomeWin : (1 - pregameHomeWin), 0)}` : null;
@@ -2562,10 +2642,11 @@
     const targetMinutes = Number.isFinite(simMin) && simMin > 0 ? Math.max(played, Math.min(48, simMin)) : 48;
     const rawProjection = (actualValue / played) * targetMinutes;
     if (!Number.isFinite(simMean)) {
-      return rawProjection;
+      return Math.max(actualValue, rawProjection);
     }
     const blendWeight = clampNumber(played / Math.max(targetMinutes, 1), 0.25, 0.85);
-    return ((1 - blendWeight) * simMean) + (blendWeight * rawProjection);
+    const blendedProjection = ((1 - blendWeight) * simMean) + (blendWeight * rawProjection);
+    return Math.max(actualValue, blendedProjection);
   }
 
   function buildLiveBoxscoreSimFallback(boxscorePayload, cardsGames, liveStatePayload, dateValue) {
@@ -3369,29 +3450,32 @@
       const ranked = candidates
         .filter((item) => Number.isFinite(candidateScore(item)))
         .sort((left, right) => candidateScore(right) - candidateScore(left));
-      return ranked[0] || null;
+      if (ranked.length) {
+        return ranked[0];
+      }
+      return candidates.find((item) => item?.available) || null;
     }
 
     if (marketKey === 'moneyline') {
       const candidates = [
-        { detail: `${home} ML ${fmtAmerican(betting.home_ml)}`, ev: toFiniteNumber(betting.home_ml_ev), probability: betting.p_home_win, tabTarget: 'game' },
-        { detail: `${away} ML ${fmtAmerican(betting.away_ml)}`, ev: toFiniteNumber(betting.away_ml_ev), probability: betting.p_away_win, tabTarget: 'game' },
+        { detail: `${home} ML ${fmtAmerican(betting.home_ml)}`, ev: toFiniteNumber(betting.home_ml_ev), probability: betting.p_home_win, tabTarget: 'game', available: Number.isFinite(toFiniteNumber(betting.home_ml)) },
+        { detail: `${away} ML ${fmtAmerican(betting.away_ml)}`, ev: toFiniteNumber(betting.away_ml_ev), probability: betting.p_away_win, tabTarget: 'game', available: Number.isFinite(toFiniteNumber(betting.away_ml)) },
       ];
       return chooseCandidate(candidates);
     }
     if (marketKey === 'spread') {
       const spread = toFiniteNumber(betting.home_spread);
       const candidates = [
-        { detail: `${home} ${Number.isFinite(spread) ? fmtSigned(spread) : '--'}`, ev: toFiniteNumber(betting.home_spread_ev), probability: betting.p_home_cover, tabTarget: 'game' },
-        { detail: `${away} ${Number.isFinite(spread) ? fmtSigned(-spread) : '--'}`, ev: toFiniteNumber(betting.away_spread_ev), probability: betting.p_away_cover, tabTarget: 'game' },
+        { detail: `${home} ${Number.isFinite(spread) ? fmtSigned(spread) : '--'}`, ev: toFiniteNumber(betting.home_spread_ev), probability: betting.p_home_cover, tabTarget: 'game', available: Number.isFinite(spread) },
+        { detail: `${away} ${Number.isFinite(spread) ? fmtSigned(-spread) : '--'}`, ev: toFiniteNumber(betting.away_spread_ev), probability: betting.p_away_cover, tabTarget: 'game', available: Number.isFinite(spread) },
       ];
       return chooseCandidate(candidates);
     }
     if (marketKey === 'total') {
       const total = toFiniteNumber(betting.total);
       const candidates = [
-        { detail: `Over ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.over_ev), probability: betting.p_total_over, tabTarget: 'game' },
-        { detail: `Under ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.under_ev), probability: betting.p_total_under, tabTarget: 'game' },
+        { detail: `Over ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.over_ev), probability: betting.p_total_over, tabTarget: 'game', available: Number.isFinite(total) },
+        { detail: `Under ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.under_ev), probability: betting.p_total_under, tabTarget: 'game', available: Number.isFinite(total) },
       ];
       return chooseCandidate(candidates);
     }
@@ -4267,7 +4351,7 @@
         oddsRefreshedAt: liveLens?.oddsRefreshedAt || null,
         projection: null,
         modelHomeWinProb: liveMoneylineHomeProb(game, signals?.quarter_ml),
-        baselineHomeWinProb: signals?.quarter_ml?.line != null ? 0.5 : null,
+        baselineHomeWinProb: Number.isFinite(Number(signals?.quarter_ml?.line)) ? Number(signals.quarter_ml.line) : null,
         markets: {
           moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.quarter_ml),
           spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.quarter_ats),
@@ -4283,7 +4367,7 @@
         oddsRefreshedAt: liveLens?.oddsRefreshedAt || null,
         projection: null,
         modelHomeWinProb: liveMoneylineHomeProb(game, signals?.half_ml),
-        baselineHomeWinProb: signals?.half_ml?.line != null ? 0.5 : null,
+        baselineHomeWinProb: Number.isFinite(Number(signals?.half_ml?.line)) ? Number(signals.half_ml.line) : null,
         markets: {
           moneyline: liveLensMarketFromSignal(game, 'moneyline', 'ML', signals?.half_ml),
           spread: liveLensMarketFromSignal(game, 'spread', 'ATS', signals?.half_ats),
