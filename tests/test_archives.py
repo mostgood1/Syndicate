@@ -2751,13 +2751,66 @@ class HomeBoardTests(unittest.TestCase):
         from syndicate.features.nba.live_lens import build_live_lens_api_payload as build_nba_live_lens_api_payload
 
         with patch(
-            "syndicate.features.nba.live_lens.build_cards_api_payload",
-            return_value={"date": "2026-05-28", "games": [{"gamePk": "game-1"}]},
+            "syndicate.features.nba.live_lens.build_cards_page_context",
+            return_value={
+                "date": "2026-05-28",
+                "requested_date": "2026-05-28",
+                "lookahead_applied": False,
+                "games": [{"gamePk": "game-1"}],
+            },
+        ), patch(
+            "syndicate.features.nba.live_lens.build_live_lens_page_context",
+            return_value={"date": "2026-05-28", "route_path": "/nba/live-lens", "rank_cards": [{"title": "Game 1"}]},
         ):
             payload = build_nba_live_lens_api_payload("2026-05-28")
 
         self.assertEqual(payload.get("date"), "2026-05-28")
         self.assertEqual((payload.get("games") or [{}])[0].get("gamePk"), "game-1")
+        self.assertEqual(payload.get("route_path"), "/nba/live-lens")
+        self.assertEqual((payload.get("rank_cards") or [{}])[0].get("title"), "Game 1")
+
+    def test_nba_live_lens_page_context_prefers_live_spread_and_total(self) -> None:
+        from syndicate.features.nba.live_lens import build_live_lens_page_context as build_nba_live_lens_page_context
+
+        cards_context = {
+            "date": "2026-05-28",
+            "requested_date": "2026-05-28",
+            "games": [
+                {
+                    "event_id": "evt-1",
+                    "status": "Live",
+                    "detail": "Q4 04:21",
+                    "summary": "Consensus market snapshot",
+                    "away": {"abbr": "NYK", "score": 100},
+                    "home": {"abbr": "BOS", "score": 98},
+                    "betting": {"home_spread": -2.5, "away_spread": 2.5, "total": 210.5},
+                    "metrics": [{"label": "Spread", "value": "BOS -2.5"}],
+                    "shared_top_play_rows": [],
+                }
+            ],
+            "source_path": "nba_cards.csv",
+        }
+        live_lines_payload = {
+            "games": [
+                {
+                    "event_id": "evt-1",
+                    "lines": {"home_spread": -4.5, "away_spread": 4.5, "total": 214.5},
+                }
+            ]
+        }
+
+        with patch("syndicate.features.nba.live_lens.build_cards_page_context", return_value=cards_context), patch(
+            "syndicate.features.nba.live_lens.build_live_lines_payload", return_value=live_lines_payload
+        ):
+            context = build_nba_live_lens_page_context("2026-05-28")
+
+        rank_cards = context.get("rank_cards") or []
+        self.assertTrue(rank_cards)
+        metrics = rank_cards[0].get("metrics") or []
+        self.assertTrue(any(metric.get("label") == "Live ATS" and metric.get("value") == "BOS -4.5" for metric in metrics))
+        self.assertTrue(any(metric.get("label") == "Live total" and metric.get("value") == "214.5" for metric in metrics))
+        self.assertIn("Live total 214.5", rank_cards[0].get("summary") or "")
+        self.assertIn("Live ATS BOS -4.5", rank_cards[0].get("summary") or "")
 
     def test_wnba_live_lens_api_payload_uses_cards_contract(self) -> None:
         from syndicate.features.wnba.live_lens import build_live_lens_api_payload as build_wnba_live_lens_api_payload
