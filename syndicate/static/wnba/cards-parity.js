@@ -2205,6 +2205,11 @@
     return 'Pregame';
   }
 
+  function isSyntheticLiveLineSource(source) {
+    const normalized = String(source || '').trim().toLowerCase();
+    return normalized === 'cards_fallback' || normalized === 'boxscore_sim_fallback';
+  }
+
   function stripSecondaryText(item) {
     if (isLivePropItem(item)) {
       const shapeSummary = String(item?.shape_summary || item?.basketball_summary || '').trim();
@@ -2221,6 +2226,7 @@
       const sentences = [];
       let pregameSentence = '';
       let contextSentence = '';
+      const syntheticLineSource = isSyntheticLiveLineSource(lineSource);
 
       if (Number.isFinite(simValue) && Number.isFinite(simAdjusted) && Math.abs(simAdjusted - simValue) >= 0.05) {
         pregameSentence = `Pregame, ${player} was ${fmtNumber(simValue, 1)} and adjusted to ${fmtNumber(simAdjusted, 1)}`;
@@ -2238,9 +2244,9 @@
       }
 
       const contextBits = [];
-        if (Number.isFinite(liveLine)) {
+        if (Number.isFinite(liveLine) && !syntheticLineSource) {
           contextBits.push(`Live line ${fmtNumber(liveLine, 1)}`);
-        } else if (lineSource) {
+        } else if (lineSource && !syntheticLineSource) {
           contextBits.push(lineSource === 'oddsapi' ? 'Live OddsAPI line' : `${titleCase(lineSource)} line`);
       }
       if (Number.isFinite(teamRatio) && Math.abs(teamRatio - 1) >= 0.02) {
@@ -2332,6 +2338,7 @@
     const line = Number(item?.line);
     const side = livePropPrimarySide(item) || String(item?.side || '').trim().toUpperCase();
     const lineSource = String(item?.line_source || '').trim().toLowerCase();
+    const syntheticLineSource = isSyntheticLiveLineSource(lineSource);
     const priorMult = Number(item?.pregame_stat_multiplier);
     const teamRatio = Number(item?.pregame_team_total_ratio);
     const clauses = [];
@@ -2367,7 +2374,7 @@
     }
 
     const contextBits = [];
-    if (lineSource) {
+    if (lineSource && !syntheticLineSource) {
       contextBits.push(lineSource === 'oddsapi' ? 'priced off live OddsAPI' : `priced off ${titleCase(lineSource)}`);
     }
     if (Number.isFinite(teamRatio) && Math.abs(teamRatio - 1) >= 0.02) {
@@ -3624,10 +3631,11 @@
     const statusLabel = stripStatusText(item);
     const sourceSummary = stripSecondaryText(item);
     const lineSource = String(item?.line_source || '').trim();
+    const syntheticLineSource = isSyntheticLiveLineSource(lineSource);
     const reasonTags = [
       statusLabel,
       item?.lens_profile === 'playoffs' ? 'Playoff lens' : (item?.lens_profile === 'regular_season' ? 'Regular lens' : ''),
-      lineSource ? (lineSource === 'oddsapi' ? 'Live OddsAPI' : titleCase(lineSource)) : '',
+      lineSource && !syntheticLineSource ? (lineSource === 'oddsapi' ? 'Live OddsAPI' : titleCase(lineSource)) : '',
       Number.isFinite(Number(item?.pregame_stat_multiplier)) && Math.abs(Number(item?.pregame_stat_multiplier) - 1) >= 0.01 ? 'Adjusted prior' : '',
     ].filter(Boolean);
     return {

@@ -361,6 +361,8 @@ def _normalized_game_status(
     if live:
         is_final = False
 
+    period, clock = _infer_period_clock_from_status_text(detail_raw or status_raw)
+
     away_val = _safe_float(away_pts)
     home_val = _safe_float(home_pts)
 
@@ -384,7 +386,46 @@ def _normalized_game_status(
         "in_progress": bool(live),
         "final": bool(is_final),
         "has_score": bool(away_val is not None and home_val is not None),
+        "period": period,
+        "clock": clock,
     }
+
+
+def _normalize_status_clock_text(clock_text: Any) -> str:
+    raw = str(clock_text or "").strip()
+    if not raw:
+        return ""
+    if re.fullmatch(r"\d{1,2}:\d{2}", raw):
+        return raw
+    if re.fullmatch(r"\d{1,2}(?:\.\d)?", raw):
+        return raw.replace(".", ":") if "." in raw else raw
+    return raw
+
+
+def _infer_period_clock_from_status_text(status_text: Any) -> tuple[int | None, str]:
+    text = str(status_text or "").strip()
+    if not text:
+        return None, ""
+    match = re.search(r"(?P<clock>\d{1,2}:\d{2}|\d{1,2}(?:\.\d)?)\s*-\s*(?P<period>(?:1st|2nd|3rd|4th|OT|\d+OT))", text, re.IGNORECASE)
+    if not match:
+        return None, ""
+    clock = _normalize_status_clock_text(match.group("clock"))
+    period_label = str(match.group("period") or "").strip().upper()
+    if period_label == "1ST":
+        return 1, clock
+    if period_label == "2ND":
+        return 2, clock
+    if period_label == "3RD":
+        return 3, clock
+    if period_label == "4TH":
+        return 4, clock
+    if period_label == "OT":
+        return 5, clock
+    overtime_match = re.fullmatch(r"(\d+)OT", period_label)
+    if overtime_match:
+        overtime_index = int(overtime_match.group(1) or 1)
+        return max(5, 4 + overtime_index), clock
+    return None, clock
 
 
 def _implied_prob_from_american(price: float | None) -> float | None:
@@ -1620,6 +1661,18 @@ def _hydrate_live_player_lens_payload(
         for game in (boxscore_payload.get("games") if isinstance(boxscore_payload.get("games"), list) else [])
         if isinstance(game, dict)
     }
+    live_state_payload = build_live_state_payload(
+        selected_date,
+        ttl=12,
+        allow_stored_date_fallback=allow_stored_date_fallback,
+    )
+    live_state_by_event = {
+        str(game.get("event_id") or "").strip(): dict(game.get("status") or {})
+        for game in (live_state_payload.get("games") if isinstance(live_state_payload.get("games"), list) else [])
+        if isinstance(game, dict)
+        and str(game.get("event_id") or "").strip()
+        and isinstance(game.get("status"), dict)
+    }
 
     hydrated_games: list[dict[str, Any]] = []
     for game in games:
@@ -1629,7 +1682,12 @@ def _hydrate_live_player_lens_payload(
         event_id = str(game.get("event_id") or "").strip()
         actual_rows = boxscore_by_event.get(event_id) or {}
         hydrated_game = dict(game)
+        live_status = live_state_by_event.get(event_id)
+        if isinstance(live_status, dict) and live_status:
+            hydrated_game["status"] = dict(live_status)
         game_status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        if isinstance(live_status, dict) and live_status:
+            game_status = dict(live_status)
         game_explicitly_not_live = bool(game_status) and not bool(game_status.get("in_progress"))
         rows = []
         for row in game.get("rows") if isinstance(game.get("rows"), list) else []:
@@ -1672,6 +1730,29 @@ def _hydrate_live_player_lens_payload(
                         hydrated_row["liveEdge"] = live_edge
                     if existing_live_projection is None and not game_explicitly_not_live:
                         hydrated_row["line_source"] = str(hydrated_row.get("line_source") or "boxscore_sim_fallback").strip() or "boxscore_sim_fallback"
+            status_period_value = _safe_float(game_status.get("period"))
+            status_period = int(status_period_value) if status_period_value is not None else None
+            status_clock = str(game_status.get("clock") or "").strip()
+            status_text = str(game_status.get("status") or "").strip()
+            if bool(game_status.get("final")):
+                status_label = "Final"
+            elif bool(game_status.get("in_progress")) and status_period is not None:
+                status_label = f"Q{status_period} {status_clock}".strip()
+            elif bool(game_status.get("in_progress")):
+                status_label = status_text or "Live"
+            else:
+                status_label = status_text or "Scheduled"
+            if status_label and not str(hydrated_row.get("status_label") or "").strip():
+                hydrated_row["status_label"] = status_label
+            if status_label and not str(hydrated_row.get("status_display") or "").strip():
+                hydrated_row["status_display"] = status_label
+            if status_text and not str(hydrated_row.get("status_context") or "").strip():
+                hydrated_row["status_context"] = status_text
+            if status_period is not None:
+                hydrated_row.setdefault("period", status_period)
+                hydrated_row.setdefault("quarter", status_period)
+            if status_clock:
+                hydrated_row.setdefault("clock", status_clock)
             rows.append(hydrated_row)
         hydrated_game["rows"] = rows
         hydrated_games.append(hydrated_game)
@@ -2251,8 +2332,8 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                 "away_pts": None,
                 "status_id": None,
                 "status": normalized_status["detail"],
-                "period": None,
-                "clock": "",
+                "period": normalized_status.get("period"),
+                "clock": normalized_status.get("clock") or "",
                 "in_progress": bool(normalized_status["in_progress"]),
                 "final": bool(normalized_status["final"]),
                 "periods": [],

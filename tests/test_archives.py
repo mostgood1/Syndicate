@@ -1670,8 +1670,83 @@ class DateArchiveHelperTests(unittest.TestCase):
             payload = build_live_player_lens_payload("2026-06-05", ["401856963"])
 
         game = (payload.get("games") or [{}])[0]
+        row = ((game.get("rows") or [{}])[0])
         self.assertEqual((game.get("status") or {}).get("status"), "Live")
         self.assertTrue((game.get("status") or {}).get("in_progress"))
+        self.assertEqual((game.get("status") or {}).get("period"), 2)
+        self.assertEqual((game.get("status") or {}).get("clock"), "4:34")
+        self.assertEqual(row.get("status_label"), "Q2 4:34")
+        self.assertEqual(row.get("status_display"), "Q2 4:34")
+        self.assertEqual(row.get("status_context"), "Live")
+        self.assertEqual(row.get("period"), 2)
+        self.assertEqual(row.get("quarter"), 2)
+        self.assertEqual(row.get("clock"), "4:34")
+
+    def test_nba_live_player_lens_overlays_status_fields_from_live_state(self) -> None:
+        from syndicate.features.nba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "status": {"status": "Scheduled", "final": False, "in_progress": False, "period": 0, "clock": ""},
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "NYK",
+                            "stat": "pts",
+                            "line": 14.5,
+                            "sim_mu_adjusted": 18.0,
+                            "line_source": "cards_fallback",
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "players": [{"team_tri": "NYK", "player": "Test Player", "pts": 8, "mp": 10}],
+                }
+            ]
+        }
+        live_state_payload = {
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "status": {"status": "6:23 - 4th", "final": False, "in_progress": True, "period": 4, "clock": "6:23"},
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ), patch(
+            "syndicate.features.nba.cards.build_live_state_payload",
+            return_value=live_state_payload,
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401859964"])
+
+        game = (payload.get("games") or [{}])[0]
+        row = ((game.get("rows") or [{}])[0])
+        self.assertEqual((game.get("status") or {}).get("period"), 4)
+        self.assertEqual((game.get("status") or {}).get("clock"), "6:23")
+        self.assertEqual(row.get("status_label"), "Q4 6:23")
+        self.assertEqual(row.get("status_display"), "Q4 6:23")
+        self.assertEqual(row.get("status_context"), "6:23 - 4th")
+        self.assertEqual(row.get("period"), 4)
+        self.assertEqual(row.get("quarter"), 4)
+        self.assertEqual(row.get("clock"), "6:23")
 
     def test_nba_live_player_lens_non_live_game_uses_actual_projection(self) -> None:
         from syndicate.features.nba.cards import build_live_player_lens_payload
@@ -2041,6 +2116,99 @@ class DateArchiveHelperTests(unittest.TestCase):
 
         self.assertEqual((games or [{}])[0].get("event_id"), "401859964")
         self.assertEqual((((games or [{}])[0].get("live_state") or {}).get("event_id")), "401859964")
+
+    def test_nba_live_state_fallback_parses_period_and_clock_from_card_detail(self) -> None:
+        from syndicate.features.nba.cards import build_live_state_payload
+
+        context = {
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "gamePk": "1",
+                    "event_id": "401859964",
+                    "away_tri": "NYK",
+                    "home_tri": "SAS",
+                    "status": "Live",
+                    "detail": "6:23 - 4th",
+                    "live_state": {},
+                    "odds": {},
+                    "sim": {},
+                }
+            ],
+        }
+
+        with patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value=context,
+        ), patch(
+            "syndicate.features.nba.cards.central_today_iso",
+            return_value="1900-01-01",
+        ), patch(
+            "syndicate.features.nba.cards._espn_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.nba.cards._best_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.nba.cards._remote_source_fallback_enabled",
+            return_value=False,
+        ):
+            payload = build_live_state_payload("2026-06-05")
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("status"), "6:23 - 4th")
+        self.assertTrue(game.get("in_progress"))
+        self.assertEqual(game.get("period"), 4)
+        self.assertEqual(game.get("clock"), "6:23")
+
+    def test_wnba_live_state_fallback_parses_period_and_clock_from_card_detail(self) -> None:
+        from syndicate.features.wnba.cards import build_live_state_payload
+
+        context = {
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "gamePk": "1",
+                    "event_id": "401856963",
+                    "away_tri": "CHI",
+                    "home_tri": "LVA",
+                    "status": "Live",
+                    "detail": "4:34 - 2nd",
+                    "live_state": {},
+                    "odds": {},
+                    "away": {},
+                    "home": {},
+                    "sim": {},
+                }
+            ],
+        }
+
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value=context,
+        ), patch(
+            "syndicate.features.wnba.cards.central_today_iso",
+            return_value="1900-01-01",
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._remote_source_fallback_enabled",
+            return_value=False,
+        ), patch(
+            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
+            return_value=None,
+        ):
+            payload = build_live_state_payload("2026-06-05")
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("status"), "4:34 - 2nd")
+        self.assertTrue(game.get("in_progress"))
+        self.assertEqual(game.get("period"), 2)
+        self.assertEqual(game.get("clock"), "4:34")
 
     def test_wnba_api_source_team_logo_fetches_official_logo_without_source_proxy(self) -> None:
         app = create_app()
