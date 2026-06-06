@@ -4738,8 +4738,8 @@
       const baselineProb = Number.isFinite(Number(row.baselineHomeWinProb)) ? Number(row.baselineHomeWinProb) : null;
       const homeDelta = (modelProb - baselineProb) * 100;
       const moneylinePick = homeDelta >= 0 ? game.home_tri : game.away_tri;
-      const spreadLine = Number(row.spreadLine);
-      const totalLine = Number(row.totalLine);
+      const spreadLine = toFiniteNumber(row.spreadLine);
+      const totalLine = toFiniteNumber(row.totalLine);
       const spreadEdgeRaw = Number.isFinite(spreadLine) && Number.isFinite(Number(row?.projection?.homeMargin))
         ? Number(row.projection.homeMargin) + spreadLine
         : null;
