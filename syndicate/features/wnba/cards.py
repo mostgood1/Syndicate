@@ -2408,6 +2408,58 @@ def _boxscore_rows_by_player(boxscore_payload: dict[str, Any] | None) -> dict[tu
     return out
 
 
+def _live_state_status_from_row(game: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(game, dict):
+        return {}
+    if isinstance(game.get("status"), dict):
+        return dict(game.get("status") or {})
+    event_status = str(game.get("status") or "").strip()
+    return {
+        "in_progress": bool(game.get("in_progress")),
+        "final": bool(game.get("final")),
+        "period": game.get("period"),
+        "clock": game.get("clock"),
+        "status": event_status,
+    }
+
+
+def _live_player_row_rank(row: dict[str, Any]) -> tuple[int, int, int, float]:
+    line_source = str(row.get("line_source") or "").strip().lower()
+    has_price = any(_price_is_usable(row.get(price_key)) for price_key in ("price", "price_over", "price_under"))
+    line_value = _safe_float(row.get("line_live") if row.get("line_live") is not None else row.get("line"))
+    return (
+        1 if has_price else 0,
+        0 if line_source == "live_lens_projection_artifact" else 1,
+        1 if line_value is not None else 0,
+        abs(_safe_float(row.get("live_edge") if row.get("live_edge") is not None else row.get("liveEdge")) or 0.0),
+    )
+
+
+def _dedupe_live_player_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    best_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+    order: list[tuple[str, str, str]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        row_key = (
+            str(row.get("team_tri") or "").strip().upper(),
+            _normalize_player_key(row.get("player")),
+            str(row.get("stat") or row.get("market") or "").strip().lower(),
+        )
+        if not all(row_key):
+            order.append((f"__index__{len(order)}", "", ""))
+            best_by_key[order[-1]] = row
+            continue
+        current = best_by_key.get(row_key)
+        if current is None:
+            best_by_key[row_key] = row
+            order.append(row_key)
+            continue
+        if _live_player_row_rank(row) > _live_player_row_rank(current):
+            best_by_key[row_key] = row
+    return [best_by_key[key] for key in order if key in best_by_key]
+
+
 def _hydrate_live_player_lens_payload(
     payload: dict[str, Any],
     selected_date: str,
@@ -2438,11 +2490,10 @@ def _hydrate_live_player_lens_payload(
         allow_stored_date_fallback=allow_stored_date_fallback,
     )
     live_state_by_event = {
-        str(game.get("event_id") or "").strip(): dict(game.get("status") or {})
+        str(game.get("event_id") or "").strip(): _live_state_status_from_row(game)
         for game in (live_state_payload.get("games") if isinstance(live_state_payload.get("games"), list) else [])
         if isinstance(game, dict)
         and str(game.get("event_id") or "").strip()
-        and isinstance(game.get("status"), dict)
     }
     fallback_games_by_event = _resolve_games_for_event_ids(selected_date, event_ids)
     fallback_rows_by_key: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
@@ -2592,8 +2643,14 @@ def _hydrate_live_player_lens_payload(
                     hydrated_row["book"] = processed_book
                 if repaired_price and str(hydrated_row.get("line_source") or "").strip().lower() == "live_lens_projection_artifact":
                     hydrated_row["line_source"] = "oddsapi_player_props_fallback"
+            if str(hydrated_row.get("line_source") or "").strip().lower() == "live_lens_projection_artifact" and not any(
+                _price_is_usable(hydrated_row.get(price_key)) for price_key in ("price", "price_over", "price_under")
+            ):
+                line_value = _safe_float(hydrated_row.get("line_live") if hydrated_row.get("line_live") is not None else hydrated_row.get("line"))
+                if line_value is None:
+                    continue
             rows.append(hydrated_row)
-        hydrated_game["rows"] = rows
+        hydrated_game["rows"] = _dedupe_live_player_rows(rows)
         hydrated_games.append(hydrated_game)
 
     hydrated_payload = dict(payload)
