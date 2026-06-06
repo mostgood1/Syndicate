@@ -228,6 +228,38 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(games["evt-2"].get("total"), 159.5)
         self.assertEqual((((games["evt-2"].get("lines") or {}).get("period_totals") or {}).get("q1")), 40.5)
 
+    def test_live_lines_payload_prefers_richer_artifact_when_local_snapshot_is_thin(self) -> None:
+        with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "include_period_totals": False,
+                "games": [{"event_id": "evt-2", "found": True, "total": 159.5, "lines": {"total": 159.5}}],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_live_lines_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "include_period_totals": True,
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "found": True,
+                        "total": 159.5,
+                        "lines": {"total": 159.5, "period_totals": {"q1": 40.5}, "period_spreads": {"q1": -2.5}},
+                    }
+                ],
+            },
+        ):
+            payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
+
+        lines = (((payload.get("games") or [{}])[0].get("lines") or {}))
+        self.assertTrue(bool(payload.get("include_period_totals")))
+        self.assertEqual((lines.get("period_totals") or {}).get("q1"), 40.5)
+        self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -2.5)
+
     def test_live_lens_card_surface_shows_total_points_and_live_line(self) -> None:
         with patch(
             "syndicate.features.wnba.live_lens.build_cards_page_context",

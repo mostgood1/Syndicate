@@ -94,6 +94,38 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
         self.assertEqual(((payload.get("games") or [{}])[0]).get("total"), 219.5)
 
+    def test_live_lines_payload_prefers_richer_artifact_when_intervals_requested(self) -> None:
+        with patch("syndicate.features.nba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "include_period_totals": False,
+                "games": [{"event_id": "evt-2", "found": True, "total": 219.5, "lines": {"total": 219.5}}],
+            },
+        ), patch(
+            "syndicate.features.nba.cards._artifact_live_lines_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "include_period_totals": True,
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "found": True,
+                        "total": 219.5,
+                        "lines": {"total": 219.5, "period_totals": {"q1": 54.5}, "period_spreads": {"q1": -1.5}},
+                    }
+                ],
+            },
+        ):
+            payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
+
+        lines = (((payload.get("games") or [{}])[0].get("lines") or {}))
+        self.assertTrue(bool(payload.get("include_period_totals")))
+        self.assertEqual((lines.get("period_totals") or {}).get("q1"), 54.5)
+        self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -1.5)
+
     def test_live_pbp_stats_payload_uses_local_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -1957,6 +1957,107 @@ def _game_from_row(
         "q3": periods_payload.get("q3") if isinstance(periods_payload.get("q3"), dict) else _default_segment(segment_total, segment_margin, p_home_win),
         "q4": periods_payload.get("q4") if isinstance(periods_payload.get("q4"), dict) else _default_segment(segment_total, segment_margin, p_home_win),
     }
+
+def _payload_games_by_event_id(payload: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    by_event: dict[str, dict[str, Any]] = {}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        if event_id:
+            by_event[event_id] = game
+    return by_event
+
+
+def _merge_live_lines_game(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(primary)
+    merged["found"] = bool(primary.get("found")) or bool(secondary.get("found"))
+
+    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
+        if merged.get(key) is None and secondary.get(key) is not None:
+            merged[key] = secondary.get(key)
+
+    primary_lines = primary.get("lines") if isinstance(primary.get("lines"), dict) else {}
+    secondary_lines = secondary.get("lines") if isinstance(secondary.get("lines"), dict) else {}
+    merged_lines = dict(primary_lines)
+    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
+        if merged_lines.get(key) is None and secondary_lines.get(key) is not None:
+            merged_lines[key] = secondary_lines.get(key)
+
+    for key in ("period_totals", "period_spreads"):
+        merged_periods = dict(primary_lines.get(key) or {}) if isinstance(primary_lines.get(key), dict) else {}
+        secondary_periods = secondary_lines.get(key) if isinstance(secondary_lines.get(key), dict) else {}
+        for period_key, period_value in secondary_periods.items():
+            if period_key not in merged_periods and period_value is not None:
+                merged_periods[period_key] = period_value
+        merged_lines[key] = merged_periods
+
+    merged["lines"] = merged_lines
+    return merged
+
+
+def _merge_live_lines_payloads(primary: dict[str, Any] | None, secondary: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(primary, dict):
+        return secondary if isinstance(secondary, dict) else None
+    if not isinstance(secondary, dict):
+        return primary
+
+    primary_games = _payload_games_by_event_id(primary)
+    secondary_games = _payload_games_by_event_id(secondary)
+    if not primary_games:
+        return secondary if secondary_games else primary
+    if not secondary_games:
+        return primary
+
+    ordered_event_ids: list[str] = []
+    for payload in (primary, secondary):
+        games = payload.get("games") if isinstance(payload.get("games"), list) else []
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            event_id = str(game.get("event_id") or "").strip()
+            if event_id and event_id not in ordered_event_ids:
+                ordered_event_ids.append(event_id)
+
+    merged_payload = dict(primary)
+    merged_payload["games"] = [
+        _merge_live_lines_game(primary_games[event_id], secondary_games[event_id])
+        if event_id in primary_games and event_id in secondary_games
+        else dict(primary_games.get(event_id) or secondary_games.get(event_id) or {})
+        for event_id in ordered_event_ids
+        if event_id in primary_games or event_id in secondary_games
+    ]
+    return merged_payload
+
+
+def _payload_has_requested_live_line_coverage(
+    payload: dict[str, Any] | None,
+    event_ids: list[str],
+    *,
+    include_period_totals: bool,
+) -> bool:
+    coverage = _payload_games_by_event_id(payload)
+    if not coverage:
+        return False
+    if event_ids and not all(event_id in coverage for event_id in event_ids):
+        return False
+    if not include_period_totals:
+        return True
+    for event_id in (event_ids or list(coverage.keys())):
+        game = coverage.get(event_id) or {}
+        lines = game.get("lines") if isinstance(game.get("lines"), dict) else {}
+        period_totals = lines.get("period_totals") if isinstance(lines.get("period_totals"), dict) else {}
+        period_spreads = lines.get("period_spreads") if isinstance(lines.get("period_spreads"), dict) else {}
+        if period_totals or period_spreads:
+            return True
+    return False
+
+
+def _finalize_live_lines_payload(payload: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
+    finalized = dict(payload)
+    finalized["include_period_totals"] = bool(include_period_totals)
+    return finalized
     normalized_status = _normalized_game_status(
         status_text=row.get("status"),
         detail_text=row.get("commence_time"),
@@ -2617,8 +2718,13 @@ def build_live_lines_payload(
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
-        return _attach_odds_refresh_timestamp(local_payload)
+    merged_payload = local_payload if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")) else None
+    if _payload_has_requested_live_line_coverage(
+        merged_payload,
+        normalized_event_ids,
+        include_period_totals=bool(include_period_totals),
+    ):
+        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     artifact_payload = _artifact_live_lines_payload(
         resolved_date,
@@ -2627,7 +2733,13 @@ def build_live_lines_payload(
         allow_stored_date_fallback=allow_stored_date_fallback,
     )
     if isinstance(artifact_payload, dict) and isinstance(artifact_payload.get("games"), list) and bool(artifact_payload.get("games")):
-        return _attach_odds_refresh_timestamp(artifact_payload)
+        merged_payload = _merge_live_lines_payloads(merged_payload, artifact_payload)
+        if _payload_has_requested_live_line_coverage(
+            merged_payload,
+            normalized_event_ids,
+            include_period_totals=bool(include_period_totals),
+        ):
+            return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     if is_today and _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -2637,7 +2749,13 @@ def build_live_lines_payload(
             include_period_totals=bool(include_period_totals),
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            return _attach_odds_refresh_timestamp(remote_payload)
+            merged_payload = _merge_live_lines_payloads(merged_payload, remote_payload)
+            if _payload_has_requested_live_line_coverage(
+                merged_payload,
+                normalized_event_ids,
+                include_period_totals=bool(include_period_totals),
+            ):
+                return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     if _remote_source_fallback_enabled() and not is_today:
         remote_payload = _remote_live_snapshot_payload(
@@ -2647,7 +2765,13 @@ def build_live_lines_payload(
             include_period_totals=bool(include_period_totals),
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            return _attach_odds_refresh_timestamp(remote_payload)
+            merged_payload = _merge_live_lines_payloads(merged_payload, remote_payload)
+            if _payload_has_requested_live_line_coverage(
+                merged_payload,
+                normalized_event_ids,
+                include_period_totals=bool(include_period_totals),
+            ):
+                return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
@@ -2657,7 +2781,7 @@ def build_live_lines_payload(
         if isinstance(game, dict)
     ]
     if fallback_games:
-        return _attach_odds_refresh_timestamp({
+        fallback_payload = {
             "ok": True,
             "ttl": int(ttl),
             "date": resolved_date,
@@ -2666,7 +2790,12 @@ def build_live_lines_payload(
             "include_period_totals": bool(include_period_totals),
             "games": fallback_games,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        })
+        }
+        merged_payload = _merge_live_lines_payloads(merged_payload, fallback_payload)
+        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload or fallback_payload, include_period_totals=bool(include_period_totals)))
+
+    if merged_payload:
+        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     return _attach_odds_refresh_timestamp({
         "ok": True,

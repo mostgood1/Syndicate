@@ -2150,6 +2150,36 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_totals") or {}), {})
         self.assertEqual((((payload.get("games") or [{}])[0].get("lines") or {}).get("period_spreads") or {}), {})
 
+    def test_shared_basketball_live_artifacts_maps_period_spreads(self) -> None:
+        from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
+
+        with TemporaryDirectory() as tmp_dir:
+            processed_root = Path(tmp_dir)
+            signal_path = processed_root / "live_lens_signals_2026-05-21.jsonl"
+            signal_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps({"event_id": "evt-1", "market": "total", "live_line": 164.5}),
+                        json.dumps({"event_id": "evt-1", "market": "quarter_total", "horizon": "q1", "live_line": 40.5}),
+                        json.dumps({"event_id": "evt-1", "market": "quarter_spread", "horizon": "q1", "live_line": -2.5}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            payload = build_live_lines_payload_from_artifacts(
+                processed_root=processed_root,
+                date_str="2026-05-21",
+                event_games={"evt-1": {"event_id": "evt-1", "away": "SEA", "home": "DAL"}},
+                include_period_totals=True,
+                source="test",
+            )
+
+        lines = ((((payload or {}).get("games") or [{}])[0].get("lines") or {}))
+        self.assertEqual((lines.get("period_totals") or {}).get("q1"), 40.5)
+        self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -2.5)
+
     def test_wnba_live_state_status_text_infers_period_and_clock(self) -> None:
         from syndicate.features.wnba.cards import _infer_period_clock_from_status_text
 

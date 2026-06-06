@@ -1834,6 +1834,35 @@ def _merge_live_lines_payloads(primary: dict[str, Any] | None, secondary: dict[s
     return merged_payload
 
 
+def _payload_has_requested_live_line_coverage(
+    payload: dict[str, Any] | None,
+    event_ids: list[str],
+    *,
+    include_period_totals: bool,
+) -> bool:
+    coverage = _payload_games_by_event_id(payload)
+    if not coverage:
+        return False
+    if event_ids and not all(event_id in coverage for event_id in event_ids):
+        return False
+    if not include_period_totals:
+        return True
+    for event_id in (event_ids or list(coverage.keys())):
+        game = coverage.get(event_id) or {}
+        lines = game.get("lines") if isinstance(game.get("lines"), dict) else {}
+        period_totals = lines.get("period_totals") if isinstance(lines.get("period_totals"), dict) else {}
+        period_spreads = lines.get("period_spreads") if isinstance(lines.get("period_spreads"), dict) else {}
+        if period_totals or period_spreads:
+            return True
+    return False
+
+
+def _finalize_live_lines_payload(payload: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
+    finalized = dict(payload)
+    finalized["include_period_totals"] = bool(include_period_totals)
+    return finalized
+
+
 def _payload_has_live_boxscore_players(payload: dict[str, Any] | None) -> bool:
     games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
     return any(
@@ -3235,9 +3264,12 @@ def build_live_lines_payload(
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
     merged_payload = local_payload if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")) else None
-    local_coverage = _payload_games_by_event_id(merged_payload)
-    if merged_payload and (not normalized_event_ids or all(event_id in local_coverage for event_id in normalized_event_ids)):
-        return _attach_odds_refresh_timestamp(merged_payload)
+    if _payload_has_requested_live_line_coverage(
+        merged_payload,
+        normalized_event_ids,
+        include_period_totals=bool(include_period_totals),
+    ):
+        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     artifact_payload = _artifact_live_lines_payload(
         resolved_date,
@@ -3247,9 +3279,12 @@ def build_live_lines_payload(
     )
     if isinstance(artifact_payload, dict) and isinstance(artifact_payload.get("games"), list) and bool(artifact_payload.get("games")):
         merged_payload = _merge_live_lines_payloads(merged_payload, artifact_payload)
-        artifact_coverage = _payload_games_by_event_id(merged_payload)
-        if merged_payload and (not normalized_event_ids or all(event_id in artifact_coverage for event_id in normalized_event_ids)):
-            return _attach_odds_refresh_timestamp(merged_payload)
+        if _payload_has_requested_live_line_coverage(
+            merged_payload,
+            normalized_event_ids,
+            include_period_totals=bool(include_period_totals),
+        ):
+            return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     if is_today and _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -3260,9 +3295,12 @@ def build_live_lines_payload(
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             merged_payload = _merge_live_lines_payloads(merged_payload, remote_payload)
-            remote_coverage = _payload_games_by_event_id(merged_payload)
-            if merged_payload and (not normalized_event_ids or all(event_id in remote_coverage for event_id in normalized_event_ids)):
-                return _attach_odds_refresh_timestamp(merged_payload)
+            if _payload_has_requested_live_line_coverage(
+                merged_payload,
+                normalized_event_ids,
+                include_period_totals=bool(include_period_totals),
+            ):
+                return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     if _remote_source_fallback_enabled() and not is_today:
         remote_payload = _remote_live_snapshot_payload(
@@ -3273,9 +3311,12 @@ def build_live_lines_payload(
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
             merged_payload = _merge_live_lines_payloads(merged_payload, remote_payload)
-            remote_coverage = _payload_games_by_event_id(merged_payload)
-            if merged_payload and (not normalized_event_ids or all(event_id in remote_coverage for event_id in normalized_event_ids)):
-                return _attach_odds_refresh_timestamp(merged_payload)
+            if _payload_has_requested_live_line_coverage(
+                merged_payload,
+                normalized_event_ids,
+                include_period_totals=bool(include_period_totals),
+            ):
+                return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
@@ -3296,9 +3337,9 @@ def build_live_lines_payload(
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         }
         merged_payload = _merge_live_lines_payloads(merged_payload, fallback_payload)
-        return _attach_odds_refresh_timestamp(merged_payload or fallback_payload)
+        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload or fallback_payload, include_period_totals=bool(include_period_totals)))
     if merged_payload:
-        return _attach_odds_refresh_timestamp(merged_payload)
+        return _attach_odds_refresh_timestamp(_finalize_live_lines_payload(merged_payload, include_period_totals=bool(include_period_totals)))
     return _attach_odds_refresh_timestamp({
         "ok": True,
         "ttl": int(ttl),

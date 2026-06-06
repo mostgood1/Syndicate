@@ -377,6 +377,13 @@ def build_live_lines_payload_from_artifacts(
                 period_totals = lines.get("period_totals") if isinstance(lines.get("period_totals"), dict) else {}
                 period_totals[horizon] = line_value
                 lines["period_totals"] = period_totals
+        elif include_period_totals and market in {"quarter_spread", "period_spread", "q_spread"}:
+            horizon = str(row.get("horizon") or row.get("period") or "").strip().lower()
+            if horizon:
+                current["found"] = True
+                period_spreads = lines.get("period_spreads") if isinstance(lines.get("period_spreads"), dict) else {}
+                period_spreads[horizon] = line_value
+                lines["period_spreads"] = period_spreads
 
     games = [game for game in games_out.values() if bool(game.get("found"))]
     if not games:
