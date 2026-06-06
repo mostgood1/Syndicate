@@ -1372,6 +1372,29 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(args[:2], ("2026-06-05", []))
         self.assertEqual(kwargs["ttl"], 20)
 
+    def test_nba_api_live_player_boxscore_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [{"event_id": "401859964", "players": [{"player": "Test Player"}]}],
+        }
+
+        with patch(
+            "syndicate.blueprints.nba.build_live_player_boxscore_payload",
+            return_value=local_payload,
+        ) as build_mock:
+            response = client.get("/nba/api/live_player_boxscore?date=2026-06-05")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-06-05", []))
+        self.assertEqual(kwargs["ttl"], 20)
+
     def test_nba_api_live_lines_allows_missing_event_ids(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
@@ -1529,6 +1552,51 @@ class DateArchiveHelperTests(unittest.TestCase):
         ), patch(
             "syndicate.features.nba.cards._resolve_games_for_event_ids",
             return_value={"401859964": {"event_id": "401859964", "status": "Live", "detail": "4:29 - 4th", "odds": {}, "live_state": {}, "away": {}, "home": {}}},
+        ):
+            payload = build_live_lines_payload("2026-06-05", [])
+
+        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401859964")
+
+    def test_nba_live_lines_historical_date_uses_final_event_ids(self) -> None:
+        from syndicate.features.nba.cards import build_live_lines_payload
+
+        with patch(
+            "syndicate.features.nba.cards.central_today_iso",
+            return_value="2026-06-06",
+        ), patch(
+            "syndicate.features.nba.cards.build_live_state_payload",
+            return_value={
+                "games": [
+                    {
+                        "event_id": "401859964",
+                        "in_progress": False,
+                        "final": True,
+                    }
+                ]
+            },
+        ), patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.nba.cards._artifact_live_lines_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.nba.cards._resolve_games_for_event_ids",
+            return_value={
+                "401859964": {
+                    "event_id": "401859964",
+                    "status": "Final",
+                    "detail": "Final",
+                    "odds": {},
+                    "live_state": {"final": True},
+                    "away": {},
+                    "home": {},
+                }
+            },
         ):
             payload = build_live_lines_payload("2026-06-05", [])
 

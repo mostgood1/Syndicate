@@ -1072,6 +1072,7 @@ def _payload_has_live_boxscore_players(payload: dict[str, Any] | None) -> bool:
 
 
 def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: bool = True) -> list[str]:
+    is_current_date = str(selected_date).strip() == central_today_iso()
     live_payload = build_live_state_payload(
         selected_date,
         ttl=12,
@@ -1079,6 +1080,7 @@ def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: b
     )
     games = live_payload.get("games") if isinstance(live_payload, dict) else []
     event_ids: list[str] = []
+    historical_event_ids: list[str] = []
     for game in games if isinstance(games, list) else []:
         if not isinstance(game, dict):
             continue
@@ -1087,11 +1089,16 @@ def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: b
             continue
         if bool(game.get("in_progress")) and not bool(game.get("final")):
             event_ids.append(event_id)
+        elif not is_current_date:
+            historical_event_ids.append(event_id)
     if event_ids:
         return list(dict.fromkeys(event_ids))
+    if historical_event_ids:
+        return list(dict.fromkeys(historical_event_ids))
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     context_games = context.get("games") if isinstance(context.get("games"), list) else []
+    historical_context_event_ids: list[str] = []
     for game in context_games:
         if not isinstance(game, dict):
             continue
@@ -1099,7 +1106,11 @@ def _default_live_event_ids(selected_date: str, *, allow_stored_date_fallback: b
         event_id = str(game.get("event_id") or "").strip()
         if event_id and bool(status.get("in_progress")) and not bool(status.get("final")):
             event_ids.append(event_id)
-    return list(dict.fromkeys(event_ids))
+        elif event_id and not is_current_date:
+            historical_context_event_ids.append(event_id)
+    if event_ids:
+        return list(dict.fromkeys(event_ids))
+    return list(dict.fromkeys(historical_context_event_ids))
 
 
 def _public_live_player_boxscore_payload(selected_date: str, event_ids: list[str]) -> dict[str, Any] | None:
