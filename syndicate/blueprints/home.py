@@ -8,7 +8,9 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 import os
+from pathlib import Path
 import re
+import subprocess
 import time
 from typing import Any
 from urllib.error import URLError
@@ -79,6 +81,61 @@ def _public_version_payload() -> dict[str, str] | None:
     return payload
 
 
+def _git_value(repo_root: Path, *args: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=2,
+        )
+    except Exception:
+        return None
+    if completed.returncode != 0:
+        return None
+    value = (completed.stdout or "").strip()
+    return value or None
+
+
+def _public_detailed_version_payload() -> dict[str, Any]:
+    repo_root = Path(current_app.root_path).resolve().parent
+    env_commit = str(
+        os.environ.get("RENDER_GIT_COMMIT")
+        or os.environ.get("GIT_COMMIT")
+        or os.environ.get("SOURCE_VERSION")
+        or ""
+    ).strip() or None
+    env_branch = str(
+        os.environ.get("RENDER_GIT_BRANCH")
+        or os.environ.get("GIT_BRANCH")
+        or ""
+    ).strip() or None
+    git_commit = _git_value(repo_root, "rev-parse", "HEAD")
+    git_branch = _git_value(repo_root, "rev-parse", "--abbrev-ref", "HEAD")
+    commit = env_commit or git_commit
+    branch = env_branch or git_branch
+    return {
+        "service": "syndicate",
+        "commit": commit,
+        "branch": branch,
+        "env_commit": env_commit,
+        "git_commit": git_commit,
+        "env_branch": env_branch,
+        "git_branch": git_branch,
+        "commit_source": "env" if env_commit else "git" if git_commit else "unknown",
+        "branch_source": "env" if env_branch else "git" if git_branch else "unknown",
+        "commit_matches_checkout": bool(env_commit and git_commit and env_commit == git_commit) if env_commit or git_commit else None,
+        "branch_matches_checkout": bool(env_branch and git_branch and env_branch == git_branch) if env_branch or git_branch else None,
+        "render_service_name": str(os.environ.get("RENDER_SERVICE_NAME") or "").strip() or None,
+        "render_instance_id": str(os.environ.get("RENDER_INSTANCE_ID") or "").strip() or None,
+        "render_external_url": str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip() or None,
+        "syndicate_data_root": str(current_app.config.get("SYNDICATE_DATA_ROOT") or os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None,
+        "syndicate_reports_root": str(current_app.config.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_REPORTS_ROOT") or "").strip() or None,
+    }
+
+
 @home_bp.get("/healthz")
 def healthz():
     payload: dict[str, Any] = {"ok": True, "service": "syndicate"}
@@ -86,6 +143,11 @@ def healthz():
     if version:
         payload["version"] = version
     return jsonify(payload)
+
+
+@home_bp.get("/versionz")
+def versionz():
+    return jsonify({"ok": True, "version": _public_detailed_version_payload()})
 
 
 def _safe_text(value: Any, fallback: str = "-") -> str:

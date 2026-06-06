@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import unittest
+from unittest.mock import patch
 
 from syndicate.app import create_app
 
@@ -16,6 +18,29 @@ class HomeHealthRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ok": True, "service": "syndicate"})
+
+    def test_versionz_exposes_public_deploy_and_checkout_metadata(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RENDER_GIT_COMMIT": "e6aa9a6",
+                "RENDER_GIT_BRANCH": "main",
+                "RENDER_SERVICE_NAME": "syndicate-web",
+            },
+            clear=False,
+        ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "main"]):
+            response = self.client.get("/versionz")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        version = payload["version"]
+        self.assertEqual(version["commit"], "e6aa9a6")
+        self.assertEqual(version["env_commit"], "e6aa9a6")
+        self.assertEqual(version["git_commit"], "ebb2136d")
+        self.assertFalse(version["commit_matches_checkout"])
+        self.assertEqual(version["branch"], "main")
+        self.assertEqual(version["render_service_name"], "syndicate-web")
 
 
 if __name__ == "__main__":
