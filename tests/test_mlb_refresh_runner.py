@@ -637,7 +637,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
                 module.live_lens_report_path = lambda d: report_path
                 module.live_lens_log_path = lambda d: log_path
-                module.build_cards_page_context = lambda selected_date: {"source_title": "MLB Game Cards", "using_sample_data": False, "games": []}
+                module.build_cards_page_context = lambda selected_date, **kwargs: {"source_title": "MLB Game Cards", "using_sample_data": False, "games": []}
                 vendor_frontend._live_lens_payload = lambda date_str, *, persist=False, refresh_markets=False: dict(payload)
 
                 result = module._persist_live_lens_report("2026-06-01")
@@ -677,7 +677,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 module.live_lens_report_path = lambda d: report_path
                 module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
                 module._persist_live_lens_report = lambda selected_date: None
-                module.build_cards_page_context = lambda selected_date: {
+                module.build_cards_page_context = lambda selected_date, **kwargs: {
                     "source_title": "MLB Game Cards",
                     "using_sample_data": False,
                     "games": [
@@ -756,7 +756,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
                 import vendor.mlb_bettingv2.tools.web.flask_frontend as vendor_frontend
                 vendor_frontend._live_lens_reports_payload = lambda d, include_archive=False: json.loads(report_path.read_text(encoding="utf-8"))
-                module.build_cards_page_context = lambda selected_date: {
+                module.build_cards_page_context = lambda selected_date, **kwargs: {
                     "source_title": "MLB Game Cards",
                     "using_sample_data": False,
                     "games": [
@@ -792,6 +792,88 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(context["games"][0]["gameLens"][0]["key"], "first1")
             self.assertEqual(context["games"][0]["liveProps"][0]["playerName"], "Player A")
             self.assertGreater(len(persisted_report["games"][0]["gameLens"]), 0)
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def test_card_to_live_lens_row_uses_segment_overview_when_game_lens_is_thin(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_card_row", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            spec.loader.exec_module(module)
+            card = {
+                "gamePk": 123,
+                "away": {"abbr": "AAA", "name": "Away A"},
+                "home": {"abbr": "BBB", "name": "Home B"},
+                "status": {"abstract": "Live", "detailed": "Top 3rd"},
+                "summary": "Fallback slate",
+                "gameLens": [
+                    {
+                        "key": "live",
+                        "label": "Live",
+                        "projection": {"away": None, "home": None, "total": None, "homeMargin": None},
+                        "modelHomeWinProb": None,
+                        "markets": {"moneyline": {}, "spread": {}, "total": {}},
+                    }
+                ],
+                "segment_overview_cards": [
+                    {"label": "Live", "subtitle": "AAA 2.9 - BBB 3.6 | Total 6.5", "reason": "live segment", "score": "AAA 1 - BBB 2", "main": "Over 6.5", "best_edge": "0.7", "home_win": "61.0%"}
+                ],
+                "probability_rows": [],
+            }
+
+            row = module._card_to_live_lens_row(card, report_date="2026-06-02")
+
+            self.assertEqual(row["gameLens"][0]["key"], "live")
+            self.assertEqual(row["gameLens"][0]["projection"]["total"], 6.5)
+            self.assertEqual(row["gameLens"][0]["projection"]["homeMargin"], 0.7)
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def test_merge_cards_context_into_live_row_replaces_thin_live_game_lens(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        module_path = repo_root / "syndicate" / "features" / "mlb" / "live_lens.py"
+        spec = importlib.util.spec_from_file_location("test_mlb_live_lens_feature_merge_row", module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+
+        try:
+            spec.loader.exec_module(module)
+            row = {
+                "gamePk": 123,
+                "status": {"abstract": "Live", "detailed": "Top 3rd"},
+                "gameLens": [
+                    {
+                        "key": "live",
+                        "label": "Live",
+                        "projection": {"away": None, "home": None, "total": None, "homeMargin": None},
+                        "modelHomeWinProb": None,
+                        "markets": {"moneyline": {}, "spread": {}, "total": {}},
+                    }
+                ],
+            }
+            card = {
+                "gamePk": 123,
+                "away": {"abbr": "AAA", "name": "Away A"},
+                "home": {"abbr": "BBB", "name": "Home B"},
+                "status": {"abstract": "Live", "detailed": "Top 3rd"},
+                "summary": "Fallback slate",
+                "segment_overview_cards": [
+                    {"label": "Live", "subtitle": "AAA 2.9 - BBB 3.6 | Total 6.5", "reason": "live segment", "score": "AAA 1 - BBB 2", "main": "Over 6.5", "best_edge": "0.7", "home_win": "61.0%"}
+                ],
+                "probability_rows": [],
+            }
+
+            merged = module._merge_cards_context_into_live_row(row, card)
+
+            self.assertEqual(merged["gameLens"][0]["key"], "live")
+            self.assertEqual(merged["gameLens"][0]["projection"]["total"], 6.5)
+            self.assertEqual(merged["gameLens"][0]["projection"]["homeMargin"], 0.7)
         finally:
             sys.modules.pop(spec.name, None)
 
@@ -844,7 +926,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
                 module.live_lens_report_path = lambda d: report_path
                 module.load_json_file = lambda path: json.loads(report_path.read_text(encoding="utf-8"))
                 module._persist_live_lens_report = lambda selected_date: None
-                module.build_cards_page_context = lambda selected_date: {
+                module.build_cards_page_context = lambda selected_date, **kwargs: {
                     "source_title": "MLB Game Cards",
                     "using_sample_data": False,
                     "games": [

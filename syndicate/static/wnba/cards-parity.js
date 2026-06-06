@@ -2291,7 +2291,7 @@
 
   function isSyntheticLiveLineSource(source) {
     const normalized = String(source || '').trim().toLowerCase();
-    return normalized === 'cards_fallback' || normalized === 'boxscore_sim_fallback';
+    return normalized === 'cards_fallback' || normalized === 'boxscore_sim_fallback' || normalized === 'oddsapi_player_props_fallback';
   }
 
   function stripSecondaryText(item) {

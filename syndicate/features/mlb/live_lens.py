@@ -567,6 +567,39 @@ def _live_lens_segments_from_card(card: dict[str, Any]) -> list[dict[str, Any]]:
     return segments
 
 
+def _lens_rows_have_projection_signal(values: Any) -> bool:
+    if not isinstance(values, list):
+        return False
+    for lens in values:
+        if not isinstance(lens, dict):
+            continue
+        projection = lens.get("projection") if isinstance(lens.get("projection"), dict) else {}
+        if any(_parse_number_text(projection.get(key)) is not None for key in ("away", "home", "total", "homeMargin")):
+            return True
+        if _parse_number_text(lens.get("modelHomeWinProb")) is not None:
+            return True
+        markets = lens.get("markets") if isinstance(lens.get("markets"), dict) else {}
+        total_market = markets.get("total") if isinstance(markets.get("total"), dict) else {}
+        spread_market = markets.get("spread") if isinstance(markets.get("spread"), dict) else {}
+        moneyline_market = markets.get("moneyline") if isinstance(markets.get("moneyline"), dict) else {}
+        if any(
+            _parse_number_text(total_market.get(key)) is not None
+            for key in ("line", "edge", "overOdds", "underOdds")
+        ):
+            return True
+        if any(
+            _parse_number_text(spread_market.get(key)) is not None
+            for key in ("homeLine", "edge", "awayOdds", "homeOdds")
+        ):
+            return True
+        if any(
+            _parse_number_text(moneyline_market.get(key)) is not None
+            for key in ("marketHomeProb", "awayOdds", "homeOdds")
+        ):
+            return True
+    return False
+
+
 _CARD_PROP_TITLE_RE = re.compile(r"^(?P<player>.+?)\s+(?P<selection>Over|Under)\s+(?P<line>[-+]?\d+(?:\.\d+)?)\s+(?P<market>.+)$", re.IGNORECASE)
 
 
@@ -641,10 +674,21 @@ def _merge_cards_context_into_live_row(row: dict[str, Any], card: dict[str, Any]
     card_props = _live_props_from_card(card)
     card_segments = _live_lens_segments_from_card(card)
     card_score = _card_score_from_card(card)
+    existing_game_lens = row.get("gameLens") if isinstance(row.get("gameLens"), list) else []
+    row_has_projection_signal = _lens_rows_have_projection_signal(existing_game_lens)
+    card_has_projection_signal = _lens_rows_have_projection_signal(card_segments)
     row_status = row.get("status") if isinstance(row.get("status"), dict) else {}
     row_status_text = f"{str(row_status.get('abstract') or row_status.get('abstractGameState') or '').strip()} {str(row_status.get('detailed') or row_status.get('detailedState') or '').strip()}".strip().lower()
     row_is_live_or_final = any(token in row_status_text for token in ("live", "in progress", "warmup", "final", "game over", "completed"))
-    if card_segments and (not isinstance(row.get("gameLens"), list) or not row.get("gameLens") or not row_is_live_or_final):
+    should_replace_game_lens = (
+        card_segments
+        and (
+            not existing_game_lens
+            or not row_is_live_or_final
+            or (card_has_projection_signal and not row_has_projection_signal)
+        )
+    )
+    if should_replace_game_lens:
         merged["gameLens"] = card_segments
     if card_props:
         merged["liveProps"] = card_props
@@ -718,6 +762,8 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
     home = card.get("home") if isinstance(card.get("home"), dict) else {}
     score = _card_score_from_card(card)
     card_props = _live_props_from_card(card)
+    card_game_lens = card.get("gameLens") if isinstance(card.get("gameLens"), list) else []
+    derived_segments = _live_lens_segments_from_card(card)
     return {
         "gamePk": int(card.get("gamePk") or 0),
         "status": card.get("status") if isinstance(card.get("status"), dict) else {"abstract": _card_status_bucket(card).title(), "detailed": str(card.get("detail") or report_date).strip() or report_date},
@@ -731,7 +777,7 @@ def _card_to_live_lens_row(card: dict[str, Any], *, report_date: str) -> dict[st
         "score": score,
         "predictions": card.get("predictions") if isinstance(card.get("predictions"), dict) else {},
         "gameMarkets": card.get("markets") if isinstance(card.get("markets"), dict) else {},
-        "gameLens": card.get("gameLens") if isinstance(card.get("gameLens"), list) else [],
+        "gameLens": card_game_lens if _lens_rows_have_projection_signal(card_game_lens) else derived_segments,
         "prop_groups": card.get("prop_groups") if isinstance(card.get("prop_groups"), list) else [],
         "prop_lens": card.get("prop_lens") if isinstance(card.get("prop_lens"), dict) else {},
         "market_tiles": card.get("market_tiles") if isinstance(card.get("market_tiles"), list) else [],
