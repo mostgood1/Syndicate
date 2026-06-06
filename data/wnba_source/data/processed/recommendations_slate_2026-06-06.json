@@ -1,8 +1,8 @@
 {
   "date": "2026-06-06",
   "counts": {
-    "games": 4,
-    "picks": 20
+    "games": 2,
+    "picks": 10
   },
   "per_game": [
     {
@@ -13,17 +13,17 @@
         {
           "market": "ATS",
           "team": "Atlanta Dream",
-          "display_pick": "Atlanta Dream -10.5",
+          "display_pick": "Atlanta Dream -9.0",
           "selection": "Atlanta Dream",
           "price": -110.0,
-          "score": 20.475,
-          "ev_pct": 20.474999999999998,
-          "win_prob": 0.72856,
-          "p_win": 0.72856,
-          "basketball_summary": "Model margin 10.0 vs market -10.5",
+          "score": 18.975,
+          "ev_pct": 18.975,
+          "win_prob": 0.71356,
+          "p_win": 0.71356,
+          "basketball_summary": "Model margin 10.0 vs market -9.0",
           "top_play_reasons": [
-            "Edge 20.5",
-            "EV 20.5%"
+            "Edge 19.0",
+            "EV 19.0%"
           ],
           "matchup": "WSH @ ATL"
         },
@@ -32,14 +32,14 @@
           "team": "ATL",
           "display_pick": "Jordin Canada OVER 9.5",
           "selection": "OVER 9.5",
-          "price": -113.0,
-          "score": 16.58611712080148,
-          "ev_pct": 16.58611712080148,
-          "win_prob": 0.5305164319248826,
-          "p_win": 0.5305164319248826,
+          "price": -111.0,
+          "score": 16.912523390063416,
+          "ev_pct": 16.912523390063416,
+          "win_prob": 0.5260663507109005,
+          "p_win": 0.5260663507109005,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 16.6%",
+            "EV 16.9%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -48,16 +48,16 @@
         {
           "market": "PROPS",
           "team": "WSH",
-          "display_pick": "Georgia Amoore OVER 10.5",
-          "selection": "OVER 10.5",
-          "price": -131.0,
-          "score": 10.079298358490906,
-          "ev_pct": 10.079298358490906,
-          "win_prob": 0.5670995670995671,
-          "p_win": 0.5670995670995671,
+          "display_pick": "Sonia Citron OVER 17.5",
+          "selection": "OVER 17.5",
+          "price": -106.0,
+          "score": 13.047287651869976,
+          "ev_pct": 13.047287651869976,
+          "win_prob": 0.5145631067961165,
+          "p_win": 0.5145631067961165,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 10.1%",
+            "EV 13.0%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -66,35 +66,34 @@
         {
           "market": "PROPS",
           "team": "WSH",
-          "display_pick": "Sonia Citron OVER 18.5",
-          "selection": "OVER 18.5",
-          "price": -110.0,
-          "score": 9.753830062312074,
-          "ev_pct": 9.753830062312074,
-          "win_prob": 0.5238095238095238,
-          "p_win": 0.5238095238095238,
+          "display_pick": "Georgia Amoore OVER 11.5",
+          "selection": "OVER 11.5",
+          "price": 100.0,
+          "score": 8.620912528818314,
+          "ev_pct": 8.620912528818314,
+          "win_prob": 0.5,
+          "p_win": 0.5,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 9.8%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
+            "EV 8.6%",
+            "Regular price range (-150 to +150)"
           ],
           "matchup": "WSH @ ATL"
         },
         {
           "market": "TOTAL",
           "team": "Total",
-          "display_pick": "Under 159.5",
+          "display_pick": "Under 160.5",
           "selection": "Under",
           "price": -110.0,
-          "score": -0.1562,
-          "ev_pct": 0.1562,
-          "win_prob": 0.525372,
-          "p_win": 0.525372,
-          "basketball_summary": "Model total 159.3 vs line 159.5",
+          "score": -1.1562,
+          "ev_pct": 1.1562,
+          "win_prob": 0.535372,
+          "p_win": 0.535372,
+          "basketball_summary": "Model total 159.3 vs line 160.5",
           "top_play_reasons": [
-            "Edge -0.2",
-            "EV 0.2%"
+            "Edge -1.2",
+            "EV 1.2%"
           ],
           "matchup": "WSH @ ATL"
         }
@@ -110,14 +109,14 @@
           "team": "NYL",
           "display_pick": "Marine Johannes UNDER 2.5",
           "selection": "UNDER 2.5",
-          "price": -115.0,
-          "score": 63.84738542440569,
-          "ev_pct": 63.84738542440569,
-          "win_prob": 0.5348837209302325,
-          "p_win": 0.5348837209302325,
+          "price": -118.0,
+          "score": 61.90989170634019,
+          "ev_pct": 61.90989170634019,
+          "win_prob": 0.5412844036697247,
+          "p_win": 0.5412844036697247,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 63.8%",
+            "EV 61.9%",
             "Regular price range (-150 to +150)",
             "Consensus: 3 books aligned",
             "Best line available"
@@ -129,14 +128,14 @@
           "team": "NYL",
           "display_pick": "Breanna Stewart UNDER 22.5",
           "selection": "UNDER 22.5",
-          "price": -112.0,
-          "score": 7.286024255129686,
-          "ev_pct": 7.286024255129686,
-          "win_prob": 0.5283018867924528,
-          "p_win": 0.5283018867924528,
+          "price": -110.0,
+          "score": 7.53719084393869,
+          "ev_pct": 7.53719084393869,
+          "win_prob": 0.5238095238095238,
+          "p_win": 0.5238095238095238,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 7.3%",
+            "EV 7.5%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
@@ -145,35 +144,17 @@
         {
           "market": "ATS",
           "team": "New York Liberty",
-          "display_pick": "New York Liberty -3.5",
+          "display_pick": "New York Liberty -2.5",
           "selection": "New York Liberty",
           "price": -110.0,
-          "score": 6.825,
-          "ev_pct": 6.825,
-          "win_prob": 0.59206,
-          "p_win": 0.59206,
-          "basketball_summary": "Model margin 3.3 vs market -3.5",
+          "score": 5.825,
+          "ev_pct": 5.825,
+          "win_prob": 0.58206,
+          "p_win": 0.58206,
+          "basketball_summary": "Model margin 3.3 vs market -2.5",
           "top_play_reasons": [
-            "Edge 6.8",
-            "EV 6.8%"
-          ],
-          "matchup": "IND @ NYL"
-        },
-        {
-          "market": "PROPS",
-          "team": "IND",
-          "display_pick": "Aliyah Boston UNDER 17.5",
-          "selection": "UNDER 17.5",
-          "price": -117.0,
-          "score": 6.704589088769714,
-          "ev_pct": 6.704589088769714,
-          "win_prob": 0.5391705069124424,
-          "p_win": 0.5391705069124424,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 6.7%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
+            "Edge 5.8",
+            "EV 5.8%"
           ],
           "matchup": "IND @ NYL"
         },
@@ -193,197 +174,24 @@
             "EV 4.3%"
           ],
           "matchup": "IND @ NYL"
-        }
-      ]
-    },
-    {
-      "home": "LVA",
-      "away": "GSV",
-      "matchup": "GSV @ LVA",
-      "picks": [
+        },
         {
           "market": "PROPS",
-          "team": "GSV",
-          "display_pick": "Veronica Burton OVER 1.5",
-          "selection": "OVER 1.5",
-          "price": 120.0,
-          "score": 59.786440382493446,
-          "ev_pct": 59.786440382493446,
-          "win_prob": 0.45454545454545453,
-          "p_win": 0.45454545454545453,
+          "team": "IND",
+          "display_pick": "Aliyah Boston UNDER 2.5",
+          "selection": "UNDER 2.5",
+          "price": -105.0,
+          "score": 3.8690421539489095,
+          "ev_pct": 3.8690421539489095,
+          "win_prob": 0.5121951219512195,
+          "p_win": 0.5121951219512195,
           "basketball_summary": "Prop projection -",
           "top_play_reasons": [
-            "EV 59.8%",
+            "EV 3.9%",
             "Regular price range (-150 to +150)",
             "Best line available"
           ],
-          "matchup": "GSV @ LVA"
-        },
-        {
-          "market": "PROPS",
-          "team": "LVA",
-          "display_pick": "Jackie Young UNDER 17.5",
-          "selection": "UNDER 17.5",
-          "price": -130.0,
-          "score": 28.269230767572186,
-          "ev_pct": 28.269230767572186,
-          "win_prob": 0.5652173913043478,
-          "p_win": 0.5652173913043478,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 28.3%",
-            "Regular price range (-150 to +150)",
-            "Consensus: 3 books aligned",
-            "Best line available"
-          ],
-          "matchup": "GSV @ LVA"
-        },
-        {
-          "market": "PROPS",
-          "team": "GSV",
-          "display_pick": "Gabby Williams UNDER 6.5",
-          "selection": "UNDER 6.5",
-          "price": 118.0,
-          "score": 20.429464003186826,
-          "ev_pct": 20.429464003186826,
-          "win_prob": 0.45871559633027525,
-          "p_win": 0.45871559633027525,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 20.4%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
-          ],
-          "matchup": "GSV @ LVA"
-        },
-        {
-          "market": "ATS",
-          "team": "Las Vegas Aces",
-          "display_pick": "Las Vegas Aces -3.0",
-          "selection": "Las Vegas Aces",
-          "price": -110.0,
-          "score": 5.85,
-          "ev_pct": 5.8500000000000005,
-          "win_prob": 0.58231,
-          "p_win": 0.58231,
-          "basketball_summary": "Model margin 2.9 vs market -3.0",
-          "top_play_reasons": [
-            "Edge 5.8",
-            "EV 5.9%"
-          ],
-          "matchup": "GSV @ LVA"
-        },
-        {
-          "market": "TOTAL",
-          "team": "Total",
-          "display_pick": "Under 167.5",
-          "selection": "Under",
-          "price": -110.0,
-          "score": -2.835771,
-          "ev_pct": 2.8358000000000003,
-          "win_prob": 0.552168,
-          "p_win": 0.552168,
-          "basketball_summary": "Model total 164.7 vs line 167.5",
-          "top_play_reasons": [
-            "Edge -2.8",
-            "EV 2.8%"
-          ],
-          "matchup": "GSV @ LVA"
-        }
-      ]
-    },
-    {
-      "home": "MIN",
-      "away": "SEA",
-      "matchup": "SEA @ MIN",
-      "picks": [
-        {
-          "market": "ATS",
-          "team": "Minnesota Lynx",
-          "display_pick": "Minnesota Lynx -13.5",
-          "selection": "Minnesota Lynx",
-          "price": -110.0,
-          "score": 26.325,
-          "ev_pct": 26.325,
-          "win_prob": 0.78706,
-          "p_win": 0.78706,
-          "basketball_summary": "Model margin 12.8 vs market -13.5",
-          "top_play_reasons": [
-            "Edge 26.3",
-            "EV 26.3%"
-          ],
-          "matchup": "SEA @ MIN"
-        },
-        {
-          "market": "PROPS",
-          "team": "MIN",
-          "display_pick": "Olivia Miles UNDER 22.5",
-          "selection": "UNDER 22.5",
-          "price": -111.0,
-          "score": 15.758861542189761,
-          "ev_pct": 15.758861542189761,
-          "win_prob": 0.5260663507109005,
-          "p_win": 0.5260663507109005,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 15.8%",
-            "Regular price range (-150 to +150)",
-            "Best line available"
-          ],
-          "matchup": "SEA @ MIN"
-        },
-        {
-          "market": "PROPS",
-          "team": "MIN",
-          "display_pick": "Natasha Howard OVER 18.5",
-          "selection": "OVER 18.5",
-          "price": 100.0,
-          "score": 15.414055284805483,
-          "ev_pct": 15.414055284805483,
-          "win_prob": 0.5,
-          "p_win": 0.5,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 15.4%",
-            "Regular price range (-150 to +150)"
-          ],
-          "matchup": "SEA @ MIN"
-        },
-        {
-          "market": "PROPS",
-          "team": "MIN",
-          "display_pick": "Courtney Williams OVER 1.5",
-          "selection": "OVER 1.5",
-          "price": -137.0,
-          "score": 7.336718742938597,
-          "ev_pct": 7.336718742938597,
-          "win_prob": 0.5780590717299579,
-          "p_win": 0.5780590717299579,
-          "basketball_summary": "Prop projection -",
-          "top_play_reasons": [
-            "EV 7.3%",
-            "Regular price range (-150 to +150)",
-            "Consensus: 4 books aligned",
-            "Best line available"
-          ],
-          "matchup": "SEA @ MIN"
-        },
-        {
-          "market": "TOTAL",
-          "team": "Total",
-          "display_pick": "Under 162.5",
-          "selection": "Under",
-          "price": -110.0,
-          "score": -1.972543,
-          "ev_pct": 1.9725,
-          "win_prob": 0.543535,
-          "p_win": 0.543535,
-          "basketball_summary": "Model total 160.5 vs line 162.5",
-          "top_play_reasons": [
-            "Edge -2.0",
-            "EV 2.0%"
-          ],
-          "matchup": "SEA @ MIN"
+          "matchup": "IND @ NYL"
         }
       ]
     }

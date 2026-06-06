@@ -1,6 +1,6 @@
 {
   "date": "2026-06-06",
-  "generatedAt": "2026-06-06T15:34:24-05:00",
+  "generatedAt": "2026-06-06T15:38:20-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -24,12 +24,12 @@
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 7.6,
-    "totalMs": 835.8,
-    "snapshotLoadMs": 4.0,
+    "marketRefreshMs": 1.9,
+    "totalMs": 771.2,
+    "snapshotLoadMs": 3.9,
     "simContextLoadMs": 2.4,
     "propEvalMs": 0.4,
-    "gameLensMs": 2.2,
+    "gameLensMs": 3.5,
     "gameCount": 15,
     "liveGameCount": 9,
     "feedFetchCount": 15,
@@ -7577,7 +7577,7 @@
                 4
               ],
               "tone": "strong",
-              "detail": "Live projection 5.1. Current 0.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "detail": "Live projection 4.8. Current 0.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
               "hitProb": 0.825,
               "source": "live",
               "actual": 0.0
@@ -7591,10 +7591,10 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Live projection 18.3. Current 3.0. Starter still active in live game state. Supported ladders: 16/16 Last supported rung: 16",
+              "detail": "Live projection 17.6. Current 4.0. Starter still active in live game state. Supported ladders: 16/16 Last supported rung: 16",
               "hitProb": 0.829,
               "source": "live",
-              "actual": 3.0
+              "actual": 4.0
             },
             {
               "label": "H up to 6",
@@ -7605,7 +7605,7 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 6.8. Current 2.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
+              "detail": "Live projection 6.5. Current 2.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
               "hitProb": 0.715,
               "source": "live",
               "actual": 2.0
@@ -9001,10 +9001,10 @@
                 17
               ],
               "tone": "strong",
-              "detail": "Live projection 16.6. Current 5.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "detail": "Live projection 16.6. Current 6.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
               "hitProb": 0.807,
               "source": "live",
-              "actual": 5.0
+              "actual": 6.0
             },
             {
               "label": "H up to 5",
@@ -9014,7 +9014,7 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 4.6. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.5. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.622,
               "source": "live",
               "actual": 1.0
@@ -9027,10 +9027,10 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.4. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.6. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.532,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             }
           ]
         },
@@ -9794,10 +9794,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 4.5. Current 2.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.6. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.547,
               "source": "live",
-              "actual": 2.0
+              "actual": 3.0
             },
             {
               "label": "O 15/16",
@@ -9808,10 +9808,10 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Live projection 16.8. Current 3.0. Starter still active in live game state. Supported ladders: 15/16 Last supported rung: 16",
+              "detail": "Live projection 16.6. Current 4.0. Starter still active in live game state. Supported ladders: 15/16 Last supported rung: 16",
               "hitProb": 0.756,
               "source": "live",
-              "actual": 3.0
+              "actual": 4.0
             },
             {
               "label": "H up to 5",
@@ -9821,8 +9821,21 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 5.8. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 5.8. Current 2.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.738,
+              "source": "live",
+              "actual": 2.0
+            },
+            {
+              "label": "BB up to 3",
+              "stat": "walks_allowed",
+              "target": 3,
+              "targets": [
+                3
+              ],
+              "tone": "strong",
+              "detail": "Live projection 2.1. Current 1.0. Starter still active in live game state. Supported ladders: 3 Last supported rung: 3",
+              "hitProb": 0.381,
               "source": "live",
               "actual": 1.0
             }
@@ -11205,10 +11218,10 @@
                 3
               ],
               "tone": "strong",
-              "detail": "Live projection 2.0. Current 0.0. Starter still active in live game state. Supported ladders: 3 Last supported rung: 3",
+              "detail": "Live projection 2.2. Current 1.0. Starter still active in live game state. Supported ladders: 3 Last supported rung: 3",
               "hitProb": 0.421,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             }
           ]
         }
@@ -12442,10 +12455,10 @@
                 4
               ],
               "tone": "strong",
-              "detail": "Live projection 4.9. Current 2.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "detail": "Live projection 5.0. Current 3.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
               "hitProb": 0.826,
               "source": "live",
-              "actual": 2.0
+              "actual": 3.0
             },
             {
               "label": "O up to 16",
@@ -12455,10 +12468,10 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Live projection 18.0. Current 4.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
+              "detail": "Live projection 17.8. Current 6.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
               "hitProb": 0.926,
               "source": "live",
-              "actual": 4.0
+              "actual": 6.0
             },
             {
               "label": "H up to 6",
@@ -12468,7 +12481,7 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 5.7. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 5.4. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.695,
               "source": "live",
               "actual": 0.0
@@ -12481,7 +12494,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.6. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.5. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.599,
               "source": "live",
               "actual": 0.0
@@ -12570,7 +12583,7 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 4.2. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.1. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.627,
               "source": "live",
               "actual": 0.0
@@ -12583,7 +12596,7 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Live projection 18.5. Current 6.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "detail": "Live projection 17.9. Current 6.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
               "hitProb": 0.841,
               "source": "live",
               "actual": 6.0
@@ -12596,7 +12609,7 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 5.4. Current 3.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 5.3. Current 3.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.533,
               "source": "live",
               "actual": 3.0

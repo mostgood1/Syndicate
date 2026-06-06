@@ -195,6 +195,29 @@ def _payload_has_snapshot_content(kind: str, payload: dict[str, object] | None) 
     return True
 
 
+def _live_lines_interval_count(payload: dict[str, object] | None) -> int:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    interval_count = 0
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        lines = game.get("lines") if isinstance(game.get("lines"), dict) else {}
+        for key in ("period_totals", "period_spreads"):
+            values = lines.get(key) if isinstance(lines.get(key), dict) else {}
+            interval_count += sum(1 for value in values.values() if _float_or_none(value) is not None)
+    return interval_count
+
+
+def _prefer_live_lines_payload(current: dict[str, object] | None, candidate: dict[str, object] | None) -> dict[str, object] | None:
+    if not _payload_has_snapshot_content("live_lines", candidate):
+        return current
+    if not _payload_has_snapshot_content("live_lines", current):
+        return candidate
+    if _live_lines_interval_count(candidate) > _live_lines_interval_count(current):
+        return candidate
+    return current
+
+
 def _snapshot_artifact_has_meaningful_content(kind: str, path: Path | None) -> bool:
     payload = _read_live_snapshot_payload(path) if path is not None else None
     return _payload_has_snapshot_content(kind, payload)
@@ -1730,7 +1753,7 @@ def _ensure_source_game_inputs(
         rc_fetch = _run_source_subprocess_cli_command(
             source_root=source_root,
             package_name=package_name,
-            command_parts=["fetch", "--years", "10", "--no-periods"],
+            command_parts=["fetch", "--years", "10"],
             log_file=log_file,
             heartbeat_cb=heartbeat_cb,
             timeout_s=45 * 60,
@@ -3421,15 +3444,21 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             if kind == "live_lines":
                 query = f"{query}&include_period_totals=1"
             payload = _fetch_json(query)
-        if not _payload_has_snapshot_content(kind, payload):
-            payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
-        if not _payload_has_snapshot_content(kind, payload):
-            payload = _build_bundle_local_live_snapshot_payload(
-                kind=kind,
-                date_str=date_str,
-                event_ids=event_ids,
-                processed_root=processed_root,
-            )
+        local_payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
+        if kind == "live_lines":
+            payload = _prefer_live_lines_payload(payload, local_payload)
+        elif not _payload_has_snapshot_content(kind, payload):
+            payload = local_payload
+        bundle_payload = _build_bundle_local_live_snapshot_payload(
+            kind=kind,
+            date_str=date_str,
+            event_ids=event_ids,
+            processed_root=processed_root,
+        )
+        if kind == "live_lines":
+            payload = _prefer_live_lines_payload(payload, bundle_payload)
+        elif not _payload_has_snapshot_content(kind, payload):
+            payload = bundle_payload
         if isinstance(payload, dict) and _payload_has_snapshot_content(kind, payload) and _write_live_snapshot_payload(destination, payload):
             if copied_key:
                 copied[copied_key] = str(destination)

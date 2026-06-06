@@ -57,6 +57,49 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertTrue(calls[0]["do_edges"])
         self.assertTrue(calls[0]["do_export"])
 
+    def test_ensure_source_game_inputs_fetches_with_periods_enabled(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir) / "source"
+            processed_root = source_root / "data" / "processed"
+            raw_root = source_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            date_str = "2026-05-22"
+            (processed_root / f"game_odds_{date_str}.csv").write_text(
+                "game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker\n"
+                "1,Chicago Sky,Minnesota Lynx,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus\n",
+                encoding="utf-8",
+            )
+
+            calls: list[list[str]] = []
+
+            def fake_cli(*, source_root, package_name, command_parts, log_file, heartbeat_cb, timeout_s):
+                calls.append(list(command_parts))
+                if command_parts and command_parts[0] == "export-game-cards":
+                    out_path = source_root / "data" / "processed" / f"game_cards_{date_str}.csv"
+                    out_path.write_text(
+                        "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                        "2026-05-22,1,Chicago Sky,Minnesota Lynx,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,164.5,oddsapi_consensus,CHI,MIN\n",
+                        encoding="utf-8",
+                    )
+                return 0
+
+            module._run_source_subprocess_cli_command = fake_cli
+            module._seed_game_odds_from_props_snapshot = lambda **kwargs: None
+            module._seed_game_odds_from_raw_history = lambda **kwargs: None
+
+            module._ensure_source_game_inputs(
+                source_root=source_root,
+                package_name="wnba_betting",
+                date_str=date_str,
+                log_file=Path(tmp_dir) / "refresh.log",
+                heartbeat_cb=None,
+            )
+
+        self.assertIn(["fetch", "--years", "10"], calls)
+
     def test_build_local_game_recommendations_artifact_uses_game_cards_and_smart_sim(self) -> None:
         module = self._load_module()
 
@@ -1144,6 +1187,86 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertIsNotNone(((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}).get("total")))
         self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Breanna Stewart")
         self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("line_source"), "live_lens_projection_artifact")
+
+    def test_export_live_snapshot_artifacts_prefers_richer_local_live_lines(self) -> None:
+        module = self._load_module()
+
+        class _FakeResponse:
+            def __init__(self, payload):
+                self.status_code = 200
+                self._payload = payload
+
+            def get_json(self):
+                return self._payload
+
+        class _FakeClient:
+            def get(self, query):
+                if query.startswith("/api/live_state"):
+                    return _FakeResponse({"ok": True, "games": [{"event_id": "401856963", "status": "Live"}]})
+                if query.startswith("/api/live_lines"):
+                    return _FakeResponse(
+                        {
+                            "ok": True,
+                            "games": [{"event_id": "401856963", "found": True, "lines": {"total": 163.5, "period_totals": {}, "period_spreads": {}}}],
+                        }
+                    )
+                return _FakeResponse({"ok": True, "games": []})
+
+        class _FakeSourceApp:
+            class app:
+                @staticmethod
+                def test_client():
+                    return _FakeClient()
+
+        def _fake_local_payload(*, kind, date_str, event_ids):
+            if kind != "live_lines":
+                return None
+            return {
+                "ok": True,
+                "games": [
+                    {
+                        "event_id": "401856963",
+                        "found": True,
+                        "lines": {
+                            "total": 162.5,
+                            "period_totals": {"q1": 40.5},
+                            "period_spreads": {"q1": -2.5},
+                        },
+                    }
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=True), patch.object(
+                module,
+                "_load_source_app",
+                return_value=_FakeSourceApp(),
+            ), patch.object(
+                module,
+                "_build_local_live_snapshot_payload",
+                side_effect=_fake_local_payload,
+            ), patch.object(
+                module,
+                "_build_bundle_local_live_snapshot_payload",
+                return_value=None,
+            ):
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str="2026-06-05",
+                    processed_root=processed_root,
+                )
+
+            self.assertIn("live_lines_path", copied)
+            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl")
+
+        lines = ((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}))
+        self.assertEqual((lines.get("period_totals") or {}).get("q1"), 40.5)
+        self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -2.5)
 
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()

@@ -275,6 +275,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
 
             game_cards_path = processed_root / f"game_cards_{date_str}.csv"
 
+            self.assertIn(["fetch", "--years", "10"], calls)
             self.assertIn(["export-game-cards", "--date", date_str], calls)
             self.assertTrue(game_cards_path.exists())
             with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
@@ -594,7 +595,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("player\nA\n", encoding="utf-8")
                 return 1, out_path
 
-            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)):
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)):
                 state = module._run_refresh_via_cli(
                     source_root=source_root,
                     date_str="2026-05-22",
@@ -648,7 +649,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("market\nPTS\n", encoding="utf-8")
                 return 1, out_path
 
-            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)):
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)):
                 state = module._run_refresh_via_cli(
                     source_root=source_root,
                     date_str="2026-05-22",
@@ -736,7 +737,7 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("player\nA\n", encoding="utf-8")
                 return 1, out_path
 
-            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "export_props_recommendations_local", side_effect=_fake_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)):
+            with patch.object(module, "_run_to_file", side_effect=_fake_run), patch.object(module, "export_props_predictions_local", side_effect=_fake_predict_export), patch.object(module, "export_props_edges_local", side_effect=_fake_edges_export), patch.object(module, "export_props_recommendations_local", side_effect=_fake_export), patch.object(module, "_ensure_player_logs_for_props_refresh", return_value=(True, None)), patch.object(module, "_ensure_game_predictions_for_props_refresh", return_value=(True, None)):
                 state = module._run_refresh_via_cli(
                     source_root=source_root,
                     date_str="2026-05-22",
@@ -1255,6 +1256,86 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Jayson Tatum")
         self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("line_source"), "live_lens_projection_artifact")
 
+    def test_export_live_snapshot_artifacts_prefers_richer_local_live_lines(self) -> None:
+        module = self._load_module()
+
+        class _FakeResponse:
+            def __init__(self, payload):
+                self.status_code = 200
+                self._payload = payload
+
+            def get_json(self):
+                return self._payload
+
+        class _FakeClient:
+            def get(self, query):
+                if query.startswith("/api/live_state"):
+                    return _FakeResponse({"ok": True, "games": [{"event_id": "401859964", "status": "Live"}]})
+                if query.startswith("/api/live_lines"):
+                    return _FakeResponse(
+                        {
+                            "ok": True,
+                            "games": [{"event_id": "401859964", "found": True, "lines": {"total": 221.5, "period_totals": {}, "period_spreads": {}}}],
+                        }
+                    )
+                return _FakeResponse({"ok": True, "games": []})
+
+        class _FakeSourceApp:
+            class app:
+                @staticmethod
+                def test_client():
+                    return _FakeClient()
+
+        def _fake_local_payload(*, kind, date_str, event_ids):
+            if kind != "live_lines":
+                return None
+            return {
+                "ok": True,
+                "games": [
+                    {
+                        "event_id": "401859964",
+                        "found": True,
+                        "lines": {
+                            "total": 219.5,
+                            "period_totals": {"q1": 54.5},
+                            "period_spreads": {"q1": -1.5},
+                        },
+                    }
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=True), patch.object(
+                module,
+                "_load_source_app",
+                return_value=_FakeSourceApp(),
+            ), patch.object(
+                module,
+                "_build_local_live_snapshot_payload",
+                side_effect=_fake_local_payload,
+            ), patch.object(
+                module,
+                "_build_bundle_local_live_snapshot_payload",
+                return_value=None,
+            ):
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str="2026-06-05",
+                    processed_root=processed_root,
+                )
+
+            self.assertIn("live_lines_path", copied)
+            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl")
+
+        lines = ((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}))
+        self.assertEqual((lines.get("period_totals") or {}).get("q1"), 54.5)
+        self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -1.5)
+
     def test_season_betting_card_export_uses_local_manifest_builder(self) -> None:
         module = self._load_module()
 
@@ -1326,6 +1407,11 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 (tmp_root / name).write_text("id\n1\n", encoding="utf-8")
             source_root = tmp_root / "source"
             source_root.mkdir()
+            source_processed_root = source_root / "data" / "processed"
+            source_processed_root.mkdir(parents=True, exist_ok=True)
+            (source_processed_root / "live_lens_signals_2026-05-22.jsonl").write_text('{"kind":"signal"}\n', encoding="utf-8")
+            (source_processed_root / "live_lens_projections_2026-05-22.jsonl").write_text('{"kind":"projection"}\n', encoding="utf-8")
+            (source_processed_root / "live_lens_tuning_override.json").write_text('{"alpha":1.25}\n', encoding="utf-8")
             artifact_root = tmp_root / "bundle"
             argv = [
                 "refresh_nba_oddsapi_props.py",
@@ -1421,6 +1507,11 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text("game_id\nquarter-123\n", encoding="utf-8")
                 return str(out_path)
 
+            def _fake_recon_games_artifact(*, source_root, date_str, processed_root):
+                out_path = processed_root / f"recon_games_{date_str}.csv"
+                out_path.write_text("game_id\n123\n", encoding="utf-8")
+                return str(out_path)
+
             def _fake_recon_props_artifact(*, source_root, date_str, processed_root):
                 out_path = processed_root / f"recon_props_{date_str}.csv"
                 out_path.write_text("player_id\n42\n", encoding="utf-8")
@@ -1461,7 +1552,53 @@ class NbaRefreshRunnerTests(unittest.TestCase):
                 out_path.write_text('{"data": []}\n', encoding="utf-8")
                 return str(out_path)
 
-            with patch.object(module, "_run_refresh_via_cli", return_value=_FakeSourceModule().run_refresh_oddsapi_props_job(log_file=tmp_root / "refresh.log")), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_export_boxscores_artifact", side_effect=_fake_boxscores_artifact), patch.object(module, "_export_recommendations_artifact", side_effect=_fake_recommendations_artifact), patch.object(module, "_export_recommendations_slate_snapshot", side_effect=_fake_recommendations_slate_artifact), patch.object(module, "_export_cards_props_snapshot", side_effect=_fake_cards_props_snapshot_artifact), patch.object(module, "_export_cards_sim_detail_snapshot", side_effect=_fake_cards_sim_detail_artifact), patch.object(module, "_export_top_by_game_snapshot", side_effect=_fake_top_by_game_artifact), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch.object(module, "_export_recon_props_artifact", side_effect=_fake_recon_props_artifact), patch("sys.argv", argv):
+            def _fake_season_betting_card_artifacts(*, source_root, date_str, processed_root):
+                manifest_path = processed_root / "season_betting_card_manifest_2025_retuned_2026-05-22.json"
+                generic_manifest_path = processed_root / "season_betting_card_manifest_2025_retuned.json"
+                day_path = processed_root / "season_betting_card_day_2025_retuned_2026-05-22.json"
+                day_insights_path = processed_root / "season_betting_card_day_2025_retuned_2026-05-22_insights.json"
+                for path, content in (
+                    (manifest_path, '{"season": 2025}\n'),
+                    (generic_manifest_path, '{"season": 2025}\n'),
+                    (day_path, '{"date": "2026-05-22"}\n'),
+                    (day_insights_path, '{"date": "2026-05-22", "insights": []}\n'),
+                ):
+                    path.write_text(content, encoding="utf-8")
+                return {
+                    "season_betting_card_manifest_path": str(manifest_path),
+                    "season_betting_card_manifest_generic_path": str(generic_manifest_path),
+                    "season_betting_card_day_path": str(day_path),
+                    "season_betting_card_day_insights_path": str(day_insights_path),
+                }
+
+            def _fake_live_lens_artifacts(*, source_root, date_str, processed_root, live_lens_root):
+                processed_root.mkdir(parents=True, exist_ok=True)
+                live_lens_root.mkdir(parents=True, exist_ok=True)
+                signals_processed = processed_root / f"live_lens_signals_{date_str}.jsonl"
+                projections_processed = processed_root / f"live_lens_projections_{date_str}.jsonl"
+                tuning_processed = processed_root / "live_lens_tuning_override.json"
+                signals_live_lens = live_lens_root / f"live_lens_signals_{date_str}.jsonl"
+                projections_live_lens = live_lens_root / f"live_lens_projections_{date_str}.jsonl"
+                tuning_live_lens = live_lens_root / "live_lens_tuning_override.json"
+                for path, content in (
+                    (signals_processed, '{"kind":"signal"}\n'),
+                    (projections_processed, '{"kind":"projection"}\n'),
+                    (tuning_processed, '{"alpha":1.25}\n'),
+                    (signals_live_lens, '{"kind":"signal"}\n'),
+                    (projections_live_lens, '{"kind":"projection"}\n'),
+                    (tuning_live_lens, '{"alpha":1.25}\n'),
+                ):
+                    path.write_text(content, encoding="utf-8")
+                return {
+                    "live_lens_signals_path": str(signals_processed),
+                    "live_lens_projections_path": str(projections_processed),
+                    "live_lens_tuning_override_path": str(tuning_processed),
+                    "live_lens_signals_live_lens_path": str(signals_live_lens),
+                    "live_lens_projections_live_lens_path": str(projections_live_lens),
+                    "live_lens_tuning_override_live_lens_path": str(tuning_live_lens),
+                }
+
+            with patch.object(module, "_run_refresh_via_cli", return_value=_FakeSourceModule().run_refresh_oddsapi_props_job(log_file=tmp_root / "refresh.log")), patch.object(module, "_load_source_app", return_value=_FakeSourceApp()), patch.object(module, "_build_optional_player_recon_artifacts", side_effect=_fake_optional_artifacts), patch.object(module, "_export_recon_games_artifact", side_effect=_fake_recon_games_artifact), patch.object(module, "_export_game_cards_artifact", side_effect=_fake_game_cards_artifact), patch.object(module, "_export_boxscores_artifact", side_effect=_fake_boxscores_artifact), patch.object(module, "_export_recommendations_artifact", side_effect=_fake_recommendations_artifact), patch.object(module, "_export_recommendations_slate_snapshot", side_effect=_fake_recommendations_slate_artifact), patch.object(module, "_export_cards_props_snapshot", side_effect=_fake_cards_props_snapshot_artifact), patch.object(module, "_export_cards_sim_detail_snapshot", side_effect=_fake_cards_sim_detail_artifact), patch.object(module, "_export_top_by_game_snapshot", side_effect=_fake_top_by_game_artifact), patch.object(module, "_export_season_betting_card_artifacts", side_effect=_fake_season_betting_card_artifacts), patch.object(module, "_export_live_lens_artifacts", side_effect=_fake_live_lens_artifacts), patch.object(module, "_export_recon_quarters_artifact", side_effect=_fake_recon_quarters_artifact), patch.object(module, "_export_recon_props_artifact", side_effect=_fake_recon_props_artifact), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)

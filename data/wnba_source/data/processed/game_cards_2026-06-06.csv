@@ -1,5 +1,3 @@
 date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
-2026-06-06,1,Atlanta Dream,Washington Mystics,2026-06-06T22:00:00Z,-399.3044856264375,399.30448562643744,-10.5,10.5,159.5,oddsapi_consensus,ATL,WSH
-2026-06-06,2,New York Liberty,Indiana Fever,2026-06-07T00:00:00Z,-138.19693898804982,138.19693898804974,-3.5,3.5,175.0,oddsapi_consensus,NYL,IND
-2026-06-06,3,Las Vegas Aces,Golden State Valkyries,2026-06-06T19:00:00Z,-138.7836062326406,138.78360623264055,-3.0,3.0,167.5,oddsapi_consensus,LVA,GSV
-2026-06-06,4,Minnesota Lynx,Seattle Storm,2026-06-06T17:00:00Z,-654.6340984095917,654.6340984095925,-13.5,13.5,162.5,oddsapi_consensus,MIN,SEA
+2026-06-06,1,Atlanta Dream,Washington Mystics,2026-06-06T22:00:00Z,-340.5478310801552,340.5478310801552,-9.0,9.0,160.5,oddsapi_consensus,ATL,WSH
+2026-06-06,2,New York Liberty,Indiana Fever,2026-06-07T00:00:00Z,-131.53439778137695,131.53439778137695,-2.5,2.5,175.0,oddsapi_consensus,NYL,IND
