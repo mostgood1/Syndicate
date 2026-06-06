@@ -143,6 +143,91 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual([game.get("game_id") for game in payload.get("games") or []], ["42"])
         self.assertTrue(((payload.get("games") or [{}])[0]).get("in_progress"))
 
+    def test_live_state_payload_repairs_stale_public_scoreboard_with_cards_context(self) -> None:
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
+            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            return_value={
+                "ok": True,
+                "source": "espn_scoreboard_fallback",
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "away": "NYL",
+                        "home": "LAS",
+                        "away_pts": 0,
+                        "home_pts": 0,
+                        "status": "5/21 - 7:00 PM EDT",
+                        "clock": "",
+                        "period": None,
+                        "in_progress": False,
+                        "final": False,
+                        "periods": [],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "away_tri": "NYL",
+                        "home_tri": "LAS",
+                        "away": {"abbr": "NYL", "score": 64},
+                        "home": {"abbr": "LAS", "score": 66},
+                        "status": "Live",
+                        "detail": "3:27 - 4th",
+                        "live_state": {"in_progress": True, "final": False},
+                    }
+                ]
+            },
+        ):
+            payload = build_live_state_payload("2026-05-21", ttl=12)
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertTrue(game.get("in_progress"))
+        self.assertEqual(game.get("away_pts"), 64.0)
+        self.assertEqual(game.get("home_pts"), 66.0)
+        self.assertEqual(game.get("clock"), "3:27")
+        self.assertEqual(game.get("period"), 4)
+
+    def test_live_lines_payload_merges_partial_local_snapshot_with_artifact(self) -> None:
+        with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "games": [{"event_id": "evt-1", "found": True, "total": 164.5, "lines": {"total": 164.5}}],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards._artifact_live_lines_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "found": True,
+                        "total": 159.5,
+                        "lines": {"total": 159.5, "period_totals": {"q1": 40.5}, "period_spreads": {}},
+                    }
+                ],
+            },
+        ):
+            payload = build_live_lines_payload("2026-05-21", ["evt-1", "evt-2"], ttl=20, include_period_totals=True)
+
+        games = {str(game.get("event_id")): game for game in payload.get("games") or [] if isinstance(game, dict)}
+        self.assertEqual(set(games.keys()), {"evt-1", "evt-2"})
+        self.assertEqual(games["evt-1"].get("total"), 164.5)
+        self.assertEqual(games["evt-2"].get("total"), 159.5)
+        self.assertEqual((((games["evt-2"].get("lines") or {}).get("period_totals") or {}).get("q1")), 40.5)
+
     def test_live_lens_card_surface_shows_total_points_and_live_line(self) -> None:
         with patch(
             "syndicate.features.wnba.live_lens.build_cards_page_context",
