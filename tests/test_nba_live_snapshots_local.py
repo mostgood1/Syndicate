@@ -68,7 +68,7 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
                 _local_live_snapshot_payload.cache_clear()
 
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
-        self.assertEqual(((payload.get("games") or [{}])[0]).get("rows"), [{"player": "Two"}])
+        self.assertEqual((((payload.get("games") or [{}])[0]).get("rows") or [{}])[0].get("player"), "Two")
 
     def test_live_lines_payload_uses_local_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -215,9 +215,9 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         metric_text = " ".join(f"{row.get('label')} {row.get('value')}" for row in metrics if isinstance(row, dict))
 
         self.assertIn("Total pts 206", card.get("summary"))
-        self.assertIn("Live line 224.5", card.get("summary"))
+        self.assertIn("Live total 224.5", card.get("summary"))
         self.assertIn("Total pts 206", metric_text)
-        self.assertIn("Live line 224.5", metric_text)
+        self.assertIn("Live total 224.5", metric_text)
         self.assertIn("Market snapshot: Consensus lines", card.get("list_items")[0])
         self.assertIn("Away ML +105", " ".join(card.get("list_items")))
         self.assertIn("Jayson Tatum | Over 28.5 PTS", " ".join(card.get("list_items")))
@@ -257,6 +257,108 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
 
         self.assertNotIn("Live line", card.get("summary"))
         self.assertNotIn("Live line", metric_labels)
+
+    def test_live_player_lens_payload_uses_local_projection_artifact_when_snapshot_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "live_lens_projections_2026-05-21.jsonl").write_text(
+                json.dumps(
+                    {
+                        "market": "player_prop",
+                        "game_id": "0401",
+                        "player": "Jayson Tatum",
+                        "team": "BOS",
+                        "opponent": "NYK",
+                        "stat": "pts",
+                        "line": 27.5,
+                        "proj": 30.2,
+                        "sim_mu": 29.2,
+                        "klass": "BET",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                "syndicate.features.nba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.nba.cards._resolve_games_for_event_ids",
+                return_value={"evt-2": {"event_id": "evt-2", "gamePk": "0401", "away_tri": "BOS", "home_tri": "NYK"}},
+            ), patch(
+                "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+                return_value={
+                    "games": [
+                        {
+                            "event_id": "evt-2",
+                            "players": [
+                                {"team_tri": "BOS", "player": "Jayson Tatum", "pts": 20, "reb": 5, "ast": 3, "mp": 24}
+                            ],
+                        }
+                    ]
+                },
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+                _local_live_snapshot_payload.cache_clear()
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("player"), "Jayson Tatum")
+        self.assertEqual(row.get("line_source"), "live_lens_projection_artifact")
+        self.assertEqual(row.get("actual"), 20)
+        self.assertEqual(row.get("live_projection"), 30.2)
+
+    def test_live_lines_payload_uses_local_signals_artifact_when_snapshot_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "live_lens_signals_2026-05-21.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "market": "total",
+                                "game_id": "0401",
+                                "home": "NYK",
+                                "away": "BOS",
+                                "live_line": 221.5,
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "market": "quarter_total",
+                                "game_id": "0401",
+                                "home": "NYK",
+                                "away": "BOS",
+                                "horizon": "q1",
+                                "live_line": 56.5,
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                "syndicate.features.nba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.nba.cards._resolve_games_for_event_ids",
+                return_value={"evt-2": {"event_id": "evt-2", "gamePk": "0401", "away_tri": "BOS", "home_tri": "NYK"}},
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
+                _local_live_snapshot_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("total"), 221.5)
+        self.assertEqual((((game.get("lines") or {}).get("period_totals") or {}).get("q1")), 56.5)
+        self.assertEqual(payload.get("source"), "syndicate_live_lens_signals_artifact")
 
 
 if __name__ == "__main__":

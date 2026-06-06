@@ -1206,6 +1206,55 @@ class NbaRefreshRunnerTests(unittest.TestCase):
             self.assertFalse((processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl").exists())
             self.assertFalse((processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl").exists())
 
+    def test_export_live_snapshot_artifacts_builds_from_bundle_live_lens_artifacts(self) -> None:
+        module = self._load_module()
+        date_str = "2099-12-31"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            source_snapshots = source_root / "data" / "processed" / "live_snapshots"
+            source_snapshots.mkdir(parents=True, exist_ok=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            module._write_live_snapshot_payload(
+                source_snapshots / f"live_state_{date_str}.jsonl",
+                {"ok": True, "games": [{"event_id": "401859964", "home": "NYK", "away": "BOS", "status": "Live"}]},
+            )
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
+                "date,game_id,event_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                f"{date_str},0401,401859964,New York Knicks,Boston Celtics,{date_str}T23:00:00Z,-140,120,-4.5,4.5,221.5,oddsapi_consensus,NYK,BOS\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"live_lens_signals_{date_str}.jsonl").write_text(
+                json.dumps({"market": "total", "game_id": "0401", "home": "NYK", "away": "BOS", "live_line": 221.5}) + "\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"live_lens_projections_{date_str}.jsonl").write_text(
+                json.dumps({"market": "player_prop", "game_id": "0401", "home": "NYK", "away": "BOS", "player": "Jayson Tatum", "team": "BOS", "opponent": "NYK", "stat": "pts", "line": 27.5, "proj": 30.2, "sim_mu": 29.2, "klass": "BET"}) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch(
+                "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+                return_value={"games": [{"event_id": "401859964", "players": []}]},
+            ):
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str=date_str,
+                    processed_root=processed_root,
+                )
+
+            self.assertIn("live_lines_path", copied)
+            self.assertIn("live_player_lens_path", copied)
+            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / f"live_lines_{date_str}.jsonl")
+            lens_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / f"live_player_lens_{date_str}.jsonl")
+
+        self.assertIsNotNone(((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}).get("total")))
+        self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Jayson Tatum")
+        self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("line_source"), "live_lens_projection_artifact")
+
     def test_season_betting_card_export_uses_local_manifest_builder(self) -> None:
         module = self._load_module()
 

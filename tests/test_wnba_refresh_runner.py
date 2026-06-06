@@ -1097,6 +1097,54 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
             self.assertFalse((processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl").exists())
             self.assertFalse((processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl").exists())
 
+    def test_export_live_snapshot_artifacts_builds_from_bundle_live_lens_artifacts(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            source_snapshots = source_root / "data" / "processed" / "live_snapshots"
+            source_snapshots.mkdir(parents=True, exist_ok=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            module._write_live_snapshot_payload(
+                source_snapshots / "live_state_2026-06-05.jsonl",
+                {"ok": True, "games": [{"event_id": "401856963", "home": "LAS", "away": "NYL", "status": "Live"}]},
+            )
+            (processed_root / "game_cards_2026-06-05.csv").write_text(
+                "date,game_id,event_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                "2026-06-05,0401,401856963,Las Vegas Aces,New York Liberty,2026-06-05T23:00:00Z,-140,120,-4.5,4.5,163.5,oddsapi_consensus,LAS,NYL\n",
+                encoding="utf-8",
+            )
+            (processed_root / "live_lens_signals_2026-06-05.jsonl").write_text(
+                json.dumps({"market": "total", "game_id": "0401", "home": "LAS", "away": "NYL", "live_line": 163.5}) + "\n",
+                encoding="utf-8",
+            )
+            (processed_root / "live_lens_projections_2026-06-05.jsonl").write_text(
+                json.dumps({"market": "player_prop", "game_id": "0401", "home": "LAS", "away": "NYL", "player": "Breanna Stewart", "team": "NYL", "opponent": "LAS", "stat": "pts", "line": 17.5, "proj": 23.0, "sim_mu": 21.0, "klass": "BET"}) + "\n",
+                encoding="utf-8",
+            )
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch(
+                "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+                return_value={"games": [{"event_id": "401856963", "players": []}]},
+            ):
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str="2026-06-05",
+                    processed_root=processed_root,
+                )
+
+            self.assertIn("live_lines_path", copied)
+            self.assertIn("live_player_lens_path", copied)
+            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl")
+            lens_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl")
+
+        self.assertIsNotNone(((((lines_payload or {}).get("games") or [{}])[0].get("lines") or {}).get("total")))
+        self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Breanna Stewart")
+        self.assertEqual((((lens_payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("line_source"), "live_lens_projection_artifact")
+
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 

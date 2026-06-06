@@ -224,6 +224,35 @@ def _build_local_live_snapshot_payload(*, kind: str, date_str: str, event_ids: l
     return None
 
 
+def _build_bundle_local_live_snapshot_payload(*, kind: str, date_str: str, event_ids: list[str], processed_root: Path) -> dict[str, object] | None:
+    bundle_root = processed_root.parents[1]
+    env_name = "SYNDICATE_NBA_ARTIFACT_ROOT"
+    previous_value = os.environ.get(env_name)
+    os.environ[env_name] = str(bundle_root)
+    try:
+        try:
+            from syndicate.features.nba import cards as cards_module
+
+            cache_clear = getattr(getattr(cards_module, "_local_live_snapshot_payload", None), "cache_clear", None)
+            if callable(cache_clear):
+                cache_clear()
+        except Exception:
+            cards_module = None
+        payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
+        try:
+            cache_clear = getattr(getattr(cards_module, "_local_live_snapshot_payload", None), "cache_clear", None)
+            if callable(cache_clear):
+                cache_clear()
+        except Exception:
+            pass
+        return payload
+    finally:
+        if previous_value is None:
+            os.environ.pop(env_name, None)
+        else:
+            os.environ[env_name] = previous_value
+
+
 def _boxscores_history_sources(*, source_root: Path, processed_root: Path) -> list[Path]:
     candidates: list[Path] = []
     seen: set[str] = set()
@@ -3394,6 +3423,13 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             payload = _fetch_json(query)
         if not _payload_has_snapshot_content(kind, payload):
             payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
+        if not _payload_has_snapshot_content(kind, payload):
+            payload = _build_bundle_local_live_snapshot_payload(
+                kind=kind,
+                date_str=date_str,
+                event_ids=event_ids,
+                processed_root=processed_root,
+            )
         if isinstance(payload, dict) and _payload_has_snapshot_content(kind, payload) and _write_live_snapshot_payload(destination, payload):
             if copied_key:
                 copied[copied_key] = str(destination)

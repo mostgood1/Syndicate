@@ -70,7 +70,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
                 _local_live_snapshot_payload.cache_clear()
 
         self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-2"])
-        self.assertEqual(((payload.get("games") or [{}])[0]).get("rows"), [{"player": "Two"}])
+        self.assertEqual((((payload.get("games") or [{}])[0]).get("rows") or [{}])[0].get("player"), "Two")
 
     def test_live_lines_payload_uses_local_snapshot(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -336,6 +336,108 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertIsNotNone(row.get("live_projection"))
         self.assertIsNotNone(row.get("live_edge"))
         self.assertEqual(row.get("line_source"), "boxscore_sim_fallback")
+
+    def test_live_player_lens_payload_uses_local_projection_artifact_when_snapshot_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "live_lens_projections_2026-05-21.jsonl").write_text(
+                json.dumps(
+                    {
+                        "market": "player_prop",
+                        "game_id": "0401",
+                        "player": "Breanna Stewart",
+                        "team": "NYL",
+                        "opponent": "LAS",
+                        "stat": "pts",
+                        "line": 17.5,
+                        "proj": 23.0,
+                        "sim_mu": 21.0,
+                        "klass": "BET",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+                "syndicate.features.wnba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+                return_value={"evt-2": {"event_id": "evt-2", "gamePk": "0401", "away_tri": "NYL", "home_tri": "LAS"}},
+            ), patch(
+                "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+                return_value={
+                    "games": [
+                        {
+                            "event_id": "evt-2",
+                            "players": [
+                                {"team_tri": "NYL", "player": "Breanna Stewart", "pts": 19, "reb": 6, "ast": 4, "mp": 23}
+                            ],
+                        }
+                    ]
+                },
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+                _local_live_snapshot_payload.cache_clear()
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("player"), "Breanna Stewart")
+        self.assertEqual(row.get("line_source"), "live_lens_projection_artifact")
+        self.assertEqual(row.get("actual"), 19)
+        self.assertEqual(row.get("live_projection"), 23.0)
+
+    def test_live_lines_payload_uses_local_signals_artifact_when_snapshot_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "live_lens_signals_2026-05-21.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "market": "total",
+                                "game_id": "0401",
+                                "home": "LAS",
+                                "away": "NYL",
+                                "live_line": 163.5,
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "market": "quarter_total",
+                                "game_id": "0401",
+                                "home": "LAS",
+                                "away": "NYL",
+                                "horizon": "q1",
+                                "live_line": 40.5,
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.wnba.sources._source_roots", return_value=[root]), patch(
+                "syndicate.features.wnba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+                return_value={"evt-2": {"event_id": "evt-2", "gamePk": "0401", "away_tri": "NYL", "home_tri": "LAS"}},
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
+                _local_live_snapshot_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("total"), 163.5)
+        self.assertEqual((((game.get("lines") or {}).get("period_totals") or {}).get("q1")), 40.5)
+        self.assertEqual(payload.get("source"), "syndicate_live_lens_signals_artifact")
 
 
 if __name__ == "__main__":

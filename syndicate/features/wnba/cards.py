@@ -15,6 +15,8 @@ from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.basketball_live_artifacts import build_live_lines_payload_from_artifacts
+from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
 from syndicate.features.wnba.sources import format_moneyline
@@ -1813,6 +1815,46 @@ def _cards_games_for_live_fallback(selected_date: str) -> list[dict[str, Any]]:
     return [game for game in (context.get("games") or []) if isinstance(game, dict)]
 
 
+def _artifact_processed_root(selected_date: str) -> Path:
+    return processed_path(f"game_cards_{selected_date}.csv").parent
+
+
+def _artifact_live_player_lens_payload(
+    selected_date: str,
+    event_ids: list[str],
+    *,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any] | None:
+    event_games = _resolve_games_for_event_ids(selected_date, event_ids)
+    if not event_games:
+        return None
+    return build_live_player_lens_payload_from_artifacts(
+        processed_root=_artifact_processed_root(selected_date),
+        date_str=selected_date,
+        event_games=event_games,
+        source="syndicate_live_lens_projection_artifact",
+    )
+
+
+def _artifact_live_lines_payload(
+    selected_date: str,
+    event_ids: list[str],
+    *,
+    include_period_totals: bool,
+    allow_stored_date_fallback: bool = True,
+) -> dict[str, Any] | None:
+    event_games = _resolve_games_for_event_ids(selected_date, event_ids)
+    if not event_games:
+        return None
+    return build_live_lines_payload_from_artifacts(
+        processed_root=_artifact_processed_root(selected_date),
+        date_str=selected_date,
+        event_games=event_games,
+        include_period_totals=bool(include_period_totals),
+        source="syndicate_live_lens_signals_artifact",
+    )
+
+
 def _game_index_by_event_id(selected_date: str) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for game in _cards_games_for_live_fallback(selected_date):
@@ -2179,7 +2221,7 @@ def _hydrate_live_player_lens_payload(
                         live_edge = round(live_projection - line_value, 3)
                         hydrated_row["live_edge"] = live_edge
                         hydrated_row["liveEdge"] = live_edge
-                    if existing_live_projection is None and not game_explicitly_not_live:
+                    if existing_live_projection is None:
                         hydrated_row["line_source"] = "boxscore_sim_fallback"
             status_period_value = _safe_float(game_status.get("period"))
             status_period = int(status_period_value) if status_period_value is not None else None
@@ -2670,6 +2712,26 @@ def build_live_player_lens_payload(
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
+    if _payload_has_live_lens_rows(local_payload):
+        return _hydrate_live_player_lens_payload(
+            _attach_odds_refresh_timestamp(local_payload),
+            resolved_date,
+            normalized_event_ids,
+            allow_stored_date_fallback=allow_stored_date_fallback,
+        )
+
+    artifact_payload = _artifact_live_player_lens_payload(
+        resolved_date,
+        normalized_event_ids,
+        allow_stored_date_fallback=allow_stored_date_fallback,
+    )
+    if _payload_has_live_lens_rows(artifact_payload):
+        return _hydrate_live_player_lens_payload(
+            _attach_odds_refresh_timestamp(artifact_payload),
+            resolved_date,
+            normalized_event_ids,
+            allow_stored_date_fallback=allow_stored_date_fallback,
+        )
 
     if is_today and _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -2686,14 +2748,6 @@ def build_live_player_lens_payload(
             )
             if any(isinstance(game, dict) and bool(game.get("rows")) for game in (hydrated_remote_payload.get("games") if isinstance(hydrated_remote_payload.get("games"), list) else [])):
                 return _attach_odds_refresh_timestamp(hydrated_remote_payload)
-
-    if _payload_has_live_lens_rows(local_payload):
-        return _hydrate_live_player_lens_payload(
-            _attach_odds_refresh_timestamp(local_payload),
-            resolved_date,
-            normalized_event_ids,
-            allow_stored_date_fallback=allow_stored_date_fallback,
-        )
 
     if _remote_source_fallback_enabled() and not is_today:
         remote_payload = _remote_live_snapshot_payload(
@@ -2770,6 +2824,17 @@ def build_live_lines_payload(
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
+    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
+        return _attach_odds_refresh_timestamp(local_payload)
+
+    artifact_payload = _artifact_live_lines_payload(
+        resolved_date,
+        normalized_event_ids,
+        include_period_totals=bool(include_period_totals),
+        allow_stored_date_fallback=allow_stored_date_fallback,
+    )
+    if isinstance(artifact_payload, dict) and isinstance(artifact_payload.get("games"), list) and bool(artifact_payload.get("games")):
+        return _attach_odds_refresh_timestamp(artifact_payload)
 
     if is_today and _remote_source_fallback_enabled():
         remote_payload = _remote_live_snapshot_payload(
@@ -2779,22 +2844,7 @@ def build_live_lines_payload(
             include_period_totals=bool(include_period_totals),
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            if not include_period_totals or any(
-                isinstance(game, dict)
-                and isinstance((game.get("lines") or {}).get("period_totals"), dict)
-                and bool((game.get("lines") or {}).get("period_totals"))
-                for game in remote_payload.get("games")
-            ):
-                return _attach_odds_refresh_timestamp(remote_payload)
-
-    if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
-        if not include_period_totals or any(
-            isinstance(game, dict)
-            and isinstance((game.get("lines") or {}).get("period_totals"), dict)
-            and bool((game.get("lines") or {}).get("period_totals"))
-            for game in local_payload.get("games")
-        ):
-            return _attach_odds_refresh_timestamp(local_payload)
+            return _attach_odds_refresh_timestamp(remote_payload)
 
     if _remote_source_fallback_enabled() and not is_today:
         remote_payload = _remote_live_snapshot_payload(
@@ -2804,13 +2854,7 @@ def build_live_lines_payload(
             include_period_totals=bool(include_period_totals),
         )
         if isinstance(remote_payload, dict) and isinstance(remote_payload.get("games"), list) and bool(remote_payload.get("games")):
-            if not include_period_totals or any(
-                isinstance(game, dict)
-                and isinstance((game.get("lines") or {}).get("period_totals"), dict)
-                and bool((game.get("lines") or {}).get("period_totals"))
-                for game in remote_payload.get("games")
-            ):
-                return _attach_odds_refresh_timestamp(remote_payload)
+            return _attach_odds_refresh_timestamp(remote_payload)
 
     game_index = _resolve_games_for_event_ids(resolved_date, normalized_event_ids)
     fallback_games = [
