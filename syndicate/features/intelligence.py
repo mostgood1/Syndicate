@@ -2497,11 +2497,17 @@ def _prop_candidate_from_item(sport: dict[str, Any], item: dict[str, Any], *, su
             "surface_key": surface_key,
             "surface_title": surface_title,
             "sport_slug": _safe_text(sport.get("slug"), "sport").lower(),
+            "context_label": _safe_text(sport.get("context_label"), ""),
+            "game_pk": _safe_int(item.get("game_pk") or item.get("gamePk")),
+            "player_name": _safe_text(item.get("player_name"), _safe_text(item.get("name"), "")),
+            "player_id": _safe_int(item.get("player_id") or item.get("playerId")),
+            "team": _safe_text(item.get("team"), ""),
             "writeup": source_summary,
             "detail": detail_text,
             "summary": summary_text,
             "status_context": _safe_text(item.get("status_context"), ""),
             "status_display": _safe_text(item.get("status_display"), ""),
+            "game_state": _safe_text(item.get("game_state"), ""),
             "hero_live_box": item.get("hero_live_box") if isinstance(item.get("hero_live_box"), dict) else None,
             "hero_sim_box": item.get("hero_sim_box") if isinstance(item.get("hero_sim_box"), dict) else None,
             "display_pills": item.get("display_pills") if isinstance(item.get("display_pills"), list) else [],
@@ -2745,6 +2751,113 @@ def _candidate_is_final(candidate: dict[str, Any]) -> bool:
         for field in ("status_badge", "status_line", "status_display", "status_context", "detail", "summary", "score_kind")
     ).lower()
     return any(token in terminal_text for token in ("final", "game over", "completed"))
+
+
+def _mlb_actual_payload_for_candidate(
+    context_label: str,
+    game_pk: int,
+    cache: dict[int, dict[str, Any] | None],
+) -> dict[str, Any] | None:
+    try:
+        from syndicate.blueprints.home import _mlb_actual_payload_for_game
+    except Exception:
+        return None
+    return _mlb_actual_payload_for_game(context_label, game_pk, cache)
+
+
+def _mlb_current_pitcher(actual_payload: dict[str, Any] | None) -> tuple[int | None, str | None]:
+    if not isinstance(actual_payload, dict):
+        return None, None
+    current_play = ((actual_payload.get("liveData") or {}).get("plays") or {}).get("currentPlay")
+    matchup = (current_play or {}).get("matchup") if isinstance(current_play, dict) else {}
+    pitcher = (matchup or {}).get("pitcher") if isinstance(matchup, dict) else {}
+    pitcher_id = _safe_int((pitcher or {}).get("id")) if isinstance(pitcher, dict) else None
+    pitcher_name = _safe_text((pitcher or {}).get("fullName"), "") if isinstance(pitcher, dict) else ""
+    return pitcher_id, pitcher_name or None
+
+
+def _mlb_probable_pitcher_side(actual_payload: dict[str, Any] | None, pitcher_id: int | None, pitcher_name: str | None) -> str | None:
+    probable_pitchers = ((actual_payload or {}).get("gameData") or {}).get("probablePitchers")
+    if not isinstance(probable_pitchers, dict):
+        return None
+    normalized_target = re.sub(r"\s+", " ", str(pitcher_name or "").strip().lower())
+    for side in ("away", "home"):
+        probable = probable_pitchers.get(side)
+        if not isinstance(probable, dict):
+            continue
+        probable_id = _safe_int(probable.get("id"))
+        probable_name = re.sub(r"\s+", " ", _safe_text(probable.get("fullName"), "").lower())
+        if pitcher_id is not None and probable_id is not None and int(probable_id) == int(pitcher_id):
+            return side
+        if normalized_target and probable_name and probable_name == normalized_target:
+            return side
+    return None
+
+
+def _mlb_candidate_live_state(candidate: dict[str, Any], actual_payload: dict[str, Any] | None) -> dict[str, Any]:
+    state: dict[str, Any] = {}
+    if not isinstance(actual_payload, dict):
+        return state
+    status = ((actual_payload.get("gameData") or {}).get("status")) if isinstance((actual_payload.get("gameData") or {}), dict) else {}
+    abstract_state = _safe_text((status or {}).get("abstractGameState"), "")
+    detailed_state = _safe_text((status or {}).get("detailedState"), "")
+    if abstract_state or detailed_state:
+        state["status_display"] = detailed_state or abstract_state
+    if abstract_state.lower() == "final" or detailed_state.lower() in {"final", "game over", "completed"}:
+        state["is_final"] = True
+        state["is_live"] = False
+    elif detailed_state:
+        state["is_live"] = detailed_state.lower() not in {"pre-game", "scheduled", "preview", "warmup"}
+
+    current_pitcher_id, current_pitcher_name = _mlb_current_pitcher(actual_payload)
+    if current_pitcher_id is not None:
+        state["current_pitcher_id"] = current_pitcher_id
+    if current_pitcher_name:
+        state["current_pitcher_name"] = current_pitcher_name
+
+    market_text = _safe_text(candidate.get("market"), "").lower()
+    pitcher_id = _safe_int(candidate.get("pitcher_id"))
+    pitcher_name = _safe_text(candidate.get("player_name"), _safe_text(candidate.get("name"), ""))
+    if market_text.startswith("pitcher") and (pitcher_id is not None or pitcher_name):
+        side = _mlb_probable_pitcher_side(actual_payload, pitcher_id, pitcher_name)
+        if side:
+            try:
+                from syndicate.features.mlb.cards import _starter_removed_from_actual_payload
+
+                removed = _starter_removed_from_actual_payload(
+                    actual_payload,
+                    side=side,
+                    starter_id=pitcher_id,
+                    starter_name=pitcher_name,
+                )
+            except Exception:
+                removed = False
+            if removed:
+                current_label = current_pitcher_name or "another pitcher"
+                state["state_invalid"] = True
+                state["state_note"] = f"{pitcher_name or 'The listed pitcher'} is no longer the current pitcher; {current_label} is on the mound now."
+    return state
+
+
+def _apply_live_state_context_to_candidates(candidates: list[dict[str, Any]]) -> None:
+    mlb_actual_cache: dict[int, dict[str, Any] | None] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        sport_slug = _safe_text(candidate.get("sport_slug"), "").lower()
+        if sport_slug != "mlb":
+            continue
+        context_label = _safe_text(candidate.get("context_label"), "")
+        game_pk = _safe_int(candidate.get("game_pk"))
+        if not context_label or game_pk is None:
+            continue
+        actual_payload = _mlb_actual_payload_for_candidate(context_label, int(game_pk), mlb_actual_cache)
+        live_state = _mlb_candidate_live_state(candidate, actual_payload)
+        if not live_state:
+            continue
+        for key, value in live_state.items():
+            if value not in {None, ""}:
+                candidate[key] = value
 
 
 def _candidate_market_focuses(candidate: dict[str, Any]) -> set[str]:
@@ -3141,7 +3254,6 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         if wants_mlb_hr_targets and not preferences.get("live_only"):
             candidates.extend(_mlb_home_run_candidates_from_artifact(sport))
 
-    candidates = [row for row in candidates if not _candidate_is_final(row)]
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
     candidates = [
         row for row in candidates if _american_odds_match(_american_odds_value(row.get("odds")), preferences)
@@ -3207,10 +3319,13 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         or _safe_text(candidate.get("detail"), "")
         or _safe_text(candidate.get("summary"), "")
     )
+    state_note = _safe_text(candidate.get("state_note"), "")
     if _safe_text(candidate.get("candidate_type"), "") == "game":
         notes: list[str] = []
         if source_summary:
             notes.append(source_summary if source_summary.endswith(".") else f"{source_summary}.")
+        if state_note:
+            notes.append(state_note if state_note.endswith(".") else f"{state_note}.")
         if _safe_text(candidate.get("projected"), "-") != "-" and _safe_text(candidate.get("line"), "-") != "-":
             notes.append(f"Model projection is {candidate.get('projected')} versus a book line of {candidate.get('line')}.")
         if bool(candidate.get("is_live")) and _safe_text(candidate.get("live_projection"), "-") != "-":
@@ -3235,6 +3350,8 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
     notes = []
     if source_summary:
         notes.append(source_summary if source_summary.endswith(".") else f"{source_summary}.")
+    if state_note:
+        notes.append(state_note if state_note.endswith(".") else f"{state_note}.")
     if _safe_text(candidate.get("projected"), "-") != "-" and _safe_text(candidate.get("line"), "-") != "-":
         notes.append(f"Model projection is {candidate.get('projected')} versus a book line of {candidate.get('line')}.")
     if bool(candidate.get("is_live")) and _safe_text(candidate.get("live_projection"), "-") != "-":
@@ -3285,6 +3402,7 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "name": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
         "surface": _safe_text(candidate.get("surface_title"), _safe_text(candidate.get("surface"), "Board")),
         "is_live": bool(candidate.get("is_live")),
+        "is_final": bool(candidate.get("is_final")),
         "line": _safe_text(candidate.get("line"), "-"),
         "odds": _safe_text(candidate.get("odds"), "-"),
         "american_odds": market_context.get("american_odds"),
@@ -3297,6 +3415,9 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "projected": _safe_text(candidate.get("projected"), "-"),
         "live_projection": _safe_text(candidate.get("live_projection"), "-"),
         "actual": _safe_text(candidate.get("actual"), "-"),
+        "status_display": _safe_text(candidate.get("status_display"), "-"),
+        "status_context": _safe_text(candidate.get("status_context"), "-"),
+        "state_note": _safe_text(candidate.get("state_note"), ""),
         "href": candidate.get("href"),
         "href_label": _safe_text(candidate.get("href_label"), "Open board"),
         "rationale": _candidate_rationale(candidate),
@@ -3977,6 +4098,9 @@ def run_intelligence_query(
     if resolved_requested_markets != (preferences.get("requested_markets") or []):
         preferences = {**preferences, "requested_markets": resolved_requested_markets}
         candidates = _filter_candidates_to_requested_markets(candidates, resolved_requested_markets)
+    _apply_live_state_context_to_candidates(candidates)
+    candidates = [row for row in candidates if not _candidate_is_final(row)]
+    candidates = [row for row in candidates if not bool(row.get("state_invalid"))]
     _apply_advanced_context_to_candidates(candidates, advanced_by_sport, preferences)
     candidates = sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
     recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]

@@ -2108,6 +2108,18 @@ def _hydrate_live_player_lens_payload(
         for game in (boxscore_payload.get("games") if isinstance(boxscore_payload.get("games"), list) else [])
         if isinstance(game, dict)
     }
+    live_state_payload = build_live_state_payload(
+        selected_date,
+        ttl=12,
+        allow_stored_date_fallback=allow_stored_date_fallback,
+    )
+    live_state_by_event = {
+        str(game.get("event_id") or "").strip(): dict(game.get("status") or {})
+        for game in (live_state_payload.get("games") if isinstance(live_state_payload.get("games"), list) else [])
+        if isinstance(game, dict)
+        and str(game.get("event_id") or "").strip()
+        and isinstance(game.get("status"), dict)
+    }
 
     hydrated_games: list[dict[str, Any]] = []
     for game in games:
@@ -2117,7 +2129,12 @@ def _hydrate_live_player_lens_payload(
         event_id = str(game.get("event_id") or "").strip()
         actual_rows = boxscore_by_event.get(event_id) or {}
         hydrated_game = dict(game)
+        live_status = live_state_by_event.get(event_id)
+        if isinstance(live_status, dict) and live_status:
+            hydrated_game["status"] = dict(live_status)
         game_status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        if isinstance(live_status, dict) and live_status:
+            game_status = dict(live_status)
         game_explicitly_not_live = bool(game_status) and not bool(game_status.get("in_progress"))
         rows: list[dict[str, Any]] = []
         for row in game.get("rows") if isinstance(game.get("rows"), list) else []:

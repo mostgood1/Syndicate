@@ -1251,6 +1251,52 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), local_payload)
 
+    def test_wnba_api_live_lines_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-05-21",
+            "games": [{"event_id": "evt-1", "found": False}],
+        }
+
+        with patch(
+            "syndicate.blueprints.wnba.build_live_lines_payload",
+            return_value=local_payload,
+        ) as build_mock:
+            response = client.get("/wnba/api/live_lines?date=2026-05-21&include_period_totals=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-05-21", []))
+        self.assertTrue(kwargs["include_period_totals"])
+
+    def test_wnba_api_live_pbp_stats_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-05-21",
+            "games": [{"event_id": "evt-1", "pbp_attempts": {}}],
+        }
+
+        with patch(
+            "syndicate.blueprints.wnba.build_live_pbp_stats_payload",
+            return_value=local_payload,
+        ) as build_mock:
+            response = client.get("/wnba/api/live_pbp_stats?date=2026-05-21")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-05-21", []))
+        self.assertEqual(kwargs["ttl"], 20)
+
     def test_wnba_api_live_player_boxscore_allows_missing_event_ids(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
@@ -1319,6 +1365,52 @@ class DateArchiveHelperTests(unittest.TestCase):
             return_value=local_payload,
         ) as build_mock:
             response = client.get("/nba/api/live_player_lens?date=2026-06-05")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-06-05", []))
+        self.assertEqual(kwargs["ttl"], 20)
+
+    def test_nba_api_live_lines_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [{"event_id": "401859964", "found": False}],
+        }
+
+        with patch(
+            "syndicate.blueprints.nba.build_live_lines_payload",
+            return_value=local_payload,
+        ) as build_mock:
+            response = client.get("/nba/api/live_lines?date=2026-06-05&include_period_totals=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-06-05", []))
+        self.assertTrue(kwargs["include_period_totals"])
+
+    def test_nba_api_live_pbp_stats_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [{"event_id": "401859964", "pbp_attempts": {}}],
+        }
+
+        with patch(
+            "syndicate.blueprints.nba.build_live_pbp_stats_payload",
+            return_value=local_payload,
+        ) as build_mock:
+            response = client.get("/nba/api/live_pbp_stats?date=2026-06-05")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), local_payload)
@@ -1521,6 +1613,65 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(row.get("liveProjection"), 7.4)
         self.assertEqual(row.get("live_projection"), 7.4)
         self.assertEqual(row.get("line_source"), "source_snapshot")
+
+    def test_wnba_live_player_lens_overlays_status_from_live_state(self) -> None:
+        from syndicate.features.wnba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "status": {"status": "Scheduled", "final": False, "in_progress": False, "period": 0, "clock": ""},
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "CHI",
+                            "stat": "ast",
+                            "line": 5.5,
+                            "sim_mu_adjusted": 6.8,
+                            "liveProjection": 7.4,
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "players": [{"team_tri": "CHI", "player": "Test Player", "ast": 2, "mp": 9}],
+                }
+            ]
+        }
+        live_state_payload = {
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "status": {"status": "Live", "final": False, "in_progress": True, "period": 2, "clock": "4:34"},
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_state_payload",
+            return_value=live_state_payload,
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401856963"])
+
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual((game.get("status") or {}).get("status"), "Live")
+        self.assertTrue((game.get("status") or {}).get("in_progress"))
 
     def test_nba_live_player_lens_non_live_game_uses_actual_projection(self) -> None:
         from syndicate.features.nba.cards import build_live_player_lens_payload

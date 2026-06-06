@@ -547,6 +547,65 @@ def _sample_mlb_compare_overview() -> list[dict[str, object]]:
     ]
 
 
+def _sample_mlb_live_pitcher_state_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "mlb",
+            "name": "MLB",
+            "context_label": "2026-06-05",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {"title": "Pregame props", "items": []},
+                "live": {
+                    "title": "Top Live Props",
+                    "items": [
+                        {
+                            "game_pk": 1,
+                            "name": "Chris Sale Over 5.5 Strikeouts",
+                            "player_name": "Chris Sale",
+                            "market": "Pitcher Strikeouts",
+                            "pick": "Over 5.5",
+                            "matchup": "ATL at NYM",
+                            "pitcher_id": 519242,
+                            "projected": 6.2,
+                            "live_projection": 6.0,
+                            "actual": 3,
+                            "line": 5.5,
+                            "odds": "+102",
+                            "confidence": "61%",
+                            "edge": "+4.8%",
+                            "writeup": "The model still liked the strikeout path before the live pitching change.",
+                            "is_live": True,
+                            "href": "/mlb/live-lens?date=2026-06-05",
+                        },
+                        {
+                            "game_pk": 1,
+                            "name": "Pete Alonso Over 1.5 Total Bases",
+                            "player_name": "Pete Alonso",
+                            "market": "Hitter Total Bases",
+                            "pick": "Over 1.5",
+                            "matchup": "ATL at NYM",
+                            "projected": 1.9,
+                            "live_projection": 2.1,
+                            "actual": 1,
+                            "line": 1.5,
+                            "odds": "+115",
+                            "confidence": "58%",
+                            "edge": "+3.2%",
+                            "writeup": "The live board still supports Alonso against the current game script.",
+                            "is_live": True,
+                            "href": "/mlb/live-lens?date=2026-06-05",
+                        },
+                    ],
+                },
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        }
+    ]
+
+
 def _sample_nfl_market_overview() -> list[dict[str, object]]:
     return [
         {
@@ -1819,6 +1878,46 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(recommendations[0].get("line"), "4.5")
         self.assertEqual(recommendations[0].get("odds"), "+124")
         self.assertIn("Projection 5.3 versus line 4.5", recommendations[0].get("rationale") or "")
+
+    def test_intelligence_query_filters_stale_live_mlb_pitcher_props_when_starter_is_out(self) -> None:
+        actual_payload = {
+            "gameData": {
+                "status": {"abstractGameState": "Live", "detailedState": "In Progress"},
+                "probablePitchers": {
+                    "away": {"id": 519242, "fullName": "Chris Sale"},
+                    "home": {"id": 543037, "fullName": "Reed Garrett"},
+                },
+            },
+            "liveData": {
+                "linescore": {"inningHalf": "bottom"},
+                "plays": {
+                    "currentPlay": {
+                        "matchup": {
+                            "pitcher": {"id": 543037, "fullName": "Reed Garrett"},
+                        }
+                    }
+                },
+            },
+        }
+
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_live_pitcher_state_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    with patch("syndicate.features.intelligence._mlb_actual_payload_for_candidate", return_value=actual_payload):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "Best live MLB props right now",
+                                "date": "2026-06-05",
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        self.assertNotIn("Chris Sale Over 5.5 Strikeouts", [item.get("name") for item in recommendations])
+        self.assertIn("Pete Alonso Over 1.5 Total Bases", [item.get("name") for item in recommendations])
 
     def test_intelligence_query_resolves_typo_subject_and_three_point_market(self) -> None:
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_nba_subject_specific_overview()):
