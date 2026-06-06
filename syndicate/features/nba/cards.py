@@ -397,9 +397,13 @@ def _normalize_status_clock_text(clock_text: Any) -> str:
         return ""
     if re.fullmatch(r"\d{1,2}:\d{2}", raw):
         return raw
-    if re.fullmatch(r"\d{1,2}(?:\.\d)?", raw):
-        return raw.replace(".", ":") if "." in raw else raw
-    return raw
+    seconds_value = _safe_float(raw)
+    if seconds_value is None:
+        return raw
+    whole_seconds = max(0, int(math.floor(seconds_value)))
+    minutes = whole_seconds // 60
+    seconds = whole_seconds % 60
+    return f"{minutes}:{seconds:02d}"
 
 
 def _infer_period_clock_from_status_text(status_text: Any) -> tuple[int | None, str]:
@@ -1742,11 +1746,14 @@ def _hydrate_live_player_lens_payload(
                 status_label = status_text or "Live"
             else:
                 status_label = status_text or "Scheduled"
-            if status_label and not str(hydrated_row.get("status_label") or "").strip():
+            existing_status_label = str(hydrated_row.get("status_label") or "").strip()
+            if status_label and (not existing_status_label or existing_status_label in {"Live", "Scheduled"}):
                 hydrated_row["status_label"] = status_label
-            if status_label and not str(hydrated_row.get("status_display") or "").strip():
+            existing_status_display = str(hydrated_row.get("status_display") or "").strip()
+            if status_label and (not existing_status_display or existing_status_display in {"Live", "Scheduled"}):
                 hydrated_row["status_display"] = status_label
-            if status_text and not str(hydrated_row.get("status_context") or "").strip():
+            existing_status_context = str(hydrated_row.get("status_context") or "").strip()
+            if status_text and (not existing_status_context or existing_status_context in {"Live", "Scheduled"}):
                 hydrated_row["status_context"] = status_text
             if status_period is not None:
                 hydrated_row.setdefault("period", status_period)

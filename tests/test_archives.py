@@ -1699,6 +1699,7 @@ class DateArchiveHelperTests(unittest.TestCase):
                             "stat": "pts",
                             "line": 14.5,
                             "sim_mu_adjusted": 18.0,
+                            "status_label": "Live",
                             "line_source": "cards_fallback",
                         }
                     ],
@@ -1747,6 +1748,14 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(row.get("period"), 4)
         self.assertEqual(row.get("quarter"), 4)
         self.assertEqual(row.get("clock"), "6:23")
+
+    def test_nba_live_state_clock_normalizer_handles_tenths_text(self) -> None:
+        from syndicate.features.nba.cards import _infer_period_clock_from_status_text
+
+        period, clock = _infer_period_clock_from_status_text("30.3 - 4th")
+
+        self.assertEqual(period, 4)
+        self.assertEqual(clock, "0:30")
 
     def test_nba_live_player_lens_non_live_game_uses_actual_projection(self) -> None:
         from syndicate.features.nba.cards import build_live_player_lens_payload
