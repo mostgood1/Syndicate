@@ -87,7 +87,7 @@
     },
     {
       "game_key": "PHX@POR",
-      "game_id": "3",
+      "game_id": "1",
       "player": "Jovana Nogic",
       "team": "PHX",
       "team_tricode": "PHX",
@@ -170,134 +170,8 @@
       "basketball_summary": "model 11.5 vs line 8.5 (+3.0)"
     },
     {
-      "game_key": "CON@CHI",
-      "game_id": "1",
-      "player": "Azura Stevens",
-      "team": "CHI",
-      "team_tricode": "CHI",
-      "opponent": "CON",
-      "score": 44.28217818819561,
-      "score_adj": 44.28217818819561,
-      "tier": "High",
-      "model": {
-        "pts": 2.325,
-        "reb": 1.1625,
-        "ast": 0.3875,
-        "threes": 0.0,
-        "stl": 0.2376,
-        "blk": 0.1944,
-        "tov": 0.648,
-        "pra": 3.875,
-        "pr": 3.4875000000000003,
-        "pa": 2.7125000000000004,
-        "ra": 1.55
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 8.5,
-        "price": -101.0,
-        "edge": 0.2225124376620774,
-        "ev": 0.4428217818819561,
-        "ev_pct": 44.28217818819561,
-        "book": "draftkings",
-        "p_win": 0.9453093440710109,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 44.3%",
-        "Regular price range (-150 to +150)",
-        "Best line available"
-      ],
-      "basketball_summary": "model 2.3 vs line 8.5 (-6.2)"
-    },
-    {
-      "game_key": "CON@CHI",
-      "game_id": "1",
-      "player": "Aneesah Morrow",
-      "team": "CON",
-      "team_tricode": "CON",
-      "opponent": "CHI",
-      "score": 42.55501022793329,
-      "score_adj": 42.55501022793329,
-      "tier": "High",
-      "model": {
-        "pts": 8.092279069767441,
-        "reb": 7.634501291989664,
-        "ast": 1.2720826873385014,
-        "threes": 0.5890645994832041,
-        "stl": 0.7348837209302326,
-        "blk": 0.2449612403100775,
-        "tov": 2.449612403100775,
-        "pra": 16.998863049095604,
-        "pr": 15.726780361757104,
-        "pa": 9.364361757105943,
-        "ra": 8.906583979328165
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 13.5,
-        "price": -103.0,
-        "edge": 0.21591951002350385,
-        "ev": 0.4255501022793329,
-        "ev_pct": 42.55501022793329,
-        "book": "draftkings",
-        "p_win": 0.9329392648409093,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 42.6%",
-        "Regular price range (-150 to +150)",
-        "Best line available"
-      ],
-      "basketball_summary": "model 8.1 vs line 13.5 (-5.4)"
-    },
-    {
-      "game_key": "CON@CHI",
-      "game_id": "1",
-      "player": "Sydney Taylor",
-      "team": "CHI",
-      "team_tricode": "CHI",
-      "opponent": "CON",
-      "score": 42.299896620611385,
-      "score_adj": 42.299896620611385,
-      "tier": "High",
-      "model": {
-        "pts": 6.141239189189189,
-        "reb": 0.920177027027027,
-        "ast": 0.8801770270270269,
-        "threes": 0.920177027027027,
-        "stl": 0.2978761261261261,
-        "blk": 0.2978761261261261,
-        "tov": 0.5957522522522523,
-        "pra": 7.941593243243243,
-        "pr": 7.061416216216216,
-        "pa": 7.021416216216216,
-        "ra": 1.800354054054054
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 9.5,
-        "price": -102.0,
-        "edge": 0.213593537391206,
-        "ev": 0.4229989662061139,
-        "ev_pct": 42.299896620611385,
-        "book": "fanduel",
-        "p_win": 0.9279494612556188,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 42.3%",
-        "Regular price range (-150 to +150)",
-        "Best line available"
-      ],
-      "basketball_summary": "model 6.1 vs line 9.5 (-3.4)"
-    },
-    {
       "game_key": "PHX@POR",
-      "game_id": "3",
+      "game_id": "1",
       "player": "Megan Gustafson",
       "team": "POR",
       "team_tricode": "POR",
@@ -339,7 +213,7 @@
     },
     {
       "game_key": "PHX@POR",
-      "game_id": "3",
+      "game_id": "1",
       "player": "Monique Akoa Makani",
       "team": "PHX",
       "team_tricode": "PHX",
