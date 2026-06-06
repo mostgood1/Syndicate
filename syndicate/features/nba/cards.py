@@ -2530,6 +2530,11 @@ def build_live_lines_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
+    if not normalized_event_ids:
+        normalized_event_ids = _default_live_event_ids(
+            selected_date,
+            allow_stored_date_fallback=allow_stored_date_fallback,
+        )
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)

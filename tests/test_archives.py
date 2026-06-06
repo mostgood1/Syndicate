@@ -1514,6 +1514,48 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401859964")
         self.assertEqual(((payload.get("games") or [{}])[0].get("rows") or [{}])[0].get("actual"), 0.0)
 
+    def test_nba_live_lines_defaults_to_live_event_ids(self) -> None:
+        from syndicate.features.nba.cards import build_live_lines_payload
+
+        with patch(
+            "syndicate.features.nba.cards._default_live_event_ids",
+            return_value=["401859964"],
+        ), patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.nba.cards._resolve_games_for_event_ids",
+            return_value={"401859964": {"event_id": "401859964", "status": "Live", "detail": "4:29 - 4th", "odds": {}, "live_state": {}, "away": {}, "home": {}}},
+        ):
+            payload = build_live_lines_payload("2026-06-05", [])
+
+        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401859964")
+
+    def test_wnba_live_lines_defaults_to_live_event_ids(self) -> None:
+        from syndicate.features.wnba.cards import build_live_lines_payload
+
+        with patch(
+            "syndicate.features.wnba.cards._default_live_event_ids",
+            return_value=["401856965"],
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+            return_value={"401856965": {"event_id": "401856965", "status": "Live", "detail": "4:29 - 3rd", "odds": {}, "live_state": {}, "away": {}, "home": {}}},
+        ):
+            payload = build_live_lines_payload("2026-06-05", [])
+
+        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401856965")
+
     def test_nba_live_player_lens_preserves_existing_live_projection(self) -> None:
         from syndicate.features.nba.cards import build_live_player_lens_payload
 

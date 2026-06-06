@@ -3063,6 +3063,7 @@
       const gameItems = safeArray(game?.rows)
         .filter((row) => row && row.player && row.team_tri)
         .filter((row) => row.line_source && row.line_source !== 'model')
+        .filter((row) => !isSyntheticLiveLineSource(row?.line_source))
         .filter((row) => row.live_projection != null || row.liveProjection != null || row.live_edge != null || row.liveEdge != null || row.pace_proj != null || row.sim_mu_adjusted != null || row.sim_mu != null || row.ev_side || row.lean)
         .map((row) => {
           try {
