@@ -254,6 +254,14 @@
     }).format(number);
   }
 
+  function toFiniteNumber(value) {
+    if (value == null || value === '') {
+      return null;
+    }
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
   function fmtStakeUnits(value, digits = 2) {
     const number = Number(value);
     if (!Number.isFinite(number)) {
