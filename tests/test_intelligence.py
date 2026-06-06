@@ -204,6 +204,75 @@ def _sample_nba_subject_specific_overview() -> list[dict[str, object]]:
     ]
 
 
+def _sample_live_game_projection_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "nba",
+            "name": "NBA",
+            "context_label": "2026-06-05",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {"title": "Pregame props", "items": []},
+                "live": {"title": "Top Live Props", "items": []},
+                "compact": {"items": []},
+            },
+            "dashboard_games": [
+                {
+                    "matchup": "CLE at IND",
+                    "away": {"abbr": "CLE"},
+                    "home": {"abbr": "IND"},
+                    "summary": "Live model still runs above the current total.",
+                    "shared_is_live": True,
+                    "href": "/nba/live-lens?date=2026-06-05",
+                    "href_label": "Open game",
+                    "gameLens": [
+                        {
+                            "label": "Live",
+                            "markets": {
+                                "total": {
+                                    "pick": "Over 221.5",
+                                    "line": 221.5,
+                                    "odds": "-108",
+                                    "edge": 3.2,
+                                    "p_win": 0.57,
+                                    "projection": 223.0,
+                                    "live_projection": 228.5,
+                                }
+                            },
+                        }
+                    ],
+                },
+                {
+                    "matchup": "OKC at DEN",
+                    "away": {"abbr": "OKC"},
+                    "home": {"abbr": "DEN"},
+                    "summary": "Live model only has a narrow total edge.",
+                    "shared_is_live": True,
+                    "href": "/nba/live-lens?date=2026-06-05",
+                    "href_label": "Open game",
+                    "gameLens": [
+                        {
+                            "label": "Live",
+                            "markets": {
+                                "total": {
+                                    "pick": "Over 221.5",
+                                    "line": 221.5,
+                                    "odds": "-108",
+                                    "edge": 3.2,
+                                    "p_win": 0.57,
+                                    "projection": 223.0,
+                                    "live_projection": 222.2,
+                                }
+                            },
+                        }
+                    ],
+                },
+            ],
+        }
+    ]
+
+
 def _sample_mlb_statcast_overview() -> list[dict[str, object]]:
     return [
         {
@@ -1521,6 +1590,31 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(first_row.get("pitcher_inplay_mult"), 1.08)
         self.assertEqual(first_row.get("batter_hardhit_rate"), 48.7)
         self.assertIn("in-play mult", first_row.get("why") or "")
+
+    def test_intelligence_query_uses_live_game_projection_for_live_totals(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_live_game_projection_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Show me the best live NBA total edges",
+                            "date": "2026-06-05",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        recommendations = result.get("recommendations") or []
+        self.assertTrue(recommendations)
+        first = recommendations[0]
+        self.assertEqual(first.get("candidate_type"), "game")
+        self.assertEqual(first.get("matchup"), "CLE @ IND")
+        self.assertEqual(first.get("projected"), "223")
+        self.assertEqual(first.get("live_projection"), "228.5")
+        self.assertEqual(first.get("market_key"), "total")
+        self.assertIn("Live model projection is 228.5 versus a current line of 221.5.", first.get("rationale") or "")
+        self.assertGreater(first.get("market_fit_score") or 0.0, 0.0)
 
     def test_intelligence_query_returns_market_specific_board(self) -> None:
         advanced_rows = [

@@ -3211,6 +3211,10 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
         notes: list[str] = []
         if source_summary:
             notes.append(source_summary if source_summary.endswith(".") else f"{source_summary}.")
+        if _safe_text(candidate.get("projected"), "-") != "-" and _safe_text(candidate.get("line"), "-") != "-":
+            notes.append(f"Model projection is {candidate.get('projected')} versus a book line of {candidate.get('line')}.")
+        if bool(candidate.get("is_live")) and _safe_text(candidate.get("live_projection"), "-") != "-":
+            notes.append(f"Live model projection is {candidate.get('live_projection')} versus a current line of {candidate.get('line')}.")
         if _safe_text(candidate.get("edge"), "-") != "-":
             notes.append(f"Model edge is {candidate.get('edge')} against the current book price.")
         if _safe_text(candidate.get("confidence"), "-") != "-":

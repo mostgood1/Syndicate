@@ -1428,7 +1428,7 @@ def _game_row_updated_epoch(game: dict[str, Any], fallback_epoch: float) -> floa
     return fallback_epoch
 
 
-def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, detail: str | None = None, fallback_epoch: float) -> None:
+def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, detail: str | None = None, fallback_epoch: float) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
         return
@@ -1436,6 +1436,9 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
     odds_text = _prop_metric_text(odds) if odds is not None else None
     edge_text = _pct_text(edge) if edge is not None and _numeric_value(edge) is not None else _safe_text(edge, "-") if edge is not None else "-"
     confidence_text = _pct_text(confidence) if confidence is not None and _numeric_value(confidence) is not None else _safe_text(confidence, "-") if confidence is not None else "-"
+    projected_text = _prop_metric_text(projected) if projected is not None else "-"
+    live_projection_text = _prop_metric_text(live_projection) if live_projection is not None else "-"
+    is_live = bool(game.get("shared_is_live") or _is_liveish(game.get("status"), game.get("detail")) or "live" in _safe_text(market, "").lower())
     edge_value = _pct_number(edge_text)
     confidence_value = _pct_number(confidence_text)
     updated_epoch = _game_row_updated_epoch(game, fallback_epoch)
@@ -1447,10 +1450,13 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "matchup": _sport_matchup(game),
             "market": _safe_text(market, _market_label_from_pick_text(pick_text)),
             "pick": pick_text,
+            "is_live": is_live,
             "line": line_text or "-",
             "odds": odds_text or "-",
             "edge": edge_text,
             "confidence": confidence_text,
+            "projected": projected_text,
+            "live_projection": live_projection_text,
             "updated_at": _format_home_timestamp(updated_epoch),
             "updated_epoch": updated_epoch,
             "detail": _safe_text(detail or game.get("summary") or game.get("detail"), "No game-bet summary available."),
@@ -1477,6 +1483,8 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             odds=_first_present_text(row.get("odds"), row.get("price"), row.get("american_odds")),
             edge=row.get("ev_pct") if row.get("ev_pct") is not None else row.get("edge"),
             confidence=row.get("p_win") if row.get("p_win") is not None else row.get("confidence"),
+            projected=row.get("projected") if row.get("projected") is not None else row.get("projection") if row.get("projection") is not None else row.get("model") if row.get("model") is not None else row.get("mean"),
+            live_projection=row.get("live_projection") if row.get("live_projection") is not None else row.get("liveProjection") if row.get("liveProjection") is not None else row.get("live_proj") if row.get("live_proj") is not None else row.get("projected_live"),
             detail=_first_present_text(row.get("summary"), row.get("reason"), game.get("summary")),
             fallback_epoch=fallback_epoch,
         )
@@ -1531,6 +1539,8 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 odds=_first_present_text(market.get("odds"), market.get("price")),
                 edge=market.get("edge"),
                 confidence=market.get("p_win"),
+                projected=market.get("projected") if market.get("projected") is not None else market.get("projection") if market.get("projection") is not None else market.get("model") if market.get("model") is not None else market.get("mean"),
+                live_projection=market.get("live_projection") if market.get("live_projection") is not None else market.get("liveProjection") if market.get("liveProjection") is not None else market.get("live_proj") if market.get("live_proj") is not None else market.get("projected_live"),
                 detail=game.get("summary"),
                 fallback_epoch=fallback_epoch,
             )
