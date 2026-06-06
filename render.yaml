@@ -6,6 +6,7 @@
 # Force redeploy after stalled Render healthz commit.
 # Force redeploy after WNBA live game lens interval odds fix.
 # Force redeploy after WNBA 2026-06-06 live lens fixes
+# Force redeploy after WNBA live-player odds fallback fix
 services:
   - type: web
     name: syndicate
