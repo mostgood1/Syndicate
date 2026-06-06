@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from difflib import SequenceMatcher
 from datetime import date
 from datetime import timedelta
 from functools import lru_cache
@@ -109,7 +110,7 @@ _MARKET_FOCUS_ALIASES: dict[str, tuple[str, ...]] = {
     "points": ("points", "point", "pts"),
     "rebounds": ("rebounds", "rebound", "rebs", "reb"),
     "assists": ("assists", "assist", "asts", "ast"),
-    "threes": ("threes", "three pointers", "three pointer", "3pm", "3 pointers", "3s"),
+    "threes": ("threes", "three pointers", "three pointer", "three point makes", "three point makes", "three point made", "3pm", "3ptm", "3 ptm", "3 point makes", "3 pointers", "3s"),
     "pra": ("pra", "points rebounds assists"),
     "shots": ("shots", "shots on goal", "sog"),
     "saves": ("saves", "save"),
@@ -557,7 +558,11 @@ def _decimal_to_american(value: float | None) -> str | None:
 
 
 def _normalized_market_text(value: Any) -> str:
-    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+    lowered = str(value or "").lower()
+    lowered = re.sub(r"\b3\s*pt\s*m\b", " 3pm ", lowered)
+    lowered = re.sub(r"\b3\s*point\s*makes?\b", " 3pm ", lowered)
+    lowered = re.sub(r"\bthree\s+point\s+makes?\b", " 3pm ", lowered)
+    normalized = re.sub(r"[^a-z0-9]+", " ", lowered).strip()
     return re.sub(r"\s+", " ", normalized)
 
 
@@ -2886,6 +2891,24 @@ def _resolved_requested_subjects(question: str, candidates: list[dict[str, Any]]
         return []
     matches: list[tuple[int, str]] = []
     seen: set[str] = set()
+    question_tokens = normalized_question.split()
+
+    def fuzzy_subject_position(aliases: set[str]) -> int | None:
+        best_position: int | None = None
+        best_score = 0.0
+        for alias in aliases:
+            alias_tokens = alias.split()
+            if len(alias_tokens) < 2:
+                continue
+            window_size = len(alias_tokens)
+            for index in range(0, len(question_tokens) - window_size + 1):
+                window_text = " ".join(question_tokens[index : index + window_size])
+                score = SequenceMatcher(None, window_text, alias).ratio()
+                if score >= 0.88 and score > best_score:
+                    best_score = score
+                    best_position = index
+        return best_position
+
     for candidate in candidates:
         if not isinstance(candidate, dict):
             continue
@@ -2899,6 +2922,12 @@ def _resolved_requested_subjects(question: str, candidates: list[dict[str, Any]]
             seen.add(subject_key)
             matches.append((match.start(), subject_key))
             break
+        if subject_key in seen:
+            continue
+        fuzzy_position = fuzzy_subject_position(_candidate_subject_aliases(candidate))
+        if fuzzy_position is not None:
+            seen.add(subject_key)
+            matches.append((fuzzy_position, subject_key))
     return [subject for _, subject in sorted(matches, key=lambda item: item[0])]
 
 

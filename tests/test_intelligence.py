@@ -143,6 +143,67 @@ def _sample_overview_with_secondary_sport() -> list[dict[str, object]]:
     return rows
 
 
+def _sample_nba_subject_specific_overview() -> list[dict[str, object]]:
+    return [
+        {
+            "slug": "nba",
+            "name": "NBA",
+            "context_label": "2026-06-05",
+            "data_health": "healthy",
+            "data_warnings": [],
+            "home_rails": {
+                "pregame": {
+                    "title": "Pregame props",
+                    "items": [
+                        {
+                            "name": "Julian Champagnie Over 1.5 3PM",
+                            "market": "3PM",
+                            "pick": "Over 1.5",
+                            "matchup": "SAS at PHX",
+                            "projected": 2.3,
+                            "line": 1.5,
+                            "odds": "+108",
+                            "confidence": "60%",
+                            "edge": "+3.9%",
+                            "writeup": "The volume profile still supports Julian's threes over.",
+                            "href": "/nba/prop-ladders?date=2026-06-05",
+                        },
+                        {
+                            "name": "Julian Champagnie Over 11.5 PTS",
+                            "market": "PTS",
+                            "pick": "Over 11.5",
+                            "matchup": "SAS at PHX",
+                            "projected": 12.1,
+                            "line": 11.5,
+                            "odds": "-102",
+                            "confidence": "56%",
+                            "edge": "+1.7%",
+                            "writeup": "The points line is playable but thinner than the threes angle.",
+                            "href": "/nba/prop-ladders?date=2026-06-05",
+                        },
+                        {
+                            "name": "Devin Booker Over 2.5 3PM",
+                            "market": "3PM",
+                            "pick": "Over 2.5",
+                            "matchup": "SAS at PHX",
+                            "projected": 3.0,
+                            "line": 2.5,
+                            "odds": "+104",
+                            "confidence": "58%",
+                            "edge": "+2.4%",
+                            "writeup": "Booker still clears the threes line, but this is not the requested player.",
+                            "href": "/nba/prop-ladders?date=2026-06-05",
+                        },
+                    ],
+                },
+                "live": {"title": "Top Live Props", "items": []},
+                "compact": {"items": []},
+            },
+            "dashboard_games": [],
+        }
+    ]
+
+
 def _sample_mlb_statcast_overview() -> list[dict[str, object]]:
     return [
         {
@@ -535,6 +596,11 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(preferences.get("correlation_explicit"))
         self.assertEqual(preferences.get("bankroll_amount"), 100)
         self.assertEqual(preferences.get("max_exposure_pct"), 20)
+
+    def test_query_preferences_normalizes_three_point_make_aliases(self) -> None:
+        preferences = _query_preferences("Julian champaigne 3ptM")
+
+        self.assertEqual(preferences.get("requested_markets"), ["threes"])
 
     def test_query_preferences_infers_baseball_market_focus(self) -> None:
         preferences = _query_preferences("Who are the top 3 strikeout targets for today?")
@@ -1659,6 +1725,28 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(recommendations[0].get("line"), "4.5")
         self.assertEqual(recommendations[0].get("odds"), "+124")
         self.assertIn("Projection 5.3 versus line 4.5", recommendations[0].get("rationale") or "")
+
+    def test_intelligence_query_resolves_typo_subject_and_three_point_market(self) -> None:
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_nba_subject_specific_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Julian champaigne 3ptM",
+                            "date": "2026-06-05",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        result = (response.get_json() or {}).get("response") or {}
+        parsed_request = result.get("parsed_request") or {}
+        self.assertEqual(parsed_request.get("requested_subjects"), ["Julian Champagnie"])
+        self.assertIn("Threes", parsed_request.get("requested_markets") or [])
+        recommendations = result.get("recommendations") or []
+        self.assertEqual([item.get("name") for item in recommendations], ["Julian Champagnie Over 1.5 3PM"])
+        self.assertTrue(all(item.get("subject_key") == "julian champagnie" for item in recommendations))
+        self.assertTrue(all(item.get("market_key") == "threes" for item in recommendations))
 
     def test_build_parlays_limits_standard_leg_count_for_tight_exposure_caps(self) -> None:
         preferences = _query_preferences(
