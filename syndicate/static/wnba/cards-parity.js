@@ -1281,8 +1281,7 @@
     if (liveState.in_progress && lensHalfKey) {
       const halfLineFromPeriod = Number(periodTotals?.[lensHalfKey]);
       const halfSim = simPeriodMean(game, lensHalfKey);
-      const useSimHalfTotalLine = !Number.isFinite(halfLineFromPeriod) && Number.isFinite(halfSim);
-      const halfLine = Number.isFinite(halfLineFromPeriod) ? halfLineFromPeriod : roundLineToHalf(halfSim);
+      const halfLine = halfLineFromPeriod;
       const halfActual = useUpcomingHalf ? 0 : halfTotalSoFar(liveState, currentTotal);
       const halfMinutesElapsed = lensHalfMinutesElapsed;
       const halfMinutesRemaining = lensHalfMinutesRemaining;
@@ -1305,7 +1304,7 @@
           edge,
           halfLine,
           projection,
-          [halfMinutesElapsed > 0 ? `Total ${fmtInteger(halfActual)}` : 'Opening live half line', useSimHalfTotalLine ? 'Using sim half baseline' : '']
+          [halfMinutesElapsed > 0 ? `Total ${fmtInteger(halfActual)}` : 'Opening live half line']
             .filter(Boolean)
             .join(' · ')
         );
@@ -1340,8 +1339,7 @@
     if (liveState.in_progress && lensQuarterKey) {
       const quarterLineFromPeriod = Number(periodTotals?.[lensQuarterKey]);
       const quarterSim = simPeriodMean(game, lensQuarterKey);
-      const useSimQuarterTotalLine = !Number.isFinite(quarterLineFromPeriod) && Number.isFinite(quarterSim);
-      const quarterLine = Number.isFinite(quarterLineFromPeriod) ? quarterLineFromPeriod : roundLineToHalf(quarterSim);
+      const quarterLine = quarterLineFromPeriod;
       const quarterActual = useUpcomingQuarter
         ? 0
         : currentQuarterTotal(liveState, currentTotal, lensQuarterKey);
@@ -1366,7 +1364,7 @@
           edge,
           quarterLine,
           projection,
-          [quarterMinutesElapsed > 0 ? `Total ${fmtInteger(quarterActual)}` : 'Opening live period line', useSimQuarterTotalLine ? 'Using sim period baseline' : '']
+          [quarterMinutesElapsed > 0 ? `Total ${fmtInteger(quarterActual)}` : 'Opening live period line']
             .filter(Boolean)
             .join(' · ')
         );
@@ -1405,8 +1403,7 @@
         ? (useUpcomingHalf ? 0 : (lensHalfKey === 'h2' ? currentMargin - completedMarginBeforePeriod(liveState, 3) : currentMargin))
         : null;
       const simHalfMargin = simPeriodMargin(game, lensHalfKey);
-      const useSimHalfSpread = !Number.isFinite(halfSpreadFromPeriod) && Number.isFinite(simHalfMargin);
-      const halfSpread = Number.isFinite(halfSpreadFromPeriod) ? halfSpreadFromPeriod : roundLineToHalf(-simHalfMargin);
+      const halfSpread = halfSpreadFromPeriod;
       const halfMinutesElapsed = lensHalfMinutesElapsed;
       const halfMinutesRemaining = lensHalfMinutesRemaining;
       if (Number.isFinite(actualHalfMargin) && Number.isFinite(halfMinutesElapsed) && Number(halfMinutesRemaining) > 0) {
@@ -1432,7 +1429,7 @@
             edge,
             line,
             projection,
-            [halfMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedHalfMargin, 1)}` : 'Opening live half spread', useSimHalfSpread ? 'Using sim half spread' : '']
+            [halfMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedHalfMargin, 1)}` : 'Opening live half spread']
               .filter(Boolean)
               .join(' · ')
           );
@@ -1516,8 +1513,7 @@
       const quarterSpreadFromPeriod = Number(liveLines?.lines?.period_spreads?.[lensQuarterKey]);
       const actualQuarterMargin = useUpcomingQuarter ? 0 : currentQuarterMargin(liveState, currentMargin, lensQuarterKey);
       const simQuarterMargin = simPeriodMargin(game, lensQuarterKey);
-      const useSimQuarterSpread = !Number.isFinite(quarterSpreadFromPeriod) && Number.isFinite(simQuarterMargin);
-      const quarterSpread = Number.isFinite(quarterSpreadFromPeriod) ? quarterSpreadFromPeriod : roundLineToHalf(-simQuarterMargin);
+      const quarterSpread = quarterSpreadFromPeriod;
       const quarterMinutesElapsed = lensQuarterMinutesElapsed;
       const quarterMinutesRemaining = lensQuarterMinutesRemaining;
       if (Number.isFinite(actualQuarterMargin) && Number.isFinite(quarterMinutesElapsed) && Number(quarterMinutesRemaining) > 0) {
@@ -1543,7 +1539,7 @@
             edge,
             line,
             projection,
-            [quarterMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedQuarterMargin, 1)}` : 'Opening live period spread', useSimQuarterSpread ? 'Using sim period spread' : '']
+            [quarterMinutesElapsed > 0 ? `Margin ${fmtSigned(projectedQuarterMargin, 1)}` : 'Opening live period spread']
               .filter(Boolean)
               .join(' · ')
           );
