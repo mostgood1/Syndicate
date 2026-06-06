@@ -1058,6 +1058,65 @@ function Get-ForcedPublishArtifactPaths {
         }
     }
 
+    function Add-BasketballPublishPaths {
+        param(
+            [string]$SportRootRelative,
+            [switch]$IncludeSeasonBettingCards
+        )
+
+        if ([string]::IsNullOrWhiteSpace($SportRootRelative)) {
+            return
+        }
+
+        foreach ($rootRelative in @(
+            $SportRootRelative.TrimEnd('/', '\'),
+            ($SportRootRelative.TrimEnd('/', '\') + '/source_artifacts')
+        )) {
+            foreach ($relativePath in @(
+                "${rootRelative}/data/processed/game_cards_${DateValue}.csv",
+                "${rootRelative}/data/processed/game_odds_${DateValue}.csv",
+                "${rootRelative}/data/processed/recommendations_${DateValue}.csv",
+                "${rootRelative}/data/processed/recommendations_slate_${DateValue}.json",
+                "${rootRelative}/data/processed/cards_sim_detail_${DateValue}.json",
+                "${rootRelative}/data/processed/cards_props_snapshot_${DateValue}.json",
+                "${rootRelative}/data/processed/props_recommendations_top_by_game_${DateValue}.json",
+                "${rootRelative}/data/processed/oddsapi_player_props_${DateValue}.csv",
+                "${rootRelative}/data/processed/props_predictions_${DateValue}.csv",
+                "${rootRelative}/data/processed/props_edges_${DateValue}.csv",
+                "${rootRelative}/data/processed/props_recommendations_${DateValue}.csv",
+                "${rootRelative}/data/processed/recon_games_${DateValue}.csv",
+                "${rootRelative}/data/processed/recon_quarters_${DateValue}.csv",
+                "${rootRelative}/data/processed/recon_props_${DateValue}.csv",
+                "${rootRelative}/data/processed/recon_players_${DateValue}.csv",
+                "${rootRelative}/data/processed/live_player_lens_tuning_${DateValue}.csv",
+                "${rootRelative}/data/processed/boxscores_${DateValue}.csv",
+                "${rootRelative}/data/processed/live_lens_projections_${DateValue}.jsonl",
+                "${rootRelative}/data/processed/live_lens_signals_${DateValue}.jsonl",
+                "${rootRelative}/data/processed/live_lens_tuning_override.json",
+                "${rootRelative}/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
+                "${rootRelative}/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
+                "${rootRelative}/data/processed/live_snapshots/live_pbp_stats_${DateValue}.jsonl",
+                "${rootRelative}/data/processed/live_snapshots/live_player_boxscore_${DateValue}.jsonl",
+                "${rootRelative}/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl",
+                "${rootRelative}/data/live_lens/live_lens_projections_${DateValue}.jsonl",
+                "${rootRelative}/data/live_lens/live_lens_signals_${DateValue}.jsonl",
+                "${rootRelative}/data/live_lens/live_lens_tuning_override.json"
+            )) {
+                Add-PathIfPresent -RelativePath $relativePath
+            }
+
+            Add-PathsByPattern -RelativePattern "${rootRelative}/data/processed/smart_sim_${DateValue}_*.json"
+            Add-PathsByPattern -RelativePattern "${rootRelative}/data/processed/team_advanced_stats_*.csv"
+            if ($IncludeSeasonBettingCards) {
+                Add-PathsByPattern -RelativePattern "${rootRelative}/data/processed/season_betting_card_manifest_*_retuned_${DateValue}.json"
+                Add-PathsByPattern -RelativePattern "${rootRelative}/data/processed/season_betting_card_manifest_*_retuned.json"
+                Add-PathsByPattern -RelativePattern "${rootRelative}/data/processed/season_betting_card_day_*_retuned_${DateValue}.json"
+                Add-PathsByPattern -RelativePattern "${rootRelative}/data/processed/season_betting_card_day_*_retuned_${DateValue}_insights.json"
+            }
+            Add-DateGameBoxscoreCachePaths -GameCardsRelativePath "${rootRelative}/data/processed/game_cards_${DateValue}.csv" -BoxscoreRelativeRoot "${rootRelative}/data/processed/boxscores"
+        }
+    }
+
     if (-not $SkipMLB) {
         foreach ($relativePath in @(
             "data/mlb_source/data/daily/daily_summary_${dateSlug}.json",
@@ -1099,81 +1158,11 @@ function Get-ForcedPublishArtifactPaths {
     }
 
     if (-not $SkipNBA) {
-        foreach ($relativePath in @(
-            "data/nba_source/data/processed/game_cards_${DateValue}.csv",
-            "data/nba_source/data/processed/game_odds_${DateValue}.csv",
-            "data/nba_source/data/processed/recommendations_${DateValue}.csv",
-            "data/nba_source/data/processed/recommendations_slate_${DateValue}.json",
-            "data/nba_source/data/processed/cards_sim_detail_${DateValue}.json",
-            "data/nba_source/data/processed/cards_props_snapshot_${DateValue}.json",
-            "data/nba_source/data/processed/props_recommendations_top_by_game_${DateValue}.json",
-            "data/nba_source/data/processed/oddsapi_player_props_${DateValue}.csv",
-            "data/nba_source/data/processed/props_predictions_${DateValue}.csv",
-            "data/nba_source/data/processed/props_edges_${DateValue}.csv",
-            "data/nba_source/data/processed/props_recommendations_${DateValue}.csv",
-            "data/nba_source/data/processed/recon_games_${DateValue}.csv",
-            "data/nba_source/data/processed/recon_quarters_${DateValue}.csv",
-            "data/nba_source/data/processed/recon_props_${DateValue}.csv",
-            "data/nba_source/data/processed/recon_players_${DateValue}.csv",
-            "data/nba_source/data/processed/live_player_lens_tuning_${DateValue}.csv",
-            "data/nba_source/data/processed/boxscores_${DateValue}.csv",
-            "data/nba_source/data/processed/live_lens_projections_${DateValue}.jsonl",
-            "data/nba_source/data/processed/live_lens_signals_${DateValue}.jsonl",
-            "data/nba_source/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
-            "data/nba_source/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
-            "data/nba_source/data/processed/live_snapshots/live_pbp_stats_${DateValue}.jsonl",
-            "data/nba_source/data/processed/live_snapshots/live_player_boxscore_${DateValue}.jsonl",
-            "data/nba_source/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl",
-            "data/nba_source/data/live_lens/live_lens_projections_${DateValue}.jsonl",
-            "data/nba_source/data/live_lens/live_lens_signals_${DateValue}.jsonl"
-        )) {
-            Add-PathIfPresent -RelativePath $relativePath
-        }
-
-        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/smart_sim_${DateValue}_*.json"
-        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/team_advanced_stats_*.csv"
-        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_manifest_*_retuned_${DateValue}.json"
-        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_manifest_*_retuned.json"
-        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_day_*_retuned_${DateValue}.json"
-        Add-PathsByPattern -RelativePattern "data/nba_source/data/processed/season_betting_card_day_*_retuned_${DateValue}_insights.json"
-        Add-DateGameBoxscoreCachePaths -GameCardsRelativePath "data/nba_source/data/processed/game_cards_${DateValue}.csv" -BoxscoreRelativeRoot 'data/nba_source/data/processed/boxscores'
+        Add-BasketballPublishPaths -SportRootRelative 'data/nba_source' -IncludeSeasonBettingCards
     }
 
     if (-not $SkipWNBA) {
-        foreach ($relativePath in @(
-            "data/wnba_source/data/processed/game_cards_${DateValue}.csv",
-            "data/wnba_source/data/processed/game_odds_${DateValue}.csv",
-            "data/wnba_source/data/processed/recommendations_${DateValue}.csv",
-            "data/wnba_source/data/processed/recommendations_slate_${DateValue}.json",
-            "data/wnba_source/data/processed/cards_sim_detail_${DateValue}.json",
-            "data/wnba_source/data/processed/cards_props_snapshot_${DateValue}.json",
-            "data/wnba_source/data/processed/props_recommendations_top_by_game_${DateValue}.json",
-            "data/wnba_source/data/processed/oddsapi_player_props_${DateValue}.csv",
-            "data/wnba_source/data/processed/props_predictions_${DateValue}.csv",
-            "data/wnba_source/data/processed/props_edges_${DateValue}.csv",
-            "data/wnba_source/data/processed/props_recommendations_${DateValue}.csv",
-            "data/wnba_source/data/processed/recon_games_${DateValue}.csv",
-            "data/wnba_source/data/processed/recon_quarters_${DateValue}.csv",
-            "data/wnba_source/data/processed/recon_props_${DateValue}.csv",
-            "data/wnba_source/data/processed/recon_players_${DateValue}.csv",
-            "data/wnba_source/data/processed/live_player_lens_tuning_${DateValue}.csv",
-            "data/wnba_source/data/processed/boxscores_${DateValue}.csv",
-            "data/wnba_source/data/processed/live_lens_projections_${DateValue}.jsonl",
-            "data/wnba_source/data/processed/live_lens_signals_${DateValue}.jsonl",
-            "data/wnba_source/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
-            "data/wnba_source/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
-            "data/wnba_source/data/processed/live_snapshots/live_pbp_stats_${DateValue}.jsonl",
-            "data/wnba_source/data/processed/live_snapshots/live_player_boxscore_${DateValue}.jsonl",
-            "data/wnba_source/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl",
-            "data/wnba_source/data/live_lens/live_lens_projections_${DateValue}.jsonl",
-            "data/wnba_source/data/live_lens/live_lens_signals_${DateValue}.jsonl"
-        )) {
-            Add-PathIfPresent -RelativePath $relativePath
-        }
-
-        Add-PathsByPattern -RelativePattern "data/wnba_source/data/processed/smart_sim_${DateValue}_*.json"
-        Add-PathsByPattern -RelativePattern "data/wnba_source/data/processed/team_advanced_stats_*.csv"
-        Add-DateGameBoxscoreCachePaths -GameCardsRelativePath "data/wnba_source/data/processed/game_cards_${DateValue}.csv" -BoxscoreRelativeRoot 'data/wnba_source/data/processed/boxscores'
+        Add-BasketballPublishPaths -SportRootRelative 'data/wnba_source'
     }
 
     if (-not $SkipNHL) {
@@ -1483,7 +1472,7 @@ print(json.dumps(result))
         $audit = ($rawOutput | Out-String | ConvertFrom-Json -ErrorAction Stop)
     }
     catch {
-        throw "Intelligence readiness audit failed for $Sport: unable to parse status payload"
+        throw "Intelligence readiness audit failed for ${Sport}: unable to parse status payload"
     }
 
     if (-not $audit.ok) {
@@ -1492,7 +1481,7 @@ print(json.dumps(result))
         if ([string]::IsNullOrWhiteSpace($detail)) {
             $detail = 'unknown intelligence readiness mismatch'
         }
-        throw "Intelligence readiness audit failed for $Sport: $detail"
+        throw "Intelligence readiness audit failed for ${Sport}: $detail"
     }
 }
 
@@ -1585,7 +1574,7 @@ if (-not $SkipNBA) {
             'scripts\refresh_nba_oddsapi_props.py',
             '--date', $Date,
             '--source-root', 'vendor\nba_betting_repo',
-            '--artifact-root', 'data\nba_source',
+            '--artifact-root', 'data\nba_source\source_artifacts',
             '--log-file', (Join-Path $runDir 'nba_props_refresh.log'),
             '--force-refresh',
             '--days-ahead', '0',
@@ -1594,6 +1583,21 @@ if (-not $SkipNBA) {
         )
         WorkingDirectory = $repoRoot
         EnvironmentOverrides = $nbaEnvOverrides
+        RuntimePolicy = $runtimePolicy.NBA
+    }
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'nba'
+        Name = 'NBA source mirror refresh'
+        Workflow = 'syndicate_mirror'
+        Command = @(
+            'powershell.exe',
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', 'scripts\refresh_nba_source_mirror.ps1',
+            '-Date', $Date
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = @{}
         RuntimePolicy = $runtimePolicy.NBA
     }
 }
@@ -1624,7 +1628,7 @@ if (-not $SkipWNBA) {
             'scripts\refresh_wnba_oddsapi_props.py',
             '--date', $Date,
             '--source-root', 'vendor\wnba_betting_repo',
-            '--artifact-root', 'data\wnba_source',
+            '--artifact-root', 'data\wnba_source\source_artifacts',
             '--log-file', (Join-Path $runDir 'wnba_props_refresh.log'),
             '--force-refresh',
             '--days-ahead', '0',
@@ -1633,6 +1637,21 @@ if (-not $SkipWNBA) {
         )
         WorkingDirectory = $repoRoot
         EnvironmentOverrides = $wnbaEnvOverrides
+        RuntimePolicy = $runtimePolicy.WNBA
+    }
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'wnba'
+        Name = 'WNBA source mirror refresh'
+        Workflow = 'syndicate_mirror'
+        Command = @(
+            'powershell.exe',
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', 'scripts\refresh_wnba_source_mirror.ps1',
+            '-Date', $Date
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = @{}
         RuntimePolicy = $runtimePolicy.WNBA
     }
 }
