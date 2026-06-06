@@ -20,7 +20,8 @@
     },
     "sources": {
       "batch_meta": null,
-      "summary": null
+      "summary": null,
+      "manifest": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_eval_manifest.json"
     },
     "batch_meta": {
       "sims_per_game": null,
@@ -605,7 +606,7 @@
     {
       "month": "2026-06",
       "label": "Jun 2026",
-      "days": 5,
+      "days": 6,
       "games": 63,
       "segments": {
         "full": {
@@ -886,15 +887,58 @@
       "date": "2026-05-30",
       "month": "2026-05",
       "games": 15,
-      "cards_available": false,
-      "cards_url": null,
-      "legacy_cards_available": false,
-      "legacy_cards_url": null,
+      "cards_available": true,
+      "cards_url": "/?date=2026-05-30",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-05-30",
       "betting_cards": {
-        "available": false,
-        "available_profiles": [],
-        "default_profile": null,
-        "profiles": {}
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_05_30_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
       },
       "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-05-30.json",
       "aggregate": {
@@ -1074,15 +1118,58 @@
       "date": "2026-06-01",
       "month": "2026-06",
       "games": 9,
-      "cards_available": false,
-      "cards_url": null,
-      "legacy_cards_available": false,
-      "legacy_cards_url": null,
+      "cards_available": true,
+      "cards_url": "/?date=2026-06-01",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-06-01",
       "betting_cards": {
-        "available": false,
-        "available_profiles": [],
-        "default_profile": null,
-        "profiles": {}
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_01_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
       },
       "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-01.json",
       "aggregate": {
@@ -1168,15 +1255,58 @@
       "date": "2026-06-02",
       "month": "2026-06",
       "games": 15,
-      "cards_available": false,
-      "cards_url": null,
-      "legacy_cards_available": false,
-      "legacy_cards_url": null,
+      "cards_available": true,
+      "cards_url": "/?date=2026-06-02",
+      "legacy_cards_available": true,
+      "legacy_cards_url": "/?date=2026-06-02",
       "betting_cards": {
-        "available": false,
-        "available_profiles": [],
-        "default_profile": null,
-        "profiles": {}
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_02_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
       },
       "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-02.json",
       "aggregate": {
@@ -1267,10 +1397,53 @@
       "legacy_cards_available": true,
       "legacy_cards_url": "/?date=2026-06-03",
       "betting_cards": {
-        "available": false,
-        "available_profiles": [],
-        "default_profile": null,
-        "profiles": {}
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_03_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 0,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 0
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
       },
       "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-03.json",
       "aggregate": {
@@ -1361,10 +1534,69 @@
       "legacy_cards_available": true,
       "legacy_cards_url": "/?date=2026-06-04",
       "betting_cards": {
-        "available": false,
-        "available_profiles": [],
-        "default_profile": null,
-        "profiles": {}
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_04_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 1,
+              "pitcher_props": 1,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 2
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 2,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 2
+            },
+            "results": {
+              "combined": {
+                "n": 2,
+                "wins": 0,
+                "losses": 2,
+                "stake_u": 2.0,
+                "profit_u": -2.0,
+                "roi": -1.0
+              },
+              "ml": {
+                "n": 1,
+                "wins": 0,
+                "losses": 1,
+                "stake_u": 1.0,
+                "profit_u": -1.0,
+                "roi": -1.0
+              },
+              "pitcher_props": {
+                "n": 1,
+                "wins": 0,
+                "losses": 1,
+                "stake_u": 1.0,
+                "profit_u": -1.0,
+                "roi": -1.0
+              }
+            }
+          }
+        }
       },
       "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-04.json",
       "aggregate": {
@@ -1444,7 +1676,53 @@
             "avg_edge_vs_no_vig": 0.128
           }
         }
-      }
+      },
+      "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_04_locked_policy.json",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 1,
+        "pitcher_props": 1,
+        "hitter_props": 0,
+        "hitter_home_runs": 0,
+        "hitter_hits": 0,
+        "hitter_strikeouts": 0,
+        "hitter_total_bases": 0,
+        "hitter_runs": 0,
+        "hitter_rbis": 0,
+        "combined": 2
+      },
+      "results": {
+        "combined": {
+          "n": 2,
+          "wins": 0,
+          "losses": 2,
+          "stake_u": 2.0,
+          "profit_u": -2.0,
+          "roi": -1.0
+        },
+        "ml": {
+          "n": 1,
+          "wins": 0,
+          "losses": 1,
+          "stake_u": 1.0,
+          "profit_u": -1.0,
+          "roi": -1.0
+        },
+        "pitcher_props": {
+          "n": 1,
+          "wins": 0,
+          "losses": 1,
+          "stake_u": 1.0,
+          "profit_u": -1.0,
+          "roi": -1.0
+        }
+      },
+      "profit_u": -2.0,
+      "roi": -1.0,
+      "settled_n": 2,
+      "unresolved_n": 0,
+      "source_kind": "season_manifest_static"
     },
     {
       "date": "2026-06-05",
@@ -1455,10 +1733,69 @@
       "legacy_cards_available": true,
       "legacy_cards_url": "/?date=2026-06-05",
       "betting_cards": {
-        "available": false,
-        "available_profiles": [],
-        "default_profile": null,
-        "profiles": {}
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_05_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 1,
+              "pitcher_props": 1,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 2
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 47,
+              "hitter_props": 0,
+              "hitter_home_runs": 0,
+              "hitter_hits": 0,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 0,
+              "hitter_runs": 0,
+              "hitter_rbis": 0,
+              "combined": 47
+            },
+            "results": {
+              "combined": {
+                "n": 2,
+                "wins": 0,
+                "losses": 2,
+                "stake_u": 2.0,
+                "profit_u": -2.0,
+                "roi": -1.0
+              },
+              "ml": {
+                "n": 1,
+                "wins": 0,
+                "losses": 1,
+                "stake_u": 1.0,
+                "profit_u": -1.0,
+                "roi": -1.0
+              },
+              "pitcher_props": {
+                "n": 1,
+                "wins": 0,
+                "losses": 1,
+                "stake_u": 1.0,
+                "profit_u": -1.0,
+                "roi": -1.0
+              }
+            }
+          }
+        }
       },
       "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-05.json",
       "aggregate": {
@@ -1538,7 +1875,163 @@
             "avg_edge_vs_no_vig": 0.36801351157569967
           }
         }
-      }
+      },
+      "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_05_locked_policy.json",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 1,
+        "pitcher_props": 1,
+        "hitter_props": 0,
+        "hitter_home_runs": 0,
+        "hitter_hits": 0,
+        "hitter_strikeouts": 0,
+        "hitter_total_bases": 0,
+        "hitter_runs": 0,
+        "hitter_rbis": 0,
+        "combined": 2
+      },
+      "results": {
+        "combined": {
+          "n": 2,
+          "wins": 0,
+          "losses": 2,
+          "stake_u": 2.0,
+          "profit_u": -2.0,
+          "roi": -1.0
+        },
+        "ml": {
+          "n": 1,
+          "wins": 0,
+          "losses": 1,
+          "stake_u": 1.0,
+          "profit_u": -1.0,
+          "roi": -1.0
+        },
+        "pitcher_props": {
+          "n": 1,
+          "wins": 0,
+          "losses": 1,
+          "stake_u": 1.0,
+          "profit_u": -1.0,
+          "roi": -1.0
+        }
+      },
+      "profit_u": -2.0,
+      "roi": -1.0,
+      "settled_n": 2,
+      "unresolved_n": 0,
+      "source_kind": "season_manifest_static"
+    },
+    {
+      "date": "2026-06-06",
+      "month": "2026-06",
+      "games": 15,
+      "cards_available": true,
+      "legacy_cards_available": true,
+      "cards_url": "/?date=2026-06-06",
+      "legacy_cards_url": "/?date=2026-06-06",
+      "betting_cards": {
+        "available": true,
+        "available_profiles": [
+          "retuned"
+        ],
+        "default_profile": "retuned",
+        "profiles": {
+          "retuned": {
+            "available": true,
+            "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_06_locked_policy.json",
+            "selected_counts": {
+              "totals": 0,
+              "ml": 1,
+              "pitcher_props": 1,
+              "hitter_props": 11,
+              "hitter_home_runs": 0,
+              "hitter_hits": 4,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 6,
+              "hitter_runs": 1,
+              "hitter_rbis": 0,
+              "combined": 13
+            },
+            "playable_counts": {
+              "totals": 0,
+              "ml": 0,
+              "pitcher_props": 12,
+              "hitter_props": 36,
+              "hitter_home_runs": 0,
+              "hitter_hits": 17,
+              "hitter_strikeouts": 0,
+              "hitter_total_bases": 17,
+              "hitter_runs": 1,
+              "hitter_rbis": 1,
+              "combined": 48
+            },
+            "results": {
+              "combined": {
+                "n": 0,
+                "wins": 0,
+                "losses": 0,
+                "stake_u": 0.0,
+                "profit_u": 0.0,
+                "roi": null
+              }
+            }
+          }
+        }
+      },
+      "full_game": {
+        "moneyline": {},
+        "totals": {},
+        "runline_fav_minus_1_5": {},
+        "pitcher_props_starters": {},
+        "pitcher_props_at_market_lines": {}
+      },
+      "aggregate": {
+        "full": {
+          "games": 15
+        },
+        "first5": {
+          "games": 15
+        },
+        "first3": {
+          "games": 15
+        }
+      },
+      "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_06_locked_policy.json",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 1,
+        "pitcher_props": 1,
+        "hitter_props": 11,
+        "hitter_home_runs": 0,
+        "hitter_hits": 4,
+        "hitter_strikeouts": 0,
+        "hitter_total_bases": 6,
+        "hitter_runs": 1,
+        "hitter_rbis": 0,
+        "combined": 13
+      },
+      "results": {
+        "combined": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        }
+      },
+      "profit_u": 0.0,
+      "roi": null,
+      "settled_n": 0,
+      "unresolved_n": 13,
+      "source_kind": "canonical_daily_fallback",
+      "_betting_payload_found": true,
+      "report_path": null
     }
-  ]
+  ],
+  "found": true,
+  "artifactDate": "2026-06-06"
 }
