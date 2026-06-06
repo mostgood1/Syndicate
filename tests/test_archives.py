@@ -1422,6 +1422,312 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401859964")
         self.assertEqual(((payload.get("games") or [{}])[0].get("rows") or [{}])[0].get("actual"), 0.0)
 
+    def test_nba_live_player_lens_preserves_existing_live_projection(self) -> None:
+        from syndicate.features.nba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "NYK",
+                            "stat": "pts",
+                            "line": 14.5,
+                            "sim_mu_adjusted": 18.0,
+                            "liveProjection": 23.25,
+                            "line_source": "source_snapshot",
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "players": [{"team_tri": "NYK", "player": "Test Player", "pts": 8, "mp": 10}],
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401859964"])
+
+        row = (((payload.get("games") or [{}])[0].get("rows") or [{}])[0])
+        self.assertEqual(row.get("actual"), 8)
+        self.assertEqual(row.get("liveProjection"), 23.25)
+        self.assertEqual(row.get("live_projection"), 23.25)
+        self.assertEqual(row.get("line_source"), "source_snapshot")
+
+    def test_wnba_live_player_lens_preserves_existing_live_projection(self) -> None:
+        from syndicate.features.wnba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "CHI",
+                            "stat": "ast",
+                            "line": 5.5,
+                            "sim_mu_adjusted": 6.8,
+                            "liveProjection": 7.4,
+                            "line_source": "source_snapshot",
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "players": [{"team_tri": "CHI", "player": "Test Player", "ast": 2, "mp": 9}],
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401856963"])
+
+        row = (((payload.get("games") or [{}])[0].get("rows") or [{}])[0])
+        self.assertEqual(row.get("actual"), 2)
+        self.assertEqual(row.get("liveProjection"), 7.4)
+        self.assertEqual(row.get("live_projection"), 7.4)
+        self.assertEqual(row.get("line_source"), "source_snapshot")
+
+    def test_nba_live_player_lens_non_live_game_uses_actual_projection(self) -> None:
+        from syndicate.features.nba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "status": {"status": "Final", "final": True, "in_progress": False},
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "NYK",
+                            "stat": "pts",
+                            "line": 14.5,
+                            "sim_mu_adjusted": 18.0,
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "players": [{"team_tri": "NYK", "player": "Test Player", "pts": 8, "mp": 30}],
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401859964"])
+
+        row = (((payload.get("games") or [{}])[0].get("rows") or [{}])[0])
+        self.assertEqual(row.get("actual"), 8)
+        self.assertEqual(row.get("liveProjection"), 8)
+        self.assertEqual(row.get("live_projection"), 8)
+
+    def test_nba_live_player_lens_applies_historical_calibration_to_fallback_projection(self) -> None:
+        from syndicate.features.nba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "status": {"status": "Live", "final": False, "in_progress": True},
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "NYK",
+                            "stat": "pts",
+                            "line": 14.5,
+                            "sim_mu_adjusted": 18.0,
+                            "min_mean": 36.0,
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "players": [{"team_tri": "NYK", "player": "Test Player", "pts": 8, "mp": 12}],
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.nba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ), patch(
+            "syndicate.features.nba.cards._live_projection_calibration_index",
+            return_value={
+                "stat": {"pts": {"factor": 0.5, "count": 20}},
+                "player_stat": {("TEST PLAYER", "pts"): {"factor": 0.5, "count": 4}},
+            },
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401859964"])
+
+        row = (((payload.get("games") or [{}])[0].get("rows") or [{}])[0])
+        self.assertEqual(row.get("actual"), 8)
+        self.assertEqual(row.get("liveProjection"), 10.0)
+        self.assertEqual(row.get("live_projection"), 10.0)
+
+    def test_wnba_live_player_lens_non_live_game_uses_actual_projection(self) -> None:
+        from syndicate.features.wnba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "status": {"status": "6/5 - 7:30 PM EDT", "final": False, "in_progress": False},
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "CHI",
+                            "stat": "ast",
+                            "line": 5.5,
+                            "sim_mu_adjusted": 6.8,
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "players": [{"team_tri": "CHI", "player": "Test Player", "ast": 2, "mp": 30}],
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401856963"])
+
+        row = (((payload.get("games") or [{}])[0].get("rows") or [{}])[0])
+        self.assertEqual(row.get("actual"), 2)
+        self.assertEqual(row.get("liveProjection"), 2)
+        self.assertEqual(row.get("live_projection"), 2)
+
+    def test_wnba_live_player_lens_applies_historical_calibration_to_fallback_projection(self) -> None:
+        from syndicate.features.wnba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "status": {"status": "Live", "final": False, "in_progress": True},
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "team_tri": "CHI",
+                            "stat": "ast",
+                            "line": 5.5,
+                            "sim_mu_adjusted": 6.8,
+                            "min_mean": 32.0,
+                        }
+                    ],
+                }
+            ],
+        }
+        boxscore_payload = {
+            "games": [
+                {
+                    "event_id": "401856963",
+                    "players": [{"team_tri": "CHI", "player": "Test Player", "ast": 2, "mp": 8}],
+                }
+            ]
+        }
+
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+            return_value=boxscore_payload,
+        ), patch(
+            "syndicate.features.wnba.cards._live_projection_calibration_index",
+            return_value={
+                "stat": {"ast": {"factor": 0.6, "count": 20}},
+                "player_stat": {("TEST PLAYER", "ast"): {"factor": 0.6, "count": 4}},
+            },
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", ["401856963"])
+
+        row = (((payload.get("games") or [{}])[0].get("rows") or [{}])[0])
+        self.assertEqual(row.get("actual"), 2)
+        self.assertEqual(row.get("liveProjection"), 4.26)
+        self.assertEqual(row.get("live_projection"), 4.26)
+
     def test_wnba_live_lines_fallback_preserves_requested_event_id(self) -> None:
         fallback_game = {
             "betting": {

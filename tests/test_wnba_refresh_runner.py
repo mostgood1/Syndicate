@@ -1003,6 +1003,46 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(reb_row["actual"], "12.0")
         self.assertEqual(reb_row["line"], "10.5")
 
+    def test_export_live_snapshot_artifacts_overwrites_empty_lens_snapshot_with_local_build(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            source_snapshots = source_root / "data" / "processed" / "live_snapshots"
+            source_snapshots.mkdir(parents=True, exist_ok=True)
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            processed_root.mkdir(parents=True, exist_ok=True)
+
+            module._write_live_snapshot_payload(
+                source_snapshots / "live_state_2026-06-05.jsonl",
+                {"ok": True, "games": [{"event_id": "401856963", "status": "Scheduled"}]},
+            )
+            module._write_live_snapshot_payload(
+                source_snapshots / "live_player_lens_2026-06-05.jsonl",
+                {"ok": True, "games": [{"event_id": "401856963", "rows": []}]},
+            )
+
+            def _fake_local_payload(*, kind: str, date_str: str, event_ids: list[str]):
+                if kind == "live_player_lens":
+                    return {"ok": True, "games": [{"event_id": "401856963", "rows": [{"player": "Aneesah Morrow"}]}]}
+                return None
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+                module,
+                "_build_local_live_snapshot_payload",
+                side_effect=_fake_local_payload,
+            ):
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str="2026-06-05",
+                    processed_root=processed_root,
+                )
+
+            self.assertIn("live_player_lens_path", copied)
+            payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_player_lens_2026-06-05.jsonl")
+            self.assertEqual((((payload or {}).get("games") or [{}])[0].get("rows") or [{}])[0].get("player"), "Aneesah Morrow")
+
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 

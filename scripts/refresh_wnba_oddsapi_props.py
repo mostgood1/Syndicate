@@ -150,6 +150,57 @@ def _write_live_snapshot_payload(path: Path, payload: dict[str, object]) -> bool
     return True
 
 
+def _payload_has_snapshot_content(kind: str, payload: dict[str, object] | None) -> bool:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    if not games:
+        return False
+    normalized_kind = str(kind or "").strip().lower()
+    if normalized_kind == "live_player_lens":
+        return any(isinstance(game, dict) and bool(game.get("rows")) for game in games)
+    if normalized_kind == "live_player_boxscore":
+        return any(isinstance(game, dict) and bool(game.get("players")) for game in games)
+    if normalized_kind == "live_lines":
+        return any(
+            isinstance(game, dict)
+            and (
+                bool(game.get("found"))
+                or (isinstance(game.get("lines"), dict) and bool(game.get("lines")))
+            )
+            for game in games
+        )
+    if normalized_kind == "live_pbp_stats":
+        return any(
+            isinstance(game, dict)
+            and any(game.get(key) is not None for key in ("pbp_recent", "pbp_attempts", "pbp_possessions", "pbp_quarters"))
+            for game in games
+        )
+    return True
+
+
+def _build_local_live_snapshot_payload(*, kind: str, date_str: str, event_ids: list[str]) -> dict[str, object] | None:
+    normalized_kind = str(kind or "").strip().lower()
+    try:
+        from syndicate.features.wnba.cards import build_live_lines_payload
+        from syndicate.features.wnba.cards import build_live_pbp_stats_payload
+        from syndicate.features.wnba.cards import build_live_player_boxscore_payload
+        from syndicate.features.wnba.cards import build_live_player_lens_payload
+        from syndicate.features.wnba.cards import build_live_state_payload
+
+        if normalized_kind == "live_state":
+            return build_live_state_payload(date_str, ttl=12, allow_stored_date_fallback=True)
+        if normalized_kind == "live_pbp_stats":
+            return build_live_pbp_stats_payload(date_str, event_ids, ttl=20, allow_stored_date_fallback=True)
+        if normalized_kind == "live_lines":
+            return build_live_lines_payload(date_str, event_ids, ttl=20, include_period_totals=True, allow_stored_date_fallback=True)
+        if normalized_kind == "live_player_boxscore":
+            return build_live_player_boxscore_payload(date_str, event_ids, ttl=20, allow_stored_date_fallback=True)
+        if normalized_kind == "live_player_lens":
+            return build_live_player_lens_payload(date_str, event_ids, ttl=20, allow_stored_date_fallback=True)
+    except Exception:
+        return None
+    return None
+
+
 def _boxscores_history_sources(*, source_root: Path, processed_root: Path) -> list[Path]:
     candidates: list[Path] = []
     seen: set[str] = set()
@@ -249,9 +300,6 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
         copied["live_state_path"] = existing_state
         state_payload = _read_live_snapshot_payload(state_destination)
 
-    if not _source_app_fallback_enabled():
-        return copied
-
     source_app = None
     client = None
 
@@ -278,12 +326,15 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             payload = None
         return payload if isinstance(payload, dict) else None
 
-    refreshed_state_payload = _fetch_json(f"/api/live_state?date={date_str}")
-    if refreshed_state_payload and _write_live_snapshot_payload(state_destination, refreshed_state_payload):
+    refreshed_state_payload = _fetch_json(f"/api/live_state?date={date_str}") if _source_app_fallback_enabled() else None
+    if _payload_has_snapshot_content("live_state", refreshed_state_payload):
+        state_payload = refreshed_state_payload
+    if not _payload_has_snapshot_content("live_state", state_payload):
+        local_state_payload = _build_local_live_snapshot_payload(kind="live_state", date_str=date_str, event_ids=[])
+        if _payload_has_snapshot_content("live_state", local_state_payload):
+            state_payload = local_state_payload
+    if _payload_has_snapshot_content("live_state", state_payload) and _write_live_snapshot_payload(state_destination, state_payload):
         copied["live_state_path"] = str(state_destination)
-        state_payload = refreshed_state_payload
-    elif state_payload is None:
-        state_payload = refreshed_state_payload
 
     event_ids = [
         str(game.get("event_id") or "").strip()
@@ -300,15 +351,15 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             file_name=file_name,
             destination=destination,
         )
-        if not joined_event_ids:
-            if existing and copied_key:
-                copied[copied_key] = existing
-            continue
-        query = f"/api/{kind}?date={date_str}&event_ids={joined_event_ids}"
-        if kind == "live_lines":
-            query = f"{query}&include_period_totals=1"
-        payload = _fetch_json(query)
-        if payload and _write_live_snapshot_payload(destination, payload):
+        payload = None
+        if joined_event_ids and _source_app_fallback_enabled():
+            query = f"/api/{kind}?date={date_str}&event_ids={joined_event_ids}"
+            if kind == "live_lines":
+                query = f"{query}&include_period_totals=1"
+            payload = _fetch_json(query)
+        if not _payload_has_snapshot_content(kind, payload):
+            payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
+        if isinstance(payload, dict) and (_payload_has_snapshot_content(kind, payload) or existing is None) and _write_live_snapshot_payload(destination, payload):
             if copied_key:
                 copied[copied_key] = str(destination)
             continue

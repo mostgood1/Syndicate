@@ -1941,6 +1941,78 @@ def _normalize_player_key(value: Any) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9\s]", " ", str(value or "").upper())).strip()
 
 
+def _median(values: list[float]) -> float | None:
+    cleaned = sorted(float(value) for value in values if value is not None)
+    if not cleaned:
+        return None
+    midpoint = len(cleaned) // 2
+    if len(cleaned) % 2:
+        return cleaned[midpoint]
+    return (cleaned[midpoint - 1] + cleaned[midpoint]) / 2.0
+
+
+@lru_cache(maxsize=1)
+def _live_projection_calibration_index() -> dict[str, dict[Any, Any]]:
+    processed_root = processed_path("game_cards_2000-01-01.csv").parent
+    stat_samples: dict[str, list[float]] = {}
+    player_stat_samples: dict[tuple[str, str], list[float]] = {}
+    for path in processed_root.glob("live_player_lens_tuning_*.csv"):
+        for row in _load_csv_rows(path):
+            stat_key = str(row.get("stat") or "").strip().lower()
+            player_key = _normalize_player_key(row.get("player_name"))
+            actual_value = _safe_float(row.get("actual"))
+            pace_projection = _safe_float(row.get("pace_proj_final"))
+            if not stat_key or actual_value is None or pace_projection is None or pace_projection <= 0:
+                continue
+            ratio = max(0.35, min(1.2, float(actual_value) / float(pace_projection)))
+            stat_samples.setdefault(stat_key, []).append(ratio)
+            if player_key:
+                player_stat_samples.setdefault((player_key, stat_key), []).append(ratio)
+
+    return {
+        "stat": {
+            key: {"factor": _median(values), "count": len(values)}
+            for key, values in stat_samples.items()
+            if values
+        },
+        "player_stat": {
+            key: {"factor": _median(values), "count": len(values)}
+            for key, values in player_stat_samples.items()
+            if values
+        },
+    }
+
+
+def _calibrate_live_projection(
+    live_projection: Any,
+    actual_value: Any,
+    *,
+    player_name: Any,
+    stat_key: Any,
+) -> float | None:
+    projected_value = _safe_float(live_projection)
+    if projected_value is None:
+        return None
+    stat = str(stat_key or "").strip().lower()
+    player_key = _normalize_player_key(player_name)
+    calibration_index = _live_projection_calibration_index()
+    selected_factor = None
+    player_entry = (calibration_index.get("player_stat") or {}).get((player_key, stat)) if player_key and stat else None
+    if isinstance(player_entry, dict) and int(player_entry.get("count") or 0) >= 3:
+        selected_factor = _safe_float(player_entry.get("factor"))
+    if selected_factor is None:
+        stat_entry = (calibration_index.get("stat") or {}).get(stat) if stat else None
+        if isinstance(stat_entry, dict) and int(stat_entry.get("count") or 0) >= 10:
+            selected_factor = _safe_float(stat_entry.get("factor"))
+    if selected_factor is None:
+        return round(projected_value, 3)
+    calibrated_value = projected_value * selected_factor
+    actual_numeric = _safe_float(actual_value)
+    if actual_numeric is not None:
+        calibrated_value = max(actual_numeric, calibrated_value)
+    return round(calibrated_value, 3)
+
+
 def _actual_stat_value(player_row: dict[str, Any], market: str) -> float | None:
     key = str(market or "").strip().lower()
     if not player_row:
@@ -2045,6 +2117,8 @@ def _hydrate_live_player_lens_payload(
         event_id = str(game.get("event_id") or "").strip()
         actual_rows = boxscore_by_event.get(event_id) or {}
         hydrated_game = dict(game)
+        game_status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        game_explicitly_not_live = bool(game_status) and not bool(game_status.get("in_progress"))
         rows: list[dict[str, Any]] = []
         for row in game.get("rows") if isinstance(game.get("rows"), list) else []:
             if not isinstance(row, dict):
@@ -2061,7 +2135,21 @@ def _hydrate_live_player_lens_payload(
                 minutes_played = _safe_float(actual_row.get("mp") or actual_row.get("min"))
                 sim_value = _safe_float(hydrated_row.get("sim_mu_adjusted") if hydrated_row.get("sim_mu_adjusted") is not None else hydrated_row.get("sim_mu"))
                 sim_minutes = _safe_float(hydrated_row.get("min_mean") or hydrated_row.get("sim_minutes") or hydrated_row.get("sim_min"))
-                live_projection = _estimated_live_projection(actual_value, minutes_played, sim_minutes, sim_value)
+                existing_live_projection = _safe_float(
+                    hydrated_row.get("live_projection") if hydrated_row.get("live_projection") is not None else hydrated_row.get("liveProjection")
+                )
+                if game_explicitly_not_live and actual_value is not None:
+                    live_projection = actual_value
+                else:
+                    live_projection = existing_live_projection
+                if live_projection is None:
+                    live_projection = _estimated_live_projection(actual_value, minutes_played, sim_minutes, sim_value)
+                    live_projection = _calibrate_live_projection(
+                        live_projection,
+                        actual_value,
+                        player_name=hydrated_row.get("player"),
+                        stat_key=hydrated_row.get("stat") or hydrated_row.get("market"),
+                    )
                 if live_projection is not None:
                     hydrated_row["live_projection"] = live_projection
                     hydrated_row["liveProjection"] = live_projection
@@ -2070,7 +2158,8 @@ def _hydrate_live_player_lens_payload(
                         live_edge = round(live_projection - line_value, 3)
                         hydrated_row["live_edge"] = live_edge
                         hydrated_row["liveEdge"] = live_edge
-                    hydrated_row["line_source"] = "boxscore_sim_fallback"
+                    if existing_live_projection is None and not game_explicitly_not_live:
+                        hydrated_row["line_source"] = "boxscore_sim_fallback"
             rows.append(hydrated_row)
         hydrated_game["rows"] = rows
         hydrated_games.append(hydrated_game)
