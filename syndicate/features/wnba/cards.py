@@ -2003,6 +2003,140 @@ def _price_is_usable(value: Any) -> bool:
     return price is not None and price != 0
 
 
+def _preferred_live_prop_side(row: dict[str, Any]) -> str:
+    for candidate in (
+        row.get("ev_side"),
+        row.get("lean"),
+        row.get("side"),
+    ):
+        side_value = str(candidate or "").strip().upper()
+        if side_value in {"OVER", "UNDER"}:
+            return side_value
+    for candidate in (
+        row.get("live_edge"),
+        row.get("liveEdge"),
+        row.get("pace_vs_line"),
+        row.get("sim_vs_line_adjusted"),
+        row.get("sim_vs_line"),
+    ):
+        edge_value = _safe_float(candidate)
+        if edge_value is not None and abs(edge_value) > 0.01:
+            return "OVER" if edge_value > 0 else "UNDER"
+    return ""
+
+
+def _oddsapi_market_to_stat(value: Any) -> str:
+    market = str(value or "").strip().lower()
+    return {
+        "player_points": "pts",
+        "player_rebounds": "reb",
+        "player_assists": "ast",
+        "player_threes": "threes",
+        "player_points_rebounds": "pr",
+        "player_points_assists": "pa",
+        "player_rebounds_assists": "ra",
+        "player_points_rebounds_assists": "pra",
+        "player_blocks": "blk",
+        "player_steals": "stl",
+        "player_blocks_steals": "bs",
+        "player_steals_blocks": "bs",
+        "player_turnovers": "tov",
+    }.get(market, "")
+
+
+def _processed_live_player_odds_index(
+    selected_date: str,
+    games_by_event: dict[str, dict[str, Any]],
+) -> dict[tuple[str, str, str], list[dict[str, Any]]]:
+    processed_root = processed_path(f"game_cards_{selected_date}.csv").parent
+    odds_path = processed_root / f"oddsapi_player_props_{selected_date}.csv"
+    if not odds_path.exists():
+        return {}
+
+    matchup_to_event: dict[tuple[str, str], str] = {}
+    for event_id, game in games_by_event.items():
+        if not isinstance(game, dict):
+            continue
+        away_tri = _canonical_wnba_tri(str(game.get("away_tri") or game.get("away") or "").strip().upper())
+        home_tri = _canonical_wnba_tri(str(game.get("home_tri") or game.get("home") or "").strip().upper())
+        if away_tri and home_tri:
+            matchup_to_event[(away_tri, home_tri)] = str(event_id or "").strip()
+
+    grouped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for row in _load_csv_rows(odds_path):
+        away_tri = _canonical_wnba_tri(str(row.get("away_team") or "").strip().upper())
+        home_tri = _canonical_wnba_tri(str(row.get("home_team") or "").strip().upper())
+        event_id = matchup_to_event.get((away_tri, home_tri))
+        if not event_id:
+            continue
+        stat_key = _oddsapi_market_to_stat(row.get("market"))
+        player_key = _normalize_player_key(row.get("player_name"))
+        line_value = _safe_float(row.get("point"))
+        price_value = _safe_float(row.get("price"))
+        if not stat_key or not player_key or line_value is None or not _price_is_usable(price_value):
+            continue
+        grouped_key = (event_id, player_key, stat_key, f"{line_value:.4f}")
+        current = grouped.setdefault(
+            grouped_key,
+            {
+                "event_id": event_id,
+                "player_key": player_key,
+                "stat": stat_key,
+                "line": line_value,
+                "price_over": None,
+                "price_under": None,
+                "book": str(row.get("bookmaker_title") or row.get("bookmaker") or "").strip() or None,
+            },
+        )
+        outcome_name = str(row.get("outcome_name") or "").strip().upper()
+        if outcome_name == "OVER" and not _price_is_usable(current.get("price_over")):
+            current["price_over"] = price_value
+        elif outcome_name == "UNDER" and not _price_is_usable(current.get("price_under")):
+            current["price_under"] = price_value
+        elif not current.get("book"):
+            current["book"] = str(row.get("bookmaker_title") or row.get("bookmaker") or "").strip() or None
+
+    index: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for grouped_key, payload in grouped.items():
+        event_id, player_key, stat_key, _line_key = grouped_key
+        index.setdefault((event_id, player_key, stat_key), []).append(payload)
+
+    for values in index.values():
+        values.sort(key=lambda item: abs(float(item.get("line") or 0.0)))
+    return index
+
+
+def _best_live_player_odds_match(
+    odds_index: dict[tuple[str, str, str], list[dict[str, Any]]],
+    row: dict[str, Any],
+    event_id: str,
+) -> dict[str, Any] | None:
+    player_key = _normalize_player_key(row.get("player"))
+    stat_key = str(row.get("stat") or row.get("market") or "").strip().lower()
+    if not player_key or not stat_key:
+        return None
+    candidates = odds_index.get((event_id, player_key, stat_key)) or []
+    if not candidates:
+        return None
+    row_line = _safe_float(row.get("line_live") if row.get("line_live") is not None else row.get("line"))
+    if row_line is None:
+        return None
+    ranked = sorted(
+        candidates,
+        key=lambda item: (
+            abs(float(item.get("line") or 0.0) - row_line),
+            0 if _price_is_usable(item.get("price_over")) and _price_is_usable(item.get("price_under")) else 1,
+        ),
+    )
+    best = ranked[0] if ranked else None
+    if not isinstance(best, dict):
+        return None
+    best_line = _safe_float(best.get("line"))
+    if best_line is None or abs(best_line - row_line) > 1.5:
+        return None
+    return best
+
+
 def _median(values: list[float]) -> float | None:
     cleaned = sorted(float(value) for value in values if value is not None)
     if not cleaned:
@@ -2184,6 +2318,7 @@ def _hydrate_live_player_lens_payload(
     }
     fallback_games_by_event = _resolve_games_for_event_ids(selected_date, event_ids)
     fallback_rows_by_key: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
+    processed_odds_by_player = _processed_live_player_odds_index(selected_date, fallback_games_by_event)
     for fallback_event_id, fallback_game in fallback_games_by_event.items():
         if not isinstance(fallback_game, dict):
             continue
@@ -2276,6 +2411,7 @@ def _hydrate_live_player_lens_payload(
             if status_clock:
                 hydrated_row.setdefault("clock", status_clock)
             fallback_row = fallback_rows_by_key.get(_live_player_row_key(hydrated_row, event_id))
+            processed_odds_row = _best_live_player_odds_match(processed_odds_by_player, hydrated_row, event_id)
             if isinstance(fallback_row, dict):
                 fallback_price_over = _safe_float(fallback_row.get("price_over"))
                 fallback_price_under = _safe_float(fallback_row.get("price_under"))
@@ -2301,6 +2437,33 @@ def _hydrate_live_player_lens_payload(
                         hydrated_row["book"] = fallback_book
                     if str(hydrated_row.get("line_source") or "").strip().lower() == "live_lens_projection_artifact":
                         hydrated_row["line_source"] = str(fallback_row.get("line_source") or "cards_fallback").strip() or "cards_fallback"
+            if isinstance(processed_odds_row, dict):
+                processed_price_over = _safe_float(processed_odds_row.get("price_over"))
+                processed_price_under = _safe_float(processed_odds_row.get("price_under"))
+                processed_book = str(processed_odds_row.get("book") or "").strip()
+                repaired_price = False
+                if not _price_is_usable(hydrated_row.get("price_over")) and _price_is_usable(processed_price_over):
+                    hydrated_row["price_over"] = processed_price_over
+                    repaired_price = True
+                if not _price_is_usable(hydrated_row.get("price_under")) and _price_is_usable(processed_price_under):
+                    hydrated_row["price_under"] = processed_price_under
+                    repaired_price = True
+                preferred_side = _preferred_live_prop_side(hydrated_row)
+                if preferred_side and not str(hydrated_row.get("ev_side") or "").strip():
+                    hydrated_row["ev_side"] = preferred_side
+                if preferred_side and not str(hydrated_row.get("lean") or "").strip():
+                    hydrated_row["lean"] = preferred_side
+                if not _price_is_usable(hydrated_row.get("price")):
+                    selected_price = processed_price_under if preferred_side == "UNDER" else processed_price_over
+                    if not _price_is_usable(selected_price):
+                        selected_price = processed_price_over if _price_is_usable(processed_price_over) else processed_price_under
+                    if _price_is_usable(selected_price):
+                        hydrated_row["price"] = selected_price
+                        repaired_price = True
+                if processed_book and not str(hydrated_row.get("book") or "").strip():
+                    hydrated_row["book"] = processed_book
+                if repaired_price and str(hydrated_row.get("line_source") or "").strip().lower() == "live_lens_projection_artifact":
+                    hydrated_row["line_source"] = "oddsapi_player_props_fallback"
             rows.append(hydrated_row)
         hydrated_game["rows"] = rows
         hydrated_games.append(hydrated_game)
