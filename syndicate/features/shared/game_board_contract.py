@@ -15,6 +15,16 @@ def _safe_text(value: Any, fallback: str = "-") -> str:
     return text or fallback
 
 
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
 def _metric_lookup(metrics: list[dict[str, Any]], label: str) -> str | None:
     wanted = label.strip().lower()
     for metric in metrics:
@@ -255,16 +265,16 @@ def _build_prop_rows(game: dict[str, Any]) -> list[dict[str, str]]:
                     "pick": _safe_text(row.get("display_pick") or row.get("pick") or row.get("selection"), ""),
                     "market": _safe_text(row.get("market") or row.get("market_label") or row.get("type_label"), ""),
                     "line": row.get("line"),
-                    "market_line": row.get("market_line") or row.get("line"),
-                    "actual": row.get("actual") or row.get("actual_value") or row.get("actual_total"),
-                    "projected": row.get("projected") or row.get("projection") or row.get("model_mean"),
-                    "live_projection": row.get("live_projection") or row.get("liveProjection") or row.get("projection_live"),
+                    "market_line": _first_present(row.get("market_line"), row.get("line")),
+                    "actual": _first_present(row.get("actual"), row.get("actual_value"), row.get("actual_total")),
+                    "projected": _first_present(row.get("projected"), row.get("projection"), row.get("model_mean")),
+                    "live_projection": _first_present(row.get("live_projection"), row.get("liveProjection"), row.get("projection_live")),
                     "odds": row.get("price") or row.get("odds") or row.get("price_american"),
                     "confidence": row.get("confidence") or row.get("prob") or row.get("win_prob"),
                     "selection": row.get("selection") or row.get("side"),
                     "game_state": row.get("game_state") or row.get("state") or row.get("status") or row.get("status_label"),
-                    "live_total": row.get("live_total") or row.get("live_total_line"),
-                    "live_total_line": row.get("live_total_line") or row.get("live_line_total"),
+                    "live_total": _first_present(row.get("live_total"), row.get("live_total_line")),
+                    "live_total_line": _first_present(row.get("live_total_line"), row.get("live_line_total")),
                     "outcome_state": row.get("outcome_state") or row.get("actual_result") or row.get("result"),
                     "outcome_label": row.get("outcome_label"),
                 }

@@ -743,11 +743,7 @@ def api_live_player_boxscore():
 def api_live_player_lens():
     selected_date = _selected_date()
     event_ids_raw = str(request.args.get("event_ids") or "").strip()
-    if not event_ids_raw:
-        return jsonify({"ok": True, "ttl": 20, "date": selected_date or None, "games": [], "generated_at": central_now().isoformat(timespec="seconds")})
-    event_ids = [item.strip() for item in event_ids_raw.split(",") if item.strip()]
-    if not event_ids:
-        return jsonify({"error": "missing event_ids"}), 400
+    event_ids = [item.strip() for item in event_ids_raw.split(",") if item.strip()] if event_ids_raw else []
     try:
         ttl = int((request.args.get("ttl") or "20").strip())
     except Exception:

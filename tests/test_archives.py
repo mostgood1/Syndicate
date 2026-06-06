@@ -1303,6 +1303,29 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(args[:2], ("2026-05-21", []))
         self.assertEqual(kwargs["ttl"], 20)
 
+    def test_nba_api_live_player_lens_allows_missing_event_ids(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        local_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [{"event_id": "401859964", "rows": [{"player": "Test Player", "stat": "pts"}]}],
+        }
+
+        with patch(
+            "syndicate.blueprints.nba.build_live_player_lens_payload",
+            return_value=local_payload,
+        ) as build_mock:
+            response = client.get("/nba/api/live_player_lens?date=2026-06-05")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), local_payload)
+        args, kwargs = build_mock.call_args
+        self.assertEqual(args[:2], ("2026-06-05", []))
+        self.assertEqual(kwargs["ttl"], 20)
+
     def test_wnba_live_player_boxscore_ignores_empty_local_shell_payload(self) -> None:
         public_payload = {
             "ok": True,
@@ -1358,6 +1381,46 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(payload.get("source"), "espn_summary_boxscore_fallback")
         self.assertEqual(len(payload.get("games") or []), 1)
         self.assertEqual(len((payload.get("games") or [{}])[0].get("players") or []), 1)
+
+    def test_nba_live_player_lens_defaults_to_live_event_ids(self) -> None:
+        from syndicate.features.nba.cards import build_live_player_lens_payload
+
+        lens_payload = {
+            "ok": True,
+            "date": "2026-06-05",
+            "games": [
+                {
+                    "event_id": "401859964",
+                    "rows": [
+                        {
+                            "player": "Test Player",
+                            "market": "Points",
+                            "actual": 0.0,
+                            "liveProjection": 14.5,
+                        }
+                    ],
+                }
+            ],
+        }
+
+        with patch(
+            "syndicate.features.nba.cards._default_live_event_ids",
+            return_value=["401859964"],
+        ), patch(
+            "syndicate.features.nba.cards.build_cards_page_context",
+            return_value={"date": "2026-06-05", "games": []},
+        ), patch(
+            "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+            return_value=lens_payload,
+        ), patch(
+            "syndicate.features.nba.cards._hydrate_live_player_lens_payload",
+            side_effect=lambda payload, *_args, **_kwargs: payload,
+        ):
+            payload = build_live_player_lens_payload("2026-06-05", [])
+
+        self.assertEqual(len(payload.get("games") or []), 1)
+        self.assertEqual((payload.get("games") or [{}])[0].get("event_id"), "401859964")
+        self.assertEqual(((payload.get("games") or [{}])[0].get("rows") or [{}])[0].get("actual"), 0.0)
 
     def test_wnba_live_lines_fallback_preserves_requested_event_id(self) -> None:
         fallback_game = {
@@ -3653,6 +3716,42 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("ATS NYL -4.5", rows[0].get("market"))
         self.assertIn("Total 168.5", rows[0].get("market"))
         self.assertNotEqual(rows[0].get("best_edge"), "-")
+
+    def test_shared_game_board_contract_preserves_zero_valued_prop_fields(self) -> None:
+        from syndicate.features.shared.game_board_contract import apply_game_board_contract
+
+        context = apply_game_board_contract(
+            {
+                "games": [
+                    {
+                        "away": {"abbr": "NYK", "name": "New York Knicks"},
+                        "home": {"abbr": "SAS", "name": "San Antonio Spurs"},
+                        "prop_recommendations": {
+                            "away": [
+                                {
+                                    "player": "Test Player",
+                                    "display_pick": "Test Player Points OVER 0.5",
+                                    "market": "Points",
+                                    "actual": 0.0,
+                                    "projected": 0.0,
+                                    "liveProjection": 0.0,
+                                    "market_line": 0.0,
+                                }
+                            ]
+                        },
+                    }
+                ]
+            },
+            sport="nba",
+            module="cards",
+        )
+
+        row = (((context.get("games") or [{}])[0].get("shared_prop_rows") or [{}])[0])
+
+        self.assertEqual(row.get("actual"), 0.0)
+        self.assertEqual(row.get("projected"), 0.0)
+        self.assertEqual(row.get("live_projection"), 0.0)
+        self.assertEqual(row.get("market_line"), 0.0)
 
     def test_wnba_cards_source_alias_preserves_explicit_source_shell(self) -> None:
         response = self.client.get("/wnba/cards/source?date=2026-05-21", follow_redirects=True)
