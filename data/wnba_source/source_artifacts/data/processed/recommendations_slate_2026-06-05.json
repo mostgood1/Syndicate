@@ -1,0 +1,200 @@
+{
+  "date": "2026-06-05",
+  "counts": {
+    "games": 2,
+    "picks": 10
+  },
+  "per_game": [
+    {
+      "home": "POR",
+      "away": "PHX",
+      "matchup": "PHX @ POR",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "PHX",
+          "display_pick": "Monique Akoa Makani UNDER 11.5",
+          "selection": "UNDER 11.5",
+          "price": -117.0,
+          "score": 29.24138065402445,
+          "ev_pct": 29.24138065402445,
+          "win_prob": 0.5391705069124424,
+          "p_win": 0.5391705069124424,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 29.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ POR"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Over 143.5",
+          "selection": "Over",
+          "price": -110.0,
+          "score": 14.962507,
+          "ev_pct": 14.9625,
+          "win_prob": 0.673435,
+          "p_win": 0.673435,
+          "basketball_summary": "Model total 158.5 vs line 143.5",
+          "top_play_reasons": [
+            "Edge 15.0",
+            "EV 15.0%"
+          ],
+          "matchup": "PHX @ POR"
+        },
+        {
+          "market": "PROPS",
+          "team": "POR",
+          "display_pick": "Bridget Carleton OVER 16.5",
+          "selection": "OVER 16.5",
+          "price": -106.0,
+          "score": 9.40573977069883,
+          "ev_pct": 9.40573977069883,
+          "win_prob": 0.5145631067961165,
+          "p_win": 0.5145631067961165,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 9.4%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ POR"
+        },
+        {
+          "market": "PROPS",
+          "team": "PHX",
+          "display_pick": "Alyssa Thomas OVER 23.5",
+          "selection": "OVER 23.5",
+          "price": -122.0,
+          "score": 9.179819039338932,
+          "ev_pct": 9.179819039338932,
+          "win_prob": 0.5495495495495496,
+          "p_win": 0.5495495495495496,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 9.2%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "PHX @ POR"
+        },
+        {
+          "market": "ATS",
+          "team": "Phoenix Mercury",
+          "display_pick": "Phoenix Mercury -2.5",
+          "selection": "Phoenix Mercury",
+          "price": -110.0,
+          "score": 0.586636,
+          "ev_pct": 0.5866,
+          "win_prob": 0.529676,
+          "p_win": 0.529676,
+          "basketball_summary": "Model margin -1.9 vs market -2.5",
+          "top_play_reasons": [
+            "Edge 0.6",
+            "EV 0.6%"
+          ],
+          "matchup": "PHX @ POR"
+        }
+      ]
+    },
+    {
+      "home": "LAS",
+      "away": "DAL",
+      "matchup": "DAL @ LAS",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Kelsey Plum OVER 2.5",
+          "selection": "OVER 2.5",
+          "price": 125.0,
+          "score": 101.41109555833414,
+          "ev_pct": 101.41109555833414,
+          "win_prob": 0.4444444444444444,
+          "p_win": 0.4444444444444444,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 101.4%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "DAL @ LAS"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 203.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -43.865518,
+          "ev_pct": 43.865500000000004,
+          "win_prob": 0.962465,
+          "p_win": 0.962465,
+          "basketball_summary": "Model total 159.6 vs line 203.5",
+          "top_play_reasons": [
+            "Edge -43.9",
+            "EV 43.9%"
+          ],
+          "matchup": "DAL @ LAS"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Erica Wheeler UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "price": 100.0,
+          "score": 30.139221149818084,
+          "ev_pct": 30.139221149818084,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 30.1%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "DAL @ LAS"
+        },
+        {
+          "market": "PROPS",
+          "team": "DAL",
+          "display_pick": "Jessica Shepard OVER 5.5",
+          "selection": "OVER 5.5",
+          "price": 125.0,
+          "score": 8.945249043847125,
+          "ev_pct": 8.945249043847125,
+          "win_prob": 0.4444444444444444,
+          "p_win": 0.4444444444444444,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.9%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "DAL @ LAS"
+        },
+        {
+          "market": "ATS",
+          "team": "Los Angeles Sparks",
+          "display_pick": "Los Angeles Sparks -1.5",
+          "selection": "Los Angeles Sparks",
+          "price": -110.0,
+          "score": 4.343768,
+          "ev_pct": 4.3438,
+          "win_prob": 0.567248,
+          "p_win": 0.567248,
+          "basketball_summary": "Model margin 2.8 vs market -1.5",
+          "top_play_reasons": [
+            "Edge 4.3",
+            "EV 4.3%"
+          ],
+          "matchup": "DAL @ LAS"
+        }
+      ]
+    }
+  ]
+}

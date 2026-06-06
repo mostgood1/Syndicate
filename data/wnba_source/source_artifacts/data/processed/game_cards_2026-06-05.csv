@@ -1,0 +1,3 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-06-05,1,Los Angeles Sparks,Dallas Wings,2026-06-06T02:06:04Z,,,,,,oddsapi_consensus,LAS,DAL
+2026-06-05,2,Portland Fire,Phoenix Mercury,2026-06-06T02:06:43Z,,,,,,oddsapi_consensus,POR,PHX
