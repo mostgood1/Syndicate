@@ -1,0 +1,9 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ATS,Atlanta Dream,Atlanta Dream,Washington Mystics,2026-06-06,0.20475,-110.0,0.52381,20.475,10.5,9.975,-10.5,,High
+TOTAL,Under,Atlanta Dream,Washington Mystics,2026-06-06,0.001562,-110.0,0.52381,-0.1562,159.5,,,159.3438,Low
+ATS,New York Liberty,New York Liberty,Indiana Fever,2026-06-06,0.06825,-110.0,0.52381,6.825,3.5,3.325,-3.5,,High
+TOTAL,Under,New York Liberty,Indiana Fever,2026-06-06,0.042712,-110.0,0.52381,-4.271214,175.0,,,170.728786,High
+ATS,Las Vegas Aces,Las Vegas Aces,Golden State Valkyries,2026-06-06,0.0585,-110.0,0.52381,5.85,3.0,2.85,-3.0,,High
+TOTAL,Under,Las Vegas Aces,Golden State Valkyries,2026-06-06,0.028358,-110.0,0.52381,-2.835771,167.5,,,164.664229,Medium
+ATS,Minnesota Lynx,Minnesota Lynx,Seattle Storm,2026-06-06,0.26325,-110.0,0.52381,26.325,13.5,12.825,-13.5,,High
+TOTAL,Under,Minnesota Lynx,Seattle Storm,2026-06-06,0.019725,-110.0,0.52381,-1.972543,162.5,,,160.527457,Low
