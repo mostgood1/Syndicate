@@ -1,10 +1,13 @@
-﻿d758e2bd3b9653085d758514ca2c9a049c29fcfb
-daily update 2026-05-28 [WNBA vendored daily update]
-vendor/wnba_betting_repo/data/processed/.cron_meta.json
-vendor/wnba_betting_repo/data/processed/game_odds_2026-05-28.csv
-vendor/wnba_betting_repo/data/processed/predictions_2026-05-28.csv
-vendor/wnba_betting_repo/data/processed/props_predictions_2026-05-28.csv
-vendor/wnba_betting_repo/data/processed/recommendations_2026-05-28.csv
+﻿ff26617af0363637f945e4a95fd8f868fa64dea4
+daily update 2026-06-03 [WNBA vendored daily update]
+data/wnba_source/data/processed/live_snapshots/live_lines_2026-06-03.jsonl
+data/wnba_source/data/processed/live_snapshots/live_pbp_stats_2026-06-03.jsonl
+data/wnba_source/data/processed/live_snapshots/live_player_boxscore_2026-06-03.jsonl
+data/wnba_source/data/processed/live_snapshots/live_player_lens_2026-06-03.jsonl
+data/wnba_source/data/processed/live_snapshots/live_state_2026-06-03.jsonl
+data/wnba_source/data/processed/recommendations_2026-06-03.csv
+data/wnba_source/data/processed/recommendations_slate_2026-06-03.json
+data/wnba_source/data/processed/smart_sim_2026-06-03_NYL_TOR.json
 vendor/wnba_betting_repo/data/processed/schedule_2026.csv
 vendor/wnba_betting_repo/data/processed/schedule_2026.json
 
