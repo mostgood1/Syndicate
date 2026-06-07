@@ -2479,6 +2479,35 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
         self.assertEqual((context.get("header_stats") or [None, None])[1], {"label": "Source", "value": "No data"})
 
+    def test_nhl_cards_date_only_prediction_row_stays_scheduled(self) -> None:
+        prediction_rows = [
+            {
+                "home": "Vegas Golden Knights",
+                "away": "Carolina Hurricanes",
+                "date": "2026-06-06",
+                "model_total": "9.065",
+                "proj_home_goals": "4.606",
+                "proj_away_goals": "4.459",
+                "home_ml_odds": "-112",
+                "away_ml_odds": "-108",
+                "over_odds": "-125",
+                "under_odds": "105",
+                "total_line_used": "5.5",
+            }
+        ]
+
+        with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-06-06", "2026-06-06", False)):
+            with patch("syndicate.features.nhl.cards._load_csv_rows", return_value=prediction_rows):
+                with patch("syndicate.features.nhl.cards.processed_path", return_value=Path("predictions_2026-06-06.csv")):
+                    from syndicate.features.nhl.cards import build_cards_page_context as build_nhl_cards_page_context
+
+                    context = build_nhl_cards_page_context("2026-06-06")
+
+        game = (context.get("games") or [{}])[0]
+        self.assertEqual(game.get("status"), "Scheduled")
+        self.assertEqual(game.get("detail"), "Scheduled")
+        self.assertEqual((context.get("scoreboard_items") or [{}])[0].get("status"), "Scheduled")
+
     def test_nhl_cards_bundle_empty_slate_preserves_empty_state(self) -> None:
         with patch("syndicate.features.nhl.cards._resolve_cards_date", return_value=("2026-05-17", "2026-05-17", False)):
             with patch("syndicate.features.nhl.cards._prediction_bundle_rows", return_value=([], "missing_predictions.csv")):

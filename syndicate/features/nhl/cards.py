@@ -57,6 +57,13 @@ def _parse_utc_datetime(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _has_explicit_start_time(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    return "T" in text or ":" in text
+
+
 def _looks_live_status_text(*values: Any) -> bool:
     text = " ".join(str(value or "").strip().lower() for value in values if str(value or "").strip())
     if not text:
@@ -103,7 +110,7 @@ def _normalized_game_status(
     if _looks_terminal_status_text(status_raw, detail_raw):
         is_final = True
 
-    if not live and not is_final:
+    if not live and not is_final and _has_explicit_start_time(start_time_utc):
         start_dt = _parse_utc_datetime(start_time_utc)
         if start_dt is not None and start_dt <= datetime.now(timezone.utc) - timedelta(hours=3):
             is_final = True
