@@ -1,0 +1,58 @@
+[2026-06-06T22:41:06] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-06-06 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-06-06.csv' --regions us
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-06-06.csv with 403 rows.
+[2026-06-06T22:41:08] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\oddsapi_player_props_2026-06-06.csv (rows=403)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-06-06T22:41:14] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Saved schedule to 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.json and 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.csv
+{'rows': 350, 'unique_dates': 119}
+[2026-06-06T22:41:36] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-06-06
+─────────────────────────────── Predict (Date) ────────────────────────────────
+Updating Elo ---------------------------------------- 100% 0:00:00
+[Building enhanced features (45 features)...]
+
+======================================================================
+ENHANCED FEATURE ENGINEERING
+======================================================================
+
+[1/3] Building base features (ELO, rest, form, schedule)...
+Built 75 base features
+
+[2/3] Adding advanced statistics (pace, efficiency, Four Factors)...
+Loaded advanced stats from C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\team_advanced_stats_2026.csv
+Added 13 advanced stats features
+Added 31 advanced stat features
+
+[3/3] Adding injury impact features...
+No injury data found. Run: python -m wnba_betting.cli fetch-injuries
+Added 9 injury features
+
+======================================================================
+TOTAL FEATURES: 115
+======================================================================
+
+[NPU] Using NPU-accelerated predictions (ONNX + QNN)
+[INFO][LOADING] Loading NBA Game Models with NPU acceleration...
+[OK] Loaded 56 game features from feature_columns_enhanced.joblib
+[OK] WIN_PROB loaded (CPU fallback from win_prob_enhanced.joblib)
+[OK] SPREAD_MARGIN loaded (CPU fallback from spread_margin_enhanced.joblib)
+[OK] TOTALS loaded (CPU fallback from totals_enhanced.joblib)
+[OK] Loaded halves models: 6 CPU (ONNX not available)
+[OK] Loaded quarters models: 12 CPU (ONNX not available)
+[READY] Ready with 21 models (0 NPU-accelerated)
+{
+    'game_odds_rows': 2,
+    'output': 
+'C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\wnba_betting_repo\\
+data\\processed\\game_odds_2026-06-06.csv'
+}
+Saved predictions to 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\predictions_2026-06-06.csv
+[2026-06-06T22:41:40] Built local game_cards from game_odds fallback: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\game_cards_2026-06-06.csv (rows=2)
