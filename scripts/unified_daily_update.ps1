@@ -1517,29 +1517,40 @@ for sport in payload.get("sports") or []:
         break
 
 gate = row.get("advanced_gate") if isinstance(row.get("advanced_gate"), dict) else {}
-missing = [str(item.get("label") or "input").strip() for item in (gate.get("missing_inputs") or []) if isinstance(item, dict)]
+            [string]$RepoRoot,
+            [bool]$RequirePublishTrackedInputs = $true
 unpublished = [str(item.get("label") or "input").strip() for item in (gate.get("publish_missing_inputs") or []) if isinstance(item, dict)]
 state = str((row.get("readiness_gate") or {}).get("state") or "").strip().lower()
 result = {
     "sport": sport_slug,
     "state": state,
-    "active_today": bool(row.get("active_today")),
-    "missing_inputs": missing,
+        $missingLabels = @($audit.missing_inputs)
+        if ($RequirePublishTrackedInputs) {
+            $missingLabels += @($audit.publish_missing_inputs)
+        }
+
+        if ($missingLabels.Count -gt 0) {
     "publish_missing_inputs": unpublished,
     "ok": not missing and not unpublished,
 }
 print(json.dumps(result))
 '@
 
+    $tempScriptPath = Join-Path $RepoRoot (
+        '.tmp_syndicate_intelligence_status_{0}_{1}.py' -f ([System.Guid]::NewGuid().ToString('N')), $PID
+    )
+    Set-Content -Path $tempScriptPath -Value $script -Encoding utf8
+
     Push-Location $RepoRoot
     try {
-        $rawOutput = & $pythonExe -c $script $Sport $DateValue
+        $rawOutput = & $pythonExe $tempScriptPath $Sport $DateValue
         if ($LASTEXITCODE -ne 0) {
             throw "intelligence status builder exited with code $LASTEXITCODE"
         }
     }
     finally {
         Pop-Location
+        Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
     }
 
     try {
@@ -1972,7 +1983,7 @@ try {
 
             if (-not $DryRun -and -not $hasLaterStepForSport) {
                 Assert-AdvancedDataReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RunDir $runDir
-                Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot
+                Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RequirePublishTrackedInputs (-not $SkipGitPush)
             }
 
             if (-not $SkipGitPush) {
