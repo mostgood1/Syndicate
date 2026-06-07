@@ -1,3 +1,3 @@
 date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
-2026-06-07,1,Toronto Tempo,Chicago Sky,2026-06-07T19:00:00Z,-151.4668749353331,151.4668749353331,-3.5,3.5,175.5,oddsapi_consensus,TOR,CHI
-2026-06-07,2,Los Angeles Sparks,Portland Fire,2026-06-07T23:00:00Z,-261.82309577237396,261.8230957723739,-7.5,7.5,175.5,oddsapi_consensus,LAS,POR
+2026-06-07,1,Toronto Tempo,Chicago Sky,2026-06-07T19:00:00Z,-151.7717860896881,151.77178608968816,-3.5,3.5,175.5,oddsapi_consensus,TOR,CHI
+2026-06-07,2,Los Angeles Sparks,Portland Fire,2026-06-07T23:00:00Z,-258.0852916753173,258.0852916753174,-7.5,7.5,175.0,oddsapi_consensus,LAS,POR
