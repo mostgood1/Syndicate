@@ -1487,7 +1487,8 @@ function Assert-IntelligenceSportReady {
     param(
         [string]$Sport,
         [string]$DateValue,
-        [string]$RepoRoot
+        [string]$RepoRoot,
+        [bool]$RequirePublishTrackedInputs = $true
     )
 
     if ([string]::IsNullOrWhiteSpace($Sport) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($RepoRoot)) {
@@ -1517,19 +1518,14 @@ for sport in payload.get("sports") or []:
         break
 
 gate = row.get("advanced_gate") if isinstance(row.get("advanced_gate"), dict) else {}
-            [string]$RepoRoot,
-            [bool]$RequirePublishTrackedInputs = $true
+missing = [str(item.get("label") or "input").strip() for item in (gate.get("missing_inputs") or []) if isinstance(item, dict)]
 unpublished = [str(item.get("label") or "input").strip() for item in (gate.get("publish_missing_inputs") or []) if isinstance(item, dict)]
 state = str((row.get("readiness_gate") or {}).get("state") or "").strip().lower()
 result = {
     "sport": sport_slug,
     "state": state,
-        $missingLabels = @($audit.missing_inputs)
-        if ($RequirePublishTrackedInputs) {
-            $missingLabels += @($audit.publish_missing_inputs)
-        }
-
-        if ($missingLabels.Count -gt 0) {
+    "active_today": bool(row.get("active_today")),
+    "missing_inputs": missing,
     "publish_missing_inputs": unpublished,
     "ok": not missing and not unpublished,
 }
@@ -1560,8 +1556,12 @@ print(json.dumps(result))
         throw "Intelligence readiness audit failed for ${Sport}: unable to parse status payload"
     }
 
-    if (-not $audit.ok) {
-        $missingLabels = @($audit.missing_inputs) + @($audit.publish_missing_inputs)
+    $missingLabels = @($audit.missing_inputs)
+    if ($RequirePublishTrackedInputs) {
+        $missingLabels += @($audit.publish_missing_inputs)
+    }
+
+    if ($missingLabels.Count -gt 0) {
         $detail = ($missingLabels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ', '
         if ([string]::IsNullOrWhiteSpace($detail)) {
             $detail = 'unknown intelligence readiness mismatch'
