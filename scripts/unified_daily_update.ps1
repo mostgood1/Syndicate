@@ -285,13 +285,59 @@ function Get-ActiveMlbUiDailyLockCount {
     return $activeCount
 }
 
+function Get-ActiveMlbUiDailyLocks {
+    param(
+        [string]$MlbDataRoot,
+        [string]$DateValue,
+        [string]$SeasonValue
+    )
+
+    if ([string]::IsNullOrWhiteSpace($MlbDataRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($SeasonValue)) {
+        return @()
+    }
+
+    $lockDir = Join-Path $MlbDataRoot 'runtime\locks'
+    if (-not (Test-Path $lockDir)) {
+        return @()
+    }
+
+    $activeLocks = @()
+    $pattern = "daily_update_ui-daily_{0}_{1}_*.lock" -f $SeasonValue, $DateValue
+    foreach ($lockFile in @(Get-ChildItem -Path $lockDir -File -Filter $pattern -ErrorAction SilentlyContinue)) {
+        $lockPayload = $null
+        $lockPid = $null
+        try {
+            $lockPayload = Get-Content -Path $lockFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+            if ($null -ne $lockPayload.pid) {
+                $lockPid = [int]$lockPayload.pid
+            }
+        }
+        catch {
+            $lockPayload = $null
+            $lockPid = $null
+        }
+
+        if ($null -ne $lockPid -and (Test-ProcessIdRunning -ProcessId $lockPid)) {
+            $activeLocks += @([pscustomobject]@{
+                pid = $lockPid
+                path = $lockFile.FullName
+                createdAt = if ($null -ne $lockPayload -and $null -ne $lockPayload.created_at) { [string]$lockPayload.created_at } else { $null }
+                command = if ($null -ne $lockPayload -and $null -ne $lockPayload.command) { @($lockPayload.command) } else { @() }
+            })
+        }
+    }
+
+    return @($activeLocks)
+}
+
 function Wait-ForMlbUiDailyLockRelease {
     param(
         [string]$MlbDataRoot,
         [string]$DateValue,
         [string]$SeasonValue,
         [int]$TimeoutSeconds = 3600,
-        [int]$PollSeconds = 20
+        [int]$PollSeconds = 20,
+        [bool]$FailFastOnActiveLock = $true
     )
 
     if ([string]::IsNullOrWhiteSpace($MlbDataRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($SeasonValue)) {
@@ -303,9 +349,26 @@ function Wait-ForMlbUiDailyLockRelease {
     $deadline = (Get-Date).AddSeconds($safeTimeout)
 
     while ($true) {
-        $activeCount = Get-ActiveMlbUiDailyLockCount -MlbDataRoot $MlbDataRoot -DateValue $DateValue -SeasonValue $SeasonValue
+        $activeLocks = @(Get-ActiveMlbUiDailyLocks -MlbDataRoot $MlbDataRoot -DateValue $DateValue -SeasonValue $SeasonValue)
+        $activeCount = $activeLocks.Count
         if ($activeCount -le 0) {
             return
+        }
+
+        if ($FailFastOnActiveLock) {
+            $lockSummary = @(
+                $activeLocks | ForEach-Object {
+                    $parts = @("pid=$($_.pid)", "path=$($_.path)")
+                    if (-not [string]::IsNullOrWhiteSpace([string]$_.createdAt)) {
+                        $parts += "created_at=$($_.createdAt)"
+                    }
+                    if ($_.command.Count -gt 0) {
+                        $parts += ("command={0}" -f ($_.command -join ' '))
+                    }
+                    $parts -join '; '
+                }
+            ) -join ' | '
+            throw "MLB ui-daily run already active for $DateValue; refusing duplicate daily update. $lockSummary"
         }
 
         $remaining = [int][Math]::Floor(($deadline - (Get-Date)).TotalSeconds)
