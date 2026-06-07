@@ -2659,7 +2659,20 @@ class DateArchiveHelperTests(unittest.TestCase):
     def test_nhl_live_lens_api_payload_preserves_games_contract(self) -> None:
         from syndicate.features.nhl.live_lens import build_live_lens_api_payload as build_nhl_live_lens_api_payload
 
-        with patch(
+        cards_context = {
+            "requested_date": "2026-05-28",
+            "date": "2026-05-29",
+            "lookahead_applied": True,
+            "empty_state": {
+                "title": "Today has no NHL games; next game day is queued",
+                "list_items": [
+                    "Requested date: 2026-05-28",
+                    "Next scheduled game day: 2026-05-29",
+                ],
+            },
+        }
+
+        with patch("syndicate.features.nhl.live_lens.build_cards_page_context", return_value=cards_context), patch(
             "syndicate.features.nhl.live_lens.build_live_lens_page_context",
             return_value={
                 "date": "2026-06-06",

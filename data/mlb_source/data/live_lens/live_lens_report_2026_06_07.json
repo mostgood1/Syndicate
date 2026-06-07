@@ -1,6 +1,6 @@
 {
   "date": "2026-06-07",
-  "generatedAt": "2026-06-07T12:40:27-05:00",
+  "generatedAt": "2026-06-07T13:09:05-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -16,22 +16,22 @@
   },
   "counts": {
     "games": 15,
-    "live": 5,
+    "live": 9,
     "final": 0,
-    "pregame": 10,
+    "pregame": 6,
     "props": 65,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 2.4,
-    "totalMs": 823.4,
-    "snapshotLoadMs": 3.2,
-    "simContextLoadMs": 0.9,
+    "totalMs": 1052.5,
+    "snapshotLoadMs": 4.4,
+    "simContextLoadMs": 1.7,
     "propEvalMs": 0.1,
-    "gameLensMs": 1.7,
+    "gameLensMs": 2.1,
     "gameCount": 15,
-    "liveGameCount": 4,
+    "liveGameCount": 6,
     "feedFetchCount": 15,
     "persistMs": 0.0
   },
@@ -1956,34 +1956,6 @@
               "detail": "Tyler Gilbert Over 4.5 Outs | Odds -127 | Edge 47.8%",
               "hitProb": 1.0
             }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "O up to 5",
-              "stat": "outs",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "strong",
-              "detail": "Live projection 18.6. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 1.0,
-              "source": "live",
-              "actual": 0.0
-            },
-            {
-              "label": "H up to 2",
-              "stat": "hits_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "strong",
-              "detail": "Live projection 8.2. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.995,
-              "source": "live",
-              "actual": 0.0
-            }
           ]
         },
         "home": {
@@ -2068,10 +2040,10 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 5.4. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 5.2. Current 2.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.504,
               "source": "live",
-              "actual": 0.0
+              "actual": 2.0
             },
             {
               "label": "O up to 18",
@@ -2081,10 +2053,10 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Live projection 19.4. Current 1.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "detail": "Live projection 17.9. Current 3.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
               "hitProb": 0.735,
               "source": "live",
-              "actual": 1.0
+              "actual": 3.0
             },
             {
               "label": "H up to 6",
@@ -2094,10 +2066,10 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 8.1. Current 1.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 7.7. Current 3.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.796,
               "source": "live",
-              "actual": 1.0
+              "actual": 3.0
             },
             {
               "label": "BB up to 2",
@@ -2107,10 +2079,10 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.8. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.7. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.538,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             }
           ]
         }
@@ -3174,6 +3146,1173 @@
       }
     },
     {
+      "gamePk": 823537,
+      "status": {
+        "abstract": "Live",
+        "detailed": "In Progress"
+      },
+      "startTime": "12:35 PM",
+      "matchup": {
+        "away": {
+          "abbr": "BOS",
+          "id": 111,
+          "logo": "https://www.mlbstatic.com/team-logos/111.svg",
+          "name": "Boston Red Sox"
+        },
+        "home": {
+          "abbr": "NYY",
+          "id": 147,
+          "logo": "https://www.mlbstatic.com/team-logos/147.svg",
+          "name": "New York Yankees"
+        },
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Ranger Suarez vs Cam Schlittler | +2 playable"
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.482,
+          "away_win_prob": 0.518,
+          "tie_prob": 0.0,
+          "away_runs_mean": 4.025,
+          "home_runs_mean": 3.609,
+          "total_runs_dist": {
+            "7": 109,
+            "19": 3,
+            "6": 88,
+            "14": 27,
+            "5": 132,
+            "10": 58,
+            "13": 34,
+            "16": 15,
+            "4": 71,
+            "20": 5,
+            "15": 18,
+            "11": 63,
+            "3": 85,
+            "9": 83,
+            "1": 40,
+            "26": 1,
+            "2": 32,
+            "8": 71,
+            "12": 40,
+            "18": 6,
+            "17": 14,
+            "23": 3,
+            "22": 2
+          },
+          "run_margin_dist": {
+            "-1": 138,
+            "3": 85,
+            "1": 154,
+            "-2": 113,
+            "12": 2,
+            "-10": 11,
+            "5": 34,
+            "10": 5,
+            "2": 94,
+            "4": 59,
+            "-8": 15,
+            "-7": 17,
+            "-3": 75,
+            "-6": 25,
+            "-16": 2,
+            "-4": 50,
+            "6": 20,
+            "-5": 47,
+            "9": 4,
+            "-9": 9,
+            "8": 14,
+            "7": 10,
+            "-13": 4,
+            "-11": 4,
+            "11": 1,
+            "-17": 1,
+            "-12": 5,
+            "-15": 1,
+            "-18": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.216,
+          "away_win_prob": 0.186,
+          "tie_prob": 0.598,
+          "away_runs_mean": 0.422,
+          "home_runs_mean": 0.47,
+          "total_runs_dist": {
+            "0": 579,
+            "1": 189,
+            "2": 105,
+            "4": 27,
+            "3": 72,
+            "7": 5,
+            "5": 15,
+            "6": 5,
+            "11": 1,
+            "10": 1,
+            "8": 1
+          },
+          "run_margin_dist": {
+            "0": 598,
+            "1": 110,
+            "-2": 40,
+            "-3": 24,
+            "3": 36,
+            "-1": 104,
+            "2": 56,
+            "-4": 10,
+            "4": 11,
+            "6": 1,
+            "-5": 4,
+            "-7": 2,
+            "-6": 2,
+            "5": 2
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.436,
+          "away_win_prob": 0.387,
+          "tie_prob": 0.177,
+          "away_runs_mean": 2.097,
+          "home_runs_mean": 2.327,
+          "total_runs_dist": {
+            "3": 122,
+            "14": 4,
+            "6": 92,
+            "8": 47,
+            "5": 114,
+            "13": 5,
+            "11": 24,
+            "12": 15,
+            "0": 79,
+            "17": 1,
+            "2": 148,
+            "4": 115,
+            "1": 101,
+            "9": 42,
+            "7": 64,
+            "10": 23,
+            "15": 2,
+            "16": 1,
+            "19": 1
+          },
+          "run_margin_dist": {
+            "-1": 121,
+            "8": 10,
+            "-2": 101,
+            "1": 127,
+            "-5": 24,
+            "5": 25,
+            "7": 13,
+            "2": 101,
+            "0": 177,
+            "3": 78,
+            "-11": 1,
+            "-8": 3,
+            "-3": 65,
+            "-4": 36,
+            "4": 47,
+            "-6": 16,
+            "11": 1,
+            "6": 25,
+            "10": 6,
+            "-7": 13,
+            "-9": 5,
+            "9": 2,
+            "13": 1,
+            "-10": 2
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.392,
+          "away_win_prob": 0.324,
+          "tie_prob": 0.284,
+          "away_runs_mean": 1.242,
+          "home_runs_mean": 1.401,
+          "total_runs_dist": {
+            "3": 152,
+            "4": 91,
+            "5": 69,
+            "1": 182,
+            "0": 209,
+            "11": 4,
+            "16": 1,
+            "8": 11,
+            "2": 168,
+            "7": 39,
+            "6": 48,
+            "12": 2,
+            "10": 6,
+            "9": 17,
+            "14": 1
+          },
+          "run_margin_dist": {
+            "-1": 131,
+            "0": 284,
+            "1": 140,
+            "7": 6,
+            "-12": 2,
+            "-8": 2,
+            "3": 85,
+            "-3": 58,
+            "2": 96,
+            "-2": 73,
+            "-5": 9,
+            "5": 21,
+            "-4": 27,
+            "8": 2,
+            "4": 30,
+            "-6": 10,
+            "10": 2,
+            "6": 9,
+            "-7": 9,
+            "-9": 3,
+            "9": 1
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-07",
+            "game_pk": 823537,
+            "away": "Boston Red Sox",
+            "home": "New York Yankees",
+            "away_abbr": "BOS",
+            "home_abbr": "NYY",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 693645,
+            "pitcher_name": "Cam Schlittler",
+            "team": "NYY",
+            "team_side": "home",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.2510114068441064,
+            "market_line": 18.0,
+            "model_prob_over": 0.732,
+            "market_prob_over": 0.4809885931558936,
+            "market_prob_under": 0.5190114068441064,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4809885931558936,
+            "selected_side_market_prob": 0.4809885931558936,
+            "selected_side_model_prob": 0.732,
+            "mean_support": 3.2049999999999983,
+            "outs_mean": 21.205,
+            "market_alternates": [
+              {
+                "line": 17.5,
+                "over_odds": "-160",
+                "under_odds": "+122",
+                "_src": "oddsapi"
+              },
+              {
+                "line": 18.5,
+                "over_odds": "+125",
+                "under_odds": null,
+                "_src": "oddsapi"
+              }
+            ],
+            "odds": "-110",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
+              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Cam Schlittler",
+              "supporting_reasons": [
+                "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume.",
+            "rank": 15,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-07",
+            "game_pk": 823537,
+            "away": "Boston Red Sox",
+            "home": "New York Yankees",
+            "away_abbr": "BOS",
+            "home_abbr": "NYY",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 665862,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 624133,
+            "opponent_pitcher_hand": "L",
+            "opponent_pitcher_name": "Ranger Suarez",
+            "opponent": "BOS",
+            "opponent_team_id": 111,
+            "lineup_source": "confirmed_feed_live",
+            "lineup_confidence": 1.0,
+            "lineup_status": "confirmed",
+            "batter_k_rate": 0.28174816280384396,
+            "batter_bb_rate": 0.09046777840587902,
+            "batter_hr_rate": 0.03214386659129451,
+            "batter_inplay_hit_rate": 0.2871558034158243,
+            "batter_xb_hit_share": 0.21568627450980393,
+            "pitcher_k_rate": 0.24708287895310796,
+            "pitcher_bb_rate": 0.0804525627044711,
+            "pitcher_hr_rate": 0.015430752453653216,
+            "pitcher_inplay_hit_rate": 0.3078734756097561,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 94.0,
+            "pitcher_platoon_k_mult": 1.1548916841369672,
+            "pitcher_platoon_bb_mult": 0.8075,
+            "pitcher_platoon_hr_mult": 1.275,
+            "pitcher_platoon_inplay_mult": 1.1925000000000001,
+            "batter_platoon_k_mult": 1.0383034799873159,
+            "batter_platoon_bb_mult": 0.8664049735774685,
+            "batter_platoon_hr_mult": 0.78,
+            "batter_platoon_inplay_mult": 1.0745662596874168,
+            "opponent_primary_pitch_type": "SI",
+            "weather_source": "statsapi_live_feed",
+            "weather_condition": "Partly Cloudy",
+            "weather_temp_f": 82.0,
+            "weather_wind_speed_mph": 14.0,
+            "weather_wind_direction": "out",
+            "weather_wind_raw": "14 mph, Out To RF",
+            "weather_hr_mult": 1.11888,
+            "weather_inplay_hit_mult": 1.018,
+            "weather_xb_share_mult": 1.0096,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 3313,
+            "venue_name": "Yankee Stadium",
+            "roof_type": "Open",
+            "park_hr_mult": 1.0466666666666666,
+            "park_inplay_hit_mult": 0.9813333333333334,
+            "park_xb_share_mult": 0.9766666666666667,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Jazz Chisholm Jr.",
+            "team": "NYY",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.0893937007874015,
+            "market_line": 0.5,
+            "model_prob_over": 0.614,
+            "market_prob_over": 0.5246062992125985,
+            "market_prob_under": 0.4753937007874017,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5246062992125985,
+            "selected_side_market_prob": 0.5246062992125985,
+            "selected_side_model_prob": 0.614,
+            "mean_support": 0.371,
+            "h_mean": 0.871,
+            "pa_mean": 4.083,
+            "ab_mean": 3.646,
+            "lineup_order": 7,
+            "market_alternates": [],
+            "odds": "-130",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Jazz Chisholm Jr.",
+              "supporting_reasons": [
+                "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances.",
+            "rank": 7,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      },
+      "gameLens": [
+        {
+          "key": "first1",
+          "label": "F1",
+          "closed": false,
+          "badge": "No bet",
+          "score": "BOS 0 - NYY 0",
+          "subtitle": "BOS 0.42 - NYY 0.47 | Total 0.89",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 0.89,
+            "homeMargin": 0.05
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 0.89,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.05,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "F3",
+          "closed": false,
+          "badge": "No bet",
+          "score": "BOS 0 - NYY 0",
+          "subtitle": "BOS 1.24 - NYY 1.4 | Total 2.64",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 2.64,
+            "homeMargin": 0.16
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 2.64,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.16,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "F5",
+          "closed": false,
+          "badge": "No bet",
+          "score": "BOS 0 - NYY 0",
+          "subtitle": "BOS 2.1 - NYY 2.33 | Total 4.43",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 4.43,
+            "homeMargin": 0.23
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 4.43,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.23,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "Full game",
+          "closed": false,
+          "badge": "No bet",
+          "score": "BOS 0 - NYY 0",
+          "subtitle": "BOS 4 - NYY 3.71 | Total 7.71",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 7.71,
+            "homeMargin": -0.28
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 7.71,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.28,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first1",
+          "label": "First 1",
+          "closed": false,
+          "badge": "",
+          "score": "BOS 18.6% | NYY 21.6% | Tie 59.8%",
+          "subtitle": "BOS 18.6% | NYY 21.6% | Tie 59.8%",
+          "reason": "BOS 18.6% | NYY 21.6% | Tie 59.8%",
+          "projection": {
+            "total": 18.6,
+            "homeMargin": 21.6
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 18.6,
+              "reason": "BOS 18.6% | NYY 21.6% | Tie 59.8%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first3",
+          "label": "First 3",
+          "closed": false,
+          "badge": "",
+          "score": "BOS 32.4% | NYY 39.2% | Tie 28.4%",
+          "subtitle": "BOS 32.4% | NYY 39.2% | Tie 28.4%",
+          "reason": "BOS 32.4% | NYY 39.2% | Tie 28.4%",
+          "projection": {
+            "total": 32.4,
+            "homeMargin": 39.2
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 32.4,
+              "reason": "BOS 32.4% | NYY 39.2% | Tie 28.4%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first5",
+          "label": "First 5",
+          "closed": false,
+          "badge": "",
+          "score": "BOS 38.7% | NYY 43.8% | Tie 17.5%",
+          "subtitle": "BOS 38.7% | NYY 43.8% | Tie 17.5%",
+          "reason": "BOS 38.7% | NYY 43.8% | Tie 17.5%",
+          "projection": {
+            "total": 38.7,
+            "homeMargin": 43.8
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 38.7,
+              "reason": "BOS 38.7% | NYY 43.8% | Tie 17.5%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "full",
+          "label": "Full game",
+          "closed": false,
+          "badge": "",
+          "score": "BOS 52.3% | NYY 47.7% | Tie 0.0%",
+          "subtitle": "BOS 52.3% | NYY 47.7% | Tie 0.0%",
+          "reason": "BOS 52.3% | NYY 47.7% | Tie 0.0%",
+          "projection": {
+            "total": 52.3,
+            "homeMargin": 47.7
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 52.3,
+              "reason": "BOS 52.3% | NYY 47.7% | Tie 0.0%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        }
+      ],
+      "props": [
+        {
+          "playerName": "Cam Schlittler",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 18.0,
+          "odds": "-110",
+          "modelProbOver": 0.732,
+          "estimatedWinProb": 0.732,
+          "rankingScore": 0.2510114068441064
+        },
+        {
+          "playerName": "Jazz Chisholm Jr.",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-130",
+          "modelProbOver": 0.614,
+          "estimatedWinProb": 0.614,
+          "rankingScore": 0.0893937007874015
+        }
+      ],
+      "liveProps": [
+        {
+          "playerName": "Cam Schlittler",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 18.0,
+          "odds": "-110",
+          "modelProbOver": 0.732,
+          "estimatedWinProb": 0.732,
+          "rankingScore": 0.2510114068441064
+        },
+        {
+          "playerName": "Jazz Chisholm Jr.",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-130",
+          "modelProbOver": 0.614,
+          "estimatedWinProb": 0.614,
+          "rankingScore": 0.0893937007874015
+        }
+      ],
+      "archivedLiveProps": [],
+      "trackedProps": [
+        {
+          "playerName": "Cam Schlittler",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 18.0,
+          "odds": "-110",
+          "modelProbOver": 0.732,
+          "estimatedWinProb": 0.732,
+          "rankingScore": 0.2510114068441064
+        },
+        {
+          "playerName": "Jazz Chisholm Jr.",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-130",
+          "modelProbOver": 0.614,
+          "estimatedWinProb": 0.614,
+          "rankingScore": 0.0893937007874015
+        }
+      ],
+      "simContextAvailable": true,
+      "snapshotAvailable": true,
+      "score": {
+        "away": 0,
+        "home": 0
+      },
+      "market_tiles": [
+        {
+          "label": "Game total",
+          "title": "No total play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Moneyline",
+          "title": "No ML play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Pitcher props",
+          "title": "Cam Schlittler Over 18 Outs",
+          "sub": "Playable only | -110"
+        },
+        {
+          "label": "Hitter props",
+          "title": "Jazz Chisholm Jr. Over 0.5 Batter Hits",
+          "sub": "Playable only | -130"
+        }
+      ],
+      "probable": {
+        "away": {
+          "id": null,
+          "fullName": "Ranger Suarez",
+          "ladderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.257
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.229
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.315
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.257
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.229
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.315
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "O up to 17",
+              "stat": "outs",
+              "target": 17,
+              "targets": [
+                17
+              ],
+              "tone": "strong",
+              "detail": "Live projection 18.8. Current 3.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "hitProb": 0.871,
+              "source": "live",
+              "actual": 3.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.8. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.635,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.8. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.611,
+              "source": "live",
+              "actual": 0.0
+            }
+          ]
+        },
+        "home": {
+          "id": 693645,
+          "fullName": "Cam Schlittler",
+          "ladderBadges": [
+            {
+              "label": "K up to 7",
+              "stat": "strikeouts",
+              "target": 7,
+              "targets": [
+                6,
+                7
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7 Last supported rung: 7",
+              "hitProb": 0.298
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.255
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.229
+            },
+            {
+              "label": "O 19+",
+              "stat": "outs",
+              "target": 19,
+              "targets": [
+                19
+              ],
+              "tone": "strong",
+              "detail": "Cam Schlittler Over 18 Outs | Odds -110 | Edge 25.1%",
+              "hitProb": 0.732
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 7",
+              "stat": "strikeouts",
+              "target": 7,
+              "targets": [
+                6,
+                7
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7 Last supported rung: 7",
+              "hitProb": 0.298
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.255
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.229
+            },
+            {
+              "label": "O 19+",
+              "stat": "outs",
+              "target": 19,
+              "targets": [
+                19
+              ],
+              "tone": "strong",
+              "detail": "Cam Schlittler Over 18 Outs | Odds -110 | Edge 25.1%",
+              "hitProb": 0.732
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "O 18/19",
+              "stat": "outs",
+              "target": 19,
+              "targets": [
+                18,
+                19
+              ],
+              "tone": "strong",
+              "detail": "Live projection 19.2. Current 3.0. Starter still active in live game state. Supported ladders: 18/19 Last supported rung: 19",
+              "hitProb": 0.732,
+              "source": "live",
+              "actual": 3.0
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.2. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.79,
+              "source": "live",
+              "actual": 1.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.4. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.464,
+              "source": "live",
+              "actual": 0.0
+            }
+          ]
+        }
+      },
+      "markets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-07",
+            "game_pk": 823537,
+            "away": "Boston Red Sox",
+            "home": "New York Yankees",
+            "away_abbr": "BOS",
+            "home_abbr": "NYY",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 693645,
+            "pitcher_name": "Cam Schlittler",
+            "team": "NYY",
+            "team_side": "home",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.2510114068441064,
+            "market_line": 18.0,
+            "model_prob_over": 0.732,
+            "market_prob_over": 0.4809885931558936,
+            "market_prob_under": 0.5190114068441064,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4809885931558936,
+            "selected_side_market_prob": 0.4809885931558936,
+            "selected_side_model_prob": 0.732,
+            "mean_support": 3.2049999999999983,
+            "outs_mean": 21.205,
+            "market_alternates": [
+              {
+                "line": 17.5,
+                "over_odds": "-160",
+                "under_odds": "+122",
+                "_src": "oddsapi"
+              },
+              {
+                "line": 18.5,
+                "over_odds": "+125",
+                "under_odds": null,
+                "_src": "oddsapi"
+              }
+            ],
+            "odds": "-110",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
+              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Cam Schlittler",
+              "supporting_reasons": [
+                "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume.",
+            "rank": 15,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-07",
+            "game_pk": 823537,
+            "away": "Boston Red Sox",
+            "home": "New York Yankees",
+            "away_abbr": "BOS",
+            "home_abbr": "NYY",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 665862,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 624133,
+            "opponent_pitcher_hand": "L",
+            "opponent_pitcher_name": "Ranger Suarez",
+            "opponent": "BOS",
+            "opponent_team_id": 111,
+            "lineup_source": "confirmed_feed_live",
+            "lineup_confidence": 1.0,
+            "lineup_status": "confirmed",
+            "batter_k_rate": 0.28174816280384396,
+            "batter_bb_rate": 0.09046777840587902,
+            "batter_hr_rate": 0.03214386659129451,
+            "batter_inplay_hit_rate": 0.2871558034158243,
+            "batter_xb_hit_share": 0.21568627450980393,
+            "pitcher_k_rate": 0.24708287895310796,
+            "pitcher_bb_rate": 0.0804525627044711,
+            "pitcher_hr_rate": 0.015430752453653216,
+            "pitcher_inplay_hit_rate": 0.3078734756097561,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 94.0,
+            "pitcher_platoon_k_mult": 1.1548916841369672,
+            "pitcher_platoon_bb_mult": 0.8075,
+            "pitcher_platoon_hr_mult": 1.275,
+            "pitcher_platoon_inplay_mult": 1.1925000000000001,
+            "batter_platoon_k_mult": 1.0383034799873159,
+            "batter_platoon_bb_mult": 0.8664049735774685,
+            "batter_platoon_hr_mult": 0.78,
+            "batter_platoon_inplay_mult": 1.0745662596874168,
+            "opponent_primary_pitch_type": "SI",
+            "weather_source": "statsapi_live_feed",
+            "weather_condition": "Partly Cloudy",
+            "weather_temp_f": 82.0,
+            "weather_wind_speed_mph": 14.0,
+            "weather_wind_direction": "out",
+            "weather_wind_raw": "14 mph, Out To RF",
+            "weather_hr_mult": 1.11888,
+            "weather_inplay_hit_mult": 1.018,
+            "weather_xb_share_mult": 1.0096,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 3313,
+            "venue_name": "Yankee Stadium",
+            "roof_type": "Open",
+            "park_hr_mult": 1.0466666666666666,
+            "park_inplay_hit_mult": 0.9813333333333334,
+            "park_xb_share_mult": 0.9766666666666667,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Jazz Chisholm Jr.",
+            "team": "NYY",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.0893937007874015,
+            "market_line": 0.5,
+            "model_prob_over": 0.614,
+            "market_prob_over": 0.5246062992125985,
+            "market_prob_under": 0.4753937007874017,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5246062992125985,
+            "selected_side_market_prob": 0.5246062992125985,
+            "selected_side_model_prob": 0.614,
+            "mean_support": 0.371,
+            "h_mean": 0.871,
+            "pa_mean": 4.083,
+            "ab_mean": 3.646,
+            "lineup_order": 7,
+            "market_alternates": [],
+            "odds": "-130",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Jazz Chisholm Jr.",
+              "supporting_reasons": [
+                "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances.",
+            "rank": 7,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      }
+    },
+    {
       "gamePk": 824916,
       "status": {
         "abstract": "Live",
@@ -3843,10 +4982,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 5.2. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.6. Current 2.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.64,
               "source": "live",
-              "actual": 0.0
+              "actual": 2.0
             },
             {
               "label": "O up to 18",
@@ -3856,10 +4995,10 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Live projection 20.5. Current 2.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "detail": "Live projection 17.8. Current 6.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
               "hitProb": 0.847,
               "source": "live",
-              "actual": 2.0
+              "actual": 6.0
             },
             {
               "label": "H up to 6",
@@ -3869,7 +5008,7 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 6.1. Current 1.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 5.2. Current 1.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.596,
               "source": "live",
               "actual": 1.0
@@ -3882,7 +5021,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.8. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.4. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.555,
               "source": "live",
               "actual": 0.0
@@ -3961,7 +5100,7 @@
       "gamePk": 822807,
       "status": {
         "abstract": "Live",
-        "detailed": "Warmup"
+        "detailed": "In Progress"
       },
       "startTime": "12:37 PM",
       "matchup": {
@@ -5277,18 +6416,17 @@
           ],
           "miniLadderBadges": [
             {
-              "label": "K up to 6",
+              "label": "K up to 5",
               "stat": "strikeouts",
-              "target": 6,
+              "target": 5,
               "targets": [
-                5,
-                6
+                5
               ],
               "tone": "strong",
-              "detail": "Live projection 5.4. Current 0.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
-              "hitProb": 0.487,
+              "detail": "Live projection 4.6. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.665,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             },
             {
               "label": "O up to 18",
@@ -5298,10 +6436,10 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Live projection 20.3. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "detail": "Live projection 17.5. Current 5.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
               "hitProb": 0.815,
               "source": "live",
-              "actual": 0.0
+              "actual": 5.0
             },
             {
               "label": "H up to 6",
@@ -5311,10 +6449,10 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 6.8. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 5.9. Current 2.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.664,
               "source": "live",
-              "actual": 0.0
+              "actual": 2.0
             },
             {
               "label": "BB up to 2",
@@ -5324,7 +6462,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.9. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.5. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.565,
               "source": "live",
               "actual": 0.0
@@ -5430,19 +6568,6 @@
           ],
           "miniLadderBadges": [
             {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.8. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.573,
-              "source": "live",
-              "actual": 0.0
-            },
-            {
               "label": "O up to 18",
               "stat": "outs",
               "target": 18,
@@ -5450,10 +6575,10 @@
                 18
               ],
               "tone": "strong",
-              "detail": "Live projection 20.5. Current 1.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "detail": "Live projection 17.8. Current 6.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
               "hitProb": 0.832,
               "source": "live",
-              "actual": 1.0
+              "actual": 6.0
             },
             {
               "label": "H up to 6",
@@ -5464,7 +6589,7 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 6.9. Current 0.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
+              "detail": "Live projection 5.6. Current 0.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
               "hitProb": 0.686,
               "source": "live",
               "actual": 0.0
@@ -5477,7 +6602,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.8. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.5. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.582,
               "source": "live",
               "actual": 0.0
@@ -6050,7 +7175,7 @@
       "gamePk": 823857,
       "status": {
         "abstract": "Live",
-        "detailed": "Warmup"
+        "detailed": "In Progress"
       },
       "startTime": "12:40 PM",
       "matchup": {
@@ -7061,10 +8186,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 5.3. Current 0.0. Starter still active in live game state. Supported ladders: 4/5 Last supported rung: 5",
+              "detail": "Live projection 4.4. Current 1.0. Starter still active in live game state. Supported ladders: 4/5 Last supported rung: 5",
               "hitProb": 0.629,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             },
             {
               "label": "O up to 15",
@@ -7074,10 +8199,10 @@
                 15
               ],
               "tone": "strong",
-              "detail": "Live projection 20.0. Current 0.0. Starter still active in live game state. Supported ladders: 15 Last supported rung: 15",
+              "detail": "Live projection 17.0. Current 5.0. Starter still active in live game state. Supported ladders: 15 Last supported rung: 15",
               "hitProb": 0.978,
               "source": "live",
-              "actual": 0.0
+              "actual": 5.0
             },
             {
               "label": "H up to 5",
@@ -7087,10 +8212,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 7.6. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 6.2. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.836,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             },
             {
               "label": "BB up to 2",
@@ -7100,10 +8225,10 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 2.1. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.9. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.634,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             }
           ]
         },
@@ -7189,10 +8314,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 5.3. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.8. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.646,
               "source": "live",
-              "actual": 0.0
+              "actual": 3.0
             },
             {
               "label": "O up to 19",
@@ -7202,10 +8327,10 @@
                 19
               ],
               "tone": "strong",
-              "detail": "Live projection 21.2. Current 0.0. Starter still active in live game state. Supported ladders: 19 Last supported rung: 19",
+              "detail": "Live projection 18.1. Current 6.0. Starter still active in live game state. Supported ladders: 19 Last supported rung: 19",
               "hitProb": 0.735,
               "source": "live",
-              "actual": 0.0
+              "actual": 6.0
             },
             {
               "label": "H up to 6",
@@ -7215,10 +8340,10 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 6.8. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 5.6. Current 1.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.667,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             },
             {
               "label": "BB up to 2",
@@ -7228,7 +8353,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.9. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.5. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.579,
               "source": "live",
               "actual": 0.0
@@ -7581,7 +8706,7 @@
       "gamePk": 824268,
       "status": {
         "abstract": "Live",
-        "detailed": "Warmup"
+        "detailed": "In Progress"
       },
       "startTime": "12:40 PM",
       "matchup": {
@@ -8677,10 +9802,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 5.4. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.9. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.655,
               "source": "live",
-              "actual": 0.0
+              "actual": 3.0
             },
             {
               "label": "O 16/16",
@@ -8691,10 +9816,10 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Live projection 20.4. Current 0.0. Starter still active in live game state. Supported ladders: 16/16 Last supported rung: 16",
+              "detail": "Live projection 17.3. Current 5.0. Starter still active in live game state. Supported ladders: 16/16 Last supported rung: 16",
               "hitProb": 0.883,
               "source": "live",
-              "actual": 0.0
+              "actual": 5.0
             },
             {
               "label": "H up to 5",
@@ -8704,7 +9829,7 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 7.4. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 5.9. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.84,
               "source": "live",
               "actual": 0.0
@@ -8717,7 +9842,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 2.0. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.6. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.605,
               "source": "live",
               "actual": 0.0
@@ -8799,19 +9924,6 @@
           ],
           "miniLadderBadges": [
             {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.4. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.458,
-              "source": "live",
-              "actual": 0.0
-            },
-            {
               "label": "O 16/16",
               "stat": "outs",
               "target": 16,
@@ -8820,10 +9932,10 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Live projection 20.1. Current 0.0. Starter still active in live game state. Supported ladders: 16/16 Last supported rung: 16",
+              "detail": "Live projection 17.2. Current 6.0. Starter still active in live game state. Supported ladders: 16/16 Last supported rung: 16",
               "hitProb": 0.868,
               "source": "live",
-              "actual": 0.0
+              "actual": 6.0
             },
             {
               "label": "H up to 5",
@@ -8833,10 +9945,10 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 7.1. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 5.9. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.819,
               "source": "live",
-              "actual": 0.0
+              "actual": 1.0
             },
             {
               "label": "BB up to 2",
@@ -8846,7 +9958,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.9. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.5. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.549,
               "source": "live",
               "actual": 0.0
@@ -9253,1094 +10365,10 @@
       }
     },
     {
-      "gamePk": 823537,
-      "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
-      },
-      "startTime": "12:35 PM",
-      "matchup": {
-        "away": {
-          "abbr": "BOS",
-          "id": 111,
-          "logo": "https://www.mlbstatic.com/team-logos/111.svg",
-          "name": "Boston Red Sox"
-        },
-        "home": {
-          "abbr": "NYY",
-          "id": 147,
-          "logo": "https://www.mlbstatic.com/team-logos/147.svg",
-          "name": "New York Yankees"
-        },
-        "score": {
-          "away": 0,
-          "home": 0
-        },
-        "liveText": "Ranger Suarez vs Cam Schlittler | +2 playable"
-      },
-      "predictions": {
-        "full": {
-          "home_win_prob": 0.482,
-          "away_win_prob": 0.518,
-          "tie_prob": 0.0,
-          "away_runs_mean": 4.025,
-          "home_runs_mean": 3.609,
-          "total_runs_dist": {
-            "7": 109,
-            "19": 3,
-            "6": 88,
-            "14": 27,
-            "5": 132,
-            "10": 58,
-            "13": 34,
-            "16": 15,
-            "4": 71,
-            "20": 5,
-            "15": 18,
-            "11": 63,
-            "3": 85,
-            "9": 83,
-            "1": 40,
-            "26": 1,
-            "2": 32,
-            "8": 71,
-            "12": 40,
-            "18": 6,
-            "17": 14,
-            "23": 3,
-            "22": 2
-          },
-          "run_margin_dist": {
-            "-1": 138,
-            "3": 85,
-            "1": 154,
-            "-2": 113,
-            "12": 2,
-            "-10": 11,
-            "5": 34,
-            "10": 5,
-            "2": 94,
-            "4": 59,
-            "-8": 15,
-            "-7": 17,
-            "-3": 75,
-            "-6": 25,
-            "-16": 2,
-            "-4": 50,
-            "6": 20,
-            "-5": 47,
-            "9": 4,
-            "-9": 9,
-            "8": 14,
-            "7": 10,
-            "-13": 4,
-            "-11": 4,
-            "11": 1,
-            "-17": 1,
-            "-12": 5,
-            "-15": 1,
-            "-18": 1
-          }
-        },
-        "first1": {
-          "home_win_prob": 0.216,
-          "away_win_prob": 0.186,
-          "tie_prob": 0.598,
-          "away_runs_mean": 0.422,
-          "home_runs_mean": 0.47,
-          "total_runs_dist": {
-            "0": 579,
-            "1": 189,
-            "2": 105,
-            "4": 27,
-            "3": 72,
-            "7": 5,
-            "5": 15,
-            "6": 5,
-            "11": 1,
-            "10": 1,
-            "8": 1
-          },
-          "run_margin_dist": {
-            "0": 598,
-            "1": 110,
-            "-2": 40,
-            "-3": 24,
-            "3": 36,
-            "-1": 104,
-            "2": 56,
-            "-4": 10,
-            "4": 11,
-            "6": 1,
-            "-5": 4,
-            "-7": 2,
-            "-6": 2,
-            "5": 2
-          }
-        },
-        "first5": {
-          "home_win_prob": 0.436,
-          "away_win_prob": 0.387,
-          "tie_prob": 0.177,
-          "away_runs_mean": 2.097,
-          "home_runs_mean": 2.327,
-          "total_runs_dist": {
-            "3": 122,
-            "14": 4,
-            "6": 92,
-            "8": 47,
-            "5": 114,
-            "13": 5,
-            "11": 24,
-            "12": 15,
-            "0": 79,
-            "17": 1,
-            "2": 148,
-            "4": 115,
-            "1": 101,
-            "9": 42,
-            "7": 64,
-            "10": 23,
-            "15": 2,
-            "16": 1,
-            "19": 1
-          },
-          "run_margin_dist": {
-            "-1": 121,
-            "8": 10,
-            "-2": 101,
-            "1": 127,
-            "-5": 24,
-            "5": 25,
-            "7": 13,
-            "2": 101,
-            "0": 177,
-            "3": 78,
-            "-11": 1,
-            "-8": 3,
-            "-3": 65,
-            "-4": 36,
-            "4": 47,
-            "-6": 16,
-            "11": 1,
-            "6": 25,
-            "10": 6,
-            "-7": 13,
-            "-9": 5,
-            "9": 2,
-            "13": 1,
-            "-10": 2
-          }
-        },
-        "first3": {
-          "home_win_prob": 0.392,
-          "away_win_prob": 0.324,
-          "tie_prob": 0.284,
-          "away_runs_mean": 1.242,
-          "home_runs_mean": 1.401,
-          "total_runs_dist": {
-            "3": 152,
-            "4": 91,
-            "5": 69,
-            "1": 182,
-            "0": 209,
-            "11": 4,
-            "16": 1,
-            "8": 11,
-            "2": 168,
-            "7": 39,
-            "6": 48,
-            "12": 2,
-            "10": 6,
-            "9": 17,
-            "14": 1
-          },
-          "run_margin_dist": {
-            "-1": 131,
-            "0": 284,
-            "1": 140,
-            "7": 6,
-            "-12": 2,
-            "-8": 2,
-            "3": 85,
-            "-3": 58,
-            "2": 96,
-            "-2": 73,
-            "-5": 9,
-            "5": 21,
-            "-4": 27,
-            "8": 2,
-            "4": 30,
-            "-6": 10,
-            "10": 2,
-            "6": 9,
-            "-7": 9,
-            "-9": 3,
-            "9": 1
-          }
-        }
-      },
-      "gameMarkets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-07",
-            "game_pk": 823537,
-            "away": "Boston Red Sox",
-            "home": "New York Yankees",
-            "away_abbr": "BOS",
-            "home_abbr": "NYY",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 693645,
-            "pitcher_name": "Cam Schlittler",
-            "team": "NYY",
-            "team_side": "home",
-            "prop": "outs",
-            "selection": "over",
-            "edge": 0.2510114068441064,
-            "market_line": 18.0,
-            "model_prob_over": 0.732,
-            "market_prob_over": 0.4809885931558936,
-            "market_prob_under": 0.5190114068441064,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4809885931558936,
-            "selected_side_market_prob": 0.4809885931558936,
-            "selected_side_model_prob": 0.732,
-            "mean_support": 3.2049999999999983,
-            "outs_mean": 21.205,
-            "market_alternates": [
-              {
-                "line": 17.5,
-                "over_odds": "-160",
-                "under_odds": "+122",
-                "_src": "oddsapi"
-              },
-              {
-                "line": 18.5,
-                "over_odds": "+125",
-                "under_odds": null,
-                "_src": "oddsapi"
-              }
-            ],
-            "odds": "-110",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
-              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:outs",
-              "subject": "Cam Schlittler",
-              "supporting_reasons": [
-                "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
-                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume.",
-            "rank": 15,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-07",
-            "game_pk": 823537,
-            "away": "Boston Red Sox",
-            "home": "New York Yankees",
-            "away_abbr": "BOS",
-            "home_abbr": "NYY",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 665862,
-            "batter_hand": "L",
-            "opponent_pitcher_id": 624133,
-            "opponent_pitcher_hand": "L",
-            "opponent_pitcher_name": "Ranger Suarez",
-            "opponent": "BOS",
-            "opponent_team_id": 111,
-            "lineup_source": "confirmed_feed_live",
-            "lineup_confidence": 1.0,
-            "lineup_status": "confirmed",
-            "batter_k_rate": 0.28174816280384396,
-            "batter_bb_rate": 0.09046777840587902,
-            "batter_hr_rate": 0.03214386659129451,
-            "batter_inplay_hit_rate": 0.2871558034158243,
-            "batter_xb_hit_share": 0.21568627450980393,
-            "pitcher_k_rate": 0.24708287895310796,
-            "pitcher_bb_rate": 0.0804525627044711,
-            "pitcher_hr_rate": 0.015430752453653216,
-            "pitcher_inplay_hit_rate": 0.3078734756097561,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 94.0,
-            "pitcher_platoon_k_mult": 1.1548916841369672,
-            "pitcher_platoon_bb_mult": 0.8075,
-            "pitcher_platoon_hr_mult": 1.275,
-            "pitcher_platoon_inplay_mult": 1.1925000000000001,
-            "batter_platoon_k_mult": 1.0383034799873159,
-            "batter_platoon_bb_mult": 0.8664049735774685,
-            "batter_platoon_hr_mult": 0.78,
-            "batter_platoon_inplay_mult": 1.0745662596874168,
-            "opponent_primary_pitch_type": "SI",
-            "weather_source": "statsapi_live_feed",
-            "weather_condition": "Partly Cloudy",
-            "weather_temp_f": 82.0,
-            "weather_wind_speed_mph": 14.0,
-            "weather_wind_direction": "out",
-            "weather_wind_raw": "14 mph, Out To RF",
-            "weather_hr_mult": 1.11888,
-            "weather_inplay_hit_mult": 1.018,
-            "weather_xb_share_mult": 1.0096,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 3313,
-            "venue_name": "Yankee Stadium",
-            "roof_type": "Open",
-            "park_hr_mult": 1.0466666666666666,
-            "park_inplay_hit_mult": 0.9813333333333334,
-            "park_xb_share_mult": 0.9766666666666667,
-            "market": "hitter_hits",
-            "market_label": "Hitter Hits",
-            "market_group": "hitter_props",
-            "player_name": "Jazz Chisholm Jr.",
-            "team": "NYY",
-            "prop": "batter_hits",
-            "prop_market_key": "batter_hits",
-            "selection": "over",
-            "edge": 0.0893937007874015,
-            "market_line": 0.5,
-            "model_prob_over": 0.614,
-            "market_prob_over": 0.5246062992125985,
-            "market_prob_under": 0.4753937007874017,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5246062992125985,
-            "selected_side_market_prob": 0.5246062992125985,
-            "selected_side_model_prob": 0.614,
-            "mean_support": 0.371,
-            "h_mean": 0.871,
-            "pa_mean": 4.083,
-            "ab_mean": 3.646,
-            "lineup_order": 7,
-            "market_alternates": [],
-            "odds": "-130",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
-              "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_hits",
-              "subject": "Jazz Chisholm Jr.",
-              "supporting_reasons": [
-                "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
-                "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances.",
-            "rank": 7,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      },
-      "gameLens": [
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "badge": "No bet",
-          "score": "BOS 0 - NYY 0",
-          "subtitle": "BOS 0.42 - NYY 0.47 | Total 0.89",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 0.89,
-            "homeMargin": 0.05
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 0.89,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.05,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "badge": "No bet",
-          "score": "BOS 0 - NYY 0",
-          "subtitle": "BOS 1.24 - NYY 1.4 | Total 2.64",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 2.64,
-            "homeMargin": 0.16
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 2.64,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.16,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "badge": "No bet",
-          "score": "BOS 0 - NYY 0",
-          "subtitle": "BOS 2.1 - NYY 2.33 | Total 4.43",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 4.43,
-            "homeMargin": 0.23
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 4.43,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.23,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "Full game",
-          "closed": false,
-          "badge": "No bet",
-          "score": "BOS 0 - NYY 0",
-          "subtitle": "BOS 4 - NYY 3.71 | Total 7.71",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 7.71,
-            "homeMargin": -0.28
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 7.71,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.28,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "First 1",
-          "closed": false,
-          "badge": "",
-          "score": "BOS 18.6% | NYY 21.6% | Tie 59.8%",
-          "subtitle": "BOS 18.6% | NYY 21.6% | Tie 59.8%",
-          "reason": "BOS 18.6% | NYY 21.6% | Tie 59.8%",
-          "projection": {
-            "total": 18.6,
-            "homeMargin": 21.6
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 18.6,
-              "reason": "BOS 18.6% | NYY 21.6% | Tie 59.8%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first3",
-          "label": "First 3",
-          "closed": false,
-          "badge": "",
-          "score": "BOS 32.4% | NYY 39.2% | Tie 28.4%",
-          "subtitle": "BOS 32.4% | NYY 39.2% | Tie 28.4%",
-          "reason": "BOS 32.4% | NYY 39.2% | Tie 28.4%",
-          "projection": {
-            "total": 32.4,
-            "homeMargin": 39.2
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 32.4,
-              "reason": "BOS 32.4% | NYY 39.2% | Tie 28.4%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first5",
-          "label": "First 5",
-          "closed": false,
-          "badge": "",
-          "score": "BOS 38.7% | NYY 43.8% | Tie 17.5%",
-          "subtitle": "BOS 38.7% | NYY 43.8% | Tie 17.5%",
-          "reason": "BOS 38.7% | NYY 43.8% | Tie 17.5%",
-          "projection": {
-            "total": 38.7,
-            "homeMargin": 43.8
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 38.7,
-              "reason": "BOS 38.7% | NYY 43.8% | Tie 17.5%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full game",
-          "closed": false,
-          "badge": "",
-          "score": "BOS 52.3% | NYY 47.7% | Tie 0.0%",
-          "subtitle": "BOS 52.3% | NYY 47.7% | Tie 0.0%",
-          "reason": "BOS 52.3% | NYY 47.7% | Tie 0.0%",
-          "projection": {
-            "total": 52.3,
-            "homeMargin": 47.7
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 52.3,
-              "reason": "BOS 52.3% | NYY 47.7% | Tie 0.0%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        }
-      ],
-      "props": [
-        {
-          "playerName": "Cam Schlittler",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 18.0,
-          "odds": "-110",
-          "modelProbOver": 0.732,
-          "estimatedWinProb": 0.732,
-          "rankingScore": 0.2510114068441064
-        },
-        {
-          "playerName": "Jazz Chisholm Jr.",
-          "selection": "Over",
-          "marketLabel": "Hitter Hits",
-          "market": "hitter_hits",
-          "line": 0.5,
-          "odds": "-130",
-          "modelProbOver": 0.614,
-          "estimatedWinProb": 0.614,
-          "rankingScore": 0.0893937007874015
-        }
-      ],
-      "liveProps": [
-        {
-          "playerName": "Cam Schlittler",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 18.0,
-          "odds": "-110",
-          "modelProbOver": 0.732,
-          "estimatedWinProb": 0.732,
-          "rankingScore": 0.2510114068441064
-        },
-        {
-          "playerName": "Jazz Chisholm Jr.",
-          "selection": "Over",
-          "marketLabel": "Hitter Hits",
-          "market": "hitter_hits",
-          "line": 0.5,
-          "odds": "-130",
-          "modelProbOver": 0.614,
-          "estimatedWinProb": 0.614,
-          "rankingScore": 0.0893937007874015
-        }
-      ],
-      "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "playerName": "Cam Schlittler",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 18.0,
-          "odds": "-110",
-          "modelProbOver": 0.732,
-          "estimatedWinProb": 0.732,
-          "rankingScore": 0.2510114068441064
-        },
-        {
-          "playerName": "Jazz Chisholm Jr.",
-          "selection": "Over",
-          "marketLabel": "Hitter Hits",
-          "market": "hitter_hits",
-          "line": 0.5,
-          "odds": "-130",
-          "modelProbOver": 0.614,
-          "estimatedWinProb": 0.614,
-          "rankingScore": 0.0893937007874015
-        }
-      ],
-      "simContextAvailable": true,
-      "snapshotAvailable": true,
-      "score": {
-        "away": 0,
-        "home": 0
-      },
-      "market_tiles": [
-        {
-          "label": "Game total",
-          "title": "No total play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Pitcher props",
-          "title": "Cam Schlittler Over 18 Outs",
-          "sub": "Playable only | -110"
-        },
-        {
-          "label": "Hitter props",
-          "title": "Jazz Chisholm Jr. Over 0.5 Batter Hits",
-          "sub": "Playable only | -130"
-        }
-      ],
-      "probable": {
-        "away": {
-          "id": null,
-          "fullName": "Ranger Suarez",
-          "ladderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.257
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.229
-            },
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.315
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.257
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.229
-            },
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.315
-            }
-          ]
-        },
-        "home": {
-          "id": 693645,
-          "fullName": "Cam Schlittler",
-          "ladderBadges": [
-            {
-              "label": "K up to 7",
-              "stat": "strikeouts",
-              "target": 7,
-              "targets": [
-                6,
-                7
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7",
-              "hitProb": 0.298
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.255
-            },
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.229
-            },
-            {
-              "label": "O 19+",
-              "stat": "outs",
-              "target": 19,
-              "targets": [
-                19
-              ],
-              "tone": "strong",
-              "detail": "Cam Schlittler Over 18 Outs | Odds -110 | Edge 25.1%",
-              "hitProb": 0.732
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 7",
-              "stat": "strikeouts",
-              "target": 7,
-              "targets": [
-                6,
-                7
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7",
-              "hitProb": 0.298
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.255
-            },
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.229
-            },
-            {
-              "label": "O 19+",
-              "stat": "outs",
-              "target": 19,
-              "targets": [
-                19
-              ],
-              "tone": "strong",
-              "detail": "Cam Schlittler Over 18 Outs | Odds -110 | Edge 25.1%",
-              "hitProb": 0.732
-            }
-          ]
-        }
-      },
-      "markets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-07",
-            "game_pk": 823537,
-            "away": "Boston Red Sox",
-            "home": "New York Yankees",
-            "away_abbr": "BOS",
-            "home_abbr": "NYY",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 693645,
-            "pitcher_name": "Cam Schlittler",
-            "team": "NYY",
-            "team_side": "home",
-            "prop": "outs",
-            "selection": "over",
-            "edge": 0.2510114068441064,
-            "market_line": 18.0,
-            "model_prob_over": 0.732,
-            "market_prob_over": 0.4809885931558936,
-            "market_prob_under": 0.5190114068441064,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4809885931558936,
-            "selected_side_market_prob": 0.4809885931558936,
-            "selected_side_model_prob": 0.732,
-            "mean_support": 3.2049999999999983,
-            "outs_mean": 21.205,
-            "market_alternates": [
-              {
-                "line": 17.5,
-                "over_odds": "-160",
-                "under_odds": "+122",
-                "_src": "oddsapi"
-              },
-              {
-                "line": 18.5,
-                "over_odds": "+125",
-                "under_odds": null,
-                "_src": "oddsapi"
-              }
-            ],
-            "odds": "-110",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
-              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:outs",
-              "subject": "Cam Schlittler",
-              "supporting_reasons": [
-                "The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average.",
-                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 73.2% of sims, while the market is pricing it closer to 48.1%. The projected lineup is mostly 5 left-handed, 3 right-handed, and 1 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.2 outs against a line of 18. If he stays on his normal starter path, the matchup against BOS gives him a fair shot to reach full workload volume.",
-            "rank": 15,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-07",
-            "game_pk": 823537,
-            "away": "Boston Red Sox",
-            "home": "New York Yankees",
-            "away_abbr": "BOS",
-            "home_abbr": "NYY",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 665862,
-            "batter_hand": "L",
-            "opponent_pitcher_id": 624133,
-            "opponent_pitcher_hand": "L",
-            "opponent_pitcher_name": "Ranger Suarez",
-            "opponent": "BOS",
-            "opponent_team_id": 111,
-            "lineup_source": "confirmed_feed_live",
-            "lineup_confidence": 1.0,
-            "lineup_status": "confirmed",
-            "batter_k_rate": 0.28174816280384396,
-            "batter_bb_rate": 0.09046777840587902,
-            "batter_hr_rate": 0.03214386659129451,
-            "batter_inplay_hit_rate": 0.2871558034158243,
-            "batter_xb_hit_share": 0.21568627450980393,
-            "pitcher_k_rate": 0.24708287895310796,
-            "pitcher_bb_rate": 0.0804525627044711,
-            "pitcher_hr_rate": 0.015430752453653216,
-            "pitcher_inplay_hit_rate": 0.3078734756097561,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 94.0,
-            "pitcher_platoon_k_mult": 1.1548916841369672,
-            "pitcher_platoon_bb_mult": 0.8075,
-            "pitcher_platoon_hr_mult": 1.275,
-            "pitcher_platoon_inplay_mult": 1.1925000000000001,
-            "batter_platoon_k_mult": 1.0383034799873159,
-            "batter_platoon_bb_mult": 0.8664049735774685,
-            "batter_platoon_hr_mult": 0.78,
-            "batter_platoon_inplay_mult": 1.0745662596874168,
-            "opponent_primary_pitch_type": "SI",
-            "weather_source": "statsapi_live_feed",
-            "weather_condition": "Partly Cloudy",
-            "weather_temp_f": 82.0,
-            "weather_wind_speed_mph": 14.0,
-            "weather_wind_direction": "out",
-            "weather_wind_raw": "14 mph, Out To RF",
-            "weather_hr_mult": 1.11888,
-            "weather_inplay_hit_mult": 1.018,
-            "weather_xb_share_mult": 1.0096,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 3313,
-            "venue_name": "Yankee Stadium",
-            "roof_type": "Open",
-            "park_hr_mult": 1.0466666666666666,
-            "park_inplay_hit_mult": 0.9813333333333334,
-            "park_xb_share_mult": 0.9766666666666667,
-            "market": "hitter_hits",
-            "market_label": "Hitter Hits",
-            "market_group": "hitter_props",
-            "player_name": "Jazz Chisholm Jr.",
-            "team": "NYY",
-            "prop": "batter_hits",
-            "prop_market_key": "batter_hits",
-            "selection": "over",
-            "edge": 0.0893937007874015,
-            "market_line": 0.5,
-            "model_prob_over": 0.614,
-            "market_prob_over": 0.5246062992125985,
-            "market_prob_under": 0.4753937007874017,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5246062992125985,
-            "selected_side_market_prob": 0.5246062992125985,
-            "selected_side_model_prob": 0.614,
-            "mean_support": 0.371,
-            "h_mean": 0.871,
-            "pa_mean": 4.083,
-            "ab_mean": 3.646,
-            "lineup_order": 7,
-            "market_alternates": [],
-            "odds": "-130",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
-              "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_hits",
-              "subject": "Jazz Chisholm Jr.",
-              "supporting_reasons": [
-                "Over his last 10 games, he has recorded a hit in 7 of 10 games.",
-                "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 61.4% of sims, while the market is pricing it closer to 52.5%. Over his last 10 games, he has recorded a hit in 7 of 10 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.9 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances.",
-            "rank": 7,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      }
-    },
-    {
       "gamePk": 823696,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "1:10 PM",
       "matchup": {
@@ -11386,6 +11414,60 @@
               "detail": "Noah Cameron Over 17.5 Outs | Odds -104 | Edge 31.2%",
               "hitProb": 0.786
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.8. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.729,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.6. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.786,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 7.2. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.684,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.8. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.534,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -11459,6 +11541,61 @@
               "tone": "strong",
               "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.391
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.3. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.641,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O 16/16",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16,
+                16
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.0. Current 0.0. Starter still active in live game state. Supported ladders: 16/16 Last supported rung: 16",
+              "hitProb": 0.854,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.4. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.585,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 2.3. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.654,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }
@@ -11816,8 +11953,8 @@
     {
       "gamePk": 824183,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "1:10 PM",
       "matchup": {
@@ -12600,6 +12737,60 @@
               "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.211
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.3. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.631,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 17",
+              "stat": "outs",
+              "target": 17,
+              "targets": [
+                17
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.0. Current 0.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "hitProb": 0.824,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.2. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.583,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.5. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.452,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -12695,6 +12886,60 @@
               "tone": "strong",
               "detail": "Mike Burrows Over 17.5 Outs | Odds -114 | Edge 23.9%",
               "hitProb": 0.739
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.5. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.498,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 19.8. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.739,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 7.6. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.755,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 2.0. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.619,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }
@@ -12877,8 +13122,8 @@
     {
       "gamePk": 823047,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "1:15 PM",
       "matchup": {
@@ -13646,6 +13891,62 @@
               "detail": "Rhett Lowder Over 14.5 Outs | Odds -136 | Edge 44.1%",
               "hitProb": 0.979
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                3,
+                4
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.3. Current 0.0. Starter still active in live game state. Supported ladders: 3/4 Last supported rung: 4",
+              "hitProb": 0.797,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 15",
+              "stat": "outs",
+              "target": 15,
+              "targets": [
+                15
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.3. Current 0.0. Starter still active in live game state. Supported ladders: 15 Last supported rung: 15",
+              "hitProb": 0.979,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                5,
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 7.2. Current 0.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
+              "hitProb": 0.693,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 2.0. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.592,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -13741,6 +14042,60 @@
               "tone": "strong",
               "detail": "Michael McGreevy Over 16.5 Outs | Odds +102 | Edge 40.8%",
               "hitProb": 0.869
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.4. Current 0.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.825,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 17",
+              "stat": "outs",
+              "target": 17,
+              "targets": [
+                17
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.8. Current 0.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "hitProb": 0.869,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 7.0. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.663,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 2.0. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.599,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }

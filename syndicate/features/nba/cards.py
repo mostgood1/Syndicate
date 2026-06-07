@@ -1958,106 +1958,6 @@ def _game_from_row(
         "q4": periods_payload.get("q4") if isinstance(periods_payload.get("q4"), dict) else _default_segment(segment_total, segment_margin, p_home_win),
     }
 
-def _payload_games_by_event_id(payload: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
-    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
-    by_event: dict[str, dict[str, Any]] = {}
-    for game in games:
-        if not isinstance(game, dict):
-            continue
-        event_id = str(game.get("event_id") or "").strip()
-        if event_id:
-            by_event[event_id] = game
-    return by_event
-
-
-def _merge_live_lines_game(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(primary)
-    merged["found"] = bool(primary.get("found")) or bool(secondary.get("found"))
-
-    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
-        if merged.get(key) is None and secondary.get(key) is not None:
-            merged[key] = secondary.get(key)
-
-    primary_lines = primary.get("lines") if isinstance(primary.get("lines"), dict) else {}
-    secondary_lines = secondary.get("lines") if isinstance(secondary.get("lines"), dict) else {}
-    merged_lines = dict(primary_lines)
-    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
-        if merged_lines.get(key) is None and secondary_lines.get(key) is not None:
-            merged_lines[key] = secondary_lines.get(key)
-
-    for key in ("period_totals", "period_spreads"):
-        merged_periods = dict(primary_lines.get(key) or {}) if isinstance(primary_lines.get(key), dict) else {}
-        secondary_periods = secondary_lines.get(key) if isinstance(secondary_lines.get(key), dict) else {}
-        for period_key, period_value in secondary_periods.items():
-            if period_key not in merged_periods and period_value is not None:
-                merged_periods[period_key] = period_value
-        merged_lines[key] = merged_periods
-
-    merged["lines"] = merged_lines
-    return merged
-
-
-def _merge_live_lines_payloads(primary: dict[str, Any] | None, secondary: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not isinstance(primary, dict):
-        return secondary if isinstance(secondary, dict) else None
-    if not isinstance(secondary, dict):
-        return primary
-
-    primary_games = _payload_games_by_event_id(primary)
-    secondary_games = _payload_games_by_event_id(secondary)
-    if not primary_games:
-        return secondary if secondary_games else primary
-    if not secondary_games:
-        return primary
-
-    ordered_event_ids: list[str] = []
-    for payload in (primary, secondary):
-        games = payload.get("games") if isinstance(payload.get("games"), list) else []
-        for game in games:
-            if not isinstance(game, dict):
-                continue
-            event_id = str(game.get("event_id") or "").strip()
-            if event_id and event_id not in ordered_event_ids:
-                ordered_event_ids.append(event_id)
-
-    merged_payload = dict(primary)
-    merged_payload["games"] = [
-        _merge_live_lines_game(primary_games[event_id], secondary_games[event_id])
-        if event_id in primary_games and event_id in secondary_games
-        else dict(primary_games.get(event_id) or secondary_games.get(event_id) or {})
-        for event_id in ordered_event_ids
-        if event_id in primary_games or event_id in secondary_games
-    ]
-    return merged_payload
-
-
-def _payload_has_requested_live_line_coverage(
-    payload: dict[str, Any] | None,
-    event_ids: list[str],
-    *,
-    include_period_totals: bool,
-) -> bool:
-    coverage = _payload_games_by_event_id(payload)
-    if not coverage:
-        return False
-    if event_ids and not all(event_id in coverage for event_id in event_ids):
-        return False
-    if not include_period_totals:
-        return True
-    for event_id in (event_ids or list(coverage.keys())):
-        game = coverage.get(event_id) or {}
-        lines = game.get("lines") if isinstance(game.get("lines"), dict) else {}
-        period_totals = lines.get("period_totals") if isinstance(lines.get("period_totals"), dict) else {}
-        period_spreads = lines.get("period_spreads") if isinstance(lines.get("period_spreads"), dict) else {}
-        if period_totals or period_spreads:
-            return True
-    return False
-
-
-def _finalize_live_lines_payload(payload: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
-    finalized = dict(payload)
-    finalized["include_period_totals"] = bool(include_period_totals)
-    return finalized
     normalized_status = _normalized_game_status(
         status_text=row.get("status"),
         detail_text=row.get("commence_time"),
@@ -2192,6 +2092,107 @@ def _finalize_live_lines_payload(payload: dict[str, Any], *, include_period_tota
         "href": f"/nba/game/{game_id}?date={selected_date}",
         "href_label": "Open NBA game",
     }
+
+def _payload_games_by_event_id(payload: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    games = payload.get("games") if isinstance(payload, dict) and isinstance(payload.get("games"), list) else []
+    by_event: dict[str, dict[str, Any]] = {}
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        if event_id:
+            by_event[event_id] = game
+    return by_event
+
+
+def _merge_live_lines_game(primary: dict[str, Any], secondary: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(primary)
+    merged["found"] = bool(primary.get("found")) or bool(secondary.get("found"))
+
+    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
+        if merged.get(key) is None and secondary.get(key) is not None:
+            merged[key] = secondary.get(key)
+
+    primary_lines = primary.get("lines") if isinstance(primary.get("lines"), dict) else {}
+    secondary_lines = secondary.get("lines") if isinstance(secondary.get("lines"), dict) else {}
+    merged_lines = dict(primary_lines)
+    for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"):
+        if merged_lines.get(key) is None and secondary_lines.get(key) is not None:
+            merged_lines[key] = secondary_lines.get(key)
+
+    for key in ("period_totals", "period_spreads"):
+        merged_periods = dict(primary_lines.get(key) or {}) if isinstance(primary_lines.get(key), dict) else {}
+        secondary_periods = secondary_lines.get(key) if isinstance(secondary_lines.get(key), dict) else {}
+        for period_key, period_value in secondary_periods.items():
+            if period_key not in merged_periods and period_value is not None:
+                merged_periods[period_key] = period_value
+        merged_lines[key] = merged_periods
+
+    merged["lines"] = merged_lines
+    return merged
+
+
+def _merge_live_lines_payloads(primary: dict[str, Any] | None, secondary: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(primary, dict):
+        return secondary if isinstance(secondary, dict) else None
+    if not isinstance(secondary, dict):
+        return primary
+
+    primary_games = _payload_games_by_event_id(primary)
+    secondary_games = _payload_games_by_event_id(secondary)
+    if not primary_games:
+        return secondary if secondary_games else primary
+    if not secondary_games:
+        return primary
+
+    ordered_event_ids: list[str] = []
+    for payload in (primary, secondary):
+        games = payload.get("games") if isinstance(payload.get("games"), list) else []
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            event_id = str(game.get("event_id") or "").strip()
+            if event_id and event_id not in ordered_event_ids:
+                ordered_event_ids.append(event_id)
+
+    merged_payload = dict(primary)
+    merged_payload["games"] = [
+        _merge_live_lines_game(primary_games[event_id], secondary_games[event_id])
+        if event_id in primary_games and event_id in secondary_games
+        else dict(primary_games.get(event_id) or secondary_games.get(event_id) or {})
+        for event_id in ordered_event_ids
+        if event_id in primary_games or event_id in secondary_games
+    ]
+    return merged_payload
+
+
+def _payload_has_requested_live_line_coverage(
+    payload: dict[str, Any] | None,
+    event_ids: list[str],
+    *,
+    include_period_totals: bool,
+) -> bool:
+    coverage = _payload_games_by_event_id(payload)
+    if not coverage:
+        return False
+    if event_ids and not all(event_id in coverage for event_id in event_ids):
+        return False
+    if not include_period_totals:
+        return True
+    for event_id in (event_ids or list(coverage.keys())):
+        game = coverage.get(event_id) or {}
+        lines = game.get("lines") if isinstance(game.get("lines"), dict) else {}
+        period_totals = lines.get("period_totals") if isinstance(lines.get("period_totals"), dict) else {}
+        period_spreads = lines.get("period_spreads") if isinstance(lines.get("period_spreads"), dict) else {}
+        if period_totals or period_spreads:
+            return True
+    return False
+
+
+def _finalize_live_lines_payload(payload: dict[str, Any], *, include_period_totals: bool) -> dict[str, Any]:
+    finalized = dict(payload)
+    finalized["include_period_totals"] = bool(include_period_totals)
+    return finalized
 
 
 def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str, str]:

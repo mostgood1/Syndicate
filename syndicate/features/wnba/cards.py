@@ -2452,6 +2452,18 @@ def _live_state_status_from_row(game: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _merge_live_status(existing_status: dict[str, Any] | None, incoming_status: dict[str, Any] | None) -> dict[str, Any]:
+    current = dict(existing_status or {}) if isinstance(existing_status, dict) else {}
+    incoming = dict(incoming_status or {}) if isinstance(incoming_status, dict) else {}
+    if not incoming:
+        return current
+    if bool(current.get("in_progress")) and not bool(incoming.get("in_progress")):
+        return current
+    if bool(current.get("final")) and not bool(incoming.get("final")):
+        return current
+    return incoming
+
+
 def _live_player_row_rank(row: dict[str, Any]) -> tuple[int, int, int, float]:
     line_source = str(row.get("line_source") or "").strip().lower()
     has_price = any(_price_is_usable(row.get(price_key)) for price_key in ("price", "price_over", "price_under"))
@@ -2545,12 +2557,11 @@ def _hydrate_live_player_lens_payload(
         actual_rows = boxscore_by_event.get(event_id) or {}
         hydrated_game = dict(game)
         live_status = live_state_by_event.get(event_id)
-        if isinstance(live_status, dict) and live_status:
-            hydrated_game["status"] = dict(live_status)
-        game_status = game.get("status") if isinstance(game.get("status"), dict) else {}
-        if isinstance(live_status, dict) and live_status:
-            game_status = dict(live_status)
-        game_explicitly_not_live = bool(game_status) and not bool(game_status.get("in_progress"))
+        source_game_status = game.get("status") if isinstance(game.get("status"), dict) else {}
+        game_status = _merge_live_status(source_game_status, live_status)
+        if game_status:
+            hydrated_game["status"] = dict(game_status)
+        game_explicitly_not_live = bool(source_game_status) and not bool(source_game_status.get("in_progress"))
         rows: list[dict[str, Any]] = []
         for row in game.get("rows") if isinstance(game.get("rows"), list) else []:
             if not isinstance(row, dict):
