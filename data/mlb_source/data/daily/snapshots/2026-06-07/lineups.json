@@ -2,7 +2,7 @@
   "date": "2026-06-07",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-07T11:22:57.515632",
+  "generated_at": "2026-06-07T11:37:30.973990",
   "summary": {
     "games": 15,
     "projected_teams": 9,
@@ -62,7 +62,7 @@
         "raw_ids": [],
         "ids": []
       },
-      "away_source": "confirmed_official_starting_lineups",
+      "away_source": "confirmed_feed_live",
       "home_source": "confirmed_feed_live",
       "away_confidence": 1.0,
       "home_confidence": 1.0,

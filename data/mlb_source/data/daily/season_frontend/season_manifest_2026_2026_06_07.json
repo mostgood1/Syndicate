@@ -2,7 +2,7 @@
   "meta": {
     "season": 2026,
     "title": "MLB 2026 Rolling Season Eval",
-    "generated_at": "2026-06-07T11:20:52.757261",
+    "generated_at": "2026-06-07T11:35:41.564396",
     "batch_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
     "game_types": [
       "R"
@@ -2156,15 +2156,15 @@
             "playable_counts": {
               "totals": 0,
               "ml": 0,
-              "pitcher_props": 17,
-              "hitter_props": 34,
+              "pitcher_props": 16,
+              "hitter_props": 32,
               "hitter_home_runs": 0,
               "hitter_hits": 13,
               "hitter_strikeouts": 0,
-              "hitter_total_bases": 12,
+              "hitter_total_bases": 10,
               "hitter_runs": 1,
               "hitter_rbis": 8,
-              "combined": 51
+              "combined": 48
             },
             "results": {
               "combined": {
