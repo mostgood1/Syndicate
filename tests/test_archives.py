@@ -2655,6 +2655,33 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(payload.get("requested_date"), "2026-05-28")
         self.assertEqual(payload.get("date"), "2026-05-29")
         self.assertTrue(payload.get("lookahead_applied"))
+
+    def test_nhl_live_lens_api_payload_preserves_games_contract(self) -> None:
+        from syndicate.features.nhl.live_lens import build_live_lens_api_payload as build_nhl_live_lens_api_payload
+
+        with patch(
+            "syndicate.features.nhl.live_lens.build_live_lens_page_context",
+            return_value={
+                "date": "2026-06-06",
+                "route_path": "/nhl/live-lens",
+                "rank_cards": [{"title": "CAR @ VGK"}],
+                "games": [
+                    {
+                        "gamePk": "2025030413",
+                        "gameState": "CRIT",
+                        "score": {"away": 4, "home": 4},
+                        "lens": {"totals": {"away": {"goals": 4}, "home": {"goals": 4}}},
+                    }
+                ],
+                "available_dates": ["2026-06-06"],
+            },
+        ):
+            payload = build_nhl_live_lens_api_payload("2026-06-06")
+
+        self.assertEqual(payload.get("date"), "2026-06-06")
+        self.assertEqual((payload.get("games") or [{}])[0].get("gamePk"), "2025030413")
+        self.assertEqual((((payload.get("games") or [{}])[0].get("lens") or {}).get("totals") or {}).get("away"), {"goals": 4})
+        self.assertEqual(payload.get("route_path"), "/nhl/live-lens")
         self.assertEqual((payload.get("empty_state") or {}).get("title"), "Today has no NHL games; next game day is queued")
         self.assertIn("Next scheduled game day: 2026-05-29", (payload.get("empty_state") or {}).get("list_items") or [])
 
@@ -2721,6 +2748,43 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(payload[0]["away_goals"], "4")
         self.assertEqual(payload[0]["home_goals"], "1")
         self.assertEqual(payload[0]["gameState"], "OFF")
+
+    def test_nhl_api_scoreboard_prefers_remote_rows_for_current_date(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        with TemporaryDirectory() as temp_dir:
+            scoreboard_path = Path(temp_dir) / "scoreboard.csv"
+            scoreboard_path.write_text(
+                "gamePk,away,home,away_abbr,home_abbr,away_goals,home_goals,gameState,period,clock,period_disp,intermission\n"
+                "2025030413,Carolina Hurricanes,Vegas Golden Knights,CAR,VGK,,,FUT,1,,,0\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.blueprints.nhl.scoreboard_snapshot_path", return_value=scoreboard_path), patch(
+                "syndicate.blueprints.nhl.central_today_iso", return_value="2026-06-06"
+            ), patch("syndicate.local_nhl_odds.NhlWebClient.scoreboard_day", return_value=[
+                {
+                    "gamePk": 2025030413,
+                    "away": "Carolina Hurricanes",
+                    "home": "Vegas Golden Knights",
+                    "away_goals": 3,
+                    "home_goals": 2,
+                    "gameState": "CRIT",
+                    "period": 4,
+                    "clock": "02:11",
+                }
+            ]):
+                response = client.get("/nhl/api/scoreboard?date=2026-06-06")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload, list)
+        self.assertEqual(payload[0]["gamePk"], 2025030413)
+        self.assertEqual(payload[0]["gameState"], "CRIT")
+        self.assertEqual(payload[0]["away_goals"], 3)
+        self.assertEqual(payload[0]["home_goals"], 2)
 
 
 class HomeBoardTests(unittest.TestCase):
@@ -6474,6 +6538,67 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn("P2", rank_cards[0].get("meta") or "")
         self.assertEqual(rank_cards[0].get("odds_refreshed_at"), "2026-05-16T23:11:00Z")
         self.assertEqual(context.get("odds_refreshed_at"), "2026-05-16T23:11:00Z")
+
+    def test_nhl_live_lens_prefers_remote_scoreboard_for_current_date(self) -> None:
+        cards_context = {
+            "requested_date": "2026-06-06",
+            "date": "2026-06-06",
+            "prev_date": "2026-06-05",
+            "next_date": "2026-06-07",
+            "source_path": str(REPO_ROOT / "data" / "processed" / "predictions_2026-06-06.csv"),
+            "source_title": "NHL processed predictions",
+            "games": [
+                {
+                    "gamePk": "2025030413",
+                    "away": {"abbr": "CAR", "name": "Carolina Hurricanes", "logo": "away.svg"},
+                    "home": {"abbr": "VGK", "name": "Vegas Golden Knights", "logo": "home.svg"},
+                    "status": "Scheduled",
+                    "detail": "Scheduled",
+                    "summary": "Stored game card",
+                    "betting": {"home_ml_ev": 0.05},
+                    "sim": {
+                        "score": {"total_mean": 5.8, "margin_mean": 0.4},
+                        "first10": {"prob_yes": 0.52, "ev_yes": 0.03},
+                    },
+                    "panels": [],
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            scoreboard_path = Path(temp_dir) / "scoreboard.csv"
+            scoreboard_path.write_text(
+                "gamePk,away,home,away_goals,home_goals,gameState,period,clock\n"
+                "2025030413,Carolina Hurricanes,Vegas Golden Knights,,,FUT,1,\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nhl.live_lens.build_cards_page_context", return_value=cards_context), patch(
+                "syndicate.features.nhl.live_lens.scoreboard_snapshot_path", return_value=scoreboard_path
+            ), patch("syndicate.features.nhl.live_lens.central_today_iso", return_value="2026-06-06"), patch(
+                "syndicate.local_nhl_odds.NhlWebClient.scoreboard_day",
+                return_value=[
+                    {
+                        "gamePk": 2025030413,
+                        "away": "Carolina Hurricanes",
+                        "home": "Vegas Golden Knights",
+                        "away_goals": 3,
+                        "home_goals": 2,
+                        "gameState": "CRIT",
+                        "period": 4,
+                        "clock": "02:11",
+                    }
+                ],
+            ), patch("syndicate.features.nhl.live_lens._load_team_odds_index", return_value=({}, None)), patch(
+                "syndicate.features.nhl.live_lens.slate_summaries", return_value=[{"date": "2026-06-06"}]
+            ):
+                context = build_nhl_live_lens_page_context("2026-06-06")
+
+        self.assertEqual((context.get("header_stats") or [None, None, None])[2], {"label": "Live", "value": "1"})
+        rank_cards = context.get("rank_cards") or []
+        self.assertTrue(rank_cards)
+        self.assertEqual(rank_cards[0].get("eyebrow"), "Live")
+        self.assertIn("CRIT", rank_cards[0].get("meta") or "")
 
     def test_nhl_live_lens_page_renders_rank_board_instead_of_redirecting(self) -> None:
         response = self.client.get("/nhl/live-lens?date=2026-05-16")

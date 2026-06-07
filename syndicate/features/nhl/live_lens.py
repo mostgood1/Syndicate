@@ -17,6 +17,7 @@ from syndicate.features.nhl.sources import team_abbreviation
 from syndicate.features.nhl.sources import team_odds_snapshot_path
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
+from syndicate.features.shared.timezone import central_today_iso
 
 
 def _safe_float(value: Any) -> float | None:
@@ -70,14 +71,25 @@ def _file_timestamp(path: Path) -> str | None:
 
 
 def _load_scoreboard_index(selected_date: str) -> dict[tuple[str, str], dict[str, Any]]:
-    path = scoreboard_snapshot_path(selected_date)
-    if not path.exists():
-        return {}
-    try:
-        with path.open("r", encoding="utf-8", newline="") as handle:
-            rows = list(csv.DictReader(handle))
-    except Exception:
-        return {}
+    rows: list[dict[str, Any]] = []
+    if selected_date == central_today_iso():
+        try:
+            from syndicate.local_nhl_odds import NhlWebClient
+
+            rows = NhlWebClient().scoreboard_day(selected_date)
+        except Exception:
+            rows = []
+
+    if not rows:
+        path = scoreboard_snapshot_path(selected_date)
+        if not path.exists():
+            return {}
+        try:
+            with path.open("r", encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+        except Exception:
+            return {}
+
     index: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
         away = str(row.get("away") or "").strip()
@@ -179,6 +191,165 @@ def _summarize_team_odds(rows: list[dict[str, Any]], *, away_team: str, home_tea
     if not any(summary.get(key) is not None for key in ("away_ml", "home_ml", "total", "away_puck_line", "home_puck_line")):
         return None
     return summary
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        if value is None or str(value).strip() == "":
+            return None
+        return int(float(value))
+    except Exception:
+        return None
+
+
+def _player_name(value: Any) -> str | None:
+    if isinstance(value, dict):
+        text = str(value.get("default") or value.get("name") or "").strip()
+        return text or None
+    text = str(value or "").strip()
+    return text or None
+
+
+def _official_boxscore_payload(game_pk: str) -> dict[str, Any] | None:
+    if not game_pk:
+        return None
+    try:
+        from syndicate.local_nhl_odds import NhlWebClient
+
+        payload = NhlWebClient()._get(f"/gamecenter/{game_pk}/boxscore")
+        return payload if isinstance(payload, dict) else None
+    except Exception:
+        return None
+
+
+def _normalize_official_skaters(rows: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        normalized.append(
+            {
+                "name": _player_name(row.get("name")),
+                "pos": str(row.get("position") or "").strip() or None,
+                "g": _safe_int(row.get("goals")),
+                "a": _safe_int(row.get("assists")),
+                "p": _safe_int(row.get("points")),
+                "s": _safe_int(row.get("sog")),
+                "blk": _safe_int(row.get("blockedShots")),
+                "toi": str(row.get("toi") or "").strip() or None,
+                "player_id": _safe_int(row.get("playerId")),
+            }
+        )
+    return normalized
+
+
+def _normalize_official_goalies(rows: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        normalized.append(
+            {
+                "name": _player_name(row.get("name")),
+                "saves": _safe_int(row.get("saves")),
+                "shots_against": _safe_int(row.get("shotsAgainst")),
+                "sv_pct": _safe_float(row.get("savePctg")),
+                "toi": str(row.get("toi") or "").strip() or None,
+                "player_id": _safe_int(row.get("playerId")),
+            }
+        )
+    return normalized
+
+
+def _live_odds_payload(team_odds: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(team_odds, dict):
+        return None
+    bookmaker = str(team_odds.get("bookmaker") or "").strip() or None
+    payload = {
+        "ml": {
+            "away": team_odds.get("away_ml"),
+            "home": team_odds.get("home_ml"),
+            "away_book": bookmaker,
+            "home_book": bookmaker,
+        },
+        "total": {
+            "line": team_odds.get("total"),
+            "over": team_odds.get("over_odds"),
+            "under": team_odds.get("under_odds"),
+            "over_book": bookmaker,
+            "under_book": bookmaker,
+        },
+        "puckline": {
+            "away_+1.5": team_odds.get("away_puck_odds") if _safe_float(team_odds.get("away_puck_line")) == 1.5 else None,
+            "away_+1.5_book": bookmaker,
+            "home_-1.5": team_odds.get("home_puck_odds") if _safe_float(team_odds.get("home_puck_line")) == -1.5 else None,
+            "home_-1.5_book": bookmaker,
+        },
+    }
+    return payload if any(isinstance(section, dict) and any(value not in {None, ""} for value in section.values()) for section in payload.values()) else None
+
+
+def _live_game_payload(game: dict[str, Any], scoreboard_row: dict[str, Any] | None = None, team_odds: dict[str, Any] | None = None, *, selected_date: str) -> dict[str, Any]:
+    away_name = str((game.get("away") or {}).get("name") or game.get("away_name") or (scoreboard_row or {}).get("away") or "").strip()
+    home_name = str((game.get("home") or {}).get("name") or game.get("home_name") or (scoreboard_row or {}).get("home") or "").strip()
+    game_pk = str(game.get("gamePk") or (scoreboard_row or {}).get("gamePk") or "").strip()
+    payload: dict[str, Any] = {
+        "gamePk": game_pk or None,
+        "key": f"{away_name} @ {home_name}".strip(),
+        "away": away_name or None,
+        "home": home_name or None,
+        "gameState": str((scoreboard_row or {}).get("gameState") or "").strip().upper() or None,
+        "period": _safe_int((scoreboard_row or {}).get("period")),
+        "clock": str((scoreboard_row or {}).get("clock") or "").strip() or None,
+        "period_disp": None,
+        "intermission": False,
+        "score": {
+            "away": _safe_int((scoreboard_row or {}).get("away_goals")),
+            "home": _safe_int((scoreboard_row or {}).get("home_goals")),
+        },
+        "odds": _live_odds_payload(team_odds),
+    }
+
+    if selected_date != central_today_iso() or not game_pk:
+        return payload
+
+    official_payload = _official_boxscore_payload(game_pk)
+    if not isinstance(official_payload, dict):
+        return payload
+
+    period_descriptor = official_payload.get("periodDescriptor") if isinstance(official_payload.get("periodDescriptor"), dict) else {}
+    clock_info = official_payload.get("clock") if isinstance(official_payload.get("clock"), dict) else {}
+    away_team = official_payload.get("awayTeam") if isinstance(official_payload.get("awayTeam"), dict) else {}
+    home_team = official_payload.get("homeTeam") if isinstance(official_payload.get("homeTeam"), dict) else {}
+    player_stats = official_payload.get("playerByGameStats") if isinstance(official_payload.get("playerByGameStats"), dict) else {}
+    away_stats = player_stats.get("awayTeam") if isinstance(player_stats.get("awayTeam"), dict) else {}
+    home_stats = player_stats.get("homeTeam") if isinstance(player_stats.get("homeTeam"), dict) else {}
+
+    payload["gameState"] = str(official_payload.get("gameState") or payload.get("gameState") or "").strip().upper() or None
+    payload["period"] = _safe_int(period_descriptor.get("number") or period_descriptor.get("period") or payload.get("period"))
+    payload["clock"] = str(clock_info.get("timeRemaining") or clock_info.get("timeRemainingInPeriod") or payload.get("clock") or "").strip() or None
+    payload["period_disp"] = str(period_descriptor.get("periodType") or "").strip() or None
+    payload["intermission"] = bool(clock_info.get("inIntermission"))
+    payload["score"] = {
+        "away": _safe_int(away_team.get("score")),
+        "home": _safe_int(home_team.get("score")),
+    }
+    payload["lens"] = {
+        "totals": {
+            "away": {"goals": _safe_int(away_team.get("score")), "shots": _safe_int(away_team.get("sog"))},
+            "home": {"goals": _safe_int(home_team.get("score")), "shots": _safe_int(home_team.get("sog"))},
+        },
+        "periods": [],
+        "players": {
+            "away": _normalize_official_skaters((away_stats.get("forwards") or []) + (away_stats.get("defense") or [])),
+            "home": _normalize_official_skaters((home_stats.get("forwards") or []) + (home_stats.get("defense") or [])),
+        },
+        "goalies": {
+            "away": _normalize_official_goalies(away_stats.get("goalies") or []),
+            "home": _normalize_official_goalies(home_stats.get("goalies") or []),
+        },
+    }
+    return payload
 
 
 def _source_title(cards_context: dict[str, Any], matched_scoreboard_rows: list[dict[str, Any]]) -> str:
@@ -412,6 +583,43 @@ def build_live_lens_page_context(selected_date: str | None) -> dict[str, Any]:
         matched_odds_rows=matched_odds_rows,
     )
     source_title = _source_title(cards_context, matched_scoreboard_rows)
+    live_games = [
+        _live_game_payload(
+            game,
+            scoreboard_row=next(
+                (
+                    scoreboard_index.get(key)
+                    for key in _lookup_keys(
+                        game_pk=game.get("gamePk"),
+                        away=(game.get("away") or {}).get("name") or game.get("away_name"),
+                        home=(game.get("home") or {}).get("name") or game.get("home_name"),
+                    )
+                    if scoreboard_index.get(key) is not None
+                ),
+                None,
+            ),
+            team_odds=next(
+                (
+                    _summarize_team_odds(
+                        rows,
+                        away_team=str((game.get("away") or {}).get("name") or game.get("away_name") or ""),
+                        home_team=str((game.get("home") or {}).get("name") or game.get("home_name") or ""),
+                        fallback_refreshed_at=odds_refreshed_at,
+                    )
+                    for key in _lookup_keys(
+                        away=(game.get("away") or {}).get("name") or game.get("away_name"),
+                        home=(game.get("home") or {}).get("name") or game.get("home_name"),
+                    )
+                    for rows in [team_odds_index.get(key)]
+                    if rows
+                ),
+                None,
+            ),
+            selected_date=resolved_date,
+        )
+        for game in games
+        if isinstance(game, dict)
+    ]
 
     context = build_rank_page_context(
         selected_date=requested_date,
@@ -439,6 +647,7 @@ def build_live_lens_page_context(selected_date: str | None) -> dict[str, Any]:
     context["available_dates"] = [item["date"] for item in slate_summaries()]
     context["odds_refreshed_at"] = odds_refreshed_at
     context["oddsRefreshedAt"] = odds_refreshed_at
+    context["games"] = live_games
     return context
 
 
@@ -446,4 +655,5 @@ def build_live_lens_api_payload(selected_date: str | None) -> dict[str, Any]:
     context = build_live_lens_page_context(selected_date)
     payload = build_rank_api_payload(context)
     payload["available_dates"] = context.get("available_dates")
+    payload["games"] = [dict(game) for game in (context.get("games") or []) if isinstance(game, dict)]
     return payload

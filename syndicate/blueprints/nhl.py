@@ -32,6 +32,7 @@ from syndicate.features.nhl.sources import slate_summaries
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.timezone import central_year
 
 
@@ -65,23 +66,23 @@ def _query_string() -> str:
 
 
 def _load_scoreboard_rows(selected_date: str) -> list[dict[str, object]]:
-    path = scoreboard_snapshot_path(selected_date)
-    if path.exists():
-        try:
-            with path.open("r", encoding="utf-8", newline="") as handle:
-                rows = list(csv.DictReader(handle))
-        except Exception:
-            rows = []
-    else:
-        rows = []
-
-    if not rows:
+    rows: list[dict[str, object]] = []
+    if selected_date == central_today_iso():
         try:
             from syndicate.local_nhl_odds import NhlWebClient
 
             rows = NhlWebClient().scoreboard_day(selected_date)
         except Exception:
             rows = []
+
+    if not rows:
+        path = scoreboard_snapshot_path(selected_date)
+        if path.exists():
+            try:
+                with path.open("r", encoding="utf-8", newline="") as handle:
+                    rows = list(csv.DictReader(handle))
+            except Exception:
+                rows = []
 
     out: list[dict[str, object]] = []
     for row in rows:
