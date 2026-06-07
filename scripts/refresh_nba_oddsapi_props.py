@@ -3540,9 +3540,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
                 copied["top_by_game_path"] = top_by_game_path
             copied.update(_export_season_betting_card_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
             copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
-            if not reuse_existing_run:
-                copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
             copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+        if not reuse_existing_run:
+            copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
     if boxscores_history_path:
         copied["boxscores_history_path"] = boxscores_history_path

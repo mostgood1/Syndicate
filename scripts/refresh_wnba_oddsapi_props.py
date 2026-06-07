@@ -40,6 +40,36 @@ def _json_ready(value):
     return value
 
 
+def _canonical_wnba_tri(value: object) -> str:
+    text = str(value or "").strip().upper()
+    compact = "".join(ch for ch in text if ch.isalnum())
+    mapped = {
+        "LA": "LAS",
+        "LV": "LVA",
+        "LVA": "LVA",
+        "LAS": "LVA",
+        "GS": "GSV",
+        "GSW": "GSV",
+        "NY": "NYL",
+        "CONN": "CON",
+        "WAS": "WSH",
+        "LASVEGASACES": "LVA",
+        "LOSANGELESSPARKS": "LAS",
+        "NEWYORKLIBERTY": "NYL",
+        "CONNECTICUTSUN": "CON",
+        "WASHINGTONMYSTICS": "WSH",
+        "INDIANAFEVER": "IND",
+        "MINNESOTALYNX": "MIN",
+        "SEATTLESTORM": "SEA",
+        "PHOENIXMERCURY": "PHX",
+        "DALLASWINGS": "DAL",
+        "ATLANTADREAM": "ATL",
+        "CHICAGOSKY": "CHI",
+        "GOLDENSTATEVALKYRIES": "GSV",
+    }
+    return mapped.get(text, mapped.get(compact, text))
+
+
 def _source_app_fallback_enabled() -> bool:
     return str(os.environ.get("SYNDICATE_WNBA_SOURCE_APP_FALLBACK") or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -163,8 +193,18 @@ def _payload_has_snapshot_content(kind: str, payload: dict[str, object] | None) 
         return any(
             isinstance(game, dict)
             and (
-                bool(game.get("found"))
-                or (isinstance(game.get("lines"), dict) and bool(game.get("lines")))
+                any(_float_or_none(game.get(key)) is not None for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"))
+                or (
+                    isinstance(game.get("lines"), dict)
+                    and (
+                        any(_float_or_none((game.get("lines") or {}).get(key)) is not None for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"))
+                        or any(
+                            _float_or_none(value) is not None
+                            for period_key in ("period_totals", "period_spreads")
+                            for value in (((game.get("lines") or {}).get(period_key) or {}).values() if isinstance(((game.get("lines") or {}).get(period_key)), dict) else [])
+                        )
+                    )
+                )
             )
             for game in games
         )
@@ -198,6 +238,151 @@ def _prefer_live_lines_payload(current: dict[str, object] | None, candidate: dic
     if _live_lines_interval_count(candidate) > _live_lines_interval_count(current):
         return candidate
     return current
+
+
+def _load_game_odds_rows_by_matchup(*, source_root: Path, processed_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, object]]:
+    candidates = [
+        source_root / "data" / "processed" / f"game_odds_{date_str}.csv",
+        processed_root / f"game_odds_{date_str}.csv",
+    ]
+    out: dict[tuple[str, str], dict[str, object]] = {}
+    odds_path = next((path for path in candidates if path.exists() and path.is_file() and _count_csv_rows_quick(path) > 0), None)
+    if odds_path is None:
+        return out
+    try:
+        with odds_path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if not isinstance(row, dict):
+                    continue
+                home_tri = _canonical_wnba_tri(_to_tricode_local(str(row.get("home_team") or row.get("home_tri") or "").strip()))
+                away_tri = _canonical_wnba_tri(_to_tricode_local(str(row.get("visitor_team") or row.get("away_team") or row.get("away_tri") or "").strip()))
+                if not home_tri or not away_tri:
+                    continue
+                out[(home_tri, away_tri)] = {
+                    "total": _float_or_none(row.get("total")),
+                    "home_spread": _float_or_none(row.get("home_spread")),
+                    "away_spread": _float_or_none(row.get("away_spread")),
+                    "home_ml": _float_or_none(row.get("home_ml")),
+                    "away_ml": _float_or_none(row.get("away_ml")),
+                    "bookmaker": str(row.get("bookmaker") or "").strip() or None,
+                }
+    except Exception:
+        return {}
+    return out
+
+
+def _load_period_lines_rows_by_matchup(*, source_root: Path, processed_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, dict[str, float | None]]]:
+    candidates = [
+        source_root / "data" / "processed" / f"period_lines_{date_str}.csv",
+        processed_root / f"period_lines_{date_str}.csv",
+    ]
+    period_path = next((path for path in candidates if path.exists() and path.is_file() and _count_csv_rows_quick(path) > 0), None)
+    if period_path is None:
+        return {}
+    out: dict[tuple[str, str], dict[str, dict[str, float | None]]] = {}
+    try:
+        with period_path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if not isinstance(row, dict):
+                    continue
+                home_tri = _canonical_wnba_tri(_to_tricode_local(str(row.get("home_team") or row.get("home_tri") or "").strip()))
+                away_tri = _canonical_wnba_tri(_to_tricode_local(str(row.get("visitor_team") or row.get("away_team") or row.get("away_tri") or "").strip()))
+                if not home_tri or not away_tri:
+                    continue
+                out[(home_tri, away_tri)] = {
+                    "period_totals": {
+                        "h1": _float_or_none(row.get("h1_total")),
+                        "q1": _float_or_none(row.get("q1_total")),
+                        "q2": _float_or_none(row.get("q2_total")),
+                        "q3": _float_or_none(row.get("q3_total")),
+                        "q4": _float_or_none(row.get("q4_total")),
+                    },
+                    "period_spreads": {
+                        "h1": _float_or_none(row.get("h1_spread")),
+                        "q1": _float_or_none(row.get("q1_spread")),
+                        "q2": _float_or_none(row.get("q2_spread")),
+                        "q3": _float_or_none(row.get("q3_spread")),
+                        "q4": _float_or_none(row.get("q4_spread")),
+                    },
+                }
+    except Exception:
+        return {}
+    return out
+
+
+def _build_source_live_lines_payload(
+    *,
+    source_root: Path,
+    processed_root: Path,
+    date_str: str,
+    state_payload: dict[str, object] | None,
+) -> dict[str, object] | None:
+    games = state_payload.get("games") if isinstance(state_payload, dict) and isinstance(state_payload.get("games"), list) else []
+    if not games:
+        return None
+
+    odds_by_matchup = _load_game_odds_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
+    period_by_matchup = _load_period_lines_rows_by_matchup(source_root=source_root, processed_root=processed_root, date_str=date_str)
+    source_app = _load_source_app(source_root)
+
+    out_games: list[dict[str, object]] = []
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        home_tri = _canonical_wnba_tri(_to_tricode_local(str(game.get("home") or "").strip()) or str(game.get("home") or "").strip())
+        away_tri = _canonical_wnba_tri(_to_tricode_local(str(game.get("away") or "").strip()) or str(game.get("away") or "").strip())
+        if not event_id or not home_tri or not away_tri:
+            continue
+        matchup_key = (home_tri, away_tri)
+        pregame_lines = dict(odds_by_matchup.get(matchup_key) or {})
+        period_lines = dict(period_by_matchup.get(matchup_key) or {})
+        live_lines = {}
+        if bool(game.get("in_progress")) and source_app is not None and hasattr(source_app, "_live_oddsapi_period_totals_for_game"):
+            try:
+                live_lines = source_app._live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri) or {}
+            except Exception:
+                live_lines = {}
+        game_lines = live_lines.get("game_lines") if isinstance(live_lines.get("game_lines"), dict) else {}
+        period_totals = live_lines.get("period_totals") if isinstance(live_lines.get("period_totals"), dict) else None
+        period_spreads = live_lines.get("period_spreads") if isinstance(live_lines.get("period_spreads"), dict) else None
+        if not (isinstance(period_totals, dict) and any(_float_or_none(value) is not None for value in period_totals.values())):
+            period_totals = period_lines.get("period_totals") if isinstance(period_lines.get("period_totals"), dict) else None
+            period_spreads = period_lines.get("period_spreads") if isinstance(period_lines.get("period_spreads"), dict) else None
+        merged_lines = {
+            "total": _float_or_none(game_lines.get("total")) if isinstance(game_lines, dict) and game_lines.get("total") is not None else _float_or_none(pregame_lines.get("total")),
+            "home_spread": _float_or_none(game_lines.get("home_spread")) if isinstance(game_lines, dict) and game_lines.get("home_spread") is not None else _float_or_none(pregame_lines.get("home_spread")),
+            "away_spread": _float_or_none(game_lines.get("away_spread")) if isinstance(game_lines, dict) and game_lines.get("away_spread") is not None else _float_or_none(pregame_lines.get("away_spread")),
+            "home_ml": _float_or_none(game_lines.get("home_ml")) if isinstance(game_lines, dict) and game_lines.get("home_ml") is not None else _float_or_none(pregame_lines.get("home_ml")),
+            "away_ml": _float_or_none(game_lines.get("away_ml")) if isinstance(game_lines, dict) and game_lines.get("away_ml") is not None else _float_or_none(pregame_lines.get("away_ml")),
+            "period_totals": period_totals,
+            "period_spreads": period_spreads,
+        }
+        out_games.append(
+            {
+                "event_id": event_id,
+                "found": any(_float_or_none(merged_lines.get(key)) is not None for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml"))
+                or any(
+                    _float_or_none(value) is not None
+                    for values in (merged_lines.get("period_totals"), merged_lines.get("period_spreads"))
+                    if isinstance(values, dict)
+                    for value in values.values()
+                ),
+                "game_id": game.get("game_id"),
+                "home": home_tri,
+                "away": away_tri,
+                "in_progress": bool(game.get("in_progress")),
+                "source": {
+                    "scoreboard": "live_state_snapshot",
+                    "game_lines": "processed_game_odds" if any(_float_or_none(merged_lines.get(key)) is not None for key in ("total", "home_spread", "away_spread", "home_ml", "away_ml")) else None,
+                    "period_totals": "oddsapi_fast" if isinstance(live_lines.get("period_totals"), dict) and any(_float_or_none(value) is not None for value in live_lines.get("period_totals", {}).values()) else ("processed_period_lines" if isinstance(period_totals, dict) and any(_float_or_none(value) is not None for value in period_totals.values()) else None),
+                },
+                "lines": merged_lines,
+            }
+        )
+
+    payload = {"ok": True, "ttl": 20, "date": date_str, "games": out_games}
+    return payload if _payload_has_snapshot_content("live_lines", payload) else None
 
 
 def _snapshot_artifact_has_meaningful_content(kind: str, path: Path | None) -> bool:
@@ -425,6 +610,14 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             if kind == "live_lines":
                 query = f"{query}&include_period_totals=1"
             payload = _fetch_json(query)
+        if kind == "live_lines":
+            source_payload = _build_source_live_lines_payload(
+                source_root=source_root,
+                processed_root=processed_root,
+                date_str=date_str,
+                state_payload=state_payload,
+            )
+            payload = _prefer_live_lines_payload(payload, source_payload)
         local_payload = _build_local_live_snapshot_payload(kind=kind, date_str=date_str, event_ids=event_ids)
         if kind == "live_lines":
             payload = _prefer_live_lines_payload(payload, local_payload)
@@ -3406,9 +3599,9 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
             if top_by_game_path:
                 copied["top_by_game_path"] = top_by_game_path
             copied.update(_export_live_lens_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root, live_lens_root=live_lens_root))
-            if not reuse_existing_run:
-                copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
             copied.update(_build_optional_player_recon_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
+        if not reuse_existing_run:
+            copied.update(_export_live_snapshot_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
     boxscores_history_path = _refresh_boxscores_history_artifact(source_root=source_root, processed_root=processed_root)
     if boxscores_history_path:
         copied["boxscores_history_path"] = boxscores_history_path

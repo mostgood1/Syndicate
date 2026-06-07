@@ -347,7 +347,29 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             processed_dir = root / "data" / "processed"
-            processed_dir.mkdir(parents=True, exist_ok=True)
+            live_snapshots_dir = processed_dir / "live_snapshots"
+            live_snapshots_dir.mkdir(parents=True, exist_ok=True)
+            (live_snapshots_dir / "live_lines_2026-05-21.jsonl").write_text(
+                json.dumps(
+                    {
+                        "payload": {
+                            "date": "2026-05-21",
+                            "games": [
+                                {
+                                    "event_id": "evt-2",
+                                    "game_id": "0401",
+                                    "away": "BOS",
+                                    "home": "NYK",
+                                    "found": True,
+                                    "lines": {"period_totals": None, "period_spreads": None},
+                                }
+                            ],
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (processed_dir / "live_lens_signals_2026-05-21.jsonl").write_text(
                 "\n".join(
                     [
@@ -382,6 +404,9 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
             ), patch(
                 "syndicate.features.nba.cards._resolve_games_for_event_ids",
                 return_value={"evt-2": {"event_id": "evt-2", "gamePk": "0401", "away_tri": "BOS", "home_tri": "NYK"}},
+            ), patch(
+                "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+                return_value=None,
             ):
                 _local_live_snapshot_payload.cache_clear()
                 payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
@@ -391,6 +416,73 @@ class NbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("total"), 221.5)
         self.assertEqual((((game.get("lines") or {}).get("period_totals") or {}).get("q1")), 56.5)
         self.assertEqual(payload.get("source"), "syndicate_live_lens_signals_artifact")
+
+    def test_live_lines_payload_prefers_local_snapshot_artifact_over_signals(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            processed_dir = root / "data" / "processed"
+            live_snapshots_dir = processed_dir / "live_snapshots"
+            live_snapshots_dir.mkdir(parents=True, exist_ok=True)
+            (processed_dir / "live_lens_signals_2026-05-21.jsonl").write_text(
+                json.dumps(
+                    {
+                        "market": "total",
+                        "game_id": "0401",
+                        "home": "NYK",
+                        "away": "BOS",
+                        "live_line": 221.5,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (live_snapshots_dir / "live_lines_2026-05-21.jsonl").write_text(
+                json.dumps(
+                    {
+                        "payload": {
+                            "date": "2026-05-21",
+                            "games": [
+                                {
+                                    "event_id": "evt-2",
+                                    "game_id": "0401",
+                                    "away": "BOS",
+                                    "home": "NYK",
+                                    "found": True,
+                                    "lines": {
+                                        "total": 219.5,
+                                        "period_totals": {"q1": 54.5},
+                                        "period_spreads": {"q1": -1.5},
+                                    },
+                                }
+                            ],
+                            "generated_at": "2026-05-21T20:00:00Z",
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("syndicate.features.nba.sources._artifact_roots", return_value=[root]), patch(
+                "syndicate.features.nba.cards.build_cards_page_context",
+                return_value={"date": "2026-05-21"},
+            ), patch(
+                "syndicate.features.nba.cards._resolve_games_for_event_ids",
+                return_value={"evt-2": {"event_id": "evt-2", "gamePk": "0401", "away_tri": "BOS", "home_tri": "NYK"}},
+            ), patch(
+                "syndicate.features.nba.cards._filtered_local_live_snapshot_payload",
+                return_value=None,
+            ):
+                _local_live_snapshot_payload.cache_clear()
+                payload = build_live_lines_payload("2026-05-21", ["evt-2"], ttl=20, include_period_totals=True)
+                _local_live_snapshot_payload.cache_clear()
+
+        game = (payload.get("games") or [{}])[0]
+        lines = game.get("lines") or {}
+        self.assertEqual(lines.get("total"), 219.5)
+        self.assertEqual((lines.get("period_totals") or {}).get("q1"), 54.5)
+        self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -1.5)
+        self.assertEqual(payload.get("source"), "syndicate_live_snapshot_artifact")
 
 
 if __name__ == "__main__":

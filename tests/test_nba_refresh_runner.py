@@ -1336,6 +1336,51 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual((lines.get("period_totals") or {}).get("q1"), 54.5)
         self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -1.5)
 
+    def test_materialize_artifact_bundle_exports_live_snapshots_when_outputs_already_in_bundle(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            artifact_root = tmp_root / "bundle"
+            processed_root = artifact_root / "data" / "processed"
+            raw_root = artifact_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            source_root = tmp_root / "source"
+            source_root.mkdir(parents=True, exist_ok=True)
+            output_root = tmp_root / "outputs"
+            output_processed = output_root / "processed"
+            output_raw = output_root / "raw"
+            output_processed.mkdir(parents=True, exist_ok=True)
+            output_raw.mkdir(parents=True, exist_ok=True)
+
+            state = {
+                "date": "2026-06-06",
+                "snapshot_alias_path": str(output_processed / "oddsapi_player_props_2026-06-06.csv"),
+                "predictions_path": str(output_processed / "props_predictions_2026-06-06.csv"),
+                "edges_path": str(output_processed / "props_edges_2026-06-06.csv"),
+                "recs_path": str(output_processed / "props_recommendations_2026-06-06.csv"),
+                "snapshot_path": str(output_raw / "odds_nba_player_props_2026-06-06.csv"),
+            }
+            for path_text in state.values():
+                if isinstance(path_text, str) and path_text.endswith((".csv", ".jsonl", ".json")):
+                    Path(path_text).parent.mkdir(parents=True, exist_ok=True)
+                    Path(path_text).write_text("id\n1\n", encoding="utf-8")
+
+            with patch.object(module, "_export_live_snapshot_artifacts", return_value={"live_lines_path": "written"}) as export_snapshots, patch.object(
+                module,
+                "_build_optional_player_recon_artifacts",
+                return_value={},
+            ):
+                copied = module._materialize_artifact_bundle(
+                    state=state,
+                    artifact_root=artifact_root,
+                    source_root=source_root,
+                )
+
+        export_snapshots.assert_called_once_with(source_root=source_root, date_str="2026-06-06", processed_root=processed_root)
+        self.assertEqual(copied.get("live_lines_path"), "written")
+
     def test_season_betting_card_export_uses_local_manifest_builder(self) -> None:
         module = self._load_module()
 

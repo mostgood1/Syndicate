@@ -1268,6 +1268,116 @@ class WnbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual((lines.get("period_totals") or {}).get("q1"), 40.5)
         self.assertEqual((lines.get("period_spreads") or {}).get("q1"), -2.5)
 
+    def test_export_live_snapshot_artifacts_builds_live_lines_from_processed_game_odds(self) -> None:
+        module = self._load_module()
+
+        class _FakeSourceApp:
+            @staticmethod
+            def _live_oddsapi_period_totals_for_game(date_str, home_tri, away_tri):
+                return {}
+
+        def _fake_local_payload(*, kind, date_str, event_ids):
+            if kind == "live_state":
+                return {
+                    "ok": True,
+                    "games": [
+                        {
+                            "event_id": "401856963",
+                            "game_id": "0401",
+                            "home": "LAS",
+                            "away": "NYL",
+                            "in_progress": False,
+                            "final": True,
+                            "status": "Final",
+                        }
+                    ],
+                }
+            if kind == "live_lines":
+                return {"ok": True, "games": [{"event_id": "401856963", "found": True, "lines": {"period_totals": None, "period_spreads": None}}]}
+            return None
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            (source_root / "data" / "processed").mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            (source_root / "data" / "processed" / "game_odds_2026-06-05.csv").write_text(
+                "date,commence_time,home_team,visitor_team,home_ml,away_ml,home_spread,away_spread,total,bookmaker\n"
+                "2026-06-05,2026-06-05T23:00:00Z,Las Vegas Aces,New York Liberty,-140,120,-4.5,4.5,163.5,oddsapi_consensus\n",
+                encoding="utf-8",
+            )
+
+            with patch.object(module, "_source_app_fallback_enabled", return_value=False), patch.object(
+                module,
+                "_load_source_app",
+                return_value=_FakeSourceApp(),
+            ), patch.object(
+                module,
+                "_build_local_live_snapshot_payload",
+                side_effect=_fake_local_payload,
+            ), patch.object(
+                module,
+                "_build_bundle_local_live_snapshot_payload",
+                return_value=None,
+            ):
+                copied = module._export_live_snapshot_artifacts(
+                    source_root=source_root,
+                    date_str="2026-06-05",
+                    processed_root=processed_root,
+                )
+
+            self.assertIn("live_lines_path", copied)
+            lines_payload = module._read_live_snapshot_payload(processed_root / "live_snapshots" / "live_lines_2026-06-05.jsonl")
+
+        game = ((lines_payload or {}).get("games") or [{}])[0]
+        lines = game.get("lines") or {}
+        self.assertEqual(lines.get("total"), 163.5)
+        self.assertEqual(lines.get("home_spread"), -4.5)
+        self.assertEqual(lines.get("away_spread"), 4.5)
+        self.assertEqual(game.get("home"), "LVA")
+        self.assertEqual(game.get("away"), "NYL")
+
+    def test_materialize_artifact_bundle_exports_live_snapshots_when_outputs_already_in_bundle(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            artifact_root = tmp_root / "bundle"
+            processed_root = artifact_root / "data" / "processed"
+            raw_root = artifact_root / "data" / "raw"
+            processed_root.mkdir(parents=True, exist_ok=True)
+            raw_root.mkdir(parents=True, exist_ok=True)
+            source_root = tmp_root / "source"
+            source_root.mkdir(parents=True, exist_ok=True)
+
+            state = {
+                "date": "2026-06-06",
+                "snapshot_alias_path": str(processed_root / "oddsapi_player_props_2026-06-06.csv"),
+                "predictions_path": str(processed_root / "props_predictions_2026-06-06.csv"),
+                "edges_path": str(processed_root / "props_edges_2026-06-06.csv"),
+                "recs_path": str(processed_root / "props_recommendations_2026-06-06.csv"),
+                "snapshot_path": str(raw_root / "odds_wnba_player_props_2026-06-06.csv"),
+            }
+            for path_text in state.values():
+                if isinstance(path_text, str) and path_text.endswith((".csv", ".jsonl", ".json")):
+                    Path(path_text).parent.mkdir(parents=True, exist_ok=True)
+                    Path(path_text).write_text("id\n1\n", encoding="utf-8")
+
+            with patch.object(module, "_export_live_snapshot_artifacts", return_value={"live_lines_path": "written"}) as export_snapshots, patch.object(
+                module,
+                "_build_optional_player_recon_artifacts",
+                return_value={},
+            ):
+                copied = module._materialize_artifact_bundle(
+                    state=state,
+                    artifact_root=artifact_root,
+                    source_root=source_root,
+                )
+
+        export_snapshots.assert_called_once_with(source_root=source_root, date_str="2026-06-06", processed_root=processed_root)
+        self.assertEqual(copied.get("live_lines_path"), "written")
+
     def test_main_materializes_core_artifacts_into_bundle_root(self) -> None:
         module = self._load_module()
 
