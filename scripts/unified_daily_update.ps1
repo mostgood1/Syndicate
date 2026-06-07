@@ -1983,7 +1983,9 @@ try {
 
             if (-not $DryRun -and -not $hasLaterStepForSport) {
                 Assert-AdvancedDataReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RunDir $runDir
-                Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RequirePublishTrackedInputs (-not $SkipGitPush)
+                if ($SkipGitPush) {
+                    Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RequirePublishTrackedInputs $false
+                }
             }
 
             if (-not $SkipGitPush) {
@@ -1998,6 +2000,10 @@ try {
                         status = $result.status
                         commit = $result.commit
                     })
+                }
+
+                if (-not $DryRun -and -not $hasLaterStepForSport) {
+                    Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RequirePublishTrackedInputs $true
                 }
             }
         }
