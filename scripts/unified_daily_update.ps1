@@ -1483,6 +1483,111 @@ function Invoke-GitPublish {
     }
 }
 
+function Get-IntelligencePublishArtifactPaths {
+    param(
+        [string]$RepoPath,
+        [string]$DateValue,
+        [bool]$SkipMLB,
+        [bool]$SkipNBA,
+        [bool]$SkipNHL,
+        [bool]$SkipWNBA,
+        [bool]$SkipNFL,
+        [bool]$SkipNCAAF,
+        [bool]$SkipNCAAB
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RepoPath) -or [string]::IsNullOrWhiteSpace($DateValue)) {
+        return @()
+    }
+
+    $pythonExe = Resolve-Python $RepoPath
+    $tempScriptPath = Join-Path $RepoPath '.tmp_unified_daily_update_intelligence_publish_paths.py'
+    $scriptContent = @'
+import json
+import sys
+from pathlib import Path
+
+from syndicate.app import create_app
+from syndicate.features.intelligence import _advanced_input_specs_for_sport
+from syndicate.features.intelligence import _status_overview_rows
+
+
+def _relative_repo_path(path: Path, repo_root: Path) -> str | None:
+    try:
+        resolved = path.resolve()
+    except Exception:
+        resolved = path
+    try:
+        relative = resolved.relative_to(repo_root.resolve())
+    except Exception:
+        return None
+    return str(relative).replace("\\", "/")
+
+
+def main() -> int:
+    selected_date = str(sys.argv[1] or "").strip()
+    skipped = {str(arg or "").strip().lower() for arg in sys.argv[2:] if str(arg or "").strip()}
+    repo_root = Path.cwd().resolve()
+    app = create_app()
+    rows: list[str] = []
+    with app.app_context():
+        overview = _status_overview_rows(selected_date=selected_date)
+        for sport in overview:
+            slug = str(sport.get("slug") or "").strip().lower()
+            if not slug or slug in skipped:
+                continue
+            for spec in _advanced_input_specs_for_sport(sport):
+                path = spec.get("path")
+                if not isinstance(path, Path):
+                    continue
+                try:
+                    if not path.exists():
+                        continue
+                except OSError:
+                    continue
+                relative = _relative_repo_path(path, repo_root)
+                if relative:
+                    rows.append(relative)
+    print(json.dumps(sorted(set(rows))))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'@
+    Set-Content -Path $tempScriptPath -Value $scriptContent -Encoding UTF8
+
+    $skippedSports = New-Object System.Collections.Generic.List[string]
+    if ($SkipMLB) { $skippedSports.Add('mlb') | Out-Null }
+    if ($SkipNBA) { $skippedSports.Add('nba') | Out-Null }
+    if ($SkipNHL) { $skippedSports.Add('nhl') | Out-Null }
+    if ($SkipWNBA) { $skippedSports.Add('wnba') | Out-Null }
+    if ($SkipNFL) { $skippedSports.Add('nfl') | Out-Null }
+    if ($SkipNCAAF) { $skippedSports.Add('ncaaf') | Out-Null }
+    if ($SkipNCAAB) { $skippedSports.Add('ncaab') | Out-Null }
+
+    Push-Location $RepoPath
+    try {
+        $rawOutput = & $pythonExe $tempScriptPath $DateValue @($skippedSports)
+        if ($LASTEXITCODE -ne 0) {
+            throw "intelligence publish path builder exited with code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
+        Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
+    }
+
+    try {
+        $paths = @((($rawOutput | Out-String) | ConvertFrom-Json -ErrorAction Stop))
+    }
+    catch {
+        throw 'Unable to parse intelligence publish paths payload'
+    }
+
+    return @($paths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
 function Assert-IntelligenceSportReady {
     param(
         [string]$Sport,
@@ -1574,7 +1679,10 @@ $sourceSteps = @()
 $publishRepos = @()
 $preferLocalMirrorArtifactsForGate = $false
 $resolveForcedPublishArtifactPaths = {
-    Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+    @(
+        Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+        Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 }
 $sharedOddsApiKey = Get-ProcessEnvValue -Names @('ODDS_API_KEY', 'ODDSAPI_KEY', 'THEODDS_API_KEY', 'THEODDSAPI_KEY', 'NCAAB_THEODDS_API_KEY')
 $ncaabOddsApiKey = Get-ProcessEnvValue -Names @('NCAAB_THEODDS_API_KEY', 'THEODDSAPI_KEY', 'THEODDS_API_KEY')

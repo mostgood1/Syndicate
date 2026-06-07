@@ -1,0 +1,200 @@
+{
+  "date": "2026-06-07",
+  "counts": {
+    "games": 2,
+    "picks": 10
+  },
+  "per_game": [
+    {
+      "home": "TOR",
+      "away": "CHI",
+      "matchup": "CHI @ TOR",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "price": -135.0,
+          "score": 8.781015000930974,
+          "ev_pct": 8.781015000930974,
+          "win_prob": 0.574468085106383,
+          "p_win": 0.574468085106383,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.8%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "CHI @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Marina Mabrey UNDER 22.5",
+          "selection": "UNDER 22.5",
+          "price": -114.0,
+          "score": 7.944669795659387,
+          "ev_pct": 7.944669795659387,
+          "win_prob": 0.5327102803738317,
+          "p_win": 0.5327102803738317,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 7.9%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "CHI @ TOR"
+        },
+        {
+          "market": "ATS",
+          "team": "Toronto Tempo",
+          "display_pick": "Toronto Tempo -3.5",
+          "selection": "Toronto Tempo",
+          "price": -110.0,
+          "score": 7.344721,
+          "ev_pct": 7.3447,
+          "win_prob": 0.597257,
+          "p_win": 0.597257,
+          "basketball_summary": "Model margin 3.8 vs market -3.5",
+          "top_play_reasons": [
+            "Edge 7.3",
+            "EV 7.3%"
+          ],
+          "matchup": "CHI @ TOR"
+        },
+        {
+          "market": "PROPS",
+          "team": "CHI",
+          "display_pick": "Kamilla Cardoso OVER 23.5",
+          "selection": "OVER 23.5",
+          "price": -102.0,
+          "score": 6.334822630240611,
+          "ev_pct": 6.334822630240611,
+          "win_prob": 0.504950495049505,
+          "p_win": 0.504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 6.3%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "CHI @ TOR"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Over 175.5",
+          "selection": "Over",
+          "price": -110.0,
+          "score": 1.981891,
+          "ev_pct": 1.9819,
+          "win_prob": 0.543629,
+          "p_win": 0.543629,
+          "basketball_summary": "Model total 177.5 vs line 175.5",
+          "top_play_reasons": [
+            "Edge 2.0",
+            "EV 2.0%"
+          ],
+          "matchup": "CHI @ TOR"
+        }
+      ]
+    },
+    {
+      "home": "LAS",
+      "away": "POR",
+      "matchup": "POR @ LAS",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Kelsey Plum OVER 2.5",
+          "selection": "OVER 2.5",
+          "price": 125.0,
+          "score": 98.12923880472749,
+          "ev_pct": 98.12923880472749,
+          "win_prob": 0.4444444444444444,
+          "p_win": 0.4444444444444444,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 98.1%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "POR @ LAS"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Erica Wheeler UNDER 8.5",
+          "selection": "UNDER 8.5",
+          "price": -114.0,
+          "score": 28.49793731991326,
+          "ev_pct": 28.49793731991326,
+          "win_prob": 0.5327102803738317,
+          "p_win": 0.5327102803738317,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 28.5%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "POR @ LAS"
+        },
+        {
+          "market": "PROPS",
+          "team": "LAS",
+          "display_pick": "Ariel Atkins UNDER 13.5",
+          "selection": "UNDER 13.5",
+          "price": -117.0,
+          "score": 15.024629794499212,
+          "ev_pct": 15.024629794499212,
+          "win_prob": 0.5391705069124424,
+          "p_win": 0.5391705069124424,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 15.0%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "POR @ LAS"
+        },
+        {
+          "market": "ATS",
+          "team": "Los Angeles Sparks",
+          "display_pick": "Los Angeles Sparks -7.5",
+          "selection": "Los Angeles Sparks",
+          "price": -110.0,
+          "score": 14.625,
+          "ev_pct": 14.625,
+          "win_prob": 0.67006,
+          "p_win": 0.67006,
+          "basketball_summary": "Model margin 7.1 vs market -7.5",
+          "top_play_reasons": [
+            "Edge 14.6",
+            "EV 14.6%"
+          ],
+          "matchup": "POR @ LAS"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 175.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -5.250429,
+          "ev_pct": 5.2504,
+          "win_prob": 0.576314,
+          "p_win": 0.576314,
+          "basketball_summary": "Model total 170.2 vs line 175.5",
+          "top_play_reasons": [
+            "Edge -5.3",
+            "EV 5.3%"
+          ],
+          "matchup": "POR @ LAS"
+        }
+      ]
+    }
+  ]
+}
