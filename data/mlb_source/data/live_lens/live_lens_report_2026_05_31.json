@@ -1,1 +1,1749 @@
-{}
+{
+  "date": "2026-05-31",
+  "generatedAt": "2026-06-07T11:00:09-05:00",
+  "dataRoot": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data",
+  "liveLensDir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/live_lens",
+  "optimizationRegime": {
+    "date": "2026-05-31",
+    "kind": "forward_tuned_live",
+    "label": "Forward tuned live",
+    "isLegacyComparison": false,
+    "isCleanBaseline": false,
+    "baselineStartDate": "2026-03-31",
+    "legacyWindowStartDate": "2026-03-25",
+    "recommendedUse": "post_retune_monitoring",
+    "forwardTuningStartDate": "2026-04-14"
+  },
+  "counts": {
+    "games": 15,
+    "live": 0,
+    "final": 15,
+    "pregame": 0,
+    "props": 0,
+    "archivedLiveProps": 0
+  },
+  "performance": {
+    "marketsRefreshed": false,
+    "marketRefreshMs": 0.0,
+    "totalMs": 3269.8,
+    "snapshotLoadMs": 4.0,
+    "simContextLoadMs": 310.3,
+    "propEvalMs": 6.1,
+    "gameLensMs": 0.3,
+    "gameCount": 15,
+    "liveGameCount": 0,
+    "feedFetchCount": 15
+  },
+  "games": [
+    {
+      "gamePk": 824832,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "11:15 AM",
+      "matchup": {
+        "away": {
+          "id": 141,
+          "abbr": "TOR",
+          "name": "Toronto Blue Jays",
+          "logo": "https://www.mlbstatic.com/team-logos/141.svg"
+        },
+        "home": {
+          "id": 110,
+          "abbr": "BAL",
+          "name": "Baltimore Orioles",
+          "logo": "https://www.mlbstatic.com/team-logos/110.svg"
+        },
+        "score": {
+          "away": 5,
+          "home": 9
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.478,
+          "away_win_prob": 0.522,
+          "tie_prob": 0.0,
+          "mean_total_runs": 7.829,
+          "mean_run_margin_home_minus_away": -0.467,
+          "actual": {
+            "away": 5,
+            "home": 9
+          },
+          "metrics": {
+            "brier_home_win": 0.272484,
+            "logloss_home_win": 0.7381445464906811,
+            "abs_err_total_runs": 6.171,
+            "abs_err_run_margin": 4.467,
+            "nll_exact_total": 3.473768074496991,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.384,
+            "brier_fav_cover_minus_1_5": 0.147456,
+            "logloss_fav_cover_minus_1_5": 0.4845083154486173,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.174,
+          "away_win_prob": 0.216,
+          "tie_prob": 0.61,
+          "mean_total_runs": 0.9,
+          "mean_run_margin_home_minus_away": -0.082,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.030275999999999997,
+            "logloss_home_win": 0.1911605054611589,
+            "abs_err_total_runs": 0.9,
+            "abs_err_run_margin": 0.082
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.402,
+          "away_win_prob": 0.423,
+          "tie_prob": 0.175,
+          "mean_total_runs": 4.277,
+          "mean_run_margin_home_minus_away": -0.175,
+          "actual": {
+            "away": 0,
+            "home": 6
+          },
+          "metrics": {
+            "brier_home_win": 0.357604,
+            "logloss_home_win": 0.9113031903631159,
+            "abs_err_total_runs": 1.7229999999999999,
+            "abs_err_run_margin": 6.175
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.335,
+          "away_win_prob": 0.36,
+          "tie_prob": 0.305,
+          "mean_total_runs": 2.633,
+          "mean_run_margin_home_minus_away": -0.093,
+          "actual": {
+            "away": 0,
+            "home": 6
+          },
+          "metrics": {
+            "brier_home_win": 0.44222500000000003,
+            "logloss_home_win": 1.0936247471570706,
+            "abs_err_total_runs": 3.367,
+            "abs_err_run_margin": 6.093
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 822729,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "12:35 PM",
+      "matchup": {
+        "away": {
+          "id": 135,
+          "abbr": "SD",
+          "name": "San Diego Padres",
+          "logo": "https://www.mlbstatic.com/team-logos/135.svg"
+        },
+        "home": {
+          "id": 120,
+          "abbr": "WSH",
+          "name": "Washington Nationals",
+          "logo": "https://www.mlbstatic.com/team-logos/120.svg"
+        },
+        "score": {
+          "away": 2,
+          "home": 4
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.566,
+          "away_win_prob": 0.434,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.621,
+          "mean_run_margin_home_minus_away": 0.689,
+          "actual": {
+            "away": 2,
+            "home": 4
+          },
+          "metrics": {
+            "brier_home_win": 0.18835600000000005,
+            "logloss_home_win": 0.5691612007789542,
+            "abs_err_total_runs": 2.6210000000000004,
+            "abs_err_run_margin": 1.311,
+            "nll_exact_total": 2.577021938695806,
+            "fav_is_home": true,
+            "p_fav_cover_minus_1_5": 0.42,
+            "brier_fav_cover_minus_1_5": 0.3364000000000001,
+            "logloss_fav_cover_minus_1_5": 0.8675005677047231,
+            "fav_cover_minus_1_5_actual": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.259,
+          "away_win_prob": 0.204,
+          "tie_prob": 0.537,
+          "mean_total_runs": 1.108,
+          "mean_run_margin_home_minus_away": 0.15,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.067081,
+            "logloss_home_win": 0.2997546536860502,
+            "abs_err_total_runs": 1.108,
+            "abs_err_run_margin": 0.15
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.516,
+          "away_win_prob": 0.369,
+          "tie_prob": 0.115,
+          "mean_total_runs": 5.277,
+          "mean_run_margin_home_minus_away": 0.687,
+          "actual": {
+            "away": 0,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.234256,
+            "logloss_home_win": 0.6616485135005743,
+            "abs_err_total_runs": 2.277,
+            "abs_err_run_margin": 2.3129999999999997
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.433,
+          "away_win_prob": 0.344,
+          "tie_prob": 0.223,
+          "mean_total_runs": 3.111,
+          "mean_run_margin_home_minus_away": 0.359,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.187489,
+            "logloss_home_win": 0.5673959752543851,
+            "abs_err_total_runs": 3.111,
+            "abs_err_run_margin": 0.359
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 823373,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "12:35 PM",
+      "matchup": {
+        "away": {
+          "id": 142,
+          "abbr": "MIN",
+          "name": "Minnesota Twins",
+          "logo": "https://www.mlbstatic.com/team-logos/142.svg"
+        },
+        "home": {
+          "id": 134,
+          "abbr": "PIT",
+          "name": "Pittsburgh Pirates",
+          "logo": "https://www.mlbstatic.com/team-logos/134.svg"
+        },
+        "score": {
+          "away": 3,
+          "home": 9
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.495,
+          "away_win_prob": 0.505,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.267,
+          "mean_run_margin_home_minus_away": -0.373,
+          "actual": {
+            "away": 3,
+            "home": 9
+          },
+          "metrics": {
+            "brier_home_win": 0.255025,
+            "logloss_home_win": 0.7031975164134467,
+            "abs_err_total_runs": 3.7330000000000005,
+            "abs_err_run_margin": 6.373,
+            "nll_exact_total": 3.101092789211817,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.386,
+            "brier_fav_cover_minus_1_5": 0.14899600000000002,
+            "logloss_fav_cover_minus_1_5": 0.4877603508349946,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.207,
+          "away_win_prob": 0.195,
+          "tie_prob": 0.598,
+          "mean_total_runs": 0.894,
+          "mean_run_margin_home_minus_away": 0.014,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.042849,
+            "logloss_home_win": 0.23193205734728903,
+            "abs_err_total_runs": 0.894,
+            "abs_err_run_margin": 0.014
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.417,
+          "away_win_prob": 0.426,
+          "tie_prob": 0.157,
+          "mean_total_runs": 4.644,
+          "mean_run_margin_home_minus_away": 0.004,
+          "actual": {
+            "away": 0,
+            "home": 9
+          },
+          "metrics": {
+            "brier_home_win": 0.33988899999999994,
+            "logloss_home_win": 0.8746690571833357,
+            "abs_err_total_runs": 4.356,
+            "abs_err_run_margin": 8.996
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.357,
+          "away_win_prob": 0.365,
+          "tie_prob": 0.278,
+          "mean_total_runs": 2.704,
+          "mean_run_margin_home_minus_away": 0.012,
+          "actual": {
+            "away": 0,
+            "home": 4
+          },
+          "metrics": {
+            "brier_home_win": 0.413449,
+            "logloss_home_win": 1.030019497202498,
+            "abs_err_total_runs": 1.2959999999999998,
+            "abs_err_run_margin": 3.988
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 822976,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "12:40 PM",
+      "matchup": {
+        "away": {
+          "id": 108,
+          "abbr": "LAA",
+          "name": "Los Angeles Angels",
+          "logo": "https://www.mlbstatic.com/team-logos/108.svg"
+        },
+        "home": {
+          "id": 139,
+          "abbr": "TB",
+          "name": "Tampa Bay Rays",
+          "logo": "https://www.mlbstatic.com/team-logos/139.svg"
+        },
+        "score": {
+          "away": 2,
+          "home": 5
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.464,
+          "away_win_prob": 0.536,
+          "tie_prob": 0.0,
+          "mean_total_runs": 9.397,
+          "mean_run_margin_home_minus_away": -0.515,
+          "actual": {
+            "away": 2,
+            "home": 5
+          },
+          "metrics": {
+            "brier_home_win": 0.28729600000000005,
+            "logloss_home_win": 0.7678707267558817,
+            "abs_err_total_runs": 2.3970000000000002,
+            "abs_err_run_margin": 3.515,
+            "nll_exact_total": 2.333044300478754,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.42,
+            "brier_fav_cover_minus_1_5": 0.17639999999999997,
+            "logloss_fav_cover_minus_1_5": 0.5447271754416719,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.22,
+          "away_win_prob": 0.183,
+          "tie_prob": 0.597,
+          "mean_total_runs": 0.993,
+          "mean_run_margin_home_minus_away": 0.073,
+          "actual": {
+            "away": 0,
+            "home": 1
+          },
+          "metrics": {
+            "brier_home_win": 0.6084,
+            "logloss_home_win": 1.5141277326297755,
+            "abs_err_total_runs": 0.007000000000000006,
+            "abs_err_run_margin": 0.927
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.413,
+          "away_win_prob": 0.433,
+          "tie_prob": 0.154,
+          "mean_total_runs": 5.035,
+          "mean_run_margin_home_minus_away": -0.135,
+          "actual": {
+            "away": 1,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.34456899999999996,
+            "logloss_home_win": 0.8843076860211043,
+            "abs_err_total_runs": 1.0350000000000001,
+            "abs_err_run_margin": 2.135
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.345,
+          "away_win_prob": 0.382,
+          "tie_prob": 0.273,
+          "mean_total_runs": 2.987,
+          "mean_run_margin_home_minus_away": -0.109,
+          "actual": {
+            "away": 1,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.42902500000000005,
+            "logloss_home_win": 1.0642108619507773,
+            "abs_err_total_runs": 1.013,
+            "abs_err_run_margin": 2.109
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 823621,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "12:40 PM",
+      "matchup": {
+        "away": {
+          "id": 146,
+          "abbr": "MIA",
+          "name": "Miami Marlins",
+          "logo": "https://www.mlbstatic.com/team-logos/146.svg"
+        },
+        "home": {
+          "id": 121,
+          "abbr": "NYM",
+          "name": "New York Mets",
+          "logo": "https://www.mlbstatic.com/team-logos/121.svg"
+        },
+        "score": {
+          "away": 1,
+          "home": 10
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.3,
+          "away_win_prob": 0.7,
+          "tie_prob": 0.0,
+          "mean_total_runs": 7.778,
+          "mean_run_margin_home_minus_away": -2.168,
+          "actual": {
+            "away": 1,
+            "home": 10
+          },
+          "metrics": {
+            "brier_home_win": 0.48999999999999994,
+            "logloss_home_win": 1.2039728043259361,
+            "abs_err_total_runs": 3.2220000000000004,
+            "abs_err_run_margin": 11.168,
+            "nll_exact_total": 2.864704011147587,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.57,
+            "brier_fav_cover_minus_1_5": 0.32489999999999997,
+            "logloss_fav_cover_minus_1_5": 0.8439700702945289,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.146,
+          "away_win_prob": 0.245,
+          "tie_prob": 0.609,
+          "mean_total_runs": 0.897,
+          "mean_run_margin_home_minus_away": -0.281,
+          "actual": {
+            "away": 0,
+            "home": 1
+          },
+          "metrics": {
+            "brier_home_win": 0.729316,
+            "logloss_home_win": 1.9241486572738007,
+            "abs_err_total_runs": 0.10299999999999998,
+            "abs_err_run_margin": 1.2810000000000001
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.259,
+          "away_win_prob": 0.58,
+          "tie_prob": 0.161,
+          "mean_total_runs": 4.32,
+          "mean_run_margin_home_minus_away": -1.278,
+          "actual": {
+            "away": 1,
+            "home": 5
+          },
+          "metrics": {
+            "brier_home_win": 0.549081,
+            "logloss_home_win": 1.3509272172825992,
+            "abs_err_total_runs": 1.6799999999999997,
+            "abs_err_run_margin": 5.2780000000000005
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.244,
+          "away_win_prob": 0.474,
+          "tie_prob": 0.282,
+          "mean_total_runs": 2.577,
+          "mean_run_margin_home_minus_away": -0.805,
+          "actual": {
+            "away": 0,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.571536,
+            "logloss_home_win": 1.410587053688935,
+            "abs_err_total_runs": 0.42300000000000004,
+            "abs_err_run_margin": 3.805
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 824430,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "12:40 PM",
+      "matchup": {
+        "away": {
+          "id": 111,
+          "abbr": "BOS",
+          "name": "Boston Red Sox",
+          "logo": "https://www.mlbstatic.com/team-logos/111.svg"
+        },
+        "home": {
+          "id": 114,
+          "abbr": "CLE",
+          "name": "Cleveland Guardians",
+          "logo": "https://www.mlbstatic.com/team-logos/114.svg"
+        },
+        "score": {
+          "away": 9,
+          "home": 4
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.382,
+          "away_win_prob": 0.618,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.357,
+          "mean_run_margin_home_minus_away": -1.143,
+          "actual": {
+            "away": 9,
+            "home": 4
+          },
+          "metrics": {
+            "brier_home_win": 0.145924,
+            "logloss_home_win": 0.4812668215244463,
+            "abs_err_total_runs": 4.643000000000001,
+            "abs_err_run_margin": 3.857,
+            "nll_exact_total": 3.146555163288575,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.448,
+            "brier_fav_cover_minus_1_5": 0.30470400000000003,
+            "logloss_fav_cover_minus_1_5": 0.8029620465671519,
+            "fav_cover_minus_1_5_actual": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.164,
+          "away_win_prob": 0.236,
+          "tie_prob": 0.6,
+          "mean_total_runs": 0.943,
+          "mean_run_margin_home_minus_away": -0.193,
+          "actual": {
+            "away": 1,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.026896000000000003,
+            "logloss_home_win": 0.17912666589743548,
+            "abs_err_total_runs": 0.05700000000000005,
+            "abs_err_run_margin": 0.8069999999999999
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.326,
+          "away_win_prob": 0.487,
+          "tie_prob": 0.187,
+          "mean_total_runs": 4.74,
+          "mean_run_margin_home_minus_away": -0.726,
+          "actual": {
+            "away": 3,
+            "home": 4
+          },
+          "metrics": {
+            "brier_home_win": 0.4542759999999999,
+            "logloss_home_win": 1.1208578976154293,
+            "abs_err_total_runs": 2.26,
+            "abs_err_run_margin": 1.726
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.288,
+          "away_win_prob": 0.436,
+          "tie_prob": 0.276,
+          "mean_total_runs": 2.946,
+          "mean_run_margin_home_minus_away": -0.468,
+          "actual": {
+            "away": 1,
+            "home": 2
+          },
+          "metrics": {
+            "brier_home_win": 0.506944,
+            "logloss_home_win": 1.2447947988461912,
+            "abs_err_total_runs": 0.053999999999999826,
+            "abs_err_run_margin": 1.468
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 824512,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "12:40 PM",
+      "matchup": {
+        "away": {
+          "id": 144,
+          "abbr": "ATL",
+          "name": "Atlanta Braves",
+          "logo": "https://www.mlbstatic.com/team-logos/144.svg"
+        },
+        "home": {
+          "id": 113,
+          "abbr": "CIN",
+          "name": "Cincinnati Reds",
+          "logo": "https://www.mlbstatic.com/team-logos/113.svg"
+        },
+        "score": {
+          "away": 4,
+          "home": 6
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.411,
+          "away_win_prob": 0.589,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.832,
+          "mean_run_margin_home_minus_away": -0.82,
+          "actual": {
+            "away": 4,
+            "home": 6
+          },
+          "metrics": {
+            "brier_home_win": 0.346921,
+            "logloss_home_win": 0.8891620644859025,
+            "abs_err_total_runs": 1.1679999999999993,
+            "abs_err_run_margin": 2.82,
+            "nll_exact_total": 2.6036901857779675,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.46,
+            "brier_fav_cover_minus_1_5": 0.2116,
+            "logloss_fav_cover_minus_1_5": 0.616186139423817,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.207,
+          "away_win_prob": 0.264,
+          "tie_prob": 0.529,
+          "mean_total_runs": 1.197,
+          "mean_run_margin_home_minus_away": -0.151,
+          "actual": {
+            "away": 1,
+            "home": 1
+          },
+          "metrics": {
+            "brier_home_win": 0.042849,
+            "logloss_home_win": 0.23193205734728903,
+            "abs_err_total_runs": 0.8029999999999999,
+            "abs_err_run_margin": 0.151
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.388,
+          "away_win_prob": 0.454,
+          "tie_prob": 0.158,
+          "mean_total_runs": 5.425,
+          "mean_run_margin_home_minus_away": -0.263,
+          "actual": {
+            "away": 2,
+            "home": 4
+          },
+          "metrics": {
+            "brier_home_win": 0.374544,
+            "logloss_home_win": 0.9467499393588635,
+            "abs_err_total_runs": 0.5750000000000002,
+            "abs_err_run_margin": 2.263
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.347,
+          "away_win_prob": 0.409,
+          "tie_prob": 0.244,
+          "mean_total_runs": 3.277,
+          "mean_run_margin_home_minus_away": -0.251,
+          "actual": {
+            "away": 1,
+            "home": 2
+          },
+          "metrics": {
+            "brier_home_win": 0.42640900000000004,
+            "logloss_home_win": 1.058430499035278,
+            "abs_err_total_runs": 0.27700000000000014,
+            "abs_err_run_margin": 1.251
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 824187,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "1:10 PM",
+      "matchup": {
+        "away": {
+          "id": 158,
+          "abbr": "MIL",
+          "name": "Milwaukee Brewers",
+          "logo": "https://www.mlbstatic.com/team-logos/158.svg"
+        },
+        "home": {
+          "id": 117,
+          "abbr": "HOU",
+          "name": "Houston Astros",
+          "logo": "https://www.mlbstatic.com/team-logos/117.svg"
+        },
+        "score": {
+          "away": 2,
+          "home": 0
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.468,
+          "away_win_prob": 0.532,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.001,
+          "mean_run_margin_home_minus_away": -0.325,
+          "actual": {
+            "away": 2,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.21902400000000002,
+            "logloss_home_win": 0.6311117896404926,
+            "abs_err_total_runs": 6.0009999999999994,
+            "abs_err_run_margin": 1.675,
+            "nll_exact_total": 3.506557897319982,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.404,
+            "brier_fav_cover_minus_1_5": 0.355216,
+            "logloss_fav_cover_minus_1_5": 0.9063404010209869,
+            "fav_cover_minus_1_5_actual": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.203,
+          "away_win_prob": 0.224,
+          "tie_prob": 0.573,
+          "mean_total_runs": 1.004,
+          "mean_run_margin_home_minus_away": 0.01,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.041209,
+            "logloss_home_win": 0.2269006001919221,
+            "abs_err_total_runs": 1.004,
+            "abs_err_run_margin": 0.01
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.365,
+          "away_win_prob": 0.473,
+          "tie_prob": 0.162,
+          "mean_total_runs": 4.74,
+          "mean_run_margin_home_minus_away": -0.392,
+          "actual": {
+            "away": 2,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.13322499999999998,
+            "logloss_home_win": 0.4541302800894454,
+            "abs_err_total_runs": 2.74,
+            "abs_err_run_margin": 1.608
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.329,
+          "away_win_prob": 0.383,
+          "tie_prob": 0.288,
+          "mean_total_runs": 2.803,
+          "mean_run_margin_home_minus_away": -0.127,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.108241,
+            "logloss_home_win": 0.3989861420104552,
+            "abs_err_total_runs": 2.803,
+            "abs_err_run_margin": 0.127
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 824592,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "1:10 PM",
+      "matchup": {
+        "away": {
+          "id": 116,
+          "abbr": "DET",
+          "name": "Detroit Tigers",
+          "logo": "https://www.mlbstatic.com/team-logos/116.svg"
+        },
+        "home": {
+          "id": 145,
+          "abbr": "CWS",
+          "name": "Chicago White Sox",
+          "logo": "https://www.mlbstatic.com/team-logos/145.svg"
+        },
+        "score": {
+          "away": 1,
+          "home": 2
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.494,
+          "away_win_prob": 0.506,
+          "tie_prob": 0.0,
+          "mean_total_runs": 7.426,
+          "mean_run_margin_home_minus_away": -0.19,
+          "actual": {
+            "away": 1,
+            "home": 2
+          },
+          "metrics": {
+            "brier_home_win": 0.256036,
+            "logloss_home_win": 0.7052197617942145,
+            "abs_err_total_runs": 4.426,
+            "abs_err_run_margin": 1.19,
+            "nll_exact_total": 2.333044300478754,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.372,
+            "brier_fav_cover_minus_1_5": 0.138384,
+            "logloss_fav_cover_minus_1_5": 0.4652151125139384,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.197,
+          "away_win_prob": 0.207,
+          "tie_prob": 0.596,
+          "mean_total_runs": 0.91,
+          "mean_run_margin_home_minus_away": -0.01,
+          "actual": {
+            "away": 1,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.038809,
+            "logloss_home_win": 0.21940056503537547,
+            "abs_err_total_runs": 0.08999999999999997,
+            "abs_err_run_margin": 0.99
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.432,
+          "away_win_prob": 0.387,
+          "tie_prob": 0.181,
+          "mean_total_runs": 4.438,
+          "mean_run_margin_home_minus_away": 0.054,
+          "actual": {
+            "away": 1,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.18662399999999998,
+            "logloss_home_win": 0.5656338602609856,
+            "abs_err_total_runs": 3.4379999999999997,
+            "abs_err_run_margin": 1.054
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.356,
+          "away_win_prob": 0.338,
+          "tie_prob": 0.306,
+          "mean_total_runs": 2.689,
+          "mean_run_margin_home_minus_away": 0.061,
+          "actual": {
+            "away": 1,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.126736,
+            "logloss_home_win": 0.4400565528777834,
+            "abs_err_total_runs": 1.689,
+            "abs_err_run_margin": 1.061
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 822895,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "1:35 PM",
+      "matchup": {
+        "away": {
+          "id": 118,
+          "abbr": "KC",
+          "name": "Kansas City Royals",
+          "logo": "https://www.mlbstatic.com/team-logos/118.svg"
+        },
+        "home": {
+          "id": 140,
+          "abbr": "TEX",
+          "name": "Texas Rangers",
+          "logo": "https://www.mlbstatic.com/team-logos/140.svg"
+        },
+        "score": {
+          "away": 3,
+          "home": 6
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.479,
+          "away_win_prob": 0.521,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.206,
+          "mean_run_margin_home_minus_away": -0.52,
+          "actual": {
+            "away": 3,
+            "home": 6
+          },
+          "metrics": {
+            "brier_home_win": 0.27144100000000004,
+            "logloss_home_win": 0.7360546815712219,
+            "abs_err_total_runs": 0.7940000000000005,
+            "abs_err_run_margin": 3.52,
+            "nll_exact_total": 2.4534079827286295,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.392,
+            "brier_fav_cover_minus_1_5": 0.15366400000000002,
+            "logloss_fav_cover_minus_1_5": 0.49758039701597007,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.179,
+          "away_win_prob": 0.224,
+          "tie_prob": 0.597,
+          "mean_total_runs": 0.94,
+          "mean_run_margin_home_minus_away": -0.07,
+          "actual": {
+            "away": 0,
+            "home": 4
+          },
+          "metrics": {
+            "brier_home_win": 0.6740409999999999,
+            "logloss_home_win": 1.720369473141382,
+            "abs_err_total_runs": 3.06,
+            "abs_err_run_margin": 4.07
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.372,
+          "away_win_prob": 0.461,
+          "tie_prob": 0.167,
+          "mean_total_runs": 4.498,
+          "mean_run_margin_home_minus_away": -0.37,
+          "actual": {
+            "away": 0,
+            "home": 6
+          },
+          "metrics": {
+            "brier_home_win": 0.394384,
+            "logloss_home_win": 0.9888614247089905,
+            "abs_err_total_runs": 1.5019999999999998,
+            "abs_err_run_margin": 6.37
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.334,
+          "away_win_prob": 0.396,
+          "tie_prob": 0.27,
+          "mean_total_runs": 2.659,
+          "mean_run_margin_home_minus_away": -0.227,
+          "actual": {
+            "away": 0,
+            "home": 4
+          },
+          "metrics": {
+            "brier_home_win": 0.4435559999999999,
+            "logloss_home_win": 1.0966142860054366,
+            "abs_err_total_runs": 1.3410000000000002,
+            "abs_err_run_margin": 4.227
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 824354,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "2:10 PM",
+      "matchup": {
+        "away": {
+          "id": 137,
+          "abbr": "SF",
+          "name": "San Francisco Giants",
+          "logo": "https://www.mlbstatic.com/team-logos/137.svg"
+        },
+        "home": {
+          "id": 115,
+          "abbr": "COL",
+          "name": "Colorado Rockies",
+          "logo": "https://www.mlbstatic.com/team-logos/115.svg"
+        },
+        "score": {
+          "away": 19,
+          "home": 6
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.405,
+          "away_win_prob": 0.595,
+          "tie_prob": 0.0,
+          "mean_total_runs": 9.717,
+          "mean_run_margin_home_minus_away": -1.233,
+          "actual": {
+            "away": 19,
+            "home": 6
+          },
+          "metrics": {
+            "brier_home_win": 0.16402500000000003,
+            "logloss_home_win": 0.5191938734365074,
+            "abs_err_total_runs": 15.283,
+            "abs_err_run_margin": 11.767,
+            "nll_exact_total": 5.521460917862246,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.491,
+            "brier_fav_cover_minus_1_5": 0.259081,
+            "logloss_fav_cover_minus_1_5": 0.7113111511876165,
+            "fav_cover_minus_1_5_actual": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.246,
+          "away_win_prob": 0.267,
+          "tie_prob": 0.487,
+          "mean_total_runs": 1.21,
+          "mean_run_margin_home_minus_away": -0.102,
+          "actual": {
+            "away": 1,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.060516,
+            "logloss_home_win": 0.282362910974181,
+            "abs_err_total_runs": 0.20999999999999996,
+            "abs_err_run_margin": 0.898
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.384,
+          "away_win_prob": 0.494,
+          "tie_prob": 0.122,
+          "mean_total_runs": 5.681,
+          "mean_run_margin_home_minus_away": -0.587,
+          "actual": {
+            "away": 11,
+            "home": 5
+          },
+          "metrics": {
+            "brier_home_win": 0.147456,
+            "logloss_home_win": 0.4845083154486173,
+            "abs_err_total_runs": 10.318999999999999,
+            "abs_err_run_margin": 5.413
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.373,
+          "away_win_prob": 0.428,
+          "tie_prob": 0.199,
+          "mean_total_runs": 3.447,
+          "mean_run_margin_home_minus_away": -0.237,
+          "actual": {
+            "away": 2,
+            "home": 1
+          },
+          "metrics": {
+            "brier_home_win": 0.139129,
+            "logloss_home_win": 0.4668087383492164,
+            "abs_err_total_runs": 0.44700000000000006,
+            "abs_err_run_margin": 0.763
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 825001,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "3:05 PM",
+      "matchup": {
+        "away": {
+          "id": 147,
+          "abbr": "NYY",
+          "name": "New York Yankees",
+          "logo": "https://www.mlbstatic.com/team-logos/147.svg"
+        },
+        "home": {
+          "id": 133,
+          "abbr": "ATH",
+          "name": "Athletics",
+          "logo": "https://www.mlbstatic.com/team-logos/133.svg"
+        },
+        "score": {
+          "away": 13,
+          "home": 8
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.395,
+          "away_win_prob": 0.605,
+          "tie_prob": 0.0,
+          "mean_total_runs": 9.034,
+          "mean_run_margin_home_minus_away": -1.462,
+          "actual": {
+            "away": 13,
+            "home": 8
+          },
+          "metrics": {
+            "brier_home_win": 0.15602500000000002,
+            "logloss_home_win": 0.5025268209512956,
+            "abs_err_total_runs": 11.966,
+            "abs_err_run_margin": 3.5380000000000003,
+            "nll_exact_total": 5.521460917862246,
+            "fav_is_home": false,
+            "p_fav_cover_minus_1_5": 0.503,
+            "brier_fav_cover_minus_1_5": 0.247009,
+            "logloss_fav_cover_minus_1_5": 0.6871651088823978,
+            "fav_cover_minus_1_5_actual": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.219,
+          "away_win_prob": 0.244,
+          "tie_prob": 0.537,
+          "mean_total_runs": 1.166,
+          "mean_run_margin_home_minus_away": -0.12,
+          "actual": {
+            "away": 0,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.6099610000000001,
+            "logloss_home_win": 1.5186835491656363,
+            "abs_err_total_runs": 1.834,
+            "abs_err_run_margin": 3.12
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.34,
+          "away_win_prob": 0.491,
+          "tie_prob": 0.169,
+          "mean_total_runs": 5.117,
+          "mean_run_margin_home_minus_away": -0.719,
+          "actual": {
+            "away": 13,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.11560000000000002,
+            "logloss_home_win": 0.41551544396166595,
+            "abs_err_total_runs": 10.883,
+            "abs_err_run_margin": 9.281
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.312,
+          "away_win_prob": 0.446,
+          "tie_prob": 0.242,
+          "mean_total_runs": 3.175,
+          "mean_run_margin_home_minus_away": -0.443,
+          "actual": {
+            "away": 13,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.097344,
+            "logloss_home_win": 0.37396644104879345,
+            "abs_err_total_runs": 12.825,
+            "abs_err_run_margin": 9.557
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 823133,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "3:10 PM",
+      "matchup": {
+        "away": {
+          "id": 109,
+          "abbr": "AZ",
+          "name": "Arizona Diamondbacks",
+          "logo": "https://www.mlbstatic.com/team-logos/109.svg"
+        },
+        "home": {
+          "id": 136,
+          "abbr": "SEA",
+          "name": "Seattle Mariners",
+          "logo": "https://www.mlbstatic.com/team-logos/136.svg"
+        },
+        "score": {
+          "away": 2,
+          "home": 3
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.532,
+          "away_win_prob": 0.468,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.474,
+          "mean_run_margin_home_minus_away": 0.162,
+          "actual": {
+            "away": 2,
+            "home": 3
+          },
+          "metrics": {
+            "brier_home_win": 0.21902399999999997,
+            "logloss_home_win": 0.6311117896404926,
+            "abs_err_total_runs": 3.474,
+            "abs_err_run_margin": 0.838,
+            "nll_exact_total": 2.2730262907525014,
+            "fav_is_home": true,
+            "p_fav_cover_minus_1_5": 0.382,
+            "brier_fav_cover_minus_1_5": 0.145924,
+            "logloss_fav_cover_minus_1_5": 0.4812668215244463,
+            "fav_cover_minus_1_5_actual": 0
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.225,
+          "away_win_prob": 0.172,
+          "tie_prob": 0.603,
+          "mean_total_runs": 0.927,
+          "mean_run_margin_home_minus_away": 0.125,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.050625,
+            "logloss_home_win": 0.25489224962879004,
+            "abs_err_total_runs": 0.927,
+            "abs_err_run_margin": 0.125
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.474,
+          "away_win_prob": 0.35,
+          "tie_prob": 0.176,
+          "mean_total_runs": 4.608,
+          "mean_run_margin_home_minus_away": 0.408,
+          "actual": {
+            "away": 0,
+            "home": 1
+          },
+          "metrics": {
+            "brier_home_win": 0.27667600000000003,
+            "logloss_home_win": 0.7465479572870606,
+            "abs_err_total_runs": 3.6079999999999997,
+            "abs_err_run_margin": 0.5920000000000001
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.392,
+          "away_win_prob": 0.318,
+          "tie_prob": 0.29,
+          "mean_total_runs": 2.787,
+          "mean_run_margin_home_minus_away": 0.303,
+          "actual": {
+            "away": 0,
+            "home": 1
+          },
+          "metrics": {
+            "brier_home_win": 0.369664,
+            "logloss_home_win": 0.9364934391916745,
+            "abs_err_total_runs": 1.787,
+            "abs_err_run_margin": 0.6970000000000001
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 823944,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "3:10 PM",
+      "matchup": {
+        "away": {
+          "id": 143,
+          "abbr": "PHI",
+          "name": "Philadelphia Phillies",
+          "logo": "https://www.mlbstatic.com/team-logos/143.svg"
+        },
+        "home": {
+          "id": 119,
+          "abbr": "LAD",
+          "name": "Los Angeles Dodgers",
+          "logo": "https://www.mlbstatic.com/team-logos/119.svg"
+        },
+        "score": {
+          "away": 1,
+          "home": 9
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.589,
+          "away_win_prob": 0.411,
+          "tie_prob": 0.0,
+          "mean_total_runs": 8.126,
+          "mean_run_margin_home_minus_away": 0.656,
+          "actual": {
+            "away": 1,
+            "home": 9
+          },
+          "metrics": {
+            "brier_home_win": 0.16892100000000002,
+            "logloss_home_win": 0.5293290953305504,
+            "abs_err_total_runs": 1.8740000000000006,
+            "abs_err_run_margin": 7.344,
+            "nll_exact_total": 3.0159349808715104,
+            "fav_is_home": true,
+            "p_fav_cover_minus_1_5": 0.418,
+            "brier_fav_cover_minus_1_5": 0.3387240000000001,
+            "logloss_fav_cover_minus_1_5": 0.8722738464573808,
+            "fav_cover_minus_1_5_actual": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.211,
+          "away_win_prob": 0.199,
+          "tie_prob": 0.59,
+          "mean_total_runs": 0.957,
+          "mean_run_margin_home_minus_away": 0.051,
+          "actual": {
+            "away": 0,
+            "home": 0
+          },
+          "metrics": {
+            "brier_home_win": 0.044521,
+            "logloss_home_win": 0.23698895813626278,
+            "abs_err_total_runs": 0.957,
+            "abs_err_run_margin": 0.051
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.473,
+          "away_win_prob": 0.356,
+          "tie_prob": 0.171,
+          "mean_total_runs": 4.746,
+          "mean_run_margin_home_minus_away": 0.49,
+          "actual": {
+            "away": 0,
+            "home": 6
+          },
+          "metrics": {
+            "brier_home_win": 0.277729,
+            "logloss_home_win": 0.7486598904902041,
+            "abs_err_total_runs": 1.2539999999999996,
+            "abs_err_run_margin": 5.51
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.416,
+          "away_win_prob": 0.314,
+          "tie_prob": 0.27,
+          "mean_total_runs": 2.844,
+          "mean_run_margin_home_minus_away": 0.34,
+          "actual": {
+            "away": 0,
+            "home": 2
+          },
+          "metrics": {
+            "brier_home_win": 0.3410560000000001,
+            "logloss_home_win": 0.8770700187208739,
+            "abs_err_total_runs": 0.8439999999999999,
+            "abs_err_run_margin": 1.66
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    },
+    {
+      "gamePk": 823053,
+      "status": {
+        "abstract": "Final",
+        "detailed": "Final"
+      },
+      "startTime": "6:20 PM",
+      "matchup": {
+        "away": {
+          "id": 112,
+          "abbr": "CHC",
+          "name": "Chicago Cubs",
+          "logo": "https://www.mlbstatic.com/team-logos/112.svg"
+        },
+        "home": {
+          "id": 138,
+          "abbr": "STL",
+          "name": "St. Louis Cardinals",
+          "logo": "https://www.mlbstatic.com/team-logos/138.svg"
+        },
+        "score": {
+          "away": 1,
+          "home": 5
+        },
+        "liveText": ""
+      },
+      "predictions": {
+        "full": {
+          "home_win_prob": 0.579,
+          "away_win_prob": 0.421,
+          "tie_prob": 0.0,
+          "mean_total_runs": 10.45,
+          "mean_run_margin_home_minus_away": 0.582,
+          "actual": {
+            "away": 1,
+            "home": 5
+          },
+          "metrics": {
+            "brier_home_win": 0.17724100000000004,
+            "logloss_home_win": 0.5464528014091419,
+            "abs_err_total_runs": 4.449999999999999,
+            "abs_err_run_margin": 3.418,
+            "nll_exact_total": 2.9374633654300153,
+            "fav_is_home": true,
+            "p_fav_cover_minus_1_5": 0.437,
+            "brier_fav_cover_minus_1_5": 0.31696899999999995,
+            "logloss_fav_cover_minus_1_5": 0.8278220838865469,
+            "fav_cover_minus_1_5_actual": 1
+          }
+        },
+        "first1": {
+          "home_win_prob": 0.285,
+          "away_win_prob": 0.215,
+          "tie_prob": 0.5,
+          "mean_total_runs": 1.354,
+          "mean_run_margin_home_minus_away": 0.19,
+          "actual": {
+            "away": 0,
+            "home": 2
+          },
+          "metrics": {
+            "brier_home_win": 0.5112250000000002,
+            "logloss_home_win": 1.2552660987134867,
+            "abs_err_total_runs": 0.6459999999999999,
+            "abs_err_run_margin": 1.81
+          }
+        },
+        "first5": {
+          "home_win_prob": 0.487,
+          "away_win_prob": 0.4,
+          "tie_prob": 0.113,
+          "mean_total_runs": 6.293,
+          "mean_run_margin_home_minus_away": 0.547,
+          "actual": {
+            "away": 0,
+            "home": 5
+          },
+          "metrics": {
+            "brier_home_win": 0.263169,
+            "logloss_home_win": 0.7194911558995473,
+            "abs_err_total_runs": 1.2930000000000001,
+            "abs_err_run_margin": 4.453
+          }
+        },
+        "first3": {
+          "home_win_prob": 0.45,
+          "away_win_prob": 0.342,
+          "tie_prob": 0.208,
+          "mean_total_runs": 3.805,
+          "mean_run_margin_home_minus_away": 0.387,
+          "actual": {
+            "away": 0,
+            "home": 5
+          },
+          "metrics": {
+            "brier_home_win": 0.30250000000000005,
+            "logloss_home_win": 0.7985076962177716,
+            "abs_err_total_runs": 1.1949999999999998,
+            "abs_err_run_margin": 4.6129999999999995
+          }
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null
+      },
+      "gameLens": [],
+      "props": [],
+      "liveProps": [],
+      "archivedLiveProps": [],
+      "trackedProps": [],
+      "simContextAvailable": true,
+      "snapshotAvailable": true
+    }
+  ]
+}
