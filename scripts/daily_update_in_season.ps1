@@ -165,6 +165,14 @@ Set-SportActive -ActiveSports $activeSports -Sport 'NFL' -ForceActive ([bool]$Fo
 Set-SportActive -ActiveSports $activeSports -Sport 'NCAAF' -ForceActive ([bool]$ForceNCAAF)
 Set-SportActive -ActiveSports $activeSports -Sport 'NCAAB' -ForceActive ([bool]$ForceNCAAB)
 
+if ($SkipTests -and $RunGateTests) {
+    throw 'Pass either -SkipTests or -RunGateTests, not both.'
+}
+
+if ($SkipSmoke -and $RunGateSmoke) {
+    throw 'Pass either -SkipSmoke or -RunGateSmoke, not both.'
+}
+
 $forcedMap = [ordered]@{
     MLB = [bool]$ForceMLB
     NBA = [bool]$ForceNBA
@@ -237,8 +245,8 @@ $dailyArgs = @(
     '-Date', $Date
 )
 
-$effectiveSkipTests = [bool]$SkipTests -or (-not [bool]$RunGateTests)
-$effectiveSkipSmoke = [bool]$SkipSmoke -or (-not [bool]$RunGateSmoke)
+$effectiveSkipTests = [bool]$SkipTests
+$effectiveSkipSmoke = [bool]$SkipSmoke
 
 if ($BaseUrl) { $dailyArgs += @('-BaseUrl', $BaseUrl) }
 if ($Json) { $dailyArgs += '-Json' }

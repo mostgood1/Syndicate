@@ -49,6 +49,9 @@ $latestDir = Join-Path $repoRoot 'reports\daily_update\latest'
 New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 New-Item -ItemType Directory -Path $latestDir -Force | Out-Null
 
+$runManifestPath = Join-Path $runDir 'unified_daily_update_run.json'
+$latestManifestPath = Join-Path $latestDir 'unified_daily_update_latest.json'
+
 $runtimePolicy = [ordered]@{
     MLB = [ordered]@{
         simsPerGame = 1000
@@ -189,6 +192,14 @@ function Test-ProcessIdRunning {
     }
 
     return [bool](Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+}
+
+function Write-RunManifest {
+    param([psobject]$Manifest)
+
+    $Manifest.lastUpdatedAt = (Get-Date).ToString('o')
+    $Manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $runManifestPath -Encoding utf8
+    $Manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $latestManifestPath -Encoding utf8
 }
 
 function Clear-StaleMlbUiDailyLocks {
@@ -1770,6 +1781,10 @@ $publishRepos += [pscustomobject]@{ Name = 'Syndicate'; RepoPath = $repoRoot; Co
 $runManifest = [ordered]@{
     date = $Date
     generatedAt = (Get-Date).ToString('o')
+    lastUpdatedAt = $null
+    completedAt = $null
+    overallStatus = if ($DryRun) { 'dry_run' } else { 'started' }
+    error = $null
     runDir = $runDir
     latestDir = $latestDir
     runtimePolicy = $runtimePolicy
@@ -1797,6 +1812,8 @@ $runManifest = [ordered]@{
     }
     pushResults = @()
 }
+
+Write-RunManifest -Manifest $runManifest
 
 Push-Location $repoRoot
 try {
@@ -1829,7 +1846,7 @@ try {
             if ($isMlbVendoredStep -and $step.EnvironmentOverrides -and $step.EnvironmentOverrides.ContainsKey('MLB_BETTING_DATA_ROOT')) {
                 $mlbDataRootForStep = [string]$step.EnvironmentOverrides.MLB_BETTING_DATA_ROOT
             }
-            $sportRun = [ordered]@{
+            $sportRun = [pscustomobject][ordered]@{
                 sport = $step.Sport
                 workflow = $step.Workflow
                 name = $step.Name
@@ -1843,6 +1860,8 @@ try {
                 mirrorManifestPath = (Get-MirrorManifestPath -Sport $step.Sport -DateValue $Date)
                 mirrorManifestExists = $false
             }
+            $runManifest.sportRuns += @($sportRun)
+            Write-RunManifest -Manifest $runManifest
 
             if (-not $DryRun -and $isMlbVendoredStep) {
                 $preRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
@@ -1871,13 +1890,13 @@ try {
                     $sportRun.status = 'error'
                     $sportRun.error = $_.Exception.Message
                     $sportRun.completedAt = (Get-Date).ToString('o')
-                    $runManifest.sportRuns += @([pscustomobject]$sportRun)
+                    Write-RunManifest -Manifest $runManifest
                     throw
                 }
             }
             $sportRun.status = if ($DryRun) { 'dry_run' } else { 'ok' }
             $sportRun.completedAt = (Get-Date).ToString('o')
-            $runManifest.sportRuns += @([pscustomobject]$sportRun)
+            Write-RunManifest -Manifest $runManifest
 
             $hasLaterStepForSport = $false
             for ($nextStepIndex = $stepIndex + 1; $nextStepIndex -lt $sourceSteps.Count; $nextStepIndex++) {
@@ -1933,9 +1952,11 @@ try {
         }
         Invoke-Step -Name 'Syndicate refresh and gate' -Command $refreshArgs -WorkingDirectory $repoRoot -EnvironmentOverrides $refreshEnvOverrides
         $runManifest.refreshGate.status = if ($DryRun) { 'dry_run' } else { 'ok' }
+        Write-RunManifest -Manifest $runManifest
     }
     else {
         $runManifest.refreshGate.status = 'skipped'
+        Write-RunManifest -Manifest $runManifest
     }
 
     foreach ($sportRun in @($runManifest.sportRuns)) {
@@ -1963,8 +1984,16 @@ try {
         }
     }
 
-    $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $runDir 'unified_daily_update_run.json') -Encoding utf8
-    $runManifest | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $latestDir 'unified_daily_update_latest.json') -Encoding utf8
+    $runManifest.overallStatus = if ($DryRun) { 'dry_run' } else { 'ok' }
+    $runManifest.completedAt = (Get-Date).ToString('o')
+    Write-RunManifest -Manifest $runManifest
+}
+catch {
+    $runManifest.overallStatus = 'error'
+    $runManifest.error = $_.Exception.Message
+    $runManifest.completedAt = (Get-Date).ToString('o')
+    Write-RunManifest -Manifest $runManifest
+    throw
 }
 finally {
     Pop-Location
