@@ -47,12 +47,55 @@
     {
       "game_key": "CHI@TOR",
       "game_id": "1",
+      "player": "Azura Stevens",
+      "team": "CHI",
+      "team_tricode": "CHI",
+      "opponent": "TOR",
+      "score": 44.99999997022643,
+      "score_adj": 44.99999997022643,
+      "tier": "High",
+      "model": {
+        "pts": 2.325,
+        "reb": 1.1625,
+        "ast": 0.3875,
+        "threes": 0.0,
+        "stl": 0.2376,
+        "blk": 0.1944,
+        "tov": 0.648,
+        "pra": 3.875,
+        "pr": 3.4875000000000003,
+        "pa": 2.7125000000000004,
+        "ra": 1.55
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 8.5,
+        "price": 100.0,
+        "edge": 0.22499999985113217,
+        "ev": 0.44999999970226434,
+        "ev_pct": 44.99999997022643,
+        "book": "draftkings",
+        "p_win": 0.9499999997022643,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 45.0%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.3 vs line 8.5 (-6.2)"
+    },
+    {
+      "game_key": "CHI@TOR",
+      "game_id": "1",
       "player": "Nyara Sabally",
       "team": "TOR",
       "team_tricode": "TOR",
       "opponent": "CHI",
-      "score": 45.525310823239316,
-      "score_adj": 45.525310823239316,
+      "score": 44.80130430173066,
+      "score_adj": 44.80130430173066,
       "tier": "High",
       "model": {
         "pts": 5.55,
@@ -71,19 +114,18 @@
         "market": "pts",
         "side": "UNDER",
         "line": 9.5,
-        "price": 101.0,
-        "edge": 0.22649408369770802,
-        "ev": 0.4552531082323932,
-        "ev_pct": 45.525310823239316,
-        "book": "draftkings",
-        "p_win": 0.9527655460433384,
+        "price": 100.0,
+        "edge": 0.2240065215086533,
+        "ev": 0.4480130430173066,
+        "ev_pct": 44.80130430173066,
+        "book": "fanduel",
+        "p_win": 0.9480130430173066,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 45.5%",
+        "EV 44.8%",
         "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
-        "Best line available"
+        "Consensus: 3 books aligned"
       ],
       "basketball_summary": "model 5.5 vs line 9.5 (-4.0)"
     },
@@ -94,8 +136,8 @@
       "team": "POR",
       "team_tricode": "POR",
       "opponent": "LAS",
-      "score": 41.43648823770321,
-      "score_adj": 41.43648823770321,
+      "score": 38.66322376245412,
+      "score_adj": 38.66322376245412,
       "tier": "High",
       "model": {
         "pts": 7.674380434782608,
@@ -114,16 +156,16 @@
         "market": "pts",
         "side": "UNDER",
         "line": 10.5,
-        "price": 104.0,
-        "edge": 0.2031200403808981,
-        "ev": 0.41436488237703206,
-        "ev_pct": 41.43648823770321,
-        "book": "williamhill_us",
-        "p_win": 0.9045609608084046,
+        "price": 100.0,
+        "edge": 0.19331611881227062,
+        "ev": 0.38663223762454124,
+        "ev_pct": 38.66322376245412,
+        "book": "fanduel",
+        "p_win": 0.8866322376245412,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 41.4%",
+        "EV 38.7%",
         "Regular price range (-150 to +150)",
         "Consensus: 3 books aligned",
         "Best line available"
@@ -131,89 +173,46 @@
       "basketball_summary": "model 7.7 vs line 10.5 (-2.8)"
     },
     {
-      "game_key": "CHI@TOR",
-      "game_id": "1",
-      "player": "Azura Stevens",
-      "team": "CHI",
-      "team_tricode": "CHI",
-      "opponent": "TOR",
-      "score": 39.01376146785872,
-      "score_adj": 39.01376146785872,
+      "game_key": "POR@LAS",
+      "game_id": "2",
+      "player": "Cameron Brink",
+      "team": "LAS",
+      "team_tricode": "LAS",
+      "opponent": "POR",
+      "score": 34.727796479713945,
+      "score_adj": 34.727796479713945,
       "tier": "High",
       "model": {
-        "pts": 2.325,
-        "reb": 1.1625,
-        "ast": 0.3875,
-        "threes": 0.0,
-        "stl": 0.2376,
-        "blk": 0.1944,
-        "tov": 0.648,
-        "pra": 3.875,
-        "pr": 3.4875000000000003,
-        "pa": 2.7125000000000004,
-        "ra": 1.55
+        "pts": 11.46194262295082,
+        "reb": 4.999975409836066,
+        "ast": 0.899195081967213,
+        "threes": 0.943195081967213,
+        "stl": 0.6546612021857923,
+        "blk": 1.963983606557377,
+        "tov": 4.255297814207649,
+        "pra": 17.361113114754097,
+        "pr": 16.461918032786887,
+        "pa": 12.361137704918033,
+        "ra": 5.899170491803279
       },
       "top_play": {
         "market": "pts",
-        "side": "UNDER",
-        "line": 9.5,
-        "price": -109.0,
-        "edge": 0.20346889952136848,
-        "ev": 0.3901376146785872,
-        "ev_pct": 39.01376146785872,
-        "book": "draftkings",
-        "p_win": 0.911668715157056,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 39.0%",
-        "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
-        "Best line available"
-      ],
-      "basketball_summary": "model 2.3 vs line 9.5 (-7.2)"
-    },
-    {
-      "game_key": "POR@LAS",
-      "game_id": "2",
-      "player": "Bridget Carleton",
-      "team": "POR",
-      "team_tricode": "POR",
-      "opponent": "LAS",
-      "score": 33.2910613359481,
-      "score_adj": 33.2910613359481,
-      "tier": "High",
-      "model": {
-        "pts": 15.967640116279068,
-        "reb": 3.1111918604651168,
-        "ast": 1.95191511627907,
-        "threes": 2.740553488372093,
-        "stl": 2.617589147286822,
-        "blk": 0.3271986434108527,
-        "tov": 1.308794573643411,
-        "pra": 21.03074709302325,
-        "pr": 19.078831976744183,
-        "pa": 17.91955523255814,
-        "ra": 5.063106976744187
-      },
-      "top_play": {
-        "market": "threes",
         "side": "OVER",
-        "line": 2.5,
-        "price": 124.0,
-        "edge": 0.14862080953548257,
-        "ev": 0.332910613359481,
-        "ev_pct": 33.2910613359481,
-        "book": "draftkings",
-        "p_win": 0.7793391847880524,
+        "line": 8.5,
+        "price": 105.0,
+        "edge": 0.1694038852668973,
+        "ev": 0.34727796479713946,
+        "ev_pct": 34.727796479713945,
+        "book": "williamhill_us",
+        "p_win": 0.8350828428459199,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 33.3%",
+        "EV 34.7%",
         "Regular price range (-150 to +150)",
         "Best line available"
       ],
-      "basketball_summary": "model 2.7 vs line 2.5 (+0.2)"
+      "basketball_summary": "model 11.5 vs line 8.5 (+3.0)"
     },
     {
       "game_key": "CHI@TOR",
@@ -222,8 +221,8 @@
       "team": "TOR",
       "team_tricode": "TOR",
       "opponent": "CHI",
-      "score": 8.781015000930974,
-      "score_adj": 8.781015000930974,
+      "score": 11.377543982820438,
+      "score_adj": 11.377543982820438,
       "tier": "High",
       "model": {
         "pts": 19.436075678040247,
@@ -239,23 +238,23 @@
         "ra": 7.207450656167978
       },
       "top_play": {
-        "market": "ra",
+        "market": "reb",
         "side": "UNDER",
-        "line": 8.5,
-        "price": -135.0,
-        "edge": 0.05044412872875237,
-        "ev": 0.08781015000930975,
-        "ev_pct": 8.781015000930974,
-        "book": "draftkings",
-        "p_win": 0.6622782351156928,
+        "line": 3.5,
+        "price": 121.0,
+        "edge": 0.05148209946977572,
+        "ev": 0.11377543982820437,
+        "ev_pct": 11.377543982820438,
+        "book": "williamhill_us",
+        "p_win": 0.5662641276110099,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 8.8%",
+        "EV 11.4%",
         "Regular price range (-150 to +150)",
         "Best line available"
       ],
-      "basketball_summary": "model 7.2 vs line 8.5 (-1.3)"
+      "basketball_summary": "model 2.7 vs line 3.5 (-0.8)"
     }
   ]
 }

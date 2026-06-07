@@ -2,4 +2,4 @@ market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_ho
 ATS,Toronto Tempo,Toronto Tempo,Chicago Sky,2026-06-07,0.073447,-110.0,0.52381,7.344721,3.5,3.844721,-3.5,,High
 TOTAL,Over,Toronto Tempo,Chicago Sky,2026-06-07,0.019819,-110.0,0.52381,1.981891,175.5,,,177.481891,Low
 ATS,Los Angeles Sparks,Los Angeles Sparks,Portland Fire,2026-06-07,0.14625,-110.0,0.52381,14.625,7.5,7.125,-7.5,,High
-TOTAL,Under,Los Angeles Sparks,Portland Fire,2026-06-07,0.052504,-110.0,0.52381,-5.250429,175.5,,,170.249571,High
+TOTAL,Under,Los Angeles Sparks,Portland Fire,2026-06-07,0.047504,-110.0,0.52381,-4.750429,175.0,,,170.249571,High
