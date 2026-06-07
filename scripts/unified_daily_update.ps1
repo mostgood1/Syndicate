@@ -1939,9 +1939,12 @@ if (-not $SkipNCAAF) {
 }
 if (-not $SkipNCAAB) {
     $ncaabRawOutputsRoot = Join-Path $repoRoot 'data\ncaab_source\raw_outputs'
+    $ncaabApiRoot = Join-Path $repoRoot 'data\ncaab_source\api'
     $ncaabApiKey = $ncaabOddsApiKey
     if (-not [string]::IsNullOrWhiteSpace($ncaabApiKey)) {
         $sourceSteps += [pscustomobject]@{
+            Sport = 'ncaab'
+            Workflow = 'syndicate_refresh'
             Name = 'NCAAB Syndicate odds refresh'
             Command = @(
                 (Resolve-Python $repoRoot),
@@ -1951,10 +1954,27 @@ if (-not $SkipNCAAB) {
             )
             WorkingDirectory = $repoRoot
             EnvironmentOverrides = @{ NCAAB_THEODDS_API_KEY = $ncaabApiKey }
+            RuntimePolicy = @{}
         }
     }
     elseif (-not (Test-Path $ncaabRawOutputsRoot)) {
         throw "NCAAB raw outputs not found at $ncaabRawOutputsRoot and no NCAAB/TheOddsAPI key is available for a local refresh."
+    }
+
+    $sourceSteps += [pscustomobject]@{
+        Sport = 'ncaab'
+        Workflow = 'syndicate_mirror'
+        Name = 'NCAAB source mirror export'
+        Command = @(
+            (Resolve-Python $repoRoot),
+            'scripts\export_ncaab_source_mirror.py',
+            'data\ncaab_source\api',
+            $Date,
+            '--raw-root', 'data\ncaab_source\raw_outputs'
+        )
+        WorkingDirectory = $repoRoot
+        EnvironmentOverrides = @{}
+        RuntimePolicy = @{}
     }
 }
 

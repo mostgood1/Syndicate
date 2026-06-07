@@ -13,6 +13,7 @@ from syndicate.features.intelligence import _build_parlays
 from syndicate.features.intelligence import _candidate_advanced_signal_score
 from syndicate.features.intelligence import _basketball_source_summary_score
 from syndicate.features.intelligence import _candidate_market_fit
+from syndicate.features.intelligence import _latest_matching_path
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
 from syndicate.features.intelligence import _query_preferences
@@ -1793,6 +1794,21 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(rows)
         self.assertTrue(all(bool(row.get("exists")) for row in rows))
         self.assertTrue(any(str(row.get("path") or "").replace("\\", "/").endswith("recommendations_summary/index.json") for row in rows))
+
+    def test_latest_matching_path_uses_parent_date_for_scoreboard_snapshots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            january = root / "date=2026-01-25"
+            june = root / "date=2026-06-06"
+            january.mkdir(parents=True, exist_ok=True)
+            june.mkdir(parents=True, exist_ok=True)
+            (january / "scoreboard.csv").write_text("game_id\n1\n", encoding="utf-8")
+            (june / "scoreboard.csv").write_text("game_id\n2\n", encoding="utf-8")
+
+            resolved = _latest_matching_path(root, "date=*/scoreboard.csv", requested_date="2026-06-07")
+
+        self.assertIsNotNone(resolved)
+        self.assertEqual("date=2026-06-06/scoreboard.csv", str(resolved.relative_to(root)).replace("\\", "/"))
 
     def test_intelligence_query_builds_football_analysis_views(self) -> None:
         advanced_rows = [

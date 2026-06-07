@@ -2302,6 +2302,14 @@ def _question_requested_date(question: str) -> str | None:
     return None
 
 
+def _path_date_token(path: Path) -> str | None:
+    for candidate in (path.name, path.stem, path.parent.name, path.as_posix()):
+        token = _coerce_date_token(candidate)
+        if token:
+            return token
+    return None
+
+
 def _latest_matching_path(directory: Path, pattern: str, *, requested_date: str | None = None) -> Path | None:
     try:
         candidates = [path for path in directory.glob(pattern) if path.is_file()]
@@ -2312,7 +2320,7 @@ def _latest_matching_path(directory: Path, pattern: str, *, requested_date: str 
     requested = str(requested_date or "").strip() or None
     dated: list[tuple[str, Path]] = []
     for path in candidates:
-        token = _coerce_date_token(path.name)
+        token = _path_date_token(path)
         if token is None:
             continue
         if requested and token > requested:
