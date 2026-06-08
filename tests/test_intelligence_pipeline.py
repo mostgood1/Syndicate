@@ -64,6 +64,7 @@ class IntelligencePipelineTests(unittest.TestCase):
         self.assertEqual(result.to_dict()["recommendations"][0]["name"], "Darius Garland Over 7.5 Assists")
         self.assertTrue(result.to_dict()["evidence"])
         self.assertIn("structured_response", result.to_dict())
+        self.assertIn("evaluation_record", result.to_dict())
         self.assertEqual(result.to_dict()["structured_response"]["intent"], "live_analysis")
         self.assertIn("clear_summary", result.to_dict()["structured_response"])
         self.assertTrue(result.to_dict()["structured_response"]["deep_analysis"])

@@ -38,6 +38,7 @@ from pipeline.evidence_builder import attach_evidence
 from pipeline.intelligence_models import IntelligenceResult
 from router.query_router import QueryRouter
 from syndicate.features.intelligence import run_intelligence_query
+from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 
 
 logger = logging.getLogger(__name__)
@@ -214,6 +215,7 @@ def _enrich_context(normalized_request: IntelligencePipelineRequest) -> dict[str
 def _build_structured_response(result: IntelligenceResult, context: dict[str, Any]) -> dict[str, Any]:
     recommendations = [item.to_dict() for item in result.recommendations[:3]]
     top_recommendation = recommendations[0] if recommendations else {}
+    engine_structured_response = result.structured_response if isinstance(result.structured_response, dict) else {}
     context_awareness = _build_context_awareness(result, context, recommendations, result.reasoning_steps)
     evidence_sections: list[dict[str, Any]] = []
     if result.analysis_brief is not None:
@@ -309,6 +311,7 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
         "recommended_interpretation": final_takeaway if final_takeaway else recommended_interpretation,
         "final_takeaway": final_takeaway,
         "reasoning_steps": [dict(step) for step in result.reasoning_steps],
+        **engine_structured_response,
         **({"preview": preview_response} if preview_response is not None else {}),
         **({"player_analysis": player_response} if player_response is not None else {}),
     }
@@ -818,12 +821,21 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
     structured_response = _time_stage("post_processing_structured_response", _build_structured_response, result, context)
     if reasoning_steps:
         structured_response = {**structured_response, "reasoning_steps": [dict(step) for step in reasoning_steps]}
-    return replace(
+    result = replace(
         result,
         query_type=normalized_request.query_type or result.query_type,
         structured_response=structured_response,
         reasoning_steps=reasoning_steps,
     )
+    if result.recommendations:
+        evaluation_record = _time_stage(
+            "evaluation_record_build",
+            build_intelligence_evaluation_bundle,
+            query=result.pipeline_request or normalized_request.to_dict(),
+            response=result.to_dict(),
+        )
+        result = replace(result, evaluation_record=evaluation_record)
+    return result
 
 
 def _call_black_box_intelligence(normalized_request: IntelligencePipelineRequest) -> dict[str, Any]:

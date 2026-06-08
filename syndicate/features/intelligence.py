@@ -31,6 +31,10 @@ from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_prop
 from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
+from syndicate.features.shared.intelligence_evaluation import adjust_confidence
+from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
+from syndicate.features.shared.recommendation_engine import filter_candidates
+from syndicate.features.shared.recommendation_engine import rank_recommendations
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_key as _runtime_parlay_leg_market_key
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_shape as _runtime_parlay_leg_market_shape
 from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
@@ -41,6 +45,7 @@ from syndicate.features.intelligence_parlay_runtime import build_parlays as _run
 from syndicate.features.intelligence_parlay_runtime import build_round_robin_parlays as _runtime_build_round_robin_parlays
 from syndicate.features.intelligence_parlay_runtime import parlay_rank_score as _runtime_parlay_rank_score
 from syndicate.features.intelligence_router import analysis_focus_from_question as _runtime_analysis_focus_from_question
+from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
@@ -513,6 +518,13 @@ def _pct_hint(value: Any) -> float | None:
     if abs(number) <= 1.0:
         number *= 100.0
     return float(number)
+
+
+def _format_probability_display(value: Any) -> Any:
+    percentage = _pct_hint(value)
+    if percentage is None:
+        return value
+    return f"{percentage:.1f}%"
 
 
 def _american_odds_value(value: Any) -> float | None:
@@ -4017,9 +4029,9 @@ def _build_supporting_evidence(
         {"label": "Projection", "value": top.get("projected")},
         {"label": "Line", "value": top.get("line")},
         {"label": "Live projection", "value": top.get("live_projection")},
-        {"label": "Confidence", "value": top.get("confidence")},
+        {"label": "Confidence", "value": _format_probability_display(top.get("confidence"))},
         {"label": "Price edge", "value": f"{top.get('price_edge_pct')}%" if top.get("price_edge_pct") is not None else None},
-        {"label": "Implied probability", "value": f"{top.get('implied_probability')}%" if top.get("implied_probability") is not None else None},
+        {"label": "Implied probability", "value": _format_probability_display(top.get("implied_probability"))},
         {"label": "Market fit", "value": top.get("market_fit_score")},
         {"label": "Advanced signal score", "value": top.get("advanced_signal_score")},
         {"label": "Source summary score", "value": top.get("source_summary_score")},
@@ -4097,6 +4109,208 @@ def _build_analysis_brief(
         safe_text=_safe_text,
         humanize_signal_key=_humanize_signal_key,
     )
+
+
+def _confidence_value_from_candidate(candidate: dict[str, Any], *, sport: str | None = None) -> float:
+    confidence_pct = _pct_hint(candidate.get("confidence"))
+    if confidence_pct is not None:
+        base_confidence = round(min(0.99, max(0.01, float(confidence_pct) / 100.0)), 2)
+    else:
+        score_value = _numeric_hint(candidate.get("score"))
+        if score_value is not None:
+            base_confidence = round(min(0.99, max(0.01, float(score_value) / 100.0)), 2)
+        else:
+            market_fit_score = _numeric_hint(candidate.get("market_fit_score"))
+            if market_fit_score is not None:
+                base_confidence = round(min(0.99, max(0.01, 0.35 + (float(market_fit_score) / 200.0))), 2)
+            else:
+                base_confidence = 0.5
+    return base_confidence
+
+
+def _manifest_supporting_data(selected_date: str, overview: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sport_slugs = [
+        _safe_text(row.get("slug"), "sport").lower()
+        for row in overview
+        if isinstance(row, dict)
+    ]
+    manifests = load_artifact_manifests(selected_date=selected_date, sport_slugs=sport_slugs)
+    supporting: list[dict[str, Any]] = []
+    for manifest in manifests:
+        payload = manifest.to_dict() if hasattr(manifest, "to_dict") else dict(manifest)
+        counts = payload.get("counts") if isinstance(payload.get("counts"), dict) else {}
+        if not any(int(counts.get(key) or 0) for key in ("predictions", "edges", "recommendations", "live_data")):
+            continue
+        primary_paths: list[str] = []
+        for category in ("predictions", "edges", "recommendations", "live_data"):
+            refs = payload.get(category) if isinstance(payload.get(category), list) else []
+            for ref in refs[:1]:
+                if not isinstance(ref, dict):
+                    continue
+                path_value = _safe_text(ref.get("relative_path") or ref.get("path"), "")
+                if path_value:
+                    primary_paths.append(path_value)
+                    break
+        supporting.append(
+            {
+                "kind": "artifact_manifest",
+                "sport": payload.get("sport_slug"),
+                "selected_date": payload.get("selected_date"),
+                "counts": {
+                    "predictions": int(counts.get("predictions") or 0),
+                    "edges": int(counts.get("edges") or 0),
+                    "recommendations": int(counts.get("recommendations") or 0),
+                    "live_data": int(counts.get("live_data") or 0),
+                },
+                "paths": primary_paths[:4],
+            }
+        )
+        if len(supporting) >= 3:
+            break
+    return supporting
+
+
+def _reliability_supporting_data(
+    top: dict[str, Any],
+    overview: list[dict[str, Any]],
+    selected_date: str,
+    confidence: float,
+    profile: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], str | None]:
+    sport_slug = _safe_text(top.get("sport_slug"), "") or (_safe_text(overview[0].get("slug"), "") if overview else "")
+    profile = profile or build_reliability_profile(sport=sport_slug or None)
+    sample_size = int(profile.get("sample_size") or 0)
+    if sample_size <= 0:
+        return {}, None
+    calibration_error = float(profile.get("calibration_error") or 0.0)
+    note = f"Historical calibration MAE for {sport_slug or 'this board'} is {calibration_error:.2f}, so the confidence score is reliability-adjusted."
+    return {
+        "kind": "model_reliability",
+        "sport": sport_slug or None,
+        "selected_date": selected_date,
+        "sample_size": sample_size,
+        "win_rate": profile.get("metrics", {}).get("win_rate"),
+        "roi": profile.get("metrics", {}).get("roi"),
+        "clv": profile.get("metrics", {}).get("clv"),
+        "calibration_error": calibration_error,
+        "calibration_penalty": profile.get("calibration_penalty"),
+        "reliability_multiplier": profile.get("reliability_multiplier"),
+        "confidence_after_reliability": confidence,
+    }, note
+
+
+def _build_structured_answer(
+    result: dict[str, Any],
+    recommendations: list[dict[str, Any]],
+    analysis_views: dict[str, Any] | None,
+    supporting_evidence: dict[str, Any] | None,
+    board_notes: list[str],
+    readiness_gate: dict[str, Any],
+    overview: list[dict[str, Any]],
+) -> dict[str, Any]:
+    top = recommendations[0] if recommendations else {}
+    summary = (
+        _safe_text(top.get("summary"), "")
+        or _safe_text(top.get("rationale"), "")
+        or _safe_text(result.get("summary"), "")
+        or _safe_text(result.get("headline"), "")
+        or "No clear answer surfaced from the current local board."
+    )
+    if top.get("name") and top.get("name") not in summary:
+        summary = f"{_safe_text(top.get('name'), 'Top candidate')}: {summary}"
+
+    key_factors: list[str] = []
+    for value in (
+        _safe_text(top.get("market_fit_note"), ""),
+        _safe_text(top.get("summary"), ""),
+        _safe_text(top.get("rationale"), ""),
+        _safe_text(top.get("writeup"), ""),
+    ):
+        if value and value not in key_factors:
+            key_factors.append(value)
+    if isinstance(analysis_views, dict):
+        focus = _safe_text(analysis_views.get("focus"), "")
+        if focus:
+            key_factors.append(f"Analysis focus: {focus}.")
+    if isinstance(supporting_evidence, dict):
+        evidence_titles = [
+            _safe_text(section.get("title"), "")
+            for section in (supporting_evidence.get("sections") or [])
+            if isinstance(section, dict)
+        ]
+        evidence_titles = [item for item in evidence_titles if item]
+        if evidence_titles:
+            key_factors.append(f"Evidence sections: {', '.join(evidence_titles[:3])}.")
+
+    if not key_factors:
+        key_factors.append("The answer is being driven by the top local candidate and the evidence returned for the current board.")
+
+    risks = [note for note in board_notes if note]
+    if readiness_gate and not bool(readiness_gate.get("ok", True)):
+        status_text = _safe_text(readiness_gate.get("status"), "not ready") or "not ready"
+        risks.append(f"Readiness gate status: {status_text}.")
+    if result.get("local_only"):
+        risks.append("This answer was generated from local-only intelligence artifacts.")
+    if not risks:
+        risks.append("No explicit board warnings were returned, so the main risk is normal model and market variance.")
+
+    sport_slug = _safe_text(top.get("sport_slug"), "") or (_safe_text(overview[0].get("slug"), "") if overview else "")
+    confidence = _confidence_value_from_candidate(top, sport=sport_slug or None)
+    if bool(readiness_gate.get("ready")):
+        confidence = round(min(0.99, confidence + 0.04), 2)
+    else:
+        confidence = round(max(0.05, confidence - 0.04), 2)
+    confidence, reliability_profile = adjust_confidence(confidence, sport=sport_slug or None)
+
+    supporting_data: list[dict[str, Any]] = []
+    if top:
+        supporting_data.append(
+            {
+                "kind": "top_candidate",
+                "name": top.get("name"),
+                "market": top.get("market"),
+                "matchup": top.get("matchup"),
+                "confidence": top.get("confidence"),
+                "score": top.get("score"),
+                "why": top.get("rationale") or top.get("summary") or top.get("writeup"),
+            }
+        )
+    reliability_data, reliability_note = _reliability_supporting_data(
+        top,
+        overview,
+        _safe_text(result.get("selected_date"), "") or _effective_date(None),
+        confidence,
+        reliability_profile,
+    )
+    if reliability_data:
+        supporting_data.append(reliability_data)
+    if reliability_note:
+        risks.append(reliability_note)
+    supporting_data.extend(_manifest_supporting_data(_safe_text(result.get("selected_date"), "") or _effective_date(None), overview))
+    if isinstance(supporting_evidence, dict):
+        supporting_data.append(
+            {
+                "kind": "supporting_evidence",
+                "title": supporting_evidence.get("title"),
+                "focus": supporting_evidence.get("focus"),
+                "section_count": len(supporting_evidence.get("sections") or []),
+            }
+        )
+
+    output = {
+        "summary": summary,
+        "key_factors": key_factors[:5],
+        "risks": risks[:5],
+        "confidence": confidence,
+        "supporting_data": supporting_data[:6],
+        "recommendations": recommendations[:5],
+    }
+    output["clear_summary"] = summary
+    output["deep_analysis"] = key_factors[:3]
+    output["risks_uncertainty"] = risks[:5]
+    output["recommended_interpretation"] = summary
+    output["final_takeaway"] = summary
+    return output
 
 
 def _parlay_rationale(legs: list[dict[str, Any]]) -> str:
@@ -4596,10 +4810,11 @@ def run_intelligence_query(
     candidates = [row for row in candidates if not _candidate_is_final(row)]
     candidates = [row for row in candidates if not bool(row.get("state_invalid"))]
     _apply_advanced_context_to_candidates(candidates, advanced_by_sport, preferences)
-    candidates = sorted(candidates, key=lambda candidate: float(candidate.get("score") or 0.0), reverse=True)
-    recommendations = [_candidate_summary(candidate) for candidate in candidates[: preferences["limit"]]]
+    filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
+    ranked_recommendations = rank_recommendations(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=preferences["limit"])
+    recommendations = [dict(candidate) for candidate in ranked_recommendations]
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
-    parlays = _build_parlays(candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
+    parlays = _build_parlays(filtered_candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
     analysis_views = _analysis_views_for_query(candidates, preferences)
     supporting_evidence = _build_supporting_evidence(recommendations, analysis_views, display_limit=preferences["limit"])
     analysis_brief = _build_analysis_brief(
@@ -4646,6 +4861,19 @@ def run_intelligence_query(
         f"Scanned {len(candidates)} board candidates across {len([sport_row for sport_row in overview if _sport_matches_preferences(sport_row, preferences)]) or len(overview)} sports. "
         f"Live candidates: {live_rows}. Pregame candidates: {pregame_rows}."
     )
+    structured_response = _build_structured_answer(
+        {
+            "selected_date": effective_date,
+            "summary": summary,
+            "local_only": True,
+        },
+        recommendations,
+        analysis_views,
+        supporting_evidence,
+        data_notes[:8],
+        readiness_gate,
+        overview,
+    )
 
     return {
         "selected_date": effective_date,
@@ -4660,5 +4888,6 @@ def run_intelligence_query(
         "supporting_evidence": supporting_evidence,
         "board_notes": data_notes[:8],
         "readiness_gate": readiness_gate,
+        "structured_response": structured_response,
         "local_only": True,
     }

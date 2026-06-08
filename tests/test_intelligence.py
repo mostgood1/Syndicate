@@ -914,13 +914,14 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
             with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
                 with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
-                    response = self.client.post(
-                        "/api/intelligence/query",
-                        json={
-                            "question": "Analyze Jayson Tatum tonight",
-                            "date": "2026-06-04",
-                        },
-                    )
+                    with patch("syndicate.features.intelligence.load_artifact_manifests", return_value=[]):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "Analyze Jayson Tatum tonight",
+                                "date": "2026-06-04",
+                            },
+                        )
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
@@ -931,8 +932,68 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(result.get("selected_date"), "2026-06-04")
         self.assertEqual(result.get("query_type"), "player_analysis")
         self.assertIn("player_analysis", structured)
+        self.assertIn("summary", structured)
+        self.assertIn("key_factors", structured)
+        self.assertIn("risks", structured)
+        self.assertIn("confidence", structured)
+        self.assertIn("supporting_data", structured)
+        self.assertIn("recommendation_id", structured.get("recommendations", [])[0])
+        self.assertIn("event_id", structured.get("recommendations", [])[0])
+        self.assertIn("reasoning", structured.get("recommendations", [])[0])
+        self.assertIn("risk_factors", structured.get("recommendations", [])[0])
+        self.assertIn("confidence_drivers", structured.get("recommendations", [])[0])
         self.assertEqual(payload.get("player_analysis", {}).get("player"), "Jayson Tatum")
         self.assertEqual(payload.get("player_analysis", {}).get("matchup"), structured.get("player_analysis", {}).get("matchup"))
+
+    def test_intelligence_query_api_reflects_model_reliability_in_confidence(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    with patch("syndicate.features.intelligence.load_artifact_manifests", return_value=[]):
+                        with patch(
+                            "syndicate.features.intelligence.build_reliability_profile",
+                            return_value={
+                                "sport": "nba",
+                                "sample_size": 24,
+                                "metrics": {"win_rate": 0.46, "roi": -0.08, "clv": -0.12, "calibration": {"mae": 0.24, "brier_score": 0.12, "sample_size": 24}},
+                                "calibration_error": 0.24,
+                                "calibration_penalty": 0.06,
+                                "win_rate_adjustment": -0.02,
+                                "roi_adjustment": -0.01,
+                                "reliability_multiplier": 0.91,
+                            },
+                        ):
+                            with patch(
+                                "syndicate.features.intelligence.adjust_confidence",
+                                side_effect=lambda base_confidence, **_: (round(max(0.05, base_confidence - 0.08), 2), {"calibration_error": 0.24, "sample_size": 24}),
+                            ):
+                                response = self.client.post(
+                                    "/api/intelligence/query",
+                                    json={
+                                        "question": "Analyze Jayson Tatum tonight",
+                                        "date": "2026-06-04",
+                                    },
+                                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        structured = (payload.get("response") or {}).get("structured_response") or {}
+        supporting_data = structured.get("supporting_data") or []
+        reliability_items = [item for item in supporting_data if isinstance(item, dict) and item.get("kind") == "model_reliability"]
+
+        self.assertTrue(reliability_items)
+        self.assertLess(structured.get("confidence") or 0.0, 0.72)
+        self.assertTrue(any("calibration" in note.lower() for note in structured.get("risks") or []))
 
     def test_intelligence_query_api_resolves_preview_date_and_preserves_contract(self) -> None:
         advanced_rows = [
@@ -949,12 +1010,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
                 with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
                     with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
-                        response = self.client.post(
-                            "/api/intelligence/query",
-                            json={
-                                "question": "preview the Lakers game tonight",
-                            },
-                        )
+                        with patch("syndicate.features.intelligence.load_artifact_manifests", return_value=[]):
+                            response = self.client.post(
+                                "/api/intelligence/query",
+                                json={
+                                    "question": "preview the Lakers game tonight",
+                                },
+                            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
@@ -965,6 +1027,11 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(result.get("query_type"), "game_preview")
         self.assertEqual(result.get("selected_date"), "2026-06-07")
         self.assertIn("preview", structured)
+        self.assertIn("summary", structured)
+        self.assertIn("key_factors", structured)
+        self.assertIn("risks", structured)
+        self.assertIn("confidence", structured)
+        self.assertIn("supporting_data", structured)
         self.assertEqual(payload.get("preview", {}).get("subject"), "Lakers")
 
     def test_intelligence_query_api_respects_explicit_filters_and_limit(self) -> None:

@@ -14,6 +14,7 @@ class FormatterTests(unittest.TestCase):
                 "headline": "Top board",
                 "recommendations": [{"name": "Play 1"}],
                 "supporting_evidence": {"title": "Evidence"},
+                "evaluation_record": {"prediction": {"prediction_id": "pred_123"}, "recommendations": [{"recommendation_id": "rec_123"}]},
                 "structured_response": {"preview": {"matchup": "BOS at NYK"}, "player_analysis": {"matchup": "BOS at NYK"}},
             },
             pipeline_request={"question": "What are the best live bets?"},
@@ -25,6 +26,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(payload["query"], "What are the best live bets?")
         self.assertEqual(payload["response"]["headline"], "Top board")
         self.assertEqual(payload["response"]["recommendations"][0]["name"], "Play 1")
+        self.assertEqual(payload["response"]["evaluation_record"]["prediction"]["prediction_id"], "pred_123")
         self.assertEqual(payload["preview"]["matchup"], "BOS at NYK")
         self.assertEqual(payload["player_analysis"]["matchup"], "BOS at NYK")
 

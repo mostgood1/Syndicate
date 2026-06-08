@@ -1,0 +1,172 @@
+from __future__ import annotations
+
+import unittest
+
+from syndicate.features.shared.intelligence_evaluation import build_artifact_metadata
+from syndicate.features.shared.recommendation_engine import calculate_edge
+from syndicate.features.shared.recommendation_engine import build_policy_optimization_summary
+from syndicate.features.shared.recommendation_engine import filter_candidates
+from syndicate.features.shared.recommendation_engine import compare_policies
+from syndicate.features.shared.recommendation_engine import rank_recommendations
+from syndicate.features.shared.recommendation_engine import select_policy
+
+
+class RecommendationEngineTests(unittest.TestCase):
+    def test_filter_candidates_suppresses_poor_market_history(self) -> None:
+        candidates = [
+            {
+                "name": "Jayson Tatum Over 28.5 Points",
+                "event_id": "game-1",
+                "market": "points",
+                "pick": "Over 28.5",
+                "odds": "+100",
+                "score": 86.0,
+                "confidence": "63%",
+                "model_probability": 0.53,
+            },
+            {
+                "name": "Boston Celtics Moneyline",
+                "event_id": "game-1",
+                "market": "moneyline",
+                "selection": "Boston Celtics",
+                "odds": "+140",
+                "score": 80.0,
+                "confidence": "61%",
+                "model_probability": 0.64,
+            },
+        ]
+        historical_records = [
+            {
+                "result": "loss",
+                "pnl": -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.53,
+                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
+                "artifact_metadata": {"sport": "nba"},
+            },
+            {
+                "result": "loss",
+                "pnl": -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.53,
+                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
+                "artifact_metadata": {"sport": "nba"},
+            },
+            {
+                "result": "loss",
+                "pnl": -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.53,
+                "recommendation": {"market": "points", "selection": "Over 28.5", "line": 28.5, "odds": "+100"},
+                "artifact_metadata": {"sport": "nba"},
+            },
+            {
+                "result": "win",
+                "pnl": 0.4,
+                "stake": 1.0,
+                "implied_probability": 0.49,
+                "recommendation": {"market": "moneyline", "selection": "Boston Celtics", "line": None, "odds": "+140"},
+                "artifact_metadata": {"sport": "nba"},
+            },
+        ]
+
+        filtered = filter_candidates(candidates, sport="nba", evaluation_records=historical_records)
+        ranked = rank_recommendations(candidates, sport="nba", evaluation_records=historical_records)
+
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]["market"], "moneyline")
+        self.assertEqual(ranked[0]["recommendation_id"].startswith("reco_"), True)
+        self.assertEqual(ranked[0]["market"], "moneyline")
+        self.assertIn("reasoning", ranked[0])
+        self.assertIn("risk_factors", ranked[0])
+        self.assertIn("confidence_drivers", ranked[0])
+
+    def test_calculate_edge_uses_fair_probability_and_implied_probability(self) -> None:
+        edge = calculate_edge({"odds": "+120", "model_probability": 0.58})
+
+        self.assertAlmostEqual(edge["fair_probability"], 0.58, places=2)
+        self.assertIsNotNone(edge["implied_probability"])
+        self.assertGreater(edge["edge"], 0.0)
+
+    def test_policy_specific_filtering_changes_threshold_behavior(self) -> None:
+        candidate = {
+            "name": "Jayson Tatum Over 28.5 Points",
+            "event_id": "game-1",
+            "market": "points",
+            "pick": "Over 28.5",
+            "odds": "+100",
+            "score": 81.0,
+            "confidence": 0.57,
+            "model_probability": 0.51,
+        }
+
+        conservative = filter_candidates([candidate], sport="nba", evaluation_records=[], policy="conservative")
+        aggressive = filter_candidates([candidate], sport="nba", evaluation_records=[], policy="aggressive")
+
+        self.assertEqual(conservative, [])
+        self.assertEqual(len(aggressive), 1)
+        self.assertEqual(aggressive[0]["market"], "points")
+
+    def test_policy_summary_promotes_better_labeled_strategy(self) -> None:
+        balanced_records = [
+            {
+                "result": "loss",
+                "pnl": -1.0,
+                "stake": 1.0,
+                "implied_probability": 0.53,
+                "decision_strategy": "balanced",
+                "recommendation": {"market": "points", "selection": "Over 28.5", "confidence": 0.57, "edge": 0.02},
+                "artifact_metadata": {"sport": "nba"},
+            }
+            for _ in range(8)
+        ]
+        aggressive_records = [
+            {
+                "result": "win",
+                "pnl": 0.8,
+                "stake": 1.0,
+                "implied_probability": 0.49,
+                "decision_strategy": "aggressive",
+                "recommendation": {"market": "moneyline", "selection": "Boston Celtics", "confidence": 0.64, "edge": 0.07},
+                "artifact_metadata": {"sport": "nba"},
+            }
+            for _ in range(8)
+        ]
+        history = balanced_records + aggressive_records
+
+        comparison = compare_policies(history, sport="nba")
+        summary = build_policy_optimization_summary(history, sport="nba")
+
+        self.assertEqual(comparison[0]["policy"], "aggressive")
+        self.assertEqual(summary["selected_policy"], "aggressive")
+        self.assertTrue(summary["promoted"])
+        self.assertEqual(select_policy(history, sport="nba"), "aggressive")
+
+    def test_artifact_metadata_carries_policy_selection(self) -> None:
+        policy_comparison = [
+            {
+                "policy": "aggressive",
+                "sample_size": 8,
+                "settled_count": 8,
+                "weighted_roi": 0.12,
+                "weighted_win_rate": 0.75,
+                "average_alignment": 0.81,
+                "average_edge": 0.06,
+                "average_confidence": 0.64,
+                "average_calibration_error": 0.08,
+                "promotion_score": 18.4,
+                "promotion_margin": 0.01,
+                "min_sample_size": 8,
+            }
+        ]
+        metadata = build_artifact_metadata(
+            query={"sport": "nba"},
+            response={"recommendations": [{"decision_strategy": "aggressive", "historical_profile": {"policy_comparison": policy_comparison}}]},
+        )
+
+        self.assertEqual(metadata["decision_strategy"], "aggressive")
+        self.assertEqual(metadata["policy_comparison"], policy_comparison)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
+from syndicate.features.shared.intelligence_contracts import build_intelligence_evaluation_record
+
 
 def _copy_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
@@ -247,6 +249,7 @@ class IntelligenceResult:
     analysis_brief: Evidence | None = None
     supporting_evidence: Evidence | None = None
     structured_response: dict[str, Any] = field(default_factory=dict)
+    evaluation_record: dict[str, Any] = field(default_factory=dict)
     reasoning_steps: tuple[dict[str, Any], ...] = ()
     board_notes: tuple[str, ...] = ()
     readiness_gate: dict[str, Any] = field(default_factory=dict)
@@ -280,6 +283,7 @@ class IntelligenceResult:
             analysis_brief=analysis_brief,
             supporting_evidence=supporting_evidence,
             structured_response=_copy_mapping(payload.get("structured_response")),
+            evaluation_record=_copy_mapping(payload.get("evaluation_record")),
             reasoning_steps=reasoning_steps,
             board_notes=board_notes,
             readiness_gate=_copy_mapping(payload.get("readiness_gate")),
@@ -311,12 +315,20 @@ class IntelligenceResult:
         if self.supporting_evidence is not None:
             payload["supporting_evidence"] = self.supporting_evidence.to_dict()
         payload["structured_response"] = dict(self.structured_response)
+        payload["evaluation_record"] = dict(self.evaluation_record)
         payload["reasoning_steps"] = [dict(item) for item in self.reasoning_steps]
         payload["board_notes"] = list(self.board_notes)
         payload["readiness_gate"] = dict(self.readiness_gate)
         if self.local_only is not None:
             payload["local_only"] = self.local_only
         return payload
+
+    def build_evaluation_record(self, *, outcome: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        return build_intelligence_evaluation_record(
+            query=self.pipeline_request or self.raw,
+            response=self.to_dict(),
+            outcome=outcome,
+        )
 
 
 __all__ = ["Evidence", "Insight", "IntelligenceResult"]

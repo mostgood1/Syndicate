@@ -1,45 +1,13 @@
 param(
     [string]$Date,
     [string]$BaseUrl,
-    [switch]$Json,
-    [switch]$RefreshOdds,
-    [string]$OddsPhase = 'all',
-    [string]$OddsSports = 'all',
-    [string]$OddsRegions = 'us',
-    [switch]$SkipTests,
-    [switch]$SkipSmoke,
-    [switch]$SkipSourceUpdates,
-    [switch]$SkipRefreshGate,
-    [switch]$SkipGitPush,
-    [switch]$DryRun,
-    [string]$GitRemote = 'origin',
-    [string]$CommitMessagePrefix = 'daily update',
-    [switch]$SkipMLB,
-    [switch]$SkipNBA,
-    [switch]$SkipNHL,
-    [switch]$SkipWNBA,
-    [switch]$SkipNFL,
-    [switch]$SkipNCAAF,
-    [switch]$SkipNCAAB
+    [int]$EventSimForceWindowMinutes = 30
 )
 
-$ErrorActionPreference = 'Stop'
-
-# Use Central Time for date calculations to match Syndicate's timezone
-if ([string]::IsNullOrWhiteSpace($Date)) {
-    $centralTZ = [TimeZoneInfo]::FindSystemTimeZoneById("Central Standard Time")
-    $Date = [TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow, $centralTZ).ToString('yyyy-MM-dd')
-}
-
-$cpuCount = [Environment]::ProcessorCount
-
 function Get-ReasonableWorkerCount {
-    param(
-        [int]$Requested,
-        [int]$CpuCount = $cpuCount
-    )
+    param([int]$Requested)
 
-    $safeCpu = [Math]::Max(1, [int]$CpuCount)
+    $safeCpu = [Environment]::ProcessorCount
     $safeRequested = [Math]::Max(1, [int]$Requested)
     return [Math]::Min($safeRequested, [Math]::Max(1, $safeCpu - 1))
 }
@@ -81,6 +49,31 @@ $runtimePolicy = [ordered]@{
 $runtimePolicy.MLB.workers = Get-ReasonableWorkerCount -Requested $runtimePolicy.MLB.workers
 $runtimePolicy.NBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.NBA.smartsimWorkers
 $runtimePolicy.WNBA.smartsimWorkers = Get-ReasonableWorkerCount -Requested $runtimePolicy.WNBA.smartsimWorkers
+
+$eventSimPolicyConfig = [ordered]@{
+    sport = [ordered]@{
+        mlb = [ordered]@{
+            policyId = 'sport:mlb:default'
+            forceWithinMinutes = 20
+            minimumSampleSize = 3
+            policyCandidates = @(
+                [ordered]@{ policyId = 'sport:mlb:default'; forceWithinMinutes = 20 }
+                [ordered]@{ policyId = 'sport:mlb:balanced'; forceWithinMinutes = 30 }
+            )
+        }
+        nba = [ordered]@{
+            policyId = 'sport:nba:default'
+            forceWithinMinutes = 45
+            minimumSampleSize = 3
+            policyCandidates = @(
+                [ordered]@{ policyId = 'sport:nba:default'; forceWithinMinutes = 45 }
+                [ordered]@{ policyId = 'sport:nba:late'; forceWithinMinutes = 60 }
+            )
+        }
+        wnba = [ordered]@{ policyId = 'sport:wnba:default'; forceWithinMinutes = 40; minimumSampleSize = 3; policyCandidates = @([ordered]@{ policyId = 'sport:wnba:default'; forceWithinMinutes = 40 }) }
+        nhl = [ordered]@{ policyId = 'sport:nhl:default'; forceWithinMinutes = 25; minimumSampleSize = 3; policyCandidates = @([ordered]@{ policyId = 'sport:nhl:default'; forceWithinMinutes = 25 }) }
+    }
+}
 
 function Invoke-Step {
     param(
@@ -287,6 +280,1158 @@ function Get-ActiveMlbUiDailyLockCount {
     }
 
     return $activeCount
+}
+
+function Get-RunPlanDecisionValue {
+    param(
+        [object]$Plan,
+        [string]$Key,
+        [bool]$Fallback
+    )
+
+    if ($null -eq $Plan -or [string]::IsNullOrWhiteSpace($Key)) {
+        return $Fallback
+    }
+
+    if ($Plan -is [System.Collections.IDictionary]) {
+        if ($Plan.Contains($Key)) {
+            $plannedValue = $Plan[$Key]
+            if ($null -ne $plannedValue) {
+                return [bool]$plannedValue
+            }
+        }
+
+        return $Fallback
+    }
+
+    $property = $Plan.PSObject.Properties[$Key]
+    if ($null -ne $property -and $null -ne $property.Value) {
+        return [bool]$property.Value
+    }
+
+    return $Fallback
+}
+
+function Get-SimExecutionDecision {
+    param(
+        [string]$RepoRoot,
+        [string]$DateValue,
+        [string]$LatestManifestPath,
+        [object[]]$SourceSteps,
+        [bool]$SkipSourceUpdates
+    )
+
+    if ($SkipSourceUpdates) {
+        return $false
+    }
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot) -or [string]::IsNullOrWhiteSpace($DateValue)) {
+        return $null
+    }
+
+    if (-not (Test-Path -LiteralPath $LatestManifestPath)) {
+        return $true
+    }
+
+    $latestManifest = $null
+    try {
+        $latestManifest = Get-Content -Path $LatestManifestPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
+
+    if ($null -eq $latestManifest -or $null -eq $latestManifest.runState) {
+        return $true
+    }
+
+    $artifactPatterns = @()
+    foreach ($step in @($SourceSteps)) {
+        $sport = [string]$step.Sport
+        $workflow = [string]$step.Workflow
+        switch ($sport.ToLowerInvariant()) {
+            'mlb' {
+                if ($workflow -eq 'vendored_daily_update') {
+                    $artifactPatterns += @(
+                        (Join-Path $RepoRoot ("data\mlb_source\data\daily\sims\{0}\sim_*.json" -f $DateValue)),
+                        (Join-Path $RepoRoot ("data\mlb_source\source_artifacts\data\daily\sims\{0}\sim_*.json" -f $DateValue))
+                    )
+                }
+            }
+            'nba' {
+                if ($workflow -eq 'vendored_daily_update') {
+                    $artifactPatterns += @(
+                        (Join-Path $RepoRoot ("data\nba_source\data\processed\smart_sim_{0}_*.json" -f $DateValue)),
+                        (Join-Path $RepoRoot ("data\nba_source\source_artifacts\data\processed\smart_sim_{0}_*.json" -f $DateValue))
+                    )
+                }
+            }
+            'wnba' {
+                if ($workflow -eq 'vendored_daily_update') {
+                    $artifactPatterns += @(
+                        (Join-Path $RepoRoot ("data\wnba_source\data\processed\smart_sim_{0}_*.json" -f $DateValue)),
+                        (Join-Path $RepoRoot ("data\wnba_source\source_artifacts\data\processed\smart_sim_{0}_*.json" -f $DateValue))
+                    )
+                }
+            }
+            'nhl' {
+                if ($workflow -eq 'vendored_daily_update') {
+                    $artifactPatterns += @(
+                        (Join-Path $RepoRoot ("data\nhl_source\data\processed\smart_sim_{0}_*.json" -f $DateValue)),
+                        (Join-Path $RepoRoot ("data\nhl_source\source_artifacts\data\processed\smart_sim_{0}_*.json" -f $DateValue))
+                    )
+                }
+            }
+        }
+    }
+
+    if ($artifactPatterns.Count -eq 0) {
+        return $null
+    }
+
+    foreach ($artifactPattern in @($artifactPatterns | Select-Object -Unique)) {
+        if (-not (Test-Path -Path $artifactPattern)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Get-SimEventArtifactPaths {
+    param(
+        [string]$RepoRoot,
+        [string]$DateValue,
+        [string]$Sport,
+        [string]$Workflow
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($Sport)) {
+        return @()
+    }
+
+    $paths = New-Object System.Collections.Generic.List[string]
+    $slug = $Sport.ToLowerInvariant()
+
+    switch ($slug) {
+        'mlb' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/mlb_source/data/daily/sims/$DateValue/sim_*.json",
+                    "data/mlb_source/source_artifacts/data/daily/sims/$DateValue/sim_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+        'nba' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/nba_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/nba_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+        'wnba' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/wnba_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/wnba_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+        'nhl' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/nhl_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/nhl_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+    }
+
+    return @($paths | Select-Object -Unique)
+}
+
+function Get-EventInputFingerprint {
+    param(
+        [string]$RepoRoot,
+        [string]$DateValue,
+        [string]$Sport,
+        [string]$Workflow
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($Sport)) {
+        return $null
+    }
+
+    $inputPaths = New-Object System.Collections.Generic.List[string]
+
+    function Add-InputPathIfPresent {
+        param([string]$RelativePath)
+
+        if ([string]::IsNullOrWhiteSpace($RelativePath)) {
+            return
+        }
+
+        $fullPath = Join-Path $RepoRoot $RelativePath
+        if (Test-Path -LiteralPath $fullPath) {
+            $inputPaths.Add((Resolve-Path -LiteralPath $fullPath).Path) | Out-Null
+        }
+    }
+
+    function Add-InputPathsByPattern {
+        param([string]$RelativePattern)
+
+        if ([string]::IsNullOrWhiteSpace($RelativePattern)) {
+            return
+        }
+
+        foreach ($match in @(Get-ChildItem -Path (Join-Path $RepoRoot $RelativePattern) -File -ErrorAction SilentlyContinue)) {
+            $inputPaths.Add($match.FullName) | Out-Null
+        }
+    }
+
+    $slug = $Sport.ToLowerInvariant()
+    switch ($slug) {
+        'mlb' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePath in @(
+                    "data/mlb_source/data/daily/daily_summary_${DateValue}.json",
+                    "data/mlb_source/data/daily/daily_summary_${DateValue}_profile_bundle.json",
+                    "data/mlb_source/data/daily/daily_summary_${DateValue}_locked_policy.json",
+                    "data/mlb_source/data/daily/daily_summary_${DateValue}_hr_targets.json",
+                    "data/mlb_source/data/daily/daily_summary_${DateValue}_rfi_targets.json",
+                    "data/mlb_source/data/daily/ladders/daily_ladders_${DateValue}.json",
+                    "data/mlb_source/data/daily/top_props/daily_top_props_${DateValue}.json",
+                    "data/mlb_source/data/daily/ops/daily_ops_${DateValue}.json",
+                    "data/mlb_source/data/daily/snapshots/${DateValue}/lineups.json",
+                    "data/mlb_source/data/daily/snapshots/${DateValue}/probables.json",
+                    "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_game_lines_${DateValue}.json",
+                    "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_pitcher_props_${DateValue}.json",
+                    "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_hitter_props_${DateValue}.json",
+                    "data/mlb_source/data/live_lens/live_lens_${DateValue}.jsonl",
+                    "data/mlb_source/data/live_lens/live_lens_report_${DateValue}.json",
+                    "data/mlb_source/data/live_lens/recaps/live_lens_daily_recap_${DateValue}.json",
+                    "data/mlb_source/data/live_lens/render_sync/live_lens_reports_${DateValue}.json",
+                    "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${DateValue}.json",
+                    "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${DateValue}.jsonl",
+                    "data/mlb_source/data/live_lens/prop_registry/live_prop_observations_${DateValue}.jsonl",
+                    "data/mlb_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/mlb_source/data/processed/team_advanced_stats_*.csv",
+                    "data/mlb_source/source_artifacts/data/daily/daily_summary_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/daily/daily_summary_${DateValue}_profile_bundle.json",
+                    "data/mlb_source/source_artifacts/data/daily/daily_summary_${DateValue}_locked_policy.json",
+                    "data/mlb_source/source_artifacts/data/daily/daily_summary_${DateValue}_hr_targets.json",
+                    "data/mlb_source/source_artifacts/data/daily/daily_summary_${DateValue}_rfi_targets.json",
+                    "data/mlb_source/source_artifacts/data/daily/ladders/daily_ladders_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/daily/top_props/daily_top_props_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/daily/ops/daily_ops_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/daily/snapshots/${DateValue}/lineups.json",
+                    "data/mlb_source/source_artifacts/data/daily/snapshots/${DateValue}/probables.json",
+                    "data/mlb_source/source_artifacts/data/daily/snapshots/${DateValue}/oddsapi_game_lines_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/daily/snapshots/${DateValue}/oddsapi_pitcher_props_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/daily/snapshots/${DateValue}/oddsapi_hitter_props_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/live_lens/live_lens_${DateValue}.jsonl",
+                    "data/mlb_source/source_artifacts/data/live_lens/live_lens_report_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/live_lens/recaps/live_lens_daily_recap_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/live_lens/render_sync/live_lens_reports_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_${DateValue}.json",
+                    "data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_registry_${DateValue}.jsonl",
+                    "data/mlb_source/source_artifacts/data/live_lens/prop_registry/live_prop_observations_${DateValue}.jsonl",
+                    "data/mlb_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/mlb_source/source_artifacts/data/processed/team_advanced_stats_*.csv"
+                )) {
+                    if ($relativePath.Contains('*')) {
+                        Add-InputPathsByPattern -RelativePattern $relativePath
+                    }
+                    else {
+                        Add-InputPathIfPresent -RelativePath $relativePath
+                    }
+                }
+            }
+        }
+        'nba' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePath in @(
+                    "data/nba_source/data/processed/game_cards_${DateValue}.csv",
+                    "data/nba_source/data/processed/game_odds_${DateValue}.csv",
+                    "data/nba_source/data/processed/recommendations_${DateValue}.csv",
+                    "data/nba_source/data/processed/recommendations_slate_${DateValue}.json",
+                    "data/nba_source/data/processed/cards_sim_detail_${DateValue}.json",
+                    "data/nba_source/data/processed/cards_props_snapshot_${DateValue}.json",
+                    "data/nba_source/data/processed/props_recommendations_top_by_game_${DateValue}.json",
+                    "data/nba_source/data/processed/oddsapi_player_props_${DateValue}.csv",
+                    "data/nba_source/data/processed/props_predictions_${DateValue}.csv",
+                    "data/nba_source/data/processed/props_edges_${DateValue}.csv",
+                    "data/nba_source/data/processed/props_movement_signals_${DateValue}.csv",
+                    "data/nba_source/data/processed/props_recommendations_${DateValue}.csv",
+                    "data/nba_source/data/processed/recon_games_${DateValue}.csv",
+                    "data/nba_source/data/processed/recon_quarters_${DateValue}.csv",
+                    "data/nba_source/data/processed/recon_props_${DateValue}.csv",
+                    "data/nba_source/data/processed/recon_players_${DateValue}.csv",
+                    "data/nba_source/data/processed/live_player_lens_tuning_${DateValue}.csv",
+                    "data/nba_source/data/processed/boxscores_${DateValue}.csv",
+                    "data/nba_source/data/processed/live_lens_projections_${DateValue}.jsonl",
+                    "data/nba_source/data/processed/live_lens_signals_${DateValue}.jsonl",
+                    "data/nba_source/data/processed/live_lens_tuning_override.json",
+                    "data/nba_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/nba_source/data/processed/team_advanced_stats_*.csv",
+                    "data/nba_source/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
+                    "data/nba_source/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
+                    "data/nba_source/data/processed/live_snapshots/live_pbp_stats_${DateValue}.jsonl",
+                    "data/nba_source/data/processed/live_snapshots/live_player_boxscore_${DateValue}.jsonl",
+                    "data/nba_source/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl",
+                    "data/nba_source/source_artifacts/data/processed/game_cards_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/game_odds_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/recommendations_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/recommendations_slate_${DateValue}.json",
+                    "data/nba_source/source_artifacts/data/processed/cards_sim_detail_${DateValue}.json",
+                    "data/nba_source/source_artifacts/data/processed/cards_props_snapshot_${DateValue}.json",
+                    "data/nba_source/source_artifacts/data/processed/props_recommendations_top_by_game_${DateValue}.json",
+                    "data/nba_source/source_artifacts/data/processed/oddsapi_player_props_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/props_predictions_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/props_edges_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/props_movement_signals_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/props_recommendations_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/recon_games_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/recon_quarters_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/recon_props_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/recon_players_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/live_player_lens_tuning_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/boxscores_${DateValue}.csv",
+                    "data/nba_source/source_artifacts/data/processed/live_lens_projections_${DateValue}.jsonl",
+                    "data/nba_source/source_artifacts/data/processed/live_lens_signals_${DateValue}.jsonl",
+                    "data/nba_source/source_artifacts/data/processed/live_lens_tuning_override.json",
+                    "data/nba_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/nba_source/source_artifacts/data/processed/team_advanced_stats_*.csv",
+                    "data/nba_source/source_artifacts/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
+                    "data/nba_source/source_artifacts/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
+                    "data/nba_source/source_artifacts/data/processed/live_snapshots/live_pbp_stats_${DateValue}.jsonl",
+                    "data/nba_source/source_artifacts/data/processed/live_snapshots/live_player_boxscore_${DateValue}.jsonl",
+                    "data/nba_source/source_artifacts/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl"
+                )) {
+                    if ($relativePath.Contains('*')) {
+                        Add-InputPathsByPattern -RelativePattern $relativePath
+                    }
+                    else {
+                        Add-InputPathIfPresent -RelativePath $relativePath
+                    }
+                }
+            }
+        }
+        'wnba' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePath in @(
+                    "data/wnba_source/data/processed/game_cards_${DateValue}.csv",
+                    "data/wnba_source/data/processed/game_odds_${DateValue}.csv",
+                    "data/wnba_source/data/processed/recommendations_${DateValue}.csv",
+                    "data/wnba_source/data/processed/recommendations_slate_${DateValue}.json",
+                    "data/wnba_source/data/processed/cards_sim_detail_${DateValue}.json",
+                    "data/wnba_source/data/processed/cards_props_snapshot_${DateValue}.json",
+                    "data/wnba_source/data/processed/props_recommendations_top_by_game_${DateValue}.json",
+                    "data/wnba_source/data/processed/oddsapi_player_props_${DateValue}.csv",
+                    "data/wnba_source/data/processed/props_predictions_${DateValue}.csv",
+                    "data/wnba_source/data/processed/props_edges_${DateValue}.csv",
+                    "data/wnba_source/data/processed/props_movement_signals_${DateValue}.csv",
+                    "data/wnba_source/data/processed/props_recommendations_${DateValue}.csv",
+                    "data/wnba_source/data/processed/recon_games_${DateValue}.csv",
+                    "data/wnba_source/data/processed/recon_quarters_${DateValue}.csv",
+                    "data/wnba_source/data/processed/recon_props_${DateValue}.csv",
+                    "data/wnba_source/data/processed/recon_players_${DateValue}.csv",
+                    "data/wnba_source/data/processed/live_player_lens_tuning_${DateValue}.csv",
+                    "data/wnba_source/data/processed/boxscores_${DateValue}.csv",
+                    "data/wnba_source/data/processed/live_lens_projections_${DateValue}.jsonl",
+                    "data/wnba_source/data/processed/live_lens_signals_${DateValue}.jsonl",
+                    "data/wnba_source/data/processed/live_lens_tuning_override.json",
+                    "data/wnba_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/wnba_source/data/processed/team_advanced_stats_*.csv",
+                    "data/wnba_source/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
+                    "data/wnba_source/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
+                    "data/wnba_source/data/processed/live_snapshots/live_pbp_stats_${DateValue}.jsonl",
+                    "data/wnba_source/data/processed/live_snapshots/live_player_boxscore_${DateValue}.jsonl",
+                    "data/wnba_source/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl",
+                    "data/wnba_source/source_artifacts/data/processed/game_cards_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/game_odds_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/recommendations_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/recommendations_slate_${DateValue}.json",
+                    "data/wnba_source/source_artifacts/data/processed/cards_sim_detail_${DateValue}.json",
+                    "data/wnba_source/source_artifacts/data/processed/cards_props_snapshot_${DateValue}.json",
+                    "data/wnba_source/source_artifacts/data/processed/props_recommendations_top_by_game_${DateValue}.json",
+                    "data/wnba_source/source_artifacts/data/processed/oddsapi_player_props_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/props_predictions_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/props_edges_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/props_movement_signals_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/props_recommendations_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/recon_games_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/recon_quarters_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/recon_props_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/recon_players_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/live_player_lens_tuning_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/boxscores_${DateValue}.csv",
+                    "data/wnba_source/source_artifacts/data/processed/live_lens_projections_${DateValue}.jsonl",
+                    "data/wnba_source/source_artifacts/data/processed/live_lens_signals_${DateValue}.jsonl",
+                    "data/wnba_source/source_artifacts/data/processed/live_lens_tuning_override.json",
+                    "data/wnba_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/wnba_source/source_artifacts/data/processed/team_advanced_stats_*.csv",
+                    "data/wnba_source/source_artifacts/data/processed/live_snapshots/live_state_${DateValue}.jsonl",
+                    "data/wnba_source/source_artifacts/data/processed/live_snapshots/live_lines_${DateValue}.jsonl",
+                    "data/wnba_source/source_artifacts/data/processed/live_snapshots/live_pbp_stats_${DateValue}.jsonl",
+                    "data/wnba_source/source_artifacts/data/processed/live_snapshots/live_player_boxscore_${DateValue}.jsonl",
+                    "data/wnba_source/source_artifacts/data/processed/live_snapshots/live_player_lens_${DateValue}.jsonl"
+                )) {
+                    if ($relativePath.Contains('*')) {
+                        Add-InputPathsByPattern -RelativePattern $relativePath
+                    }
+                    else {
+                        Add-InputPathIfPresent -RelativePath $relativePath
+                    }
+                }
+            }
+        }
+        'nhl' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePath in @(
+                    "data/nhl_source/data/processed/predictions_${DateValue}.csv",
+                    "data/nhl_source/data/processed/predictions_sim_${DateValue}.csv",
+                    "data/nhl_source/data/processed/recommendations_${DateValue}.csv",
+                    "data/nhl_source/data/processed/recommendations_sim_${DateValue}.csv",
+                    "data/nhl_source/data/processed/recon_games_${DateValue}.csv",
+                    "data/nhl_source/data/processed/recon_props_${DateValue}.csv",
+                    "data/nhl_source/data/processed/props_projections_all_${DateValue}.csv",
+                    "data/nhl_source/data/processed/props_boxscores_sim_${DateValue}.csv",
+                    "data/nhl_source/data/processed/props_boxscores_sim_hist_${DateValue}.csv",
+                    "data/nhl_source/data/processed/props_boxscores_sim_samples_${DateValue}.csv",
+                    "data/nhl_source/data/processed/props_recommendations_${DateValue}.csv",
+                    "data/nhl_source/data/processed/roster_snapshot_${DateValue}.csv",
+                    "data/nhl_source/data/processed/injuries_${DateValue}.csv",
+                    "data/nhl_source/data/processed/lineups_${DateValue}.csv",
+                    "data/nhl_source/data/processed/lineups_co_toi_${DateValue}.csv",
+                    "data/nhl_source/data/processed/shifts_${DateValue}.csv",
+                    "data/nhl_source/data/processed/co_toi_shifts_${DateValue}.csv",
+                    "data/nhl_source/data/processed/starting_goalies_${DateValue}.csv",
+                    "data/nhl_source/data/processed/smart_sim_${DateValue}_bundle.json",
+                    "data/nhl_source/data/processed/live_lens_projections_${DateValue}.jsonl",
+                    "data/nhl_source/data/processed/live_lens_signals_${DateValue}.jsonl",
+                    "data/nhl_source/data/processed/live_lens_tuning_override.json",
+                    "data/nhl_source/data/odds/games/date=${DateValue}/scoreboard.csv",
+                    "data/nhl_source/data/odds/team/date=${DateValue}/oddsapi.csv",
+                    "data/nhl_source/data/odds/team/date=${DateValue}/oddsapi.parquet",
+                    "data/nhl_source/data/props/player_props_lines/date=${DateValue}/oddsapi.csv",
+                    "data/nhl_source/data/props/player_props_lines/date=${DateValue}/oddsapi.parquet",
+                    "data/nhl_source/source_artifacts/data/processed/predictions_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/predictions_sim_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/recommendations_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/recommendations_sim_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/recon_games_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/recon_props_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/props_projections_all_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/props_boxscores_sim_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/props_boxscores_sim_hist_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/props_boxscores_sim_samples_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/props_recommendations_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/roster_snapshot_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/injuries_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/lineups_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/lineups_co_toi_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/shifts_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/co_toi_shifts_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/starting_goalies_${DateValue}.csv",
+                    "data/nhl_source/source_artifacts/data/processed/smart_sim_${DateValue}_bundle.json",
+                    "data/nhl_source/source_artifacts/data/processed/live_lens_projections_${DateValue}.jsonl",
+                    "data/nhl_source/source_artifacts/data/processed/live_lens_signals_${DateValue}.jsonl",
+                    "data/nhl_source/source_artifacts/data/processed/live_lens_tuning_override.json",
+                    "data/nhl_source/source_artifacts/data/odds/games/date=${DateValue}/scoreboard.csv",
+                    "data/nhl_source/source_artifacts/data/odds/team/date=${DateValue}/oddsapi.csv",
+                    "data/nhl_source/source_artifacts/data/odds/team/date=${DateValue}/oddsapi.parquet",
+                    "data/nhl_source/source_artifacts/data/props/player_props_lines/date=${DateValue}/oddsapi.csv",
+                    "data/nhl_source/source_artifacts/data/props/player_props_lines/date=${DateValue}/oddsapi.parquet"
+                )) {
+                    if ($relativePath.Contains('*')) {
+                        Add-InputPathsByPattern -RelativePattern $relativePath
+                    }
+                    else {
+                        Add-InputPathIfPresent -RelativePath $relativePath
+                    }
+                }
+            }
+        }
+    }
+
+    $resolvedPaths = @($inputPaths | Sort-Object -Unique)
+    if ($resolvedPaths.Count -eq 0) {
+        return $null
+    }
+
+    $fingerprintParts = New-Object System.Collections.Generic.List[string]
+    foreach ($path in $resolvedPaths) {
+        try {
+            $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256 -ErrorAction Stop).Hash
+            $fingerprintParts.Add(($path + '|' + $hash)) | Out-Null
+        }
+        catch {
+        }
+    }
+
+    if ($fingerprintParts.Count -eq 0) {
+        return $null
+    }
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $payload = [System.Text.Encoding]::UTF8.GetBytes(($fingerprintParts -join [Environment]::NewLine))
+        return (([System.BitConverter]::ToString($sha256.ComputeHash($payload))) -replace '-', '').ToLowerInvariant()
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
+function ConvertTo-NullableDateTimeOffset {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $null
+    }
+
+    $parsedOffset = [DateTimeOffset]::MinValue
+    if ([DateTimeOffset]::TryParse(
+        $text,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::AssumeUniversal,
+        [ref]$parsedOffset
+    )) {
+        return $parsedOffset.ToUniversalTime()
+    }
+
+    $parsedDateTime = [datetime]::MinValue
+    if ([datetime]::TryParse(
+        $text,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::AssumeUniversal,
+        [ref]$parsedDateTime
+    )) {
+        return ([DateTimeOffset]$parsedDateTime).ToUniversalTime()
+    }
+
+    return $null
+}
+
+function Get-Policy {
+    param(
+        [object]$Context,
+        [object]$PolicyConfig,
+        [object[]]$PolicyPerformance
+    )
+
+    if ($null -eq $PolicyConfig) {
+        return $null
+    }
+
+    $sport = [string]$Context.sport
+    $market = [string]$Context.market
+    $timeToStartMinutes = $Context.timeToStartMinutes
+    $selectedPolicy = $null
+    $policySource = $null
+
+    if (-not [string]::IsNullOrWhiteSpace($sport) -and $PolicyConfig.sport -and $PolicyConfig.sport.Contains($sport.ToLowerInvariant())) {
+        $selectedPolicy = $PolicyConfig.sport[$sport.ToLowerInvariant()]
+        $policySource = 'sport'
+    }
+
+    if ($null -eq $selectedPolicy -and -not [string]::IsNullOrWhiteSpace($market) -and $PolicyConfig.market -and $PolicyConfig.market.Contains($market.ToLowerInvariant())) {
+        $selectedPolicy = $PolicyConfig.market[$market.ToLowerInvariant()]
+        $policySource = 'market'
+    }
+
+    if ($null -eq $selectedPolicy) {
+        return $null
+    }
+
+    return Select-BestPolicy -Context $Context -PolicyGroup $selectedPolicy -PolicySource $policySource -PolicyPerformance $PolicyPerformance
+}
+
+function Select-BestPolicy {
+    param(
+        [object]$Context,
+        [object]$PolicyGroup,
+        [string]$PolicySource,
+        [object[]]$PolicyPerformance
+    )
+
+    if ($null -eq $PolicyGroup) {
+        return $null
+    }
+
+    $sport = [string]$Context.sport
+    $market = [string]$Context.market
+    $timeToStartMinutes = $Context.timeToStartMinutes
+    $minimumSampleSize = 0
+    if ($null -ne $PolicyGroup.minimumSampleSize) {
+        $minimumSampleSize = [int]$PolicyGroup.minimumSampleSize
+    }
+
+    $candidatePolicies = @()
+    if ($PolicyGroup.policyCandidates -and @($PolicyGroup.policyCandidates).Count -gt 0) {
+        $candidatePolicies = @($PolicyGroup.policyCandidates)
+    }
+    else {
+        $candidatePolicies = @($PolicyGroup)
+    }
+
+    $performanceRows = @($PolicyPerformance | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.policyId) })
+    if ($performanceRows.Count -eq 0) {
+        $defaultCandidate = @($candidatePolicies | Select-Object -First 1)
+        if ($defaultCandidate.Count -eq 0) {
+            return $null
+        }
+
+        $selectedPolicy = $defaultCandidate[0]
+        $forceWithinMinutes = if ($null -ne $selectedPolicy.forceWithinMinutes) { [int]$selectedPolicy.forceWithinMinutes } else { $null }
+        return [ordered]@{
+            policyId = [string]$selectedPolicy.policyId
+            sport = $sport
+            market = $market
+            timeToStartMinutes = $timeToStartMinutes
+            forceWithinMinutes = $forceWithinMinutes
+            policySource = $PolicySource
+            selectionMode = 'default'
+            keyParameters = [ordered]@{ forceWithinMinutes = $forceWithinMinutes }
+        }
+    }
+
+    $performanceByPolicyId = @{}
+    foreach ($row in $performanceRows) {
+        $policyId = [string]$row.policyId
+        if ([string]::IsNullOrWhiteSpace($policyId)) {
+            continue
+        }
+        $performanceByPolicyId[$policyId] = $row
+    }
+
+    $eligibleCandidates = New-Object System.Collections.Generic.List[object]
+    foreach ($candidate in $candidatePolicies) {
+        $candidatePolicyId = [string]$candidate.policyId
+        if ([string]::IsNullOrWhiteSpace($candidatePolicyId)) {
+            continue
+        }
+
+        $performance = $performanceByPolicyId[$candidatePolicyId]
+        if ($null -eq $performance) {
+            continue
+        }
+
+        $sampleSize = [int]($performance.sampleSize -as [int])
+        if ($sampleSize -le 0) {
+            $sampleSize = [int]($performance.recordCount -as [int])
+        }
+        if ($sampleSize -lt $minimumSampleSize) {
+            continue
+        }
+
+        $roi = $null
+        foreach ($roiProperty in @('roi', 'policyRoi', 'performanceRoi')) {
+            if ($null -ne $performance.$roiProperty) {
+                $roiText = [string]$performance.$roiProperty
+                if ([double]::TryParse($roiText, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$roi)) {
+                    break
+                }
+                $roi = $null
+            }
+        }
+
+        $eligibleCandidates.Add([ordered]@{
+            candidate = $candidate
+            performance = $performance
+            sampleSize = [int]$sampleSize
+            roi = $roi
+        }) | Out-Null
+    }
+
+    if ($eligibleCandidates.Count -eq 0) {
+        $defaultCandidate = @($candidatePolicies | Select-Object -First 1)
+        if ($defaultCandidate.Count -eq 0) {
+            return $null
+        }
+
+        $selectedPolicy = $defaultCandidate[0]
+        $forceWithinMinutes = if ($null -ne $selectedPolicy.forceWithinMinutes) { [int]$selectedPolicy.forceWithinMinutes } else { $null }
+        return [ordered]@{
+            policyId = [string]$selectedPolicy.policyId
+            sport = $sport
+            market = $market
+            timeToStartMinutes = $timeToStartMinutes
+            forceWithinMinutes = $forceWithinMinutes
+            policySource = $PolicySource
+            selectionMode = 'default'
+            keyParameters = [ordered]@{ forceWithinMinutes = $forceWithinMinutes }
+        }
+    }
+
+    $bestCandidate = $eligibleCandidates | Sort-Object -Property @{ Expression = { if ($null -ne $_.roi) { [double]$_.roi } else { [double]::MinValue } } ; Descending = $true }, @{ Expression = { [int]$_.sampleSize }; Descending = $true } | Select-Object -First 1
+    $bestPolicy = $bestCandidate.candidate
+    $bestForceWithinMinutes = if ($null -ne $bestPolicy.forceWithinMinutes) { [int]$bestPolicy.forceWithinMinutes } else { $null }
+    return [ordered]@{
+        policyId = [string]$bestPolicy.policyId
+        sport = $sport
+        market = $market
+        timeToStartMinutes = $timeToStartMinutes
+        forceWithinMinutes = $bestForceWithinMinutes
+        policySource = $PolicySource
+        selectionMode = 'performance'
+        keyParameters = [ordered]@{ forceWithinMinutes = $bestForceWithinMinutes }
+    }
+}
+
+function Get-PolicyPerformance {
+    param([object[]]$Records)
+
+    $policyRecords = @($Records | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.policyId) })
+    if ($policyRecords.Count -eq 0) {
+        return @()
+    }
+
+    $performanceRows = New-Object System.Collections.Generic.List[object]
+    foreach ($policyGroup in @($policyRecords | Group-Object -Property policyId)) {
+        $groupRecords = @($policyGroup.Group)
+        $timeSamples = New-Object System.Collections.Generic.List[double]
+        $forceSamples = New-Object System.Collections.Generic.List[double]
+        $roiSamples = New-Object System.Collections.Generic.List[double]
+        $withinWindowCount = 0
+
+        foreach ($record in $groupRecords) {
+            $timeSample = $null
+            if ($null -ne $record.timeToStartMinutes) {
+                $timeSampleText = [string]$record.timeToStartMinutes
+                if ([double]::TryParse($timeSampleText, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$timeSample)) {
+                    $timeSamples.Add([double]$timeSample) | Out-Null
+                }
+            }
+
+            $forceSample = $null
+            if ($null -ne $record.forceWithinMinutes) {
+                $forceSampleText = [string]$record.forceWithinMinutes
+                if ([double]::TryParse($forceSampleText, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$forceSample)) {
+                    $forceSamples.Add([double]$forceSample) | Out-Null
+                }
+            }
+
+            $roiSample = $null
+            foreach ($roiProperty in @('roi', 'policyRoi', 'performanceRoi')) {
+                if ($null -ne $record.$roiProperty) {
+                    $roiSampleText = [string]$record.$roiProperty
+                    if ([double]::TryParse($roiSampleText, [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$roiSample)) {
+                        $roiSamples.Add([double]$roiSample) | Out-Null
+                    }
+                    break
+                }
+            }
+
+            if ($null -ne $timeSample -and $null -ne $forceSample -and $timeSample -ge 0 -and $timeSample -le $forceSample) {
+                $withinWindowCount += 1
+            }
+        }
+
+        $policySource = [string]($groupRecords | Select-Object -First 1 | ForEach-Object { $_.policySource })
+        $keyParameters = @($groupRecords | Select-Object -First 1 | ForEach-Object { $_.policyKeyParameters })
+        $performanceRows.Add([ordered]@{
+            policyId = [string]$policyGroup.Name
+            policySource = $policySource
+            keyParameters = if ($keyParameters.Count -gt 0) { $keyParameters[0] } else { $null }
+            recordCount = [int]$groupRecords.Count
+            sampleSize = [int]$groupRecords.Count
+            plannedCount = [int](@($groupRecords | Where-Object { [string]$_.decision -eq 'planned' }).Count)
+            skippedCount = [int](@($groupRecords | Where-Object { [string]$_.decision -eq 'skipped' -or [string]$_.status -eq 'skipped' }).Count)
+            dryRunCount = [int](@($groupRecords | Where-Object { [string]$_.status -eq 'dry_run' }).Count)
+            withinWindowCount = [int]$withinWindowCount
+            averageTimeToStartMinutes = if ($timeSamples.Count -gt 0) { [math]::Round((($timeSamples | Measure-Object -Average).Average), 2) } else { $null }
+            averageForceWithinMinutes = if ($forceSamples.Count -gt 0) { [math]::Round((($forceSamples | Measure-Object -Average).Average), 2) } else { $null }
+            roi = if ($roiSamples.Count -gt 0) { [math]::Round((($roiSamples | Measure-Object -Average).Average), 4) } else { $null }
+        }) | Out-Null
+    }
+
+    return @($performanceRows)
+}
+
+function Sync-RunManifestPolicyPerformance {
+    param([psobject]$Manifest)
+
+    if ($null -eq $Manifest) {
+        return
+    }
+
+    $policyPerformance = @(Get-PolicyPerformance -Records @($Manifest.eventSimExecution))
+    $Manifest.policyPerformance = $policyPerformance
+    if ($Manifest.runPlan) {
+        $Manifest.runPlan.policyPerformance = $policyPerformance
+    }
+    if ($Manifest.statusArtifact -and $Manifest.statusArtifact.state) {
+        $Manifest.statusArtifact.state.policyPerformance = $policyPerformance
+    }
+}
+
+function Get-EventSimExecutionStartTimeUtc {
+    param([object]$EventPlan)
+
+    if ($null -eq $EventPlan) {
+        return $null
+    }
+
+    foreach ($propertyName in @('eventStartTimeUtc', 'startTimeUtc', 'scheduledStartTimeUtc', 'scheduledStartUtc', 'startTime', 'scheduledStartTime')) {
+        $candidateStartTime = ConvertTo-NullableDateTimeOffset -Value $EventPlan.$propertyName
+        if ($null -ne $candidateStartTime) {
+            return $candidateStartTime
+        }
+    }
+
+    $candidatePaths = New-Object System.Collections.Generic.List[string]
+    foreach ($pathValue in @($EventPlan.artifactPath, $EventPlan.inputArtifactPath, $EventPlan.sourceArtifactPath)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$pathValue)) {
+            $candidatePaths.Add([string]$pathValue) | Out-Null
+        }
+    }
+    foreach ($pathValue in @($EventPlan.candidateArtifactPaths)) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$pathValue)) {
+            $candidatePaths.Add([string]$pathValue) | Out-Null
+        }
+    }
+
+    foreach ($candidatePath in @($candidatePaths | Select-Object -Unique)) {
+        if ([string]::IsNullOrWhiteSpace($candidatePath) -or -not (Test-Path -LiteralPath $candidatePath)) {
+            continue
+        }
+
+        try {
+            $content = Get-Content -LiteralPath $candidatePath -Raw -ErrorAction Stop
+            $payload = $content | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            continue
+        }
+
+        $payloadItems = @()
+        if ($payload -is [System.Collections.IEnumerable] -and -not ($payload -is [string])) {
+            $payloadItems = @($payload)
+        }
+        else {
+            $payloadItems = @($payload)
+        }
+
+        foreach ($payloadItem in $payloadItems) {
+            if ($null -eq $payloadItem) {
+                continue
+            }
+
+            foreach ($propertyName in @('eventStartTimeUtc', 'startTimeUtc', 'scheduledStartTimeUtc', 'scheduledStartUtc', 'start_time_utc', 'start_time_iso', 'start_time', 'startTime', 'commence_time', 'gameDateTimeUTC', 'gameDate')) {
+                $candidateStartTime = ConvertTo-NullableDateTimeOffset -Value $payloadItem.$propertyName
+                if ($null -ne $candidateStartTime) {
+                    return $candidateStartTime
+                }
+            }
+
+            foreach ($nestedGamesProperty in @('games', 'items', 'events', 'rows')) {
+                $nestedGames = @($payloadItem.$nestedGamesProperty)
+                foreach ($nestedGame in $nestedGames) {
+                    if ($null -eq $nestedGame) {
+                        continue
+                    }
+
+                    foreach ($propertyName in @('eventStartTimeUtc', 'startTimeUtc', 'scheduledStartTimeUtc', 'scheduledStartUtc', 'start_time_utc', 'start_time_iso', 'start_time', 'startTime', 'commence_time', 'gameDateTimeUTC', 'gameDate')) {
+                        $candidateStartTime = ConvertTo-NullableDateTimeOffset -Value $nestedGame.$propertyName
+                        if ($null -ne $candidateStartTime) {
+                            return $candidateStartTime
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return $null
+}
+
+function Get-ManifestEventRecordKey {
+    param([object]$Record)
+
+    if ($null -eq $Record) {
+        return $null
+    }
+
+    $sport = [string]$Record.sport
+    $workflow = [string]$Record.workflow
+    $eventKey = [string]$Record.eventKey
+    $artifactPath = [string]$Record.artifactPath
+
+    if ([string]::IsNullOrWhiteSpace($sport) -and [string]::IsNullOrWhiteSpace($workflow) -and [string]::IsNullOrWhiteSpace($eventKey) -and [string]::IsNullOrWhiteSpace($artifactPath)) {
+        return $null
+    }
+
+    return @($sport, $workflow, $eventKey, $artifactPath) -join '|'
+}
+
+function Update-ManifestEventRecordCollection {
+    param(
+        [object[]]$ExistingRecords,
+        [object[]]$NewRecords
+    )
+
+    $updatedRecords = New-Object System.Collections.Generic.List[object]
+    $indexByKey = @{}
+
+    foreach ($record in @($ExistingRecords)) {
+        $recordKey = Get-ManifestEventRecordKey -Record $record
+        if ([string]::IsNullOrWhiteSpace($recordKey)) {
+            $updatedRecords.Add($record) | Out-Null
+            continue
+        }
+
+        if (-not $indexByKey.ContainsKey($recordKey)) {
+            $indexByKey[$recordKey] = $updatedRecords.Count
+            $updatedRecords.Add($record) | Out-Null
+        }
+    }
+
+    foreach ($record in @($NewRecords)) {
+        $recordKey = Get-ManifestEventRecordKey -Record $record
+        if ([string]::IsNullOrWhiteSpace($recordKey)) {
+            continue
+        }
+
+        if ($indexByKey.ContainsKey($recordKey)) {
+            $updatedRecords[$indexByKey[$recordKey]] = $record
+        }
+        else {
+            $indexByKey[$recordKey] = $updatedRecords.Count
+            $updatedRecords.Add($record) | Out-Null
+        }
+    }
+
+    return @($updatedRecords)
+}
+
+function Sync-RunManifestEventRecords {
+    param(
+        [psobject]$Manifest,
+        [object[]]$EventRecords,
+        [object[]]$ArtifactUpdateRecords
+    )
+
+    $Manifest.eventSimExecution = Update-ManifestEventRecordCollection -ExistingRecords @($Manifest.eventSimExecution) -NewRecords $EventRecords
+    $Manifest.runPlan.eventSimExecution = Update-ManifestEventRecordCollection -ExistingRecords @($Manifest.runPlan.eventSimExecution) -NewRecords $EventRecords
+    $Manifest.artifactUpdates = Update-ManifestEventRecordCollection -ExistingRecords @($Manifest.artifactUpdates) -NewRecords $ArtifactUpdateRecords
+    $Manifest.runPlan.artifactUpdates = Update-ManifestEventRecordCollection -ExistingRecords @($Manifest.runPlan.artifactUpdates) -NewRecords $ArtifactUpdateRecords
+}
+
+function Get-SimExecutionNoOpDecision {
+    param(
+        [string]$RepoRoot,
+        [string]$DateValue,
+        [object[]]$LatestEventSimExecutionPlan
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot) -or [string]::IsNullOrWhiteSpace($DateValue)) {
+        return $null
+    }
+
+    $eventPlans = @($LatestEventSimExecutionPlan)
+    if ($eventPlans.Count -eq 0) {
+        return $null
+    }
+
+    $currentFingerprintByKey = @{}
+    foreach ($eventPlan in $eventPlans) {
+        $sport = [string]$eventPlan.sport
+        $workflow = [string]$eventPlan.workflow
+        if ([string]::IsNullOrWhiteSpace($sport) -or [string]::IsNullOrWhiteSpace($workflow)) {
+            continue
+        }
+
+        $planKey = ($sport.ToLowerInvariant() + '|' + $workflow.ToLowerInvariant())
+        if (-not $currentFingerprintByKey.ContainsKey($planKey)) {
+            $currentFingerprint = Get-EventInputFingerprint -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow
+            if ([string]::IsNullOrWhiteSpace([string]$currentFingerprint)) {
+                return $null
+            }
+
+            $currentFingerprintByKey[$planKey] = [string]$currentFingerprint
+        }
+
+        $previousFingerprint = [string]$eventPlan.inputFingerprint
+        if ([string]::IsNullOrWhiteSpace($previousFingerprint)) {
+            return $null
+        }
+
+        if ($currentFingerprintByKey[$planKey] -ne $previousFingerprint) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Get-EventSimExecutionDecision {
+    param(
+        [object]$CurrentFingerprint,
+        [object]$PreviousFingerprint,
+        [object]$Fallback,
+        [object]$CurrentTimeUtc,
+        [object]$EventStartTimeUtc,
+        [int]$ForceWithinMinutes = 30
+    )
+
+    $currentFingerprintText = [string]$CurrentFingerprint
+    $previousFingerprintText = [string]$PreviousFingerprint
+    $currentTimeOffset = ConvertTo-NullableDateTimeOffset -Value $CurrentTimeUtc
+    $eventStartOffset = ConvertTo-NullableDateTimeOffset -Value $EventStartTimeUtc
+
+    if ($null -ne $currentTimeOffset -and $null -ne $eventStartOffset -and $ForceWithinMinutes -gt 0) {
+        $windowStartOffset = $eventStartOffset.AddMinutes(-1 * [double]$ForceWithinMinutes)
+        if ($currentTimeOffset -ge $windowStartOffset -and $currentTimeOffset -le $eventStartOffset) {
+            return $true
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($currentFingerprintText)) {
+        return $Fallback
+    }
+
+    if ([string]::IsNullOrWhiteSpace($previousFingerprintText)) {
+        return $true
+    }
+
+    if ($currentFingerprintText -eq $previousFingerprintText) {
+        return $false
+    }
+
+    return $true
+}
+
+function Get-SimEventArtifactPaths {
+    param(
+        [string]$RepoRoot,
+        [string]$DateValue,
+        [string]$Sport,
+        [string]$Workflow
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot) -or [string]::IsNullOrWhiteSpace($DateValue) -or [string]::IsNullOrWhiteSpace($Sport)) {
+        return @()
+    }
+
+    $paths = New-Object System.Collections.Generic.List[string]
+    $sportSlug = $Sport.ToLowerInvariant()
+
+    switch ($sportSlug) {
+        'mlb' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/mlb_source/data/daily/sims/$DateValue/sim_*.json",
+                    "data/mlb_source/source_artifacts/data/daily/sims/$DateValue/sim_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+        'nba' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/nba_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/nba_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+        'wnba' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/wnba_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/wnba_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+        'nhl' {
+            if ($Workflow -eq 'vendored_daily_update') {
+                foreach ($relativePattern in @(
+                    "data/nhl_source/data/processed/smart_sim_${DateValue}_*.json",
+                    "data/nhl_source/source_artifacts/data/processed/smart_sim_${DateValue}_*.json"
+                )) {
+                    $fullPattern = Join-Path $RepoRoot $relativePattern
+                    foreach ($match in @(Get-ChildItem -Path $fullPattern -File -ErrorAction SilentlyContinue)) {
+                        $paths.Add($match.FullName) | Out-Null
+                    }
+                }
+            }
+        }
+    }
+
+    return @($paths | Select-Object -Unique)
+}
+
+function Get-SimEventArtifactsFromManifest {
+    param(
+        [object]$Manifest,
+        [string]$Sport,
+        [string]$Workflow
+    )
+
+    if ($null -eq $Manifest -or [string]::IsNullOrWhiteSpace($Sport)) {
+        return @()
+    }
+
+    $records = @($Manifest.eventSimExecution)
+    if ($records.Count -eq 0) {
+        return @()
+    }
+
+    return @(
+        $records |
+            Where-Object { [string]$_.sport -eq $Sport -and ([string]::IsNullOrWhiteSpace($Workflow) -or [string]$_.workflow -eq $Workflow) } |
+            ForEach-Object {
+                [ordered]@{
+                    sport = [string]$_.sport
+                    workflow = [string]$_.workflow
+                    eventKey = [string]$_.eventKey
+                    candidateArtifactPaths = @($_.candidateArtifactPaths)
+                    inputFingerprint = [string]$_.inputFingerprint
+                    eventStartTimeUtc = [string]$_.eventStartTimeUtc
+                }
+            }
+    )
 }
 
 function Get-ActiveMlbUiDailyLocks {
@@ -1997,17 +3142,80 @@ if (-not $SkipNCAAB) {
 
 $publishRepos += [pscustomobject]@{ Name = 'Syndicate'; RepoPath = $repoRoot; CommitMessage = "$CommitMessagePrefix $Date (Syndicate mirror + gate)" }
 
+$simExecutionDecision = Get-SimExecutionDecision -RepoRoot $repoRoot -DateValue $Date -LatestManifestPath $latestManifestPath -SourceSteps $sourceSteps -SkipSourceUpdates ([bool]$SkipSourceUpdates)
+$latestManifest = $null
+$latestEventSimExecutionPlan = @()
+if (Test-Path -LiteralPath $latestManifestPath) {
+    try {
+        $latestManifest = Get-Content -Path $latestManifestPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $latestEventSimExecutionPlan = @($latestManifest.eventSimExecution)
+    }
+    catch {
+        $latestManifest = $null
+        $latestEventSimExecutionPlan = @()
+    }
+}
+
 $runManifest = [ordered]@{
     date = $Date
     generatedAt = (Get-Date).ToString('o')
     lastUpdatedAt = $null
     completedAt = $null
+    runMode = if ($DryRun) { 'dry_run' } else { 'standard' }
     overallStatus = if ($DryRun) { 'dry_run' } else { 'started' }
     error = $null
     runDir = $runDir
     latestDir = $latestDir
     runtimePolicy = $runtimePolicy
+    runPlan = [ordered]@{
+        simExecution = $simExecutionDecision
+        eventSimExecution = @()
+        artifactUpdates = @()
+        policyPerformance = @()
+        sourceUpdates = [bool](-not $SkipSourceUpdates)
+        refreshGate = [bool](-not $SkipRefreshGate)
+        artifactGeneration = [bool](-not $SkipGitPush)
+        manifestGeneration = $true
+        publish = [bool](-not $SkipGitPush)
+        refreshOdds = [bool]$RefreshOdds
+        oddsPhase = $OddsPhase
+        oddsSports = $OddsSports
+        oddsRegions = $OddsRegions
+    }
+    runState = [ordered]@{
+        currentStage = 'queued'
+        completedStages = @()
+        failedStage = $null
+        lastUpdatedAt = $null
+    }
+    eventSimExecution = @()
+    artifactUpdates = @()
+    policyPerformance = @()
     sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; name = $_.Name; workingDirectory = $_.WorkingDirectory; environmentOverrides = $_.EnvironmentOverrides; runtimePolicy = $_.RuntimePolicy; command = $_.Command } })
+    stageDecisions = @(
+        @($sourceSteps | ForEach-Object { [ordered]@{ stage = 'source_update'; sport = $_.Sport; workflow = $_.Workflow; name = $_.Name; decision = 'planned'; status = if ($DryRun) { 'dry_run' } else { 'pending' } } })
+        [ordered]@{ stage = 'sim_execution'; decision = if ($simExecutionDecision -eq $false) { 'skipped' } elseif ($simExecutionDecision -eq $true) { 'planned' } else { 'planned' }; status = if ($simExecutionDecision -eq $false) { 'skipped' } else { if ($DryRun) { 'dry_run' } else { 'pending' } } }
+        [ordered]@{ stage = 'event_sim_execution'; decision = if ($simExecutionDecision -eq $false) { 'skipped' } else { 'planned' }; status = if ($simExecutionDecision -eq $false) { 'skipped' } else { if ($DryRun) { 'dry_run' } else { 'pending' } } }
+        [ordered]@{ stage = 'refresh_gate'; decision = if ($SkipRefreshGate) { 'skipped' } else { 'planned' }; status = if ($SkipRefreshGate) { 'skipped' } else { if ($DryRun) { 'dry_run' } else { 'pending' } } }
+        [ordered]@{ stage = 'artifact_generation'; decision = if ($SkipGitPush) { 'skipped' } else { 'planned' }; status = if ($SkipGitPush) { 'skipped' } else { if ($DryRun) { 'dry_run' } else { 'pending' } } }
+        [ordered]@{ stage = 'manifest_generation'; decision = 'planned'; status = if ($DryRun) { 'dry_run' } else { 'pending' } }
+        [ordered]@{ stage = 'git_publish'; decision = if ($SkipGitPush) { 'skipped' } else { 'planned' }; status = if ($SkipGitPush) { 'skipped' } else { if ($DryRun) { 'dry_run' } else { 'pending' } } }
+    )
+    simTriggerPlan = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; trigger = 'planned'; status = if ($DryRun) { 'dry_run' } else { 'pending' }; reason = 'simulation compute is foundational and deferred until source-stage completion' } })
+    statusArtifact = [ordered]@{
+        format = 'json'
+        scope = 'daily_update'
+        runManifestPath = $runManifestPath
+        latestManifestPath = $latestManifestPath
+        state = [ordered]@{
+            runMode = if ($DryRun) { 'dry_run' } else { 'standard' }
+            overallStatus = if ($DryRun) { 'dry_run' } else { 'started' }
+            currentStage = 'queued'
+            completedStages = @()
+            failedStage = $null
+            policyPerformance = @()
+        }
+    }
     sportRuns = @()
     skipGitPush = [bool]$SkipGitPush
     gitRemote = $GitRemote
@@ -2036,7 +3244,19 @@ $runManifest = [ordered]@{
     pushResults = @()
 }
 
-Write-RunManifest -Manifest $runManifest
+if ($null -ne $latestManifest) {
+    $runManifest.eventSimExecution = @($latestManifest.eventSimExecution)
+    $runManifest.runPlan.eventSimExecution = @($latestManifest.eventSimExecution)
+    $runManifest.artifactUpdates = @($latestManifest.artifactUpdates)
+    $runManifest.runPlan.artifactUpdates = @($latestManifest.artifactUpdates)
+}
+
+Sync-RunManifestPolicyPerformance -Manifest $runManifest
+
+$shouldRunManifestGeneration = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'manifestGeneration' -Fallback $true
+if ($shouldRunManifestGeneration) {
+    Write-RunManifest -Manifest $runManifest
+}
 
 Push-Location $repoRoot
 try {
@@ -2044,7 +3264,8 @@ try {
         throw 'Cannot push git updates when -SkipRefreshGate is set. Run the gate or pass -SkipGitPush.'
     }
 
-    if (-not $SkipGitPush) {
+    $shouldRunArtifactGeneration = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'artifactGeneration' -Fallback ([bool](-not $SkipGitPush))
+    if ($shouldRunArtifactGeneration) {
         foreach ($repo in $publishRepos) {
             $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
             $runManifest.pushResults += @([ordered]@{
@@ -2059,7 +3280,18 @@ try {
         }
     }
 
-    if (-not $SkipSourceUpdates) {
+    $shouldRunSimExecution = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'simExecution' -Fallback ([bool](-not $SkipSourceUpdates))
+    $simExecutionNoOpDecision = Get-SimExecutionNoOpDecision -RepoRoot $repoRoot -DateValue $Date -LatestEventSimExecutionPlan $latestEventSimExecutionPlan
+    $artifactGenerationFallbackToFullPublish = $false
+    if ($simExecutionNoOpDecision -eq $false) {
+        Write-Host 'Sim stage no-op: all planned event fingerprints are unchanged; skipping simulation stage.' -ForegroundColor Yellow
+        $shouldRunSimExecution = $false
+        foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'sim_execution' -or [string]$_.stage -eq 'event_sim_execution' })) {
+            $stageDecision.decision = 'skipped'
+            $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
+        }
+    }
+    if ($shouldRunSimExecution) {
         for ($stepIndex = 0; $stepIndex -lt $sourceSteps.Count; $stepIndex++) {
             $step = $sourceSteps[$stepIndex]
             $sportKey = [string]$step.Sport
@@ -2068,6 +3300,65 @@ try {
             $mlbDataRootForStep = $null
             if ($isMlbVendoredStep -and $step.EnvironmentOverrides -and $step.EnvironmentOverrides.ContainsKey('MLB_BETTING_DATA_ROOT')) {
                 $mlbDataRootForStep = [string]$step.EnvironmentOverrides.MLB_BETTING_DATA_ROOT
+            }
+            $currentEventInputFingerprint = Get-EventInputFingerprint -RepoRoot $repoRoot -DateValue $Date -Sport $step.Sport -Workflow $step.Workflow
+            $stepEventPlans = @(
+                $latestEventSimExecutionPlan |
+                    Where-Object { [string]$_.sport -eq [string]$step.Sport -and [string]$_.workflow -eq [string]$step.Workflow }
+            )
+            $stepEventDecisions = @()
+            $stepShouldRunSim = $null
+            if ($stepEventPlans.Count -gt 0) {
+                $stepShouldRunSim = $false
+                foreach ($eventPlan in $stepEventPlans) {
+                    $previousInputFingerprint = [string]$eventPlan.inputFingerprint
+                    $eventStartTimeUtc = Get-EventSimExecutionStartTimeUtc -EventPlan $eventPlan
+                    $currentTimeUtc = [DateTimeOffset]::UtcNow
+                    $timeToStartMinutes = $null
+                    if ($null -ne $currentTimeUtc -and $null -ne $eventStartTimeUtc) {
+                        $timeToStartMinutes = [math]::Round(($eventStartTimeUtc - $currentTimeUtc).TotalMinutes, 2)
+                    }
+
+                    $eventPolicyContext = [pscustomobject]@{
+                        sport = [string]$step.Sport
+                        market = [string]$step.Workflow
+                        timeToStartMinutes = $timeToStartMinutes
+                    }
+                    $eventPolicy = Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig -PolicyPerformance @($runManifest.policyPerformance)
+                    $effectivePolicy = if ($null -ne $eventPolicy) { $eventPolicy } else { [ordered]@{ policyId = 'policy:default'; policySource = 'fallback'; keyParameters = [ordered]@{ forceWithinMinutes = [int]$EventSimForceWindowMinutes } } }
+                    $effectiveForceWindowMinutes = if ($null -ne $effectivePolicy -and $null -ne $effectivePolicy.keyParameters -and $null -ne $effectivePolicy.keyParameters.forceWithinMinutes) { [int]$effectivePolicy.keyParameters.forceWithinMinutes } else { [int]$EventSimForceWindowMinutes }
+
+                    $eventDecision = Get-EventSimExecutionDecision -CurrentFingerprint $currentEventInputFingerprint -PreviousFingerprint $previousInputFingerprint -Fallback $null -CurrentTimeUtc $currentTimeUtc -EventStartTimeUtc $eventStartTimeUtc -ForceWithinMinutes $effectiveForceWindowMinutes
+                    if ($null -eq $eventDecision) {
+                        $stepShouldRunSim = $null
+                        $stepEventDecisions = @()
+                        break
+                    }
+
+                    if ($eventDecision) {
+                        $stepShouldRunSim = $true
+                        $stepEventDecisions += @([ordered]@{
+                            sport = [string]$step.Sport
+                            workflow = [string]$step.Workflow
+                            eventKey = [string]$eventPlan.eventKey
+                            artifactPath = [string]$eventPlan.artifactPath
+                            inputFingerprint = [string]$currentEventInputFingerprint
+                            previousInputFingerprint = $previousInputFingerprint
+                            eventStartTimeUtc = if ($null -ne $eventStartTimeUtc) { [string]$eventStartTimeUtc.UtcDateTime.ToString('o') } else { $null }
+                            timeToStartMinutes = $timeToStartMinutes
+                            policyId = [string]$effectivePolicy.policyId
+                            policySource = [string]$effectivePolicy.policySource
+                            policyKeyParameters = $effectivePolicy.keyParameters
+                            forceWithinMinutes = [int]$effectiveForceWindowMinutes
+                            decision = 'planned'
+                            status = if ($DryRun) { 'dry_run' } else { 'pending' }
+                        })
+                    }
+                }
+            }
+
+            if ($null -eq $stepShouldRunSim) {
+                $stepShouldRunSim = $shouldRunSimExecution
             }
             $sportRun = [pscustomobject][ordered]@{
                 sport = $step.Sport
@@ -2084,7 +3375,44 @@ try {
                 mirrorManifestExists = $false
             }
             $runManifest.sportRuns += @($sportRun)
-            Write-RunManifest -Manifest $runManifest
+            if ($shouldRunManifestGeneration) {
+                Write-RunManifest -Manifest $runManifest
+            }
+
+            if ($stepEventDecisions.Count -gt 0) {
+                Sync-RunManifestEventRecords -Manifest $runManifest -EventRecords $stepEventDecisions -ArtifactUpdateRecords @($stepEventDecisions | ForEach-Object {
+                    [ordered]@{
+                        sport = [string]$_.sport
+                        workflow = [string]$_.workflow
+                        eventKey = [string]$_.eventKey
+                        artifactPath = [string]$_.artifactPath
+                        inputFingerprint = [string]$_.inputFingerprint
+                        previousInputFingerprint = [string]$_.previousInputFingerprint
+                        policyId = [string]$_.policyId
+                        policySource = [string]$_.policySource
+                        policyKeyParameters = $_.policyKeyParameters
+                        decision = [string]$_.decision
+                        status = [string]$_.status
+                    }
+                })
+                Sync-RunManifestPolicyPerformance -Manifest $runManifest
+                if ($shouldRunManifestGeneration) {
+                    Write-RunManifest -Manifest $runManifest
+                }
+            }
+
+            if (($stepEventPlans.Count -eq 0) -and ($null -eq $latestManifest) -and -not [string]::IsNullOrWhiteSpace([string]$currentEventInputFingerprint) -and $stepShouldRunSim) {
+                $artifactGenerationFallbackToFullPublish = $true
+            }
+
+            if (-not $stepShouldRunSim) {
+                $sportRun.status = 'skipped'
+                $sportRun.completedAt = (Get-Date).ToString('o')
+                if ($shouldRunManifestGeneration) {
+                    Write-RunManifest -Manifest $runManifest
+                }
+                continue
+            }
 
             if (-not $DryRun -and $isMlbVendoredStep) {
                 $preRemovedLocks = Clear-StaleMlbUiDailyLocks -MlbDataRoot $mlbDataRootForStep -DateValue $Date -SeasonValue $season
@@ -2113,13 +3441,47 @@ try {
                     $sportRun.status = 'error'
                     $sportRun.error = $_.Exception.Message
                     $sportRun.completedAt = (Get-Date).ToString('o')
-                    Write-RunManifest -Manifest $runManifest
+                    if ($shouldRunManifestGeneration) {
+                        Write-RunManifest -Manifest $runManifest
+                    }
                     throw
                 }
             }
             $sportRun.status = if ($DryRun) { 'dry_run' } else { 'ok' }
             $sportRun.completedAt = (Get-Date).ToString('o')
-            Write-RunManifest -Manifest $runManifest
+            if ($shouldRunManifestGeneration) {
+                Write-RunManifest -Manifest $runManifest
+            }
+
+
+            if (($stepEventPlans.Count -eq 0) -and ($null -eq $latestManifest) -and $stepShouldRunSim) {
+                $stepEventArtifactPaths = @()
+                if ($step.Sport -eq 'mlb' -and $step.Workflow -eq 'vendored_daily_update') {
+                    $stepEventArtifactPaths = @(Get-SimEventArtifactPaths -RepoRoot $repoRoot -DateValue $Date -Sport $step.Sport -Workflow $step.Workflow)
+                }
+                elseif ($step.Workflow -eq 'vendored_daily_update' -and ($step.Sport -eq 'nba' -or $step.Sport -eq 'wnba' -or $step.Sport -eq 'nhl')) {
+                    $stepEventArtifactPaths = @(Get-SimEventArtifactPaths -RepoRoot $repoRoot -DateValue $Date -Sport $step.Sport -Workflow $step.Workflow)
+                }
+
+                $fullEventRecords = @()
+                foreach ($artifactPath in @($stepEventArtifactPaths | Select-Object -Unique)) {
+                    $eventKey = [IO.Path]::GetFileNameWithoutExtension($artifactPath)
+                    $fullEventRecords += @([ordered]@{
+                        sport = [string]$step.Sport
+                        workflow = [string]$step.Workflow
+                        eventKey = $eventKey
+                        artifactPath = $artifactPath
+                        candidateArtifactPaths = @($artifactPath)
+                        inputFingerprint = [string]$currentEventInputFingerprint
+                        decision = 'planned'
+                        status = if ($DryRun) { 'dry_run' } else { 'pending' }
+                    })
+                }
+
+                if ($fullEventRecords.Count -gt 0) {
+                    Sync-RunManifestEventRecords -Manifest $runManifest -EventRecords $fullEventRecords -ArtifactUpdateRecords $fullEventRecords
+                }
+            }
 
             $hasLaterStepForSport = $false
             for ($nextStepIndex = $stepIndex + 1; $nextStepIndex -lt $sourceSteps.Count; $nextStepIndex++) {
@@ -2137,28 +3499,31 @@ try {
                 }
             }
 
-            if (-not $SkipGitPush) {
-                foreach ($repo in $publishRepos) {
-                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
-                    $runManifest.pushResults += @([ordered]@{
-                        name = $result.name
-                        repoPath = $result.repoPath
-                        remote = $result.remote
-                        branch = $result.branch
-                        commitMessage = $result.commitMessage
-                        status = $result.status
-                        commit = $result.commit
-                    })
-                }
+            if ($shouldRunArtifactGeneration) {
+                if ($artifactGenerationFallbackToFullPublish) {
+                    foreach ($repo in $publishRepos) {
+                        $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date [$($step.Name)]" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
+                        $runManifest.pushResults += @([ordered]@{
+                            name = $result.name
+                            repoPath = $result.repoPath
+                            remote = $result.remote
+                            branch = $result.branch
+                            commitMessage = $result.commitMessage
+                            status = $result.status
+                            commit = $result.commit
+                        })
+                    }
 
-                if (-not $DryRun -and -not $hasLaterStepForSport) {
-                    Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RequirePublishTrackedInputs $true
+                    if (-not $DryRun -and -not $hasLaterStepForSport) {
+                        Assert-IntelligenceSportReady -Sport $step.Sport -DateValue $Date -RepoRoot $repoRoot -RequirePublishTrackedInputs $true
+                    }
                 }
             }
         }
     }
 
-    if (-not $SkipRefreshGate) {
+    $shouldRunRefreshGate = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'refreshGate' -Fallback ([bool](-not $SkipRefreshGate))
+    if ($shouldRunRefreshGate) {
         $refreshArgs = @(
             'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'refresh_and_gate.ps1'),
             '-Date', $Date,
@@ -2185,11 +3550,15 @@ try {
         }
         Invoke-Step -Name 'Syndicate refresh and gate' -Command $refreshArgs -WorkingDirectory $repoRoot -EnvironmentOverrides $refreshEnvOverrides
         $runManifest.refreshGate.status = if ($DryRun) { 'dry_run' } else { 'ok' }
-        Write-RunManifest -Manifest $runManifest
+        if ($shouldRunManifestGeneration) {
+            Write-RunManifest -Manifest $runManifest
+        }
     }
     else {
         $runManifest.refreshGate.status = 'skipped'
-        Write-RunManifest -Manifest $runManifest
+        if ($shouldRunManifestGeneration) {
+            Write-RunManifest -Manifest $runManifest
+        }
     }
 
     foreach ($sportRun in @($runManifest.sportRuns)) {
@@ -2202,32 +3571,99 @@ try {
         }
     }
 
-    if (-not $SkipGitPush) {
-        foreach ($repo in $publishRepos) {
-            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
-            $runManifest.pushResults += @([ordered]@{
-                name = $result.name
-                repoPath = $result.repoPath
-                remote = $result.remote
-                branch = $result.branch
-                commitMessage = $result.commitMessage
-                status = $result.status
-                commit = $result.commit
-            })
+    if ($shouldRunArtifactGeneration) {
+        $artifactUpdatePaths = @($runManifest.artifactUpdates | ForEach-Object { [string]$_.artifactPath } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+        if ($artifactGenerationFallbackToFullPublish) {
+            foreach ($repo in $publishRepos) {
+                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
+                $runManifest.pushResults += @([ordered]@{
+                    name = $result.name
+                    repoPath = $result.repoPath
+                    remote = $result.remote
+                    branch = $result.branch
+                    commitMessage = $result.commitMessage
+                    status = $result.status
+                    commit = $result.commit
+                })
+            }
+        }
+        elseif ($artifactUpdatePaths.Count -gt 0) {
+            Write-Host ("Artifact stage incremental: publishing {0} updated event artifact(s)." -f $artifactUpdatePaths.Count) -ForegroundColor Yellow
+            foreach ($repo in $publishRepos) {
+                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths
+                $runManifest.pushResults += @([ordered]@{
+                    name = $result.name
+                    repoPath = $result.repoPath
+                    remote = $result.remote
+                    branch = $result.branch
+                    commitMessage = $result.commitMessage
+                    status = $result.status
+                    commit = $result.commit
+                })
+            }
+        }
+        else {
+            Write-Host 'Artifact stage no-op: no event-level artifact updates were scheduled; skipping artifact publish.' -ForegroundColor Yellow
+            foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'artifact_generation' })) {
+                $stageDecision.decision = 'skipped'
+                $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
+            }
         }
     }
 
     $runManifest.overallStatus = if ($DryRun) { 'dry_run' } else { 'ok' }
     $runManifest.completedAt = (Get-Date).ToString('o')
-    Write-RunManifest -Manifest $runManifest
+    if ($shouldRunManifestGeneration) {
+        Write-RunManifest -Manifest $runManifest
+    }
 }
 catch {
     $runManifest.overallStatus = 'error'
     $runManifest.error = $_.Exception.Message
     $runManifest.completedAt = (Get-Date).ToString('o')
-    Write-RunManifest -Manifest $runManifest
+    if ($shouldRunManifestGeneration) {
+        Write-RunManifest -Manifest $runManifest
+    }
     throw
 }
 finally {
-    Pop-Location
+        $artifactUpdatePaths = @($runManifest.artifactUpdates | ForEach-Object { [string]$_.artifactPath } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+        if ($artifactGenerationFallbackToFullPublish -or $artifactUpdatePaths.Count -eq 0) {
+            if ($artifactUpdatePaths.Count -eq 0 -and -not $artifactGenerationFallbackToFullPublish) {
+                Write-Host 'Artifact stage no-op: no event-level artifact updates were scheduled; skipping artifact publish.' -ForegroundColor Yellow
+                foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'artifact_generation' })) {
+                    $stageDecision.decision = 'skipped'
+                    $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
+                }
+            }
+            else {
+                foreach ($repo in $publishRepos) {
+                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
+                    $runManifest.pushResults += @([ordered]@{
+                        name = $result.name
+                        repoPath = $result.repoPath
+                        remote = $result.remote
+                        branch = $result.branch
+                        commitMessage = $result.commitMessage
+                        status = $result.status
+                        commit = $result.commit
+                    })
+                }
+            }
+        }
+        else {
+            Write-Host ("Artifact stage incremental: publishing {0} updated event artifact(s)." -f $artifactUpdatePaths.Count) -ForegroundColor Yellow
+            foreach ($repo in $publishRepos) {
+                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths
+                $runManifest.pushResults += @([ordered]@{
+                    name = $result.name
+                    repoPath = $result.repoPath
+                    remote = $result.remote
+                    branch = $result.branch
+                    commitMessage = $result.commitMessage
+                    status = $result.status
+                    commit = $result.commit
+                })
+                }
+            }
 }
