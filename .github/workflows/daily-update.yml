@@ -54,6 +54,13 @@ jobs:
           Write-Host "  BaseUrl: $(if ($baseUrl) { $baseUrl } else { '<empty>' })"
           Write-Host "  EventSimForceWindowMinutes: $forceWindow"
 
+      - name: Run archive regression suite
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Write-Host 'Running python -m unittest tests.test_archives'
+          python -m unittest tests.test_archives
+
       - name: Run daily pipeline
         shell: pwsh
         run: |
