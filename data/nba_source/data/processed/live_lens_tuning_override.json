@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "ttl": 300,
+  "round_live_line_to_half": true,
+  "logging": {
+    "mode": "bet",
+    "min_interval_sec": 60
+  },
+  "markets": {
+    "total": {
+      "watch": 3.0,
+      "bet": 6.0
+    },
+    "half_total": {
+      "watch": 3.0,
+      "bet": 6.0
+    },
+    "quarter_total": {
+      "watch": 2.0,
+      "bet": 4.0
+    },
+    "ats": {
+      "watch": 2.0,
+      "bet": 4.0
+    },
+    "player_prop": {
+      "watch": 2.0,
+      "bet": 4.0
+    }
+  }
+}
