@@ -12,3 +12,4 @@
 - [x] Extend incremental manifest updates
 - [x] Add context-aware policy layer
 - [x] Add policy performance tracking
+- [x] Add policy experimentation

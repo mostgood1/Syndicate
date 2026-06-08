@@ -12,8 +12,10 @@ class UnifiedDailyUpdatePolicyPerformanceTests(unittest.TestCase):
 
         self.assertIn("policyId = [string]$effectivePolicy.policyId", content)
         self.assertIn("policySource = [string]$effectivePolicy.policySource", content)
+        self.assertIn("policySelectionMode = [string]$effectivePolicy.selectionMode", content)
+        self.assertIn("isExploratory = [bool]$effectivePolicy.isExploratory", content)
         self.assertIn("policyKeyParameters = $effectivePolicy.keyParameters", content)
-        self.assertIn("selectionMode = 'default'", content)
+        self.assertIn("selectionMode = 'optimal'", content)
 
     def test_aggregation_groups_correctly_by_policy(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -22,6 +24,8 @@ class UnifiedDailyUpdatePolicyPerformanceTests(unittest.TestCase):
 
         self.assertIn("function Get-PolicyPerformance", content)
         self.assertIn("sampleSize = [int]$groupRecords.Count", content)
+        self.assertIn("exploratoryCount = [int]$exploratoryCount", content)
+        self.assertIn("exploratoryRate = if ($groupRecords.Count -gt 0)", content)
         self.assertIn("Group-Object -Property policyId", content)
         self.assertIn("withinWindowCount", content)
         self.assertIn("roi = if ($roiSamples.Count -gt 0)", content)
