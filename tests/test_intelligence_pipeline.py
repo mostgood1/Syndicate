@@ -5,6 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from pipeline.formatter import format_intelligence_query_response
 from pipeline.intelligence_pipeline import run_intelligence_pipeline
 from pipeline.evidence_builder import build_evidence_records
 from pipeline.intelligence_models import Evidence
@@ -151,6 +152,197 @@ class IntelligencePipelineTests(unittest.TestCase):
         self.assertIn("Best takeaway:", structured["recommended_interpretation"])
         self.assertIn("clear_summary", structured)
         self.assertIn("final_takeaway", structured)
+
+    def test_preview_queries_build_game_preview_sections(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "Preview the Celtics game tonight",
+                "date": "2026-06-04",
+            },
+            form={},
+        )
+
+        with patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Celtics preview",
+                "summary": "The board points toward a tight game preview with a few strong prop angles.",
+                "recommendations": [
+                    {
+                        "candidate_type": "game",
+                        "name": "BOS at NYK",
+                        "matchup": "BOS at NYK",
+                        "summary": "The game edge leans Boston in a close matchup.",
+                        "score": 97.4,
+                    },
+                    {
+                        "candidate_type": "prop",
+                        "name": "Jayson Tatum Over 28.5 Points",
+                        "matchup": "BOS at NYK",
+                        "summary": "Best single play from the Celtics game.",
+                        "score": 95.1,
+                    },
+                    {
+                        "candidate_type": "prop",
+                        "name": "Jaylen Brown Over 3.5 Threes",
+                        "matchup": "BOS at NYK",
+                        "summary": "Secondary prop tied to the same matchup.",
+                        "score": 91.0,
+                    },
+                ],
+                "parlays": [
+                    {
+                        "parlay_type": "same_game",
+                        "label": "2-leg same-game parlay",
+                        "legs": [
+                            {"matchup": "BOS at NYK", "name": "BOS at NYK"},
+                            {"matchup": "BOS at NYK", "name": "Jayson Tatum Over 28.5 Points"},
+                        ],
+                    }
+                ],
+                "board_notes": ["Line movement is modest."],
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        preview = structured["preview"]
+        formatted = format_intelligence_query_response(question="Preview the Celtics game tonight", result=result)
+
+        self.assertEqual(result.query_type, "game_preview")
+        self.assertEqual(result.pipeline_request["preview_subject"], "Celtics")
+        self.assertEqual(preview["matchup"], "BOS at NYK")
+        self.assertTrue(preview["game_recommendation_recap"]["plays"])
+        self.assertTrue(preview["prop_recommendation_recap"]["plays"])
+        self.assertTrue(preview["top_selected_single_plays"])
+        self.assertTrue(preview["top_same_game_parlays"])
+        self.assertTrue(preview["risks_uncertainty"])
+        self.assertTrue(preview["what_to_watch_before_lock"])
+        self.assertEqual(formatted["preview"]["matchup"], "BOS at NYK")
+
+    def test_player_analysis_queries_build_player_sections(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "Analyze Jayson Tatum tonight",
+                "date": "2026-06-04",
+            },
+            form={},
+        )
+
+        with patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Jayson Tatum player analysis",
+                "summary": "The board shows a strong scoring and usage outlook.",
+                "recommendations": [
+                    {
+                        "candidate_type": "prop",
+                        "name": "Jayson Tatum Over 28.5 Points",
+                        "matchup": "BOS at NYK",
+                        "summary": "Primary player angle and top prop recap.",
+                        "score": 98.1,
+                    },
+                    {
+                        "candidate_type": "game",
+                        "name": "BOS at NYK",
+                        "matchup": "BOS at NYK",
+                        "summary": "Matchup supports Tatum volume.",
+                        "score": 94.5,
+                    },
+                    {
+                        "candidate_type": "prop",
+                        "name": "Jayson Tatum Over 4.5 Rebounds",
+                        "matchup": "BOS at NYK",
+                        "summary": "Secondary prop tied to the same game.",
+                        "score": 92.0,
+                    },
+                ],
+                "parlays": [
+                    {
+                        "parlay_type": "same_game",
+                        "label": "2-leg same-game parlay",
+                        "legs": [
+                            {"matchup": "BOS at NYK", "name": "Jayson Tatum Over 28.5 Points"},
+                            {"matchup": "BOS at NYK", "name": "Jayson Tatum Over 4.5 Rebounds"},
+                        ],
+                    }
+                ],
+                "board_notes": ["Minutes projection is sensitive to blowout risk."],
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        player_analysis = structured["player_analysis"]
+        formatted = format_intelligence_query_response(question="Analyze Jayson Tatum tonight", result=result)
+
+        self.assertEqual(result.query_type, "player_analysis")
+        self.assertEqual(result.pipeline_request["player_subject"], "Jayson Tatum")
+        self.assertEqual(player_analysis["player"], "Jayson Tatum")
+        self.assertEqual(player_analysis["matchup"], "BOS at NYK")
+        self.assertTrue(player_analysis["player_outlook"]["selected_player_play"])
+        self.assertTrue(player_analysis["matchup_analysis"]["plays"])
+        self.assertTrue(player_analysis["prop_recap"]["plays"])
+        self.assertTrue(player_analysis["top_single_plays"])
+        self.assertTrue(player_analysis["same_game_parlays"])
+        self.assertTrue(player_analysis["risks"])
+        self.assertTrue(player_analysis["final_recommendation"])
+        self.assertEqual(formatted["player_analysis"]["matchup"], "BOS at NYK")
+
+    def test_bet_evaluation_queries_build_decision_sections(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "Is Jayson Tatum over 28.5 points a good bet?",
+                "date": "2026-06-04",
+            },
+            form={},
+        )
+
+        with patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Jayson Tatum bet evaluation",
+                "summary": "The board shows a positive edge on the scoring prop.",
+                "recommendations": [
+                    {
+                        "candidate_type": "prop",
+                        "name": "Jayson Tatum Over 28.5 Points",
+                        "matchup": "BOS at NYK",
+                        "summary": "Top betting angle and the best value on the board.",
+                        "basketball_summary": "Recent form is already clearing the number with a last-five average above the line.",
+                        "why_explain": "Projected minutes and usage both support the over.",
+                        "writeup": "Model confidence and price edge line up.",
+                        "confidence": "63%",
+                        "edge": "+5.4%",
+                        "odds": "+102",
+                        "line": 28.5,
+                    },
+                    {
+                        "candidate_type": "game",
+                        "name": "BOS at NYK",
+                        "matchup": "BOS at NYK",
+                        "summary": "Game context supports the same read.",
+                        "score": 94.5,
+                    },
+                ],
+                "board_notes": ["Minutes projection is sensitive to blowout risk."],
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        bet_evaluation = structured["bet_evaluation"]
+        formatted = format_intelligence_query_response(question="Is Jayson Tatum over 28.5 points a good bet?", result=result)
+
+        self.assertEqual(result.query_type, "bet_evaluation")
+        self.assertEqual(result.pipeline_request["bet_subject"], "Jayson Tatum over 28.5 points")
+        self.assertEqual(bet_evaluation["bet_details"]["selection"], "Jayson Tatum Over 28.5 Points")
+        self.assertIn(bet_evaluation["verdict"], {"yes", "lean yes", "pass", "no"})
+        self.assertTrue(bet_evaluation["reasoning"])
+        self.assertTrue(bet_evaluation["edge_explanation"])
+        self.assertTrue(bet_evaluation["risk_factors"])
+        self.assertIn("bet_evaluation", formatted)
+        self.assertEqual(formatted["bet_evaluation"]["bet_details"]["selection"], "Jayson Tatum Over 28.5 Points")
 
     def test_vague_queries_include_context_awareness_and_assumptions(self) -> None:
         fake_request = SimpleNamespace(

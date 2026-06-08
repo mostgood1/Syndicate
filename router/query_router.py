@@ -10,9 +10,26 @@ class QueryRoute:
     question: str
     query_type: str
     pipeline_mode: str
+    preview_subject: str | None = None
+    player_subject: str | None = None
+    bet_subject: str | None = None
 
 
 class QueryRouter:
+    _BET_EVALUATION_PATTERNS = (
+        re.compile(r"\bshould i bet\s+(?P<subject>.+?)(?:\?|$)", re.IGNORECASE),
+        re.compile(r"\bis\s+(?P<subject>.+?)\s+a good bet\b", re.IGNORECASE),
+        re.compile(r"\bworth taking\s+(?P<subject>.+?)(?:\?|$)", re.IGNORECASE),
+        re.compile(r"\bshould i take\s+(?P<subject>.+?)(?:\?|$)", re.IGNORECASE),
+    )
+    _PLAYER_ANALYSIS_PATTERNS = (
+        re.compile(r"\banaly[sz]e\s+(?P<subject>.+?)(?:\s+tonight\b|$)", re.IGNORECASE),
+        re.compile(r"\bbreak down\s+(?P<subject>.+?)(?:\s+tonight\b|$)", re.IGNORECASE),
+    )
+    _PREVIEW_PATTERNS = (
+        re.compile(r"\bpreview\b.*\bgame\b", re.IGNORECASE),
+        re.compile(r"\bgame preview\b", re.IGNORECASE),
+    )
     _LIVE_PATTERNS = (
         re.compile(r"\blive\b", re.IGNORECASE),
         re.compile(r"\bin[- ]game\b", re.IGNORECASE),
@@ -62,8 +79,63 @@ class QueryRouter:
         re.compile(r"\breason\b", re.IGNORECASE),
     )
 
+    @staticmethod
+    def _preview_subject_from_question(question: str) -> str | None:
+        normalized_question = str(question or "").strip()
+        if not normalized_question:
+            return None
+        patterns = (
+            re.compile(r"\bpreview(?: the)? (?P<subject>.+?) game(?: tonight)?\b", re.IGNORECASE),
+            re.compile(r"\bpreview(?: the)? (?P<subject>.+?) tonight\b", re.IGNORECASE),
+        )
+        for pattern in patterns:
+            match = pattern.search(normalized_question)
+            if not match:
+                continue
+            subject = str(match.group("subject") or "").strip().strip(" .?!,;:\"")
+            if subject.lower().startswith("the "):
+                subject = subject[4:].strip()
+            return subject or None
+        return None
+
+    @staticmethod
+    def _player_subject_from_question(question: str) -> str | None:
+        normalized_question = str(question or "").strip()
+        if not normalized_question:
+            return None
+        for pattern in QueryRouter._PLAYER_ANALYSIS_PATTERNS:
+            match = pattern.search(normalized_question)
+            if not match:
+                continue
+            subject = str(match.group("subject") or "").strip().strip(" .?!,;:\"")
+            if subject.lower().startswith(("the ", "a ", "an ")):
+                subject = re.sub(r"^(?:the|a|an)\s+", "", subject, flags=re.IGNORECASE).strip()
+            return subject or None
+        return None
+
+    @staticmethod
+    def _bet_subject_from_question(question: str) -> str | None:
+        normalized_question = str(question or "").strip()
+        if not normalized_question:
+            return None
+        for pattern in QueryRouter._BET_EVALUATION_PATTERNS:
+            match = pattern.search(normalized_question)
+            if not match:
+                continue
+            subject = str(match.group("subject") or "").strip().strip(" .?!,;:\"")
+            if subject.lower().startswith(("the ", "a ", "an ")):
+                subject = re.sub(r"^(?:the|a|an)\s+", "", subject, flags=re.IGNORECASE).strip()
+            return subject or None
+        return None
+
     def classify_query(self, question: str) -> str:
         normalized_question = str(question or "").strip()
+        if self._matches(self._BET_EVALUATION_PATTERNS, normalized_question):
+            return "bet_evaluation"
+        if self._matches(self._PLAYER_ANALYSIS_PATTERNS, normalized_question):
+            return "player_analysis"
+        if self._matches(self._PREVIEW_PATTERNS, normalized_question):
+            return "game_preview"
         if self._matches(self._LIVE_PATTERNS, normalized_question):
             return "live_analysis"
         if self._matches(self._COMPARISON_PATTERNS, normalized_question):
@@ -80,13 +152,19 @@ class QueryRouter:
         normalized_question = str(question or "").strip()
         query_type = self.classify_query(normalized_question)
         pipeline_mode = {
+            "bet_evaluation": "pregame",
+            "player_analysis": "pregame",
+            "game_preview": "pregame",
             "live_analysis": "live",
             "comparison": "comparison",
             "trend_analysis": "trend",
             "risk_evaluation": "explanation",
             "explanation": "explanation",
         }.get(query_type, "explanation")
-        return QueryRoute(question=normalized_question, query_type=query_type, pipeline_mode=pipeline_mode)
+        bet_subject = self._bet_subject_from_question(normalized_question) if query_type == "bet_evaluation" else None
+        player_subject = self._player_subject_from_question(normalized_question) if query_type == "player_analysis" else None
+        preview_subject = self._preview_subject_from_question(normalized_question) if query_type == "game_preview" else None
+        return QueryRoute(question=normalized_question, query_type=query_type, pipeline_mode=pipeline_mode, preview_subject=preview_subject, player_subject=player_subject, bet_subject=bet_subject)
 
     def route_payload(self, payload: Mapping[str, Any] | None) -> dict[str, Any]:
         routed_payload = dict(payload or {})
@@ -95,6 +173,15 @@ class QueryRouter:
         routed_payload["question"] = route.question
         routed_payload["mode"] = route.pipeline_mode
         routed_payload["query_type"] = route.query_type
+        if route.preview_subject:
+            routed_payload["preview_subject"] = route.preview_subject
+        if route.player_subject:
+            routed_payload["player_subject"] = route.player_subject
+        if route.bet_subject:
+            routed_payload["bet_subject"] = route.bet_subject
+        if route.query_type in {"game_preview", "player_analysis", "bet_evaluation"}:
+            routed_payload["include_games"] = True
+            routed_payload["include_props"] = True
         return routed_payload
 
     def route_request(self, request_or_payload: Any) -> dict[str, Any]:

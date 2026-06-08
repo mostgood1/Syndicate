@@ -17,6 +17,39 @@ class IntelligenceEntrypointTests(unittest.TestCase):
         self.assertEqual(payload["mode"], "live")
         self.assertEqual(payload["query_type"], "live_analysis")
 
+    def test_route_intelligence_request_detects_game_preview(self) -> None:
+        request = SimpleNamespace(get_json=lambda silent=True: {"question": "Preview the Celtics game tonight"}, form={})
+
+        payload = route_intelligence_request(request)
+
+        self.assertEqual(payload["mode"], "pregame")
+        self.assertEqual(payload["query_type"], "game_preview")
+        self.assertEqual(payload["preview_subject"], "Celtics")
+        self.assertTrue(payload["include_games"])
+        self.assertTrue(payload["include_props"])
+
+    def test_route_intelligence_request_detects_player_analysis(self) -> None:
+        request = SimpleNamespace(get_json=lambda silent=True: {"question": "Analyze Jayson Tatum tonight"}, form={})
+
+        payload = route_intelligence_request(request)
+
+        self.assertEqual(payload["mode"], "pregame")
+        self.assertEqual(payload["query_type"], "player_analysis")
+        self.assertEqual(payload["player_subject"], "Jayson Tatum")
+        self.assertTrue(payload["include_games"])
+        self.assertTrue(payload["include_props"])
+
+    def test_route_intelligence_request_detects_bet_evaluation(self) -> None:
+        request = SimpleNamespace(get_json=lambda silent=True: {"question": "Is Jayson Tatum over 28.5 points a good bet?"}, form={})
+
+        payload = route_intelligence_request(request)
+
+        self.assertEqual(payload["mode"], "pregame")
+        self.assertEqual(payload["query_type"], "bet_evaluation")
+        self.assertEqual(payload["bet_subject"], "Jayson Tatum over 28.5 points")
+        self.assertTrue(payload["include_games"])
+        self.assertTrue(payload["include_props"])
+
     def test_run_routed_intelligence_pipeline_uses_routed_payload(self) -> None:
         request = SimpleNamespace(get_json=lambda silent=True: {"question": "Compare Player A vs Player B"}, form={})
 

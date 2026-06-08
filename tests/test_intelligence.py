@@ -900,6 +900,72 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("$100 bankroll", parsed_request.get("chips") or [])
         self.assertIn("Max 20% exposure", parsed_request.get("chips") or [])
 
+    def test_intelligence_query_api_returns_player_analysis_payload(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Analyze Jayson Tatum tonight",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload.get("ok"))
+        self.assertIn("player_analysis", payload)
+        result = payload.get("response") or {}
+        structured = result.get("structured_response") or {}
+        self.assertEqual(result.get("selected_date"), "2026-06-04")
+        self.assertEqual(result.get("query_type"), "player_analysis")
+        self.assertIn("player_analysis", structured)
+        self.assertEqual(payload.get("player_analysis", {}).get("player"), "Jayson Tatum")
+        self.assertEqual(payload.get("player_analysis", {}).get("matchup"), structured.get("player_analysis", {}).get("matchup"))
+
+    def test_intelligence_query_api_returns_bet_evaluation_payload(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    response = self.client.post(
+                        "/api/intelligence/query",
+                        json={
+                            "question": "Is Jayson Tatum over 28.5 points a good bet?",
+                            "date": "2026-06-04",
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload.get("ok"))
+        self.assertIn("bet_evaluation", payload)
+        result = payload.get("response") or {}
+        structured = result.get("structured_response") or {}
+        self.assertEqual(result.get("query_type"), "bet_evaluation")
+        self.assertIn("bet_evaluation", structured)
+        self.assertEqual(payload.get("bet_evaluation", {}).get("bet_details", {}).get("selection"), "Jayson Tatum Over 28.5")
+
     def test_intelligence_query_api_respects_explicit_filters_and_limit(self) -> None:
         overview = _sample_overview_with_secondary_sport()
         nba_live_bucket = ((overview[0].get("home_rails") or {}).get("live") or {})
