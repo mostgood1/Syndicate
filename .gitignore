@@ -60,3 +60,6 @@ data/mlb_source/source_artifacts/data/daily/snapshots/*/meta.json
 
 # Mirror refresh manifests are local operational status artifacts.
 data/*_source/manifests/mirror_refresh*.json
+
+# Keep the evaluation ledger local; it is generated data and too large for GitHub history.
+reports/intelligence/evaluation_ledger.jsonl
