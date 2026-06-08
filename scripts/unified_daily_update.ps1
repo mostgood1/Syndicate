@@ -3149,18 +3149,20 @@ if (-not $SkipNCAAF) {
         $ncaafSourceRoot = Resolve-WorkspaceRepoPath 'NCAAFCompare'
     }
     if ([string]::IsNullOrWhiteSpace($ncaafSourceRoot) -or (-not (Test-Path $ncaafSourceRoot))) {
-        throw 'NCAAF local odds refresh requires a usable source root. Set SYNDICATE_SOURCE_ROOT_NCAAF or open the NCAAFCompare workspace repo.'
+        Write-Host 'NCAAF local odds refresh skipped: SYNDICATE_SOURCE_ROOT_NCAAF is not set and the NCAAFCompare workspace repo is not available.' -ForegroundColor Yellow
     }
-    $sourceSteps += [pscustomobject]@{
-        Name = 'NCAAF local odds refresh'
-        Command = @(
-            (Resolve-Python $repoRoot),
-            'scripts\refresh_ncaaf_oddsapi.py',
-            '--source-root', $ncaafSourceRoot,
-            '--artifact-root', 'data\ncaaf_source\source_artifacts'
-        )
-        WorkingDirectory = $repoRoot
-        EnvironmentOverrides = $ncaafEnvOverrides
+    else {
+        $sourceSteps += [pscustomobject]@{
+            Name = 'NCAAF local odds refresh'
+            Command = @(
+                (Resolve-Python $repoRoot),
+                'scripts\refresh_ncaaf_oddsapi.py',
+                '--source-root', $ncaafSourceRoot,
+                '--artifact-root', 'data\ncaaf_source\source_artifacts'
+            )
+            WorkingDirectory = $repoRoot
+            EnvironmentOverrides = $ncaafEnvOverrides
+        }
     }
 }
 if (-not $SkipNCAAB) {
