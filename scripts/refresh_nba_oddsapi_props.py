@@ -3305,6 +3305,10 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
     copied: dict[str, str] = {}
     missing_exports: list[tuple[str, str, tuple[tuple[Path, str | None], ...]]] = []
     for file_name, query, destinations in exports:
+        existing = _copy_existing_live_lens_artifact(source_root=source_root, file_name=file_name, destinations=destinations)
+        if existing:
+            copied.update(existing)
+            continue
         if file_name == f"live_lens_signals_{date_str}.jsonl":
             local = _build_local_live_lens_signals_artifact(processed_root=processed_root, date_str=date_str, live_lens_root=live_lens_root)
             if local:
@@ -3315,10 +3319,6 @@ def _export_live_lens_artifacts(*, source_root: Path, date_str: str, processed_r
             if local:
                 copied.update(local)
                 continue
-        existing = _copy_existing_live_lens_artifact(source_root=source_root, file_name=file_name, destinations=destinations)
-        if existing:
-            copied.update(existing)
-            continue
         if file_name == "live_lens_tuning_override.json":
             local = _build_local_live_lens_tuning_artifact(processed_root=processed_root, live_lens_root=live_lens_root)
             if local:

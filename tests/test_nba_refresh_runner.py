@@ -915,6 +915,76 @@ class NbaRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(rows[0]["pred"], 228.0)
         self.assertEqual(rows[0]["remaining"], 48)
 
+    def test_live_lens_signals_export_prefers_existing_source_artifact(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            source_root = tmp_root / "source"
+            processed_source = source_root / "data" / "processed"
+            processed_root = tmp_root / "bundle" / "data" / "processed"
+            live_lens_root = tmp_root / "bundle" / "data" / "live_lens"
+            date_str = "2026-05-22"
+            processed_source.mkdir(parents=True, exist_ok=True)
+            processed_root.mkdir(parents=True, exist_ok=True)
+            live_lens_root.mkdir(parents=True, exist_ok=True)
+
+            source_rows = [
+                {
+                    "market": "quarter_total",
+                    "klass": "BET",
+                    "game_id": "0401",
+                    "home": "BOS",
+                    "away": "NYK",
+                    "side": "OVER",
+                    "live_line": 54.5,
+                    "pred": 59.0,
+                    "edge": 4.5,
+                    "edge_adj": 4.5,
+                    "horizon": "q1",
+                }
+            ]
+            (processed_source / f"live_lens_signals_{date_str}.jsonl").write_text(
+                "\n".join(json.dumps(row) for row in source_rows) + "\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"game_cards_{date_str}.csv").write_text(
+                "date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri\n"
+                "2026-05-22,0401,Boston Celtics,New York Knicks,2026-05-22T23:00:00Z,-140,120,-4.5,4.5,216.5,oddsapi_consensus,BOS,NYK\n",
+                encoding="utf-8",
+            )
+            (processed_root / f"smart_sim_{date_str}_BOS_NYK.json").write_text(
+                json.dumps(
+                    {
+                        "date": date_str,
+                        "home": "BOS",
+                        "away": "NYK",
+                        "periods": {
+                            "q1": {"home_mean": 29.0, "away_mean": 27.0},
+                            "q2": {"home_mean": 28.0, "away_mean": 26.0},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.object(module, "_load_source_app", side_effect=AssertionError("source app should not load")):
+                copied = module._export_live_lens_artifacts(
+                    source_root=source_root,
+                    date_str=date_str,
+                    processed_root=processed_root,
+                    live_lens_root=live_lens_root,
+                )
+
+            self.assertEqual(copied["live_lens_signals_path"], str(processed_root / f"live_lens_signals_{date_str}.jsonl"))
+            rows = [
+                json.loads(line)
+                for line in (processed_root / f"live_lens_signals_{date_str}.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+
+        self.assertEqual(rows, source_rows)
+
     def test_live_lens_projections_export_uses_local_predictions_builder(self) -> None:
         module = self._load_module()
 
