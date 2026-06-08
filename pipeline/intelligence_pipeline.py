@@ -81,7 +81,6 @@ _MARKET_CONTEXT_PATTERNS = (
 
 def _pipeline_mode_for_query_type(query_type: str | None) -> str | None:
     return {
-        "bet_evaluation": "pregame",
         "player_analysis": "pregame",
         "game_preview": "pregame",
         "live_analysis": "live",
@@ -114,7 +113,6 @@ class IntelligencePipelineRequest:
     mode: str | None = None
     preview_subject: str | None = None
     player_subject: str | None = None
-    bet_subject: str | None = None
     sport: str | None = None
     limit: int | None = None
     timing: str | None = None
@@ -130,7 +128,6 @@ class IntelligencePipelineRequest:
             "mode": self.mode,
             "preview_subject": self.preview_subject,
             "player_subject": self.player_subject,
-            "bet_subject": self.bet_subject,
             "sport": self.sport,
             "limit": self.limit,
             "timing": self.timing,
@@ -186,12 +183,11 @@ def _normalize_request(request_or_payload: Any) -> IntelligencePipelineRequest:
     mode = str(payload.get("mode") or "").strip() or (routed.pipeline_mode if routed is not None else _pipeline_mode_for_query_type(query_type))
     return IntelligencePipelineRequest(
         question=question,
-        selected_date=str(payload.get("date") or "").strip() or None,
+        selected_date=str(payload.get("date") or payload.get("selected_date") or "").strip() or (routed.selected_date if routed is not None else None),
         query_type=query_type,
         mode=mode,
         preview_subject=str(payload.get("preview_subject") or "").strip() or (routed.preview_subject if routed is not None else None),
         player_subject=str(payload.get("player_subject") or "").strip() or (routed.player_subject if routed is not None else None),
-        bet_subject=str(payload.get("bet_subject") or "").strip() or (routed.bet_subject if routed is not None else None),
         sport=str(payload.get("sport") or "").strip() or None,
         limit=_optional_int(payload.get("limit")),
         timing=str(payload.get("timing") or "").strip() or None,
@@ -209,7 +205,6 @@ def _enrich_context(normalized_request: IntelligencePipelineRequest) -> dict[str
         "query_type": normalized_request.query_type,
         "preview_subject": normalized_request.preview_subject,
         "player_subject": normalized_request.player_subject,
-        "bet_subject": normalized_request.bet_subject,
         "sport": normalized_request.sport,
         "mode": normalized_request.mode,
         "timing": normalized_request.timing,
@@ -220,7 +215,6 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
     recommendations = [item.to_dict() for item in result.recommendations[:3]]
     top_recommendation = recommendations[0] if recommendations else {}
     context_awareness = _build_context_awareness(result, context, recommendations, result.reasoning_steps)
-    bet_response = _build_bet_evaluation_response(result, context)
     evidence_sections: list[dict[str, Any]] = []
     if result.analysis_brief is not None:
         evidence_sections.append(result.analysis_brief.to_dict())
@@ -246,15 +240,11 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
         risks.append("This response was generated from local-only data.")
     if context.get("query_type") == "risk_evaluation":
         risks.append("The query was classified as a risk check, so uncertainty and failure modes were prioritized.")
-    if context.get("query_type") == "bet_evaluation":
-        risks.append("The query was classified as a bet decision, so the board was reduced to the strongest price-versus-model comparison.")
 
     summary_text = result.summary or result.headline or ""
     interpretation_source = top_recommendation.get("summary") or top_recommendation.get("writeup") or top_recommendation.get("rationale") or top_recommendation.get("name") or "No actionable candidate surfaced."
     if context.get("query_type") == "risk_evaluation":
         recommended_interpretation = f"Treat this as a risk screen: {interpretation_source}"
-    elif bet_response is not None:
-        recommended_interpretation = bet_response.get("final_recommendation") or interpretation_source
     else:
         recommended_interpretation = interpretation_source
 
@@ -298,8 +288,6 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
         if top_recommendation
         else "Best takeaway: use the returned evidence and risks to interpret the board directionally, since no single standout candidate was returned."
     )
-    if bet_response is not None:
-        final_takeaway = str(bet_response.get("final_recommendation") or final_takeaway).strip() or final_takeaway
 
     return {
         "intent": context.get("query_type") or result.query_type or "explanation",
@@ -323,7 +311,6 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
         "reasoning_steps": [dict(step) for step in result.reasoning_steps],
         **({"preview": preview_response} if preview_response is not None else {}),
         **({"player_analysis": player_response} if player_response is not None else {}),
-        **({"bet_evaluation": bet_response} if bet_response is not None else {}),
     }
 
 
@@ -394,234 +381,6 @@ def _preview_related_recommendations(recommendations: list[dict[str, Any]], prev
                 continue
         related.append(dict(recommendation))
     return related
-
-
-def _numeric_value_from_text(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    text = str(value or "").strip()
-    if not text:
-        return None
-    match = re.search(r"-?\d+(?:\.\d+)?", text.replace(",", ""))
-    if not match:
-        return None
-    try:
-        return float(match.group(0))
-    except Exception:
-        return None
-
-
-def _percent_value_from_text(value: Any) -> float | None:
-    numeric = _numeric_value_from_text(value)
-    if numeric is None:
-        return None
-    text = str(value or "")
-    if "%" in text:
-        return numeric
-    if numeric <= 1.0:
-        return numeric * 100.0
-    return numeric
-
-
-def _implied_probability_from_american_odds(value: Any) -> float | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    match = re.search(r"-?\d+", text)
-    if not match:
-        return None
-    try:
-        odds = int(match.group(0))
-    except Exception:
-        return None
-    if odds == 0:
-        return None
-    if odds > 0:
-        return round(100.0 / (odds + 100.0) * 100.0, 3)
-    return round(abs(odds) / (abs(odds) + 100.0) * 100.0, 3)
-
-
-def _trend_snippets(*values: Any) -> list[str]:
-    snippets: list[str] = []
-    trend_patterns = (
-        r"last\s*\d+",
-        r"recent\s+form",
-        r"recent\s+trend",
-        r"rolling\s+",
-        r"streak",
-        r"sample",
-        r"trend",
-        r"form",
-    )
-    for value in values:
-        text = str(value or "").strip()
-        if not text:
-            continue
-        normalized_text = text.lower()
-        if any(re.search(pattern, normalized_text) for pattern in trend_patterns):
-            snippets.append(text)
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for snippet in snippets:
-        normalized = snippet.lower()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        deduped.append(snippet)
-    return deduped[:4]
-
-
-def _build_bet_evaluation_response(result: IntelligenceResult, context: dict[str, Any]) -> dict[str, Any] | None:
-    bet_subject = str(context.get("bet_subject") or result.pipeline_request.get("bet_subject") or "").strip()
-    recommendations = [item.to_dict() for item in result.recommendations]
-    recommendation_pool = [item for item in recommendations if isinstance(item, Mapping)]
-    if not recommendation_pool:
-        return None
-
-    selected_pick = max(recommendation_pool, key=lambda candidate: _preview_candidate_score(candidate, bet_subject))
-    selected_pick_copy = dict(selected_pick)
-    market_context = selected_pick_copy.get("market_context") if isinstance(selected_pick_copy.get("market_context"), Mapping) else {}
-    market_context = dict(market_context or {})
-
-    model_probability = _percent_value_from_text(market_context.get("model_probability"))
-    if model_probability is None:
-        model_probability = _percent_value_from_text(selected_pick_copy.get("confidence"))
-    if model_probability is None:
-        model_probability = _percent_value_from_text(selected_pick_copy.get("sim"))
-
-    implied_probability = _percent_value_from_text(market_context.get("implied_probability"))
-    if implied_probability is None:
-        implied_probability = _implied_probability_from_american_odds(selected_pick_copy.get("odds") or market_context.get("odds"))
-
-    price_edge_pct = _numeric_value_from_text(market_context.get("price_edge_pct"))
-    if price_edge_pct is None:
-        price_edge_pct = _numeric_value_from_text(selected_pick_copy.get("edge"))
-    if price_edge_pct is None and model_probability is not None and implied_probability is not None:
-        price_edge_pct = round(model_probability - implied_probability, 3)
-
-    confidence_value = _percent_value_from_text(selected_pick_copy.get("confidence"))
-    if confidence_value is None:
-        confidence_value = _percent_value_from_text(market_context.get("confidence"))
-
-    edge_value = price_edge_pct if price_edge_pct is not None else 0.0
-    verdict = "pass"
-    if edge_value >= 5.0:
-        verdict = "yes"
-    elif edge_value >= 2.0:
-        verdict = "lean yes"
-    elif edge_value <= -5.0:
-        verdict = "no"
-    elif confidence_value is not None and edge_value > 0.0:
-        verdict = "lean yes"
-
-    confidence_level = "low"
-    if verdict == "yes" and abs(edge_value) >= 5.0:
-        confidence_level = "high"
-    elif verdict in {"lean yes", "no"} or abs(edge_value) >= 2.0:
-        confidence_level = "medium"
-    elif confidence_value is not None and confidence_value >= 65.0:
-        confidence_level = "medium"
-
-    bet_details = {
-        "subject": bet_subject or None,
-        "selection": selected_pick_copy.get("name") or selected_pick_copy.get("pick") or None,
-        "market": selected_pick_copy.get("market") or market_context.get("market") or None,
-        "line": selected_pick_copy.get("line") or market_context.get("line") or selected_pick_copy.get("price") or None,
-        "matchup": selected_pick_copy.get("matchup") or None,
-        "candidate_type": selected_pick_copy.get("candidate_type") or None,
-    }
-
-    matchup_context = (
-        selected_pick_copy.get("summary")
-        or selected_pick_copy.get("basketball_summary")
-        or selected_pick_copy.get("rationale")
-        or selected_pick_copy.get("writeup")
-        or selected_pick_copy.get("why_explain")
-        or result.summary
-        or result.headline
-        or ""
-    )
-    edge_explanation_parts = []
-    if model_probability is not None:
-        edge_explanation_parts.append(f"Model probability sits at {model_probability:.1f}%")
-    if implied_probability is not None:
-        edge_explanation_parts.append(f"versus an implied price of {implied_probability:.1f}%")
-    if price_edge_pct is not None:
-        sign = "+" if price_edge_pct >= 0 else ""
-        edge_explanation_parts.append(f"for a {sign}{price_edge_pct:.1f} point edge")
-    edge_explanation = ", ".join(edge_explanation_parts) if edge_explanation_parts else "The available board data did not provide a clean probability edge."
-
-    risk_factors: list[str] = []
-    if result.board_notes:
-        risk_factors.extend(note for note in result.board_notes if note)
-    if market_context.get("risk"):
-        risk_factors.append(str(market_context.get("risk")))
-    if market_context.get("market_fit_note"):
-        risk_factors.append(str(market_context.get("market_fit_note")))
-    if result.local_only:
-        risk_factors.append("This bet read is built from local-only intelligence artifacts.")
-
-    prop_game_signals = [
-        str(selected_pick_copy.get("market_fit_note") or "").strip(),
-        str(market_context.get("market_fit_note") or "").strip(),
-        str(selected_pick_copy.get("advanced_signals") or "").strip(),
-        str(market_context.get("advanced_signals") or "").strip(),
-        str(selected_pick_copy.get("why_explain") or "").strip(),
-        str(selected_pick_copy.get("basketball_summary") or "").strip(),
-        str(selected_pick_copy.get("writeup") or "").strip(),
-    ]
-    prop_game_signals = [signal for signal in prop_game_signals if signal]
-
-    historical_trends = _trend_snippets(
-        selected_pick_copy.get("summary"),
-        selected_pick_copy.get("basketball_summary"),
-        selected_pick_copy.get("writeup"),
-        selected_pick_copy.get("rationale"),
-        selected_pick_copy.get("why_explain"),
-        market_context.get("summary"),
-        market_context.get("writeup"),
-        market_context.get("rationale"),
-    )
-
-    reasoning: list[str] = []
-    if selected_pick_copy.get("summary"):
-        reasoning.append(str(selected_pick_copy.get("summary")))
-    elif selected_pick_copy.get("basketball_summary"):
-        reasoning.append(str(selected_pick_copy.get("basketball_summary")))
-    elif selected_pick_copy.get("rationale"):
-        reasoning.append(str(selected_pick_copy.get("rationale")))
-    if matchup_context and matchup_context not in reasoning:
-        reasoning.append(str(matchup_context))
-    if edge_explanation:
-        reasoning.append(edge_explanation)
-
-    if verdict == "yes":
-        final_recommendation = f"Yes, this grades as a bet. {edge_explanation}."
-    elif verdict == "lean yes":
-        final_recommendation = f"Lean yes. {edge_explanation}."
-    elif verdict == "no":
-        final_recommendation = f"No, the current price looks too expensive. {edge_explanation}."
-    else:
-        final_recommendation = f"Pass for now. {edge_explanation}."
-
-    return {
-        "subject": bet_subject or None,
-        "bet_details": bet_details,
-        "verdict": verdict,
-        "confidence_level": confidence_level,
-        "underlying_probability": model_probability,
-        "implied_probability": implied_probability,
-        "price_edge_pct": price_edge_pct,
-        "matchup_context": matchup_context or None,
-        "historical_trends": historical_trends,
-        "prop_game_signals": prop_game_signals,
-        "risk_factors": risk_factors,
-        "reasoning": reasoning,
-        "edge_explanation": edge_explanation,
-        "final_recommendation": final_recommendation,
-    }
 
 
 def _same_game_parlay_matches(parlay: Mapping[str, Any], matchup: str | None) -> bool:
@@ -868,8 +627,6 @@ def _build_context_awareness(result: IntelligenceResult, context: dict[str, Any]
 
     if query_type == "risk_evaluation":
         reasoning = "The request was handled as a risk-first question because the wording centered on uncertainty and downside."
-    elif query_type == "bet_evaluation":
-        reasoning = "The request was handled as a bet decision because the wording asked whether a market is worth taking."
     elif query_type == "comparison":
         reasoning = "The request was handled as a comparison because it asked for relative evaluation or side-by-side judgment."
     elif query_type == "trend_analysis":
@@ -931,10 +688,6 @@ def _decompose_reasoning_steps(normalized_request: IntelligencePipelineRequest) 
         add_step("decompose", "Question frame", f"Identify the entities, markets, and comparison criteria in: {question}")
         add_step("analyze", "Compare sides", f"Compare the candidates or options in: {question}")
         add_step("aggregate", "Final comparison", f"Synthesize the better side and explain the deciding factors for: {question}")
-    elif query_type == "bet_evaluation":
-        add_step("decompose", "Bet frame", f"Identify the selection, market, and line in: {question}")
-        add_step("analyze", "Edge check", f"Compare the model read against the market price for: {question}")
-        add_step("aggregate", "Bet conclusion", f"State whether the bet has value and explain the main risk factors for: {question}")
     elif query_type == "trend_analysis":
         add_step("decompose", "Trend frame", f"Break down the recent trend drivers in: {question}")
         add_step("analyze", "Trend evidence", f"Assess the recent trend direction, sample, and stability for: {question}")

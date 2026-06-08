@@ -14,11 +14,7 @@ class FormatterTests(unittest.TestCase):
                 "headline": "Top board",
                 "recommendations": [{"name": "Play 1"}],
                 "supporting_evidence": {"title": "Evidence"},
-                "structured_response": {
-                    "preview": {"matchup": "BOS at NYK"},
-                    "player_analysis": {"matchup": "BOS at NYK"},
-                    "bet_evaluation": {"verdict": "lean yes"},
-                },
+                "structured_response": {"preview": {"matchup": "BOS at NYK"}, "player_analysis": {"matchup": "BOS at NYK"}},
             },
             pipeline_request={"question": "What are the best live bets?"},
         )
@@ -31,7 +27,6 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(payload["response"]["recommendations"][0]["name"], "Play 1")
         self.assertEqual(payload["preview"]["matchup"], "BOS at NYK")
         self.assertEqual(payload["player_analysis"]["matchup"], "BOS at NYK")
-        self.assertEqual(payload["bet_evaluation"]["verdict"], "lean yes")
 
     def test_format_intelligence_query_error_normalizes_message(self) -> None:
         payload = format_intelligence_query_error(error="  question is required  ")

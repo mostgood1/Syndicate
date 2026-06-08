@@ -289,60 +289,36 @@ class IntelligencePipelineTests(unittest.TestCase):
         self.assertTrue(player_analysis["final_recommendation"])
         self.assertEqual(formatted["player_analysis"]["matchup"], "BOS at NYK")
 
-    def test_bet_evaluation_queries_build_decision_sections(self) -> None:
+    def test_relative_date_queries_route_through_pipeline(self) -> None:
         fake_request = SimpleNamespace(
             get_json=lambda silent=True: {
-                "question": "Is Jayson Tatum over 28.5 points a good bet?",
-                "date": "2026-06-04",
+                "question": "preview the Lakers game tonight",
             },
             form={},
         )
 
-        with patch(
-            "pipeline.intelligence_pipeline.run_intelligence_query",
-            return_value={
-                "headline": "Jayson Tatum bet evaluation",
-                "summary": "The board shows a positive edge on the scoring prop.",
-                "recommendations": [
-                    {
-                        "candidate_type": "prop",
-                        "name": "Jayson Tatum Over 28.5 Points",
-                        "matchup": "BOS at NYK",
-                        "summary": "Top betting angle and the best value on the board.",
-                        "basketball_summary": "Recent form is already clearing the number with a last-five average above the line.",
-                        "why_explain": "Projected minutes and usage both support the over.",
-                        "writeup": "Model confidence and price edge line up.",
-                        "confidence": "63%",
-                        "edge": "+5.4%",
-                        "odds": "+102",
-                        "line": 28.5,
-                    },
-                    {
-                        "candidate_type": "game",
-                        "name": "BOS at NYK",
-                        "matchup": "BOS at NYK",
-                        "summary": "Game context supports the same read.",
-                        "score": 94.5,
-                    },
-                ],
-                "board_notes": ["Minutes projection is sensitive to blowout risk."],
-            },
-        ):
-            result = run_intelligence_pipeline(fake_request)
+        with patch("router.query_router.central_today_iso", return_value="2026-06-07"):
+            with patch(
+                "pipeline.intelligence_pipeline.run_intelligence_query",
+                return_value={
+                    "headline": "Lakers preview",
+                    "summary": "The board points toward a close matchup preview.",
+                    "recommendations": [
+                        {
+                            "candidate_type": "game",
+                            "name": "LAL at DEN",
+                            "matchup": "LAL at DEN",
+                            "summary": "Primary game preview angle.",
+                            "score": 95.0,
+                        }
+                    ],
+                },
+            ):
+                result = run_intelligence_pipeline(fake_request)
 
-        structured = result.to_dict()["structured_response"]
-        bet_evaluation = structured["bet_evaluation"]
-        formatted = format_intelligence_query_response(question="Is Jayson Tatum over 28.5 points a good bet?", result=result)
-
-        self.assertEqual(result.query_type, "bet_evaluation")
-        self.assertEqual(result.pipeline_request["bet_subject"], "Jayson Tatum over 28.5 points")
-        self.assertEqual(bet_evaluation["bet_details"]["selection"], "Jayson Tatum Over 28.5 Points")
-        self.assertIn(bet_evaluation["verdict"], {"yes", "lean yes", "pass", "no"})
-        self.assertTrue(bet_evaluation["reasoning"])
-        self.assertTrue(bet_evaluation["edge_explanation"])
-        self.assertTrue(bet_evaluation["risk_factors"])
-        self.assertIn("bet_evaluation", formatted)
-        self.assertEqual(formatted["bet_evaluation"]["bet_details"]["selection"], "Jayson Tatum Over 28.5 Points")
+        self.assertEqual(result.query_type, "game_preview")
+        self.assertEqual(result.pipeline_request["selected_date"], "2026-06-07")
+        self.assertEqual(result.pipeline_request["preview_subject"], "Lakers")
 
     def test_vague_queries_include_context_awareness_and_assumptions(self) -> None:
         fake_request = SimpleNamespace(

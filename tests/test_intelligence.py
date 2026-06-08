@@ -934,7 +934,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(payload.get("player_analysis", {}).get("player"), "Jayson Tatum")
         self.assertEqual(payload.get("player_analysis", {}).get("matchup"), structured.get("player_analysis", {}).get("matchup"))
 
-    def test_intelligence_query_api_returns_bet_evaluation_payload(self) -> None:
+    def test_intelligence_query_api_resolves_preview_date_and_preserves_contract(self) -> None:
         advanced_rows = [
             {
                 "label": "Team advanced stats",
@@ -945,26 +945,27 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                 "inside_repo": True,
             }
         ]
-        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
-            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
-                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
-                    response = self.client.post(
-                        "/api/intelligence/query",
-                        json={
-                            "question": "Is Jayson Tatum over 28.5 points a good bet?",
-                            "date": "2026-06-04",
-                        },
-                    )
+        with patch("router.query_router.central_today_iso", return_value="2026-06-07"):
+            with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+                with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                    with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "preview the Lakers game tonight",
+                            },
+                        )
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertTrue(payload.get("ok"))
-        self.assertIn("bet_evaluation", payload)
+        self.assertIn("preview", payload)
         result = payload.get("response") or {}
         structured = result.get("structured_response") or {}
-        self.assertEqual(result.get("query_type"), "bet_evaluation")
-        self.assertIn("bet_evaluation", structured)
-        self.assertEqual(payload.get("bet_evaluation", {}).get("bet_details", {}).get("selection"), "Jayson Tatum Over 28.5")
+        self.assertEqual(result.get("query_type"), "game_preview")
+        self.assertEqual(result.get("selected_date"), "2026-06-07")
+        self.assertIn("preview", structured)
+        self.assertEqual(payload.get("preview", {}).get("subject"), "Lakers")
 
     def test_intelligence_query_api_respects_explicit_filters_and_limit(self) -> None:
         overview = _sample_overview_with_secondary_sport()

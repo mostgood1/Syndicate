@@ -19,9 +19,6 @@ def format_intelligence_query_response(*, question: str, result: IntelligenceRes
     player_analysis = structured_response.get("player_analysis") if isinstance(structured_response, dict) else None
     if player_analysis is not None:
         payload["player_analysis"] = player_analysis
-    bet_evaluation = structured_response.get("bet_evaluation") if isinstance(structured_response, dict) else None
-    if bet_evaluation is not None:
-        payload["bet_evaluation"] = bet_evaluation
     return payload
 
 

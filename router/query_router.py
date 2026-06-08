@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from datetime import date
+from datetime import timedelta
 from dataclasses import dataclass
 from typing import Any, Mapping
 import re
+
+from syndicate.features.shared.timezone import central_today_iso
 
 
 @dataclass(frozen=True)
@@ -10,25 +14,22 @@ class QueryRoute:
     question: str
     query_type: str
     pipeline_mode: str
+    selected_date: str | None = None
     preview_subject: str | None = None
     player_subject: str | None = None
-    bet_subject: str | None = None
 
 
 class QueryRouter:
-    _BET_EVALUATION_PATTERNS = (
-        re.compile(r"\bshould i bet\s+(?P<subject>.+?)(?:\?|$)", re.IGNORECASE),
-        re.compile(r"\bis\s+(?P<subject>.+?)\s+a good bet\b", re.IGNORECASE),
-        re.compile(r"\bworth taking\s+(?P<subject>.+?)(?:\?|$)", re.IGNORECASE),
-        re.compile(r"\bshould i take\s+(?P<subject>.+?)(?:\?|$)", re.IGNORECASE),
-    )
     _PLAYER_ANALYSIS_PATTERNS = (
-        re.compile(r"\banaly[sz]e\s+(?P<subject>.+?)(?:\s+tonight\b|$)", re.IGNORECASE),
-        re.compile(r"\bbreak down\s+(?P<subject>.+?)(?:\s+tonight\b|$)", re.IGNORECASE),
+        re.compile(r"\banaly[sz]e\s+(?P<subject>.+?)(?:\s+(?:tonight|today|right now)\b|$)", re.IGNORECASE),
+        re.compile(r"\bbreak down\s+(?P<subject>.+?)(?:\s+(?:tonight|today|right now)\b|$)", re.IGNORECASE),
+        re.compile(r"\bhow does\s+(?P<subject>.+?)\s+look(?:\s+(?:tonight|today|right now))?\b", re.IGNORECASE),
+        re.compile(r"\bhow is\s+(?P<subject>.+?)\s+looking(?:\s+(?:tonight|today|right now))?\b", re.IGNORECASE),
     )
     _PREVIEW_PATTERNS = (
         re.compile(r"\bpreview\b.*\bgame\b", re.IGNORECASE),
         re.compile(r"\bgame preview\b", re.IGNORECASE),
+        re.compile(r"\bwhat should i know about\b.*\bgame\b", re.IGNORECASE),
     )
     _LIVE_PATTERNS = (
         re.compile(r"\blive\b", re.IGNORECASE),
@@ -87,6 +88,8 @@ class QueryRouter:
         patterns = (
             re.compile(r"\bpreview(?: the)? (?P<subject>.+?) game(?: tonight)?\b", re.IGNORECASE),
             re.compile(r"\bpreview(?: the)? (?P<subject>.+?) tonight\b", re.IGNORECASE),
+            re.compile(r"\bwhat should i know about(?: the)? (?P<subject>.+?) game(?: tonight| today)?\b", re.IGNORECASE),
+            re.compile(r"\bwhat should i know about(?: the)? (?P<subject>.+?)\b(?: game)?(?: tonight| today)?\b", re.IGNORECASE),
         )
         for pattern in patterns:
             match = pattern.search(normalized_question)
@@ -114,24 +117,21 @@ class QueryRouter:
         return None
 
     @staticmethod
-    def _bet_subject_from_question(question: str) -> str | None:
-        normalized_question = str(question or "").strip()
-        if not normalized_question:
+    def _resolve_selected_date(question: str, selected_date: str | None = None) -> str | None:
+        explicit_date = str(selected_date or "").strip()
+        if explicit_date:
+            return explicit_date
+        normalized_question = f" {str(question or '').strip().lower()} "
+        if not normalized_question.strip():
             return None
-        for pattern in QueryRouter._BET_EVALUATION_PATTERNS:
-            match = pattern.search(normalized_question)
-            if not match:
-                continue
-            subject = str(match.group("subject") or "").strip().strip(" .?!,;:\"")
-            if subject.lower().startswith(("the ", "a ", "an ")):
-                subject = re.sub(r"^(?:the|a|an)\s+", "", subject, flags=re.IGNORECASE).strip()
-            return subject or None
+        if "tomorrow" in normalized_question:
+            return (date.fromisoformat(central_today_iso()) + timedelta(days=1)).isoformat()
+        if "today" in normalized_question or "tonight" in normalized_question:
+            return central_today_iso()
         return None
 
     def classify_query(self, question: str) -> str:
         normalized_question = str(question or "").strip()
-        if self._matches(self._BET_EVALUATION_PATTERNS, normalized_question):
-            return "bet_evaluation"
         if self._matches(self._PLAYER_ANALYSIS_PATTERNS, normalized_question):
             return "player_analysis"
         if self._matches(self._PREVIEW_PATTERNS, normalized_question):
@@ -152,7 +152,6 @@ class QueryRouter:
         normalized_question = str(question or "").strip()
         query_type = self.classify_query(normalized_question)
         pipeline_mode = {
-            "bet_evaluation": "pregame",
             "player_analysis": "pregame",
             "game_preview": "pregame",
             "live_analysis": "live",
@@ -161,25 +160,27 @@ class QueryRouter:
             "risk_evaluation": "explanation",
             "explanation": "explanation",
         }.get(query_type, "explanation")
-        bet_subject = self._bet_subject_from_question(normalized_question) if query_type == "bet_evaluation" else None
+        selected_date = self._resolve_selected_date(normalized_question)
         player_subject = self._player_subject_from_question(normalized_question) if query_type == "player_analysis" else None
         preview_subject = self._preview_subject_from_question(normalized_question) if query_type == "game_preview" else None
-        return QueryRoute(question=normalized_question, query_type=query_type, pipeline_mode=pipeline_mode, preview_subject=preview_subject, player_subject=player_subject, bet_subject=bet_subject)
+        return QueryRoute(question=normalized_question, query_type=query_type, pipeline_mode=pipeline_mode, selected_date=selected_date, preview_subject=preview_subject, player_subject=player_subject)
 
     def route_payload(self, payload: Mapping[str, Any] | None) -> dict[str, Any]:
         routed_payload = dict(payload or {})
         question = str(routed_payload.get("question") or "").strip()
+        explicit_date = str(routed_payload.get("selected_date") or routed_payload.get("date") or "").strip()
         route = self.route_question(question)
         routed_payload["question"] = route.question
         routed_payload["mode"] = route.pipeline_mode
         routed_payload["query_type"] = route.query_type
+        if not explicit_date and route.selected_date:
+            routed_payload["selected_date"] = route.selected_date
+            routed_payload["date"] = route.selected_date
         if route.preview_subject:
             routed_payload["preview_subject"] = route.preview_subject
         if route.player_subject:
             routed_payload["player_subject"] = route.player_subject
-        if route.bet_subject:
-            routed_payload["bet_subject"] = route.bet_subject
-        if route.query_type in {"game_preview", "player_analysis", "bet_evaluation"}:
+        if route.query_type in {"game_preview", "player_analysis"}:
             routed_payload["include_games"] = True
             routed_payload["include_props"] = True
         return routed_payload

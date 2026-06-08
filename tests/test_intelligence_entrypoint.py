@@ -39,16 +39,29 @@ class IntelligenceEntrypointTests(unittest.TestCase):
         self.assertTrue(payload["include_games"])
         self.assertTrue(payload["include_props"])
 
-    def test_route_intelligence_request_detects_bet_evaluation(self) -> None:
-        request = SimpleNamespace(get_json=lambda silent=True: {"question": "Is Jayson Tatum over 28.5 points a good bet?"}, form={})
+    def test_route_intelligence_request_resolves_preview_date_and_subject(self) -> None:
+        request = SimpleNamespace(get_json=lambda silent=True: {"question": "preview the Lakers game tonight"}, form={})
 
-        payload = route_intelligence_request(request)
+        with patch("router.query_router.central_today_iso", return_value="2026-06-07"):
+            payload = route_intelligence_request(request)
 
         self.assertEqual(payload["mode"], "pregame")
-        self.assertEqual(payload["query_type"], "bet_evaluation")
-        self.assertEqual(payload["bet_subject"], "Jayson Tatum over 28.5 points")
-        self.assertTrue(payload["include_games"])
-        self.assertTrue(payload["include_props"])
+        self.assertEqual(payload["query_type"], "game_preview")
+        self.assertEqual(payload["preview_subject"], "Lakers")
+        self.assertEqual(payload["selected_date"], "2026-06-07")
+        self.assertEqual(payload["date"], "2026-06-07")
+
+    def test_route_intelligence_request_resolves_player_date(self) -> None:
+        request = SimpleNamespace(get_json=lambda silent=True: {"question": "break down Aaron Judge today"}, form={})
+
+        with patch("router.query_router.central_today_iso", return_value="2026-06-07"):
+            payload = route_intelligence_request(request)
+
+        self.assertEqual(payload["mode"], "pregame")
+        self.assertEqual(payload["query_type"], "player_analysis")
+        self.assertEqual(payload["player_subject"], "Aaron Judge")
+        self.assertEqual(payload["selected_date"], "2026-06-07")
+        self.assertEqual(payload["date"], "2026-06-07")
 
     def test_run_routed_intelligence_pipeline_uses_routed_payload(self) -> None:
         request = SimpleNamespace(get_json=lambda silent=True: {"question": "Compare Player A vs Player B"}, form={})
