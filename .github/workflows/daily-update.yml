@@ -59,7 +59,11 @@ jobs:
         continue-on-error: true
         run: |
           Write-Host 'Running python -m unittest tests.test_archives'
-          python -m unittest tests.test_archives || echo "Tests failed, continuing"
+          try {
+            python -m unittest tests.test_archives
+          } catch {
+              Write-Host "Tests failed, continuing"
+            }
 
       - name: Run daily pipeline
         shell: pwsh
