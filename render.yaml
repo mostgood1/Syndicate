@@ -56,6 +56,18 @@ services:
         value: "5"
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "1"
+      - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
+        value: "true"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
+        value: "30"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
+        value: "live"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE
+        value: "source"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
+        value: us
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
+        value: "true"
       - key: MLB_BETTING_DATA_ROOT
         value: /opt/render/project/data/mlb_source/source_artifacts/data
       - key: MLB_LIVE_LENS_DIR

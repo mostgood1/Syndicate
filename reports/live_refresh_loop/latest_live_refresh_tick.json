@@ -1,0 +1,13 @@
+{
+  "startedAt": "2026-06-08T01:03:16Z",
+  "date": "2026-06-07",
+  "phase": "live",
+  "regions": "us",
+  "executionMode": "source",
+  "skipMirror": true,
+  "sports": "active",
+  "ok": false,
+  "skipped": true,
+  "error": "A refresh run is already active (pid=123). Cancel it before starting a new run.",
+  "finishedAt": "2026-06-08T01:03:16Z"
+}
