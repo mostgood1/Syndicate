@@ -42,7 +42,7 @@ jobs:
         run: |
           python --version
           where python
-          python-m pip list
+          python -m pip list
 
       - name: Resolve runtime parameters
         shell: pwsh
