@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template, request
 
+from pipeline.formatter import format_intelligence_query_error
+from pipeline.formatter import format_intelligence_query_response
+from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
-from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.shared.timezone import central_today_iso
 
 
@@ -62,29 +64,11 @@ def intelligence_status_api():
 
 @intelligence_bp.post("/api/intelligence/query")
 def intelligence_query_api():
-    payload = request.get_json(silent=True) if request.is_json else None
-    payload = payload if isinstance(payload, dict) else {}
-    question = str(payload.get("question") or request.form.get("question") or "").strip()
-    selected_date = str(payload.get("date") or request.form.get("date") or "").strip() or None
-    mode = str(payload.get("mode") or request.form.get("mode") or "").strip() or None
-    sport = str(payload.get("sport") or request.form.get("sport") or "").strip() or None
-    timing = str(payload.get("timing") or request.form.get("timing") or "").strip() or None
-    limit_value = payload.get("limit") or request.form.get("limit")
-    include_props = _optional_bool(payload.get("include_props") if "include_props" in payload else request.form.get("include_props"))
-    include_games = _optional_bool(payload.get("include_games") if "include_games" in payload else request.form.get("include_games"))
-
+    try:
+        pipeline_result = run_routed_intelligence_pipeline(request)
+    except ValueError as exc:
+        return jsonify(format_intelligence_query_error(error=str(exc))), 400
+    question = str((pipeline_result.pipeline_request or {}).get("question") or "").strip()
     if not question:
-        return jsonify({"ok": False, "error": "question is required"}), 400
-
-    result = run_intelligence_query(
-        question,
-        selected_date=selected_date,
-        mode=mode,
-        sport=sport,
-        limit=int(limit_value) if str(limit_value or "").strip() else None,
-        timing=timing,
-        include_props=include_props,
-        include_games=include_games,
-        force_refresh=True,
-    )
-    return jsonify({"ok": True, "query": question, "response": result})
+        return jsonify(format_intelligence_query_error(error="question is required")), 400
+    return jsonify(format_intelligence_query_response(question=question, result=pipeline_result))

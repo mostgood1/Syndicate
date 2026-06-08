@@ -1,0 +1,111 @@
+{
+	"ok": true,
+	"query": "What should I play?",
+	"response": {
+		"selected_date": "2026-06-07",
+		"query_type": "explanation",
+		"headline": "Vague request handled with best-effort assumptions",
+		"summary": "The prompt did not specify a sport or market, so the board was read broadly and the strongest available angle was surfaced.",
+		"clear_summary": "The prompt did not specify a sport or market, so the board was read broadly and the strongest available angle was surfaced.",
+		"deep_analysis": [
+			"The strongest current read centers on Board read, because the best assumption was to keep the answer broad.",
+			"Supporting detail is carried by Supporting evidence and Evidence records, which keeps the response tied to the returned evidence instead of a shallow headline-only answer.",
+			"The main caution is that a vague prompt was handled with best-effort assumptions. That means the recommendation should be interpreted with the listed uncertainty rather than treated as a fixed outcome.",
+			"The reasoning path is explicit: Explanation frame, Analyze, Aggregate, so the answer shows how the model moved from decomposition to conclusion."
+		],
+		"context_awareness": {
+			"is_vague": true,
+			"confidence": "low",
+			"detected_signals": ["intent=explanation"],
+			"assumptions": [
+				"I assumed you want the strongest board-wide read because no specific sport or market was named.",
+				"I treated the request as a explanation prompt so the engine could answer instead of waiting for more input."
+			],
+			"clarifying_questions": [
+				"Which sport should I narrow this to?",
+				"Do you want props, game plays, or both?"
+			],
+			"reasoning": "The request was handled as a general explanation because the prompt did not pin down a narrower market frame. Because the prompt was vague, the pipeline also made best-effort assumptions and preserved clarifying questions for follow-up.",
+			"recommendation_count": 1,
+			"reasoning_step_count": 1
+		},
+		"key_insights": [
+			{
+				"label": "Board read",
+				"interpretation": "The best assumption was to keep the answer broad.",
+				"confidence": "52%",
+				"score": 71.4
+			}
+		],
+		"supporting_evidence": [
+			{
+				"kind": "bundle",
+				"title": "Supporting evidence",
+				"sections": [
+					{
+						"kind": "metrics",
+						"title": "Top case evidence",
+						"items": [
+							{ "label": "Usage", "value": 1.08 },
+							{ "label": "Projection", "value": 8.1 }
+						]
+					}
+				]
+			},
+			{
+				"kind": "bundle",
+				"title": "Evidence records",
+				"sections": [
+					{
+						"source_type": "recommendation",
+						"entity": "Board read",
+						"metric": "summary",
+						"value": 8.1,
+						"context": "The prompt did not specify a sport or market, so the board was read broadly.",
+						"timestamp": "2026-06-07"
+					}
+				]
+			}
+		],
+		"risks_uncertainty": [
+			"The prompt was vague, so the result should be treated as a broad first pass.",
+			"A narrower sport or market may change the recommendation materially."
+		],
+		"recommended_interpretation": "Best takeaway: Board read is the primary angle, but size it against the reported risks and treat the evidence as directional, not absolute.",
+		"final_takeaway": "Best takeaway: Board read is the primary angle, but size it against the reported risks and treat the evidence as directional, not absolute.",
+		"reasoning_steps": [
+			{
+				"step_type": "reasoning",
+				"step_label": "Direct answer",
+				"question": "Answer the question directly and keep the explanation concise for: What should I play?",
+				"summary": "The prompt was vague, so the answer stayed board-wide.",
+				"answer": "The best assumption was to keep the answer broad.",
+				"top_recommendation": {
+					"name": "Board read",
+					"summary": "The best assumption was to keep the answer broad."
+				},
+				"evidence": [],
+				"recommendations": [],
+				"board_notes": []
+			}
+		],
+		"board_notes": [
+			"The prompt was vague, so the result should be treated as a broad first pass."
+		],
+		"readiness_gate": {
+			"ok": true,
+			"status": "ready"
+		},
+		"evidence": [
+			{
+				"source_type": "recommendation",
+				"entity": "Board read",
+				"metric": "summary",
+				"value": 8.1,
+				"context": "The prompt did not specify a sport or market, so the board was read broadly.",
+				"timestamp": "2026-06-07"
+			}
+		],
+		"local_only": true
+	}
+}

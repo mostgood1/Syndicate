@@ -748,6 +748,7 @@
     <section id="intel-response" class="intel-response-stack">
       <div class="intel-empty">Run a query to render The Syndicate response here. Returned charts, tables, recommendation cards, and parlays will appear in this area only.</div>
     </section>
+
   </section>
 {% endblock %}
 
@@ -1354,14 +1355,201 @@
           </article>`;
       }
 
+      function renderStructuredResponse(response) {
+        const structured = response?.structured_response;
+        if (!structured || typeof structured !== 'object') {
+          return '';
+        }
+
+        const clearSummary = compactText(structured.clear_summary || structured.summary || '', 420);
+        const deepAnalysis = Array.isArray(structured.deep_analysis) ? structured.deep_analysis : [];
+        const contextAwareness = structured.context_awareness && typeof structured.context_awareness === 'object' ? structured.context_awareness : null;
+        const keyInsights = Array.isArray(structured.key_insights) ? structured.key_insights : [];
+        const evidence = Array.isArray(structured.supporting_evidence) ? structured.supporting_evidence : [];
+        const risks = Array.isArray(structured.risks_uncertainty) ? structured.risks_uncertainty : [];
+        const reasoningSteps = Array.isArray(structured.reasoning_steps) ? structured.reasoning_steps : [];
+        const extractedEvidence = Array.isArray(response?.evidence) ? response.evidence : [];
+        const summary = clearSummary;
+        const interpretation = compactText(structured.recommended_interpretation || '', 420);
+        const finalTakeaway = compactText(structured.final_takeaway || '', 420);
+        const assumptions = Array.isArray(contextAwareness?.assumptions) ? contextAwareness.assumptions : [];
+        const clarifyingQuestions = Array.isArray(contextAwareness?.clarifying_questions) ? contextAwareness.clarifying_questions : [];
+
+        if (!summary && !deepAnalysis.length && !keyInsights.length && !evidence.length && !risks.length && !interpretation && !finalTakeaway && !extractedEvidence.length && !reasoningSteps.length && !assumptions.length && !clarifyingQuestions.length) {
+          return '';
+        }
+
+        const insightMarkup = keyInsights.length
+          ? `<div class="intel-rec-grid">${keyInsights.map((item) => `
+              <article class="intel-rec-card">
+                <div>
+                  <h4>${escapeHtml(item?.label || 'Insight')}</h4>
+                  <p class="intel-meta">${escapeHtml(item?.confidence ? `Confidence ${item.confidence}` : 'Structured insight')}</p>
+                </div>
+                <p>${escapeHtml(item?.interpretation || '—')}</p>
+                <div class="intel-chip-row">${item?.score !== null && item?.score !== undefined ? chip(`Score ${item.score}`, 'is-good') : ''}</div>
+              </article>`).join('')}</div>`
+          : '';
+
+        const evidenceMarkup = evidence.length
+          ? `<div class="intel-analysis-stack">${evidence.map((entry) => {
+              if (!entry || typeof entry !== 'object') {
+                return '';
+              }
+              const sections = Array.isArray(entry.sections) ? entry.sections : [];
+              const items = Array.isArray(entry.items) ? entry.items : [];
+              const body = sections.length
+                ? `<div class="intel-smart-stack">${sections.map((section) => `<div class="intel-smart-line"><span>${escapeHtml(section?.label || section?.title || 'Evidence')}</span><strong>${escapeHtml(section?.detail || section?.value || 'Tracked input')}</strong></div>`).join('')}</div>`
+                : items.length
+                  ? `<div class="intel-metric-grid">${items.map((item) => metricPill(item?.label || 'Metric', item?.value ?? item?.detail ?? '—')).join('')}</div>`
+                  : `<p class="intel-meta">${escapeHtml(entry.title || 'Supporting evidence')}</p>`;
+
+              return `
+                <article class="intel-analysis-card">
+                  <div>
+                    <div class="intel-kicker">Structured evidence</div>
+                    <h3>${escapeHtml(entry.title || 'Evidence bundle')}</h3>
+                  </div>
+                  ${body}
+                </article>`;
+            }).filter(Boolean).join('')}</div>`
+          : '';
+
+        const riskMarkup = risks.length
+          ? `<article class="intel-board-notes">
+              <details open>
+                <summary>Risks and uncertainty</summary>
+                <p>${escapeHtml(risks.join(' | '))}</p>
+              </details>
+            </article>`
+          : '';
+
+        const extractedEvidenceMarkup = extractedEvidence.length
+          ? `<article class="intel-analysis-card">
+              <div>
+                <div class="intel-kicker">Extracted evidence</div>
+                <h3>Structured evidence records</h3>
+              </div>
+              <div class="intel-analysis-table-wrap">
+                <table class="intel-analysis-table">
+                  <thead>
+                    <tr>
+                      <th>Entity</th>
+                      <th>Metric</th>
+                      <th>Value</th>
+                      <th>Context</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${extractedEvidence.map((item) => `
+                      <tr>
+                        <td>${escapeHtml(item?.entity || '—')}</td>
+                        <td>${escapeHtml(item?.metric || '—')}</td>
+                        <td>${escapeHtml(formatCell(item?.value))}</td>
+                        <td>${escapeHtml(compactText(item?.context || item?.summary || item?.detail || '', 180) || '—')}</td>
+                      </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </article>`
+          : '';
+
+        const reasoningMarkup = reasoningSteps.length
+          ? `<article class="intel-analysis-card">
+              <div>
+                <div class="intel-kicker">Reasoning trace</div>
+                <h3>Step-by-step breakdown</h3>
+              </div>
+              <div class="intel-rec-grid">
+                ${reasoningSteps.map((step, index) => `
+                  <article class="intel-rec-card">
+                    <div>
+                      <h4>Step ${index + 1}: ${escapeHtml(step?.step_label || step?.step_type || 'Reasoning step')}</h4>
+                      <p class="intel-meta">${escapeHtml(step?.step_type || 'step')}</p>
+                    </div>
+                    <p>${escapeHtml(step?.question || '—')}</p>
+                    <p>${escapeHtml(step?.answer || step?.summary || '—')}</p>
+                  </article>`).join('')}
+              </div>
+            </article>`
+          : '';
+
+        const analysisMarkup = deepAnalysis.length
+          ? `<article class="intel-analysis-card">
+              <div>
+                <div class="intel-kicker">Deep analysis</div>
+                <h3>Expanded reasoning</h3>
+              </div>
+              <div class="intel-brief-body">
+                ${deepAnalysis.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('')}
+              </div>
+            </article>`
+          : '';
+
+        const takeawayMarkup = finalTakeaway
+          ? `<article class="intel-analysis-card intel-analysis-overview">
+              <div>
+                <div class="intel-kicker">Final takeaway</div>
+                <h3>How to use the answer</h3>
+                <p class="intel-table-note">${escapeHtml(finalTakeaway)}</p>
+              </div>
+            </article>`
+          : '';
+
+        const contextAwarenessMarkup = contextAwareness
+          ? `<article class="intel-analysis-card">
+              <div>
+                <div class="intel-kicker">Context awareness</div>
+                <h3>How the request was interpreted</h3>
+              </div>
+              <div class="intel-brief-list">
+                <div class="intel-brief-list-item">
+                  <strong>Is vague</strong>
+                  <span class="intel-meta">${escapeHtml(contextAwareness.is_vague ? 'Yes' : 'No')} · confidence ${escapeHtml(contextAwareness.confidence || 'unknown')}</span>
+                </div>
+                <div class="intel-brief-list-item">
+                  <strong>Reasoning</strong>
+                  <span class="intel-meta">${escapeHtml(contextAwareness.reasoning || '—')}</span>
+                </div>
+                ${assumptions.length ? `<div class="intel-brief-list-item"><strong>Assumptions</strong><span class="intel-meta">${escapeHtml(assumptions.join(' | '))}</span></div>` : ''}
+                ${clarifyingQuestions.length ? `<div class="intel-brief-list-item"><strong>Clarifying questions</strong><span class="intel-meta">${escapeHtml(clarifyingQuestions.join(' | '))}</span></div>` : ''}
+              </div>
+            </article>`
+          : '';
+
+        return `
+          <section class="intel-analysis-stack">
+            <article class="intel-analysis-card intel-analysis-overview">
+              <div>
+                <div class="intel-kicker">Structured response</div>
+                <h3>${escapeHtml(prettyLabel(structured.intent || 'intelligence'))}</h3>
+                ${summary ? `<p class="intel-table-note">${escapeHtml(summary)}</p>` : ''}
+              </div>
+              <div class="intel-analysis-overview__stats">
+                <div class="intel-kicker">Interpretation</div>
+                <p class="intel-meta">${escapeHtml(interpretation || 'No explicit interpretation returned.')}</p>
+              </div>
+            </article>
+            ${contextAwarenessMarkup}
+            ${analysisMarkup}
+            ${insightMarkup}
+            ${reasoningMarkup}
+            ${evidenceMarkup}
+            ${extractedEvidenceMarkup}
+            ${riskMarkup}
+            ${takeawayMarkup}
+          </section>`;
+      }
+
       function renderResponse(payload) {
         const response = payload?.response || {};
         const recommendations = Array.isArray(response.recommendations) ? response.recommendations : [];
         const parlays = Array.isArray(response.parlays) ? response.parlays : [];
         const notes = Array.isArray(response.board_notes) ? response.board_notes : [];
         const parsedRequest = response.parsed_request || {};
+        const structuredResponseMarkup = renderStructuredResponse(response);
 
-        if (!recommendations.length && !parlays.length) {
+        if (!recommendations.length && !parlays.length && !structuredResponseMarkup) {
           responseRoot.innerHTML = '<div class="intel-empty">No actionable candidates were surfaced from the current board state for that request.</div>';
           return;
         }
@@ -1381,6 +1569,7 @@
 
         responseRoot.innerHTML = `
           ${briefMarkup}
+          ${structuredResponseMarkup}
           ${renderTopRecommendation(recommendations[0] || null)}
           ${renderAnalysisBrief(response)}
           ${renderSupportingEvidence(response)}
