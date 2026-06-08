@@ -55,9 +55,7 @@ jobs:
           Write-Host "  EventSimForceWindowMinutes: $forceWindow"
 
       - name: Run archive regression suite
-        run: |
-          Write-Host 'Running python -m unittest tests.test_archives'
-          python -m unittest tests.test_archives || Echo "Tests failed, continuing"
+        run: python -m unittest tests.test_archives || true
 
       - name: Run daily pipeline
         shell: pwsh
