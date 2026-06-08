@@ -40,9 +40,14 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python --version
-          where python
-          python -m pip list
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+          
+      - name: Capture Python path
+        run: echo "PYTHON_PATH=$(where python)" >> $env:GITHUB_ENV
+        shell: pwsh
+
 
       - name: Resolve runtime parameters
         shell: pwsh
@@ -62,7 +67,7 @@ jobs:
 
       - name: Run archive regression suite
         run: python -m unittest tests.test_archives || true
-
+      
       - name: Run daily pipeline
         shell: pwsh
         run: |
@@ -71,13 +76,28 @@ jobs:
           Write-Host "Using BaseUrl=$(if ($env:BASE_URL) { $env:BASE_URL } else { '<empty>' })"
           Write-Host "Using EventSimForceWindowMinutes=$env:EVENT_SIM_FORCE_WINDOW_MINUTES"
 
+          # ✅ Get correct Python path
+          $python = $env:PYTHON_PATH.Split("`n")[0].Trim()
+          Write-Host "Using Python at: $python"
+
+          # ✅ Force Python into PATH (THIS IS THE MISSING PIECE)
+          $pythonDir = Split-Path $python
+          $env:PATH = "$pythonDir;$env:PATH"
+
           $forceWindowMinutes = [int]$env:EVENT_SIM_FORCE_WINDOW_MINUTES
+
           if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            & ./scripts/unified_daily_update.ps1 -Date $env:DATE -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
+            & ./scripts/unified_daily_update.ps1 `
+              -Date $env:DATE `
+              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
           else {
-            & ./scripts/unified_daily_update.ps1 -Date $env:DATE -BaseUrl $env:BASE_URL -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
+            & ./scripts/unified_daily_update.ps1 `
+              -Date $env:DATE `
+              -BaseUrl $env:BASE_URL `
+              -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
+
           $exitCode = $LASTEXITCODE
           Write-Host "scripts/unified_daily_update.ps1 exited with code $exitCode"
           exit $exitCode
