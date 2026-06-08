@@ -45,8 +45,12 @@ jobs:
 
           
       - name: Capture Python path
-        run: echo "PYTHON_PATH=$(where python)" >> $env:GITHUB_ENV
         shell: pwsh
+        run: |
+          $python = (Get-Command python).Source
+          "PYTHON_PATH=$python" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Captured Python: $python"
+
 
 
       - name: Resolve runtime parameters
