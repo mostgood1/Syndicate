@@ -3692,34 +3692,18 @@ catch {
     throw
 }
 finally {
-        $artifactUpdatePaths = @($runManifest.artifactUpdates | ForEach-Object { [string]$_.artifactPath } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
-        if ($artifactGenerationFallbackToFullPublish -or $artifactUpdatePaths.Count -eq 0) {
-            if ($artifactUpdatePaths.Count -eq 0 -and -not $artifactGenerationFallbackToFullPublish) {
-                Write-Host 'Artifact stage no-op: no event-level artifact updates were scheduled; skipping artifact publish.' -ForegroundColor Yellow
-                foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'artifact_generation' })) {
-                    $stageDecision.decision = 'skipped'
-                    $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
-                }
-            }
-            else {
-                foreach ($repo in $publishRepos) {
-                    $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
-                    $runManifest.pushResults += @([ordered]@{
-                        name = $result.name
-                        repoPath = $result.repoPath
-                        remote = $result.remote
-                        branch = $result.branch
-                        commitMessage = $result.commitMessage
-                        status = $result.status
-                        commit = $result.commit
-                    })
-                }
+    $artifactUpdatePaths = @($runManifest.artifactUpdates | ForEach-Object { [string]$_.artifactPath } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    if ($artifactGenerationFallbackToFullPublish -or $artifactUpdatePaths.Count -eq 0) {
+        if ($artifactUpdatePaths.Count -eq 0 -and -not $artifactGenerationFallbackToFullPublish) {
+            Write-Host 'Artifact stage no-op: no event-level artifact updates were scheduled; skipping artifact publish.' -ForegroundColor Yellow
+            foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'artifact_generation' })) {
+                $stageDecision.decision = 'skipped'
+                $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
             }
         }
         else {
-            Write-Host ("Artifact stage incremental: publishing {0} updated event artifact(s)." -f $artifactUpdatePaths.Count) -ForegroundColor Yellow
             foreach ($repo in $publishRepos) {
-                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths
+                $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
                 $runManifest.pushResults += @([ordered]@{
                     name = $result.name
                     repoPath = $result.repoPath
@@ -3729,6 +3713,22 @@ finally {
                     status = $result.status
                     commit = $result.commit
                 })
-                }
             }
+        }
+    }
+    else {
+        Write-Host ("Artifact stage incremental: publishing {0} updated event artifact(s)." -f $artifactUpdatePaths.Count) -ForegroundColor Yellow
+        foreach ($repo in $publishRepos) {
+            $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage $repo.CommitMessage -RemoteName $GitRemote -ForceIncludePaths $artifactUpdatePaths
+            $runManifest.pushResults += @([ordered]@{
+                name = $result.name
+                repoPath = $result.repoPath
+                remote = $result.remote
+                branch = $result.branch
+                commitMessage = $result.commitMessage
+                status = $result.status
+                commit = $result.commit
+            })
+        }
+    }
 }
