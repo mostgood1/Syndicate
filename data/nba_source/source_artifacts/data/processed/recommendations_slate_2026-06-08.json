@@ -1,0 +1,50 @@
+{
+  "date": "2026-06-08",
+  "counts": {
+    "games": 1,
+    "picks": 2
+  },
+  "per_game": [
+    {
+      "home": "NYK",
+      "away": "SAS",
+      "matchup": "SAS @ NYK",
+      "picks": [
+        {
+          "market": "ATS",
+          "team": "New York Knicks",
+          "display_pick": "New York Knicks -2.0",
+          "selection": "New York Knicks",
+          "price": -110.0,
+          "score": 3.978342,
+          "ev_pct": 3.9783,
+          "win_prob": 0.563593,
+          "p_win": 0.563593,
+          "basketball_summary": "Model margin 2.0 vs market -2.0",
+          "top_play_reasons": [
+            "Edge 4.0",
+            "EV 4.0%"
+          ],
+          "matchup": "SAS @ NYK"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Over 216.5",
+          "selection": "Over",
+          "price": -110.0,
+          "score": 2.16003,
+          "ev_pct": 2.16,
+          "win_prob": 0.54541,
+          "p_win": 0.54541,
+          "basketball_summary": "Model total 218.7 vs line 216.5",
+          "top_play_reasons": [
+            "Edge 2.2",
+            "EV 2.2%"
+          ],
+          "matchup": "SAS @ NYK"
+        }
+      ]
+    }
+  ]
+}
