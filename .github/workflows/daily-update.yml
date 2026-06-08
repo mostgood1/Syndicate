@@ -1,0 +1,105 @@
+name: Daily Update
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Run date in YYYY-MM-DD format'
+        required: false
+        type: string
+      base_url:
+        description: 'Optional base URL passed to the daily update script'
+        required: false
+        type: string
+      event_sim_force_window_minutes:
+        description: 'Optional force window in minutes for event simulation'
+        required: false
+        type: number
+        default: 30
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  daily-update:
+    runs-on: ubuntu-latest
+    env:
+      DAILY_UPDATE_DATE: ${{ github.event.inputs.date || '' }}
+      DAILY_UPDATE_BASE_URL: ${{ github.event.inputs.base_url || '' }}
+      DAILY_UPDATE_FORCE_WINDOW_MINUTES: ${{ github.event.inputs.event_sim_force_window_minutes || 30 }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve runtime parameters
+        shell: pwsh
+        run: |
+          $runDate = if ($env:DAILY_UPDATE_DATE) { $env:DAILY_UPDATE_DATE } else { (Get-Date).ToString('yyyy-MM-dd') }
+          $baseUrl = if ($env:DAILY_UPDATE_BASE_URL) { $env:DAILY_UPDATE_BASE_URL } else { '' }
+          $forceWindow = if ($env:DAILY_UPDATE_FORCE_WINDOW_MINUTES) { [int]$env:DAILY_UPDATE_FORCE_WINDOW_MINUTES } else { 30 }
+
+          "DATE=$runDate" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "BASE_URL=$baseUrl" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "EVENT_SIM_FORCE_WINDOW_MINUTES=$forceWindow" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          Write-Host "Resolved daily update parameters:"
+          Write-Host "  Date: $runDate"
+          Write-Host "  BaseUrl: $(if ($baseUrl) { $baseUrl } else { '<empty>' })"
+          Write-Host "  EventSimForceWindowMinutes: $forceWindow"
+
+      - name: Run daily pipeline
+        shell: pwsh
+        run: |
+          Write-Host 'Starting scripts/unified_daily_update.ps1'
+          Write-Host "Using Date=$env:DATE"
+          Write-Host "Using BaseUrl=$(if ($env:BASE_URL) { $env:BASE_URL } else { '<empty>' })"
+          Write-Host "Using EventSimForceWindowMinutes=$env:EVENT_SIM_FORCE_WINDOW_MINUTES"
+
+          $args = @(
+            '-Date', $env:DATE,
+            '-EventSimForceWindowMinutes', $env:EVENT_SIM_FORCE_WINDOW_MINUTES
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:BASE_URL)) {
+            $args += @('-BaseUrl', $env:BASE_URL)
+          }
+
+          & ./scripts/unified_daily_update.ps1 @args 2>&1 | Tee-Object -FilePath daily-update.log
+          $exitCode = $LASTEXITCODE
+          Write-Host "scripts/unified_daily_update.ps1 exited with code $exitCode"
+          exit $exitCode
+
+      - name: Commit and push pipeline outputs
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          git add -A -- . ':(exclude)daily-update.log'
+
+          $status = git status --short
+          if ([string]::IsNullOrWhiteSpace($status)) {
+            Write-Host 'No pipeline output changes detected; skipping commit and push.'
+            exit 0
+          }
+
+          Write-Host 'Pipeline output changes detected:'
+          Write-Host $status
+
+          git commit -m "Update daily pipeline outputs"
+          $branch = $env:GITHUB_REF_NAME
+          Write-Host "Pushing commit to origin/$branch"
+          git push origin "HEAD:$branch"
+
+      - name: Upload daily update log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-update-log
+          path: daily-update.log

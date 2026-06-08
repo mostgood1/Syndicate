@@ -12,7 +12,7 @@ class UnifiedDailyUpdateEventSimFreshnessWindowTests(unittest.TestCase):
 
         self.assertIn("Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig", content)
         self.assertIn("selectionMode = 'default'", content)
-        self.assertIn("selectionMode = 'performance'", content)
+        self.assertIn("selectionMode = 'optimal'", content)
         self.assertIn("function Get-EventSimExecutionStartTimeUtc", content)
         self.assertIn("Get-EventSimExecutionDecision -CurrentFingerprint $currentEventInputFingerprint -PreviousFingerprint $previousInputFingerprint -Fallback $null -CurrentTimeUtc $currentTimeUtc -EventStartTimeUtc $eventStartTimeUtc -ForceWithinMinutes $effectiveForceWindowMinutes", content)
         self.assertIn("$currentTimeOffset -ge $windowStartOffset -and $currentTimeOffset -le $eventStartOffset", content)
