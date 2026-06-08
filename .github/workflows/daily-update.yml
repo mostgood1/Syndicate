@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   daily-update:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     env:
       DAILY_UPDATE_DATE: ${{ github.event.inputs.date || '' }}
       DAILY_UPDATE_BASE_URL: ${{ github.event.inputs.base_url || '' }}
