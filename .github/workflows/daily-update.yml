@@ -38,6 +38,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
       - name: Resolve runtime parameters
         shell: pwsh
         run: |
