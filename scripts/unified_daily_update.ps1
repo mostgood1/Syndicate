@@ -2,6 +2,10 @@ param(
     [string]$Date,
     [string]$BaseUrl,
     [switch]$Json,
+    [switch]$RefreshOdds,
+    [string]$OddsPhase = 'all',
+    [string]$OddsSports = 'all',
+    [string]$OddsRegions = 'us',
     [switch]$SkipTests,
     [switch]$SkipSmoke,
     [switch]$SkipSourceUpdates,
@@ -1157,6 +1161,7 @@ function Get-ForcedPublishArtifactPaths {
                 "${rootRelative}/data/processed/oddsapi_player_props_${DateValue}.csv",
                 "${rootRelative}/data/processed/props_predictions_${DateValue}.csv",
                 "${rootRelative}/data/processed/props_edges_${DateValue}.csv",
+                "${rootRelative}/data/processed/props_movement_signals_${DateValue}.csv",
                 "${rootRelative}/data/processed/props_recommendations_${DateValue}.csv",
                 "${rootRelative}/data/processed/recon_games_${DateValue}.csv",
                 "${rootRelative}/data/processed/recon_quarters_${DateValue}.csv",
@@ -1175,6 +1180,14 @@ function Get-ForcedPublishArtifactPaths {
                 "${rootRelative}/data/live_lens/live_lens_projections_${DateValue}.jsonl",
                 "${rootRelative}/data/live_lens/live_lens_signals_${DateValue}.jsonl",
                 "${rootRelative}/data/live_lens/live_lens_tuning_override.json"
+            )) {
+                Add-PathIfPresent -RelativePath $relativePath
+            }
+
+            foreach ($relativePath in @(
+                "${rootRelative}/data/raw/odds_${SportName}_player_props_${DateValue}.csv",
+                "${rootRelative}/data/raw/odds_${SportName}_player_props_opening_${DateValue}.csv",
+                "${rootRelative}/data/raw/odds_${SportName}_player_props_history_${DateValue}.csv"
             )) {
                 Add-PathIfPresent -RelativePath $relativePath
             }
@@ -1229,6 +1242,7 @@ function Get-ForcedPublishArtifactPaths {
         Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/season_betting_cards_retuned_hrr_manifest.json"
         Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/betting_day_payloads*/season_betting_day_*_${dateSlug}*.json"
         Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/betting_day_recaps*/season_betting_day_*_${dateSlug}*.json"
+        Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/tracking'
     }
 
     if (-not $SkipNBA) {
@@ -1313,6 +1327,7 @@ function Get-ForcedPublishArtifactPaths {
         )) {
             Add-PathIfPresent -RelativePath $relativePath
         }
+        Add-PathsUnderRoot -RelativeRoot 'data/nhl_source/tracking'
     }
 
     if (-not $SkipNFL) {
@@ -1337,6 +1352,7 @@ function Get-ForcedPublishArtifactPaths {
         Add-PathsByPattern -RelativePattern 'data/nfl_source/source_artifacts/oddsapi_player_props_*.csv'
         Add-PathsUnderRoot -RelativeRoot 'data/nfl_source/manifests'
         Add-PathsUnderRoot -RelativeRoot 'data/nfl_source/source_artifacts/manifests'
+        Add-PathsUnderRoot -RelativeRoot 'data/nfl_source/tracking'
     }
 
     if (-not $SkipNCAAF) {
@@ -1355,6 +1371,7 @@ function Get-ForcedPublishArtifactPaths {
         Add-PathsByPattern -RelativePattern 'data/ncaaf_source/source_artifacts/recommendations_*.csv'
         Add-PathsUnderRoot -RelativeRoot 'data/ncaaf_source/data/manifests'
         Add-PathsUnderRoot -RelativeRoot 'data/ncaaf_source/source_artifacts/manifests'
+        Add-PathsUnderRoot -RelativeRoot 'data/ncaaf_source/tracking'
     }
 
     if (-not $SkipNCAAB) {
@@ -1365,6 +1382,7 @@ function Get-ForcedPublishArtifactPaths {
         )) {
             Add-PathIfPresent -RelativePath $relativePath
         }
+        Add-PathsUnderRoot -RelativeRoot 'data/ncaab_source/tracking'
     }
 
     return @($paths | Select-Object -Unique)
@@ -1939,7 +1957,6 @@ if (-not $SkipNCAAF) {
 }
 if (-not $SkipNCAAB) {
     $ncaabRawOutputsRoot = Join-Path $repoRoot 'data\ncaab_source\raw_outputs'
-    $ncaabApiRoot = Join-Path $repoRoot 'data\ncaab_source\api'
     $ncaabApiKey = $ncaabOddsApiKey
     if (-not [string]::IsNullOrWhiteSpace($ncaabApiKey)) {
         $sourceSteps += [pscustomobject]@{
@@ -2009,6 +2026,10 @@ $runManifest = [ordered]@{
     dryRun = [bool]$DryRun
     refreshGate = [ordered]@{
         requested = [bool](-not $SkipRefreshGate)
+        refreshOdds = [bool]$RefreshOdds
+        oddsPhase = $OddsPhase
+        oddsSports = $OddsSports
+        oddsRegions = $OddsRegions
         manifestPath = (Join-Path $runDir 'migration\refresh_status_manifest.json')
         runSummaryPath = (Join-Path $runDir 'migration\refresh_and_gate_run.json')
     }
@@ -2145,6 +2166,10 @@ try {
         )
         if ($BaseUrl) { $refreshArgs += @('-BaseUrl', $BaseUrl) }
         if ($Json) { $refreshArgs += '-Json' }
+        if ($RefreshOdds) { $refreshArgs += '-RefreshOdds' }
+        if ($OddsPhase) { $refreshArgs += @('-OddsPhase', $OddsPhase) }
+        if ($OddsSports) { $refreshArgs += @('-OddsSports', $OddsSports) }
+        if ($OddsRegions) { $refreshArgs += @('-OddsRegions', $OddsRegions) }
         if ($SkipTests) { $refreshArgs += '-SkipTests' }
         if ($SkipSmoke) { $refreshArgs += '-SkipSmoke' }
         if ($SkipMLB) { $refreshArgs += '-SkipMLB' }

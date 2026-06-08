@@ -17,6 +17,7 @@ $sourceArtifactRootEnvVar = 'SYNDICATE_ARTIFACT_ROOT_NCAAF'
 $sourceRoot = $null
 $artifactRoot = $null
 $destRoot = Join-Path $repoRoot 'data\ncaaf_source\data'
+$destTrackingRoot = Join-Path (Join-Path $repoRoot 'data\ncaaf_source') 'tracking'
 
 if (-not $UseExistingMirrorArtifacts) {
     $artifactRootCandidate = $SourceArtifactRoot
@@ -43,6 +44,7 @@ if ((-not $UseExistingMirrorArtifacts) -and (-not $artifactRoot)) {
 }
 
 $sourceDataRoot = if ($UseExistingMirrorArtifacts) { $destRoot } elseif ($artifactRoot) { $artifactRoot } else { Join-Path $sourceRoot 'data' }
+$trackingSourceRoot = if ($UseExistingMirrorArtifacts) { $destTrackingRoot } elseif ($artifactRoot -and (Test-Path (Join-Path $artifactRoot 'tracking'))) { Join-Path $artifactRoot 'tracking' } else { $destTrackingRoot }
 
 function Copy-IfExists {
     param(
@@ -136,6 +138,10 @@ foreach ($name in $dirNames) {
     if (Copy-IfExists -SourcePath $src -DestinationPath $dst -Recurse) {
         $copied.Add($name) | Out-Null
     }
+}
+
+if (Copy-IfExists -SourcePath $trackingSourceRoot -DestinationPath $destTrackingRoot -Recurse) {
+    $copied.Add('tracking') | Out-Null
 }
 
 $artifactGroups = [ordered]@{

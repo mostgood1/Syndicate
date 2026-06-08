@@ -191,6 +191,7 @@ $files = @(
     "oddsapi_player_props_$Date.csv",
     "props_predictions_$Date.csv",
     "props_edges_$Date.csv",
+    "props_movement_signals_$Date.csv",
     "props_recommendations_$Date.csv",
     "recon_games_$Date.csv",
     "recon_quarters_$Date.csv",
@@ -259,6 +260,8 @@ foreach ($name in $liveSnapshotFiles) {
 
 $rawFiles = @(
     "odds_wnba_player_props_$Date.csv",
+    "odds_wnba_player_props_opening_$Date.csv",
+    "odds_wnba_player_props_history_$Date.csv",
     "odds_nba_player_props_$Date.csv"
 )
 

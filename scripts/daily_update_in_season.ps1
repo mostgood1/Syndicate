@@ -2,6 +2,10 @@ param(
     [string]$Date,
     [string]$BaseUrl,
     [switch]$Json,
+    [switch]$RefreshOdds,
+    [string]$OddsPhase = 'all',
+    [string]$OddsSports = 'all',
+    [string]$OddsRegions = 'us',
     [switch]$SkipTests,
     [switch]$SkipSmoke,
     [switch]$SkipSourceUpdates,
@@ -250,6 +254,10 @@ $effectiveSkipSmoke = [bool]$SkipSmoke
 
 if ($BaseUrl) { $dailyArgs += @('-BaseUrl', $BaseUrl) }
 if ($Json) { $dailyArgs += '-Json' }
+if ($RefreshOdds) { $dailyArgs += '-RefreshOdds' }
+if ($OddsPhase) { $dailyArgs += @('-OddsPhase', $OddsPhase) }
+if ($OddsSports) { $dailyArgs += @('-OddsSports', $OddsSports) }
+if ($OddsRegions) { $dailyArgs += @('-OddsRegions', $OddsRegions) }
 if ($effectiveSkipTests) { $dailyArgs += '-SkipTests' }
 if ($effectiveSkipSmoke) { $dailyArgs += '-SkipSmoke' }
 if ($SkipSourceUpdates) { $dailyArgs += '-SkipSourceUpdates' }
@@ -289,6 +297,9 @@ if ($effectiveSkipSmoke) {
 }
 Write-Host ("    gate tests: {0}" -f $gateTestsStatus) -ForegroundColor DarkGray
 Write-Host ("    gate smoke: {0}" -f $gateSmokeStatus) -ForegroundColor DarkGray
+if ($RefreshOdds) {
+    Write-Host ("    central odds refresh: enabled phase={0} sports={1} regions={2}" -f $OddsPhase, $OddsSports, $OddsRegions) -ForegroundColor DarkGray
+}
 Write-Host ("    " + ($dailyArgs -join ' ')) -ForegroundColor DarkGray
 
 if ($DryRun) {

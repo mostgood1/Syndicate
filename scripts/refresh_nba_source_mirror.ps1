@@ -279,6 +279,7 @@ $datedProcessedArtifacts = @(
     @{ Prefix = 'oddsapi_player_props_'; Suffix = '.csv' },
     @{ Prefix = 'props_predictions_'; Suffix = '.csv' },
     @{ Prefix = 'props_edges_'; Suffix = '.csv' },
+    @{ Prefix = 'props_movement_signals_'; Suffix = '.csv' },
     @{ Prefix = 'props_recommendations_'; Suffix = '.csv' },
     @{ Prefix = 'recon_games_'; Suffix = '.csv' },
     @{ Prefix = 'recon_quarters_'; Suffix = '.csv' },
@@ -368,7 +369,9 @@ foreach ($artifact in $datedLiveSnapshotArtifacts) {
 }
 
 $datedRawArtifacts = @(
-    @{ Prefix = 'odds_nba_player_props_'; Suffix = '.csv' }
+    @{ Prefix = 'odds_nba_player_props_'; Suffix = '.csv' },
+    @{ Prefix = 'odds_nba_player_props_opening_'; Suffix = '.csv' },
+    @{ Prefix = 'odds_nba_player_props_history_'; Suffix = '.csv' }
 )
 
 foreach ($artifact in $datedRawArtifacts) {

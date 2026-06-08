@@ -2,6 +2,10 @@ param(
     [string]$Date,
     [string]$BaseUrl,
     [switch]$Json,
+    [switch]$RefreshOdds,
+    [string]$OddsPhase = 'all',
+    [string]$OddsSports = 'all',
+    [string]$OddsRegions = 'us',
     [switch]$SkipTests,
     [switch]$SkipSmoke,
     [switch]$SkipSourceUpdates,
@@ -33,6 +37,10 @@ $unifiedArgs = @(
 
 if ($BaseUrl) { $unifiedArgs += @('-BaseUrl', $BaseUrl) }
 if ($Json) { $unifiedArgs += '-Json' }
+if ($RefreshOdds) { $unifiedArgs += '-RefreshOdds' }
+if ($OddsPhase) { $unifiedArgs += @('-OddsPhase', $OddsPhase) }
+if ($OddsSports) { $unifiedArgs += @('-OddsSports', $OddsSports) }
+if ($OddsRegions) { $unifiedArgs += @('-OddsRegions', $OddsRegions) }
 if ($SkipTests) { $unifiedArgs += '-SkipTests' }
 if ($SkipSmoke) { $unifiedArgs += '-SkipSmoke' }
 if ($SkipGitPush) { $unifiedArgs += '-SkipGitPush' }

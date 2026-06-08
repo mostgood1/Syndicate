@@ -58,6 +58,7 @@ $destLiveLensRoot = Join-Path $destinationSportRoot 'data\live_lens'
 $destOddsRoot = Join-Path $destinationSportRoot (Join-Path 'data\odds\games' ("date=" + $Date))
 $destTeamOddsRoot = Join-Path $destinationSportRoot (Join-Path 'data\odds\team' ("date=" + $Date))
 $destPropsRoot = Join-Path $destinationSportRoot (Join-Path 'data\props\player_props_lines' ("date=" + $Date))
+$destTrackingRoot = Join-Path $destinationSportRoot 'tracking'
 
 if (-not $UseExistingMirrorArtifacts) {
     $artifactRootCandidate = $SourceArtifactRoot
@@ -166,6 +167,7 @@ function Add-IfExists {
 }
 
 $copied = New-Object System.Collections.Generic.List[string]
+$trackingSourceRoot = if ($UseExistingMirrorArtifacts) { $destTrackingRoot } elseif ($artifactRoot -and (Test-Path (Join-Path $artifactRoot 'tracking'))) { Join-Path $artifactRoot 'tracking' } else { $destTrackingRoot }
 
 $files = @(
     "predictions_$Date.csv",
@@ -254,6 +256,10 @@ foreach ($name in $propsFiles) {
     if (($UseExistingMirrorArtifacts -and (Test-Path $dst)) -or ((-not $UseExistingMirrorArtifacts) -and (Copy-IfExists -SourcePath (Join-Path ($(if ($artifactRoot) { $artifactRoot } else { $sourceRoot })) (Join-Path 'data\props\player_props_lines' ("date=" + $Date + ('\\' + $name)))) -DestinationPath $dst))) {
         $copied.Add((Join-Path (Join-Path 'props\player_props_lines' ("date=" + $Date)) $name)) | Out-Null
     }
+}
+
+if (Copy-TreeIfExists -SourcePath $trackingSourceRoot -DestinationPath $destTrackingRoot) {
+    $copied.Add('tracking') | Out-Null
 }
 
 $artifactGroups = [ordered]@{

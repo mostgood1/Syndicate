@@ -56,6 +56,7 @@ $localSourceRoot = Join-Path $repoRoot 'data\mlb_source'
 $localArtifactRoot = Join-Path $localSourceRoot 'source_artifacts'
 $destinationSportRoot = Resolve-DestinationSportRoot -LocalDirName 'mlb_source' -ExplicitRootEnvVars @('SYNDICATE_MLB_SOURCE_ROOT')
 $destDataRoot = Join-Path $destinationSportRoot 'data'
+$destTrackingRoot = Join-Path $destinationSportRoot 'tracking'
 $dateSlug = $Date -replace '-', '_'
 $season = ($Date -split '-')[0]
 $seasonPayloadSlug = $dateSlug
@@ -233,6 +234,11 @@ function Resolve-OddsApiSourcePath {
 }
 
 $copied = New-Object System.Collections.Generic.List[string]
+$trackingSourceRoot = if ($UseExistingMirrorArtifacts) { $destTrackingRoot } elseif ($artifactRoot -and (Test-Path (Join-Path $artifactRoot 'tracking'))) { Join-Path $artifactRoot 'tracking' } else { $destTrackingRoot }
+
+if (Copy-IfExists -SourcePath $trackingSourceRoot -DestinationPath $destTrackingRoot -Recurse) {
+    $copied.Add('tracking') | Out-Null
+}
 
 $filePairs = @(
     @("data\daily\lineups_last_known_by_team.json", "daily\lineups_last_known_by_team.json"),

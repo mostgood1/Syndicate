@@ -19,6 +19,7 @@ class MlbMirrorScriptTests(unittest.TestCase):
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
         self.assertIn("usedArtifactBundle", content)
+        self.assertIn("tracking", content)
 
 
 class NbaMirrorScriptTests(unittest.TestCase):
@@ -44,6 +45,9 @@ class NbaMirrorScriptTests(unittest.TestCase):
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
         self.assertIn("usedArtifactBundle", content)
+        self.assertIn("props_movement_signals_", content)
+        self.assertIn("odds_nba_player_props_opening_", content)
+        self.assertIn("odds_nba_player_props_history_", content)
 
 
 class NhlMirrorScriptTests(unittest.TestCase):
@@ -60,6 +64,7 @@ class NhlMirrorScriptTests(unittest.TestCase):
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
         self.assertIn("usedArtifactBundle", content)
+        self.assertIn("tracking", content)
 
 
 class NflMirrorScriptTests(unittest.TestCase):
@@ -74,6 +79,7 @@ class NflMirrorScriptTests(unittest.TestCase):
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
         self.assertIn("usedArtifactBundle", content)
+        self.assertIn("tracking", content)
 
 
 class NcaafMirrorScriptTests(unittest.TestCase):
@@ -90,6 +96,7 @@ class NcaafMirrorScriptTests(unittest.TestCase):
         self.assertIn("usedArtifactBundle", content)
         self.assertIn("college_football_betting_lines_2025.csv", content)
         self.assertIn("college_football_schedule_2025_predicted_totals_enhanced*.csv", content)
+        self.assertIn("tracking", content)
 
 
 class WnbaMirrorScriptTests(unittest.TestCase):
@@ -106,3 +113,28 @@ class WnbaMirrorScriptTests(unittest.TestCase):
         self.assertIn("or use -UseExistingMirrorArtifacts", content)
         self.assertIn("usedExistingMirrorArtifacts", content)
         self.assertIn("usedArtifactBundle", content)
+        self.assertIn("props_movement_signals_", content)
+        self.assertIn("odds_wnba_player_props_opening_", content)
+        self.assertIn("odds_wnba_player_props_history_", content)
+
+
+class UnifiedDailyUpdatePublishTests(unittest.TestCase):
+    def test_basketball_force_publish_paths_include_tracking_artifacts(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "unified_daily_update.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("props_movement_signals_${DateValue}.csv", content)
+        self.assertIn("odds_${SportName}_player_props_opening_${DateValue}.csv", content)
+        self.assertIn("odds_${SportName}_player_props_history_${DateValue}.csv", content)
+
+    def test_non_basketball_force_publish_paths_include_tracking_roots(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "unified_daily_update.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("data/mlb_source/tracking", content)
+        self.assertIn("data/nhl_source/tracking", content)
+        self.assertIn("data/nfl_source/tracking", content)
+        self.assertIn("data/ncaaf_source/tracking", content)
+        self.assertIn("data/ncaab_source/tracking", content)

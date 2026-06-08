@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = REPO_ROOT.parent
@@ -175,6 +177,14 @@ def _local_source_artifact_root(slug: str) -> Path:
 
 def _local_source_bundle_root(slug: str) -> Path:
     return REPO_ROOT / "data" / f"{slug}_source"
+
+
+def _post_refresh_root(spec: SportSpec) -> Path:
+    if spec.slug == "mlb":
+        return _local_mlb_bundle_root()
+    if spec.slug in {"nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab"}:
+        return _local_source_bundle_root(spec.slug)
+    return _source_repo_root(spec.slug, spec.source_repo_name)
 
 
 def _basketball_source_root(slug: str, vendor_repo_name: str) -> Path:
@@ -566,6 +576,64 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     }
 
 
+def _sync_post_refresh_tracking_step(*, sport: str, source_root: Path, date_str: str, dry_run: bool = False) -> dict[str, Any]:
+    started = _utc_now()
+    if dry_run:
+        return {
+            "name": f"{sport}_post_refresh_tracking_sync",
+            "description": "Persist Syndicate-owned post-refresh tracking artifacts.",
+            "cwd": str(source_root),
+            "command": [],
+            "return_code": 0,
+            "started_at": started,
+            "finished_at": started,
+            "stdout": "",
+            "stderr": "",
+            "ok": True,
+            "dry_run": True,
+            "meta": {
+                "ok": True,
+                "skipped": False,
+                "reason": None,
+                "sport": sport,
+                "date": date_str,
+            },
+        }
+    try:
+        meta = sync_sport_post_refresh_tracking(sport=sport, source_root=source_root, date_str=date_str)
+        finished = _utc_now()
+        return {
+            "name": f"{sport}_post_refresh_tracking_sync",
+            "description": "Persist Syndicate-owned post-refresh tracking artifacts.",
+            "cwd": str(source_root),
+            "command": [],
+            "return_code": 0 if bool(meta.get("ok")) else 1,
+            "started_at": started,
+            "finished_at": finished,
+            "stdout": "",
+            "stderr": "" if bool(meta.get("ok")) else str(meta.get("error") or "post refresh tracking sync failed"),
+            "ok": bool(meta.get("ok")),
+            "dry_run": False,
+            "meta": meta,
+        }
+    except Exception as exc:
+        finished = _utc_now()
+        return {
+            "name": f"{sport}_post_refresh_tracking_sync",
+            "description": "Persist Syndicate-owned post-refresh tracking artifacts.",
+            "cwd": str(source_root),
+            "command": [],
+            "return_code": 1,
+            "started_at": started,
+            "finished_at": finished,
+            "stdout": "",
+            "stderr": f"{type(exc).__name__}: {exc}",
+            "ok": False,
+            "dry_run": False,
+            "meta": {"ok": False, "sport": sport, "date": date_str, "error": f"{type(exc).__name__}: {exc}"},
+        }
+
+
 def _validate_source_root(spec: SportSpec) -> str | None:
     if spec.slug == "mlb":
         source_root = _local_mlb_bundle_root()
@@ -742,6 +810,24 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                     summary["ok"] = False
                     return summary
 
+        if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
+            tracking_result = _sync_post_refresh_tracking_step(
+                sport=spec.slug,
+                source_root=_post_refresh_root(spec),
+                date_str=args.date,
+                dry_run=bool(args.dry_run),
+            )
+            sport_result["post_refresh"] = tracking_result
+            sport_result["generation"]["post_refresh"] = tracking_result
+            if not tracking_result["ok"]:
+                any_failure = True
+                sport_result["ok"] = False
+                if not args.continue_on_error:
+                    summary["results"].append(sport_result)
+                    summary["finished_at"] = _utc_now()
+                    summary["ok"] = False
+                    return summary
+
         if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
             if _hosted_source_mode_writes_directly(spec=spec, execution_mode=execution_mode, mirror_only=execution_mode == "ingest"):
                 timestamp = _utc_now()
@@ -845,6 +931,10 @@ def main() -> int:
             for step_result in sport_result.get("refresh_steps", []):
                 marker = "dry-run" if step_result.get("dry_run") else ("ok" if step_result.get("ok") else "failed")
                 print(f"  - refresh {step_result['name']}: {marker}")
+            post_refresh = sport_result.get("post_refresh")
+            if isinstance(post_refresh, dict):
+                marker = "dry-run" if post_refresh.get("dry_run") else ("ok" if post_refresh.get("ok") else "failed")
+                print(f"  - post-refresh {post_refresh['name']}: {marker}")
             mirror = sport_result.get("mirror")
             if isinstance(mirror, dict):
                 marker = "dry-run" if mirror.get("dry_run") else ("ok" if mirror.get("ok") else "failed")
