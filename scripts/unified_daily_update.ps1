@@ -56,6 +56,7 @@ $eventSimPolicyConfig = [ordered]@{
             policyId = 'sport:mlb:default'
             forceWithinMinutes = 20
             minimumSampleSize = 3
+            explorationRate = 0.05
             policyCandidates = @(
                 [ordered]@{ policyId = 'sport:mlb:default'; forceWithinMinutes = 20 }
                 [ordered]@{ policyId = 'sport:mlb:balanced'; forceWithinMinutes = 30 }
@@ -65,13 +66,14 @@ $eventSimPolicyConfig = [ordered]@{
             policyId = 'sport:nba:default'
             forceWithinMinutes = 45
             minimumSampleSize = 3
+            explorationRate = 0.05
             policyCandidates = @(
                 [ordered]@{ policyId = 'sport:nba:default'; forceWithinMinutes = 45 }
                 [ordered]@{ policyId = 'sport:nba:late'; forceWithinMinutes = 60 }
             )
         }
-        wnba = [ordered]@{ policyId = 'sport:wnba:default'; forceWithinMinutes = 40; minimumSampleSize = 3; policyCandidates = @([ordered]@{ policyId = 'sport:wnba:default'; forceWithinMinutes = 40 }) }
-        nhl = [ordered]@{ policyId = 'sport:nhl:default'; forceWithinMinutes = 25; minimumSampleSize = 3; policyCandidates = @([ordered]@{ policyId = 'sport:nhl:default'; forceWithinMinutes = 25 }) }
+        wnba = [ordered]@{ policyId = 'sport:wnba:default'; forceWithinMinutes = 40; minimumSampleSize = 3; explorationRate = 0.05; policyCandidates = @([ordered]@{ policyId = 'sport:wnba:default'; forceWithinMinutes = 40 }) }
+        nhl = [ordered]@{ policyId = 'sport:nhl:default'; forceWithinMinutes = 25; minimumSampleSize = 3; explorationRate = 0.05; policyCandidates = @([ordered]@{ policyId = 'sport:nhl:default'; forceWithinMinutes = 25 }) }
     }
 }
 
@@ -871,10 +873,55 @@ function Get-Policy {
         return $null
     }
 
-    return Select-BestPolicy -Context $Context -PolicyGroup $selectedPolicy -PolicySource $policySource -PolicyPerformance $PolicyPerformance
+    $optimalPolicy = Get-OptimalPolicy -Context $Context -PolicyGroup $selectedPolicy -PolicySource $policySource -PolicyPerformance $PolicyPerformance
+    if ($null -eq $optimalPolicy) {
+        return $null
+    }
+
+    $candidatePolicies = @()
+    if ($selectedPolicy.policyCandidates -and @($selectedPolicy.policyCandidates).Count -gt 0) {
+        $candidatePolicies = @($selectedPolicy.policyCandidates)
+    }
+    else {
+        $candidatePolicies = @($selectedPolicy)
+    }
+
+    $explorationRate = 0.0
+    if ($null -ne $selectedPolicy.explorationRate) {
+        $explorationRate = [double]$selectedPolicy.explorationRate
+    }
+    elseif ($null -ne $PolicyConfig.explorationRate) {
+        $explorationRate = [double]$PolicyConfig.explorationRate
+    }
+
+    if ($explorationRate -gt 0 -and $candidatePolicies.Count -gt 1) {
+        $exploreThreshold = [int][math]::Round([math]::Max(0.0, [math]::Min(1.0, $explorationRate)) * 10000)
+        if ($exploreThreshold -gt 0 -and (Get-Random -Minimum 0 -Maximum 10000) -lt $exploreThreshold) {
+            $explorationCandidates = @($candidatePolicies | Where-Object { [string]$_.policyId -ne [string]$optimalPolicy.policyId })
+            if ($explorationCandidates.Count -gt 0) {
+                $exploratoryPolicy = $explorationCandidates | Get-Random
+                $forceWithinMinutes = if ($null -ne $exploratoryPolicy.forceWithinMinutes) { [int]$exploratoryPolicy.forceWithinMinutes } else { $null }
+                return [ordered]@{
+                    policyId = [string]$exploratoryPolicy.policyId
+                    sport = $sport
+                    market = $market
+                    timeToStartMinutes = $timeToStartMinutes
+                    forceWithinMinutes = $forceWithinMinutes
+                    policySource = $policySource
+                    selectionMode = 'exploratory'
+                    isExploratory = $true
+                    explorationRate = $explorationRate
+                    optimalPolicyId = [string]$optimalPolicy.policyId
+                    keyParameters = [ordered]@{ forceWithinMinutes = $forceWithinMinutes }
+                }
+            }
+        }
+    }
+
+    return $optimalPolicy
 }
 
-function Select-BestPolicy {
+function Get-OptimalPolicy {
     param(
         [object]$Context,
         [object]$PolicyGroup,
@@ -919,6 +966,7 @@ function Select-BestPolicy {
             forceWithinMinutes = $forceWithinMinutes
             policySource = $PolicySource
             selectionMode = 'default'
+            isExploratory = $false
             keyParameters = [ordered]@{ forceWithinMinutes = $forceWithinMinutes }
         }
     }
@@ -1001,9 +1049,21 @@ function Select-BestPolicy {
         timeToStartMinutes = $timeToStartMinutes
         forceWithinMinutes = $bestForceWithinMinutes
         policySource = $PolicySource
-        selectionMode = 'performance'
+        selectionMode = 'optimal'
+        isExploratory = $false
         keyParameters = [ordered]@{ forceWithinMinutes = $bestForceWithinMinutes }
     }
+}
+
+function Select-BestPolicy {
+    param(
+        [object]$Context,
+        [object]$PolicyGroup,
+        [string]$PolicySource,
+        [object[]]$PolicyPerformance
+    )
+
+    return Get-OptimalPolicy -Context $Context -PolicyGroup $PolicyGroup -PolicySource $PolicySource -PolicyPerformance $PolicyPerformance
 }
 
 function Get-PolicyPerformance {
@@ -1057,12 +1117,15 @@ function Get-PolicyPerformance {
 
         $policySource = [string]($groupRecords | Select-Object -First 1 | ForEach-Object { $_.policySource })
         $keyParameters = @($groupRecords | Select-Object -First 1 | ForEach-Object { $_.policyKeyParameters })
+        $exploratoryCount = [int](@($groupRecords | Where-Object { [bool]$_.isExploratory }).Count)
         $performanceRows.Add([ordered]@{
             policyId = [string]$policyGroup.Name
             policySource = $policySource
             keyParameters = if ($keyParameters.Count -gt 0) { $keyParameters[0] } else { $null }
             recordCount = [int]$groupRecords.Count
             sampleSize = [int]$groupRecords.Count
+            exploratoryCount = [int]$exploratoryCount
+            exploratoryRate = if ($groupRecords.Count -gt 0) { [math]::Round((($exploratoryCount / [double]$groupRecords.Count)), 4) } else { $null }
             plannedCount = [int](@($groupRecords | Where-Object { [string]$_.decision -eq 'planned' }).Count)
             skippedCount = [int](@($groupRecords | Where-Object { [string]$_.decision -eq 'skipped' -or [string]$_.status -eq 'skipped' }).Count)
             dryRunCount = [int](@($groupRecords | Where-Object { [string]$_.status -eq 'dry_run' }).Count)
@@ -3348,6 +3411,8 @@ try {
                             timeToStartMinutes = $timeToStartMinutes
                             policyId = [string]$effectivePolicy.policyId
                             policySource = [string]$effectivePolicy.policySource
+                            policySelectionMode = [string]$effectivePolicy.selectionMode
+                            isExploratory = [bool]$effectivePolicy.isExploratory
                             policyKeyParameters = $effectivePolicy.keyParameters
                             forceWithinMinutes = [int]$effectiveForceWindowMinutes
                             decision = 'planned'

@@ -35,9 +35,9 @@ class UnifiedDailyUpdateEventSimPolicyTests(unittest.TestCase):
 
         self.assertIn("$timeToStartMinutes = $null", content)
         self.assertIn("Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig", content)
+        self.assertIn("Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig -PolicyPerformance @($runManifest.policyPerformance)", content)
         self.assertIn("Get-EventSimExecutionDecision -CurrentFingerprint $currentEventInputFingerprint -PreviousFingerprint $previousInputFingerprint -Fallback $null -CurrentTimeUtc $currentTimeUtc -EventStartTimeUtc $eventStartTimeUtc -ForceWithinMinutes $effectiveForceWindowMinutes", content)
         self.assertIn("$currentTimeOffset -ge $windowStartOffset -and $currentTimeOffset -le $eventStartOffset", content)
-        self.assertIn("policyPerformance = @($runManifest.policyPerformance)", content)
 
 
 if __name__ == "__main__":

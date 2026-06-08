@@ -11,7 +11,6 @@ class UnifiedDailyUpdateEventSimFreshnessWindowTests(unittest.TestCase):
         content = script_path.read_text(encoding="utf-8")
 
         self.assertIn("Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig", content)
-        self.assertIn("Get-Policy -Context $eventPolicyContext -PolicyConfig $eventSimPolicyConfig -PolicyPerformance @($runManifest.policyPerformance)", content)
         self.assertIn("selectionMode = 'default'", content)
         self.assertIn("selectionMode = 'performance'", content)
         self.assertIn("function Get-EventSimExecutionStartTimeUtc", content)
