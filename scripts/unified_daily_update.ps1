@@ -184,7 +184,10 @@ function Invoke-Step {
         $LASTEXITCODE = $exitCode
         if ($exitCode -ne 0) {
             $exitCodeText = [string]$exitCode
-            throw "$Name failed with exit code $exitCodeText"
+            Write-Host "$Name failed with exit code $exitCodeText — continuing" -ForegroundColor Yellow
+            return
+        }
+
         }
     }
 
