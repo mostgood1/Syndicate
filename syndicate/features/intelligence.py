@@ -3784,6 +3784,7 @@ def _apply_advanced_context_to_candidates(
             + float(candidate.get("advanced_signal_score") or 0.0)
             + float(candidate.get("source_summary_score") or 0.0)
         )
+        candidate["confidence"] = _candidate_confidence(candidate)
 
 
 def _candidate_betting_edge_components(candidate: dict[str, Any]) -> tuple[float, float, float] | None:
@@ -3806,6 +3807,40 @@ def _candidate_betting_rank_key(candidate: dict[str, Any]) -> tuple[float, float
     score_value = _numeric_hint(candidate.get("score"))
     score = score_value if score_value is not None else float("-inf")
     return edge, confidence_value, score
+
+
+def _candidate_confidence(candidate: dict[str, Any]) -> float:
+    relevant_signals = [signal for signal in _relevant_advanced_signals(candidate) if isinstance(signal, dict)]
+    signal_count = len(relevant_signals)
+    direction_votes: list[int] = []
+    for signal in relevant_signals:
+        delta = _advanced_signal_delta(signal)
+        if delta is None:
+            continue
+        if delta > 0:
+            direction_votes.append(1)
+        elif delta < 0:
+            direction_votes.append(-1)
+
+    if len(direction_votes) == 1:
+        agreement = 0.5
+    elif direction_votes:
+        agreement = abs(sum(direction_votes)) / float(len(direction_votes))
+    else:
+        agreement = 0.0
+
+    readiness = candidate.get("advanced_gate") if isinstance(candidate.get("advanced_gate"), dict) else {}
+    readiness_ratio = float(readiness.get("ratio") or 0.0)
+    missing_inputs = readiness.get("missing_inputs") if isinstance(readiness.get("missing_inputs"), list) else []
+    publish_missing_inputs = readiness.get("publish_missing_inputs") if isinstance(readiness.get("publish_missing_inputs"), list) else []
+    missing_penalty = min(
+        0.35,
+        (len(missing_inputs) * 0.08) + (len(publish_missing_inputs) * 0.03) + (max(0.0, 1.0 - readiness_ratio) * 0.15),
+    )
+
+    signal_count_factor = min(1.0, float(signal_count) / 6.0)
+    confidence = 0.20 + (signal_count_factor * 0.35) + (agreement * 0.30) + (readiness_ratio * 0.20) - missing_penalty
+    return round(max(0.0, min(1.0, confidence)), 2)
 
 
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
