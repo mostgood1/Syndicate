@@ -1,0 +1,67 @@
+event_id,commence_time,home,away,bookmaker_key,bookmaker,book_last_update,market,outcome_name,outcome_price,outcome_point,date
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanduel,FanDuel,,h2h,Carolina Hurricanes,-113,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanduel,FanDuel,,h2h,Vegas Golden Knights,-106,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanduel,FanDuel,,spreads,Carolina Hurricanes,210,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanduel,FanDuel,,spreads,Vegas Golden Knights,-265,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanduel,FanDuel,,totals,Over,-130,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanduel,FanDuel,,totals,Under,108,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,draftkings,DraftKings,,h2h,Carolina Hurricanes,-115,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,draftkings,DraftKings,,h2h,Vegas Golden Knights,-105,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,draftkings,DraftKings,,spreads,Carolina Hurricanes,225,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,draftkings,DraftKings,,spreads,Vegas Golden Knights,-278,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,draftkings,DraftKings,,totals,Over,-130,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,draftkings,DraftKings,,totals,Under,110,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanatics,Fanatics,,h2h,Carolina Hurricanes,-115,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanatics,Fanatics,,h2h,Vegas Golden Knights,-105,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanatics,Fanatics,,spreads,Carolina Hurricanes,210,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanatics,Fanatics,,spreads,Vegas Golden Knights,-270,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanatics,Fanatics,,totals,Over,-135,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,fanatics,Fanatics,,totals,Under,110,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betmgm,BetMGM,,h2h,Carolina Hurricanes,-115,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betmgm,BetMGM,,h2h,Vegas Golden Knights,-105,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betmgm,BetMGM,,spreads,Carolina Hurricanes,220,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betmgm,BetMGM,,spreads,Vegas Golden Knights,-275,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betmgm,BetMGM,,totals,Over,-105,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betmgm,BetMGM,,totals,Under,-115,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,lowvig,LowVig.ag,,h2h,Carolina Hurricanes,-112,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,lowvig,LowVig.ag,,h2h,Vegas Golden Knights,-102,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,lowvig,LowVig.ag,,spreads,Carolina Hurricanes,222,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,lowvig,LowVig.ag,,spreads,Vegas Golden Knights,-270,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,lowvig,LowVig.ag,,totals,Over,101,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,lowvig,LowVig.ag,,totals,Under,-117,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betonlineag,BetOnline.ag,,h2h,Carolina Hurricanes,-112,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betonlineag,BetOnline.ag,,h2h,Vegas Golden Knights,-102,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betonlineag,BetOnline.ag,,spreads,Carolina Hurricanes,222,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betonlineag,BetOnline.ag,,spreads,Vegas Golden Knights,-270,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betonlineag,BetOnline.ag,,totals,Over,101,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betonlineag,BetOnline.ag,,totals,Under,-117,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,mybookieag,MyBookie.ag,,h2h,Carolina Hurricanes,-109,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,mybookieag,MyBookie.ag,,h2h,Vegas Golden Knights,-107,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,mybookieag,MyBookie.ag,,spreads,Carolina Hurricanes,218,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,mybookieag,MyBookie.ag,,spreads,Vegas Golden Knights,-275,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Over,-104,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,mybookieag,MyBookie.ag,,totals,Under,-117,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,bovada,Bovada,,h2h,Carolina Hurricanes,-115,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,bovada,Bovada,,h2h,Vegas Golden Knights,-105,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,bovada,Bovada,,spreads,Carolina Hurricanes,220,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,bovada,Bovada,,spreads,Vegas Golden Knights,-270,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,bovada,Bovada,,totals,Over,-105,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,bovada,Bovada,,totals,Under,-115,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,williamhill_us,Caesars,,h2h,Carolina Hurricanes,-110,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,williamhill_us,Caesars,,h2h,Vegas Golden Knights,-110,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,williamhill_us,Caesars,,spreads,Carolina Hurricanes,215,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,williamhill_us,Caesars,,spreads,Vegas Golden Knights,-267,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,williamhill_us,Caesars,,totals,Over,-105,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,williamhill_us,Caesars,,totals,Under,-115,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betrivers,BetRivers,,h2h,Carolina Hurricanes,-114,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betrivers,BetRivers,,h2h,Vegas Golden Knights,-107,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betrivers,BetRivers,,spreads,Carolina Hurricanes,210,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betrivers,BetRivers,,spreads,Vegas Golden Knights,-278,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betrivers,BetRivers,,totals,Over,-125,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betrivers,BetRivers,,totals,Under,100,5.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betus,BetUS,,h2h,Carolina Hurricanes,-115,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betus,BetUS,,h2h,Vegas Golden Knights,-105,,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betus,BetUS,,spreads,Carolina Hurricanes,228,-1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betus,BetUS,,spreads,Vegas Golden Knights,-270,1.5,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betus,BetUS,,totals,Over,-105,6.0,2026-06-09
+b400caea65ac57f7ed21fc091b8aade3,2026-06-10T00:20:00Z,Vegas Golden Knights,Carolina Hurricanes,betus,BetUS,,totals,Under,-115,6.0,2026-06-09
