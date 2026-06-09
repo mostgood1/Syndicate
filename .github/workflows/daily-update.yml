@@ -105,6 +105,8 @@ jobs:
           $exitCode = $LASTEXITCODE
           Write-Host "scripts/unified_daily_update.ps1 exited with code $exitCode"
           exit $exitCode
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
 
       - name: Commit and push pipeline outputs
         shell: pwsh
