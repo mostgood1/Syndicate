@@ -8,6 +8,7 @@ from itertools import combinations
 from pathlib import Path
 import re
 import subprocess
+from statistics import NormalDist
 from typing import Any
 
 from flask import current_app
@@ -3904,13 +3905,66 @@ def _candidate_confidence(candidate: dict[str, Any]) -> float:
     return round(max(0.0, min(1.0, confidence)), 2)
 
 
-def _candidate_model_probability(candidate: dict[str, Any]) -> float | None:
+def _simulation_model_probability(candidate: dict[str, Any]) -> float | None:
     simulation = candidate.get("simulation") if isinstance(candidate.get("simulation"), dict) else {}
+    if not simulation:
+        return None
+
+    def _lookup_normalized(mapping: dict[str, Any], target_key: str | None) -> Any:
+        if not isinstance(mapping, dict) or not target_key:
+            return None
+        normalized_target = _normalized_market_text(target_key)
+        if not normalized_target:
+            return None
+        for actual_key, value in mapping.items():
+            if _normalized_market_text(str(actual_key)) == normalized_target:
+                return value
+        return None
+
+    market_text = _normalized_market_text(_safe_text(candidate.get("market"), _safe_text(candidate.get("market_key"), "")))
+    selection_direction = _candidate_selection_direction(candidate)
+    line_value = _numeric_hint(candidate.get("line") or candidate.get("market_line") or candidate.get("prop_line"))
+
     distributions = simulation.get("probability_distributions") if isinstance(simulation.get("probability_distributions"), dict) else simulation.get("distribution")
-    if isinstance(distributions, dict):
-        win_probability = _coerce_float(distributions.get("win"))
+    if isinstance(distributions, dict) and market_text in _GAME_SIDE_MARKETS:
+        win_probability = _numeric_hint(distributions.get("win"))
         if win_probability is not None:
             return max(0.0, min(1.0, win_probability))
+
+    if selection_direction == 0 or line_value is None:
+        if isinstance(distributions, dict):
+            win_probability = _numeric_hint(distributions.get("win"))
+            if win_probability is not None:
+                return max(0.0, min(1.0, win_probability))
+        return None
+
+    player_name = _candidate_subject_key(candidate)
+    stat_name = _candidate_market_key(candidate)
+    player_distributions = simulation.get("player_stat_distributions") if isinstance(simulation.get("player_stat_distributions"), dict) else {}
+    player_distribution = _lookup_normalized(player_distributions, player_name)
+    stat_distribution = _lookup_normalized(player_distribution, stat_name)
+
+    if isinstance(stat_distribution, dict):
+        mean_value = _numeric_hint(stat_distribution.get("mean"))
+        std_dev_value = _numeric_hint(stat_distribution.get("std_dev"))
+        if mean_value is not None and std_dev_value is not None and std_dev_value > 0:
+            cdf = NormalDist(mu=mean_value, sigma=std_dev_value).cdf(line_value)
+            if selection_direction < 0:
+                return max(0.0, min(1.0, cdf))
+            if selection_direction > 0:
+                return max(0.0, min(1.0, 1.0 - cdf))
+
+    if isinstance(distributions, dict):
+        win_probability = _numeric_hint(distributions.get("win"))
+        if win_probability is not None:
+            return max(0.0, min(1.0, win_probability))
+    return None
+
+
+def _candidate_model_probability(candidate: dict[str, Any]) -> float | None:
+    simulation_probability = _simulation_model_probability(candidate)
+    if simulation_probability is not None:
+        return simulation_probability
     score_value = _numeric_hint(candidate.get("score"))
     if score_value is None:
         return None
