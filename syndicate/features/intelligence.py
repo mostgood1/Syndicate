@@ -44,6 +44,7 @@ from syndicate.features.intelligence_parlay_correlation import parlay_leg_market
 from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
 from syndicate.features.intelligence_parlay_correlation import parlay_pair_penalty as _runtime_parlay_pair_penalty
 from syndicate.features.intelligence_reasoning import build_analysis_brief as _runtime_build_analysis_brief
+from syndicate.features.correlation_engine import compute_correlation as _compute_candidate_correlation
 from syndicate.features.intelligence_parlay_runtime import build_parlay_payload as _runtime_build_parlay_payload
 from syndicate.features.intelligence_parlay_runtime import build_parlays as _runtime_build_parlays
 from syndicate.features.intelligence_parlay_runtime import build_round_robin_parlays as _runtime_build_round_robin_parlays
@@ -59,6 +60,7 @@ from syndicate.features.wnba.sources import processed_path as wnba_processed_pat
 
 ENABLE_PREDICTION_TRACKING = True
 _SIMULATION_ENGINE = SimulationEngine()
+MAX_CORRELATION_THRESHOLD = 0.65
 
 
 _SPORT_KEYWORDS: dict[str, set[str]] = {
@@ -3923,6 +3925,29 @@ def _candidate_betting_rank_key(candidate: dict[str, Any]) -> tuple[float, float
     return edge, confidence_value, score
 
 
+def _candidate_correlation_score(first_candidate: dict[str, Any], second_candidate: dict[str, Any]) -> float:
+    try:
+        return float(_compute_candidate_correlation(first_candidate, second_candidate).get("correlation_score") or 0.0)
+    except Exception:
+        return 0.0
+
+
+def _greedy_low_correlation_selection(
+    candidates: list[dict[str, Any]],
+    *,
+    limit: int,
+    threshold: float = MAX_CORRELATION_THRESHOLD,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for candidate in sorted(candidates, key=_candidate_betting_rank_key, reverse=True):
+        if len(selected) >= limit:
+            break
+        if any(abs(_candidate_correlation_score(candidate, existing)) > threshold for existing in selected):
+            continue
+        selected.append(candidate)
+    return selected
+
+
 def _candidate_confidence(candidate: dict[str, Any]) -> float:
     relevant_signals = [signal for signal in _relevant_advanced_signals(candidate) if isinstance(signal, dict)]
     signal_count = len(relevant_signals)
@@ -5071,9 +5096,12 @@ def run_intelligence_query(
     candidates = [row for row in candidates if not bool(row.get("state_invalid"))]
     _apply_advanced_context_to_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_recommendations(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=preferences["limit"])
-    recommendations = [dict(candidate) for candidate in ranked_recommendations]
-    recommendations.sort(key=_candidate_betting_rank_key, reverse=True)
+    ranked_recommendations = rank_recommendations(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=None)
+    recommendations = _greedy_low_correlation_selection(
+        [dict(candidate) for candidate in ranked_recommendations],
+        limit=preferences["limit"],
+        threshold=MAX_CORRELATION_THRESHOLD,
+    )
     if ENABLE_PREDICTION_TRACKING:
         for recommendation in recommendations:
             if recommendation.get("is_final") is False:
