@@ -649,6 +649,153 @@
       gap: 12px;
     }
 
+    .intel-pick-card__header {
+      display: grid;
+      gap: 6px;
+    }
+
+    .intel-card-metrics {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+
+    .intel-card-metric {
+      display: grid;
+      gap: 4px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(6, 16, 26, 0.72);
+      border: 1px solid rgba(125, 152, 178, 0.12);
+    }
+
+    .intel-card-metric span,
+    .intel-pick-card__bet-size span,
+    .intel-pick-card__footer-item span {
+      color: var(--intel-dim);
+      font-size: 0.76rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .intel-card-metric strong,
+    .intel-pick-card__bet-size strong,
+    .intel-pick-card__footer-item strong {
+      color: var(--intel-ink);
+    }
+
+    .intel-card-metric.is-edge-strong strong,
+    .intel-card-metric.is-confidence-strong strong,
+    .intel-pick-card__footer-item.is-risk-low strong,
+    .intel-card-badge-row .intel-chip.is-edge-strong,
+    .intel-card-badge-row .intel-chip.is-confidence-strong,
+    .intel-card-badge-row .intel-chip.is-risk-low {
+      color: var(--intel-good);
+    }
+
+    .intel-card-metric.is-edge-moderate strong,
+    .intel-card-metric.is-confidence-moderate strong,
+    .intel-pick-card__footer-item.is-risk-medium strong,
+    .intel-card-badge-row .intel-chip.is-edge-moderate,
+    .intel-card-badge-row .intel-chip.is-confidence-moderate,
+    .intel-card-badge-row .intel-chip.is-risk-medium {
+      color: var(--intel-warn);
+    }
+
+    .intel-card-metric.is-edge-weak strong,
+    .intel-card-metric.is-confidence-weak strong,
+    .intel-card-badge-row .intel-chip.is-edge-weak,
+    .intel-card-badge-row .intel-chip.is-confidence-weak {
+      color: var(--intel-dim);
+    }
+
+    .intel-card-badge-row .intel-chip.is-risk-high {
+      color: var(--intel-danger);
+      background: rgba(255, 143, 143, 0.12);
+    }
+
+    .intel-pick-card__confidence-bar {
+      margin-top: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(125, 152, 178, 0.12);
+      overflow: hidden;
+    }
+
+    .intel-pick-card__confidence-bar > div {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(139, 211, 255, 0.8), rgba(137, 226, 168, 0.95));
+    }
+
+    .intel-pick-card__bet-size {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(125, 152, 178, 0.12);
+      background: rgba(6, 16, 26, 0.72);
+    }
+
+    .intel-pick-card__lists {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .intel-pick-card__list {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(6, 16, 26, 0.6);
+      border: 1px solid rgba(125, 152, 178, 0.1);
+    }
+
+    .intel-pick-card__list ul {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: var(--intel-soft);
+    }
+
+    .intel-pick-card__footer {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .intel-pick-card__footer-item {
+      display: grid;
+      gap: 4px;
+    }
+
+    .intel-card-badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .intel-card-badge-row .intel-chip.is-edge-strong,
+    .intel-card-badge-row .intel-chip.is-confidence-strong,
+    .intel-card-badge-row .intel-chip.is-risk-low {
+      background: rgba(137, 226, 168, 0.12);
+    }
+
+    .intel-card-badge-row .intel-chip.is-edge-moderate,
+    .intel-card-badge-row .intel-chip.is-confidence-moderate,
+    .intel-card-badge-row .intel-chip.is-risk-medium {
+      background: rgba(242, 203, 107, 0.12);
+    }
+
+    .intel-card-badge-row .intel-chip.is-edge-weak,
+    .intel-card-badge-row .intel-chip.is-confidence-weak {
+      background: rgba(125, 152, 178, 0.1);
+    }
+
+    .intel-confidence-chip strong {
+      display: block;
+      margin-top: 2px;
+    }
+
     .intel-card-actions {
       display: flex;
       flex-wrap: wrap;
@@ -708,7 +855,7 @@
       <form id="intel-query-form" class="intel-form">
         <label>
           <span class="intel-kicker">Question</span>
-          <textarea id="intel-question" name="question" placeholder="What are the best home run matchups today and why? Build a top 10 table and chart."></textarea>
+          <textarea id="intel-question" name="question" placeholder="What are the best home run matchups today and why? Build a top 10 table and chart.">{{ initial_question or '' }}</textarea>
         </label>
         <div class="intel-form-row">
           <label>
@@ -786,7 +933,128 @@
     </article>
 
     <section id="intel-response" class="intel-response-stack">
-      <div class="intel-empty">Run a query to render The Syndicate response here. Returned charts, tables, recommendation cards, and parlays will appear in this area only.</div>
+      {% set initial_picks = (initial_response.get('picks') if initial_response else []) or (initial_response.get('recommendations') if initial_response else []) or [] %}
+      {% set initial_portfolio = initial_response.get('portfolio') if initial_response else {} %}
+      {% set initial_parlays = initial_response.get('parlays') if initial_response else [] %}
+      {% if initial_response %}
+        <article class="intel-brief-card">
+          <div class="intel-kicker">Initial board</div>
+          <h3>{{ initial_response.get('headline') or initial_question or 'The Syndicate brief' }}</h3>
+          <p>{{ initial_response.get('summary') or 'Rendered directly from the routed intelligence response.' }}</p>
+        </article>
+
+        <article class="intel-top-card">
+          <div class="intel-top-card__grid">
+            <div>
+              <div class="intel-kicker">Portfolio summary</div>
+              <h3>Portfolio</h3>
+              <div class="intel-chip-row">
+                <span class="intel-chip">Exposure {{ initial_portfolio.get('total_exposure') if initial_portfolio else '—' }}</span>
+                <span class="intel-chip">Expected return {{ initial_portfolio.get('expected_return') if initial_portfolio else '—' }}</span>
+                <span class="intel-chip">Risk {{ initial_portfolio.get('risk_label') or initial_portfolio.get('risk_level') or '—' }}</span>
+                <span class="intel-chip">Diversification {{ initial_portfolio.get('diversification_score') if initial_portfolio else '—' }}</span>
+                <span class="intel-chip">Correlation {{ initial_portfolio.get('average_correlation') if initial_portfolio else '—' }}</span>
+              </div>
+            </div>
+            <div class="intel-top-card__score">
+              <span class="intel-kicker">Portfolio health</span>
+              <strong>{{ initial_portfolio.get('risk_label') or 'Ready' }}</strong>
+              <p class="intel-meta">Simple initial rendering of the returned board contract.</p>
+            </div>
+          </div>
+        </article>
+
+        <section class="intel-pick-grid">
+          {% for pick in initial_picks %}
+            {% set movement = pick.get('movement') or {} %}
+            {% set visual = pick.get('visual') or {} %}
+            {% set edge_value = pick.get('edge') if pick.get('edge') is not none else none %}
+            {% set confidence_value = pick.get('confidence') if pick.get('confidence') is not none else none %}
+            {% set model_value = pick.get('model_probability') if pick.get('model_probability') is not none else none %}
+            {% set implied_value = pick.get('implied_probability') if pick.get('implied_probability') is not none else none %}
+            {% set bet_value = pick.get('recommended_bet_size') if pick.get('recommended_bet_size') is not none else none %}
+            {% set volatility_value = pick.get('volatility') if pick.get('volatility') is not none else none %}
+            {% set risk_value = visual.get('risk_level') or pick.get('risk_level') or 'medium' %}
+            {% set edge_pct = (edge_value * 100) if edge_value is not none and edge_value|abs <= 1 else edge_value %}
+            {% set confidence_pct = (confidence_value * 100) if confidence_value is not none and confidence_value|abs <= 1 else confidence_value %}
+            {% set model_pct = (model_value * 100) if model_value is not none and model_value|abs <= 1 else model_value %}
+            {% set implied_pct = (implied_value * 100) if implied_value is not none and implied_value|abs <= 1 else implied_value %}
+            {% set bet_pct = (bet_value * 100) if bet_value is not none and bet_value|abs <= 1 else bet_value %}
+            {% set volatility_pct = (volatility_value * 100) if volatility_value is not none and volatility_value|abs <= 1 else volatility_value %}
+            {% set edge_tier = 'is-edge-strong' if edge_pct is not none and edge_pct >= 6 else 'is-edge-moderate' if edge_pct is not none and edge_pct >= 3 else 'is-edge-weak' %}
+            {% set confidence_tier = 'is-confidence-strong' if confidence_pct is not none and confidence_pct >= 65 else 'is-confidence-moderate' if confidence_pct is not none and confidence_pct >= 55 else 'is-confidence-weak' %}
+            {% set risk_tier = 'is-risk-low' if 'low' in risk_value|string|lower else 'is-risk-high' if 'high' in risk_value|string|lower else 'is-risk-medium' %}
+            <article class="intel-rec-card">
+              <div class="intel-pick-card__header">
+                <div class="intel-kicker">Pick Card</div>
+                <h3>{{ pick.get('selection') or pick.get('name') or 'Pick' }}</h3>
+              </div>
+              <div class="intel-card-metrics">
+                <div class="intel-card-metric {{ edge_tier }}"><span>Edge</span><strong>{{ '+' if edge_pct is not none and edge_pct >= 0 else '' }}{{ edge_pct|round(1) if edge_pct is not none else '—' }}%</strong></div>
+                <div class="intel-card-metric {{ confidence_tier }} intel-confidence-chip"><span>Confidence</span><strong>{{ confidence_pct|round(1) if confidence_pct is not none else '—' }}%</strong><div class="intel-pick-card__confidence-bar"><div style="width: {{ confidence_pct|round(1) if confidence_pct is not none else 0 }}%;"></div></div></div>
+                <div class="intel-card-metric"><span>Model vs Market</span><strong>{{ model_pct|round(1) if model_pct is not none else '—' }}% vs {{ implied_pct|round(1) if implied_pct is not none else '—' }}%</strong></div>
+              </div>
+              <div class="intel-pick-card__bet-size">
+                <div><span>Bet Size</span><strong>{{ bet_pct|round(1) if bet_pct is not none else '—' }}% of bankroll</strong></div>
+                <div class="{{ risk_tier }}"><span>Risk level</span><strong>{{ visual.get('risk_level') or pick.get('risk_level') or '—' }}</strong></div>
+              </div>
+              <div class="intel-card-badge-row">
+                <span class="intel-chip {{ edge_tier }}">Edge tier {{ edge_tier.replace('is-edge-', '') }}</span>
+                <span class="intel-chip {{ confidence_tier }}">Confidence tier {{ confidence_tier.replace('is-confidence-', '') }}</span>
+                <span class="intel-chip {{ risk_tier }}">Risk tier {{ risk_tier.replace('is-risk-', '') }}</span>
+              </div>
+              <div class="intel-pick-card__lists">
+                <div class="intel-pick-card__list">
+                  <div class="intel-kicker">Drivers</div>
+                  <ul>
+                    {% for driver in (pick.get('drivers') or [])[:3] %}
+                      <li>{{ driver.get('detail') or driver.get('label') or driver }}</li>
+                    {% else %}
+                      <li>{{ pick.get('rationale') or pick.get('summary') or 'No drivers returned.' }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div class="intel-pick-card__list">
+                  <div class="intel-kicker">Risks</div>
+                  <ul>
+                    {% for risk in (pick.get('risks') or [])[:2] %}
+                      <li>{{ risk.get('detail') or risk.get('label') or risk }}</li>
+                    {% else %}
+                      <li>{{ 'Volatility ' ~ (volatility_pct|round(1)) ~ '%' if volatility_pct is not none else 'No explicit risks returned.' }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+              <div class="intel-pick-card__footer">
+                <div class="intel-pick-card__footer-item"><span>Volatility</span><strong>{{ volatility_pct|round(1) if volatility_pct is not none else '—' }}%</strong></div>
+                <div class="intel-pick-card__footer-item"><span>Correlation group</span><strong>{{ visual.get('correlation_group') or pick.get('correlation_group') or '—' }}</strong></div>
+              </div>
+            </article>
+          {% endfor %}
+        </section>
+
+        {% if initial_parlays %}
+          <section class="intel-parlay-stack">
+            {% for parlay in initial_parlays %}
+              <article class="intel-parlay-card">
+                <div>
+                  <div class="intel-kicker">Parlay</div>
+                  <h3>{{ parlay.get('label') or parlay.get('name') or 'Parlay' }}</h3>
+                </div>
+                <div class="intel-chip-row">
+                  <span class="intel-chip">Probability {{ parlay.get('combined_probability') if parlay.get('combined_probability') is not none else '—' }}</span>
+                  <span class="intel-chip">Edge {{ parlay.get('combined_edge') if parlay.get('combined_edge') is not none else '—' }}</span>
+                  <span class="intel-chip">EV {{ parlay.get('expected_value') if parlay.get('expected_value') is not none else '—' }}</span>
+                  <span class="intel-chip">Correlation {{ parlay.get('correlation_score') if parlay.get('correlation_score') is not none else '—' }}</span>
+                </div>
+                <p>{{ parlay.get('rationale') or parlay.get('summary') or 'Returned directly from the intelligence response.' }}</p>
+              </article>
+            {% endfor %}
+          </section>
+        {% endif %}
+      {% else %}
+        <div class="intel-empty">Run a query to render The Syndicate response here. Returned charts, tables, recommendation cards, and parlays will appear in this area only.</div>
+      {% endif %}
     </section>
 
   </section>
@@ -808,6 +1076,7 @@
       const statusLink = document.getElementById('intel-status-link');
       const LIVE_REFRESH_MS = 30000;
       const EDGE_MOVE_THRESHOLD = 0.01;
+      const INTELLIGENCE_JSON_ENDPOINT = '/api/intelligence/query';
       const liveState = {
         timerId: null,
         inflight: false,
@@ -1314,70 +1583,140 @@
         return `<section class="intel-analysis-stack"><article class="intel-analysis-card intel-analysis-overview"><div><div class="intel-kicker">Reasoning contract</div><h3>${escapeHtml(brief?.title || 'Returned analysis brief')}</h3><p class="intel-table-note">This layer converts the artifact-backed board, advanced metrics, and live-context inputs into a readable cross-sport analysis brief before the deeper evidence grid and chart views.</p></div><div class="intel-analysis-overview__stats"><div class="intel-kicker">Sections</div><div class="intel-metric-grid">${metricPill('Brief sections', sections.length)}${brief?.focus ? metricPill('Focus', prettyLabel(brief.focus)) : ''}</div></div></article>${sectionMarkup}</section>`;
       }
 
-      function renderTopRecommendation(item, stateClass = '') {
+      function renderPickCard(item, stateClass = '', variant = 'standard') {
         if (!item) {
           return '';
         }
 
-        const statPills = [
-          item.score !== null && item.score !== undefined ? metricPill('Score', item.score) : '',
-          item.confidence && item.confidence !== '-' ? metricPill('Confidence', item.confidence) : '',
-          item.market_fit_score !== null && item.market_fit_score !== undefined ? metricPill('Market fit', item.market_fit_score) : '',
-          item.price_edge_pct !== null && item.price_edge_pct !== undefined ? metricPill('Price edge', `${item.price_edge_pct}%`) : '',
-          item.implied_probability !== null && item.implied_probability !== undefined ? metricPill('Implied', `${item.implied_probability}%`) : '',
-          item.projected && item.projected !== '-' ? metricPill('Projection', item.projected) : '',
-          item.line && item.line !== '-' ? metricPill('Line', item.line) : '',
-          item.odds && item.odds !== '-' ? metricPill('Odds', item.odds) : ''
-        ].filter(Boolean).join('');
+        function percentText(value) {
+          const number = Number(value);
+          if (!Number.isFinite(number)) {
+            return '—';
+          }
+          const normalized = Math.abs(number) <= 1 ? number * 100 : number;
+          return `${normalized >= 0 ? '+' : ''}${normalized.toFixed(1)}%`;
+        }
 
-        const chips = renderPickBadgeRow(item);
+        function plainPercentText(value) {
+          const number = Number(value);
+          if (!Number.isFinite(number)) {
+            return '—';
+          }
+          const normalized = Math.abs(number) <= 1 ? number * 100 : number;
+          return `${normalized.toFixed(1)}%`;
+        }
 
-        const displayPills = Array.isArray(item.display_pills) ? item.display_pills.map((entry) => chip(entry)).join('') : '';
+        function barePercent(value) {
+          const number = Number(value);
+          if (!Number.isFinite(number)) {
+            return null;
+          }
+          return Math.abs(number) <= 1 ? number * 100 : number;
+        }
+
+        function edgeTierClass(value) {
+          const percent = barePercent(value);
+          if (percent === null) {
+            return 'is-edge-weak';
+          }
+          if (percent >= 6) {
+            return 'is-edge-strong';
+          }
+          if (percent >= 3) {
+            return 'is-edge-moderate';
+          }
+          return 'is-edge-weak';
+        }
+
+        function confidenceTierClass(value) {
+          const percent = barePercent(value);
+          if (percent === null) {
+            return 'is-confidence-weak';
+          }
+          if (percent >= 65) {
+            return 'is-confidence-strong';
+          }
+          if (percent >= 55) {
+            return 'is-confidence-moderate';
+          }
+          return 'is-confidence-weak';
+        }
+
+        function riskTierClass(value) {
+          const text = String(value || '').toLowerCase();
+          if (text.includes('low')) {
+            return 'is-risk-low';
+          }
+          if (text.includes('high')) {
+            return 'is-risk-high';
+          }
+          return 'is-risk-medium';
+        }
+
         const cta = item.href ? `<a class="intel-link is-primary" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
+        const sportLabel = item.game || item.matchup || item.surface || item.sport || item.sport_slug || '-';
+        const edgeText = percentText(item.edge);
+        const confidenceText = plainPercentText(item.confidence);
+        const modelProbabilityText = plainPercentText(item.model_probability);
+        const impliedProbabilityText = plainPercentText(item.implied_probability);
+        const betSizeText = plainPercentText(item.recommended_bet_size);
+        const riskLevelText = item.visual?.risk_level || item.risk_level || item.risk || '—';
+        const volatilityText = plainPercentText(item.volatility);
+        const correlationGroup = item.visual?.correlation_group || item.correlation_group?.label || item.correlation_group?.key || '—';
+        const metricRow = `
+          <div class="intel-card-metrics">
+            <div class="intel-card-metric ${edgeTierClass(item.edge)}"><span>Edge</span><strong>${escapeHtml(edgeText)}</strong></div>
+            <div class="intel-card-metric ${confidenceTierClass(item.confidence)} intel-confidence-chip"><span>Confidence</span><strong>${escapeHtml(confidenceText)}</strong><div class="intel-pick-card__confidence-bar"><div style="width:${Math.max(0, Math.min(100, barePercent(item.confidence) ?? 0))}%"></div></div></div>
+            <div class="intel-card-metric"><span>Model vs Market</span><strong>${escapeHtml(modelProbabilityText)} vs ${escapeHtml(impliedProbabilityText)}</strong></div>
+          </div>`;
+        const drivers = Array.isArray(item.drivers) && item.drivers.length
+          ? item.drivers.slice(0, 3).map((driver) => `<li>${escapeHtml(driver?.detail || driver?.label || driver)}</li>`).join('')
+          : `<li>${escapeHtml(item.rationale || item.summary || 'No drivers returned.')}</li>`;
+        const risks = Array.isArray(item.risks) && item.risks.length
+          ? item.risks.slice(0, 2).map((risk) => `<li>${escapeHtml(risk?.detail || risk?.label || risk)}</li>`).join('')
+          : `<li>${escapeHtml(item.volatility !== null && item.volatility !== undefined ? `Volatility ${plainPercentText(item.volatility)}` : 'No explicit risks returned.')}</li>`;
 
         return `
-          <article class="intel-top-card ${stateClass}" data-pick-key="${escapeHtml(pickKey(item))}" data-card-role="top">
-            <div>
-              <div class="intel-kicker">Top returned recommendation</div>
-              <h3>${escapeHtml(item.name || item.pick || 'Top target')}</h3>
-              <p class="intel-meta">${escapeHtml(item.matchup || '-')}${item.market ? ` · ${escapeHtml(item.market)}` : ''}${item.surface ? ` · ${escapeHtml(item.surface)}` : ''}</p>
+          <article class="intel-rec-card ${stateClass}" data-pick-key="${escapeHtml(pickKey(item))}" data-card-role="pick-card" data-card-variant="${escapeHtml(variant)}">
+            <div class="intel-pick-card__header">
+              <div class="intel-kicker">${escapeHtml(sportLabel)}</div>
+              <h4>${escapeHtml(item.selection || item.name || item.pick || 'Target')}</h4>
             </div>
-            <div class="intel-top-card__grid">
-              <div>
-                <div class="intel-card-badge-row" data-badge-row>${chips}${displayPills}</div>
-                <p>${escapeHtml(item.rationale || '')}</p>
-                <div class="intel-card-actions">${cta}</div>
+            ${metricRow}
+            <div class="intel-pick-card__bet-size">
+              <div><span>Bet Size</span><strong>${escapeHtml(betSizeText)} of bankroll</strong></div>
+              <div class="${riskTierClass(riskLevelText)}"><span>Risk level</span><strong>${escapeHtml(riskLevelText)}</strong></div>
+            </div>
+            <div class="intel-card-badge-row">
+              <span class="intel-chip ${edgeTierClass(item.edge)}">Edge tier ${escapeHtml(edgeTierClass(item.edge).replace('is-edge-', ''))}</span>
+              <span class="intel-chip ${confidenceTierClass(item.confidence)}">Confidence tier ${escapeHtml(confidenceTierClass(item.confidence).replace('is-confidence-', ''))}</span>
+              <span class="intel-chip ${riskTierClass(riskLevelText)}">Risk tier ${escapeHtml(riskTierClass(riskLevelText).replace('is-risk-', ''))}</span>
+            </div>
+            <div class="intel-pick-card__lists">
+              <div class="intel-pick-card__list">
+                <div class="intel-kicker">Drivers</div>
+                <ul>${drivers}</ul>
               </div>
-              <div class="intel-top-card__score">
-                <span class="intel-kicker">Returned case</span>
-                <strong>${escapeHtml(item.score ?? '—')}</strong>
-                <div class="intel-metric-grid">${statPills}</div>
+              <div class="intel-pick-card__list">
+                <div class="intel-kicker">Risks</div>
+                <ul>${risks}</ul>
               </div>
             </div>
+            <div class="intel-pick-card__footer">
+              <div class="intel-pick-card__footer-item"><span>Volatility</span><strong>${escapeHtml(volatilityText)}</strong></div>
+              <div class="intel-pick-card__footer-item"><span>Correlation group</span><strong>${escapeHtml(correlationGroup)}</strong></div>
+            </div>
+            <div class="intel-card-actions">${cta}</div>
           </article>`;
       }
 
+      function renderTopRecommendation(item, stateClass = '') {
+        return renderPickCard(item, stateClass, 'top');
+      }
+
+
       function renderRecommendationCard(item, stateClass = '') {
-        const chips = [
-          item.sport ? chip(item.sport) : '',
-          chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
-          item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
-          item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
-          item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : ''
-        ].filter(Boolean).join('');
-
-        const cta = item.href ? `<a class="intel-link" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
-
-        return `
-          <article class="intel-rec-card ${stateClass}" data-pick-key="${escapeHtml(pickKey(item))}" data-card-role="recommendation">
-            <div>
-              <h4>${escapeHtml(item.name || item.pick || 'Target')}</h4>
-              <p class="intel-meta">${escapeHtml(item.matchup || '-')}${item.market ? ` · ${escapeHtml(item.market)}` : ''}${item.surface ? ` · ${escapeHtml(item.surface)}` : ''}</p>
-            </div>
-            <div class="intel-card-badge-row" data-badge-row>${chips}</div>
-            <p>${escapeHtml(item.rationale || '')}</p>
-            <div class="intel-card-actions">${cta}</div>
-          </article>`;
+        return renderPickCard(item, stateClass, 'recommendation');
       }
 
       function renderAnalysisViews(response) {
@@ -1437,7 +1776,7 @@
         }
 
         return `
-          <section class="intel-rec-grid">
+          <section class="intel-pick-grid">
             ${secondary.map((item) => renderRecommendationCard(item)).join('')}
           </section>`;
       }
@@ -1746,17 +2085,24 @@
             <div class="intel-summary-grid">${buildSummaryMetrics(response, recommendations, parlays)}</div>
           </article>`;
 
+        const pickGridMarkup = `
+          <section class="intel-pick-grid">
+            ${renderTopRecommendation(recommendations[0] || null)}
+            ${renderRecommendationCards(recommendations)}
+          </section>`;
+
         responseRoot.innerHTML = `
-          ${briefMarkup}
-          ${structuredResponseMarkup}
-          ${renderTopRecommendation(recommendations[0] || null)}
-          ${portfolioMarkup}
-          ${renderAnalysisBrief(response)}
-          ${renderSupportingEvidence(response)}
-          ${renderAnalysisViews(response)}
-          ${renderRecommendationCards(recommendations)}
-          <div id="intel-parlays-panel">${renderParlays(parlays)}</div>
-          ${renderBoardNotes(notes)}`;
+          <div class="intel-board-layout">
+            ${briefMarkup}
+            ${structuredResponseMarkup}
+            ${portfolioMarkup}
+            ${pickGridMarkup}
+            ${renderAnalysisBrief(response)}
+            ${renderSupportingEvidence(response)}
+            ${renderAnalysisViews(response)}
+            ${renderParlays(parlays)}
+            ${renderBoardNotes(notes)}
+          </div>`;
 
         syncLiveRefreshState();
       }
@@ -1887,6 +2233,15 @@
         return true;
       }
 
+      async function fetchIntelligenceJson(payload) {
+        const result = await fetch(INTELLIGENCE_JSON_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        return result.json();
+      }
+
       async function refreshLiveResponse() {
         if (liveState.inflight || !liveState.request || !isLiveQueryActive()) {
           return;
@@ -1894,12 +2249,7 @@
 
         liveState.inflight = true;
         try {
-          const result = await fetch('/api/intelligence/query', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(liveState.request),
-          });
-          const payload = await result.json();
+          const payload = await fetchIntelligenceJson(liveState.request);
           if (!payload.ok) {
             return;
           }
@@ -1915,13 +2265,7 @@
         liveState.request = buildQueryPayload();
         responseRoot.innerHTML = '<div class="intel-empty">Running The Syndicate...</div>';
 
-        const result = await fetch('/api/intelligence/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(liveState.request),
-        });
-
-        const payload = await result.json();
+        const payload = await fetchIntelligenceJson(liveState.request);
         if (!payload.ok) {
           responseRoot.innerHTML = `<div class="intel-empty">${escapeHtml(payload.error || 'The Syndicate query failed.')}</div>`;
           return;

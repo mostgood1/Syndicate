@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from syndicate.app import create_app
@@ -3717,17 +3718,53 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("publish_missing_inputs", (mlb_row or {}).get("advanced_gate") or {})
 
     def test_intelligence_page_renders_embedded_console(self) -> None:
-        with patch(
-            "syndicate.blueprints.intelligence.build_intelligence_status",
-            return_value={
-                "selected_date": "2026-06-04",
-                "sports": [],
-                "tracked_summary": {"tracked_ok": 0, "tracked_total": 0},
-                "advanced_summary": {"tracked_ok": 0, "tracked_total": 0},
-                "readiness_gate": {"ready": False, "ready_sports": [], "partial_sports": [], "blocked_sports": [], "inactive_sports": []},
+        fake_response = {
+            "headline": "The Syndicate brief",
+            "summary": "Rendered directly from the routed intelligence response.",
+            "portfolio": {
+                "total_exposure": 18.0,
+                "expected_return": 22.5,
+                "risk_level": "low",
+                "risk_label": "low risk",
+                "diversification_score": 0.83,
+                "average_correlation": 0.12,
             },
+            "picks": [
+                {
+                    "selection": "Player A over 1.5 hits",
+                    "edge": 0.032,
+                    "confidence": 0.61,
+                    "model_probability": 0.574,
+                    "implied_probability": 0.542,
+                    "movement": {"trend": "up"},
+                    "visual": {"risk_level": "low", "pills": ["MLB", "hits"]},
+                }
+            ],
+            "parlays": [
+                {
+                    "label": "2-leg parlay",
+                    "combined_probability": 0.41,
+                    "combined_edge": 0.056,
+                    "expected_value": 0.18,
+                    "correlation_score": 0.12,
+                }
+            ],
+        }
+        with patch(
+            "syndicate.blueprints.intelligence.run_routed_intelligence_pipeline",
+            return_value=SimpleNamespace(to_dict=lambda: fake_response),
         ):
-            response = self.client.get("/intelligence?date=2026-06-04")
+            with patch(
+                "syndicate.blueprints.intelligence.build_intelligence_status",
+                return_value={
+                    "selected_date": "2026-06-04",
+                    "sports": [],
+                    "tracked_summary": {"tracked_ok": 0, "tracked_total": 0},
+                    "advanced_summary": {"tracked_ok": 0, "tracked_total": 0},
+                    "readiness_gate": {"ready": False, "ready_sports": [], "partial_sports": [], "blocked_sports": [], "inactive_sports": []},
+                },
+            ):
+                response = self.client.get("/intelligence?date=2026-06-04")
 
         body = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
@@ -3736,3 +3773,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn('renderSupportingEvidence', body)
         self.assertIn('View data coverage page', body)
         self.assertIn('Prompt The Syndicate', body)
+        self.assertIn('Initial board', body)
+        self.assertIn('Portfolio summary', body)
+        self.assertIn('Player A over 1.5 hits', body)
+        self.assertIn('2-leg parlay', body)

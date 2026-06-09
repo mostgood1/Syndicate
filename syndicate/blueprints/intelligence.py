@@ -11,6 +11,8 @@ from syndicate.features.shared.timezone import central_today_iso
 
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
 
+_DEFAULT_INTELLIGENCE_QUESTION = "What are the best live bets on the board right now?"
+
 
 def _optional_bool(value):
     if isinstance(value, bool):
@@ -23,12 +25,50 @@ def _optional_bool(value):
     return None
 
 
+def _optional_int(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except Exception:
+        return None
+
+
+def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
+    question = str(request.args.get("question") or _DEFAULT_INTELLIGENCE_QUESTION).strip()
+    payload: dict[str, object] = {
+        "question": question,
+        "date": selected_date,
+        "mode": str(request.args.get("mode") or "").strip(),
+        "sport": str(request.args.get("sport") or "").strip(),
+        "timing": str(request.args.get("timing") or "").strip(),
+        "limit": _optional_int(request.args.get("limit")),
+        "include_props": _optional_bool(request.args.get("include_props")),
+        "include_games": _optional_bool(request.args.get("include_games")),
+        "force_refresh": _optional_bool(request.args.get("force_refresh")) if request.args.get("force_refresh") is not None else True,
+    }
+    return payload
+
+
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    payload = _intelligence_page_payload(selected_date)
+    initial_response: dict[str, object] = {}
+    try:
+        pipeline_result = run_routed_intelligence_pipeline(payload)
+        if hasattr(pipeline_result, "to_dict"):
+            initial_response = pipeline_result.to_dict()
+        elif isinstance(pipeline_result, dict):
+            initial_response = dict(pipeline_result)
+    except Exception:
+        initial_response = {}
     return render_template(
         "intelligence.html",
         selected_date=selected_date,
+        initial_question=str(payload.get("question") or _DEFAULT_INTELLIGENCE_QUESTION),
+        initial_response=initial_response,
         default_questions=[
             "What are the best live bets on the board right now?",
             "What are the best home run matchups today and why? Build a top 10 table and chart.",
