@@ -3838,6 +3838,13 @@ def _apply_advanced_context_to_candidates(
         candidate["signal_contributions_top_negative"] = signal_contributions_top_negative
         candidate["advanced_signal_score"] = _candidate_advanced_signal_score(candidate)
         candidate["source_summary_score"] = _basketball_source_summary_score(candidate)
+        edge_profile = _candidate_betting_edge_profile(candidate)
+        if edge_profile is not None:
+            candidate["expected_value"] = round(float(edge_profile["expected_value"]), 4)
+            candidate["volatility"] = round(float(edge_profile["volatility"]), 4)
+            candidate["volatility_score"] = round(float(edge_profile["volatility_score"]), 4)
+            candidate["volatility_penalty"] = round(float(edge_profile["volatility_penalty"]), 4)
+            candidate["adjusted_edge"] = round(float(edge_profile["adjusted_edge"]), 4)
         candidate["score"] = (
             float(candidate.get("score") or 0.0)
             + _advanced_score_adjustment(readiness_summary)
@@ -3851,19 +3858,64 @@ def _apply_advanced_context_to_candidates(
 
 
 def _candidate_betting_edge_components(candidate: dict[str, Any]) -> tuple[float, float, float] | None:
+    profile = _candidate_betting_edge_profile(candidate)
+    if profile is None:
+        return None
+    return profile["implied_probability"], profile["model_probability"], profile["edge"]
+
+
+def _candidate_betting_edge_profile(candidate: dict[str, Any]) -> dict[str, Any] | None:
     implied_probability = odds_to_implied_probability(_american_odds_value(candidate.get("odds")))
     model_probability = _candidate_model_probability(candidate)
-    if model_probability is None:
+    if model_probability is None or implied_probability is None:
         return None
-    if implied_probability is None:
-        return None
+
     edge = model_probability - implied_probability
-    return implied_probability, model_probability, edge
+    simulation = candidate.get("simulation") if isinstance(candidate.get("simulation"), dict) else {}
+    distributions = simulation.get("probability_distributions") if isinstance(simulation.get("probability_distributions"), dict) else simulation.get("distribution")
+
+    decimal_odds = _american_to_decimal(_american_odds_value(candidate.get("odds")))
+    if decimal_odds is None:
+        decimal_odds = 1.0
+
+    win_probability = model_probability
+    loss_probability = max(0.0, 1.0 - win_probability)
+    push_probability = 0.0
+    if isinstance(distributions, dict) and any(key in distributions for key in ("win", "loss", "push")):
+        win_probability = _numeric_hint(distributions.get("win")) or win_probability
+        push_probability = _numeric_hint(distributions.get("push")) or 0.0
+        loss_probability = _numeric_hint(distributions.get("loss"))
+        if loss_probability is None:
+            loss_probability = max(0.0, 1.0 - win_probability - push_probability)
+
+    win_return = decimal_odds - 1.0
+    loss_return = -1.0
+    push_return = 0.0
+    expected_value = (win_probability * win_return) + (loss_probability * loss_return) + (push_probability * push_return)
+    variance = (
+        (win_probability * ((win_return - expected_value) ** 2))
+        + (loss_probability * ((loss_return - expected_value) ** 2))
+        + (push_probability * ((push_return - expected_value) ** 2))
+    )
+    volatility_score = 0.0 if variance <= 0.0 else min(1.0, variance / (variance + 1.0))
+    volatility_penalty = min(0.5, volatility_score * 0.5)
+    adjusted_edge = edge * (1.0 - volatility_penalty)
+
+    return {
+        "implied_probability": implied_probability,
+        "model_probability": model_probability,
+        "edge": edge,
+        "expected_value": expected_value,
+        "volatility": variance,
+        "volatility_score": volatility_score,
+        "volatility_penalty": volatility_penalty,
+        "adjusted_edge": adjusted_edge,
+    }
 
 
 def _candidate_betting_rank_key(candidate: dict[str, Any]) -> tuple[float, float, float]:
-    components = _candidate_betting_edge_components(candidate)
-    edge = components[2] if components is not None else float("-inf")
+    profile = _candidate_betting_edge_profile(candidate)
+    edge = profile["adjusted_edge"] if profile is not None else float("-inf")
     confidence = _numeric_hint(candidate.get("confidence"))
     confidence_value = confidence if confidence is not None else float("-inf")
     score_value = _numeric_hint(candidate.get("score"))
@@ -4076,6 +4128,10 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "model_probability": market_context.get("model_probability"),
         "price_edge_pct": market_context.get("price_edge_pct"),
         "edge": _safe_text(candidate.get("edge"), "-"),
+        "expected_value": candidate.get("expected_value"),
+        "volatility": candidate.get("volatility"),
+        "volatility_score": candidate.get("volatility_score"),
+        "adjusted_edge": candidate.get("adjusted_edge"),
         "confidence": _safe_text(candidate.get("confidence"), "-"),
         "projected": _safe_text(candidate.get("projected"), "-"),
         "live_projection": _safe_text(candidate.get("live_projection"), "-"),
@@ -4121,6 +4177,7 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
             "odds": candidate.get("odds"),
             "implied_probability": market_context.get("implied_probability"),
             "edge": candidate.get("edge"),
+            "adjusted_edge": candidate.get("adjusted_edge"),
         },
         "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
         "source_summary_score": round(float(candidate.get("source_summary_score") or 0.0), 2),
