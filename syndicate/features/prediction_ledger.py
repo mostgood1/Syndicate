@@ -392,6 +392,154 @@ def get_performance_summary(ledger_path: Path | str | None = None) -> dict[str, 
     }
 
 
+def analyze_prediction_performance(ledger_path: Path | str | None = None) -> dict[str, Any]:
+    predictions = load_all_predictions(ledger_path=ledger_path)
+    settled = _settled_predictions(predictions)
+
+    signal_rows: dict[str, dict[str, Any]] = {}
+    edge_rows: list[dict[str, Any]] = []
+    confidence_rows: list[dict[str, Any]] = []
+
+    for prediction in settled:
+        result = _prediction_result(prediction)
+        if result is None:
+            continue
+
+        outcome = _normalize_text(result.get("outcome")).lower()
+        pnl = _coerce_float(result.get("pnl")) or 0.0
+        edge = _coerce_float(prediction.get("edge"))
+        confidence = _coerce_float(prediction.get("confidence"))
+
+        if edge is not None:
+            edge_rows.append(
+                {
+                    "prediction_id": prediction.get("id"),
+                    "edge": edge,
+                    "outcome": outcome,
+                    "pnl": pnl,
+                }
+            )
+        if confidence is not None:
+            confidence_rows.append(
+                {
+                    "prediction_id": prediction.get("id"),
+                    "confidence": confidence,
+                    "outcome": outcome,
+                    "pnl": pnl,
+                }
+            )
+
+        signals = prediction.get("signals") if isinstance(prediction.get("signals"), Mapping) else {}
+        signal_contributions = signals.get("signal_contributions") if isinstance(signals.get("signal_contributions"), Mapping) else {}
+        if not signal_contributions:
+            continue
+
+        for signal_name, contribution in signal_contributions.items():
+            contribution_value = _coerce_float(contribution)
+            if contribution_value is None:
+                continue
+            bucket = signal_rows.setdefault(
+                str(signal_name),
+                {
+                    "signal_name": str(signal_name),
+                    "samples": 0,
+                    "total_contribution": 0.0,
+                    "wins": 0,
+                    "losses": 0,
+                    "pnl": 0.0,
+                },
+            )
+            bucket["samples"] += 1
+            bucket["total_contribution"] += contribution_value
+            bucket["pnl"] += pnl
+            if outcome == "win":
+                bucket["wins"] += 1
+            elif outcome == "loss":
+                bucket["losses"] += 1
+
+    signal_insights: list[dict[str, Any]] = []
+    for bucket in signal_rows.values():
+        samples = int(bucket["samples"] or 0)
+        decisive = int(bucket["wins"] + bucket["losses"])
+        win_rate = (bucket["wins"] / float(decisive)) if decisive else None
+        signal_insights.append(
+            {
+                "signal_name": bucket["signal_name"],
+                "samples": samples,
+                "avg_contribution": round(bucket["total_contribution"] / float(samples), 4) if samples else None,
+                "win_rate": win_rate,
+                "pnl": round(bucket["pnl"], 4),
+            }
+        )
+
+    best_signals = sorted(
+        [row for row in signal_insights if row.get("avg_contribution") is not None],
+        key=lambda row: (float(row.get("win_rate") or 0.0), float(row.get("avg_contribution") or 0.0), int(row.get("samples") or 0)),
+        reverse=True,
+    )[:5]
+    worst_signals = sorted(
+        [row for row in signal_insights if row.get("avg_contribution") is not None],
+        key=lambda row: (float(row.get("win_rate") or 0.0), float(row.get("avg_contribution") or 0.0), int(row.get("samples") or 0)),
+    )[:5]
+
+    overconfident_zones: list[dict[str, Any]] = []
+    if confidence_rows:
+        for threshold_low, threshold_high, label in ((0.75, 1.0, "high_confidence"), (0.60, 0.75, "medium_high_confidence")):
+            zone = [row for row in confidence_rows if threshold_low <= float(row.get("confidence") or 0.0) < threshold_high]
+            if not zone:
+                continue
+            wins = sum(1 for row in zone if row.get("outcome") == "win")
+            losses = sum(1 for row in zone if row.get("outcome") == "loss")
+            decisive = wins + losses
+            win_rate = wins / float(decisive) if decisive else None
+            avg_pnl = mean([float(row.get("pnl") or 0.0) for row in zone]) if zone else None
+            if win_rate is not None and win_rate < 0.5:
+                overconfident_zones.append(
+                    {
+                        "zone": label,
+                        "confidence_range": [threshold_low, threshold_high],
+                        "samples": len(zone),
+                        "win_rate": win_rate,
+                        "avg_pnl": avg_pnl,
+                    }
+                )
+
+    underperforming_edges: list[dict[str, Any]] = []
+    if edge_rows:
+        edge_buckets = {
+            "very_positive": [row for row in edge_rows if float(row.get("edge") or 0.0) >= 0.05],
+            "slightly_positive": [row for row in edge_rows if 0.0 <= float(row.get("edge") or 0.0) < 0.05],
+            "negative": [row for row in edge_rows if float(row.get("edge") or 0.0) < 0.0],
+        }
+        for bucket_name, rows in edge_buckets.items():
+            if not rows:
+                continue
+            wins = sum(1 for row in rows if row.get("outcome") == "win")
+            losses = sum(1 for row in rows if row.get("outcome") == "loss")
+            decisive = wins + losses
+            win_rate = wins / float(decisive) if decisive else None
+            avg_pnl = mean([float(row.get("pnl") or 0.0) for row in rows]) if rows else None
+            if win_rate is None or win_rate < 0.5 or avg_pnl is not None and avg_pnl < 0.0:
+                underperforming_edges.append(
+                    {
+                        "bucket": bucket_name,
+                        "samples": len(rows),
+                        "win_rate": win_rate,
+                        "avg_edge": mean([float(row.get("edge") or 0.0) for row in rows]),
+                        "avg_pnl": avg_pnl,
+                    }
+                )
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "sample_size": len(settled),
+        "best_performing_signals": best_signals[:3],
+        "worst_signals": worst_signals[:3],
+        "overconfident_zones": overconfident_zones,
+        "underperforming_edges": underperforming_edges,
+    }
+
+
 __all__ = [
     "SCHEMA_VERSION",
     "DEFAULT_LEDGER_PATH",
