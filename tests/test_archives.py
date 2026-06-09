@@ -4905,14 +4905,14 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(payload.get("control_name"), "date")
 
     def test_mlb_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
-        response = self.client.get("/mlb/api/season/2026/betting-card?date=2026-05-18")
+        response = self.client.get("/mlb/api/season/2026/betting-card?date=2026-06-08")
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("control_name"), "date")
         self.assertTrue(payload.get("warning_panel"))
-        self.assertTrue(any(link.get("href") == "/mlb/archive?date=2026-05-18" for link in (payload.get("module_links") or [])))
+        self.assertTrue(any(link.get("href") == "/mlb/archive?date=2026-06-08" for link in (payload.get("module_links") or [])))
 
     def test_mlb_top_props_api_exposes_rank_board_navigation_metadata(self) -> None:
         response = self.client.get("/mlb/api/top-props?date=2026-05-18")
@@ -5242,73 +5242,77 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertTrue(isinstance(payload.get("available_dates"), list))
 
     def test_nba_prop_ladders_api_exposes_unfiltered_controls(self) -> None:
-        response = self.client.get("/nba/api/prop-ladders?date=2026-05-14")
+        season_date = "2026-06-05"
+        response = self.client.get(f"/nba/api/prop-ladders?date={season_date}")
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual([control.get("name") for control in (payload.get("extra_controls") or [])], ["team", "player", "sort"])
         team_control = next(control for control in (payload.get("extra_controls") or []) if control.get("name") == "team")
         sort_control = next(control for control in (payload.get("extra_controls") or []) if control.get("name") == "sort")
-        self.assertTrue(any(option.get("value") == "MEM" for option in (team_control.get("options") or [])))
+        self.assertTrue(any(option.get("value") == "NYK" for option in (team_control.get("options") or [])))
         self.assertTrue(any(option.get("value") == "team" for option in (sort_control.get("options") or [])))
         first_card = (payload.get("rank_cards") or [{}])[0]
-        self.assertEqual(first_card.get("href"), "/nba/prop-ladders?date=2026-05-14&player=Adama+Bal")
+        self.assertEqual(first_card.get("href"), f"/nba/prop-ladders?date={season_date}&player=Jose+Alvarado")
         self.assertEqual(first_card.get("href_label"), "Player focus")
 
     def test_nba_prop_ladders_api_filters_cards_and_preserves_query_state(self) -> None:
-        response = self.client.get("/nba/api/prop-ladders?date=2026-05-14&team=MEM&player=Adama&sort=team")
+        season_date = "2026-06-05"
+        response = self.client.get(f"/nba/api/prop-ladders?date={season_date}&team=NYK&player=Jose&sort=team")
         payload = response.get_json()
+        season_day = date.fromisoformat(season_date)
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(payload.get("using_sample_data"))
         self.assertEqual(len(payload.get("rank_cards") or []), 1)
-        self.assertIn("Adama Bal", (payload.get("rank_cards") or [{}])[0].get("title", ""))
+        self.assertIn("Jose Alvarado", (payload.get("rank_cards") or [{}])[0].get("title", ""))
         self.assertEqual(
             payload.get("prev_href"),
-            "/nba/prop-ladders?date=2026-05-13&team=MEM&player=Adama&sort=team",
+            f"/nba/prop-ladders?date={(season_day - timedelta(days=1)).isoformat()}&team=NYK&player=Jose&sort=team",
         )
         self.assertEqual(
             payload.get("next_href"),
-            "/nba/prop-ladders?date=2026-05-15&team=MEM&player=Adama&sort=team",
+            f"/nba/prop-ladders?date={(season_day + timedelta(days=1)).isoformat()}&team=NYK&player=Jose&sort=team",
         )
         self.assertEqual(
             payload.get("hidden_fields"),
             [],
         )
         self.assertEqual(payload.get("focus_panel", {}).get("eyebrow"), "Selected player")
-        self.assertEqual(payload.get("focus_panel", {}).get("title"), "Adama Bal")
+        self.assertEqual(payload.get("focus_panel", {}).get("title"), "Jose Alvarado")
         self.assertEqual(
             payload.get("focus_panel", {}).get("href"),
-            "/nba/prop-ladders?date=2026-05-14&team=MEM&sort=team",
+            f"/nba/prop-ladders?date={season_date}&team=NYK&sort=team",
         )
-        self.assertEqual(payload.get("focus_panel", {}).get("summary_stats", [])[1].get("value"), "PRA 14.7")
+        self.assertEqual(payload.get("focus_panel", {}).get("summary_stats", [])[1].get("value"), "Over 0.5 3PM")
         self.assertEqual(payload.get("focus_panel", {}).get("table_groups", [])[0].get("heading"), "Model outputs")
 
     def test_nba_prop_ladders_page_preserves_active_filters_in_date_form(self) -> None:
-        response = self.client.get("/nba/prop-ladders?date=2026-05-14&team=MEM&player=Adama&sort=team")
+        season_date = "2026-06-05"
+        response = self.client.get(f"/nba/prop-ladders?date={season_date}&team=NYK&player=Jose&sort=team")
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('name="team"', html)
         self.assertIn('name="player"', html)
         self.assertIn('name="sort"', html)
-        self.assertIn('<option value="MEM" selected>MEM</option>', html)
-        self.assertIn('name="player" value="Adama"', html)
+        self.assertIn('<option value="NYK" selected>NYK</option>', html)
+        self.assertIn('name="player" value="Jose"', html)
         self.assertIn('<option value="team" selected>Team</option>', html)
-        self.assertNotIn('type="hidden" name="team" value="MEM"', html)
-        self.assertNotIn('type="hidden" name="player" value="Adama"', html)
+        self.assertNotIn('type="hidden" name="team" value="NYK"', html)
+        self.assertNotIn('type="hidden" name="player" value="Jose"', html)
         self.assertNotIn('type="hidden" name="sort" value="team"', html)
         self.assertIn("Selected player", html)
-        self.assertIn("Adama Bal", html)
-        self.assertIn("PRA 14.7", html)
+        self.assertIn("Jose Alvarado", html)
+        self.assertIn("Over 0.5 3PM", html)
         self.assertIn("Model outputs", html)
-        self.assertIn('/nba/prop-ladders?date=2026-05-14&amp;team=MEM&amp;sort=team', html)
-        self.assertIn('/nba/prop-ladders?date=2026-05-14&amp;team=MEM&amp;player=Adama+Bal&amp;sort=team', html)
+        self.assertIn(f'/nba/prop-ladders?date={season_date}&amp;team=NYK&amp;sort=team', html)
+        self.assertIn(f'/nba/prop-ladders?date={season_date}&amp;team=NYK&amp;player=Jose+Alvarado&amp;sort=team', html)
         self.assertIn('id="propLadderForm"', html)
         self.assertIn('Player Prop Ladders', html)
 
     def test_nba_prop_ladders_page_shows_unfiltered_controls(self) -> None:
-        response = self.client.get("/nba/prop-ladders?date=2026-05-14")
+        response = self.client.get("/nba/prop-ladders?date=2026-06-05")
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
@@ -5316,11 +5320,12 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn('name="player"', html)
         self.assertIn('name="sort"', html)
         self.assertIn('name="market"', html)
-        self.assertIn('<option value="MEM">MEM</option>', html)
+        self.assertIn('<option value="NYK">NYK</option>', html)
 
     def test_nba_prop_ladders_page_shows_empty_state_for_no_match_filters(self) -> None:
-        response = self.client.get("/nba/prop-ladders?date=2026-05-14&team=ZZZ")
-        payload = self.client.get("/nba/api/prop-ladders?date=2026-05-14&team=ZZZ").get_json()
+        season_date = "2026-06-05"
+        response = self.client.get(f"/nba/prop-ladders?date={season_date}&team=ZZZ")
+        payload = self.client.get(f"/nba/api/prop-ladders?date={season_date}&team=ZZZ").get_json()
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
@@ -5347,12 +5352,13 @@ class ArchiveRouteTests(unittest.TestCase):
         )
 
     def test_nba_betting_card_page_uses_versioned_syndicate_assets(self) -> None:
-        html = self.client.get("/nba/season/2026/betting-card?profile=retuned&date=2026-05-14").get_data(as_text=True)
+        season_date = "2026-06-05"
+        html = self.client.get(f"/nba/season/2026/betting-card?profile=retuned&date={season_date}").get_data(as_text=True)
 
         self.assertIn('/nba/assets/betting-card-v2.css?v=', html)
         self.assertIn('/nba/assets/betting-card-v2.js?v=', html)
-        self.assertIn('/nba/cards?date=2026-05-14', html)
-        self.assertIn('/nba/season/2026/live-lens?date=2026-05-14&amp;profile=retuned', html)
+        self.assertIn(f'/nba/cards?date={season_date}', html)
+        self.assertIn(f'/nba/season/2026/live-lens?date={season_date}&amp;profile=retuned', html)
 
     def test_nba_betting_card_page_preserves_requested_profile_in_live_lens_nav(self) -> None:
         html = self.client.get('/nba/season/2025/betting-card?profile=alt&date=2025-04-15').get_data(as_text=True)
@@ -5382,9 +5388,10 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIn(f'/wnba/live-player-props-audit?date={season_date}', html)
 
     def test_nba_cards_source_page_uses_versioned_syndicate_assets(self) -> None:
-        context = build_nba_cards_page_context("2026-05-14")
+        season_date = "2026-06-05"
+        context = build_nba_cards_page_context(season_date)
         resolved_date = str(context.get("date") or "")
-        html = self.client.get("/nba/cards?date=2026-05-14").get_data(as_text=True)
+        html = self.client.get(f"/nba/cards?date={season_date}").get_data(as_text=True)
 
         self.assertIn('/static/shared/standalone_shell.css?v=', html)
         self.assertIn('/static/nba/cards_source.css?v=', html)
