@@ -162,3 +162,4 @@ def build_archive_api_payload(selected_date: str | None) -> dict[str, Any]:
             "selected": selected_team,
         }
     }
+    return payload

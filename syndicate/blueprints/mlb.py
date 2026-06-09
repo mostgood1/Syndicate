@@ -567,7 +567,7 @@ def api_daily_archive():
 
 from flask import request, jsonify
 
-@mlb_bp.route("/betting-card/api")
+@mlb_bp.get("/betting-card/api")
 def mlb_betting_card_api():
     date = request.args.get("date")
 
