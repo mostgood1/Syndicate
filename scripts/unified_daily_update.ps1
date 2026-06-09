@@ -1,3 +1,11 @@
+
+if ($env:PYTHON_PATH) {
+    $python = $env:PYTHON_PATH.Split("`n")[0].Trim()
+} else {
+    $python = "python"
+}
+
+Write-Host "Unified script using Python: $python"
 param(
     [string]$Date,
     [string]$BaseUrl,
