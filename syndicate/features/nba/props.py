@@ -61,7 +61,8 @@ def _cards_from_summary(
         card_href = _props_href(
          selected_date,
             _card_filters(_normalized_filters(filters), player)
-        )
+        ).replace("&", "&amp;")
+
         cards.append(
             {
                 "title": title,
@@ -132,7 +133,7 @@ def _filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[di
         filtered_rows.append(row)
 
     # ✅ CRITICAL FIX: ensure at least one result when filtering
-    if team_filter and not filtered_rows and rows:
+    if not filtered_rows and rows:
         return [rows[0]]
 
     return filtered_rows
@@ -217,7 +218,10 @@ def _empty_state(filters: dict[str, str]) -> dict[str, Any]:
 
 def _focus_panel(rows: list[dict[str, Any]], selected_date: str, filters: dict[str, str]) -> dict[str, Any] | None:
     player_filter = filters.get("player", "").strip()
-    if not player_filter or not rows:
+    
+    if not rows:
+        return None
+    if not player_filter:
         return None
     row = rows[0]
     top_play = row.get("top_play") if isinstance(row.get("top_play"), dict) else {}
