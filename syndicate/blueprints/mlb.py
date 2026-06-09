@@ -566,25 +566,21 @@ def api_daily_archive():
     return jsonify(build_daily_archive_api_payload(selected_date))
 
 from flask import request, jsonify
-
+@mlb_bp.get("/api/betting-card")
+@mlb_bp.get("/api/betting-card/")
 @mlb_bp.get("/betting-card/api")
 @mlb_bp.get("/betting-card/api/")
-@mlb_bp.get("/api/betting-card")
-@mlb_bp.get("/api/betting-card")
 def mlb_betting_card_api():
     date = request.args.get("date")
 
-    payload = {
+    return jsonify({
         "date": date,
         "module_links": [
-            {
-                "href": f"/mlb/archive?date={date}"
-            }
+            {"href": f"/mlb/archive?date={date}"}
         ],
         "rank_cards": []
-    }
+    }), 200
 
-    return jsonify(payload), 200
 
 
 @mlb_bp.get("/pitcher-top-props")
