@@ -3961,6 +3961,8 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
     market_key = _candidate_market_key(candidate)
+    drivers = [dict(item) for item in (candidate.get("signal_contributions_top_positive") or []) if isinstance(item, dict)][:3]
+    risks = [dict(item) for item in (candidate.get("signal_contributions_top_negative") or []) if isinstance(item, dict)][:2]
     output = {
         "candidate_type": _safe_text(candidate.get("candidate_type"), "candidate"),
         "sport": _safe_text(candidate.get("sport"), "Sport"),
@@ -4024,6 +4026,13 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
             for item in (candidate.get("advanced_signals") or [])[:6]
             if isinstance(item, dict)
         ],
+        "drivers": drivers,
+        "risks": risks,
+        "market_context": {
+            "odds": candidate.get("odds"),
+            "implied_probability": market_context.get("implied_probability"),
+            "edge": candidate.get("edge"),
+        },
         "advanced_signal_score": round(float(candidate.get("advanced_signal_score") or 0.0), 2),
         "source_summary_score": round(float(candidate.get("source_summary_score") or 0.0), 2),
         "selection_direction": _candidate_selection_direction(candidate),
