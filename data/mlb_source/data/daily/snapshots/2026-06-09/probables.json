@@ -2,7 +2,7 @@
   "date": "2026-06-09",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-09T16:51:20.524338",
+  "generated_at": "2026-06-09T20:27:59.650642",
   "games": [
     {
       "idx": 0,
@@ -592,7 +592,7 @@
         "abbr": "CWS"
       },
       "away_probable_id": 656550,
-      "home_probable_id": 607200,
+      "home_probable_id": 685126,
       "away_source": "feed_gameData_probablePitchers",
       "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
@@ -617,8 +617,8 @@
       },
       "home_validation": {
         "status": "ok",
-        "selected_id": 607200,
-        "selected_name": "Erick Fedde",
+        "selected_id": 685126,
+        "selected_name": "Brandon Eisert",
         "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
         "roster_team_ids": [
@@ -635,13 +635,13 @@
       },
       "raw": {
         "away_schedule_id": 656550,
-        "home_schedule_id": 607200,
+        "home_schedule_id": 685126,
         "away_schedule_name": "Grant Holmes",
-        "home_schedule_name": "Erick Fedde",
+        "home_schedule_name": "Brandon Eisert",
         "away_feed_id": 656550,
-        "home_feed_id": 607200,
+        "home_feed_id": 685126,
         "away_feed_name": "Grant Holmes",
-        "home_feed_name": "Erick Fedde"
+        "home_feed_name": "Brandon Eisert"
       }
     },
     {
