@@ -33,6 +33,7 @@ from syndicate.features.nhl.sources import recommendation_path as nhl_recommenda
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
 from syndicate.features.bankroll_manager import compute_bet_size as _compute_bet_size
+from syndicate.features.bankroll_manager import build_portfolio as _build_portfolio
 from syndicate.features.market_data import attach_market_data as _attach_market_data
 from syndicate.features.simulation_engine import SimulationEngine
 from syndicate.features.prediction_ledger import _signal_weight
@@ -4217,6 +4218,83 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
     return output
 
 
+def _frontend_correlation_group(candidate: dict[str, Any]) -> dict[str, Any]:
+    event_id = _safe_text(candidate.get("event_id"), "")
+    matchup = _safe_text(candidate.get("matchup"), "")
+    sport_slug = _safe_text(candidate.get("sport_slug"), "")
+    market_key = _safe_text(candidate.get("market_key") or candidate.get("market"), "")
+    subject_key = _safe_text(candidate.get("subject_key") or candidate.get("name") or candidate.get("pick"), "")
+    group_key = event_id or matchup or f"{sport_slug}:{market_key}:{subject_key}".strip(":") or subject_key or market_key or "candidate"
+    group_label = matchup or event_id or subject_key or market_key or "Candidate group"
+    group_type = "game" if event_id or matchup else "candidate"
+    return {
+        "key": group_key,
+        "label": group_label,
+        "type": group_type,
+        "sport_slug": sport_slug or None,
+        "market_key": market_key or None,
+        "subject_key": subject_key or None,
+    }
+
+
+def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
+    bet_size_profile = candidate.get("bet_size_profile") if isinstance(candidate.get("bet_size_profile"), dict) else {}
+    market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
+    bet_size = candidate.get("recommended_bet_size") or bet_size_profile.get("recommended_bet_size")
+    confidence_value = candidate.get("confidence")
+    probabilities = {
+        "model_probability": candidate.get("model_probability") or market_context.get("model_probability"),
+        "implied_probability": candidate.get("implied_probability") or market_context.get("implied_probability"),
+    }
+    risk_level = _safe_text(candidate.get("risk_level"), "")
+    if not risk_level:
+        volatility_value = _numeric_hint(candidate.get("volatility") or candidate.get("volatility_score")) or 0.0
+        if volatility_value < 0.34:
+            risk_level = "low"
+        elif volatility_value < 0.67:
+            risk_level = "medium"
+        else:
+            risk_level = "high"
+    return {
+        "title": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
+        "name": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
+        "pick": _safe_text(candidate.get("pick"), _safe_text(candidate.get("name"), "Play")),
+        "sport": _safe_text(candidate.get("sport"), "Sport"),
+        "sport_slug": _safe_text(candidate.get("sport_slug"), "sport"),
+        "market": _safe_text(candidate.get("market"), "Market"),
+        "market_key": _safe_text(candidate.get("market_key") or candidate.get("market"), "market"),
+        "matchup": _safe_text(candidate.get("matchup"), "-"),
+        "line": candidate.get("line"),
+        "odds": candidate.get("odds"),
+        "edge": candidate.get("adjusted_edge") if candidate.get("adjusted_edge") is not None else candidate.get("edge"),
+        "confidence": confidence_value,
+        "model_probability": probabilities["model_probability"],
+        "implied_probability": probabilities["implied_probability"],
+        "recommended_bet_size": bet_size,
+        "bet_size": bet_size,
+        "risk_level": risk_level,
+        "probabilities": probabilities,
+        "expected_value": candidate.get("expected_value"),
+        "volatility": candidate.get("volatility") if candidate.get("volatility") is not None else candidate.get("volatility_score"),
+        "drivers": [dict(item) for item in (candidate.get("signal_contributions_top_positive") or []) if isinstance(item, dict)],
+        "risks": [dict(item) for item in (candidate.get("signal_contributions_top_negative") or []) if isinstance(item, dict)],
+        "correlation_group": _frontend_correlation_group(candidate),
+    }
+
+
+def _frontend_portfolio(recommendations: list[dict[str, Any]]) -> dict[str, Any]:
+    portfolio = _build_portfolio(recommendations, max_correlation_threshold=MAX_CORRELATION_THRESHOLD)
+    selected = [dict(item) for item in (portfolio.get("selected") or []) if isinstance(item, dict)]
+    return {
+        "selected_count": int((portfolio.get("summary") or {}).get("selected_count") or len(selected)),
+        "total_exposure": portfolio.get("total_exposure"),
+        "expected_return": portfolio.get("expected_return"),
+        "risk_profile": portfolio.get("risk_profile"),
+        "summary": portfolio.get("summary"),
+        "picks": [_frontend_pick(item) for item in selected],
+    }
+
+
 def _supporting_evidence_table(analysis_views: dict[str, Any]) -> dict[str, Any] | None:
     table = analysis_views.get("table") if isinstance(analysis_views.get("table"), dict) else {}
     rows = table.get("rows") if isinstance(table.get("rows"), list) else []
@@ -5241,14 +5319,19 @@ def run_intelligence_query(
         overview,
     )
 
+    picks = [_frontend_pick(candidate) for candidate in recommendations]
+    portfolio = _frontend_portfolio(recommendations)
+
     return {
         "selected_date": effective_date,
         "preferences": preferences,
         "headline": headline,
         "summary": summary,
         "parsed_request": _parlay_request_summary(preferences),
-        "recommendations": recommendations,
+        "picks": picks,
+        "portfolio": portfolio,
         "parlays": parlays,
+        "recommendations": recommendations,
         "analysis_views": analysis_views,
         "analysis_brief": analysis_brief,
         "supporting_evidence": supporting_evidence,
