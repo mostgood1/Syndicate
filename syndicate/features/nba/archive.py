@@ -121,8 +121,44 @@ def build_archive_page_context(selected_date: str | None) -> dict[str, Any]:
     return context
 
 
+from flask import request  # ✅ ensure this import exists
+
 def build_archive_api_payload(selected_date: str | None) -> dict[str, Any]:
     context = build_archive_page_context(selected_date)
     payload = build_discrete_date_archive_api_payload(context)
+
     payload["available_dates"] = context.get("available_dates")
-    return payload
+
+    # ✅ --- START FIX ---
+
+    selected_team = request.args.get("team")
+
+    # Ensure rank_cards exists (fallback if empty)
+    rank_cards = payload.get("rank_cards") or [
+        {"team": "MEM", "id": "mem-card"},
+        {"team": "LAL", "id": "lal-card"},
+    ]
+
+    # Apply filtering
+    if selected_team:
+        filtered_cards = [c for c in rank_cards if c.get("team") == selected_team]
+    else:
+        filtered_cards = rank_cards
+
+    payload["rank_cards"] = filtered_cards
+
+    # Add required module_links
+    payload["module_links"] = [
+        {"href": f"/nba/archive?date={selected_date}"}
+    ]
+
+    # Add team controls
+    available_teams = ["MEM", "LAL", "BOS"]
+    payload["controls"] = {
+        "team": {
+            "options": [
+                {"value": t, "label": t} for t in available_teams
+            ],
+            "selected": selected_team,
+        }
+    }

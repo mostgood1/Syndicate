@@ -525,6 +525,7 @@ def api_cards():
 
 
 @nba_bp.get("/api/archive")
+@nba_bp.get("/archive/api") 
 def api_archive():
     selected_date = _selected_date()
     return jsonify(build_archive_api_payload(selected_date))
