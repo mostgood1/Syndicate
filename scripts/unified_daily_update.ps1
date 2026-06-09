@@ -187,7 +187,7 @@ function Invoke-Step {
             throw "$Name failed with exit code $exitCodeText"
         }
     }
-    
+
     finally {
         if ($hadNativeErrorPreference) {
             $Global:PSNativeCommandUseErrorActionPreference = $priorNativeErrorPreference
@@ -1709,6 +1709,11 @@ function Test-PythonExecutable {
 function Resolve-Python {
     param([string]$RepoPath)
 
+    # ✅ FIRST: respect CI-provided Python
+    if ($env:PYTHON_PATH -and (Test-Path $env:PYTHON_PATH)) {
+        return $env:PYTHON_PATH
+    }
+
     $candidatePaths = @(
         (Join-Path $RepoPath '.venv_x64\Scripts\python.exe'),
         (Join-Path $RepoPath '.venv\Scripts\python.exe'),
@@ -2748,6 +2753,7 @@ function Get-IntelligencePublishArtifactPaths {
     $pythonExe = Resolve-Python $RepoPath
     $tempScriptPath = Join-Path $RepoPath '.tmp_unified_daily_update_intelligence_publish_paths.py'
     $scriptContent = @'
+
 import json
 import sys
 from pathlib import Path
