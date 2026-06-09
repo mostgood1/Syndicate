@@ -4,3 +4,7 @@ To https://github.com/mostgood1/Syndicate
    0c6f686..6839cbb  HEAD -> main
 To https://github.com/mostgood1/Syndicate
    6839cbb..2f1e7f4  HEAD -> main
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+To https://github.com/mostgood1/Syndicate
+   2f1e7f4..7c5d90b  HEAD -> main
