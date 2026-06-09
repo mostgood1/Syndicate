@@ -4240,11 +4240,29 @@ def _frontend_correlation_group(candidate: dict[str, Any]) -> dict[str, Any]:
 def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
     bet_size_profile = candidate.get("bet_size_profile") if isinstance(candidate.get("bet_size_profile"), dict) else {}
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
-    bet_size = candidate.get("recommended_bet_size") or bet_size_profile.get("recommended_bet_size")
-    confidence_value = candidate.get("confidence")
+    bet_size = _numeric_hint(candidate.get("recommended_bet_size") or bet_size_profile.get("recommended_bet_size"))
+    confidence_value = _numeric_hint(candidate.get("confidence"))
+    current_edge = candidate.get("adjusted_edge") if candidate.get("adjusted_edge") is not None else candidate.get("edge")
+    previous_edge = (
+        candidate.get("previous_adjusted_edge")
+        if candidate.get("previous_adjusted_edge") is not None
+        else candidate.get("previous_edge")
+    )
+    if previous_edge is None:
+        previous_edge = candidate.get("edge_previous") or candidate.get("prior_edge")
+    previous_edge_value = _numeric_hint(previous_edge)
+    current_edge_value = _numeric_hint(current_edge)
+    edge_delta = None if current_edge_value is None or previous_edge_value is None else round(current_edge_value - previous_edge_value, 4)
+    rising_edge = edge_delta is not None and edge_delta > 0.01
+    falling_edge = edge_delta is not None and edge_delta < -0.01
+    movement = {
+        "edge_delta": edge_delta,
+        "trend": "up" if edge_delta is not None and edge_delta > 0.01 else "down" if edge_delta is not None and edge_delta < -0.01 else "flat",
+    }
+    display_pills = candidate.get("display_pills") if isinstance(candidate.get("display_pills"), list) else []
     probabilities = {
-        "model_probability": candidate.get("model_probability") or market_context.get("model_probability"),
-        "implied_probability": candidate.get("implied_probability") or market_context.get("implied_probability"),
+        "model_probability": _numeric_hint(candidate.get("model_probability") or market_context.get("model_probability")),
+        "implied_probability": _numeric_hint(candidate.get("implied_probability") or market_context.get("implied_probability")),
     }
     risk_level = _safe_text(candidate.get("risk_level"), "")
     if not risk_level:
@@ -4255,10 +4273,9 @@ def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
             risk_level = "medium"
         else:
             risk_level = "high"
+    selection = _safe_text(candidate.get("selection") or candidate.get("pick") or candidate.get("name"), "Play")
     return {
-        "title": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
-        "name": _safe_text(candidate.get("name"), _safe_text(candidate.get("pick"), "Play")),
-        "pick": _safe_text(candidate.get("pick"), _safe_text(candidate.get("name"), "Play")),
+        "selection": selection,
         "sport": _safe_text(candidate.get("sport"), "Sport"),
         "sport_slug": _safe_text(candidate.get("sport_slug"), "sport"),
         "market": _safe_text(candidate.get("market"), "Market"),
@@ -4266,33 +4283,174 @@ def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
         "matchup": _safe_text(candidate.get("matchup"), "-"),
         "line": candidate.get("line"),
         "odds": candidate.get("odds"),
-        "edge": candidate.get("adjusted_edge") if candidate.get("adjusted_edge") is not None else candidate.get("edge"),
+        "edge": current_edge_value,
+        "last_updated_timestamp": candidate.get("last_updated_timestamp") or candidate.get("updated_at") or candidate.get("timestamp"),
+        "previous_edge": previous_edge_value,
+        "edge_delta": edge_delta,
+        "rising_edge": rising_edge,
+        "falling_edge": falling_edge,
         "confidence": confidence_value,
         "model_probability": probabilities["model_probability"],
         "implied_probability": probabilities["implied_probability"],
         "recommended_bet_size": bet_size,
-        "bet_size": bet_size,
         "risk_level": risk_level,
-        "probabilities": probabilities,
-        "expected_value": candidate.get("expected_value"),
-        "volatility": candidate.get("volatility") if candidate.get("volatility") is not None else candidate.get("volatility_score"),
+        "expected_value": _numeric_hint(candidate.get("expected_value")),
+        "volatility": _numeric_hint(candidate.get("volatility") if candidate.get("volatility") is not None else candidate.get("volatility_score")),
         "drivers": [dict(item) for item in (candidate.get("signal_contributions_top_positive") or []) if isinstance(item, dict)],
         "risks": [dict(item) for item in (candidate.get("signal_contributions_top_negative") or []) if isinstance(item, dict)],
-        "correlation_group": _frontend_correlation_group(candidate),
+        "visual": {
+            "pills": [str(item).strip() for item in display_pills if str(item).strip()][:6],
+            "risk_level": risk_level,
+            "correlation_group": _frontend_correlation_group(candidate),
+        },
+        "movement": movement,
     }
 
 
 def _frontend_portfolio(recommendations: list[dict[str, Any]]) -> dict[str, Any]:
     portfolio = _build_portfolio(recommendations, max_correlation_threshold=MAX_CORRELATION_THRESHOLD)
-    selected = [dict(item) for item in (portfolio.get("selected") or []) if isinstance(item, dict)]
+    risk_profile = portfolio.get("risk_profile") if isinstance(portfolio.get("risk_profile"), dict) else {}
+
+    def _number(*values: Any, default: float = 0.0) -> float:
+        for value in values:
+            try:
+                if value is None:
+                    continue
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return default
+
+    risk_level = _safe_text(risk_profile.get("level") or portfolio.get("risk_level"), "low")
     return {
-        "selected_count": int((portfolio.get("summary") or {}).get("selected_count") or len(selected)),
         "total_exposure": portfolio.get("total_exposure"),
         "expected_return": portfolio.get("expected_return"),
-        "risk_profile": portfolio.get("risk_profile"),
-        "summary": portfolio.get("summary"),
-        "picks": [_frontend_pick(item) for item in selected],
+        "risk_level": risk_level,
+        "risk_label": f"{risk_level} risk",
+        "diversification_score": _number(risk_profile.get("diversification_score"), portfolio.get("diversification_score")),
+        "average_correlation": _number(risk_profile.get("average_correlation"), portfolio.get("average_correlation")),
     }
+
+
+def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    generated_parlays = _build_parlays(
+        recommendations,
+        limit=3,
+        preferences={
+            "parlay_type": "standard",
+            "parlay_leg_min": 2,
+            "parlay_leg_max": 3,
+            "max_correlation_threshold": MAX_CORRELATION_THRESHOLD,
+        },
+    )
+
+    def _frontend_parlay(parlay: dict[str, Any]) -> dict[str, Any]:
+        correlation_profile = parlay.get("correlation_profile") if isinstance(parlay.get("correlation_profile"), dict) else {}
+        return {
+            "legs": [dict(leg) for leg in (parlay.get("legs") or []) if isinstance(leg, dict)],
+            "combined_probability": parlay.get("combined_probability"),
+            "combined_edge": parlay.get("combined_edge"),
+            "expected_value": parlay.get("combined_expected_value"),
+            "correlation_score": correlation_profile.get("max_correlation") if correlation_profile else None,
+        }
+
+    pick_payloads = [_frontend_pick(candidate) for candidate in recommendations]
+    movement_deltas = [float(item.get("edge_delta")) for item in pick_payloads if item.get("edge_delta") is not None]
+    movement_edge_delta = round(sum(movement_deltas) / float(len(movement_deltas)), 4) if movement_deltas else None
+    if movement_edge_delta is None:
+        movement_trend = "flat"
+    elif movement_edge_delta > 0.01:
+        movement_trend = "up"
+    elif movement_edge_delta < -0.01:
+        movement_trend = "down"
+    else:
+        movement_trend = "flat"
+
+    response = {
+        "picks": pick_payloads,
+        "portfolio": _frontend_portfolio(recommendations),
+        "parlays": [_frontend_parlay(parlay) for parlay in generated_parlays],
+        "movement": {
+            "edge_delta": movement_edge_delta,
+            "trend": movement_trend,
+        },
+    }
+
+    validate_response_contract(response)
+    return response
+
+
+def validate_response_contract(response: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(response, dict):
+        raise TypeError("Response contract must be a dictionary")
+    for key in ("picks", "portfolio", "parlays"):
+        if key not in response:
+            raise ValueError(f"Missing response key: {key}")
+    if not isinstance(response.get("picks"), list):
+        raise TypeError("Response picks must be a list")
+    if not isinstance(response.get("portfolio"), dict):
+        raise TypeError("Response portfolio must be a dictionary")
+    if not isinstance(response.get("parlays"), list):
+        raise TypeError("Response parlays must be a list")
+
+    pick_required_keys = (
+        "selection",
+        "edge",
+        "confidence",
+        "model_probability",
+        "implied_probability",
+        "recommended_bet_size",
+        "expected_value",
+        "volatility",
+        "drivers",
+        "risks",
+        "visual",
+        "movement",
+    )
+    numeric_keys = {
+        "edge",
+        "confidence",
+        "model_probability",
+        "implied_probability",
+        "recommended_bet_size",
+        "expected_value",
+        "volatility",
+    }
+    for pick in response.get("picks") or []:
+        if not isinstance(pick, dict):
+            raise TypeError("Each pick must be a dictionary")
+        for key in pick_required_keys:
+            if key not in pick:
+                raise ValueError(f"Missing pick key: {key}")
+        for key in numeric_keys:
+            if pick.get(key) is not None and not isinstance(pick.get(key), (int, float)):
+                raise TypeError(f"Pick field {key} must be numeric or None")
+        if not isinstance(pick.get("selection"), str) or not pick.get("selection"):
+            raise TypeError("Pick selection must be a non-empty string")
+        if not isinstance(pick.get("drivers"), list) or not isinstance(pick.get("risks"), list):
+            raise TypeError("Pick drivers and risks must be lists")
+        if not isinstance(pick.get("visual"), dict):
+            raise TypeError("Pick visual must be a dictionary")
+        if not isinstance(pick.get("movement"), dict):
+            raise TypeError("Pick movement must be a dictionary")
+
+    portfolio = response.get("portfolio") or {}
+    for key in ("total_exposure", "expected_return", "risk_level", "diversification_score", "average_correlation"):
+        if key not in portfolio:
+            raise ValueError(f"Missing portfolio key: {key}")
+    if not isinstance(portfolio.get("risk_level"), str):
+        raise TypeError("Portfolio risk_level must be a string")
+
+    movement = response.get("movement")
+    if movement is not None:
+        if not isinstance(movement, dict):
+            raise TypeError("Response movement must be a dictionary")
+        if "edge_delta" not in movement or "trend" not in movement:
+            raise ValueError("Missing response movement keys")
+        if movement.get("trend") not in {"up", "down", "flat"}:
+            raise ValueError("Response movement trend must be up, down, or flat")
+
+    return response
 
 
 def _supporting_evidence_table(analysis_views: dict[str, Any]) -> dict[str, Any] | None:
@@ -5319,24 +5477,4 @@ def run_intelligence_query(
         overview,
     )
 
-    picks = [_frontend_pick(candidate) for candidate in recommendations]
-    portfolio = _frontend_portfolio(recommendations)
-
-    return {
-        "selected_date": effective_date,
-        "preferences": preferences,
-        "headline": headline,
-        "summary": summary,
-        "parsed_request": _parlay_request_summary(preferences),
-        "picks": picks,
-        "portfolio": portfolio,
-        "parlays": parlays,
-        "recommendations": recommendations,
-        "analysis_views": analysis_views,
-        "analysis_brief": analysis_brief,
-        "supporting_evidence": supporting_evidence,
-        "board_notes": data_notes[:8],
-        "readiness_gate": readiness_gate,
-        "structured_response": structured_response,
-        "local_only": True,
-    }
+    return build_response(recommendations=recommendations, parlays=parlays)
