@@ -1,0 +1,384 @@
+{
+  "date": "2026-06-09",
+  "data": [
+    {
+      "game_key": "PHX@GSV",
+      "game_id": "198",
+      "player": "Cecilia Zandalasini",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "PHX",
+      "score": 63.44909145123043,
+      "score_adj": 63.44909145123043,
+      "tier": "High",
+      "model": {
+        "pts": 2.2666666666666666,
+        "reb": 0.5666666666666667,
+        "ast": 0.2833333333333333,
+        "threes": 0.2833333333333333,
+        "stl": 0.176,
+        "blk": 0.144,
+        "tov": 0.48,
+        "pra": 3.1166666666666663,
+        "pr": 2.833333333333333,
+        "pa": 2.55,
+        "ra": 0.85
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": -102.0,
+        "edge": 0.3203865013874012,
+        "ev": 0.6344909145123043,
+        "ev_pct": 63.44909145123043,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 63.4%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.3 vs line 1.5 (-1.2)"
+    },
+    {
+      "game_key": "DAL@MIN",
+      "game_id": "132",
+      "player": "Arike Ogunbowale",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "MIN",
+      "score": 61.50425826498348,
+      "score_adj": 61.50425826498348,
+      "tier": "High",
+      "model": {
+        "pts": 14.956552180451126,
+        "reb": 2.155192180451128,
+        "ast": 3.643566616541353,
+        "threes": 3.003073984962406,
+        "stl": 0.339934335839599,
+        "blk": 0.339934335839599,
+        "tov": 2.0396060150375943,
+        "pra": 20.755310977443607,
+        "pr": 17.111744360902254,
+        "pa": 18.60011879699248,
+        "ra": 5.79875879699248
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -137.0,
+        "edge": 0.35553094440095934,
+        "ev": 0.6150425826498348,
+        "ev_pct": 61.50425826498348,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 61.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.0 vs line 1.5 (+1.5)"
+    },
+    {
+      "game_key": "PHX@GSV",
+      "game_id": "198",
+      "player": "Kahleah Copper",
+      "team": "PHX",
+      "team_tricode": "PHX",
+      "opponent": "GSV",
+      "score": 55.48157898191117,
+      "score_adj": 55.48157898191117,
+      "tier": "High",
+      "model": {
+        "pts": 19.815295929592963,
+        "reb": 3.44294499449945,
+        "ast": 2.1401771177117714,
+        "threes": 0.7867172717271729,
+        "stl": 0.0,
+        "blk": 0.0,
+        "tov": 3.585649064906491,
+        "pra": 25.398418041804184,
+        "pr": 23.258240924092412,
+        "pa": 21.955473047304736,
+        "ra": 5.583122112211221
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 104.0,
+        "edge": 0.27196852442113323,
+        "ev": 0.5548157898191117,
+        "ev_pct": 55.48157898191117,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 55.5%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.8 vs line 1.5 (-0.7)"
+    },
+    {
+      "game_key": "DAL@MIN",
+      "game_id": "132",
+      "player": "Azzi Fudd",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "MIN",
+      "score": 54.3154763417647,
+      "score_adj": 54.3154763417647,
+      "tier": "High",
+      "model": {
+        "pts": 14.16801851851852,
+        "reb": 1.0657222222222222,
+        "ast": 1.4096296296296296,
+        "threes": 2.8451666666666666,
+        "stl": 1.306049382716049,
+        "blk": 1.6325617283950618,
+        "tov": 0.6530246913580247,
+        "pra": 16.64337037037037,
+        "pr": 15.233740740740743,
+        "pa": 15.57764814814815,
+        "ra": 2.475351851851852
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -144.0,
+        "edge": 0.32055035218090644,
+        "ev": 0.543154763417647,
+        "ev_pct": 54.3154763417647,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 54.3%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.8 vs line 1.5 (+1.3)"
+    },
+    {
+      "game_key": "ATL@CHI",
+      "game_id": "66",
+      "player": "Naz Hillmon",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "CHI",
+      "score": 43.66439786289433,
+      "score_adj": 43.66439786289433,
+      "tier": "High",
+      "model": {
+        "pts": 5.506666666666666,
+        "reb": 4.1066666666666665,
+        "ast": 0.75,
+        "threes": 0.2066666666666666,
+        "stl": 0.6419929999999999,
+        "blk": 0.5252669999999999,
+        "tov": 1.7508899999999998,
+        "pra": 10.363333333333332,
+        "pr": 9.613333333333333,
+        "pa": 6.256666666666666,
+        "ra": 4.8566666666666665
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 8.5,
+        "price": 100.0,
+        "edge": 0.21832198931447167,
+        "ev": 0.43664397862894333,
+        "ev_pct": 43.66439786289433,
+        "book": "fanduel",
+        "p_win": 0.9366439786289433,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 43.7%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.5 vs line 8.5 (-3.0)"
+    },
+    {
+      "game_key": "ATL@CHI",
+      "game_id": "66",
+      "player": "Azura Stevens",
+      "team": "CHI",
+      "team_tricode": "CHI",
+      "opponent": "ATL",
+      "score": 33.94067796610166,
+      "score_adj": 33.94067796610166,
+      "tier": "High",
+      "model": {
+        "pts": 2.325,
+        "reb": 1.1625,
+        "ast": 0.3875,
+        "threes": 0.0,
+        "stl": 0.2376,
+        "blk": 0.1944,
+        "tov": 0.648,
+        "pra": 3.875,
+        "pr": 3.4875000000000003,
+        "pa": 2.7125000000000004,
+        "ra": 1.55
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -118.0,
+        "edge": 0.18371559633027512,
+        "ev": 0.3394067796610166,
+        "ev_pct": 33.94067796610166,
+        "book": "draftkings",
+        "p_win": 0.8806911833307414,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 33.9%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.3 vs line 10.5 (-8.2)"
+    },
+    {
+      "game_key": "DAL@MIN",
+      "game_id": "132",
+      "player": "Maddy Siegrist",
+      "team": "DAL",
+      "team_tricode": "DAL",
+      "opponent": "MIN",
+      "score": 28.701550387425,
+      "score_adj": 28.701550387425,
+      "tier": "High",
+      "model": {
+        "pts": 3.573164444444444,
+        "reb": 1.598951111111111,
+        "ast": 0.4274044444444445,
+        "threes": 0.3994044444444444,
+        "stl": 0.740237037037037,
+        "blk": 0.740237037037037,
+        "tov": 0.3701185185185185,
+        "pra": 5.59952,
+        "pr": 5.172115555555555,
+        "pa": 4.000568888888889,
+        "ra": 2.0263555555555555
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -129.0,
+        "edge": 0.16168122270645524,
+        "ev": 0.28701550387425,
+        "ev_pct": 28.701550387425,
+        "book": "draftkings",
+        "p_win": 0.8503342811668264,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 28.7%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.6 vs line 10.5 (-6.9)"
+    },
+    {
+      "game_key": "PHX@GSV",
+      "game_id": "198",
+      "player": "Janelle Salaun",
+      "team": "GSV",
+      "team_tricode": "GSV",
+      "opponent": "PHX",
+      "score": 26.7943999836494,
+      "score_adj": 26.7943999836494,
+      "tier": "High",
+      "model": {
+        "pts": 9.030699999999998,
+        "reb": 2.5672666666666664,
+        "ast": 0.4979333333333333,
+        "threes": 1.4938,
+        "stl": 0.47568994,
+        "blk": 0.38920086,
+        "tov": 1.2973362,
+        "pra": 12.0959,
+        "pr": 11.597966666666665,
+        "pa": 9.528633333333332,
+        "ra": 3.0651999999999995
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 13.5,
+        "price": -129.0,
+        "edge": 0.1509378863707761,
+        "ev": 0.267943999836494,
+        "ev_pct": 26.7943999836494,
+        "book": "draftkings",
+        "p_win": 0.8312627771290704,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 26.8%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 9.0 vs line 13.5 (-4.5)"
+    },
+    {
+      "game_key": "ATL@CHI",
+      "game_id": "66",
+      "player": "Allisha Gray",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "CHI",
+      "score": 19.39591315880135,
+      "score_adj": 19.39591315880135,
+      "tier": "High",
+      "model": {
+        "pts": 19.572857142857146,
+        "reb": 4.141428571428572,
+        "ast": 0.6928571428571428,
+        "threes": 1.417142857142857,
+        "stl": 0.753166857142857,
+        "blk": 0.6162274285714284,
+        "tov": 2.054091428571428,
+        "pra": 24.40714285714286,
+        "pr": 23.71428571428572,
+        "pa": 20.26571428571429,
+        "ra": 4.834285714285715
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 124.0,
+        "edge": 0.08658889803036313,
+        "ev": 0.19395913158801348,
+        "ev_pct": 19.39591315880135,
+        "book": "draftkings",
+        "p_win": 0.640387703016585,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 19.4%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 1.4 vs line 1.5 (-0.1)"
+    }
+  ]
+}
