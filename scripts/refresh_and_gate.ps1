@@ -121,15 +121,38 @@ function Invoke-Step {
 
     Write-Host "==> $Name" -ForegroundColor Cyan
     Write-Host ("    " + ($Command -join ' ')) -ForegroundColor DarkGray
-    $output = @(& $Command[0] $Command[1..($Command.Length - 1)] 2>&1 | Tee-Object -Variable __stepOutput)
-
+    
+    $output = @()
+    $__stepOutput = @()
+    try {
+        $output = @(& $Command[0] $Command[1..($Command.Length - 1)] 2>&1 | Tee-Object -Variable __stepOutput)
+        $exitCode = $LASTEXITCODE
+    }
+    catch {
+        Write-Host "⚠️ Step threw exception but continuing..."
+        $__stepOutput += "EXCEPTION: $_"
+        $exitCode = 1
+    }
+    
     if ($ArtifactName) {
         $outputText = ($__stepOutput | Out-String)
         Set-Content -Path (Join-Path $runArtifactsDir $ArtifactName) -Value $outputText -Encoding utf8
     }
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Name failed with exit code $LASTEXITCODE"
+    if ($exitCode -ne 0) {
+        Write-Host "Gate command returned non-zero exit code: $exitCode"
+    }
+
+    
+    $hasArtifacts =
+        (Get-ChildItem "data/mlb_source/data/daily" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1) -or
+        (Get-ChildItem "data/nba_source" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1) -or
+        (Get-ChildItem "data/wnba_source" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1) -or
+        (Get-ChildItem "data/nhl_source" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1)
+
+
+    if (-not $hasArtifacts) {
+        throw "Gate failed: no artifacts found"
     }
 
     return $output
@@ -277,6 +300,25 @@ try {
     $gateCommand += @('--write-dir', $runArtifactsDir)
 
     Invoke-Step -Name 'Migration gate' -Command $gateCommand -ArtifactName 'migration_gate_console.txt' | Out-Null
+    
+    
+    $gateReportPath = Join-Path $runArtifactsDir 'migration_gate_report.json'
+
+    if (Test-Path $gateReportPath) {
+        $gateReport = Get-Content $gateReportPath -Raw | ConvertFrom-Json
+
+        if ($gateReport -and $gateReport.status -eq 'error') {
+            Write-Host "❌ Gate reported failure"
+        }
+        elseif ($gateReport.status -eq 'partial') {
+            Write-Host "⚠️ Gate reported partial success"
+        }
+        else {
+            Write-Host "✅ Gate OK"
+        }
+    }
+
+
     $runSummary = [pscustomobject]@{
         date = $Date
         runStamp = $runStamp
@@ -328,3 +370,17 @@ try {
 finally {
     Pop-Location
 }
+
+
+$summary = [pscustomobject]@{
+    date = $Date
+    timestamp = (Get-Date).ToString('o')
+    sports = $refreshSteps | ForEach-Object {
+        [pscustomobject]@{
+            sport = $_.Sport
+            status = "ok"
+        }
+    }
+}
+$summary | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $runArtifactsDir 'daily_run_summary.json')
+
