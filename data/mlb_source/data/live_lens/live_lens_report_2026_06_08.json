@@ -1,6 +1,6 @@
 {
   "date": "2026-06-08",
-  "generatedAt": "2026-06-08T22:26:14-05:00",
+  "generatedAt": "2026-06-08T22:35:59-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -24,12 +24,12 @@
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 4.7,
-    "totalMs": 1018.7,
-    "snapshotLoadMs": 2.8,
+    "marketRefreshMs": 4.4,
+    "totalMs": 952.5,
+    "snapshotLoadMs": 3.1,
     "simContextLoadMs": 1.1,
-    "propEvalMs": 0.9,
-    "gameLensMs": 0.9,
+    "propEvalMs": 1.1,
+    "gameLensMs": 1.2,
     "gameCount": 8,
     "liveGameCount": 4,
     "feedFetchCount": 8,
@@ -927,6 +927,21 @@
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.272
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 4.6. Current 4.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.691,
+              "source": "live",
+              "actual": 4.0
             }
           ]
         },
@@ -3366,6 +3381,21 @@
               "detail": "Logan Webb Over 18.5 Outs | Odds +104 | Edge 26.5%",
               "hitProb": 0.722
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.4. Current 5.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.694,
+              "source": "live",
+              "actual": 5.0
+            }
           ]
         }
       },
@@ -4866,6 +4896,21 @@
               "tone": "solid",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.253
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "O up to 16",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Live projection 16.7. Current 13.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
+              "hitProb": 0.877,
+              "source": "live",
+              "actual": 13.0
             }
           ]
         }
@@ -6736,6 +6781,53 @@
               "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.239
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K -1 (3)",
+              "stat": "strikeouts",
+              "tone": "loss",
+              "detail": "Final K: 3. Supported ladders: 5. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 3,
+              "targets": [
+                5
+              ],
+              "source": "final"
+            },
+            {
+              "label": "O -1 (15)",
+              "stat": "outs",
+              "tone": "loss",
+              "detail": "Final O: 15. Supported ladders: 18. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 15,
+              "targets": [
+                18
+              ],
+              "source": "final"
+            },
+            {
+              "label": "H -1 (3)",
+              "stat": "hits_allowed",
+              "tone": "loss",
+              "detail": "Final H: 3. Supported ladders: 5. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 3,
+              "targets": [
+                5
+              ],
+              "source": "final"
+            }
           ]
         },
         "home": {
@@ -8364,6 +8456,54 @@
               "detail": "Connelly Early Over 17.5 Outs | Odds -120 | Edge 31.5%",
               "hitProb": 0.815
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K +2 (6)",
+              "stat": "strikeouts",
+              "tone": "win",
+              "detail": "Final K: 6. Supported ladders: 5/6. Correct ladders: 2. Missed ladders: 0.",
+              "count": 2,
+              "wins": 2,
+              "losses": 0,
+              "targetCount": 2,
+              "actual": 6,
+              "targets": [
+                5,
+                6
+              ],
+              "source": "final"
+            },
+            {
+              "label": "H -1 (5)",
+              "stat": "hits_allowed",
+              "tone": "loss",
+              "detail": "Final H: 5. Supported ladders: 6. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 5,
+              "targets": [
+                6
+              ],
+              "source": "final"
+            },
+            {
+              "label": "O -1 (14)",
+              "stat": "outs",
+              "tone": "loss",
+              "detail": "Final O: 14. Supported ladders: 18. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 14,
+              "targets": [
+                18
+              ],
+              "source": "final"
+            }
           ]
         },
         "home": {
@@ -9884,6 +10024,53 @@
               "detail": "Will Warren Over 16.5 Outs | Odds +106 | Edge 41.9%",
               "hitProb": 0.869
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K +1 (5)",
+              "stat": "strikeouts",
+              "tone": "win",
+              "detail": "Final K: 5. Supported ladders: 5. Correct ladders: 1. Missed ladders: 0.",
+              "count": 1,
+              "wins": 1,
+              "losses": 0,
+              "targetCount": 1,
+              "actual": 5,
+              "targets": [
+                5
+              ],
+              "source": "final"
+            },
+            {
+              "label": "H -1 (3)",
+              "stat": "hits_allowed",
+              "tone": "loss",
+              "detail": "Final H: 3. Supported ladders: 6. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 3,
+              "targets": [
+                6
+              ],
+              "source": "final"
+            },
+            {
+              "label": "O -1 (13)",
+              "stat": "outs",
+              "tone": "loss",
+              "detail": "Final O: 13. Supported ladders: 17. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 13,
+              "targets": [
+                17
+              ],
+              "source": "final"
+            }
           ]
         },
         "home": {
@@ -9957,6 +10144,53 @@
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.263
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K -1 (5)",
+              "stat": "strikeouts",
+              "tone": "loss",
+              "detail": "Final K: 5. Supported ladders: 7. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 5,
+              "targets": [
+                7
+              ],
+              "source": "final"
+            },
+            {
+              "label": "O -1 (15)",
+              "stat": "outs",
+              "tone": "loss",
+              "detail": "Final O: 15. Supported ladders: 19. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 15,
+              "targets": [
+                19
+              ],
+              "source": "final"
+            },
+            {
+              "label": "H -1 (4)",
+              "stat": "hits_allowed",
+              "tone": "loss",
+              "detail": "Final H: 4. Supported ladders: 5. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 4,
+              "targets": [
+                5
+              ],
+              "source": "final"
             }
           ]
         }
@@ -11661,6 +11895,53 @@
               "detail": "Cristopher S\u00e1nchez Over 20.5 Outs | Odds -115 | Edge 17.1%",
               "hitProb": 0.662
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K +1 (10)",
+              "stat": "strikeouts",
+              "tone": "win",
+              "detail": "Final K: 10. Supported ladders: 7. Correct ladders: 1. Missed ladders: 0.",
+              "count": 1,
+              "wins": 1,
+              "losses": 0,
+              "targetCount": 1,
+              "actual": 10,
+              "targets": [
+                7
+              ],
+              "source": "final"
+            },
+            {
+              "label": "H -1 (4)",
+              "stat": "hits_allowed",
+              "tone": "loss",
+              "detail": "Final H: 4. Supported ladders: 6. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 4,
+              "targets": [
+                6
+              ],
+              "source": "final"
+            },
+            {
+              "label": "O +1 (21)",
+              "stat": "outs",
+              "tone": "win",
+              "detail": "Final O: 21. Supported ladders: 21. Correct ladders: 1. Missed ladders: 0.",
+              "count": 1,
+              "wins": 1,
+              "losses": 0,
+              "targetCount": 1,
+              "actual": 21,
+              "targets": [
+                21
+              ],
+              "source": "final"
+            }
           ]
         },
         "home": {
@@ -11734,6 +12015,53 @@
               "tone": "soft",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.225
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K -1 (3)",
+              "stat": "strikeouts",
+              "tone": "loss",
+              "detail": "Final K: 3. Supported ladders: 5. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 3,
+              "targets": [
+                5
+              ],
+              "source": "final"
+            },
+            {
+              "label": "O -1 (9)",
+              "stat": "outs",
+              "tone": "loss",
+              "detail": "Final O: 9. Supported ladders: 16. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 9,
+              "targets": [
+                16
+              ],
+              "source": "final"
+            },
+            {
+              "label": "H -1 (4)",
+              "stat": "hits_allowed",
+              "tone": "loss",
+              "detail": "Final H: 4. Supported ladders: 6. Correct ladders: 0. Missed ladders: 1.",
+              "count": 1,
+              "wins": 0,
+              "losses": 1,
+              "targetCount": 1,
+              "actual": 4,
+              "targets": [
+                6
+              ],
+              "source": "final"
             }
           ]
         }
