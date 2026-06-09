@@ -4985,10 +4985,12 @@ def run_intelligence_query(
                     "signal_contributions_top_negative": recommendation.get("signal_contributions_top_negative"),
                 },
                 features_snapshot={
+                    "selected_date": preferences.get("selected_date") or preferences.get("date"),
                     "event_id": recommendation.get("event_id"),
                     "sport": recommendation.get("sport"),
                     "market": recommendation.get("market"),
                     "market_key": recommendation.get("market_key"),
+                    "line": recommendation.get("line") or recommendation.get("market_line") or recommendation.get("prop_line"),
                     "score": recommendation.get("score"),
                     "fair_probability": recommendation.get("fair_probability"),
                     "confidence_drivers": recommendation.get("confidence_drivers"),

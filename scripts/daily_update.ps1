@@ -30,6 +30,7 @@ if ([string]::IsNullOrWhiteSpace($Date)) {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$python = if ($env:PYTHON_PATH) { $env:PYTHON_PATH.Split("`n")[0].Trim() } else { "python" }
 $unifiedArgs = @(
     'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'unified_daily_update.ps1'),
     '-Date', $Date
@@ -62,6 +63,16 @@ try {
     & $unifiedArgs[0] $unifiedArgs[1..($unifiedArgs.Length - 1)]
     if ($LASTEXITCODE -ne 0) {
         throw "Unified daily update failed with exit code $LASTEXITCODE"
+    }
+
+    $reconciliationArgs = @(
+        $python, '-m', 'syndicate.features.prediction_reconciliation', '--date', $Date
+    )
+    Write-Host '==> Prediction reconciliation' -ForegroundColor Cyan
+    Write-Host ("    " + ($reconciliationArgs -join ' ')) -ForegroundColor DarkGray
+    & $reconciliationArgs[0] $reconciliationArgs[1..($reconciliationArgs.Length - 1)]
+    if ($LASTEXITCODE -ne 0) {
+        throw "Prediction reconciliation failed with exit code $LASTEXITCODE"
     }
 }
 finally {

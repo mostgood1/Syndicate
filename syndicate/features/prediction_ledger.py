@@ -12,7 +12,7 @@ from syndicate.features.shared.source_roots import repo_root_from
 
 
 SCHEMA_VERSION = 1
-DEFAULT_LEDGER_PATH = repo_root_from(__file__) / "data" / "prediction_ledger.json
+DEFAULT_LEDGER_PATH = repo_root_from(__file__) / "data" / "prediction_ledger.json"
 
 
 def _utc_now() -> str:
@@ -319,6 +319,7 @@ def record_result(
     payload = _read_payload(path)
     results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
     result_dict = record.to_dict()
+    results = [item for item in results if str(item.get("prediction_id") or "").strip() != record.prediction_id]
     results.append(result_dict)
     payload["results"] = results
 
