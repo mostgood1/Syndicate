@@ -273,6 +273,46 @@
       background: rgba(255, 143, 143, 0.14);
     }
 
+    .intel-card-badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .intel-card-badge-row.is-badge-changed {
+      animation: intelBadgePulse 700ms ease;
+    }
+
+    .intel-top-card.is-movement-up,
+    .intel-rec-card.is-movement-up {
+      box-shadow: 0 0 0 1px rgba(137, 226, 168, 0.25), 0 0 24px rgba(137, 226, 168, 0.12);
+      animation: intelPulseUp 900ms ease;
+    }
+
+    .intel-top-card.is-movement-down,
+    .intel-rec-card.is-movement-down {
+      box-shadow: 0 0 0 1px rgba(255, 143, 143, 0.24), 0 0 24px rgba(255, 143, 143, 0.12);
+      animation: intelFadeDown 900ms ease;
+    }
+
+    @keyframes intelPulseUp {
+      0% { transform: scale(1); }
+      35% { transform: scale(1.01); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes intelFadeDown {
+      0% { opacity: 1; }
+      45% { opacity: 0.92; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes intelBadgePulse {
+      0% { transform: scale(1); }
+      35% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+
     .intel-response-stack,
     .intel-analysis-stack,
     .intel-parlay-stack {
@@ -766,6 +806,14 @@
       const filterSummaryEl = document.getElementById('intel-filter-summary');
       const responseRoot = document.getElementById('intel-response');
       const statusLink = document.getElementById('intel-status-link');
+      const LIVE_REFRESH_MS = 30000;
+      const EDGE_MOVE_THRESHOLD = 0.01;
+      const liveState = {
+        timerId: null,
+        inflight: false,
+        request: null,
+        response: null,
+      };
 
       function escapeHtml(value) {
         return String(value ?? '')
@@ -789,6 +837,93 @@
 
       function chip(label, extraClass = '') {
         return `<span class="intel-chip ${extraClass}">${escapeHtml(label)}</span>`;
+      }
+
+      function pickKey(item) {
+        if (!item || typeof item !== 'object') {
+          return '';
+        }
+        const correlationGroup = item.correlation_group && typeof item.correlation_group === 'object' ? item.correlation_group : null;
+        return String(
+          correlationGroup?.key
+          || item.selection
+          || item.pick
+          || item.name
+          || `${item.sport_slug || item.sport || 'sport'}:${item.market_key || item.market || 'market'}:${item.matchup || 'matchup'}`
+        ).trim();
+      }
+
+      function pickEdgeValue(item) {
+        const value = Number(item?.edge);
+        return Number.isFinite(value) ? value : null;
+      }
+
+      function movementStateClass(item) {
+        const trend = String(item?.movement?.trend || '').toLowerCase();
+        if (trend === 'up') {
+          return 'is-movement-up';
+        }
+        if (trend === 'down') {
+          return 'is-movement-down';
+        }
+        return '';
+      }
+
+      function shouldAnimateBadgeChange(nextItem, previousItem) {
+        const nextEdge = pickEdgeValue(nextItem);
+        const previousEdge = pickEdgeValue(previousItem);
+        if (nextEdge === null || previousEdge === null) {
+          return false;
+        }
+        return Math.abs(nextEdge - previousEdge) >= EDGE_MOVE_THRESHOLD;
+      }
+
+      function findCardByPickKey(key) {
+        if (!key || !responseRoot) {
+          return null;
+        }
+        return Array.from(responseRoot.querySelectorAll('[data-pick-key]')).find((element) => element.getAttribute('data-pick-key') === key) || null;
+      }
+
+      function clearCardAnimationClasses(cardElement) {
+        if (!cardElement) {
+          return;
+        }
+        cardElement.classList.remove('is-movement-up', 'is-movement-down');
+        const badgeRow = cardElement.querySelector('[data-badge-row]');
+        if (badgeRow) {
+          badgeRow.classList.remove('is-badge-changed');
+        }
+      }
+
+      function pulseCardUpdate(cardElement, nextItem, previousItem) {
+        if (!cardElement) {
+          return;
+        }
+        clearCardAnimationClasses(cardElement);
+        const trendClass = movementStateClass(nextItem);
+        if (trendClass) {
+          cardElement.classList.add(trendClass);
+        }
+        if (shouldAnimateBadgeChange(nextItem, previousItem)) {
+          const badgeRow = cardElement.querySelector('[data-badge-row]');
+          if (badgeRow) {
+            badgeRow.classList.add('is-badge-changed');
+            window.setTimeout(() => badgeRow.classList.remove('is-badge-changed'), 750);
+          }
+        }
+        window.setTimeout(() => {
+          clearCardAnimationClasses(cardElement);
+        }, 950);
+      }
+
+      function renderPickBadgeRow(item) {
+        return [
+          item.sport ? chip(item.sport) : '',
+          chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
+          item.market ? chip(item.market) : '',
+          item.surface ? chip(item.surface) : ''
+        ].filter(Boolean).join('');
       }
 
       function sanitizeLimit(rawValue) {
@@ -1179,7 +1314,7 @@
         return `<section class="intel-analysis-stack"><article class="intel-analysis-card intel-analysis-overview"><div><div class="intel-kicker">Reasoning contract</div><h3>${escapeHtml(brief?.title || 'Returned analysis brief')}</h3><p class="intel-table-note">This layer converts the artifact-backed board, advanced metrics, and live-context inputs into a readable cross-sport analysis brief before the deeper evidence grid and chart views.</p></div><div class="intel-analysis-overview__stats"><div class="intel-kicker">Sections</div><div class="intel-metric-grid">${metricPill('Brief sections', sections.length)}${brief?.focus ? metricPill('Focus', prettyLabel(brief.focus)) : ''}</div></div></article>${sectionMarkup}</section>`;
       }
 
-      function renderTopRecommendation(item) {
+      function renderTopRecommendation(item, stateClass = '') {
         if (!item) {
           return '';
         }
@@ -1195,18 +1330,13 @@
           item.odds && item.odds !== '-' ? metricPill('Odds', item.odds) : ''
         ].filter(Boolean).join('');
 
-        const chips = [
-          item.sport ? chip(item.sport) : '',
-          chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
-          item.market ? chip(item.market) : '',
-          item.surface ? chip(item.surface) : ''
-        ].filter(Boolean).join('');
+        const chips = renderPickBadgeRow(item);
 
         const displayPills = Array.isArray(item.display_pills) ? item.display_pills.map((entry) => chip(entry)).join('') : '';
         const cta = item.href ? `<a class="intel-link is-primary" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
 
         return `
-          <article class="intel-top-card">
+          <article class="intel-top-card ${stateClass}" data-pick-key="${escapeHtml(pickKey(item))}" data-card-role="top">
             <div>
               <div class="intel-kicker">Top returned recommendation</div>
               <h3>${escapeHtml(item.name || item.pick || 'Top target')}</h3>
@@ -1214,7 +1344,7 @@
             </div>
             <div class="intel-top-card__grid">
               <div>
-                <div class="intel-chip-row">${chips}${displayPills}</div>
+                <div class="intel-card-badge-row" data-badge-row>${chips}${displayPills}</div>
                 <p>${escapeHtml(item.rationale || '')}</p>
                 <div class="intel-card-actions">${cta}</div>
               </div>
@@ -1224,6 +1354,29 @@
                 <div class="intel-metric-grid">${statPills}</div>
               </div>
             </div>
+          </article>`;
+      }
+
+      function renderRecommendationCard(item, stateClass = '') {
+        const chips = [
+          item.sport ? chip(item.sport) : '',
+          chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
+          item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
+          item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
+          item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : ''
+        ].filter(Boolean).join('');
+
+        const cta = item.href ? `<a class="intel-link" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
+
+        return `
+          <article class="intel-rec-card ${stateClass}" data-pick-key="${escapeHtml(pickKey(item))}" data-card-role="recommendation">
+            <div>
+              <h4>${escapeHtml(item.name || item.pick || 'Target')}</h4>
+              <p class="intel-meta">${escapeHtml(item.matchup || '-')}${item.market ? ` · ${escapeHtml(item.market)}` : ''}${item.surface ? ` · ${escapeHtml(item.surface)}` : ''}</p>
+            </div>
+            <div class="intel-card-badge-row" data-badge-row>${chips}</div>
+            <p>${escapeHtml(item.rationale || '')}</p>
+            <div class="intel-card-actions">${cta}</div>
           </article>`;
       }
 
@@ -1285,28 +1438,7 @@
 
         return `
           <section class="intel-rec-grid">
-            ${secondary.map((item) => {
-              const chips = [
-                item.sport ? chip(item.sport) : '',
-                chip(item.is_live ? 'Live' : 'Pregame', item.is_live ? 'is-live' : ''),
-                item.confidence && item.confidence !== '-' ? chip(`Conf ${item.confidence}`) : '',
-                item.odds && item.odds !== '-' ? chip(`Odds ${item.odds}`) : '',
-                item.edge && item.edge !== '-' ? chip(`Edge ${item.edge}`, 'is-good') : ''
-              ].filter(Boolean).join('');
-
-              const cta = item.href ? `<a class="intel-link" href="${escapeHtml(item.href)}">${escapeHtml(item.href_label || 'Open board')}</a>` : '';
-
-              return `
-                <article class="intel-rec-card">
-                  <div>
-                    <h4>${escapeHtml(item.name || item.pick || 'Target')}</h4>
-                    <p class="intel-meta">${escapeHtml(item.matchup || '-')}${item.market ? ` · ${escapeHtml(item.market)}` : ''}${item.surface ? ` · ${escapeHtml(item.surface)}` : ''}</p>
-                  </div>
-                  <div class="intel-chip-row">${chips}</div>
-                  <p>${escapeHtml(item.rationale || '')}</p>
-                  <div class="intel-card-actions">${cta}</div>
-                </article>`;
-            }).join('')}
+            ${secondary.map((item) => renderRecommendationCard(item)).join('')}
           </section>`;
       }
 
@@ -1339,6 +1471,46 @@
                 </div>
               </article>`).join('')}
           </section>`;
+      }
+
+      function renderPortfolioPanel(portfolio) {
+        if (!portfolio || typeof portfolio !== 'object') {
+          return '';
+        }
+
+        const healthFlags = Array.isArray(portfolio.health_flags) ? portfolio.health_flags : [];
+        const flagsMarkup = healthFlags.length ? healthFlags.map((flag) => chip(flag.replace(/_/g, ' '))).join('') : chip('No flags');
+
+        return `
+          <article class="intel-analysis-card" id="intel-portfolio-panel" data-card-role="portfolio">
+            <div>
+              <div class="intel-kicker">Portfolio summary</div>
+              <h3>Portfolio panel</h3>
+            </div>
+            <div class="intel-rec-grid">
+              <article class="intel-rec-card">
+                <strong>${escapeHtml(portfolio.exposure || '—')}</strong>
+                <p class="intel-meta">Exposure</p>
+              </article>
+              <article class="intel-rec-card">
+                <strong>${escapeHtml(portfolio.expected_return || '—')}</strong>
+                <p class="intel-meta">Expected return</p>
+              </article>
+              <article class="intel-rec-card">
+                <strong>${escapeHtml(portfolio.risk_level || '—')}</strong>
+                <p class="intel-meta">Risk level</p>
+              </article>
+              <article class="intel-rec-card">
+                <strong>${escapeHtml(portfolio.diversification_score || '—')}</strong>
+                <p class="intel-meta">Diversification</p>
+              </article>
+              <article class="intel-rec-card">
+                <strong>${escapeHtml(portfolio.correlation_display || '—')}</strong>
+                <p class="intel-meta">Correlation</p>
+              </article>
+            </div>
+            <div class="intel-card-badge-row">${flagsMarkup}</div>
+          </article>`;
       }
 
       function renderBoardNotes(notes) {
@@ -1543,11 +1715,18 @@
 
       function renderResponse(payload) {
         const response = payload?.response || {};
-        const recommendations = Array.isArray(response.recommendations) ? response.recommendations : [];
+        const recommendations = Array.isArray(response.recommendations)
+          ? response.recommendations
+          : Array.isArray(response.picks)
+            ? response.picks
+            : [];
         const parlays = Array.isArray(response.parlays) ? response.parlays : [];
         const notes = Array.isArray(response.board_notes) ? response.board_notes : [];
         const parsedRequest = response.parsed_request || {};
         const structuredResponseMarkup = renderStructuredResponse(response);
+        const portfolioMarkup = renderPortfolioPanel(response.portfolio);
+
+        liveState.response = response;
 
         if (!recommendations.length && !parlays.length && !structuredResponseMarkup) {
           responseRoot.innerHTML = '<div class="intel-empty">No actionable candidates were surfaced from the current board state for that request.</div>';
@@ -1571,36 +1750,175 @@
           ${briefMarkup}
           ${structuredResponseMarkup}
           ${renderTopRecommendation(recommendations[0] || null)}
+          ${portfolioMarkup}
           ${renderAnalysisBrief(response)}
           ${renderSupportingEvidence(response)}
           ${renderAnalysisViews(response)}
           ${renderRecommendationCards(recommendations)}
-          ${renderParlays(parlays)}
+          <div id="intel-parlays-panel">${renderParlays(parlays)}</div>
           ${renderBoardNotes(notes)}`;
+
+        syncLiveRefreshState();
       }
 
-      form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        responseRoot.innerHTML = '<div class="intel-empty">Running The Syndicate...</div>';
+      function buildQueryPayload() {
         const normalizedLimit = sanitizeLimit(limitEl?.value);
         if (limitEl) {
           limitEl.value = String(normalizedLimit);
         }
         const flags = scopeFlags(boardScopeEl?.value || 'all');
+        return {
+          question: questionEl.value,
+          date: dateEl.value,
+          mode: modeEl.value,
+          sport: sportEl.value,
+          timing: timingEl?.value || '',
+          limit: normalizedLimit,
+          include_props: flags.includeProps,
+          include_games: flags.includeGames,
+        };
+      }
+
+      function isLiveQueryActive() {
+        return String(timingEl?.value || modeEl?.value || '').toLowerCase() === 'live';
+      }
+
+      function stopLiveRefresh() {
+        if (liveState.timerId) {
+          window.clearInterval(liveState.timerId);
+          liveState.timerId = null;
+        }
+      }
+
+      function syncLiveRefreshState() {
+        stopLiveRefresh();
+        if (isLiveQueryActive() && liveState.request) {
+          liveState.timerId = window.setInterval(() => {
+            refreshLiveResponse();
+          }, LIVE_REFRESH_MS);
+        }
+      }
+
+      function patchLiveResponse(nextResponse) {
+        if (!liveState.response || !responseRoot) {
+          return false;
+        }
+
+        const previousResponse = liveState.response;
+        const previousRecommendations = Array.isArray(previousResponse.recommendations)
+          ? previousResponse.recommendations
+          : Array.isArray(previousResponse.picks)
+            ? previousResponse.picks
+            : [];
+        const nextRecommendations = Array.isArray(nextResponse.recommendations)
+          ? nextResponse.recommendations
+          : Array.isArray(nextResponse.picks)
+            ? nextResponse.picks
+            : [];
+        const previousMap = new Map(previousRecommendations.map((item) => [pickKey(item), item]));
+        const previousKeys = previousRecommendations.map((item) => pickKey(item));
+        const nextKeys = nextRecommendations.map((item) => pickKey(item));
+        const structureChanged = previousKeys.length !== nextKeys.length || previousKeys.some((key, index) => key !== nextKeys[index]);
+        const nextPortfolio = nextResponse.portfolio && typeof nextResponse.portfolio === 'object' ? nextResponse.portfolio : null;
+        const previousPortfolio = previousResponse.portfolio && typeof previousResponse.portfolio === 'object' ? previousResponse.portfolio : null;
+        const portfolioChanged = JSON.stringify(nextPortfolio || {}) !== JSON.stringify(previousPortfolio || {});
+        const nextParlays = Array.isArray(nextResponse.parlays) ? nextResponse.parlays : [];
+        const previousParlays = Array.isArray(previousResponse.parlays) ? previousResponse.parlays : [];
+        const parlaysChanged = JSON.stringify(nextParlays) !== JSON.stringify(previousParlays);
+
+        if (structureChanged) {
+          renderResponse({ response: nextResponse, query: liveState.request?.question || '' });
+          return true;
+        }
+
+        let changed = false;
+
+        nextRecommendations.forEach((nextItem, index) => {
+          const key = pickKey(nextItem);
+          if (!key) {
+            return;
+          }
+          const previousItem = previousMap.get(key);
+          if (!previousItem) {
+            changed = true;
+            return;
+          }
+
+          const edgeChanged = pickEdgeValue(nextItem) !== pickEdgeValue(previousItem);
+          const trendChanged = String(nextItem?.movement?.trend || '') !== String(previousItem?.movement?.trend || '');
+          const movementChanged = String(nextItem?.movement?.edge_delta ?? '') !== String(previousItem?.movement?.edge_delta ?? '');
+          if (!edgeChanged && !trendChanged && !movementChanged) {
+            return;
+          }
+
+          const cardElement = findCardByPickKey(key);
+          if (cardElement) {
+            const replacementMarkup = index === 0
+              ? renderTopRecommendation(nextItem, movementStateClass(nextItem))
+              : renderRecommendationCard(nextItem, movementStateClass(nextItem));
+            cardElement.outerHTML = replacementMarkup;
+            const freshCard = findCardByPickKey(key);
+            pulseCardUpdate(freshCard, nextItem, previousItem);
+          }
+          changed = true;
+        });
+
+        if (portfolioChanged) {
+          const portfolioPanel = document.getElementById('intel-portfolio-panel');
+          if (portfolioPanel) {
+            portfolioPanel.outerHTML = renderPortfolioPanel(nextPortfolio || {});
+          }
+          changed = true;
+        }
+
+        if (parlaysChanged) {
+          const parlaysPanel = document.getElementById('intel-parlays-panel');
+          if (parlaysPanel) {
+            parlaysPanel.outerHTML = `<div id="intel-parlays-panel">${renderParlays(nextParlays)}</div>`;
+          }
+          changed = true;
+        }
+
+        if (!changed) {
+          return false;
+        }
+
+        liveState.response = nextResponse;
+        return true;
+      }
+
+      async function refreshLiveResponse() {
+        if (liveState.inflight || !liveState.request || !isLiveQueryActive()) {
+          return;
+        }
+
+        liveState.inflight = true;
+        try {
+          const result = await fetch('/api/intelligence/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(liveState.request),
+          });
+          const payload = await result.json();
+          if (!payload.ok) {
+            return;
+          }
+          patchLiveResponse(payload.response || {});
+        } finally {
+          liveState.inflight = false;
+        }
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        stopLiveRefresh();
+        liveState.request = buildQueryPayload();
+        responseRoot.innerHTML = '<div class="intel-empty">Running The Syndicate...</div>';
 
         const result = await fetch('/api/intelligence/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question: questionEl.value,
-            date: dateEl.value,
-            mode: modeEl.value,
-            sport: sportEl.value,
-            timing: timingEl?.value || '',
-            limit: normalizedLimit,
-            include_props: flags.includeProps,
-            include_games: flags.includeGames,
-          }),
+          body: JSON.stringify(liveState.request),
         });
 
         const payload = await result.json();

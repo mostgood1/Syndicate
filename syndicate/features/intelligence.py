@@ -4489,6 +4489,92 @@ def build_edge_board_view(response: dict[str, Any], *, top_limit: int = 10) -> d
     }
 
 
+def build_portfolio_panel_view(portfolio: dict[str, Any]) -> dict[str, Any]:
+    risk_profile = portfolio.get("risk_profile") if isinstance(portfolio.get("risk_profile"), dict) else {}
+
+    def _number(*values: Any, default: float = 0.0) -> float:
+        for value in values:
+            try:
+                if value is None:
+                    continue
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return default
+
+    exposure_value = _number(portfolio.get("total_exposure"))
+    expected_return_value = _number(portfolio.get("expected_return"))
+    risk_level = _safe_text(risk_profile.get("level") or portfolio.get("risk_level"), "low")
+    diversification_score = _number(risk_profile.get("diversification_score"), portfolio.get("diversification_score"))
+    average_correlation = _number(risk_profile.get("average_correlation"), portfolio.get("average_correlation"))
+
+    health_flags: list[str] = []
+    if diversification_score > 0.8:
+        health_flags.append("well_diversified")
+    if average_correlation < 0.15:
+        health_flags.append("low_correlation")
+
+    return {
+        "exposure": f"{exposure_value * 100.0:.1f}%",
+        "expected_return": f"{expected_return_value * 100.0:+.2f}%",
+        "risk_level": risk_level[:1].upper() + risk_level[1:].lower() if risk_level else "Low",
+        "diversification_score": f"{diversification_score:.2f}",
+        "correlation_display": f"{average_correlation:.2f}",
+        "health_flags": health_flags,
+    }
+
+
+def build_parlay_card_view(parlay: dict[str, Any]) -> dict[str, Any]:
+    correlation_score = _numeric_hint(parlay.get("correlation_score"))
+    if correlation_score is None:
+        correlation_score = _numeric_hint((parlay.get("correlation_profile") or {}).get("max_correlation"))
+    correlation_label = "High"
+    if correlation_score is not None and correlation_score < 0.3:
+        correlation_label = "Low"
+    elif correlation_score is not None and correlation_score < 0.5:
+        correlation_label = "Moderate"
+
+    probability_value = _numeric_hint(parlay.get("combined_probability"))
+    edge_value = _numeric_hint(parlay.get("combined_edge"))
+    expected_value = _numeric_hint(parlay.get("expected_value") if parlay.get("expected_value") is not None else parlay.get("combined_expected_value"))
+
+    return {
+        "legs": [dict(leg) for leg in (parlay.get("legs") or []) if isinstance(leg, dict)],
+        "probability_display": f"{probability_value * 100.0:.1f}%" if probability_value is not None else "-",
+        "edge_display": f"{edge_value * 100.0:+.1f}%" if edge_value is not None else "-",
+        "ev_display": f"{expected_value * 100.0:+.2f}%" if expected_value is not None else "-",
+        "correlation_label": correlation_label,
+    }
+
+
+def build_pick_card_view(pick: dict[str, Any]) -> dict[str, Any]:
+    visual = pick.get("visual") if isinstance(pick.get("visual"), dict) else {}
+    movement = pick.get("movement") if isinstance(pick.get("movement"), dict) else {}
+    probabilities = pick.get("probabilities") if isinstance(pick.get("probabilities"), dict) else {}
+    return {
+        "title": _safe_text(pick.get("selection") or pick.get("pick") or pick.get("name"), "Play"),
+        "edge_display": pick.get("edge_display") or pick.get("edge"),
+        "confidence_display": pick.get("confidence_display") or pick.get("confidence"),
+        "probability_display": {
+            "model": pick.get("model_probability_display") or probabilities.get("model_probability") or pick.get("model_probability"),
+            "market": pick.get("implied_probability_display") or probabilities.get("implied_probability") or pick.get("implied_probability"),
+        },
+        "bet_size_display": pick.get("bet_size_display") or pick.get("recommended_bet_size") or pick.get("bet_size"),
+        "risk_label": _safe_text(pick.get("risk_label") or pick.get("risk_level"), ""),
+        "drivers": pick.get("drivers") if isinstance(pick.get("drivers"), list) else [],
+        "risks": pick.get("risks") if isinstance(pick.get("risks"), list) else [],
+        "badges": [
+            visual.get("edge_tier"),
+            visual.get("confidence_tier"),
+            visual.get("risk_tier"),
+        ],
+        "movement": {
+            "trend": _safe_text(movement.get("trend"), "flat"),
+            "delta_display": movement.get("delta_display") or movement.get("edge_delta"),
+        },
+    }
+
+
 def _supporting_evidence_table(analysis_views: dict[str, Any]) -> dict[str, Any] | None:
     table = analysis_views.get("table") if isinstance(analysis_views.get("table"), dict) else {}
     rows = table.get("rows") if isinstance(table.get("rows"), list) else []
