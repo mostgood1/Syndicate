@@ -3,11 +3,15 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from syndicate.features.prediction_ledger import load_all_predictions
 from syndicate.features.prediction_ledger import record_result
+
+
+logger = logging.getLogger(__name__)
 
 
 RECONCILIATION_PATTERNS = (
@@ -235,6 +239,26 @@ def _match_result_row(prediction: Mapping[str, Any], rows: Iterable[Mapping[str,
     return None
 
 
+def _candidate_result_debug_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        candidates.append(
+            {
+                "prediction_id": str(row.get("prediction_id") or row.get("id") or "").strip() or None,
+                "sport": row.get("sport"),
+                "market": row.get("market"),
+                "selection": row.get("selection") or row.get("player") or row.get("name"),
+                "result": row.get("result") or row.get("outcome") or row.get("grade"),
+                "actual": row.get("actual"),
+                "line": row.get("line") or row.get("market_line") or row.get("closing_line"),
+                "closing_line": row.get("closing_line"),
+            }
+        )
+    return candidates
+
+
 def reconcile_prediction_results_for_date(
     date_value: str,
     *,
@@ -267,6 +291,20 @@ def reconcile_prediction_results_for_date(
 
         matched_row = _match_result_row(prediction, result_rows)
         if matched_row is None:
+            logger.info(
+                json.dumps(
+                    {
+                        "prediction_id": prediction.get("id"),
+                        "sport": prediction.get("sport"),
+                        "selection": prediction.get("selection"),
+                        "market": prediction.get("market"),
+                        "reason": "no match found",
+                        "candidate_results_checked": _candidate_result_debug_rows(result_rows),
+                    },
+                    sort_keys=True,
+                    default=str,
+                )
+            )
             skipped += 1
             reconciled_predictions.append(dict(prediction))
             continue
