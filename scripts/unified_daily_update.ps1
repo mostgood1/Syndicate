@@ -133,11 +133,20 @@ function Invoke-Step {
             $Global:PSNativeCommandUseErrorActionPreference = $false
         }
 
+        
         $resolvedCommand = $Command[0]
-        $commandInfo = Get-Command -Name $Command[0] -ErrorAction SilentlyContinue
-        if ($commandInfo -and -not [string]::IsNullOrWhiteSpace($commandInfo.Source)) {
-            $resolvedCommand = $commandInfo.Source
+
+        # ✅ Force python commands to use the correct interpreter
+        if ($resolvedCommand -eq "python") {
+            $resolvedCommand = $python
         }
+        else {
+            $commandInfo = Get-Command -Name $Command[0] -ErrorAction SilentlyContinue
+            if ($commandInfo -and -not [string]::IsNullOrWhiteSpace($commandInfo.Source)) {
+                $resolvedCommand = $commandInfo.Source
+            }
+        }
+
         $argumentList = @()
         if ($Command.Length -gt 1) {
             $argumentList = $Command[1..($Command.Length - 1)]
@@ -178,6 +187,7 @@ function Invoke-Step {
             throw "$Name failed with exit code $exitCodeText"
         }
     }
+    
     finally {
         if ($hadNativeErrorPreference) {
             $Global:PSNativeCommandUseErrorActionPreference = $priorNativeErrorPreference
