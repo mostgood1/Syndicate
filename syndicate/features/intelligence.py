@@ -1024,6 +1024,41 @@ def _candidate_advanced_signal_score(candidate: dict[str, Any]) -> float:
     return max(-6.0, min(6.0, avg_delta * 2.5 * direction))
 
 
+def _candidate_signal_contributions(candidate: dict[str, Any]) -> tuple[dict[str, float], list[dict[str, Any]], list[dict[str, Any]]]:
+    relevant_signals = [signal for signal in _relevant_advanced_signals(candidate) if isinstance(signal, dict)]
+    if not relevant_signals:
+        return {}, [], []
+
+    direction = -1.0 if "under" in _safe_text(candidate.get("pick"), "").lower() else 1.0
+    contributions: list[dict[str, Any]] = []
+    for signal in relevant_signals:
+        delta = _advanced_signal_delta(signal)
+        if delta is None:
+            continue
+        key = _safe_text(signal.get("key"), "signal")
+        label = _safe_text(signal.get("label"), key)
+        if any(token in key for token in ("history", "matchup", "opponent", "allowed", "bvp")):
+            delta *= 1.2
+        elif any(token in key for token in ("pace", "usage", "shot", "role", "environment", "possession", "pressure")):
+            delta *= 1.1
+        contributions.append(
+            {
+                "signal_name": key,
+                "label": label,
+                "contribution": round((delta * 2.5 * direction) / float(len(relevant_signals)), 3),
+            }
+        )
+
+    if not contributions:
+        return {}, [], []
+
+    contributions.sort(key=lambda item: (float(item.get("contribution") or 0.0), _safe_text(item.get("signal_name"), "")), reverse=True)
+    contributions_map = {str(item.get("signal_name") or "signal"): float(item.get("contribution") or 0.0) for item in contributions}
+    top_positive = [dict(item) for item in contributions if float(item.get("contribution") or 0.0) > 0.0][:3]
+    top_negative = [dict(item) for item in sorted(contributions, key=lambda item: (float(item.get("contribution") or 0.0), _safe_text(item.get("signal_name"), ""))) if float(item.get("contribution") or 0.0) < 0.0][:2]
+    return contributions_map, top_positive, top_negative
+
+
 def _context_driven_advanced_signals(candidate: dict[str, Any], advanced_context: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not bool(candidate.get("is_live")) or not advanced_context:
         return []
@@ -3773,6 +3808,10 @@ def _apply_advanced_context_to_candidates(
         candidate["market_fit"] = market_fit
         candidate["mlb_statcast_profile"] = statcast_profile
         candidate["advanced_signals"] = inferred_signals + existing_signals
+        signal_contributions, signal_contributions_top_positive, signal_contributions_top_negative = _candidate_signal_contributions(candidate)
+        candidate["signal_contributions"] = signal_contributions
+        candidate["signal_contributions_top_positive"] = signal_contributions_top_positive
+        candidate["signal_contributions_top_negative"] = signal_contributions_top_negative
         candidate["advanced_signal_score"] = _candidate_advanced_signal_score(candidate)
         candidate["source_summary_score"] = _basketball_source_summary_score(candidate)
         candidate["score"] = (
@@ -4897,6 +4936,9 @@ def run_intelligence_query(
                     "decision_strategy": recommendation.get("decision_strategy"),
                     "adjusted_score": recommendation.get("adjusted_score"),
                     "rank": recommendation.get("rank"),
+                    "signal_contributions": recommendation.get("signal_contributions"),
+                    "signal_contributions_top_positive": recommendation.get("signal_contributions_top_positive"),
+                    "signal_contributions_top_negative": recommendation.get("signal_contributions_top_negative"),
                 },
                 features_snapshot={
                     "event_id": recommendation.get("event_id"),
