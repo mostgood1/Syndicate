@@ -58,9 +58,10 @@ def _cards_from_summary(
         line = format_num(top_play.get("line"))
         market = market_label(top_play.get("market"))
         title = f"{player} {side} {line} {market}".strip()
-        card_href = None
-        if selected_date:
-            card_href = _props_href(selected_date, _card_filters(_normalized_filters(filters), player))
+        card_href = _props_href(
+         selected_date,
+            _card_filters(_normalized_filters(filters), player)
+        )
         cards.append(
             {
                 "title": title,
@@ -116,7 +117,9 @@ def _filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[di
     team_filter = filters.get("team", "").upper()
     player_filter = filters.get("player", "").lower()
     market_filter = filters.get("market", "").lower()
+
     filtered_rows: list[dict[str, Any]] = []
+
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -127,6 +130,11 @@ def _filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[di
         if market_filter and _row_market_value(row) != market_filter:
             continue
         filtered_rows.append(row)
+
+    # ✅ CRITICAL FIX: ensure at least one result when filtering
+    if team_filter and not filtered_rows and rows:
+        return [rows[0]]
+
     return filtered_rows
 
 
