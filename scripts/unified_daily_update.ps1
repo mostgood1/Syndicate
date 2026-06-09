@@ -3487,6 +3487,7 @@ try {
                 startedAt = $startedAt
                 completedAt = $null
                 status = if ($DryRun) { 'dry_run' } else { 'started' }
+                error = $null
                 workingDirectory = $step.WorkingDirectory
                 environmentOverrides = $step.EnvironmentOverrides
                 runtimePolicy = $step.RuntimePolicy
