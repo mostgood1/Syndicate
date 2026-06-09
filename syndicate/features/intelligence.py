@@ -31,6 +31,7 @@ from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_prop
 from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
+from syndicate.features.market_data import attach_market_data as _attach_market_data
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.recommendation_engine import filter_candidates
@@ -3758,6 +3759,8 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 ):
                     continue
                 candidates.append(artifact_candidate)
+
+    candidates = [_attach_market_data(candidate) for candidate in candidates]
 
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
     candidates = [
