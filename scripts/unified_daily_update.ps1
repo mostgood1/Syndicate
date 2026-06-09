@@ -2967,6 +2967,7 @@ print(json.dumps(result))
             throw "Intelligence readiness audit failed for ${Sport}: $detail"
         }
     }
+}
 
 $sourceSteps = @()
 $publishRepos = @()
