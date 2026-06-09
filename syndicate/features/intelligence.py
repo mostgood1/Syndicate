@@ -4453,6 +4453,42 @@ def validate_response_contract(response: dict[str, Any]) -> dict[str, Any]:
     return response
 
 
+def build_edge_board_view(response: dict[str, Any], *, top_limit: int = 10) -> dict[str, Any]:
+    picks = response.get("picks") if isinstance(response.get("picks"), list) else []
+    portfolio = response.get("portfolio") if isinstance(response.get("portfolio"), dict) else {}
+    parlays = response.get("parlays") if isinstance(response.get("parlays"), list) else []
+
+    def _edge_value(pick: dict[str, Any]) -> float:
+        edge_value = pick.get("edge")
+        if edge_value is None:
+            return float("-inf")
+        try:
+            return float(edge_value)
+        except (TypeError, ValueError):
+            return float("-inf")
+
+    sorted_picks = sorted((pick for pick in picks if isinstance(pick, dict)), key=_edge_value, reverse=True)
+    top_picks = sorted_picks[: max(0, int(top_limit))]
+
+    picks_by_sport: dict[str, list[dict[str, Any]]] = {}
+    picks_by_game: dict[str, list[dict[str, Any]]] = {}
+    for pick in sorted_picks:
+        sport_key = _safe_text(pick.get("sport"), "Sport")
+        picks_by_sport.setdefault(sport_key, []).append(pick)
+
+        correlation_group = pick.get("correlation_group") if isinstance(pick.get("correlation_group"), dict) else {}
+        game_key = _safe_text(correlation_group.get("key") or correlation_group.get("label"), "candidate")
+        picks_by_game.setdefault(game_key, []).append(pick)
+
+    return {
+        "top_picks": top_picks,
+        "portfolio_summary": portfolio,
+        "parlay_opportunities": [dict(parlay) for parlay in parlays if isinstance(parlay, dict)],
+        "grouped_picks_by_sport": picks_by_sport,
+        "grouped_picks_by_game": picks_by_game,
+    }
+
+
 def _supporting_evidence_table(analysis_views: dict[str, Any]) -> dict[str, Any] | None:
     table = analysis_views.get("table") if isinstance(analysis_views.get("table"), dict) else {}
     rows = table.get("rows") if isinstance(table.get("rows"), list) else []
