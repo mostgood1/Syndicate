@@ -32,6 +32,7 @@ from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_prop
 from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
+from syndicate.features.bankroll_manager import compute_bet_size as _compute_bet_size
 from syndicate.features.market_data import attach_market_data as _attach_market_data
 from syndicate.features.simulation_engine import SimulationEngine
 from syndicate.features.prediction_ledger import _signal_weight
@@ -4547,6 +4548,29 @@ def _build_structured_answer(
         confidence = round(max(0.05, confidence - 0.04), 2)
     confidence, reliability_profile = adjust_confidence(confidence, sport=sport_slug or None)
 
+    recommended_bet_size = None
+    risk_level = None
+    if top:
+        bet_size_profile = _compute_bet_size(top)
+        recommended_bet_size = bet_size_profile.get("recommended_bet_size")
+        edge_value = _numeric_hint(top.get("adjusted_edge") or top.get("edge")) or 0.0
+        volatility_value = _numeric_hint(top.get("volatility_score") or top.get("volatility")) or 0.0
+        if volatility_value > 1.0:
+            volatility_value = volatility_value / (volatility_value + 1.0)
+        confidence_value = max(0.0, min(1.0, confidence))
+        risk_score = (max(0.0, 1.0 - confidence_value) * 0.45) + (max(0.0, min(1.0, volatility_value)) * 0.35)
+        if edge_value >= 0.0:
+            risk_score -= min(0.15, edge_value * 0.10)
+        else:
+            risk_score += min(0.15, abs(edge_value) * 0.15)
+        risk_score = max(0.0, min(1.0, risk_score))
+        if risk_score < 0.34:
+            risk_level = "low"
+        elif risk_score < 0.67:
+            risk_level = "medium"
+        else:
+            risk_level = "high"
+
     supporting_data: list[dict[str, Any]] = []
     if top:
         supporting_data.append(
@@ -4587,6 +4611,8 @@ def _build_structured_answer(
         "key_factors": key_factors[:5],
         "risks": risks[:5],
         "confidence": confidence,
+        "recommended_bet_size": recommended_bet_size,
+        "risk_level": risk_level,
         "supporting_data": supporting_data[:6],
         "recommendations": recommendations[:5],
     }
