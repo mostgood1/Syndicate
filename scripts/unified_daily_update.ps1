@@ -1,3 +1,9 @@
+param(
+    [string]$Date,
+    [string]$BaseUrl,
+    [int]$EventSimForceWindowMinutes = 30
+)
+
 
 if ($env:PYTHON_PATH) {
     $python = $env:PYTHON_PATH.Split("`n")[0].Trim()
@@ -6,11 +12,6 @@ if ($env:PYTHON_PATH) {
 }
 
 Write-Host "Unified script using Python: $python"
-param(
-    [string]$Date,
-    [string]$BaseUrl,
-    [int]$EventSimForceWindowMinutes = 30
-)
 
 function Get-ReasonableWorkerCount {
     param([int]$Requested)
