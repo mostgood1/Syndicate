@@ -32,6 +32,7 @@ from syndicate.features.nhl.sources import recommendation_path as nhl_recommenda
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
 from syndicate.features.market_data import attach_market_data as _attach_market_data
+from syndicate.features.simulation_engine import SimulationEngine
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.recommendation_engine import filter_candidates
@@ -55,6 +56,7 @@ from syndicate.features.wnba.sources import processed_path as wnba_processed_pat
 
 
 ENABLE_PREDICTION_TRACKING = True
+_SIMULATION_ENGINE = SimulationEngine()
 
 
 _SPORT_KEYWORDS: dict[str, set[str]] = {
@@ -3810,6 +3812,21 @@ def _apply_advanced_context_to_candidates(
         candidate["market_focuses"] = market_focuses
         candidate["market_fit"] = market_fit
         candidate["mlb_statcast_profile"] = statcast_profile
+        candidate["simulation"] = _SIMULATION_ENGINE.run_simulation(
+            {
+                "sport": candidate.get("sport"),
+                "market": candidate.get("market"),
+                "selection": candidate.get("pick") or candidate.get("name"),
+                "line": candidate.get("line"),
+                "current_line": (candidate.get("market_data") or {}).get("current_line"),
+                "opening_line": (candidate.get("market_data") or {}).get("opening_line"),
+                "movement_history": (candidate.get("market_data") or {}).get("movement_history"),
+                "odds": candidate.get("odds"),
+                "confidence": candidate.get("confidence"),
+                "edge": candidate.get("edge"),
+                "model_probability": candidate.get("model_probability") or candidate.get("fair_probability"),
+            }
+        )
         candidate["advanced_signals"] = inferred_signals + existing_signals
         signal_contributions, signal_contributions_top_positive, signal_contributions_top_negative = _candidate_signal_contributions(candidate)
         candidate["signal_contributions"] = signal_contributions
