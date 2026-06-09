@@ -2650,6 +2650,14 @@ function Invoke-GitPublish {
         return [pscustomobject]$result
     }
 
+        if ([string]::IsNullOrWhiteSpace($RepoPath)) {
+            throw "RepoPath is empty before git operations"
+        }
+
+        if (-not (Test-Path (Join-Path $RepoPath ".git"))) {
+            throw "RepoPath is not a valid git repo: $RepoPath"
+    }
+    
     Push-Location $RepoPath
     try {
         $result.branch = Get-CurrentBranch -RepoPath $RepoPath
@@ -2695,6 +2703,11 @@ function Invoke-GitPublish {
         }
 
         # Only attempt commit when there are staged changes.
+        
+        if ([string]::IsNullOrWhiteSpace($RepoPath)) {
+            throw "RepoPath is empty — cannot perform git operations"
+        }
+
         & git diff --cached --quiet --exit-code
         $stagedDiffExitCode = $LASTEXITCODE
         if ($stagedDiffExitCode -eq 0) {
