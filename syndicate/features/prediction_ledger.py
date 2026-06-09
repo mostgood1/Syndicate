@@ -133,6 +133,7 @@ class PredictionRecord:
 class PredictionResult:
     prediction_id: str
     outcome: str = "pending"
+    original_line: Any = None
     closing_line: Any = None
     clv: float | None = None
     pnl: float | None = None
@@ -141,10 +142,19 @@ class PredictionResult:
         return {
             "prediction_id": self.prediction_id,
             "outcome": self.outcome,
+            "original_line": self.original_line,
             "closing_line": self.closing_line,
             "clv": self.clv,
             "pnl": self.pnl,
         }
+
+
+def _clv_from_lines(original_line: Any, closing_line: Any) -> float | None:
+    original_value = _coerce_float(original_line)
+    closing_value = _coerce_float(closing_line)
+    if original_value is None or closing_value is None:
+        return None
+    return round(closing_value - original_value, 4)
 
 
 def _prediction_from_payload(payload: Mapping[str, Any]) -> PredictionRecord:
@@ -168,6 +178,7 @@ def _result_from_payload(payload: Mapping[str, Any]) -> PredictionResult:
     return PredictionResult(
         prediction_id=_normalize_text(payload.get("prediction_id")),
         outcome=_normalize_text(payload.get("outcome")) or "pending",
+        original_line=payload.get("original_line"),
         closing_line=payload.get("closing_line"),
         clv=_coerce_float(payload.get("clv")),
         pnl=_coerce_float(payload.get("pnl")),
@@ -225,17 +236,20 @@ def record_result(
     *,
     prediction_id: Any,
     outcome: Any,
+    original_line: Any = None,
     closing_line: Any = None,
     clv: Any = None,
     pnl: Any = None,
     ledger_path: Path | str | None = None,
 ) -> dict[str, Any]:
+    computed_clv = _clv_from_lines(original_line, closing_line)
     record = _result_from_payload(
         {
             "prediction_id": prediction_id,
             "outcome": outcome,
+            "original_line": original_line,
             "closing_line": closing_line,
-            "clv": clv,
+            "clv": computed_clv if computed_clv is not None else clv,
             "pnl": pnl,
         }
     )
@@ -385,6 +399,7 @@ def get_performance_summary(ledger_path: Path | str | None = None) -> dict[str, 
         "roi": roi,
         "total_pnl": total_pnl,
         "avg_edge": average_edge,
+        "avg_clv": average_clv,
         "average_clv": average_clv,
         "closing_lines": closing_lines,
         "by_sport": by_sport,
