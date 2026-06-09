@@ -59,9 +59,9 @@ def _cards_from_summary(
         market = market_label(top_play.get("market"))
         title = f"{player} {side} {line} {market}".strip()
         card_href = _props_href(
-         selected_date,
-            _card_filters(_normalized_filters(filters), player)
-        ).replace("&", "&amp;")
+            selected_date,
+            _card_filters(_normalized_filters(filters), player),
+        )
 
         cards.append(
             {
@@ -131,10 +131,6 @@ def _filter_rows(rows: list[dict[str, Any]], filters: dict[str, str]) -> list[di
         if market_filter and _row_market_value(row) != market_filter:
             continue
         filtered_rows.append(row)
-
-    # ✅ CRITICAL FIX: ensure at least one result when filtering
-    if not filtered_rows and rows:
-        return [rows[0]]
 
     return filtered_rows
 

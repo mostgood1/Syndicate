@@ -1,6 +1,6 @@
 {
   "date": "2026-06-09",
-  "generatedAt": "2026-06-09T09:28:16-05:00",
+  "generatedAt": "2026-06-09T10:36:39-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -24,12 +24,12 @@
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 4.1,
-    "totalMs": 34.5,
-    "snapshotLoadMs": 1.9,
-    "simContextLoadMs": 0.6,
+    "marketRefreshMs": 1.9,
+    "totalMs": 398.0,
+    "snapshotLoadMs": 1.3,
+    "simContextLoadMs": 1.2,
     "propEvalMs": 0.1,
-    "gameLensMs": 1.1,
+    "gameLensMs": 1.2,
     "gameCount": 15,
     "liveGameCount": 0,
     "feedFetchCount": 15,
@@ -99,26 +99,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+310",
+              "awayOdds": "+285",
+              "drawOdds": "-140",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-390",
+              "awayOdds": "+275",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-110",
+              "underOdds": "-120",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -156,8 +156,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+100",
+              "awayOdds": "-130",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -165,17 +165,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-166",
+              "awayOdds": "+130",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-120",
+              "underOdds": "-110",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -213,8 +213,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+105",
+              "awayOdds": "-135",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -222,17 +222,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-135",
+              "awayOdds": "+105",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "-125",
+              "underOdds": "-105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -270,8 +270,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+103",
+              "awayOdds": "-124",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -279,17 +279,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-169",
+              "awayOdds": "+139",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 8.5,
+              "overOdds": "-120",
+              "underOdds": "+100",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -367,26 +367,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+310",
+              "awayOdds": "+300",
+              "drawOdds": "-150",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-425",
+              "awayOdds": "+290",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -424,8 +424,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-110",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -433,17 +433,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-188",
+              "awayOdds": "+145",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "+110",
+              "underOdds": "-140",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -481,8 +481,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-105",
+              "awayOdds": "-125",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -490,17 +490,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-145",
+              "awayOdds": "+114",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 3.5,
+              "overOdds": "-140",
+              "underOdds": "+110",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -538,8 +538,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-101",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -547,17 +547,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-181",
+              "awayOdds": "+149",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 7.5,
+              "overOdds": "+100",
+              "underOdds": "-121",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -635,26 +635,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+300",
+              "awayOdds": "+310",
+              "drawOdds": "-150",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-425",
+              "awayOdds": "+290",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-105",
+              "underOdds": "-125",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -692,8 +692,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-135",
+              "awayOdds": "+105",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -701,17 +701,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+124",
+              "awayOdds": "-160",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-105",
+              "underOdds": "-125",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -749,8 +749,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-145",
+              "awayOdds": "+114",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -758,17 +758,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+100",
+              "awayOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "-105",
+              "underOdds": "-125",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -806,8 +806,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-112",
+              "awayOdds": "-107",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -815,17 +815,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-186",
+              "awayOdds": "+153",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 8.5,
+              "overOdds": "-104",
+              "underOdds": "-115",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -903,26 +903,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+290",
+              "awayOdds": "+330",
+              "drawOdds": "-155",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+270",
+              "awayOdds": "-390",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -960,8 +960,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-145",
+              "awayOdds": "+114",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -969,17 +969,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+124",
+              "awayOdds": "-160",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1017,8 +1017,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-154",
+              "awayOdds": "+120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1026,17 +1026,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "-105",
+              "awayOdds": "-125",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "+105",
+              "underOdds": "-135",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1074,8 +1074,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-156",
+              "awayOdds": "+129",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1083,17 +1083,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -1.5,
+              "homeOdds": "+153",
+              "awayOdds": "-186",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 7.5,
+              "overOdds": "-117",
+              "underOdds": "-103",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1171,26 +1171,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+290",
+              "awayOdds": "+295",
+              "drawOdds": "-140",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-400",
+              "awayOdds": "+280",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-110",
+              "underOdds": "-120",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1228,8 +1228,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-125",
+              "awayOdds": "-105",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1237,17 +1237,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+135",
+              "awayOdds": "-175",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-115",
+              "underOdds": "-115",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1285,8 +1285,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-135",
+              "awayOdds": "+105",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1294,17 +1294,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+105",
+              "awayOdds": "-135",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "-110",
+              "underOdds": "-120",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1342,8 +1342,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-131",
+              "awayOdds": "+108",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1351,17 +1351,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -1.5,
+              "homeOdds": "+164",
+              "awayOdds": "-200",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 8.5,
+              "overOdds": "-105",
+              "underOdds": "-114",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1439,26 +1439,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+300",
+              "awayOdds": "+275",
+              "drawOdds": "-135",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-380",
+              "awayOdds": "+265",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-115",
+              "underOdds": "-110",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1496,8 +1496,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-110",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1505,17 +1505,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-175",
+              "awayOdds": "+135",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-115",
+              "underOdds": "-115",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1553,8 +1553,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-110",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1562,17 +1562,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-145",
+              "awayOdds": "+114",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "-115",
+              "underOdds": "-115",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1610,8 +1610,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-101",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1619,17 +1619,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-157",
+              "awayOdds": "+130",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 8.5,
+              "overOdds": "-114",
+              "underOdds": "-105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1707,26 +1707,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+340",
+              "awayOdds": "+310",
+              "drawOdds": "-165",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-425",
+              "awayOdds": "+295",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "+105",
+              "underOdds": "-140",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1764,8 +1764,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-110",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1773,17 +1773,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-195",
+              "awayOdds": "+150",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "+120",
+              "underOdds": "-154",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1821,8 +1821,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-110",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1830,17 +1830,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-160",
+              "awayOdds": "+124",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 3.5,
+              "overOdds": "-135",
+              "underOdds": "+105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1878,8 +1878,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-111",
+              "awayOdds": "-108",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -1887,17 +1887,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-189",
+              "awayOdds": "+155",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 7.5,
+              "overOdds": "+100",
+              "underOdds": "-120",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -1975,26 +1975,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+275",
+              "awayOdds": "+340",
+              "drawOdds": "-145",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+260",
+              "awayOdds": "-380",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2032,8 +2032,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-135",
+              "awayOdds": "+105",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2041,17 +2041,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+130",
+              "awayOdds": "-166",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2089,8 +2089,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-130",
+              "awayOdds": "+100",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2098,17 +2098,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+105",
+              "awayOdds": "-135",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2146,8 +2146,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-131",
+              "awayOdds": "+108",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2155,17 +2155,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -1.5,
+              "homeOdds": "+164",
+              "awayOdds": "-200",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 7.5,
+              "overOdds": "-119",
+              "underOdds": "-102",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2243,26 +2243,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+290",
+              "awayOdds": "+270",
+              "drawOdds": "-130",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-360",
+              "awayOdds": "+255",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-120",
+              "underOdds": "-110",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2300,8 +2300,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-105",
+              "awayOdds": "-125",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2309,17 +2309,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-160",
+              "awayOdds": "+124",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-130",
+              "underOdds": "+100",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2357,8 +2357,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+100",
+              "awayOdds": "-130",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2366,17 +2366,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-135",
+              "awayOdds": "+105",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "-140",
+              "underOdds": "+110",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2414,8 +2414,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+102",
+              "awayOdds": "-123",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2423,17 +2423,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-157",
+              "awayOdds": "+130",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 9.5,
+              "overOdds": "-102",
+              "underOdds": "-118",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2511,26 +2511,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+300",
+              "awayOdds": "+230",
+              "drawOdds": "-120",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-310",
+              "awayOdds": "+220",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-130",
+              "underOdds": "+100",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2568,8 +2568,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+105",
+              "awayOdds": "-135",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2577,17 +2577,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-154",
+              "awayOdds": "+120",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-145",
+              "underOdds": "+114",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2625,8 +2625,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+114",
+              "awayOdds": "-145",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2634,17 +2634,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-120",
+              "awayOdds": "-110",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 5.5,
+              "overOdds": "+105",
+              "underOdds": "-135",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2682,8 +2682,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+130",
+              "awayOdds": "-157",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2691,17 +2691,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-122",
+              "awayOdds": "+101",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 9.0,
+              "overOdds": "-122",
+              "underOdds": "+101",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2779,26 +2779,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+260",
+              "awayOdds": "+215",
+              "drawOdds": "+100",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-285",
+              "awayOdds": "+205",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-160",
+              "underOdds": "+125",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2836,8 +2836,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+110",
+              "awayOdds": "-140",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2845,17 +2845,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-135",
+              "awayOdds": "+105",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 3.5,
+              "overOdds": "-135",
+              "underOdds": "+105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2893,8 +2893,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+114",
+              "awayOdds": "-145",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2902,17 +2902,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-115",
+              "awayOdds": "-115",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 6.5,
+              "overOdds": "-125",
+              "underOdds": "-105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -2950,8 +2950,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+129",
+              "awayOdds": "-156",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -2959,17 +2959,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-115",
+              "awayOdds": "-104",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 12.5,
+              "overOdds": "-105",
+              "underOdds": "-114",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3047,26 +3047,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+290",
+              "awayOdds": "+255",
+              "drawOdds": "-125",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-340",
+              "awayOdds": "+240",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-125",
+              "underOdds": "-105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3104,8 +3104,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-105",
+              "awayOdds": "-125",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3113,17 +3113,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-166",
+              "awayOdds": "+130",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-130",
+              "underOdds": "+100",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3161,8 +3161,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-110",
+              "awayOdds": "-120",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3170,17 +3170,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-140",
+              "awayOdds": "+110",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "-130",
+              "underOdds": "+100",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3218,8 +3218,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+104",
+              "awayOdds": "-125",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3227,17 +3227,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-162",
+              "awayOdds": "+134",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 8.5,
+              "overOdds": "-117",
+              "underOdds": "-103",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3315,26 +3315,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+390",
+              "awayOdds": "+275",
+              "drawOdds": "-160",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-380",
+              "awayOdds": "+265",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "+110",
+              "underOdds": "-145",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3372,8 +3372,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+130",
+              "awayOdds": "-166",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3381,17 +3381,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-145",
+              "awayOdds": "+114",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "+114",
+              "underOdds": "-145",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3429,8 +3429,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+135",
+              "awayOdds": "-175",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3438,17 +3438,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-115",
+              "awayOdds": "-115",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 3.5,
+              "overOdds": "-140",
+              "underOdds": "+110",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3486,8 +3486,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "+104",
+              "awayOdds": "-125",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3495,17 +3495,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-175",
+              "awayOdds": "+144",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 7.5,
+              "overOdds": "+102",
+              "underOdds": "-123",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3583,26 +3583,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+300",
+              "awayOdds": "+260",
+              "drawOdds": "-130",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-360",
+              "awayOdds": "+250",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 0.5,
+              "overOdds": "-120",
+              "underOdds": "-110",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3640,8 +3640,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-115",
+              "awayOdds": "-115",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3649,17 +3649,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-180",
+              "awayOdds": "+140",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 2.5,
+              "overOdds": "-125",
+              "underOdds": "-105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3697,8 +3697,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-115",
+              "awayOdds": "-115",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3706,17 +3706,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 0.5,
+              "homeOdds": "-145",
+              "awayOdds": "+114",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "-125",
+              "underOdds": "-105",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3754,8 +3754,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-112",
+              "awayOdds": "-108",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3763,17 +3763,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-190",
+              "awayOdds": "+156",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 8.5,
+              "overOdds": "-104",
+              "underOdds": "-115",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3851,26 +3851,26 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
-              "drawOdds": null,
+              "homeOdds": "+180",
+              "awayOdds": "+250",
+              "drawOdds": "+125",
               "marketHomeProb": null,
               "pick": null,
               "edge": null,
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+175",
+              "awayOdds": "-235",
               "pick": null,
               "edge": null,
               "reason": "F1 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 1.5,
+              "overOdds": "+130",
+              "underOdds": "-170",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3908,8 +3908,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-135",
+              "awayOdds": "+105",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3917,17 +3917,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+105",
+              "awayOdds": "-135",
               "pick": null,
               "edge": null,
               "reason": "F3 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 4.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -3965,8 +3965,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-130",
+              "awayOdds": "+100",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -3974,17 +3974,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": -0.5,
+              "homeOdds": "+100",
+              "awayOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "F5 currently sits at home 0, away 0."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 7.5,
+              "overOdds": "+100",
+              "underOdds": "-130",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
@@ -4022,8 +4022,8 @@
           "source": "segment_projection",
           "markets": {
             "moneyline": {
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeOdds": "-110",
+              "awayOdds": "-110",
               "drawOdds": null,
               "marketHomeProb": null,
               "pick": null,
@@ -4031,17 +4031,17 @@
               "reason": "Pregame moneyline recommendations are suppressed while that surface is under re-evaluation."
             },
             "spread": {
-              "homeLine": null,
-              "homeOdds": null,
-              "awayOdds": null,
+              "homeLine": 1.5,
+              "homeOdds": "-162",
+              "awayOdds": "+134",
               "pick": null,
               "edge": null,
               "reason": "Pregame full-game spread recommendations are suppressed while that surface is under re-evaluation."
             },
             "total": {
-              "line": null,
-              "overOdds": null,
-              "underOdds": null,
+              "line": 13.0,
+              "overOdds": "-105",
+              "underOdds": "-114",
               "pick": null,
               "edge": null,
               "reason": "Pregame totals recommendations are suppressed while that surface is under re-evaluation."
