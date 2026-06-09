@@ -3848,10 +3848,9 @@ def _apply_advanced_context_to_candidates(
 
 def _candidate_betting_edge_components(candidate: dict[str, Any]) -> tuple[float, float, float] | None:
     implied_probability = odds_to_implied_probability(_american_odds_value(candidate.get("odds")))
-    score_value = _numeric_hint(candidate.get("score"))
-    if score_value is None:
+    model_probability = _candidate_model_probability(candidate)
+    if model_probability is None:
         return None
-    model_probability = max(0.0, min(1.0, float(score_value) / 100.0))
     if implied_probability is None:
         return None
     edge = model_probability - implied_probability
@@ -3900,6 +3899,19 @@ def _candidate_confidence(candidate: dict[str, Any]) -> float:
     signal_count_factor = min(1.0, float(signal_count) / 6.0)
     confidence = 0.20 + (signal_count_factor * 0.35) + (agreement * 0.30) + (readiness_ratio * 0.20) - missing_penalty
     return round(max(0.0, min(1.0, confidence)), 2)
+
+
+def _candidate_model_probability(candidate: dict[str, Any]) -> float | None:
+    simulation = candidate.get("simulation") if isinstance(candidate.get("simulation"), dict) else {}
+    distributions = simulation.get("probability_distributions") if isinstance(simulation.get("probability_distributions"), dict) else simulation.get("distribution")
+    if isinstance(distributions, dict):
+        win_probability = _coerce_float(distributions.get("win"))
+        if win_probability is not None:
+            return max(0.0, min(1.0, win_probability))
+    score_value = _numeric_hint(candidate.get("score"))
+    if score_value is None:
+        return None
+    return max(0.0, min(1.0, float(score_value) / 100.0))
 
 
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
