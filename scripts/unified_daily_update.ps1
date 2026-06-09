@@ -2705,6 +2705,9 @@ function Invoke-GitPublish {
             throw "git diff --cached --quiet failed for $RepoPath with exit code $stagedDiffExitCode"
         }
 
+        & git config user.name "github-actions[bot]"
+        & git config user.email "github-actions[bot]@users.noreply.github.com"
+
         $commitOutput = @(& git commit -m $CommitMessage 2>&1)
         if ($LASTEXITCODE -ne 0) {
             $commitText = ($commitOutput | Out-String)
