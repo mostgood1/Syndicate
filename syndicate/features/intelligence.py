@@ -45,10 +45,15 @@ from syndicate.features.intelligence_parlay_runtime import build_parlays as _run
 from syndicate.features.intelligence_parlay_runtime import build_round_robin_parlays as _runtime_build_round_robin_parlays
 from syndicate.features.intelligence_parlay_runtime import parlay_rank_score as _runtime_parlay_rank_score
 from syndicate.features.intelligence_router import analysis_focus_from_question as _runtime_analysis_focus_from_question
+from syndicate.features.prediction_ledger import PredictionRecord
+from syndicate.features.prediction_ledger import record_prediction
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
+
+
+ENABLE_PREDICTION_TRACKING = True
 
 
 _SPORT_KEYWORDS: dict[str, set[str]] = {
@@ -4813,6 +4818,52 @@ def run_intelligence_query(
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
     ranked_recommendations = rank_recommendations(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=preferences["limit"])
     recommendations = [dict(candidate) for candidate in ranked_recommendations]
+    if ENABLE_PREDICTION_TRACKING:
+        for recommendation in recommendations:
+            if recommendation.get("is_final") is False:
+                continue
+            prediction_record = PredictionRecord(
+                sport=_safe_text(recommendation.get("sport") or preferences.get("sport"), ""),
+                market=_safe_text(recommendation.get("market") or recommendation.get("market_key"), ""),
+                selection=_safe_text(recommendation.get("selection") or recommendation.get("pick") or recommendation.get("name"), ""),
+                odds=recommendation.get("odds"),
+                implied_probability=recommendation.get("implied_probability") or recommendation.get("fair_probability"),
+                model_probability=recommendation.get("model_probability") or recommendation.get("confidence"),
+                edge=recommendation.get("edge"),
+                confidence=recommendation.get("confidence"),
+                signals={
+                    "decision_strategy": recommendation.get("decision_strategy"),
+                    "adjusted_score": recommendation.get("adjusted_score"),
+                    "rank": recommendation.get("rank"),
+                },
+                features_snapshot={
+                    "event_id": recommendation.get("event_id"),
+                    "sport": recommendation.get("sport"),
+                    "market": recommendation.get("market"),
+                    "market_key": recommendation.get("market_key"),
+                    "score": recommendation.get("score"),
+                    "fair_probability": recommendation.get("fair_probability"),
+                    "confidence_drivers": recommendation.get("confidence_drivers"),
+                    "historical_profile": recommendation.get("historical_profile"),
+                },
+            )
+            try:
+                record_prediction(
+                    sport=prediction_record.sport,
+                    market=prediction_record.market,
+                    selection=prediction_record.selection,
+                    odds=prediction_record.odds,
+                    implied_probability=prediction_record.implied_probability,
+                    model_probability=prediction_record.model_probability,
+                    edge=prediction_record.edge,
+                    confidence=prediction_record.confidence,
+                    signals=prediction_record.signals,
+                    features_snapshot=prediction_record.features_snapshot,
+                    timestamp=prediction_record.timestamp,
+                    prediction_id=prediction_record.id,
+                )
+            except Exception:
+                pass
     parlay_limit = preferences["limit"] if preferences.get("parlay_type") == "round_robin" else min(3, preferences["limit"])
     parlays = _build_parlays(filtered_candidates, limit=parlay_limit, preferences=preferences) if preferences.get("intent") == "parlay" or "parlay" in preferences.get("question", "").lower() else []
     analysis_views = _analysis_views_for_query(candidates, preferences)
