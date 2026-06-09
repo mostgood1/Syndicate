@@ -1313,8 +1313,17 @@ function Update-ManifestEventRecordCollection {
         }
     }
 
-    return @($updatedRecords)
-}
+    
+        if ($null -eq $updatedRecords) {
+            return @()
+        }       
+
+        if ($updatedRecords -is [System.Array]) {
+            return $updatedRecords
+        }
+        return @($updatedRecords)
+    }
+
 
 function Sync-RunManifestEventRecords {
     param(
