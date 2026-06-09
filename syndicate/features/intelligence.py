@@ -564,6 +564,10 @@ def _american_implied_probability(value: float | None) -> float | None:
     return abs(value) / (abs(value) + 100.0)
 
 
+def odds_to_implied_probability(value: float | None) -> float | None:
+    return _american_implied_probability(value)
+
+
 def _decimal_to_american(value: float | None) -> str | None:
     if value is None or value <= 1.0:
         return None
@@ -725,7 +729,7 @@ def _market_shape_profile(market_key: str | None, *, candidate_type: str, sport_
 def _market_context(candidate: dict[str, Any]) -> dict[str, Any]:
     american_odds = _american_odds_value(candidate.get("odds"))
     decimal_odds = _american_to_decimal(american_odds)
-    implied_probability = _american_implied_probability(american_odds)
+    implied_probability = odds_to_implied_probability(american_odds)
     model_probability_pct = _pct_hint(candidate.get("confidence"))
     price_edge_pct = None
     if implied_probability is not None and model_probability_pct is not None:
@@ -3782,6 +3786,28 @@ def _apply_advanced_context_to_candidates(
         )
 
 
+def _candidate_betting_edge_components(candidate: dict[str, Any]) -> tuple[float, float, float] | None:
+    implied_probability = odds_to_implied_probability(_american_odds_value(candidate.get("odds")))
+    score_value = _numeric_hint(candidate.get("score"))
+    if score_value is None:
+        return None
+    model_probability = max(0.0, min(1.0, float(score_value) / 100.0))
+    if implied_probability is None:
+        return None
+    edge = model_probability - implied_probability
+    return implied_probability, model_probability, edge
+
+
+def _candidate_betting_rank_key(candidate: dict[str, Any]) -> tuple[float, float, float]:
+    components = _candidate_betting_edge_components(candidate)
+    edge = components[2] if components is not None else float("-inf")
+    confidence = _numeric_hint(candidate.get("confidence"))
+    confidence_value = confidence if confidence is not None else float("-inf")
+    score_value = _numeric_hint(candidate.get("score"))
+    score = score_value if score_value is not None else float("-inf")
+    return edge, confidence_value, score
+
+
 def _candidate_rationale(candidate: dict[str, Any]) -> str:
     advanced_context = candidate.get("advanced_context") if isinstance(candidate.get("advanced_context"), list) else []
     advanced_driver_text = _advanced_driver_text(advanced_context)
@@ -4818,6 +4844,7 @@ def run_intelligence_query(
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
     ranked_recommendations = rank_recommendations(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=preferences["limit"])
     recommendations = [dict(candidate) for candidate in ranked_recommendations]
+    recommendations.sort(key=_candidate_betting_rank_key, reverse=True)
     if ENABLE_PREDICTION_TRACKING:
         for recommendation in recommendations:
             if recommendation.get("is_final") is False:
