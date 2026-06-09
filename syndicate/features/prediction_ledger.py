@@ -97,6 +97,15 @@ def _latest_prediction_index(records: list[dict[str, Any]]) -> dict[str, dict[st
     return latest
 
 
+def _latest_result_index(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    latest: dict[str, dict[str, Any]] = {}
+    for record in records:
+        prediction_id = _normalize_text(record.get("prediction_id"))
+        if prediction_id:
+            latest[prediction_id] = record
+    return latest
+
+
 def _read_signal_weights(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"schema_version": SCHEMA_VERSION, "default_weight": 1.0, "weights": {}}
@@ -318,8 +327,12 @@ def record_result(
     path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
     payload = _read_payload(path)
     results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
+    result_index = _latest_result_index(results)
+    existing_result = result_index.get(record.prediction_id)
+    if existing_result is not None:
+        return dict(existing_result)
+
     result_dict = record.to_dict()
-    results = [item for item in results if str(item.get("prediction_id") or "").strip() != record.prediction_id]
     results.append(result_dict)
     payload["results"] = results
 
@@ -335,6 +348,13 @@ def record_result(
     payload["updated_at"] = _utc_now()
     _write_payload(path, payload)
     return result_dict
+
+
+def result_exists(prediction_id: Any, ledger_path: Path | str | None = None) -> bool:
+    path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+    payload = _read_payload(path)
+    results = [dict(item) for item in payload.get("results", []) if isinstance(item, Mapping)]
+    return _normalize_text(prediction_id) in _latest_result_index(results)
 
 
 def load_all_predictions(ledger_path: Path | str | None = None) -> list[dict[str, Any]]:
@@ -627,6 +647,7 @@ __all__ = [
     "PredictionResult",
     "record_prediction",
     "record_result",
+    "result_exists",
     "load_all_predictions",
     "get_performance_summary",
     "_signal_weight",
