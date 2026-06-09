@@ -274,32 +274,44 @@ def load_all_predictions(ledger_path: Path | str | None = None) -> list[dict[str
     return merged
 
 
-def get_performance_summary(ledger_path: Path | str | None = None) -> dict[str, Any]:
-    predictions = load_all_predictions(ledger_path=ledger_path)
-    results = [dict(item.get("result")) for item in predictions if isinstance(item.get("result"), Mapping)]
-    settled = [item for item in results if _normalize_text(item.get("outcome")).lower() in {"win", "loss", "push", "void"}]
-    decisive = [item for item in settled if _normalize_text(item.get("outcome")).lower() in {"win", "loss"}]
+def _prediction_result(prediction: Mapping[str, Any]) -> dict[str, Any] | None:
+    result = prediction.get("result")
+    return dict(result) if isinstance(result, Mapping) else None
 
-    win_rate = None
-    if decisive:
-        wins = sum(1 for item in decisive if _normalize_text(item.get("outcome")).lower() == "win")
-        win_rate = wins / float(len(decisive))
 
-    total_pnl = sum(_coerce_float(item.get("pnl")) or 0.0 for item in settled)
-    settled_pnl = [(_coerce_float(item.get("pnl")) or 0.0) for item in settled]
-    average_pnl = mean(settled_pnl) if settled_pnl else None
-
-    closing_lines = [item.get("closing_line") for item in settled if item.get("closing_line") is not None]
-    clv_values = [(_coerce_float(item.get("clv")) or 0.0) for item in settled if _coerce_float(item.get("clv")) is not None]
-    average_clv = mean(clv_values) if clv_values else None
-
-    by_sport: dict[str, dict[str, Any]] = {}
+def _settled_predictions(predictions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    settled: list[dict[str, Any]] = []
     for prediction in predictions:
-        sport = _normalize_text(prediction.get("sport")).lower() or "unknown"
-        bucket = by_sport.setdefault(sport, {"predictions": 0, "settled": 0, "wins": 0, "losses": 0, "pnl": 0.0})
+        result = _prediction_result(prediction)
+        if result is None:
+            continue
+        outcome = _normalize_text(result.get("outcome")).lower()
+        if outcome in {"win", "loss", "push", "void"}:
+            settled.append(prediction)
+    return settled
+
+
+def _breakdown_by_field(predictions: list[dict[str, Any]], field_name: str) -> dict[str, dict[str, Any]]:
+    breakdown: dict[str, dict[str, Any]] = {}
+    for prediction in predictions:
+        key = _normalize_text(prediction.get(field_name)).lower() or "unknown"
+        bucket = breakdown.setdefault(
+            key,
+            {
+                "predictions": 0,
+                "settled": 0,
+                "wins": 0,
+                "losses": 0,
+                "pnl": 0.0,
+                "edges": [],
+            },
+        )
         bucket["predictions"] += 1
-        result = prediction.get("result") if isinstance(prediction.get("result"), Mapping) else None
-        if not isinstance(result, Mapping):
+        edge_value = _coerce_float(prediction.get("edge"))
+        if edge_value is not None:
+            bucket["edges"].append(edge_value)
+        result = _prediction_result(prediction)
+        if result is None:
             continue
         outcome = _normalize_text(result.get("outcome")).lower()
         if outcome in {"win", "loss", "push", "void"}:
@@ -310,23 +322,73 @@ def get_performance_summary(ledger_path: Path | str | None = None) -> dict[str, 
             bucket["losses"] += 1
         bucket["pnl"] += _coerce_float(result.get("pnl")) or 0.0
 
-    for bucket in by_sport.values():
-        if bucket["wins"] + bucket["losses"]:
-            bucket["win_rate"] = bucket["wins"] / float(bucket["wins"] + bucket["losses"])
-        else:
-            bucket["win_rate"] = None
+    for bucket in breakdown.values():
+        decisive = bucket["wins"] + bucket["losses"]
+        bucket["win_rate"] = bucket["wins"] / float(decisive) if decisive else None
+        bucket["roi"] = bucket["pnl"] / float(bucket["predictions"] or 1)
+        bucket["avg_edge"] = mean(bucket["edges"]) if bucket["edges"] else None
+        bucket["edges"] = None
+    return breakdown
+
+
+def _roi(predictions: list[dict[str, Any]]) -> float | None:
+    if not predictions:
+        return None
+    total_pnl = 0.0
+    total_stake = 0.0
+    for prediction in predictions:
+        result = _prediction_result(prediction)
+        if result is None:
+            continue
+        outcome = _normalize_text(result.get("outcome")).lower()
+        if outcome not in {"win", "loss", "push", "void"}:
+            continue
+        total_pnl += _coerce_float(result.get("pnl")) or 0.0
+        stake = _coerce_float(prediction.get("stake"))
+        total_stake += stake if stake is not None and stake > 0 else 1.0
+    if total_stake <= 0.0:
+        return None
+    return round(total_pnl / total_stake, 4)
+
+
+def get_performance_summary(ledger_path: Path | str | None = None) -> dict[str, Any]:
+    predictions = load_all_predictions(ledger_path=ledger_path)
+    settled = _settled_predictions(predictions)
+    results = [_prediction_result(item) for item in settled]
+    decisive = [item for item in results if item is not None and _normalize_text(item.get("outcome")).lower() in {"win", "loss"}]
+
+    win_rate = None
+    if decisive:
+        wins = sum(1 for item in decisive if _normalize_text(item.get("outcome")).lower() == "win")
+        win_rate = wins / float(len(decisive))
+
+    total_pnl = sum(_coerce_float(item.get("pnl")) or 0.0 for item in settled)
+    settled_pnl = [(_coerce_float(item.get("pnl")) or 0.0) for item in settled]
+    average_pnl = mean(settled_pnl) if settled_pnl else None
+    edge_values = [_coerce_float(item.get("edge")) for item in predictions if _coerce_float(item.get("edge")) is not None]
+    average_edge = mean(edge_values) if edge_values else None
+    roi = _roi(predictions)
+
+    closing_lines = [item.get("closing_line") for item in settled if item.get("closing_line") is not None]
+    clv_values = [(_coerce_float(item.get("clv")) or 0.0) for item in settled if _coerce_float(item.get("clv")) is not None]
+    average_clv = mean(clv_values) if clv_values else None
+
+    by_sport = _breakdown_by_field(predictions, "sport")
+    by_market = _breakdown_by_field(predictions, "market")
 
     return {
         "schema_version": SCHEMA_VERSION,
-        "sample_size": len(predictions),
+        "total_bets": len(predictions),
         "settled_count": len(settled),
         "decisive_count": len(decisive),
         "win_rate": win_rate,
+        "roi": roi,
         "total_pnl": total_pnl,
-        "average_pnl": average_pnl,
+        "avg_edge": average_edge,
         "average_clv": average_clv,
         "closing_lines": closing_lines,
         "by_sport": by_sport,
+        "by_market": by_market,
     }
 
 
