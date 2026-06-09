@@ -2404,31 +2404,68 @@ def _repair_predictions_slate_from_game_odds_if_needed(*, processed_root: Path, 
         if pred_pairs & target_pairs:
             return True
 
-    # Rebuild a minimal predictions slate from local props snapshot/game odds when existing predictions are cross-league.
+
+    # ✅ FIXED rebuild block starts here
     if not props_df.empty:
-        rebuild = props_df[[column for column in ["home_team", "away_team", "commence_time"] if column in props_df.columns]].copy()
+        rebuild = props_df[[column for column in ["home_team", "away_team", "commence_time"]
+                            if column in props_df.columns]].copy()
+
         rebuild = rebuild.rename(columns={"away_team": "visitor_team"})
         rebuild["date"] = str(date_str)
-        rebuild = rebuild.drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
-        if not odds_df.empty:
-            odds_merge = odds_df[[column for column in [
-                "home_team", "visitor_team", "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker"
-            ] if column in odds_df.columns]].copy()
-            odds_merge = odds_merge.drop_duplicates(subset=["home_team", "visitor_team"], keep="first")
-            rebuild = rebuild.merge(odds_merge, on=["home_team", "visitor_team"], how="left")
-    else:
+
+        rebuild = rebuild.drop_duplicates(
+            subset=["home_team", "visitor_team"], keep="first"
+        )
+
+    elif not odds_df.empty:
         rebuild = odds_df.copy()
+    else:
+        return False
+
+# ✅ merge odds if available
+    if not odds_df.empty:
+        odds_merge = odds_df.copy()
+
+        if "visitor_team" not in odds_merge.columns:
+            if "away_team" in odds_merge.columns:
+                odds_merge["visitor_team"] = odds_merge["away_team"]
+            else:
+                return False
+
+        odds_merge = odds_merge[[column for column in [
+            "home_team", "visitor_team",
+            "home_ml", "away_ml",
+            "home_spread", "away_spread",
+            "total", "bookmaker"
+        ] if column in odds_merge.columns]].copy()
+
+        odds_merge = odds_merge.drop_duplicates(
+            subset=["home_team", "visitor_team"], keep="first"
+        )
+
+        if not rebuild.empty:
+            rebuild = rebuild.merge(
+                odds_merge,
+                on=["home_team", "visitor_team"],
+                how="left"
+            )
+        
     if rebuild.empty:
         return False
+
+        # ✅ Normalize rebuild into final shape
     rebuild = rebuild[[column for column in [
         "date", "home_team", "visitor_team", "commence_time",
         "home_ml", "away_ml", "home_spread", "away_spread", "total", "bookmaker"
     ] if column in rebuild.columns]].copy()
+    
     if "date" not in rebuild.columns:
         rebuild["date"] = str(date_str)
+
     for col in ("home_ml", "away_ml", "home_spread", "away_spread", "total"):
         if col in rebuild.columns:
             rebuild[col] = pd.to_numeric(rebuild[col], errors="coerce")
+    
 
     def _implied(odds: float | None) -> float | None:
         try:
