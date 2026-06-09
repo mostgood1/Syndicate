@@ -1,6 +1,6 @@
 {
   "date": "2026-06-08",
-  "generatedAt": "2026-06-08T22:35:59-05:00",
+  "generatedAt": "2026-06-08T22:49:39-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -24,12 +24,12 @@
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 4.4,
-    "totalMs": 952.5,
-    "snapshotLoadMs": 3.1,
-    "simContextLoadMs": 1.1,
-    "propEvalMs": 1.1,
-    "gameLensMs": 1.2,
+    "marketRefreshMs": 3.6,
+    "totalMs": 938.6,
+    "snapshotLoadMs": 2.9,
+    "simContextLoadMs": 0.9,
+    "propEvalMs": 0.8,
+    "gameLensMs": 0.9,
     "gameCount": 8,
     "liveGameCount": 4,
     "feedFetchCount": 8,
@@ -927,21 +927,6 @@
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.272
-            }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "strong",
-              "detail": "Live projection 4.6. Current 4.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.691,
-              "source": "live",
-              "actual": 4.0
             }
           ]
         },
@@ -3381,21 +3366,6 @@
               "detail": "Logan Webb Over 18.5 Outs | Odds +104 | Edge 26.5%",
               "hitProb": 0.722
             }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.4. Current 5.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.694,
-              "source": "live",
-              "actual": 5.0
-            }
           ]
         }
       },
@@ -4896,21 +4866,6 @@
               "tone": "solid",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.253
-            }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "O up to 16",
-              "stat": "outs",
-              "target": 16,
-              "targets": [
-                16
-              ],
-              "tone": "strong",
-              "detail": "Live projection 16.7. Current 13.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
-              "hitProb": 0.877,
-              "source": "live",
-              "actual": 13.0
             }
           ]
         }
