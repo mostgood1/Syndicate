@@ -1,0 +1,1302 @@
+{
+  "date": "2026-06-09",
+  "home": "CHI",
+  "away": "ATL",
+  "market_total": null,
+  "market_home_spread": null,
+  "quarters": [
+    {
+      "q": 1,
+      "home_pts_mu": 21.874139102651462,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 21.147170834476675,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 2,
+      "home_pts_mu": 21.874139102651462,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 21.147170834476675,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 3,
+      "home_pts_mu": 22.766961106841322,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 22.010320664455314,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    },
+    {
+      "q": 4,
+      "home_pts_mu": 22.766961106841322,
+      "home_pts_sigma": 6.0,
+      "away_pts_mu": 22.010320664455314,
+      "away_pts_sigma": 6.0,
+      "corr": 0.25
+    }
+  ],
+  "players": {
+    "home": [
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Kamilla Cardoso",
+        "player_id": 4433405,
+        "pts_mean": 14.989999999999998,
+        "reb_mean": 8.875,
+        "ast_mean": 1.995,
+        "threes_mean": 0.0,
+        "pra_mean": 25.86,
+        "stl_mean": 0.582252,
+        "blk_mean": 0.476388,
+        "tov_mean": 1.58796,
+        "pts_sd": 3.7474999999999996,
+        "reb_sd": 2.21875,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.465,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 26.466
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Natasha Cloud",
+        "player_id": 2529137,
+        "pts_mean": 10.42,
+        "reb_mean": 4.43,
+        "ast_mean": 3.65,
+        "threes_mean": 0.53,
+        "pra_mean": 18.5,
+        "stl_mean": 0.68838,
+        "blk_mean": 0.5632199999999999,
+        "tov_mean": 1.8774,
+        "pts_sd": 2.605,
+        "reb_sd": 1.1075,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.625,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 31.29
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Skylar Diggins",
+        "player_id": 2491205,
+        "pts_mean": 9.788571428571428,
+        "reb_mean": 3.322857142857143,
+        "ast_mean": 4.185714285714286,
+        "threes_mean": 0.5528571428571428,
+        "pra_mean": 17.29714285714286,
+        "stl_mean": 0.5941948571428571,
+        "blk_mean": 0.4861594285714285,
+        "tov_mean": 1.6205314285714283,
+        "pts_sd": 2.447142857142857,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0464285714285715,
+        "threes_sd": 1.0,
+        "pra_sd": 4.324285714285715,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 27.008857142857146
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Gabriela Jaquez",
+        "player_id": 4858656,
+        "pts_mean": 11.205,
+        "reb_mean": 5.025,
+        "ast_mean": 0.825,
+        "threes_mean": 0.6599999999999999,
+        "pra_mean": 17.055,
+        "stl_mean": 0.5743705,
+        "blk_mean": 0.4699395,
+        "tov_mean": 1.5664650000000002,
+        "pts_sd": 2.80125,
+        "reb_sd": 1.25625,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 4.26375,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 26.107750000000003
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Tonie Morgan",
+        "player_id": 4565515,
+        "pts_mean": 6.025,
+        "reb_mean": 3.725,
+        "ast_mean": 2.3,
+        "threes_mean": 0.575,
+        "pra_mean": 12.05,
+        "stl_mean": 0.2452999999999999,
+        "blk_mean": 0.2006999999999999,
+        "tov_mean": 0.6689999999999999,
+        "pts_sd": 1.50625,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.0125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 11.15
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Maddy Westbeld",
+        "player_id": 4433424,
+        "pts_mean": 5.0,
+        "reb_mean": 5.0,
+        "ast_mean": 2.0,
+        "threes_mean": 1.0,
+        "pra_mean": 12.0,
+        "stl_mean": 0.2639999999999999,
+        "blk_mean": 0.2159999999999999,
+        "tov_mean": 0.7199999999999999,
+        "pts_sd": 1.25,
+        "reb_sd": 1.25,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 11.999999999999998
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Jacy Sheldon",
+        "player_id": 4432865,
+        "pts_mean": 6.415,
+        "reb_mean": 1.38,
+        "ast_mean": 1.745,
+        "threes_mean": 0.85,
+        "pra_mean": 9.54,
+        "stl_mean": 0.4972715,
+        "blk_mean": 0.4068584999999999,
+        "tov_mean": 1.3561949999999998,
+        "pts_sd": 1.60375,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.385,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 22.60325
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Rachel Banham",
+        "player_id": 2566186,
+        "pts_mean": 7.63,
+        "reb_mean": 0.2199999999999999,
+        "ast_mean": 1.4249999999999998,
+        "threes_mean": 1.74,
+        "pra_mean": 9.275,
+        "stl_mean": 0.3685879999999999,
+        "blk_mean": 0.3015719999999999,
+        "tov_mean": 1.00524,
+        "pts_sd": 1.9075,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.31875,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 16.753999999999998
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Rickea Jackson",
+        "player_id": 4433630,
+        "pts_mean": 6.71,
+        "reb_mean": 1.565,
+        "ast_mean": 0.625,
+        "threes_mean": 0.5,
+        "pra_mean": 8.9,
+        "stl_mean": 0.2390299999999999,
+        "blk_mean": 0.1955699999999999,
+        "tov_mean": 0.6518999999999999,
+        "pts_sd": 1.6775,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.225,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 10.864999999999998
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Elizabeth Williams",
+        "player_id": 2566081,
+        "pts_mean": 3.4799999999999995,
+        "reb_mean": 4.363333333333333,
+        "ast_mean": 0.7266666666666666,
+        "threes_mean": 0.0,
+        "pra_mean": 8.57,
+        "stl_mean": 0.3740733333333333,
+        "blk_mean": 0.30606,
+        "tov_mean": 1.0202,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0908333333333333,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.1425,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "C",
+        "minutes": 17.003333333333334
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Sydney Taylor",
+        "player_id": 4594786,
+        "pts_mean": 5.97,
+        "reb_mean": 0.96,
+        "ast_mean": 0.8599999999999999,
+        "threes_mean": 0.96,
+        "pra_mean": 7.789999999999999,
+        "stl_mean": 0.3015045,
+        "blk_mean": 0.2466855,
+        "tov_mean": 0.822285,
+        "pts_sd": 1.4925,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.9474999999999998,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 13.70475
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Aicha Coulibaly",
+        "player_id": 4433433,
+        "pts_mean": 3.434285714285714,
+        "reb_mean": 1.377142857142857,
+        "ast_mean": 0.6742857142857143,
+        "threes_mean": 0.0,
+        "pra_mean": 5.485714285714286,
+        "stl_mean": 0.3287318571428571,
+        "blk_mean": 0.2689624285714285,
+        "tov_mean": 0.8965414285714285,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.3714285714285714,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 14.942357142857142
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Megan Nestor",
+        "player_id": 5315047,
+        "pts_mean": 2.85,
+        "reb_mean": 1.85,
+        "ast_mean": 0.575,
+        "threes_mean": 0.0,
+        "pra_mean": 5.275,
+        "stl_mean": 0.2326499999999999,
+        "blk_mean": 0.1903499999999999,
+        "tov_mean": 0.6345,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.31875,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 10.575
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Jordan Hobbs",
+        "player_id": 4898392,
+        "pts_mean": 1.725,
+        "reb_mean": 1.85,
+        "ast_mean": 1.15,
+        "threes_mean": 0.575,
+        "pra_mean": 4.725,
+        "stl_mean": 0.2766499999999999,
+        "blk_mean": 0.2263499999999999,
+        "tov_mean": 0.7545,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.18125,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 12.575
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Latasha Lattimore",
+        "player_id": 4433517,
+        "pts_mean": 2.85,
+        "reb_mean": 1.15,
+        "ast_mean": 0.0,
+        "threes_mean": 0.4249999999999999,
+        "pra_mean": 4.0,
+        "stl_mean": 0.25465,
+        "blk_mean": 0.2083499999999999,
+        "tov_mean": 0.6944999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 11.575
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Azura Stevens",
+        "player_id": 3142010,
+        "pts_mean": 2.325,
+        "reb_mean": 1.1625,
+        "ast_mean": 0.3875,
+        "threes_mean": 0.0,
+        "pra_mean": 3.875,
+        "stl_mean": 0.2376,
+        "blk_mean": 0.1944,
+        "tov_mean": 0.648,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 10.8
+      },
+      {
+        "team": "CHI",
+        "opponent": "ATL",
+        "player_name": "Sidney Cooks",
+        "player_id": 4281245,
+        "pts_mean": 2.0,
+        "reb_mean": 1.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 3.0,
+        "stl_mean": 0.2199999999999999,
+        "blk_mean": 0.18,
+        "tov_mean": 0.6,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 10.0
+      }
+    ],
+    "away": [
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Angel Reese",
+        "player_id": 4433402,
+        "pts_mean": 13.472857142857142,
+        "reb_mean": 10.132857142857144,
+        "ast_mean": 2.838571428571429,
+        "threes_mean": 0.0,
+        "pra_mean": 26.444285714285712,
+        "stl_mean": 0.6819575714285713,
+        "blk_mean": 0.5579652857142856,
+        "tov_mean": 1.8598842857142848,
+        "pts_sd": 3.3682142857142856,
+        "reb_sd": 2.533214285714286,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.611071428571428,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 30.998071428571425
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Rhyne Howard",
+        "player_id": 4398674,
+        "pts_mean": 17.406666666666666,
+        "reb_mean": 4.87,
+        "ast_mean": 3.333333333333333,
+        "threes_mean": 3.14,
+        "pra_mean": 25.61,
+        "stl_mean": 0.7278736666666666,
+        "blk_mean": 0.595533,
+        "tov_mean": 1.98511,
+        "pts_sd": 4.351666666666667,
+        "reb_sd": 1.2175,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.4025,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 33.085166666666666
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Allisha Gray",
+        "player_id": 3058901,
+        "pts_mean": 19.572857142857146,
+        "reb_mean": 4.141428571428572,
+        "ast_mean": 0.6928571428571428,
+        "threes_mean": 1.417142857142857,
+        "pra_mean": 24.40714285714286,
+        "stl_mean": 0.753166857142857,
+        "blk_mean": 0.6162274285714284,
+        "tov_mean": 2.054091428571428,
+        "pts_sd": 4.893214285714286,
+        "reb_sd": 1.035357142857143,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 6.101785714285715,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 34.23485714285714
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Jordin Canada",
+        "player_id": 3142250,
+        "pts_mean": 11.004285714285714,
+        "reb_mean": 4.944285714285714,
+        "ast_mean": 8.29142857142857,
+        "threes_mean": 0.6214285714285714,
+        "pra_mean": 24.24,
+        "stl_mean": 0.6581912857142856,
+        "blk_mean": 0.5385201428571428,
+        "tov_mean": 1.7950671428571428,
+        "pts_sd": 2.7510714285714286,
+        "reb_sd": 1.2360714285714285,
+        "ast_sd": 2.0728571428571425,
+        "threes_sd": 1.0,
+        "pra_sd": 6.06,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 29.91778571428572
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Maite Cazorla",
+        "player_id": 3907713,
+        "pts_mean": 5.0,
+        "reb_mean": 4.0,
+        "ast_mean": 4.0,
+        "threes_mean": 0.0,
+        "pra_mean": 13.0,
+        "stl_mean": 0.484,
+        "blk_mean": 0.3959999999999999,
+        "tov_mean": 1.3199999999999998,
+        "pts_sd": 1.25,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.25,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 22.0
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Te-Hina Paopao",
+        "player_id": 4433431,
+        "pts_mean": 7.994285714285714,
+        "reb_mean": 2.0742857142857143,
+        "ast_mean": 2.0985714285714288,
+        "threes_mean": 1.8814285714285712,
+        "pra_mean": 12.167142857142856,
+        "stl_mean": 0.3742812857142856,
+        "blk_mean": 0.3062301428571428,
+        "tov_mean": 1.0207671428571428,
+        "pts_sd": 1.9985714285714284,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 3.041785714285714,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "G",
+        "minutes": 17.012785714285712
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Naz Hillmon",
+        "player_id": 4398915,
+        "pts_mean": 5.506666666666666,
+        "reb_mean": 4.1066666666666665,
+        "ast_mean": 0.75,
+        "threes_mean": 0.2066666666666666,
+        "pra_mean": 10.363333333333332,
+        "stl_mean": 0.6419929999999999,
+        "blk_mean": 0.5252669999999999,
+        "tov_mean": 1.7508899999999998,
+        "pts_sd": 1.3766666666666665,
+        "reb_sd": 1.0266666666666666,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.590833333333333,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "position": "F",
+        "minutes": 29.1815
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Stephanie Jones",
+        "player_id": 4065785,
+        "pts_mean": 3.0,
+        "reb_mean": 5.999999999999999,
+        "ast_mean": 1.0,
+        "threes_mean": 0.0,
+        "pra_mean": 9.999999999999998,
+        "stl_mean": 0.4399999999999999,
+        "blk_mean": 0.36,
+        "tov_mean": 1.2,
+        "pts_sd": 1.0,
+        "reb_sd": 1.4999999999999998,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 2.4999999999999996,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 20.0
+      },
+      {
+        "team": "ATL",
+        "opponent": "CHI",
+        "player_name": "Laila Phelia",
+        "player_id": 4433541,
+        "pts_mean": 0.0,
+        "reb_mean": 0.0,
+        "ast_mean": 0.0,
+        "threes_mean": 0.0,
+        "pra_mean": 0.0,
+        "stl_mean": 0.242,
+        "blk_mean": 0.1979999999999999,
+        "tov_mean": 0.6599999999999999,
+        "pts_sd": 1.0,
+        "reb_sd": 1.0,
+        "ast_sd": 1.0,
+        "threes_sd": 1.0,
+        "pra_sd": 1.0,
+        "stl_sd": 1.0,
+        "blk_sd": 1.0,
+        "tov_sd": 1.0,
+        "q_pts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_reb": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_ast": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "q_threes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "minutes": 11.0
+      }
+    ]
+  },
+  "home_team_total_pts_mean": 102.81785714285714,
+  "away_team_total_pts_mean": 82.95761904761905,
+  "excluded_player_keys_by_team": {
+    "CHI": [],
+    "ATL": []
+  },
+  "pregame_context": {
+    "home_injuries_out": 0,
+    "away_injuries_out": 0,
+    "home_pace": 83.32666666666667,
+    "away_pace": 82.83,
+    "home_b2b": false,
+    "away_b2b": false
+  },
+  "n_sims": 1000
+}
