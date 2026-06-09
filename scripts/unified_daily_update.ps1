@@ -188,7 +188,6 @@ function Invoke-Step {
             return
         }
 
-        }
     }
 
     finally {
