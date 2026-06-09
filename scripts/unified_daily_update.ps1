@@ -2657,7 +2657,7 @@ function Invoke-GitPublish {
         if (-not (Test-Path (Join-Path $RepoPath ".git"))) {
             throw "RepoPath is not a valid git repo: $RepoPath"
     }
-    
+
     Push-Location $RepoPath
     try {
         $result.branch = Get-CurrentBranch -RepoPath $RepoPath
@@ -2736,10 +2736,22 @@ function Invoke-GitPublish {
             throw "git rev-parse failed for $RepoPath with exit code $LASTEXITCODE"
         }
 
-        & git push $RemoteName $result.branch
+       # ✅ Ensure remote name exists
+        if ([string]::IsNullOrWhiteSpace($RemoteName)) {
+            $RemoteName = "origin"
+        }
+
+        # ✅ Ensure branch exists
+        if ([string]::IsNullOrWhiteSpace($result.branch)) {
+            throw "Branch name is empty — cannot push"
+        }
+
+        Write-Host "Pushing to $RemoteName $($result.branch)"
+
+        & git push $RemoteName "HEAD:$($result.branch)"
         if ($LASTEXITCODE -ne 0) {
             throw "git push failed for $RepoPath with exit code $LASTEXITCODE"
-        }
+        }   
 
         $result.status = 'pushed'
         return [pscustomobject]$result
