@@ -2805,10 +2805,20 @@ function Invoke-GitPublish {
 
         Write-Host "Pushing to $RemoteName $($result.branch)"
 
-        & git push $RemoteName "HEAD:$($result.branch)"
+        & git push $RemoteName $result.branch
         if ($LASTEXITCODE -ne 0) {
-            throw "git push failed for $RepoPath with exit code $LASTEXITCODE"
-        }   
+            Write-Host "⚠️ Push rejected, attempting pull + rebase..." -ForegroundColor Yellow
+
+            
+            & git pull --rebase $RemoteName $result.branch
+            & git push $RemoteName $result.branch
+
+
+            if ($LASTEXITCODE -ne 0) {
+                throw "git push failed after retry"
+            }
+        }
+ 
 
         $result.status = 'pushed'
         return [pscustomobject]$result
