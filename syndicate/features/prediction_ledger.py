@@ -97,6 +97,68 @@ def _latest_prediction_index(records: list[dict[str, Any]]) -> dict[str, dict[st
     return latest
 
 
+def _read_signal_weights(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"schema_version": SCHEMA_VERSION, "default_weight": 1.0, "weights": {}}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"schema_version": SCHEMA_VERSION, "default_weight": 1.0, "weights": {}}
+    if not isinstance(payload, dict):
+        return {"schema_version": SCHEMA_VERSION, "default_weight": 1.0, "weights": {}}
+    payload.setdefault("schema_version", SCHEMA_VERSION)
+    payload.setdefault("default_weight", 1.0)
+    payload.setdefault("weights", {})
+    if not isinstance(payload.get("weights"), dict):
+        payload["weights"] = {}
+    return payload
+
+
+def _write_signal_weights(path: Path, payload: Mapping[str, Any]) -> None:
+    _ensure_parent(path)
+    path.write_text(json.dumps(dict(payload), indent=2, sort_keys=True, ensure_ascii=False, default=str), encoding="utf-8")
+
+
+def _signal_weight(signal_name: Any, *, weights_payload: Mapping[str, Any] | None = None) -> float:
+    payload = weights_payload if isinstance(weights_payload, Mapping) else _read_signal_weights(DEFAULT_SIGNAL_WEIGHTS_PATH)
+    default_weight = _coerce_float(payload.get("default_weight")) or 1.0
+    weights = payload.get("weights") if isinstance(payload.get("weights"), Mapping) else {}
+    key = _normalize_text(signal_name)
+    if not key:
+        return default_weight
+    weight = _coerce_float(weights.get(key))
+    return weight if weight is not None else default_weight
+
+
+def _update_signal_weights_from_prediction(record: Mapping[str, Any], *, weights_path: Path | None = None) -> dict[str, Any]:
+    path = Path(weights_path) if weights_path is not None else DEFAULT_SIGNAL_WEIGHTS_PATH
+    payload = _read_signal_weights(path)
+    weights = dict(payload.get("weights") or {})
+    signals = record.get("signals") if isinstance(record.get("signals"), Mapping) else {}
+    contributions = signals.get("signal_contributions") if isinstance(signals.get("signal_contributions"), Mapping) else {}
+    if not contributions:
+        return payload
+
+    result = record.get("result") if isinstance(record.get("result"), Mapping) else {}
+    outcome = _normalize_text((result.get("outcome") if isinstance(result, Mapping) else record.get("outcome"))).lower()
+    if outcome not in {"win", "loss"}:
+        return payload
+
+    outcome_sign = 1.0 if outcome == "win" else -1.0
+    for signal_name, contribution in contributions.items():
+        contribution_value = _coerce_float(contribution)
+        if contribution_value is None:
+            continue
+        current_weight = _signal_weight(signal_name, weights_payload=payload)
+        updated_weight = max(0.5, min(1.5, current_weight + (contribution_value * outcome_sign * 0.03)))
+        weights[str(signal_name)] = round(updated_weight, 4)
+
+    payload["weights"] = weights
+    payload["updated_at"] = _utc_now()
+    _write_signal_weights(path, payload)
+    return payload
+
+
 @dataclass(frozen=True)
 class PredictionRecord:
     id: str = field(default_factory=_new_id)
@@ -267,6 +329,7 @@ def record_result(
         prediction["result"] = result_dict
         prediction["updated_at"] = _utc_now()
         payload["predictions"] = predictions
+        _update_signal_weights_from_prediction(prediction)
 
     payload["updated_at"] = _utc_now()
     _write_payload(path, payload)
@@ -558,10 +621,12 @@ def analyze_prediction_performance(ledger_path: Path | str | None = None) -> dic
 __all__ = [
     "SCHEMA_VERSION",
     "DEFAULT_LEDGER_PATH",
+    "DEFAULT_SIGNAL_WEIGHTS_PATH",
     "PredictionRecord",
     "PredictionResult",
     "record_prediction",
     "record_result",
     "load_all_predictions",
     "get_performance_summary",
+    "_signal_weight",
 ]

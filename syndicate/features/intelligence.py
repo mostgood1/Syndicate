@@ -33,6 +33,7 @@ from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_score
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
 from syndicate.features.market_data import attach_market_data as _attach_market_data
 from syndicate.features.simulation_engine import SimulationEngine
+from syndicate.features.prediction_ledger import _signal_weight
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.recommendation_engine import filter_candidates
@@ -1044,11 +1045,13 @@ def _candidate_signal_contributions(candidate: dict[str, Any]) -> tuple[dict[str
             delta *= 1.2
         elif any(token in key for token in ("pace", "usage", "shot", "role", "environment", "possession", "pressure")):
             delta *= 1.1
+        weight = _signal_weight(key)
         contributions.append(
             {
                 "signal_name": key,
                 "label": label,
-                "contribution": round((delta * 2.5 * direction) / float(len(relevant_signals)), 3),
+                "contribution": round(((delta * 2.5 * direction) / float(len(relevant_signals))) * weight, 3),
+                "weight": round(weight, 4),
             }
         )
 
