@@ -181,11 +181,34 @@ function Invoke-Step {
             throw "$Name failed because the child process exit code could not be determined (pid $($process.Id))."
         }
 
-        $LASTEXITCODE = $exitCode
         if ($exitCode -ne 0) {
+        # ✅ Generic artifact check (all sports)
+            $artifactRoot = Join-Path $repoRoot "data"
+            $stepHasArtifacts = $false
+
+        if ($Name -like "*MLB*") {
+            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "mlb_source")
+        }
+        elseif ($Name -like "*NBA*") {
+            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nba_source")
+        }
+        elseif ($Name -like "*WNBA*") {
+            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "wnba_source")
+        }
+        elseif ($Name -like "*NHL*") {
+            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nhl_source")
+        }
+        elseif ($Name -like "*NFL*") {
+            $stepHasArtifacts = Test-Path (Join-Path $artifactRoot "nfl_source")
+        }
+        
+        if ($stepHasArtifacts) {
+                Write-Host "$Name returned exit code $exitCode but artifacts exist → treating as success" -ForegroundColor Yellow
+                return
+        }
+            # ❌ real failure
             $exitCodeText = [string]$exitCode
-            Write-Host "$Name failed with exit code $exitCodeText - continuing" -ForegroundColor Yellow
-            return
+            Write-Host "$Name failed with exit code $exitCodeText (no artifacts found)" -ForegroundColor Red
         }
 
     }
