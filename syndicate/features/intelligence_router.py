@@ -6,6 +6,24 @@ def question_requests_explainer(question: str) -> bool:
     return any(token in lowered for token in ("why", "matchup", "matchups", "analysis", "breakdown", "explain"))
 
 
+def question_requests_performance_analytics(question: str) -> bool:
+    lowered = str(question or "").lower()
+    return any(
+        token in lowered
+        for token in (
+            "how are we performing",
+            "best signals",
+            "where losing",
+            "where are we losing",
+            "performance",
+            "roi",
+            "win rate",
+            "clv",
+            "signals",
+        )
+    )
+
+
 def analysis_focus_from_question(
     question: str,
     requested_sports: list[str] | tuple[str, ...] | None,
@@ -16,6 +34,8 @@ def analysis_focus_from_question(
     question_requests_chart,
 ) -> str | None:
     lowered_question = str(question or "").lower()
+    if question_requests_performance_analytics(question):
+        return "prediction_performance"
     if question_targets_mlb_home_runs(question):
         return "mlb_home_runs"
 
