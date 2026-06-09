@@ -184,7 +184,7 @@ function Invoke-Step {
         $LASTEXITCODE = $exitCode
         if ($exitCode -ne 0) {
             $exitCodeText = [string]$exitCode
-            Write-Host "$Name failed with exit code $exitCodeText — continuing" -ForegroundColor Yellow
+            Write-Host "$Name failed with exit code $exitCodeText - continuing" -ForegroundColor Yellow
             return
         }
 
@@ -2175,7 +2175,12 @@ function Assert-AdvancedDataReady {
 
             return
         }
+
+        default {
+            return
+        }
     }
+}
 
 function Get-ProcessEnvValue {
     param([string[]]$Names)
@@ -2680,7 +2685,7 @@ function Invoke-GitPublish {
 
         if (-not (Test-Path (Join-Path $RepoPath ".git"))) {
             throw "RepoPath is not a valid git repo: $RepoPath"
-    }
+        }
 
     Push-Location $RepoPath
     try {
@@ -2729,7 +2734,7 @@ function Invoke-GitPublish {
         # Only attempt commit when there are staged changes.
         
         if ([string]::IsNullOrWhiteSpace($RepoPath)) {
-            throw "RepoPath is empty — cannot perform git operations"
+            throw "RepoPath is empty - cannot perform git operations"
         }
 
         & git diff --cached --quiet --exit-code
@@ -2760,14 +2765,14 @@ function Invoke-GitPublish {
             throw "git rev-parse failed for $RepoPath with exit code $LASTEXITCODE"
         }
 
-       # ✅ Ensure remote name exists
+    # Ensure remote name exists
         if ([string]::IsNullOrWhiteSpace($RemoteName)) {
             $RemoteName = "origin"
         }
 
-        # ✅ Ensure branch exists
+        # Ensure branch exists
         if ([string]::IsNullOrWhiteSpace($result.branch)) {
-            throw "Branch name is empty — cannot push"
+            throw "Branch name is empty - cannot push"
         }
 
         Write-Host "Pushing to $RemoteName $($result.branch)"
