@@ -42,266 +42,469 @@
 
 {% block extra_scripts %}
 <script>
-console.log("JS LOADED");
+let lastVersion = null;
 
-async function loadIntelligence() {
-  try {
-    const res = await fetch("/api/intelligence/query", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ question: "top edges today" })
-    });
+function numericValue(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
 
-    const json = await res.json();
-    const response = json.response || {};
+function edgeValue(item) {
+  return numericValue(item.edge)
+    ?? numericValue(item.adjusted_edge)
+    ?? numericValue(item.expected_value)
+    ?? numericValue(item.ev_current)
+    ?? 0;
+}
 
-    console.log("REAL RESPONSE:", response);
+function edgeTheme(item) {
+  const edge = edgeValue(item);
+  if (edge > 0.06) {
+    return {
+      color: "#2ecc71",
+      border: "rgba(46, 204, 113, .55)",
+      background: "rgba(46, 204, 113, .10)",
+      label: "HIGH EDGE",
+    };
+  }
+  if (edge > 0.03) {
+    return {
+      color: "#f1c40f",
+      border: "rgba(241, 196, 15, .55)",
+      background: "rgba(241, 196, 15, .10)",
+      label: "MEDIUM EDGE",
+    };
+  }
+  return {
+    color: "#7f8c8d",
+    border: "rgba(127, 140, 141, .45)",
+    background: "rgba(127, 140, 141, .10)",
+    label: "LOW EDGE",
+  };
+}
 
-    if (!response || Object.keys(response).length === 0) {
-      document.getElementById("picks").innerHTML = "No response data";
-      return;
-    }
+function badgeStyle(kind) {
+  const styles = {
+    LIVE: { background: "rgba(59, 130, 246, .16)", color: "#d7e9ff", border: "rgba(59, 130, 246, .38)" },
+    PREGAME: { background: "rgba(168, 85, 247, .16)", color: "#efe0ff", border: "rgba(168, 85, 247, .38)" },
+    "HIGH CONFIDENCE": { background: "rgba(46, 204, 113, .16)", color: "#d6ffe4", border: "rgba(46, 204, 113, .38)" },
+    "HIGH VARIANCE": { background: "rgba(231, 76, 60, .16)", color: "#ffd9d5", border: "rgba(231, 76, 60, .38)" },
+    default: { background: "rgba(255,255,255,.08)", color: "#f3f4f6", border: "rgba(255,255,255,.16)" },
+  };
+  return styles[kind] || styles.default;
+}
 
-    // ===== PORTFOLIO =====
-    const portfolio = response.portfolio || {};
-    const portfolioEl = document.getElementById("portfolio");
-    const topOpportunitiesEl = document.getElementById("top-opportunities");
+function renderBadge(label) {
+  const style = badgeStyle(label);
+  return `
+    <span style="display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; background:${style.background}; color:${style.color}; border:1px solid ${style.border};">
+      ${label}
+    </span>
+  `;
+}
 
+function renderCardBadges(item) {
+  const badges = [];
+  const tag = String(item.tag || item.timing || item.phase || "").trim().toUpperCase();
+  const sportState = item.is_live || tag === "LIVE" ? "LIVE" : (tag === "PREGAME" ? "PREGAME" : null);
+  if (sportState) {
+    badges.push(renderBadge(sportState));
+  }
+
+  const confidence = numericValue(item.confidence);
+  if (confidence !== null && confidence >= 0.7) {
+    badges.push(renderBadge("HIGH CONFIDENCE"));
+  }
+
+  const variance = numericValue(item.volatility) ?? numericValue(item.volatility_score);
+  if (variance !== null && variance >= 0.67) {
+    badges.push(renderBadge("HIGH VARIANCE"));
+  }
+
+  const theme = edgeTheme(item);
+  badges.push(`
+    <span style="display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; background:${theme.background}; color:${theme.color}; border:1px solid ${theme.border};">
+      ${theme.label}
+    </span>
+  `);
+
+  return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${badges.join("")}</div>`;
+}
+
+function renderLoadingState() {
+  const portfolioEl = document.getElementById("portfolio");
+  const topOpportunitiesEl = document.getElementById("top-opportunities");
+  const scannerEl = document.getElementById("scanner");
+  const picksEl = document.getElementById("picks");
+  const parlaysEl = document.getElementById("parlays");
+
+  if (topOpportunitiesEl) {
+    topOpportunitiesEl.innerHTML = `
+      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
+        <div style="height:18px;width:180px;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
+        <div style="height:14px;width:85%;background:rgba(255,255,255,.06);border-radius:999px;margin-bottom:10px;animation:pulse 1.4s ease-in-out infinite;"></div>
+        <div style="height:14px;width:72%;background:rgba(255,255,255,.06);border-radius:999px;animation:pulse 1.4s ease-in-out infinite;"></div>
+      </div>
+    `;
+  }
+
+  if (portfolioEl) {
     portfolioEl.innerHTML = `
       <div style="background:#111;color:white;padding:16px;border-radius:12px;">
         <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
         <div style="margin-top:10px;">
-          <div><strong>Exposure:</strong> ${portfolio.total_exposure || "—"}</div>
-          <div><strong>Risk:</strong> ${portfolio.risk_level || "—"}</div>
+          <div style="height:14px;width:70%;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:10px;animation:pulse 1.4s ease-in-out infinite;"></div>
+          <div style="height:14px;width:55%;background:rgba(255,255,255,.08);border-radius:999px;animation:pulse 1.4s ease-in-out infinite;"></div>
         </div>
       </div>
     `;
+  }
 
-    // ===== PICKS =====
-    const scannerEl = document.getElementById("scanner");
-    const picksEl = document.getElementById("picks");
+  if (scannerEl) {
+    scannerEl.innerHTML = `
+      <div style="background:#141414;color:white;padding:16px;border-radius:12px;margin-bottom:12px;">
+        <div style="height:16px;width:220px;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
+        <div style="height:12px;width:90%;background:rgba(255,255,255,.06);border-radius:999px;margin-bottom:8px;animation:pulse 1.4s ease-in-out infinite;"></div>
+        <div style="height:12px;width:78%;background:rgba(255,255,255,.06);border-radius:999px;animation:pulse 1.4s ease-in-out infinite;"></div>
+      </div>
+    `;
+  }
 
-    const topOpportunities = (response.top_opportunities || [])
-      .slice()
-      .sort((a, b) => (Number(b.expected_value) || 0) - (Number(a.expected_value) || 0));
+  if (picksEl) {
+    picksEl.innerHTML = `
+      <div style="background:#1a1a1a;color:white;padding:16px;border-radius:12px;margin-bottom:12px;">
+        <div style="height:16px;width:200px;background:rgba(255,255,255,.08);border-radius:999px;margin-bottom:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
+        <div style="height:72px;background:rgba(255,255,255,.06);border-radius:12px;margin-bottom:10px;animation:pulse 1.4s ease-in-out infinite;"></div>
+        <div style="height:72px;background:rgba(255,255,255,.06);border-radius:12px;animation:pulse 1.4s ease-in-out infinite;"></div>
+      </div>
+    `;
+  }
 
-    const allRecs = (response.recommendations || [])
-      .sort((a, b) => (b.edge || 0) - (a.edge || 0));
+  if (parlaysEl) {
+    parlaysEl.innerHTML = `
+      <div style="opacity:.8;color:white;padding:8px 0;">Loading parlays…</div>
+    `;
+  }
+}
 
-    const topLiveOpportunities = (response.top_live_opportunities || []).slice(0, 5);
+function renderEmptyState() {
+  const portfolioEl = document.getElementById("portfolio");
+  const topOpportunitiesEl = document.getElementById("top-opportunities");
+  const scannerEl = document.getElementById("scanner");
+  const picksEl = document.getElementById("picks");
+  const parlaysEl = document.getElementById("parlays");
 
-    // ✅ Split by tag
-    const liveRecs = allRecs.filter(r => r.tag === "LIVE");
-    const pregameRecs = allRecs.filter(r => r.tag === "PREGAME");
+  if (portfolioEl) {
+    portfolioEl.innerHTML = `
+      <div style="background:#111;color:white;padding:16px;border-radius:12px;">
+        <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
+        <div style="margin-top:10px; opacity:.8;">No opportunities available</div>
+      </div>
+    `;
+  }
 
-    function renderSection(title, recs) {
-      if (!recs.length) {
-        return `<div style="opacity:.5; margin-bottom:20px;">No ${title} picks</div>`;
-      }
+  if (topOpportunitiesEl) {
+    topOpportunitiesEl.innerHTML = `
+      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
+        <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
+        <div style="opacity:.65;">No opportunities available</div>
+      </div>
+    `;
+  }
 
-      function numericValue(value) {
-        return typeof value === "number" && Number.isFinite(value) ? value : null;
-      }
+  if (scannerEl) {
+    scannerEl.innerHTML = `
+      <div style="background:#141414;color:white;padding:16px;border-radius:12px;">
+        <div style="opacity:.65;">No opportunities available</div>
+      </div>
+    `;
+  }
 
-      function liveIndicatorChips(p) {
-        const chips = [];
-        const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
-        const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
-        const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
+  if (picksEl) {
+    picksEl.innerHTML = `
+      <div style="background:#1a1a1a;color:white;padding:16px;border-radius:12px;">
+        <div style="opacity:.65;">No opportunities available</div>
+      </div>
+    `;
+  }
 
-        if (evDelta !== null) {
-          chips.push(`
-            <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-              EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
-            </span>
-          `);
-        }
+  if (parlaysEl) {
+    parlaysEl.innerHTML = `<div style="opacity:.65;color:white;">No opportunities available</div>`;
+  }
+}
 
-        if (lineDelta !== null) {
-          chips.push(`
-            <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-              Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
-            </span>
-          `);
-        }
+function renderErrorState(message) {
+  const portfolioEl = document.getElementById("portfolio");
+  const topOpportunitiesEl = document.getElementById("top-opportunities");
+  const scannerEl = document.getElementById("scanner");
+  const picksEl = document.getElementById("picks");
+  const parlaysEl = document.getElementById("parlays");
+  const safeMessage = message || "Failed to load data";
 
-        if (confidenceStability !== null) {
-          chips.push(`
-            <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
-              Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
-            </span>
-          `);
-        }
+  if (topOpportunitiesEl) {
+    topOpportunitiesEl.innerHTML = `
+      <div style="background:#2a1111;color:#ffd4d4;padding:18px;border-radius:14px;border:1px solid rgba(255,100,100,.18);">
+        <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
+        <div>${safeMessage}</div>
+      </div>
+    `;
+  }
 
-        return chips.length
-          ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
-          : "";
-      }
+  if (portfolioEl) {
+    portfolioEl.innerHTML = `
+      <div style="background:#2a1111;color:#ffd4d4;padding:16px;border-radius:12px;border:1px solid rgba(255,100,100,.18);">
+        <div style="font-size:13px; opacity:.85;">Portfolio Overview</div>
+        <div style="margin-top:10px;">${safeMessage}</div>
+      </div>
+    `;
+  }
 
-      return `
-        <div style="margin-bottom:25px;">
-          <h3 style="margin-bottom:10px;">${title}</h3>
-          ${recs.map((p, i) => {
-            const edge = (p.edge * 100).toFixed(1);
+  if (scannerEl) {
+    scannerEl.innerHTML = `
+      <div style="background:#2a1111;color:#ffd4d4;padding:16px;border-radius:12px;border:1px solid rgba(255,100,100,.18);">
+        ${safeMessage}
+      </div>
+    `;
+  }
 
-            const confidence = p.confidence
-              ? Math.round(p.confidence * 100) + "%"
-              : "—";
+  if (picksEl) {
+    picksEl.innerHTML = `
+      <div style="background:#2a1111;color:#ffd4d4;padding:16px;border-radius:12px;border:1px solid rgba(255,100,100,.18);">
+        ${safeMessage}
+      </div>
+    `;
+  }
 
-            const betSize = p.recommended_bet_size
-              ? (p.recommended_bet_size * 100).toFixed(1) + "%"
-              : "—";
+  if (parlaysEl) {
+    parlaysEl.innerHTML = `<div style="color:#ffd4d4;">${safeMessage}</div>`;
+  }
+}
 
-            const color =
-              p.edge > 0.06 ? "#2ecc71" :
-              p.edge > 0.03 ? "#f39c12" :
-              "#7f8c8d";
+function renderIntelligence(response) {
+  if (!response || Object.keys(response).length === 0) {
+    renderEmptyState();
+    return;
+  }
 
-            return `
-              <div style="
-                background:#1a1a1a;
-                color:white;
-                padding:16px;
-                border-radius:12px;
-                margin-bottom:10px;
-                border-left:6px solid ${color};
-              ">
+  // ===== PORTFOLIO =====
+  const portfolio = response.portfolio || {};
+  const portfolioEl = document.getElementById("portfolio");
+  const topOpportunitiesEl = document.getElementById("top-opportunities");
 
-                <div style="display:flex; justify-content:space-between;">
-                  <div style="font-size:16px; font-weight:600;">
-                    ${i === 0 ? "🔥 " : ""}${p.selection}
-                  </div>
+  portfolioEl.innerHTML = `
+    <div style="background:#111;color:white;padding:16px;border-radius:12px;">
+      <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
+      <div style="margin-top:10px;">
+        <div><strong>Exposure:</strong> ${portfolio.total_exposure || "—"}</div>
+        <div><strong>Risk:</strong> ${portfolio.risk_level || "—"}</div>
+      </div>
+    </div>
+  `;
 
-                  <div style="font-weight:600;color:${color};">
-                    ${edge}%
-                  </div>
-                </div>
+  // ===== PICKS =====
+  const scannerEl = document.getElementById("scanner");
+  const picksEl = document.getElementById("picks");
 
-                <div style="font-size:12px; margin-top:4px; opacity:.6;">
-                  ${p.tag || "EDGE"}
-                </div>
+  const topOpportunities = (response.top_opportunities || [])
+    .slice()
+    .sort((a, b) => (Number(b.expected_value) || 0) - (Number(a.expected_value) || 0));
 
-                <div style="display:flex; gap:20px; margin-top:8px; font-size:12px;">
-                  <div>Confidence: ${confidence}</div>
-                  <div>Bet Size: ${betSize}</div>
-                </div>
+  const allRecs = (response.recommendations || [])
+    .sort((a, b) => (b.edge || 0) - (a.edge || 0));
 
-                ${liveIndicatorChips(p)}
+  const topLiveOpportunities = (response.top_live_opportunities || []).slice(0, 5);
 
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `;
+  // ✅ Split by tag
+  const liveRecs = allRecs.filter(r => r.tag === "LIVE");
+  const pregameRecs = allRecs.filter(r => r.tag === "PREGAME");
+
+  function renderSection(title, recs) {
+    if (!recs.length) {
+      return `<div style="opacity:.5; margin-bottom:20px;">No ${title} picks</div>`;
     }
 
-    function renderScannerSection(title, recs) {
-      if (!recs.length) {
-        return "";
+    function liveIndicatorChips(p) {
+      const chips = [];
+      const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
+      const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
+      const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
+
+      if (evDelta !== null) {
+        chips.push(`
+          <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+            EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
+          </span>
+        `);
       }
 
-      function numericValue(value) {
-        return typeof value === "number" && Number.isFinite(value) ? value : null;
+      if (lineDelta !== null) {
+        chips.push(`
+          <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+            Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
+          </span>
+        `);
       }
 
-      function liveIndicatorChips(p) {
-        const chips = [];
-        const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
-        const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
-        const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
-
-        if (evDelta !== null) {
-          chips.push(`
-            <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-              EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
-            </span>
-          `);
-        }
-
-        if (lineDelta !== null) {
-          chips.push(`
-            <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
-              Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
-            </span>
-          `);
-        }
-
-        if (confidenceStability !== null) {
-          chips.push(`
-            <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
-              Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
-            </span>
-          `);
-        }
-
-        return chips.length
-          ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
-          : "";
+      if (confidenceStability !== null) {
+        chips.push(`
+          <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
+            Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
+          </span>
+        `);
       }
 
-      return `
-        <div style="margin-bottom:25px;">
-          <h3 style="margin-bottom:10px;">${title}</h3>
-          ${recs.map((p, i) => {
-            const evCurrent = typeof p.ev_current === "number" ? (p.ev_current * 100).toFixed(1) : "—";
-            const evDelta = typeof p.ev_delta === "number" ? (p.ev_delta * 100).toFixed(1) : null;
-            const lineImpact = typeof p.line_movement_impact === "number" ? (p.line_movement_impact * 100).toFixed(1) : null;
-            const confidence = typeof p.confidence === "number" ? Math.round(p.confidence * 100) + "%" : "—";
-            const edge = typeof p.edge === "number" ? (p.edge * 100).toFixed(1) + "%" : "—";
-            const color = typeof p.ev_delta === "number" && p.ev_delta > 0 ? "#2ecc71" : "#f39c12";
-            const badge = p.movement_label || (evDelta ? (Number(evDelta) > 0 ? "Edge improving" : "Edge softening") : "Positive EV");
-
-            return `
-              <div style="
-                background:#141414;
-                color:white;
-                padding:16px;
-                border-radius:12px;
-                margin-bottom:10px;
-                border-left:6px solid ${color};
-              ">
-                <div style="display:flex; justify-content:space-between; gap:12px;">
-                  <div style="font-size:16px; font-weight:600;">${i === 0 ? "⚡ " : ""}${p.selection}</div>
-                  <div style="font-weight:600;color:${color};">EV ${evCurrent}%</div>
-                </div>
-
-                <div style="font-size:12px; margin-top:4px; opacity:.7;">
-                  ${p.sport} | ${p.market} | ${badge}
-                </div>
-
-                <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; font-size:12px; opacity:.9;">
-                  <div>Confidence: ${confidence}</div>
-                  <div>Edge: ${edge}</div>
-                  ${evDelta ? `<div>EV change: ${Number(evDelta) > 0 ? "+" : ""}${evDelta}%</div>` : ""}
-                  ${lineImpact ? `<div>Line impact: ${Number(lineImpact) > 0 ? "+" : ""}${lineImpact}%</div>` : ""}
-                </div>
-
-                ${liveIndicatorChips(p)}
-
-                ${p.reasoning ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">${p.reasoning}</div>` : ""}
-              </div>
-            `;
-          }).join("")}
-        </div>
-      `;
+      return chips.length
+        ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
+        : "";
     }
 
-    function renderTopOpportunitiesSection(recs) {
-      if (!recs.length) {
-        return `
-          <div style="
-            background:#101010;
-            color:white;
-            padding:18px;
-            border-radius:14px;
-            border:1px solid rgba(255,255,255,.08);
-          ">
-            <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
-            <div style="opacity:.65;">No opportunities available</div>
-          </div>
-        `;
+    return `
+      <div style="margin-bottom:25px;">
+        <h3 style="margin-bottom:10px;">${title}</h3>
+        ${recs.map((p, i) => {
+          const theme = edgeTheme(p);
+          const edge = (edgeValue(p) * 100).toFixed(1);
+
+          const confidence = p.confidence
+            ? Math.round(p.confidence * 100) + "%"
+            : "—";
+
+          const betSize = p.recommended_bet_size
+            ? (p.recommended_bet_size * 100).toFixed(1) + "%"
+            : "—";
+
+          return `
+            <div style="
+              background:${theme.background};
+              color:white;
+              padding:16px;
+              border-radius:12px;
+              margin-bottom:10px;
+              border-left:6px solid ${theme.color};
+              border:1px solid ${theme.border};
+            ">
+
+              <div style="display:flex; justify-content:space-between;">
+                <div style="font-size:16px; font-weight:600;">
+                  ${i === 0 ? "🔥 " : ""}${p.selection}
+                </div>
+
+                <div style="font-weight:600;color:${theme.color};">
+                  ${edge}%
+                </div>
+              </div>
+
+              <div style="font-size:12px; margin-top:4px; opacity:.6;">
+                ${p.tag || "EDGE"}
+              </div>
+
+              <div style="display:flex; gap:20px; margin-top:8px; font-size:12px;">
+                <div>Confidence: ${confidence}</div>
+                <div>Bet Size: ${betSize}</div>
+              </div>
+
+              ${renderCardBadges(p)}
+
+              ${liveIndicatorChips(p)}
+
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  function renderScannerSection(title, recs) {
+    if (!recs.length) {
+      return "";
+    }
+
+    function liveIndicatorChips(p) {
+      const chips = [];
+      const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
+      const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
+      const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
+
+      if (evDelta !== null) {
+        chips.push(`
+          <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+            EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
+          </span>
+        `);
       }
 
+      if (lineDelta !== null) {
+        chips.push(`
+          <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+            Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
+          </span>
+        `);
+      }
+
+      if (confidenceStability !== null) {
+        chips.push(`
+          <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
+            Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
+          </span>
+        `);
+      }
+
+      return chips.length
+        ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
+        : "";
+    }
+
+    return `
+      <div style="margin-bottom:25px;">
+        <h3 style="margin-bottom:10px;">${title}</h3>
+        ${recs.map((p, i) => {
+          const theme = edgeTheme(p);
+          const evCurrent = typeof p.ev_current === "number" ? (p.ev_current * 100).toFixed(1) : "—";
+          const evDelta = typeof p.ev_delta === "number" ? (p.ev_delta * 100).toFixed(1) : null;
+          const lineImpact = typeof p.line_movement_impact === "number" ? (p.line_movement_impact * 100).toFixed(1) : null;
+          const confidence = typeof p.confidence === "number" ? Math.round(p.confidence * 100) + "%" : "—";
+          const edge = (edgeValue(p) * 100).toFixed(1) + "%";
+          const badge = p.movement_label || (evDelta ? (Number(evDelta) > 0 ? "Edge improving" : "Edge softening") : theme.label);
+
+          return `
+            <div style="
+              background:${theme.background};
+              color:white;
+              padding:16px;
+              border-radius:12px;
+              margin-bottom:10px;
+              border-left:6px solid ${theme.color};
+              border:1px solid ${theme.border};
+            ">
+              <div style="display:flex; justify-content:space-between; gap:12px;">
+                <div style="font-size:16px; font-weight:600;">${i === 0 ? "⚡ " : ""}${p.selection}</div>
+                <div style="font-weight:600;color:${theme.color};">EV ${evCurrent}%</div>
+              </div>
+
+              <div style="font-size:12px; margin-top:4px; opacity:.7;">
+                ${p.sport} | ${p.market} | ${badge}
+              </div>
+
+              <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; font-size:12px; opacity:.9;">
+                <div>Confidence: ${confidence}</div>
+                <div>Edge: ${edge}</div>
+                ${evDelta ? `<div>EV change: ${Number(evDelta) > 0 ? "+" : ""}${evDelta}%</div>` : ""}
+                ${lineImpact ? `<div>Line impact: ${Number(lineImpact) > 0 ? "+" : ""}${lineImpact}%</div>` : ""}
+              </div>
+
+              ${renderCardBadges(p)}
+
+              ${liveIndicatorChips(p)}
+
+              ${p.reasoning ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">${p.reasoning}</div>` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  function renderTopOpportunitiesSection(recs) {
+    if (!recs.length) {
       return `
         <div style="
           background:#101010;
@@ -309,91 +512,152 @@ async function loadIntelligence() {
           padding:18px;
           border-radius:14px;
           border:1px solid rgba(255,255,255,.08);
-          margin-bottom:20px;
         ">
-          <h3 style="margin:0 0 12px 0;">Top Opportunities Right Now</h3>
-          ${recs.map((item, index) => {
-            const expectedValue = typeof item.expected_value === "number"
-              ? (item.expected_value * 100).toFixed(1) + "%"
-              : (item.expected_value ?? "—");
-            const confidence = typeof item.confidence === "number"
-              ? Math.round(item.confidence * 100) + "%"
-              : (item.confidence ?? "—");
-            const sport = item.sport || item.sport_slug || "—";
-            const bet = item.bet || item.selection || item.pick || item.market || "—";
-            const reasoning = item.reasoning || item.rationale || item.summary || "";
-            const evDelta = typeof item.ev_delta === "number" ? item.ev_delta : null;
-            const lineDelta = typeof item.line_movement_impact === "number" ? item.line_movement_impact : null;
-            const confidenceStability = typeof item.confidence_stability === "number" ? item.confidence_stability : (typeof item.confidence_delta === "number" ? item.confidence_delta : null);
-            const indicatorChips = [];
-
-            if (evDelta !== null) {
-              indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}</span>`);
-            }
-            if (lineDelta !== null) {
-              indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}</span>`);
-            }
-            if (confidenceStability !== null) {
-              indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}</span>`);
-            }
-
-            return `
-              <div style="
-                padding:14px 0;
-                border-top:${index === 0 ? "0" : "1px solid rgba(255,255,255,.08)"};
-              ">
-                <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                  <div style="font-weight:600;">${sport} · ${bet}</div>
-                  <div style="font-weight:600; color:#7dd3fc;">EV ${expectedValue}</div>
-                </div>
-                <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:12px; opacity:.82;">
-                  <div><strong>Confidence:</strong> ${confidence}</div>
-                </div>
-                ${indicatorChips.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${indicatorChips.join("")}</div>` : ""}
-                ${reasoning ? `<div style="margin-top:8px; font-size:12px; line-height:1.5; opacity:.78;">${reasoning}</div>` : ""}
-              </div>
-            `;
-          }).join("")}
+          <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
+          <div style="opacity:.65;">No opportunities available</div>
         </div>
       `;
     }
 
-    // ✅ Render sections
-    if (topOpportunitiesEl) {
-      topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(topOpportunities);
-    }
+    return `
+      <div style="
+        background:#101010;
+        color:white;
+        padding:18px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.08);
+        margin-bottom:20px;
+      ">
+        <h3 style="margin:0 0 12px 0;">Top Opportunities Right Now</h3>
+        ${recs.map((item, index) => {
+          const theme = edgeTheme(item);
+          const expectedValue = typeof item.expected_value === "number"
+            ? (item.expected_value * 100).toFixed(1) + "%"
+            : (item.expected_value ?? "—");
+          const confidence = typeof item.confidence === "number"
+            ? Math.round(item.confidence * 100) + "%"
+            : (item.confidence ?? "—");
+          const sport = item.sport || item.sport_slug || "—";
+          const bet = item.bet || item.selection || item.pick || item.market || "—";
+          const reasoning = item.reasoning || item.rationale || item.summary || "";
+          const evDelta = typeof item.ev_delta === "number" ? item.ev_delta : null;
+          const lineDelta = typeof item.line_movement_impact === "number" ? item.line_movement_impact : null;
+          const confidenceStability = typeof item.confidence_stability === "number" ? item.confidence_stability : (typeof item.confidence_delta === "number" ? item.confidence_delta : null);
+          const indicatorChips = [];
 
-    if (scannerEl) {
-      scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", topLiveOpportunities);
-    }
+          if (evDelta !== null) {
+            indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}</span>`);
+          }
+          if (lineDelta !== null) {
+            indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}</span>`);
+          }
+          if (confidenceStability !== null) {
+            indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}</span>`);
+          }
 
-    picksEl.innerHTML = `
-      ${renderSection("🔥 Live Opportunities", liveRecs)}
-      ${renderSection("📊 Pregame Edges", pregameRecs)}
+          return `
+            <div style="
+              padding:14px 0;
+              border-top:${index === 0 ? "0" : "1px solid rgba(255,255,255,.08)"};
+            ">
+              <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div style="font-weight:600;">${sport} · ${bet}</div>
+                <div style="font-weight:600; color:${theme.color};">EV ${expectedValue}</div>
+              </div>
+              <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:12px; opacity:.82;">
+                <div><strong>Confidence:</strong> ${confidence}</div>
+              </div>
+              ${renderCardBadges(item)}
+              ${indicatorChips.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${indicatorChips.join("")}</div>` : ""}
+              ${reasoning ? `<div style="margin-top:8px; font-size:12px; line-height:1.5; opacity:.78;">${reasoning}</div>` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
     `;
+  }
 
-    // ===== PARLAYS =====
-    const parlaysEl = document.getElementById("parlays");
-    const parlays = response.parlays || [];
+  // ✅ Render sections
+  if (topOpportunitiesEl) {
+    topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(topOpportunities);
+  }
 
-    if (parlays.length) {
-      parlaysEl.innerHTML = parlays.map(p => `
-        <div style="
-          padding:12px;
-          margin-bottom:10px;
-          border-radius:10px;
-          background:#222;
-          color:white;
-        ">
-          Edge: ${(p.combined_edge * 100).toFixed(1)}%
-        </div>
-      `).join("");
-    } else {
-      parlaysEl.innerHTML = `<div style="opacity:.6;">No parlays available</div>`;
+  if (scannerEl) {
+    scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", topLiveOpportunities);
+  }
+
+  picksEl.innerHTML = `
+    ${renderSection("🔥 Live Opportunities", liveRecs)}
+    ${renderSection("📊 Pregame Edges", pregameRecs)}
+  `;
+
+  // ===== PARLAYS =====
+  const parlaysEl = document.getElementById("parlays");
+  const parlays = response.parlays || [];
+
+  if (parlays.length) {
+    parlaysEl.innerHTML = parlays.map(p => `
+      <div style="
+        padding:12px;
+        margin-bottom:10px;
+        border-radius:10px;
+        background:#222;
+        color:white;
+      ">
+        Edge: ${(p.combined_edge * 100).toFixed(1)}%
+      </div>
+    `).join("");
+  } else {
+    parlaysEl.innerHTML = `<div style="opacity:.6;">No parlays available</div>`;
+  }
+}
+
+async function loadIntelligence() {
+  try {
+    if (lastVersion === null) {
+      renderLoadingState();
+    }
+    const res = await fetch("/api/intelligence/query", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ question: "top edges today" })
+    });
+
+    if (!res.ok) {
+      renderErrorState("Failed to load data");
+      return;
     }
 
+    const json = await res.json();
+    const version = json.version ?? null;
+
+    if (version !== null && version === lastVersion) {
+      return;
+    }
+
+    lastVersion = version;
+
+    const response = json.response || {};
+    if (!response || Object.keys(response).length === 0) {
+      renderEmptyState();
+      return;
+    }
+
+    const hasOpportunityData = Boolean(
+      (Array.isArray(response.top_opportunities) && response.top_opportunities.length) ||
+      (Array.isArray(response.recommendations) && response.recommendations.length) ||
+      (Array.isArray(response.parlays) && response.parlays.length) ||
+      (response.portfolio && Object.keys(response.portfolio).length)
+    );
+
+    if (!hasOpportunityData) {
+      renderEmptyState();
+      return;
+    }
+
+    renderIntelligence(response);
   } catch (err) {
-    console.error("Load error:", err);
+    renderErrorState("Failed to load data");
   }
 }
 

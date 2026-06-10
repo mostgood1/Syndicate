@@ -1,6 +1,6 @@
 {
   "date": "2026-06-10",
-  "generatedAt": "2026-06-10T12:59:44-05:00",
+  "generatedAt": "2026-06-10T13:09:48-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -23,13 +23,13 @@
     "archivedLiveProps": 0
   },
   "performance": {
-    "marketsRefreshed": true,
-    "marketRefreshMs": 8948.1,
-    "totalMs": 121498.6,
-    "snapshotLoadMs": 2.4,
-    "simContextLoadMs": 4.4,
+    "marketsRefreshed": false,
+    "marketRefreshMs": 20.8,
+    "totalMs": 1560.5,
+    "snapshotLoadMs": 1.9,
+    "simContextLoadMs": 0.6,
     "propEvalMs": 0.1,
-    "gameLensMs": 1.4,
+    "gameLensMs": 0.8,
     "gameCount": 15,
     "liveGameCount": 2,
     "feedFetchCount": 15,
@@ -680,7 +680,7 @@
                 4
               ],
               "tone": "strong",
-              "detail": "Live projection 3.9. Current 3.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "detail": "Live projection 3.8. Current 3.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
               "hitProb": 0.698,
               "source": "live",
               "actual": 3.0
@@ -693,23 +693,10 @@
                 15
               ],
               "tone": "strong",
-              "detail": "Live projection 15.7. Current 12.0. Starter still active in live game state. Supported ladders: 15 Last supported rung: 15",
+              "detail": "Live projection 15.3. Current 12.0. Starter still active in live game state. Supported ladders: 15 Last supported rung: 15",
               "hitProb": 0.938,
               "source": "live",
               "actual": 12.0
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.1. Current 3.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.679,
-              "source": "live",
-              "actual": 3.0
             }
           ]
         },
@@ -786,6 +773,34 @@
               "tone": "strong",
               "detail": "Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.473
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 17.7. Current 15.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.797,
+              "source": "live",
+              "actual": 15.0
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 4.1. Current 2.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.734,
+              "source": "live",
+              "actual": 2.0
             }
           ]
         }
@@ -2013,7 +2028,7 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 4.7. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.5. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.62,
               "source": "live",
               "actual": 3.0
@@ -2095,6 +2110,19 @@
           ],
           "miniLadderBadges": [
             {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 17.3. Current 12.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.812,
+              "source": "live",
+              "actual": 12.0
+            },
+            {
               "label": "H up to 6",
               "stat": "hits_allowed",
               "target": 6,
@@ -2103,7 +2131,7 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 5.7. Current 4.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
+              "detail": "Live projection 5.5. Current 4.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
               "hitProb": 0.615,
               "source": "live",
               "actual": 4.0
