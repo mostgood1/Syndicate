@@ -5,6 +5,8 @@ from datetime import date
 from datetime import timedelta
 from functools import lru_cache
 from itertools import combinations
+import json
+import logging
 from pathlib import Path
 import re
 import subprocess
@@ -41,8 +43,8 @@ from syndicate.features.simulation_engine import SimulationEngine
 from syndicate.features.prediction_ledger import _signal_weight
 from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
-from syndicate.features.shared.recommendation_engine import filter_candidates
-from syndicate.features.shared.recommendation_engine import rank_recommendations
+from syndicate.features.shared.recommendation_engine import filter_candidates as _shared_filter_candidates
+from syndicate.features.shared.recommendation_engine import rank_recommendations as _shared_rank_recommendations
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_key as _runtime_parlay_leg_market_key
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_shape as _runtime_parlay_leg_market_shape
 from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
@@ -70,6 +72,7 @@ from syndicate.features.wnba.sources import processed_path as wnba_processed_pat
 ENABLE_PREDICTION_TRACKING = True
 _SIMULATION_ENGINE = SimulationEngine()
 MAX_CORRELATION_THRESHOLD = 0.65
+logger = logging.getLogger(__name__)
 
 
 _SPORT_KEYWORDS: dict[str, set[str]] = {
@@ -5208,7 +5211,168 @@ def _has_mlb_home_run_candidates(candidates: list[dict[str, Any]]) -> bool:
     )
 
 
-def collect_all_recommendations(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
+def _candidate_log_id(candidate: dict[str, Any]) -> str:
+    candidate_id = (
+        candidate.get("candidate_id")
+        or candidate.get("recommendation_id")
+        or candidate.get("prediction_id")
+        or candidate.get("event_id")
+        or candidate.get("id")
+    )
+    if candidate_id is not None and str(candidate_id).strip():
+        return str(candidate_id).strip()
+    sport = _safe_text(candidate.get("sport_slug") or candidate.get("sport"), "sport")
+    market = _safe_text(candidate.get("market") or candidate.get("market_key"), "market")
+    selection = _safe_text(candidate.get("selection") or candidate.get("pick") or candidate.get("name"), "candidate")
+    return f"{sport}:{market}:{selection}"
+
+
+def _candidate_filter_reason(candidate: dict[str, Any], *, selected: bool) -> str:
+    if selected:
+        return "ranked_in_final_picks"
+    if bool(candidate.get("state_invalid")):
+        return "state_invalid"
+    if _candidate_is_final(candidate):
+        return "final_state_excluded"
+    if candidate.get("edge") is not None and _numeric_hint(candidate.get("edge")) is not None and float(_numeric_hint(candidate.get("edge")) or 0.0) <= 0.0:
+        return "non_positive_edge"
+    return "filtered_or_not_selected"
+
+
+def _log_json_event(level: int, event: str, **fields: Any) -> None:
+    if not logger.isEnabledFor(level):
+        return
+    payload = {"event": event, **fields}
+    logger.log(level, json.dumps(payload, sort_keys=True, default=str))
+
+
+def _log_candidate_pipeline(
+    *,
+    candidates: list[dict[str, Any]],
+    filtered_candidates: list[dict[str, Any]],
+    final_picks: list[dict[str, Any]],
+    pipeline_name: str,
+) -> None:
+    candidate_ids = [_candidate_log_id(candidate) for candidate in candidates if isinstance(candidate, dict)]
+    filtered_ids = {_candidate_log_id(candidate) for candidate in filtered_candidates if isinstance(candidate, dict)}
+    final_ids = {_candidate_log_id(candidate) for candidate in final_picks if isinstance(candidate, dict)}
+    _log_json_event(
+        logging.INFO,
+        "intelligence_candidate_pipeline_summary",
+        pipeline=pipeline_name,
+        total_candidates_generated=len(candidates),
+        filtered_count=max(len(candidates) - len(filtered_candidates), 0),
+        final_picks_count=len(final_picks),
+    )
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        candidate_id = _candidate_log_id(candidate)
+        selected = candidate_id in final_ids
+        payload = {
+            "event": "intelligence_candidate_decision",
+            "pipeline": pipeline_name,
+            "candidate_id": candidate_id,
+            "sport": _safe_text(candidate.get("sport"), "Sport"),
+            "edge": _numeric_hint(candidate.get("edge") or candidate.get("adjusted_edge")),
+            "confidence": _numeric_hint(candidate.get("confidence")),
+            "selected": selected,
+        }
+        reason = _candidate_filter_reason(candidate, selected=selected)
+        if selected:
+            payload["reason_selected"] = reason
+        else:
+            payload["reason_filtered"] = reason
+        _log_json_event(logging.DEBUG, "intelligence_candidate_decision", **payload)
+
+
+def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
+    return _collect_candidates(overview, preferences)
+
+
+def score_candidate(
+    candidate: dict[str, Any],
+    *,
+    preferences: dict[str, Any] | None = None,
+    advanced_context: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    scored_candidate = dict(candidate)
+    _apply_live_state_context_to_candidates([scored_candidate])
+    advanced_by_sport = {
+        _safe_text(scored_candidate.get("sport_slug"), "sport").lower(): [dict(item) for item in (advanced_context or []) if isinstance(item, dict)]
+    }
+    _apply_advanced_context_to_candidates([scored_candidate], advanced_by_sport, preferences or {})
+    return scored_candidate
+
+
+def _score_candidates(
+    candidates: list[dict[str, Any]],
+    advanced_by_sport: dict[str, list[dict[str, Any]]],
+    preferences: dict[str, Any],
+) -> list[dict[str, Any]]:
+    scored_candidates: list[dict[str, Any]] = []
+    for candidate in candidates:
+        scored_candidate = score_candidate(
+            candidate,
+            preferences=preferences,
+            advanced_context=advanced_by_sport.get(_safe_text(candidate.get("sport_slug"), "sport").lower(), []),
+        )
+        if _candidate_is_final(scored_candidate) or bool(scored_candidate.get("state_invalid")):
+            continue
+        scored_candidates.append(scored_candidate)
+    return scored_candidates
+
+
+def filter_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    sport: str | None = None,
+    ledger_path: Path | str | None = None,
+    evaluation_records: Iterable[Mapping[str, Any]] | None = None,
+    policy: str | None = None,
+    min_edge: float = 0.0,
+) -> list[dict[str, Any]]:
+    return _shared_filter_candidates(
+        candidates,
+        sport=sport,
+        ledger_path=ledger_path,
+        evaluation_records=evaluation_records,
+        policy=policy,
+        min_edge=min_edge,
+    )
+
+
+def rank_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    sport: str | None = None,
+    ledger_path: Path | str | None = None,
+    evaluation_records: Iterable[Mapping[str, Any]] | None = None,
+    policy: str | None = None,
+    experiment_key: str | None = None,
+    limit: int | None = None,
+    ranking_key: Any | None = None,
+) -> list[dict[str, Any]]:
+    ranked_candidates = _shared_rank_recommendations(
+        candidates,
+        sport=sport,
+        ledger_path=ledger_path,
+        evaluation_records=evaluation_records,
+        policy=policy,
+        experiment_key=experiment_key,
+        limit=limit,
+    )
+    if ranking_key is None:
+        return ranked_candidates
+    custom_ranked = sorted([dict(candidate) for candidate in candidates if isinstance(candidate, dict)], key=ranking_key, reverse=True)
+    if limit is not None:
+        return custom_ranked[: max(0, int(limit))]
+    return custom_ranked
+
+
+def collect_all_recommendations(*, selected_date: str | None = None, force_refresh: bool = False, log_pipeline: bool = True) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date or central_today_iso())
     overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
     tracked = _tracked_repo_files()
@@ -5225,7 +5389,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
-    candidates = _collect_candidates(overview, preferences)
+    candidates = collect_candidates(overview, preferences)
     if _query_needs_mlb_home_run_candidates(preferences) and not _has_mlb_home_run_candidates(candidates):
         for sport_row in overview:
             if not isinstance(sport_row, dict):
@@ -5252,16 +5416,20 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
             ):
                 continue
             candidates.append(candidate)
-    _apply_live_state_context_to_candidates(candidates)
-    candidates = [row for row in candidates if not _candidate_is_final(row)]
-    candidates = [row for row in candidates if not bool(row.get("state_invalid"))]
-    _apply_advanced_context_to_candidates(candidates, advanced_by_sport, preferences)
+    candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_recommendations(
+    ranked_recommendations = rank_candidates(
         filtered_candidates,
         sport=_safe_text(preferences.get("sport"), "") or None,
         limit=None,
     )
+    if log_pipeline:
+        _log_candidate_pipeline(
+            candidates=candidates,
+            filtered_candidates=filtered_candidates,
+            final_picks=ranked_recommendations,
+            pipeline_name="collect_all_recommendations",
+        )
     return [dict(recommendation) for recommendation in ranked_recommendations if isinstance(recommendation, dict)]
 
 
@@ -5310,7 +5478,7 @@ def run_intelligence_query(
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
-    shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh)
+    shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
     candidates = [dict(recommendation) for recommendation in shared_recommendations]
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
@@ -5323,16 +5491,19 @@ def run_intelligence_query(
     resolved_analysis_focus = _analysis_focus_from_resolved_candidates(question, candidates, preferences)
     if resolved_analysis_focus and resolved_analysis_focus != preferences.get("analysis_focus"):
         preferences = {**preferences, "analysis_focus": resolved_analysis_focus}
-    _apply_live_state_context_to_candidates(candidates)
-    candidates = [row for row in candidates if not _candidate_is_final(row)]
-    candidates = [row for row in candidates if not bool(row.get("state_invalid"))]
-    _apply_advanced_context_to_candidates(candidates, advanced_by_sport, preferences)
+    candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_recommendations(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=None)
+    ranked_recommendations = rank_candidates(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=None)
     recommendations = _greedy_low_correlation_selection(
         [dict(candidate) for candidate in ranked_recommendations],
         limit=preferences["limit"],
         threshold=MAX_CORRELATION_THRESHOLD,
+    )
+    _log_candidate_pipeline(
+        candidates=candidates,
+        filtered_candidates=filtered_candidates,
+        final_picks=recommendations,
+        pipeline_name="run_intelligence_query",
     )
     if ENABLE_PREDICTION_TRACKING:
         for recommendation in recommendations:

@@ -34,6 +34,62 @@ def _frontend_correlation_group(candidate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _frontend_explanation(candidate: dict[str, Any]) -> dict[str, list[str]]:
+    edge_drivers: list[str] = []
+    confidence_drivers: list[str] = []
+    risk_flags: list[str] = []
+
+    movement = candidate.get("movement") if isinstance(candidate.get("movement"), dict) else {}
+    edge_delta = _numeric_hint(movement.get("edge_delta") if movement else None)
+    current_edge = _numeric_hint(candidate.get("adjusted_edge") if candidate.get("adjusted_edge") is not None else candidate.get("edge"))
+    if edge_delta is not None:
+        if edge_delta > 0.01:
+            edge_drivers.append(f"Line moving in our favor ({edge_delta:+.2f})")
+        elif edge_delta < -0.01:
+            edge_drivers.append(f"Line moving against the position ({edge_delta:+.2f})")
+    if current_edge is not None:
+        edge_drivers.append(f"Current edge {current_edge:+.2f}")
+
+    model_probability = _numeric_hint(candidate.get("model_probability"))
+    implied_probability = _numeric_hint(candidate.get("implied_probability"))
+    confidence_value = _numeric_hint(candidate.get("confidence"))
+    if model_probability is not None and implied_probability is not None:
+        gap = round(model_probability - implied_probability, 4)
+        if gap > 0:
+            confidence_drivers.append(f"Model agrees with value versus market ({gap:+.2f})")
+        elif gap < 0:
+            confidence_drivers.append(f"Model is below market price ({gap:+.2f})")
+        else:
+            confidence_drivers.append("Model and market are aligned")
+    elif confidence_value is not None:
+        confidence_drivers.append(f"Confidence {confidence_value:.2f}")
+
+    volatility_value = _numeric_hint(candidate.get("volatility") if candidate.get("volatility") is not None else candidate.get("volatility_score"))
+    if volatility_value is not None:
+        if volatility_value >= 0.67:
+            risk_flags.append(f"High volatility ({volatility_value:.2f})")
+        elif volatility_value >= 0.34:
+            risk_flags.append(f"Moderate volatility ({volatility_value:.2f})")
+        else:
+            risk_flags.append(f"Low volatility ({volatility_value:.2f})")
+
+    if bool(candidate.get("is_live")):
+        risk_flags.append("Live market risk remains")
+
+    if not edge_drivers:
+        edge_drivers.append("No line movement signal available")
+    if not confidence_drivers:
+        confidence_drivers.append("No model agreement signal available")
+    if not risk_flags:
+        risk_flags.append("No volatility signal available")
+
+    return {
+        "edge_drivers": edge_drivers[:3],
+        "confidence_drivers": confidence_drivers[:3],
+        "risk_flags": risk_flags[:3],
+    }
+
+
 def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
     bet_size_profile = candidate.get("bet_size_profile") if isinstance(candidate.get("bet_size_profile"), dict) else {}
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
@@ -71,6 +127,7 @@ def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
         else:
             risk_level = "high"
     selection = _safe_text(candidate.get("selection") or candidate.get("pick") or candidate.get("name"), "Play")
+    explanation = _frontend_explanation(candidate)
     return {
         "selection": selection,
         "sport": _safe_text(candidate.get("sport"), "Sport"),
@@ -95,6 +152,7 @@ def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
         "volatility": _numeric_hint(candidate.get("volatility") if candidate.get("volatility") is not None else candidate.get("volatility_score")),
         "drivers": [dict(item) for item in (candidate.get("signal_contributions_top_positive") or []) if isinstance(item, dict)],
         "risks": [dict(item) for item in (candidate.get("signal_contributions_top_negative") or []) if isinstance(item, dict)],
+        "explanation": explanation,
         "visual": {
             "pills": [str(item).strip() for item in display_pills if str(item).strip()][:6],
             "risk_level": risk_level,
@@ -169,6 +227,8 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
             rationale_text = _safe_text(recommendation.get("rationale"), "")
             if rationale_text and "advanced drivers in play" not in rationale_text.lower():
                 recommendation["rationale"] = f"Advanced drivers in play. {rationale_text}"
+        if "explanation" not in recommendation:
+            recommendation["explanation"] = _frontend_explanation(candidate)
         return recommendation
 
     ordered_recommendations = sorted(
