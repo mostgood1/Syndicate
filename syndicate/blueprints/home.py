@@ -4151,7 +4151,7 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
 
 @home_bp.get("/")
 def home():
-    return "HOME FAST"
+    return render_template("home.html")
         
 
 

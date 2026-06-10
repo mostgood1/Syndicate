@@ -35,6 +35,7 @@ from dataclasses import replace
 from typing import Any, Mapping
 
 from pipeline.evidence_builder import attach_evidence
+from pipeline.intelligence_models import Evidence
 from pipeline.intelligence_models import IntelligenceResult
 from router.query_router import QueryRouter
 from syndicate.features.intelligence import run_intelligence_query
@@ -805,28 +806,122 @@ def _run_reasoning_steps(normalized_request: IntelligencePipelineRequest) -> tup
 def _call_intelligence(normalized_request: IntelligencePipelineRequest, context: dict[str, Any]) -> IntelligenceResult:
     if not normalized_request.question:
         raise ValueError("question is required")
-    reasoning_steps, reasoning_step_evidence = _time_stage("reasoning_decomposition", _run_reasoning_steps, normalized_request)
-    raw_response = _time_stage("intelligence_call", _run_intelligence_query_with_retry, normalized_request)
+
+    print("STEP: reasoning_decomposition")
+    reasoning_steps, reasoning_step_evidence = _time_stage(
+        "reasoning_decomposition",
+        _run_reasoning_steps,
+        normalized_request
+    )
+
+    print("STEP: intelligence_call (real)")
+
+    try:
+        raw_response = _time_stage(
+            "intelligence_call",
+            _run_intelligence_query_with_retry,
+            normalized_request
+        )
+
+        # ✅ Safety: ensure structure exists
+        if not raw_response or not isinstance(raw_response, dict):
+            print("⚠️ Invalid raw_response — using fallback")
+            raw_response = {}
+
+    except Exception as e:
+        print("❌ intelligence_call failed:", e)
+
+        # ✅ Guaranteed fallback (never break UI)
+        raw_response = {
+            "recommendations": [{
+                "selection": "FALLBACK: pipeline failed",
+                "edge": 0
+            }],
+            "portfolio": {},
+            "parlays": []
+        }
+
+    # ✅ SMART NORMALIZATION (handles real pipeline structure)
+    print("STEP: normalizing response")
+
+    raw_response = {
+        "recommendations": (
+            raw_response.get("recommendations")
+            or raw_response.get("data", {}).get("recommendations")
+            or []
+        ),
+        "portfolio": (
+            raw_response.get("portfolio")
+            or raw_response.get("data", {}).get("portfolio")
+            or {}
+        ),
+        "parlays": (
+            raw_response.get("parlays")
+            or raw_response.get("data", {}).get("parlays")
+            or []
+        )
+    }
+    # ✅ Ensure required pipeline fields exist
+    raw_response.setdefault("recommendations", [])
+    raw_response.setdefault("portfolio", {})
+    raw_response.setdefault("parlays", [])
+    raw_response.setdefault("evidence", [])
+    raw_response.setdefault("supporting_evidence", [])
+    raw_response.setdefault("evaluation_record", {})
+
+    print("STEP: post_processing")
+
+
     result = _time_stage(
         "post_processing",
         IntelligenceResult.from_raw,
         raw_response,
         pipeline_request=normalized_request.to_dict(),
         pipeline_context=context,
-        pipeline_stages=("input_normalization", "context_enrichment", "intelligence_call", "post_processing"),
+        pipeline_stages=(
+            "input_normalization",
+            "context_enrichment",
+            "intelligence_call",
+            "post_processing",
+        ),
     )
-    result = _time_stage("post_processing_evidence", attach_evidence, result, raw_response, selected_date=normalized_request.selected_date)
-    if reasoning_step_evidence:
-        result = replace(result, evidence=_dedupe_evidence_records(result.evidence, reasoning_step_evidence))
-    structured_response = _time_stage("post_processing_structured_response", _build_structured_response, result, context)
+
+    result = _time_stage(
+        "post_processing_evidence",
+        attach_evidence,
+        result,
+        raw_response,
+        selected_date=normalized_request.selected_date,
+    )
+
+    
+    if reasoning_step_evidence and hasattr(result, "evidence"):
+        result = replace(
+            result,
+            evidence=_dedupe_evidence_records(result.evidence or [], reasoning_step_evidence)
+        )
+
+
+    structured_response = _time_stage(
+        "post_processing_structured_response",
+        _build_structured_response,
+        result,
+        context
+    )
+
     if reasoning_steps:
-        structured_response = {**structured_response, "reasoning_steps": [dict(step) for step in reasoning_steps]}
+        structured_response = {
+            **structured_response,
+            "reasoning_steps": [dict(step) for step in reasoning_steps]
+        }
+
     result = replace(
         result,
         query_type=normalized_request.query_type or result.query_type,
         structured_response=structured_response,
         reasoning_steps=reasoning_steps,
     )
+
     if result.recommendations:
         evaluation_record = _time_stage(
             "evaluation_record_build",
@@ -835,8 +930,8 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
             response=result.to_dict(),
         )
         result = replace(result, evaluation_record=evaluation_record)
-    return result
 
+    return result
 
 def _call_black_box_intelligence(normalized_request: IntelligencePipelineRequest) -> dict[str, Any]:
     return run_intelligence_query(
@@ -883,16 +978,38 @@ def _build_partial_raw_response(normalized_request: IntelligencePipelineRequest,
     }
 
 
+import time
+import traceback
+
 def _run_intelligence_query_with_retry(normalized_request: IntelligencePipelineRequest) -> dict[str, Any]:
     retry_count = 0
     last_error: Exception | None = None
+
     for attempt in range(2):
         try:
             if attempt:
                 retry_count += 1
-            return _call_black_box_intelligence(normalized_request)
+
+            print(f"⚠️ Calling black box intelligence (attempt {attempt + 1})")
+
+            start = time.time()
+
+            result = _call_black_box_intelligence(normalized_request)
+
+            duration = time.time() - start
+            print(f"✅ Black box returned in {round(duration, 2)}s")
+
+            # ✅ Fail fast if empty / invalid
+            if not result:
+                raise ValueError("Empty black box response")
+
+            return result
+
         except Exception as exc:  # noqa: BLE001
             last_error = exc
+
+            print(f"❌ Attempt {attempt + 1} failed: {str(exc)}")
+
             if attempt == 0:
                 _log_json_event(
                     "pipeline_retry",
@@ -902,18 +1019,28 @@ def _run_intelligence_query_with_retry(normalized_request: IntelligencePipelineR
                     traceback=traceback.format_exc(),
                 )
                 continue
+
             _log_json_event(
                 "pipeline_error",
                 stage="intelligence_call",
-                retry_count=1,
+                retry_count=retry_count,
                 error=str(exc or "").strip() or exc.__class__.__name__,
                 traceback=traceback.format_exc(),
             )
+
             break
+
+    # ✅ Never allow hanging — always return something
     if last_error is None:
         last_error = RuntimeError("intelligence query failed")
-    return _build_partial_raw_response(normalized_request, last_error, retry_count=retry_count)
 
+    print("⚠️ Returning fallback partial response")
+
+    return _build_partial_raw_response(
+        normalized_request,
+        last_error,
+        retry_count=retry_count
+    )
 
 def run_intelligence_pipeline(request_or_payload: Any) -> IntelligenceResult:
     normalized_request = _time_stage("input_normalization", _normalize_request, request_or_payload)
