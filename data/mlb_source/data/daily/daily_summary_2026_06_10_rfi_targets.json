@@ -1,7 +1,7 @@
 {
   "date": "2026-06-10",
   "season": 2026,
-  "generated_at": "2026-06-10T13:33:02.818129",
+  "generated_at": "2026-06-10T23:34:19.811985",
   "tool": "tools/daily_update_multi_profile.py",
   "locked": true,
   "source_profile": "game_recos",
@@ -34,12 +34,12 @@
       "signal": {
         "label": "F1 YRFI",
         "tone": "yrfi",
-        "summary": "F1 mean 1.25 | side lead 25.3%",
-        "detail": "Season filter qualified: only 47.7% simulated NRFI, 1.25 expected first-inning runs, and one side reaches a 25.3% chance to be ahead after one.",
-        "nrfiProb": 0.477,
-        "yrfiProb": 0.523,
-        "meanTotalRuns": 1.253,
-        "maxSideLeadProb": 0.253
+        "summary": "F1 mean 1.33 | side lead 26.8%",
+        "detail": "Season filter qualified: only 44.9% simulated NRFI, 1.33 expected first-inning runs, and one side reaches a 26.8% chance to be ahead after one.",
+        "nrfiProb": 0.449,
+        "yrfiProb": 0.551,
+        "meanTotalRuns": 1.331,
+        "maxSideLeadProb": 0.268
       }
     }
   ]
