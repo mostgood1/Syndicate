@@ -4151,17 +4151,8 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
 
 @home_bp.get("/")
 def home():
-    payload = _home_payload(selected_date=request.args.get("date"))
-    return render_template(
-        "home.html",
-        sports=payload["sports"],
-        dashboard=payload["dashboard"],
-        selected_home_date=payload.get("selected_date"),
-        tracker_sports=current_app.config["SYNDICATE_SPORTS"],
-        show_app_header=True,
-        page_body_class="syndicate-home-page",
-        page_shell_class="syndicate-home-shell",
-    )
+    return "HOME FAST"
+        
 
 
 @home_bp.get("/api/home")

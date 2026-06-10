@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from flask import Flask
-
+print("✅ Before registering blueprints")
 from syndicate.blueprints.home import home_bp
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.ops import ops_bp
@@ -14,7 +14,7 @@ from syndicate.blueprints.mlb import mlb_bp
 from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
-
+print("✅ After registering blueprints")
 
 def create_app() -> Flask:
     app = Flask(

@@ -53,32 +53,41 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    payload = _intelligence_page_payload(selected_date)
-    initial_response: dict[str, object] = {}
+    selected_date = str(request.args.get("date") or "").strip()
+
+    # ✅ lightweight payload (NOT full pipeline input)
+    payload = {
+        "date": selected_date,
+        "question": "top edges today"
+    }
+
+    data = {
+        "picks": [],
+        "portfolio": {},
+        "parlays": []
+    }
+
     try:
-        pipeline_result = run_routed_intelligence_pipeline(payload)
-        if hasattr(pipeline_result, "to_dict"):
-            initial_response = pipeline_result.to_dict()
-        elif isinstance(pipeline_result, dict):
-            initial_response = dict(pipeline_result)
-    except Exception:
-        initial_response = {}
-    return render_template(
-        "intelligence.html",
-        selected_date=selected_date,
-        initial_question=str(payload.get("question") or _DEFAULT_INTELLIGENCE_QUESTION),
-        initial_response=initial_response,
-        default_questions=[
-            "What are the best live bets on the board right now?",
-            "What are the best home run matchups today and why? Build a top 10 table and chart.",
-            "Build me a two-leg parlay from the strongest pregame edges.",
-            "Give me the top cross-sport value plays using model edge and confidence.",
-        ],
-        show_app_header=True,
-        page_body_class="syndicate-intelligence-page",
-        page_shell_class="syndicate-intelligence-shell",
-    )
+        result = run_routed_intelligence_pipeline(payload)
+
+        if hasattr(result, "to_dict"):
+            raw = result.to_dict()
+        elif isinstance(result, dict):
+            raw = result
+        else:
+            raw = {}
+
+        # ✅ CLEAN MAPPING (THIS IS KEY)
+        data = {
+            "picks": raw.get("recommendations", []) or raw.get("picks", []),
+            "portfolio": raw.get("portfolio", {}),
+            "parlays": raw.get("parlays", [])
+        }
+
+    except Exception as e:
+        print("⚠️ intelligence error:", e)
+
+    return render_template("intelligence.html", data=data)
 
 
 @intelligence_bp.get("/intelligence/status")
