@@ -43,6 +43,7 @@
 {% block extra_scripts %}
 <script>
 let lastVersion = null;
+let warmKickoffStarted = false;
 
 function numericValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -128,6 +129,34 @@ function renderCardBadges(item) {
   `);
 
   return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${badges.join("")}</div>`;
+}
+
+function normalizeIntelligenceResponse(response) {
+  const analysis = response && typeof response.analysis === "object" && response.analysis ? response.analysis : (response && typeof response.response === "object" && response.response ? response.response : {});
+  const recommendations = Array.isArray(response.recommendations) && response.recommendations.length
+    ? response.recommendations
+    : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : []));
+  const topOpportunities = Array.isArray(response.top_opportunities) && response.top_opportunities.length
+    ? response.top_opportunities
+    : (Array.isArray(analysis.top_opportunities) ? analysis.top_opportunities : recommendations);
+  const topLiveOpportunities = Array.isArray(response.top_live_opportunities) && response.top_live_opportunities.length
+    ? response.top_live_opportunities
+    : (Array.isArray(analysis.top_live_opportunities) ? analysis.top_live_opportunities : recommendations.filter((item) => String(item.tag || item.timing || item.phase || "").trim().toUpperCase() === "LIVE"));
+  const portfolio = response.portfolio && typeof response.portfolio === "object"
+    ? response.portfolio
+    : (analysis.portfolio && typeof analysis.portfolio === "object" ? analysis.portfolio : {});
+  const parlays = Array.isArray(response.parlays) && response.parlays.length
+    ? response.parlays
+    : (Array.isArray(analysis.parlays) ? analysis.parlays : []);
+
+  return {
+    analysis,
+    recommendations,
+    topOpportunities,
+    topLiveOpportunities,
+    portfolio,
+    parlays,
+  };
 }
 
 function renderLoadingState() {
@@ -285,8 +314,10 @@ function renderIntelligence(response) {
     return;
   }
 
+  const data = normalizeIntelligenceResponse(response);
+
   // ===== PORTFOLIO =====
-  const portfolio = response.portfolio || {};
+  const portfolio = data.portfolio || {};
   const portfolioEl = document.getElementById("portfolio");
   const topOpportunitiesEl = document.getElementById("top-opportunities");
 
@@ -304,14 +335,14 @@ function renderIntelligence(response) {
   const scannerEl = document.getElementById("scanner");
   const picksEl = document.getElementById("picks");
 
-  const topOpportunities = (response.top_opportunities || [])
+  const topOpportunities = (data.topOpportunities || [])
     .slice()
     .sort((a, b) => (Number(b.expected_value) || 0) - (Number(a.expected_value) || 0));
 
-  const allRecs = (response.recommendations || [])
+  const allRecs = (data.recommendations || [])
     .sort((a, b) => (b.edge || 0) - (a.edge || 0));
 
-  const topLiveOpportunities = (response.top_live_opportunities || []).slice(0, 5);
+  const topLiveOpportunities = (data.topLiveOpportunities || []).slice(0, 5);
 
   // ✅ Split by tag
   const liveRecs = allRecs.filter(r => r.tag === "LIVE");
@@ -593,7 +624,7 @@ function renderIntelligence(response) {
 
   // ===== PARLAYS =====
   const parlaysEl = document.getElementById("parlays");
-  const parlays = response.parlays || [];
+  const parlays = data.parlays || [];
 
   if (parlays.length) {
     parlaysEl.innerHTML = parlays.map(p => `
@@ -612,15 +643,28 @@ function renderIntelligence(response) {
   }
 }
 
+function kickOffWarmQuery() {
+  if (warmKickoffStarted) {
+    return;
+  }
+  warmKickoffStarted = true;
+  void fetch("/api/intelligence/query/warm", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ question: "top edges today" })
+  }).catch(() => {});
+}
+
 async function loadIntelligence() {
   try {
     if (lastVersion === null) {
       renderLoadingState();
+      kickOffWarmQuery();
     }
     const res = await fetch("/api/intelligence/query", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ question: "top edges today" })
+      body: JSON.stringify({ question: "top edges today", force_refresh: false })
     });
 
     if (!res.ok) {
@@ -638,20 +682,20 @@ async function loadIntelligence() {
     lastVersion = version;
 
     const response = json.response || {};
-    if (!response || Object.keys(response).length === 0) {
-      renderEmptyState();
-      return;
-    }
-
+    const data = normalizeIntelligenceResponse(response);
     const hasOpportunityData = Boolean(
-      (Array.isArray(response.top_opportunities) && response.top_opportunities.length) ||
-      (Array.isArray(response.recommendations) && response.recommendations.length) ||
-      (Array.isArray(response.parlays) && response.parlays.length) ||
-      (response.portfolio && Object.keys(response.portfolio).length)
+      (Array.isArray(data.topOpportunities) && data.topOpportunities.length) ||
+      (Array.isArray(data.recommendations) && data.recommendations.length) ||
+      (Array.isArray(data.parlays) && data.parlays.length) ||
+      (data.portfolio && Object.keys(data.portfolio).length)
     );
 
-    if (!hasOpportunityData) {
-      renderEmptyState();
+    if (!response || Object.keys(response).length === 0 || !hasOpportunityData) {
+      if (warmKickoffStarted) {
+        renderLoadingState();
+      } else {
+        renderEmptyState();
+      }
       return;
     }
 

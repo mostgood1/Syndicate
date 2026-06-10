@@ -18,6 +18,7 @@ intelligence_bp = Blueprint("syndicate_intelligence", __name__)
 
 DEFAULT_QUESTION = "top edges today"
 _QUERY_RESPONSE_VERSION_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "query_response_version.json"
+_QUERY_RESPONSE_CACHE_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "query_response_cache.json"
 _QUERY_RESPONSE_VERSION_LOCK = threading.Lock()
 _QUERY_RESPONSE_VERSION_STATE: dict[str, object] | None = None
 
@@ -87,6 +88,35 @@ def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, 
         "timestamp": _server_timestamp(),
         "response": response_payload,
     }
+
+
+def _load_response_cache_state() -> dict[str, object] | None:
+    try:
+        if not _QUERY_RESPONSE_CACHE_PATH.exists():
+            return None
+        payload = json.loads(_QUERY_RESPONSE_CACHE_PATH.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and isinstance(payload.get("response"), dict):
+            return payload
+    except Exception:
+        return None
+    return None
+
+
+def _store_response_cache_state(state: dict[str, object]) -> None:
+    try:
+        _QUERY_RESPONSE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _QUERY_RESPONSE_CACHE_PATH.write_text(json.dumps(state, sort_keys=True), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _warm_intelligence_query_cache(app, payload: dict[str, object]) -> None:
+    try:
+        with app.app_context():
+            with app.test_request_context("/api/intelligence/query", method="POST", json=payload):
+                intelligence_query_api()
+    except Exception:
+        pass
 
 
 def _number_value(value: object) -> float | None:
@@ -373,9 +403,64 @@ def intelligence_query_api():
     global LAST_RESULT
     print("✅ SERVING LAST RESULT")
     payload = request.get_json(silent=True) or {}
+    force_refresh = bool(payload.get("force_refresh"))
     user_profile = _normalize_user_profile(payload)
+    if not force_refresh and user_profile is None:
+        cached_response = _load_response_cache_state()
+        if cached_response is not None:
+            LAST_RESULT = dict(cached_response.get("response") or {})
+            return jsonify(cached_response)
+        if isinstance(LAST_RESULT, dict) and any(LAST_RESULT.get(key) for key in ("recommendations", "portfolio", "parlays")):
+            cached_recommendations = [dict(item) for item in (LAST_RESULT.get("recommendations") or []) if isinstance(item, dict)]
+            cached_portfolio = dict(LAST_RESULT.get("portfolio") or {}) if isinstance(LAST_RESULT.get("portfolio"), dict) else {}
+            cached_parlays = [dict(item) for item in (LAST_RESULT.get("parlays") or []) if isinstance(item, dict)]
+            cached_by_sport: dict[str, list[dict[str, object]]] = {}
+            for recommendation in cached_recommendations:
+                sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
+                cached_by_sport.setdefault(sport_key, []).append(recommendation)
+            cached_response = {
+                "ok": True,
+                "top_opportunities": cached_recommendations,
+                "by_sport": cached_by_sport,
+                "analysis": {
+                    "recommendations": cached_recommendations,
+                    "picks": cached_recommendations,
+                    "portfolio": cached_portfolio,
+                    "parlays": cached_parlays,
+                    "top_live_opportunities": [recommendation for recommendation in cached_recommendations if bool(recommendation.get("is_live"))],
+                },
+                "response": {
+                    "recommendations": cached_recommendations,
+                    "picks": cached_recommendations,
+                    "portfolio": cached_portfolio,
+                    "parlays": cached_parlays,
+                    "top_live_opportunities": [recommendation for recommendation in cached_recommendations if bool(recommendation.get("is_live"))],
+                },
+            }
+            return jsonify(_versioned_query_response(cached_response))
+        empty_response = {
+            "ok": True,
+            "top_opportunities": [],
+            "by_sport": {},
+            "analysis": {
+                "recommendations": [],
+                "picks": [],
+                "portfolio": {},
+                "parlays": [],
+                "top_live_opportunities": [],
+            },
+            "response": {
+                "recommendations": [],
+                "picks": [],
+                "portfolio": {},
+                "parlays": [],
+                "top_live_opportunities": [],
+            },
+        }
+        return jsonify(_versioned_query_response(empty_response))
+
     top_opportunities = rank_global_recommendations(
-        collect_all_recommendations(force_refresh=True),
+        collect_all_recommendations(force_refresh=force_refresh),
         limit=int(payload.get("limit") or 10) if str(payload.get("limit") or "").strip() else 10,
     )
     by_sport: dict[str, list[dict[str, object]]] = {}
@@ -448,7 +533,23 @@ def intelligence_query_api():
 
     response = _apply_user_profile_to_response(response, user_profile)
     LAST_RESULT = dict(response)
-    return jsonify(_versioned_query_response(response))
+    versioned_response = _versioned_query_response(response)
+    if user_profile is None:
+        _store_response_cache_state(versioned_response)
+    return jsonify(versioned_response)
+
+
+@intelligence_bp.post("/api/intelligence/query/warm")
+def intelligence_query_warm_api():
+    payload = request.get_json(silent=True) or {}
+    from flask import current_app
+
+    app = current_app._get_current_object()
+    warm_payload = dict(payload)
+    warm_payload["force_refresh"] = True
+    thread = threading.Thread(target=_warm_intelligence_query_cache, args=(app, warm_payload), daemon=True)
+    thread.start()
+    return jsonify({"ok": True, "queued": True})
 
 @intelligence_bp.get("/intelligence/run")
 def run_intelligence():
