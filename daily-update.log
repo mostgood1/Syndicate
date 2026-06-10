@@ -10,3 +10,9 @@ warning: in the working copy of 'data/nba_source/source_artifacts/data/processed
 warning: in the working copy of 'data/nba_source/source_artifacts/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
 To https://github.com/mostgood1/Syndicate
    2e9fb95..8a1436d  main -> main
+warning: in the working copy of 'data/nba_source/data/live_lens/live_lens_projections_2026-06-10.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/nba_source/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/nba_source/data/processed/live_lens_projections_2026-06-10.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/nba_source/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+To https://github.com/mostgood1/Syndicate
+   8a1436d..52d84b4  main -> main
