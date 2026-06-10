@@ -1,9 +1,44 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from syndicate.features.intelligence.signals.normalization import _numeric_hint
 from syndicate.features.intelligence.signals.normalization import _safe_text
+
+
+def _has_live_context(recommendation: dict[str, Any]) -> bool:
+    return any(
+        bool(recommendation.get(key))
+        for key in (
+            "is_live",
+            "matchup",
+            "player_name",
+            "subject_key",
+            "event_id",
+            "game_pk",
+        )
+    )
+
+
+def _display_name(recommendation: dict[str, Any]) -> str:
+    reasoning = _safe_text(recommendation.get("reasoning") or recommendation.get("reasoning_text") or recommendation.get("summary") or recommendation.get("rationale"), "")
+    if reasoning:
+        match = re.search(r"\bfor\s+(.+?)\s+Props?\s+at\b", reasoning, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        match = re.search(r"\bfor\s+(.+?)\s+at\b", reasoning, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return _safe_text(
+        recommendation.get("player_name")
+        or recommendation.get("name")
+        or recommendation.get("subject_key")
+        or recommendation.get("pick")
+        or recommendation.get("selection")
+        or recommendation.get("market"),
+        "Play",
+    )
 
 
 def get_top_live_opportunities(
@@ -15,6 +50,8 @@ def get_top_live_opportunities(
     candidates: list[dict[str, Any]] = []
     for recommendation in recommendations:
         if not isinstance(recommendation, dict):
+            continue
+        if not _has_live_context(recommendation):
             continue
         ev_current = _numeric_hint(
             recommendation.get("ev_current")
@@ -43,9 +80,13 @@ def get_top_live_opportunities(
         candidates.append(
             {
                 "selection": _safe_text(recommendation.get("selection") or recommendation.get("pick") or recommendation.get("name"), "Play"),
+                "display_name": _display_name(recommendation),
                 "sport": _safe_text(recommendation.get("sport"), "Sport"),
                 "sport_slug": _safe_text(recommendation.get("sport_slug") or recommendation.get("sport"), "sport").lower(),
                 "market": _safe_text(recommendation.get("market") or recommendation.get("market_key"), "Market"),
+                "player_name": _safe_text(recommendation.get("player_name"), ""),
+                "matchup": _safe_text(recommendation.get("matchup"), ""),
+                "candidate_type": _safe_text(recommendation.get("candidate_type"), ""),
                 "odds_open": recommendation.get("odds_open") or recommendation.get("odds"),
                 "odds_current": recommendation.get("odds_current") or recommendation.get("odds"),
                 "ev_open": _numeric_hint(recommendation.get("ev_open") or recommendation.get("expected_value_open")),

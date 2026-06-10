@@ -904,13 +904,15 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("$100 bankroll", parsed_request.get("chips") or [])
         self.assertIn("Max 20% exposure", parsed_request.get("chips") or [])
 
-    def test_get_top_live_opportunities_ranks_positive_ev_globally(self) -> None:
+    def test_get_top_live_opportunities_ranks_positive_ev_with_live_context(self) -> None:
         opportunities = get_top_live_opportunities(
             [
                 {
                     "selection": "NBA Over",
                     "sport": "NBA",
                     "market": "points",
+                    "player_name": "Jayson Tatum",
+                    "matchup": "BOS at NYK",
                     "ev_current": 0.08,
                     "ev_delta": 0.01,
                     "confidence": 0.64,
@@ -920,6 +922,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     "selection": "MLB Under",
                     "sport": "MLB",
                     "market": "strikeouts",
+                    "player_name": "Chris Sale",
+                    "matchup": "ATL at NYM",
                     "ev_current": 0.11,
                     "ev_delta": 0.03,
                     "confidence": 0.59,
@@ -944,6 +948,58 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertGreater(opportunities[0]["ev_current"], 0.0)
         self.assertGreater(opportunities[0]["ev_delta"], opportunities[1]["ev_delta"])
         self.assertNotIn("NHL Over", [item["selection"] for item in opportunities])
+
+    def test_get_top_live_opportunities_requires_live_context(self) -> None:
+        opportunities = get_top_live_opportunities(
+            [
+                {
+                    "selection": "NBA Over 4.5",
+                    "sport": "NBA",
+                    "market": "points",
+                    "ev_current": 0.08,
+                    "confidence": 0.64,
+                    "adjusted_score": 91.0,
+                },
+                {
+                    "selection": "Donovan Mitchell Over 4.5 3PM",
+                    "player_name": "Donovan Mitchell",
+                    "sport": "NBA",
+                    "market": "3PM",
+                    "matchup": "CLE at IND",
+                    "candidate_type": "prop",
+                    "ev_current": 0.12,
+                    "confidence": 0.72,
+                    "adjusted_score": 94.0,
+                },
+            ],
+            limit=5,
+        )
+
+        self.assertEqual(len(opportunities), 1)
+        self.assertEqual(opportunities[0].get("selection"), "Donovan Mitchell Over 4.5 3PM")
+        self.assertEqual(opportunities[0].get("display_name"), "Donovan Mitchell")
+        self.assertEqual(opportunities[0].get("matchup"), "CLE at IND")
+
+    def test_get_top_live_opportunities_derives_display_name_from_reasoning(self) -> None:
+        opportunities = get_top_live_opportunities(
+            [
+                {
+                    "selection": "Over",
+                    "sport": "MLB",
+                    "market": "pitcher_props",
+                    "matchup": "CLE at MIN",
+                    "reasoning": "Live lean Over for Carlos Rodon Props at 17.5. Model gives 75.8% win probability.",
+                    "ev_current": 0.095,
+                    "confidence": 0.76,
+                    "adjusted_score": 95.0,
+                }
+            ],
+            limit=5,
+        )
+
+        self.assertEqual(len(opportunities), 1)
+        self.assertEqual(opportunities[0].get("display_name"), "Carlos Rodon")
+        self.assertEqual(opportunities[0].get("selection"), "Over")
 
     def test_intelligence_query_api_returns_player_analysis_payload(self) -> None:
         advanced_rows = [

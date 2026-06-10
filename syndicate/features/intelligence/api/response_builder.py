@@ -15,6 +15,31 @@ from syndicate.features.intelligence.signals.normalization import _safe_text
 MAX_CORRELATION_THRESHOLD = 0.65
 
 
+def _frontend_display_name(candidate: dict[str, Any]) -> str:
+    reasoning = _safe_text(
+        candidate.get("reasoning") or candidate.get("reasoning_text") or candidate.get("summary") or candidate.get("rationale"),
+        "",
+    )
+    if reasoning:
+        import re
+
+        match = re.search(r"\bfor\s+(.+?)\s+Props?\s+at\b", reasoning, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        match = re.search(r"\bfor\s+(.+?)\s+at\b", reasoning, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return _safe_text(
+        candidate.get("player_name")
+        or candidate.get("name")
+        or candidate.get("subject_key")
+        or candidate.get("pick")
+        or candidate.get("selection")
+        or candidate.get("market"),
+        "Play",
+    )
+
+
 def _frontend_correlation_group(candidate: dict[str, Any]) -> dict[str, Any]:
     event_id = _safe_text(candidate.get("event_id"), "")
     matchup = _safe_text(candidate.get("matchup"), "")
@@ -129,6 +154,7 @@ def _frontend_pick(candidate: dict[str, Any]) -> dict[str, Any]:
     selection = _safe_text(candidate.get("selection") or candidate.get("pick") or candidate.get("name"), "Play")
     explanation = _frontend_explanation(candidate)
     return {
+        "display_name": _frontend_display_name(candidate),
         "selection": selection,
         "sport": _safe_text(candidate.get("sport"), "Sport"),
         "sport_slug": _safe_text(candidate.get("sport_slug"), "sport"),
@@ -229,6 +255,8 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
                 recommendation["rationale"] = f"Advanced drivers in play. {rationale_text}"
         if "explanation" not in recommendation:
             recommendation["explanation"] = _frontend_explanation(candidate)
+        if not recommendation.get("display_name"):
+            recommendation["display_name"] = _frontend_display_name(candidate)
         return recommendation
 
     ordered_recommendations = sorted(

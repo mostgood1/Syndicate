@@ -49,6 +49,26 @@ function numericValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function displayTitle(item) {
+  return String(item.display_name || item.player_name || item.name || item.subject_key || item.pick || item.selection || item.market || "—").trim();
+}
+
+function displayContext(item) {
+  const parts = [];
+  const matchup = String(item.matchup || "").trim();
+  const candidateType = String(item.candidate_type || "").trim();
+  const market = String(item.market || "").trim();
+  if (matchup) {
+    parts.push(matchup);
+  }
+  if (candidateType) {
+    parts.push(candidateType.toUpperCase());
+  } else if (market) {
+    parts.push(market);
+  }
+  return parts.join(" · ");
+}
+
 function edgeValue(item) {
   return numericValue(item.edge)
     ?? numericValue(item.adjusted_edge)
@@ -592,7 +612,7 @@ function renderIntelligence(response) {
               border-top:${index === 0 ? "0" : "1px solid rgba(255,255,255,.08)"};
             ">
               <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                <div style="font-weight:600;">${sport} · ${bet}</div>
+                <div style="font-weight:600;">${sport} · ${displayTitle(item)}</div>
                 <div style="font-weight:600; color:${theme.color};">EV ${expectedValue}</div>
               </div>
               <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:12px; opacity:.82;">
