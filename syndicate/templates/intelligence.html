@@ -27,7 +27,6 @@
   <!-- RIGHT COLUMN -->
   <div>
 
-    <h2>Top Edges</h2>
     <div id="picks"></div>
 
   </div>
@@ -49,27 +48,21 @@ async function loadIntelligence() {
 
     const json = await res.json();
     const response = json.response || {};
+
     console.log("REAL RESPONSE:", response);
 
-    
-  if (!response || Object.keys(response).length === 0) {
-    document.getElementById("picks").innerHTML = "No response data";
-    return;
-  }
+    if (!response || Object.keys(response).length === 0) {
+      document.getElementById("picks").innerHTML = "No response data";
+      return;
+    }
 
-// ===== PORTFOLIO =====
+    // ===== PORTFOLIO =====
     const portfolio = response.portfolio || {};
     const portfolioEl = document.getElementById("portfolio");
 
     portfolioEl.innerHTML = `
-      <div style="
-        background:#111;
-        color:white;
-        padding:16px;
-        border-radius:12px;
-      ">
+      <div style="background:#111;color:white;padding:16px;border-radius:12px;">
         <div style="font-size:13px; opacity:.7;">Portfolio Overview</div>
-
         <div style="margin-top:10px;">
           <div><strong>Exposure:</strong> ${portfolio.total_exposure || "—"}</div>
           <div><strong>Risk:</strong> ${portfolio.risk_level || "—"}</div>
@@ -77,74 +70,81 @@ async function loadIntelligence() {
       </div>
     `;
 
-    // ===== PICKS (SORTED + ENHANCED) =====
+    // ===== PICKS =====
     const picksEl = document.getElementById("picks");
 
-    const recs = (response.recommendations || [])
+    const allRecs = (response.recommendations || [])
       .sort((a, b) => (b.edge || 0) - (a.edge || 0));
 
-    if (recs.length) {
-      picksEl.innerHTML = recs.map((p, i) => {
-        const edge = (p.edge * 100).toFixed(1);
+    // ✅ Split by tag
+    const liveRecs = allRecs.filter(r => r.tag === "LIVE");
+    const pregameRecs = allRecs.filter(r => r.tag === "PREGAME");
 
-        // ✅ SAFE optional fields
-        const confidence = p.confidence
-          ? Math.round(p.confidence * 100) + "%"
-          : "—";
+    function renderSection(title, recs) {
+      if (!recs.length) {
+        return `<div style="opacity:.5; margin-bottom:20px;">No ${title} picks</div>`;
+      }
 
-        const betSize = p.recommended_bet_size
-          ? (p.recommended_bet_size * 100).toFixed(1) + "%"
-          : "—";
+      return `
+        <div style="margin-bottom:25px;">
+          <h3 style="margin-bottom:10px;">${title}</h3>
+          ${recs.map((p, i) => {
+            const edge = (p.edge * 100).toFixed(1);
 
-        const color =
-          p.edge > 0.06 ? "#2ecc71" :
-          p.edge > 0.03 ? "#f39c12" :
-          "#7f8c8d";
+            const confidence = p.confidence
+              ? Math.round(p.confidence * 100) + "%"
+              : "—";
 
-        return `
-          <div style="
-            background:#1a1a1a;
-            color:white;
-            padding:16px;
-            border-radius:12px;
-            margin-bottom:12px;
-            border-left:6px solid ${color};
-          ">
+            const betSize = p.recommended_bet_size
+              ? (p.recommended_bet_size * 100).toFixed(1) + "%"
+              : "—";
 
-            <div style="display:flex; justify-content:space-between;">
-              <div style="font-size:16px; font-weight:600;">
-                ${i === 0 ? "🔥 " : ""}${p.selection}
-              </div>
+            const color =
+              p.edge > 0.06 ? "#2ecc71" :
+              p.edge > 0.03 ? "#f39c12" :
+              "#7f8c8d";
 
+            return `
               <div style="
-                font-weight:600;
-                color:${color};
+                background:#1a1a1a;
+                color:white;
+                padding:16px;
+                border-radius:12px;
+                margin-bottom:10px;
+                border-left:6px solid ${color};
               ">
-                ${edge}%
+
+                <div style="display:flex; justify-content:space-between;">
+                  <div style="font-size:16px; font-weight:600;">
+                    ${i === 0 ? "🔥 " : ""}${p.selection}
+                  </div>
+
+                  <div style="font-weight:600;color:${color};">
+                    ${edge}%
+                  </div>
+                </div>
+
+                <div style="font-size:12px; margin-top:4px; opacity:.6;">
+                  ${p.tag || "EDGE"}
+                </div>
+
+                <div style="display:flex; gap:20px; margin-top:8px; font-size:12px;">
+                  <div>Confidence: ${confidence}</div>
+                  <div>Bet Size: ${betSize}</div>
+                </div>
+
               </div>
-            </div>
-
-            <div style="font-size:12px; margin-top:4px; opacity:.6;">
-              ${i === 0 ? "Top Model Edge" : "Positive Edge Opportunity"}
-            </div>
-
-            <div style="
-              display:flex;
-              gap:20px;
-              margin-top:8px;
-              font-size:12px;
-              opacity:.85;
-            ">
-              <div>Confidence: ${confidence}</div>
-              <div>Bet Size: ${betSize}</div>
-            </div>
-
-          </div>
-        `;
-      }).join("");
-    } else {
-      picksEl.innerHTML = "No picks found";
+            `;
+          }).join("")}
+        </div>
+      `;
     }
+
+    // ✅ Render sections
+    picksEl.innerHTML = `
+      ${renderSection("🔥 Live Opportunities", liveRecs)}
+      ${renderSection("📊 Pregame Edges", pregameRecs)}
+    `;
 
     // ===== PARLAYS =====
     const parlaysEl = document.getElementById("parlays");
@@ -163,9 +163,7 @@ async function loadIntelligence() {
         </div>
       `).join("");
     } else {
-      parlaysEl.innerHTML = `
-        <div style="opacity:.6;">No parlays available</div>
-      `;
+      parlaysEl.innerHTML = `<div style="opacity:.6;">No parlays available</div>`;
     }
 
   } catch (err) {
@@ -173,11 +171,7 @@ async function loadIntelligence() {
   }
 }
 
-// ✅ INITIAL LOAD
 window.onload = loadIntelligence;
-
-// ✅ ✅ LIVE REFRESH (every 20 seconds)
 setInterval(loadIntelligence, 20000);
-
 </script>
 {% endblock %}
