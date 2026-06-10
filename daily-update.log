@@ -1,10 +1,6 @@
 To https://github.com/mostgood1/Syndicate
-   4a304cd..a5d6204  HEAD -> main
-To https://github.com/mostgood1/Syndicate
-   a5d6204..df5528c  HEAD -> main
-To https://github.com/mostgood1/Syndicate
-   df5528c..da5d722  HEAD -> main
-To https://github.com/mostgood1/Syndicate
-   da5d722..8f614d0  HEAD -> main
-To https://github.com/mostgood1/Syndicate
-   8f614d0..a0dc89e  HEAD -> main
+   5aeb807..4351deb  main -> main
+warning: in the working copy of 'data/nba_source/source_artifacts/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/nba_source/source_artifacts/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/nba_source/source_artifacts/data/processed/live_lens_projections_2026-06-10.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/nba_source/source_artifacts/data/live_lens/live_lens_projections_2026-06-10.jsonl', LF will be replaced by CRLF the next time Git touches it
