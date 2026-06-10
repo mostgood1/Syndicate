@@ -32,7 +32,7 @@
         "edge": 0.4747988933764937,
         "ev": 1.0682975100971108,
         "ev_pct": 106.82975100971109,
-        "book": "draftkings",
+        "book": "bovada",
         "p_win": 1.0,
         "snapshot_ts": null
       },
@@ -46,12 +46,54 @@
     {
       "game_key": "SAS@NYK",
       "game_id": "1",
+      "player": "De'Aaron Fox",
+      "team": "SAS",
+      "team_tricode": "SAS",
+      "opponent": "NYK",
+      "score": 87.0812869732442,
+      "score_adj": 87.0812869732442,
+      "tier": "High",
+      "model": {
+        "pts": 20.08,
+        "reb": 3.92,
+        "ast": 6.19,
+        "threes": 2.46,
+        "stl": 0.69872,
+        "blk": 0.57168,
+        "tov": 1.9056,
+        "pra": 30.19,
+        "pr": 24.0,
+        "pa": 26.27,
+        "ra": 10.11
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": 125.0,
+        "edge": 0.3870279421033076,
+        "ev": 0.870812869732442,
+        "ev_pct": 87.0812869732442,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 87.1%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.5 vs line 1.5 (+1.0)"
+    },
+    {
+      "game_key": "SAS@NYK",
+      "game_id": "1",
       "player": "Victor Wembanyama",
       "team": "SAS",
       "team_tricode": "SAS",
       "opponent": "NYK",
-      "score": 85.84210526315789,
-      "score_adj": 85.84210526315789,
+      "score": 81.5,
+      "score_adj": 81.5,
       "tier": "High",
       "model": {
         "pts": 33.11,
@@ -70,64 +112,21 @@
         "market": "blk",
         "side": "UNDER",
         "line": 3.5,
-        "price": -114.0,
-        "edge": 0.45728971962616827,
-        "ev": 0.8584210526315789,
-        "ev_pct": 85.84210526315789,
-        "book": "fanduel",
+        "price": -120.0,
+        "edge": 0.4445454545454546,
+        "ev": 0.8150000000000001,
+        "ev_pct": 81.5,
+        "book": "draftkings",
         "p_win": 1.0,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 85.8%",
+        "EV 81.5%",
         "Regular price range (-150 to +150)",
         "Consensus: 4 books aligned",
         "Best line available"
       ],
       "basketball_summary": "model 0.5 vs line 3.5 (-3.0)"
-    },
-    {
-      "game_key": "SAS@NYK",
-      "game_id": "1",
-      "player": "Keldon Johnson",
-      "team": "SAS",
-      "team_tricode": "SAS",
-      "opponent": "NYK",
-      "score": 50.1360813651508,
-      "score_adj": 50.1360813651508,
-      "tier": "High",
-      "model": {
-        "pts": 16.62,
-        "reb": 6.050000000000001,
-        "ast": 1.22,
-        "threes": 1.12,
-        "stl": 0.5238200000000001,
-        "blk": 0.42858,
-        "tov": 1.4286,
-        "pra": 23.89,
-        "pr": 22.67,
-        "pa": 17.84,
-        "ra": 7.2700000000000005
-      },
-      "top_play": {
-        "market": "threes",
-        "side": "OVER",
-        "line": 0.5,
-        "price": 105.0,
-        "edge": 0.24456625056171122,
-        "ev": 0.501360813651508,
-        "ev_pct": 50.1360813651508,
-        "book": "draftkings",
-        "p_win": 0.9891656917002885,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 50.1%",
-        "Regular price range (-150 to +150)",
-        "Consensus: 4 books aligned",
-        "Best line available"
-      ],
-      "basketball_summary": "model 1.1 vs line 0.5 (+0.6)"
     }
   ]
 }
