@@ -154,7 +154,7 @@ def intelligence_query_api():
     print("✅ SERVING LAST RESULT")
     payload = request.get_json(silent=True) or {}
     top_opportunities = rank_global_recommendations(
-        collect_all_recommendations(),
+        collect_all_recommendations(force_refresh=True),
         limit=int(payload.get("limit") or 10) if str(payload.get("limit") or "").strip() else 10,
     )
     by_sport: dict[str, list[dict[str, object]]] = {}

@@ -4,6 +4,10 @@
 {% block page_title %}Intelligence{% endblock %}
 
 {% block content %}
+<section style="max-width:1200px; margin:auto; margin-bottom:20px;">
+  <div id="top-opportunities"></div>
+</section>
+
 <section style="
   max-width:1200px;
   margin:auto;
@@ -61,6 +65,7 @@ async function loadIntelligence() {
     // ===== PORTFOLIO =====
     const portfolio = response.portfolio || {};
     const portfolioEl = document.getElementById("portfolio");
+    const topOpportunitiesEl = document.getElementById("top-opportunities");
 
     portfolioEl.innerHTML = `
       <div style="background:#111;color:white;padding:16px;border-radius:12px;">
@@ -76,6 +81,10 @@ async function loadIntelligence() {
     const scannerEl = document.getElementById("scanner");
     const picksEl = document.getElementById("picks");
 
+    const topOpportunities = (response.top_opportunities || [])
+      .slice()
+      .sort((a, b) => (Number(b.expected_value) || 0) - (Number(a.expected_value) || 0));
+
     const allRecs = (response.recommendations || [])
       .sort((a, b) => (b.edge || 0) - (a.edge || 0));
 
@@ -88,6 +97,45 @@ async function loadIntelligence() {
     function renderSection(title, recs) {
       if (!recs.length) {
         return `<div style="opacity:.5; margin-bottom:20px;">No ${title} picks</div>`;
+      }
+
+      function numericValue(value) {
+        return typeof value === "number" && Number.isFinite(value) ? value : null;
+      }
+
+      function liveIndicatorChips(p) {
+        const chips = [];
+        const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
+        const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
+        const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
+
+        if (evDelta !== null) {
+          chips.push(`
+            <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+              EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
+            </span>
+          `);
+        }
+
+        if (lineDelta !== null) {
+          chips.push(`
+            <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+              Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
+            </span>
+          `);
+        }
+
+        if (confidenceStability !== null) {
+          chips.push(`
+            <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
+              Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
+            </span>
+          `);
+        }
+
+        return chips.length
+          ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
+          : "";
       }
 
       return `
@@ -138,6 +186,8 @@ async function loadIntelligence() {
                   <div>Bet Size: ${betSize}</div>
                 </div>
 
+                ${liveIndicatorChips(p)}
+
               </div>
             `;
           }).join("")}
@@ -148,6 +198,45 @@ async function loadIntelligence() {
     function renderScannerSection(title, recs) {
       if (!recs.length) {
         return "";
+      }
+
+      function numericValue(value) {
+        return typeof value === "number" && Number.isFinite(value) ? value : null;
+      }
+
+      function liveIndicatorChips(p) {
+        const chips = [];
+        const evDelta = numericValue(p.ev_delta) ?? numericValue(p.ev_change) ?? numericValue(p.expected_value_delta);
+        const lineDelta = numericValue(p.line_movement_impact) ?? numericValue(p.line_delta) ?? numericValue(p.line_move_delta);
+        const confidenceStability = numericValue(p.confidence_stability) ?? numericValue(p.confidence_delta) ?? numericValue(p.confidence_change);
+
+        if (evDelta !== null) {
+          chips.push(`
+            <span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+              EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}
+            </span>
+          `);
+        }
+
+        if (lineDelta !== null) {
+          chips.push(`
+            <span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">
+              Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}
+            </span>
+          `);
+        }
+
+        if (confidenceStability !== null) {
+          chips.push(`
+            <span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">
+              Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}
+            </span>
+          `);
+        }
+
+        return chips.length
+          ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${chips.join("")}</div>`
+          : "";
       }
 
       return `
@@ -187,6 +276,8 @@ async function loadIntelligence() {
                   ${lineImpact ? `<div>Line impact: ${Number(lineImpact) > 0 ? "+" : ""}${lineImpact}%</div>` : ""}
                 </div>
 
+                ${liveIndicatorChips(p)}
+
                 ${p.reasoning ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">${p.reasoning}</div>` : ""}
               </div>
             `;
@@ -195,7 +286,83 @@ async function loadIntelligence() {
       `;
     }
 
+    function renderTopOpportunitiesSection(recs) {
+      if (!recs.length) {
+        return `
+          <div style="
+            background:#101010;
+            color:white;
+            padding:18px;
+            border-radius:14px;
+            border:1px solid rgba(255,255,255,.08);
+          ">
+            <h3 style="margin:0 0 8px 0;">Top Opportunities Right Now</h3>
+            <div style="opacity:.65;">No opportunities available</div>
+          </div>
+        `;
+      }
+
+      return `
+        <div style="
+          background:#101010;
+          color:white;
+          padding:18px;
+          border-radius:14px;
+          border:1px solid rgba(255,255,255,.08);
+          margin-bottom:20px;
+        ">
+          <h3 style="margin:0 0 12px 0;">Top Opportunities Right Now</h3>
+          ${recs.map((item, index) => {
+            const expectedValue = typeof item.expected_value === "number"
+              ? (item.expected_value * 100).toFixed(1) + "%"
+              : (item.expected_value ?? "—");
+            const confidence = typeof item.confidence === "number"
+              ? Math.round(item.confidence * 100) + "%"
+              : (item.confidence ?? "—");
+            const sport = item.sport || item.sport_slug || "—";
+            const bet = item.bet || item.selection || item.pick || item.market || "—";
+            const reasoning = item.reasoning || item.rationale || item.summary || "";
+            const evDelta = typeof item.ev_delta === "number" ? item.ev_delta : null;
+            const lineDelta = typeof item.line_movement_impact === "number" ? item.line_movement_impact : null;
+            const confidenceStability = typeof item.confidence_stability === "number" ? item.confidence_stability : (typeof item.confidence_delta === "number" ? item.confidence_delta : null);
+            const indicatorChips = [];
+
+            if (evDelta !== null) {
+              indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${evDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${evDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">EV ${evDelta > 0 ? '↑ improving' : evDelta < 0 ? '↓ worsening' : 'flat'}</span>`);
+            }
+            if (lineDelta !== null) {
+              indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${lineDelta > 0 ? 'rgba(46, 204, 113, .14)' : 'rgba(231, 76, 60, .14)'}; color:${lineDelta > 0 ? '#b9f6cf' : '#ffd0cc'};">Line ${lineDelta > 0 ? '↑' : lineDelta < 0 ? '↓' : '→'} ${lineDelta > 0 ? 'moving for us' : lineDelta < 0 ? 'moving against' : 'flat'}</span>`);
+            }
+            if (confidenceStability !== null) {
+              indicatorChips.push(`<span style="padding:4px 8px; border-radius:999px; background:${confidenceStability > 0 ? 'rgba(125, 211, 252, .14)' : confidenceStability < 0 ? 'rgba(251, 191, 36, .14)' : 'rgba(255,255,255,.08)'}; color:${confidenceStability > 0 ? '#cfefff' : confidenceStability < 0 ? '#fde6a0' : '#d1d5db'};">Confidence ${confidenceStability > 0 ? 'stable' : confidenceStability < 0 ? 'slipping' : 'unchanged'}</span>`);
+            }
+
+            return `
+              <div style="
+                padding:14px 0;
+                border-top:${index === 0 ? "0" : "1px solid rgba(255,255,255,.08)"};
+              ">
+                <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                  <div style="font-weight:600;">${sport} · ${bet}</div>
+                  <div style="font-weight:600; color:#7dd3fc;">EV ${expectedValue}</div>
+                </div>
+                <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:12px; opacity:.82;">
+                  <div><strong>Confidence:</strong> ${confidence}</div>
+                </div>
+                ${indicatorChips.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${indicatorChips.join("")}</div>` : ""}
+                ${reasoning ? `<div style="margin-top:8px; font-size:12px; line-height:1.5; opacity:.78;">${reasoning}</div>` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
     // ✅ Render sections
+    if (topOpportunitiesEl) {
+      topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(topOpportunities);
+    }
+
     if (scannerEl) {
       scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", topLiveOpportunities);
     }

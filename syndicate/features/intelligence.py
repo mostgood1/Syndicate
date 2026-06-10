@@ -5560,15 +5560,60 @@ def _has_mlb_home_run_candidates(candidates: list[dict[str, Any]]) -> bool:
 
 
 def collect_all_recommendations(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
-    response = run_intelligence_query(
+    effective_date = _effective_date(selected_date or central_today_iso())
+    overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
+    tracked = _tracked_repo_files()
+    preferences = _query_preferences(
         "top edges today",
-        selected_date=selected_date,
-        force_refresh=force_refresh,
+        mode="recommendation",
+        sport="all",
+        timing="live",
+        include_props=True,
+        include_games=True,
     )
-    recommendations = response.get("recommendations") if isinstance(response, dict) else []
-    if not isinstance(recommendations, list):
-        return []
-    return [dict(recommendation) for recommendation in recommendations if isinstance(recommendation, dict)]
+    advanced_by_sport = {
+        _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)
+        for sport_row in overview
+        if isinstance(sport_row, dict)
+    }
+    candidates = _collect_candidates(overview, preferences)
+    if _query_needs_mlb_home_run_candidates(preferences) and not _has_mlb_home_run_candidates(candidates):
+        for sport_row in overview:
+            if not isinstance(sport_row, dict):
+                continue
+            if _safe_text(sport_row.get("slug"), "").lower() != "mlb":
+                continue
+            candidates.extend(_mlb_home_run_candidates_from_artifact(sport_row))
+            break
+    for sport_row in overview:
+        if not isinstance(sport_row, dict):
+            continue
+        extra_subject_candidates = _mlb_subject_prop_candidates_from_artifact(
+            sport_row,
+            question="top edges today",
+            preferences=preferences,
+        )
+        for candidate in extra_subject_candidates:
+            candidate_subject = _candidate_subject_key(candidate)
+            candidate_market = _candidate_market_key(candidate)
+            if any(
+                _candidate_subject_key(existing) == candidate_subject
+                and _candidate_market_key(existing) == candidate_market
+                for existing in candidates
+            ):
+                continue
+            candidates.append(candidate)
+    _apply_live_state_context_to_candidates(candidates)
+    candidates = [row for row in candidates if not _candidate_is_final(row)]
+    candidates = [row for row in candidates if not bool(row.get("state_invalid"))]
+    _apply_advanced_context_to_candidates(candidates, advanced_by_sport, preferences)
+    filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
+    ranked_recommendations = rank_recommendations(
+        filtered_candidates,
+        sport=_safe_text(preferences.get("sport"), "") or None,
+        limit=None,
+    )
+    return [dict(recommendation) for recommendation in ranked_recommendations if isinstance(recommendation, dict)]
 
 
 def rank_global_recommendations(recommendations: list[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
@@ -5616,33 +5661,8 @@ def run_intelligence_query(
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
-    candidates = _collect_candidates(overview, preferences)
-    if _query_needs_mlb_home_run_candidates(preferences) and not _has_mlb_home_run_candidates(candidates):
-        for sport_row in overview:
-            if not isinstance(sport_row, dict):
-                continue
-            if _safe_text(sport_row.get("slug"), "").lower() != "mlb":
-                continue
-            candidates.extend(_mlb_home_run_candidates_from_artifact(sport_row))
-            break
-    for sport_row in overview:
-        if not isinstance(sport_row, dict):
-            continue
-        extra_subject_candidates = _mlb_subject_prop_candidates_from_artifact(
-            sport_row,
-            question=question,
-            preferences=preferences,
-        )
-        for candidate in extra_subject_candidates:
-            candidate_subject = _candidate_subject_key(candidate)
-            candidate_market = _candidate_market_key(candidate)
-            if any(
-                _candidate_subject_key(existing) == candidate_subject
-                and _candidate_market_key(existing) == candidate_market
-                for existing in candidates
-            ):
-                continue
-            candidates.append(candidate)
+    shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh)
+    candidates = [dict(recommendation) for recommendation in shared_recommendations]
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}
