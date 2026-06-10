@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 
 from pipeline.intelligence_models import IntelligenceResult
+from syndicate.features.intelligence import _candidate_summary
+from syndicate.features.intelligence.scoring.edge import get_top_live_opportunities
 from syndicate.features.shared.intelligence_contracts import build_intelligence_evaluation_record
 
 
@@ -78,6 +80,49 @@ class IntelligenceContractsTest(unittest.TestCase):
         self.assertEqual(record["response"]["recommendation_count"], 1)
         self.assertEqual(record["top_recommendation"]["name"], "Jayson Tatum Over 28.5 Points")
         self.assertEqual(record["outcome"]["actual"], "hit")
+
+    def test_candidate_summary_includes_settlement_metadata(self) -> None:
+        summary = _candidate_summary(
+            {
+                "candidate_type": "prop",
+                "sport": "NBA",
+                "sport_slug": "nba",
+                "matchup": "LAL @ BOS",
+                "market": "Points",
+                "pick": "Over 28.5",
+                "name": "Jayson Tatum",
+                "line": 28.5,
+                "actual": 31,
+                "status_display": "Final",
+                "is_final": True,
+            }
+        )
+
+        self.assertEqual(summary["actual"], "31")
+        self.assertEqual(summary["settlement"]["status"], "settled")
+        self.assertEqual(summary["settlement"]["result"], "won")
+
+    def test_top_live_opportunities_include_actual_and_settlement(self) -> None:
+        opportunities = get_top_live_opportunities(
+            [
+                {
+                    "is_live": True,
+                    "sport": "NBA",
+                    "sport_slug": "nba",
+                    "market": "Points",
+                    "name": "Jayson Tatum",
+                    "selection": "Over 28.5",
+                    "ev_current": 0.12,
+                    "line": 28.5,
+                    "actual": 19,
+                    "status_display": "In Progress",
+                }
+            ],
+            limit=1,
+        )
+
+        self.assertEqual(opportunities[0]["actual"], "19")
+        self.assertEqual(opportunities[0]["settlement"]["status"], "live")
 
 
 if __name__ == "__main__":

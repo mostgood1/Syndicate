@@ -41,6 +41,79 @@ def _display_name(recommendation: dict[str, Any]) -> str:
     )
 
 
+def _settlement_summary(recommendation: dict[str, Any]) -> dict[str, Any]:
+    status_text = _safe_text(
+        recommendation.get("status_display")
+        or recommendation.get("status_context")
+        or recommendation.get("game_state")
+        or "",
+        "",
+    ).lower()
+    actual_value = _safe_text(
+        recommendation.get("actual")
+        or recommendation.get("actual_value")
+        or recommendation.get("actual_so_far")
+        or recommendation.get("current_actual")
+        or recommendation.get("live_actual"),
+        "-",
+    )
+    if actual_value in {"", "-"} and _safe_text(recommendation.get("sport_slug"), "").lower() == "mlb":
+        game_pk = recommendation.get("game_pk")
+        context_label = _safe_text(recommendation.get("context_label"), "")
+        if game_pk is not None and context_label:
+            try:
+                from syndicate.blueprints.home import _mlb_actual_payload_for_candidate
+                from syndicate.blueprints.home import _mlb_prop_actual_value
+
+                actual_payload = _mlb_actual_payload_for_candidate(context_label, int(game_pk), {})
+                if isinstance(actual_payload, dict):
+                    live_actual = _mlb_prop_actual_value(recommendation, actual_payload)
+                    if live_actual is not None:
+                        actual_value = _safe_text(live_actual, "-")
+            except Exception:
+                pass
+    line_value = _numeric_hint(recommendation.get("line"))
+    actual_numeric = _numeric_hint(actual_value)
+    is_final = bool(recommendation.get("is_final")) or any(token in status_text for token in ("final", "completed", "settled", "graded"))
+    is_live = bool(recommendation.get("is_live"))
+
+    if is_final:
+        status = "settled"
+    elif is_live:
+        status = "live"
+    elif actual_value not in {"", "-"}:
+        status = "resolved"
+    else:
+        status = "pending"
+
+    result = _safe_text(recommendation.get("settlement_result") or recommendation.get("result"), "")
+    if not result and status == "settled" and actual_numeric is not None and line_value is not None:
+        selection_text = _safe_text(recommendation.get("selection") or recommendation.get("pick"), "").lower()
+        over_selected = selection_text.startswith("over") or " over " in selection_text
+        under_selected = selection_text.startswith("under") or " under " in selection_text
+        if actual_numeric == line_value:
+            result = "push"
+        elif over_selected:
+            result = "won" if actual_numeric > line_value else "lost"
+        elif under_selected:
+            result = "won" if actual_numeric < line_value else "lost"
+
+    status_label = {
+        "live": "Live",
+        "resolved": "Resolved",
+        "settled": "Settled",
+        "pending": "Pending",
+    }.get(status, status.title() if status else "")
+
+    return {
+        "status": status,
+        "status_label": status_label,
+        "actual": actual_value,
+        "line": _safe_text(recommendation.get("line"), "-"),
+        "result": result,
+    }
+
+
 def get_top_live_opportunities(
     recommendations: list[dict[str, Any]],
     *,
@@ -87,6 +160,8 @@ def get_top_live_opportunities(
                 "player_name": _safe_text(recommendation.get("player_name"), ""),
                 "matchup": _safe_text(recommendation.get("matchup"), ""),
                 "candidate_type": _safe_text(recommendation.get("candidate_type"), ""),
+                "actual": _safe_text(recommendation.get("actual") or recommendation.get("actual_value") or recommendation.get("actual_so_far") or recommendation.get("current_actual") or recommendation.get("live_actual"), "-"),
+                "settlement": _settlement_summary(recommendation),
                 "odds_open": recommendation.get("odds_open") or recommendation.get("odds"),
                 "odds_current": recommendation.get("odds_current") or recommendation.get("odds"),
                 "ev_open": _numeric_hint(recommendation.get("ev_open") or recommendation.get("expected_value_open")),

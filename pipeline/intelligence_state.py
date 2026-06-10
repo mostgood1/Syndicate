@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import threading
 import time
@@ -13,6 +14,7 @@ from typing import Any
 from flask import Flask
 
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
+from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.shared.refresh_state_store import read_json_file
@@ -23,6 +25,7 @@ from syndicate.features.shared.timezone import central_today_iso
 
 REPO_ROOT = repo_root_from(__file__)
 STATE_PATH = REPO_ROOT / "reports" / "intelligence" / "query_state_cache.json"
+logger = logging.getLogger(__name__)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -51,12 +54,25 @@ def _utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def _log_stage_timing(stage_name: str, duration_ms: float) -> None:
+    logger.info(json.dumps({"stage": stage_name, "duration_ms": round(duration_ms, 3)}, sort_keys=True, default=str))
+
+
+def _profile_stage(stage_name: str, callback, *args, **kwargs):
+    started_at = time.perf_counter()
+    try:
+        return callback(*args, **kwargs)
+    finally:
+        _log_stage_timing(stage_name, (time.perf_counter() - started_at) * 1000.0)
+
+
 @dataclass
 class IntelligenceSnapshot:
     key: str
     payload: dict[str, Any]
     response: dict[str, Any]
     computed_at: str
+    source_fingerprint: str
 
 
 class IntelligenceStateService:
@@ -72,9 +88,199 @@ class IntelligenceStateService:
         self._snapshots: OrderedDict[str, IntelligenceSnapshot] = OrderedDict()
         self._watched_payloads: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._pending_keys: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._candidate_pools: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._latest_key: str | None = None
         self._loaded_from_disk = False
         self._app: Flask | None = None
+
+    def _artifact_signature(self, relative_path: str | None) -> dict[str, Any]:
+        path_text = str(relative_path or "").strip()
+        if not path_text:
+            return {"path": "", "exists": False, "size": None, "mtime_ns": None}
+        path = Path(path_text)
+        if not path.is_absolute():
+            path = REPO_ROOT / path
+        try:
+            stat_result = path.stat()
+        except OSError:
+            return {"path": path_text, "exists": False, "size": None, "mtime_ns": None}
+        return {
+            "path": path_text,
+            "exists": True,
+            "size": int(stat_result.st_size),
+            "mtime_ns": int(stat_result.st_mtime_ns),
+        }
+
+    def _source_state_fingerprint(self, selected_date: str | None) -> str:
+        status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+        sports_payload: list[dict[str, Any]] = []
+        for sport in status.get("sports") if isinstance(status.get("sports"), list) else []:
+            if not isinstance(sport, dict):
+                continue
+            artifact_signatures = []
+            for artifact in sport.get("artifacts") if isinstance(sport.get("artifacts"), list) else []:
+                if not isinstance(artifact, dict):
+                    continue
+                artifact_signatures.append(
+                    {
+                        "label": str(artifact.get("label") or "").strip(),
+                        **self._artifact_signature(str(artifact.get("path") or "").strip()),
+                        "tracked": bool(artifact.get("tracked")),
+                        "inside_repo": bool(artifact.get("inside_repo")),
+                    }
+                )
+            advanced_signatures = []
+            for advanced_input in sport.get("advanced_inputs") if isinstance(sport.get("advanced_inputs"), list) else []:
+                if not isinstance(advanced_input, dict):
+                    continue
+                advanced_signatures.append(
+                    {
+                        "label": str(advanced_input.get("label") or "").strip(),
+                        **self._artifact_signature(str(advanced_input.get("path") or "").strip()),
+                        "exists": bool(advanced_input.get("exists")),
+                        "tracked": bool(advanced_input.get("tracked")),
+                        "inside_repo": bool(advanced_input.get("inside_repo")),
+                    }
+                )
+            sports_payload.append(
+                {
+                    "slug": str(sport.get("slug") or "").strip().lower(),
+                    "name": str(sport.get("name") or "").strip(),
+                    "context_label": str(sport.get("context_label") or "").strip(),
+                    "data_health": str(sport.get("data_health") or "").strip(),
+                    "active_today": bool(sport.get("active_today")),
+                    "tracked_ready": bool(sport.get("tracked_ready")),
+                    "advanced_ready": bool(sport.get("advanced_ready")),
+                    "advanced_gate": sport.get("advanced_gate") if isinstance(sport.get("advanced_gate"), dict) else {},
+                    "data_warnings": [str(item).strip() for item in (sport.get("data_warnings") or []) if str(item).strip()],
+                    "artifacts": artifact_signatures,
+                    "advanced_inputs": advanced_signatures,
+                }
+            )
+        payload = {
+            "selected_date": status.get("selected_date") or selected_date,
+            "tracked_summary": status.get("tracked_summary") if isinstance(status.get("tracked_summary"), dict) else {},
+            "advanced_summary": status.get("advanced_summary") if isinstance(status.get("advanced_summary"), dict) else {},
+            "readiness_gate": status.get("readiness_gate") if isinstance(status.get("readiness_gate"), dict) else {},
+            "sports": sports_payload,
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _candidate_pool_key(self, selected_date: str | None, source_fingerprint: str) -> str:
+        payload = {
+            "selected_date": str(selected_date or "").strip(),
+            "source_fingerprint": str(source_fingerprint or "").strip(),
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _candidate_id(self, candidate: dict[str, Any]) -> str:
+        identifier = {
+            "sport_slug": str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower(),
+            "candidate_type": str(candidate.get("candidate_type") or "").strip().lower(),
+            "event_id": str(candidate.get("event_id") or "").strip(),
+            "game_pk": str(candidate.get("game_pk") or candidate.get("gamePk") or "").strip(),
+            "subject_key": str(candidate.get("subject_key") or candidate.get("player_name") or candidate.get("name") or "").strip().lower(),
+            "market_key": str(candidate.get("market_key") or candidate.get("market") or "").strip().lower(),
+            "selection": str(candidate.get("selection") or candidate.get("pick") or "").strip().lower(),
+            "line": str(candidate.get("line") or candidate.get("market_line") or candidate.get("prop_line") or "").strip().lower(),
+            "odds": str(candidate.get("odds") or candidate.get("odds_current") or "").strip().lower(),
+        }
+        canonical = json.dumps(identifier, sort_keys=True, separators=(",", ":"), default=str)
+        return f"cand_{hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:16]}"
+
+    def _candidate_raw_inputs(self, candidate: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: candidate.get(key)
+            for key in (
+                "event_id",
+                "game_pk",
+                "sport",
+                "sport_slug",
+                "candidate_type",
+                "market",
+                "market_key",
+                "selection",
+                "pick",
+                "line",
+                "odds",
+                "matchup",
+                "player_name",
+                "name",
+                "team",
+                "status_display",
+                "status_context",
+                "game_state",
+                "timestamp",
+                "updated_at",
+                "live_projection",
+                "live_total",
+                "actual",
+            )
+        }
+
+    def _candidate_precomputed_features(self, candidate: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "simulation": candidate.get("simulation") if isinstance(candidate.get("simulation"), dict) else None,
+            "market_context": candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else None,
+            "market_data": candidate.get("market_data") if isinstance(candidate.get("market_data"), dict) else None,
+            "market_fit": candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else None,
+            "historical_profile": candidate.get("historical_profile") if isinstance(candidate.get("historical_profile"), dict) else None,
+            "sport_profile": candidate.get("sport_profile") if isinstance(candidate.get("sport_profile"), dict) else None,
+            "performance_context": candidate.get("performance_context") if isinstance(candidate.get("performance_context"), dict) else None,
+            "advanced_gate": candidate.get("advanced_gate") if isinstance(candidate.get("advanced_gate"), dict) else None,
+            "advanced_context": [dict(item) for item in (candidate.get("advanced_context") or []) if isinstance(item, dict)],
+            "advanced_inputs": [dict(item) for item in (candidate.get("advanced_inputs") or []) if isinstance(item, dict)],
+        }
+
+    def _candidate_preliminary_scores(self, candidate: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "score": candidate.get("score"),
+            "adjusted_score": candidate.get("adjusted_score"),
+            "source_summary_score": candidate.get("source_summary_score"),
+            "edge": candidate.get("edge"),
+            "adjusted_edge": candidate.get("adjusted_edge"),
+            "ev_current": candidate.get("ev_current"),
+            "ev_delta": candidate.get("ev_delta"),
+            "confidence": candidate.get("confidence"),
+            "model_probability": candidate.get("model_probability"),
+            "implied_probability": candidate.get("implied_probability"),
+        }
+
+    def _build_candidate_pool(self, selected_date: str | None, source_fingerprint: str) -> dict[str, Any]:
+        cache_key = self._candidate_pool_key(selected_date, source_fingerprint)
+        with self._condition:
+            cached_pool = self._candidate_pools.get(cache_key)
+            if cached_pool is not None:
+                return json.loads(json.dumps(cached_pool, default=str))
+
+        raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+        candidate_build_started_at = time.perf_counter()
+        candidate_entries: list[dict[str, Any]] = []
+        for candidate in raw_candidates:
+            if not isinstance(candidate, dict):
+                continue
+            candidate_entry = dict(candidate)
+            candidate_entry["candidate_id"] = self._candidate_id(candidate_entry)
+            candidate_entry["raw_inputs"] = self._candidate_raw_inputs(candidate_entry)
+            candidate_entry["precomputed_features"] = self._candidate_precomputed_features(candidate_entry)
+            candidate_entry["preliminary_scores"] = self._candidate_preliminary_scores(candidate_entry)
+            candidate_entry["source_fingerprint"] = source_fingerprint
+            candidate_entries.append(candidate_entry)
+        _log_stage_timing("candidate_building", (time.perf_counter() - candidate_build_started_at) * 1000.0)
+
+        pool = {
+            "selected_date": selected_date,
+            "source_fingerprint": source_fingerprint,
+            "candidate_count": len(candidate_entries),
+            "candidates": candidate_entries,
+        }
+        with self._condition:
+            self._candidate_pools[cache_key] = pool
+            self._candidate_pools.move_to_end(cache_key)
+            self._trim_ordered_dict(self._candidate_pools, self._max_snapshots)
+        return json.loads(json.dumps(pool, default=str))
 
     def start(self, app: Flask | None = None) -> bool:
         with self._lock:
@@ -102,7 +308,9 @@ class IntelligenceStateService:
                 "running": bool(self._running),
                 "latestKey": self._latest_key,
                 "cachedSnapshots": len(self._snapshots),
+                "cachedCandidatePools": len(self._candidate_pools),
                 "latestComputedAt": latest_snapshot.computed_at if latest_snapshot else None,
+                "latestSourceFingerprint": latest_snapshot.source_fingerprint if latest_snapshot else None,
             }
 
     def get_response(self, payload: dict[str, Any], *, refresh: bool = False, wait: bool = True) -> dict[str, Any] | None:
@@ -127,6 +335,17 @@ class IntelligenceStateService:
             if self._latest_key and self._latest_key in self._snapshots:
                 return dict(self._snapshots[self._latest_key].response)
         return None
+
+    def read_latest_response(self, payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        normalized_payload = self._normalize_payload(payload or self._default_payload())
+        key = _payload_key(normalized_payload)
+        with self._lock:
+            snapshot = self._snapshots.get(key)
+            if snapshot is not None and not self._is_stale(snapshot):
+                return dict(snapshot.response)
+            if self._latest_key and self._latest_key in self._snapshots:
+                return dict(self._snapshots[self._latest_key].response)
+            return None
 
     def queue_refresh(self, payload: dict[str, Any]) -> str:
         normalized_payload = self._normalize_payload(payload)
@@ -173,6 +392,7 @@ class IntelligenceStateService:
     def _background_loop(self) -> None:
         while not self._stop.is_set():
             payload_to_process: dict[str, Any] | None = None
+            source_fingerprint: str | None = None
             with self._condition:
                 if not self._pending_keys:
                     for key, watched_payload in list(self._watched_payloads.items()):
@@ -188,6 +408,16 @@ class IntelligenceStateService:
             if payload_to_process is None:
                 continue
             try:
+                selected_date = str(payload_to_process.get("date") or payload_to_process.get("selected_date") or "").strip() or None
+                source_fingerprint = self._source_state_fingerprint(selected_date)
+                candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+                with self._condition:
+                    current_snapshot = self._snapshots.get(_payload_key(payload_to_process))
+                    if current_snapshot is not None and current_snapshot.source_fingerprint == source_fingerprint:
+                        self._latest_key = current_snapshot.key
+                        self._condition.notify_all()
+                        self._condition.wait(timeout=self._interval_seconds)
+                        continue
                 if self._app is not None:
                     with self._app.app_context():
                         response = self._compute_response(payload_to_process)
@@ -207,6 +437,7 @@ class IntelligenceStateService:
                 payload=dict(payload_to_process),
                 response=response,
                 computed_at=_utc_now(),
+                source_fingerprint=source_fingerprint or "",
             )
             with self._condition:
                 self._snapshots[snapshot.key] = snapshot
@@ -218,6 +449,7 @@ class IntelligenceStateService:
             self._condition.wait(timeout=self._interval_seconds)
 
     def _compute_response(self, payload: dict[str, Any]) -> dict[str, Any]:
+        request_started_at = time.perf_counter()
         request_payload = dict(payload)
         question = str(request_payload.get("question") or "").strip() or "top edges today"
         selected_date = str(request_payload.get("date") or request_payload.get("selected_date") or "").strip() or None
@@ -227,13 +459,23 @@ class IntelligenceStateService:
         except Exception:
             limit_value = 10
 
-        shared_recommendations = collect_all_recommendations(selected_date=selected_date, force_refresh=True)
-        top_opportunities = rank_global_recommendations(shared_recommendations, limit=limit_value)
+        source_fingerprint = self._source_state_fingerprint(selected_date)
+        cache_key = _payload_key(request_payload)
+        candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+        candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
+        with self._condition:
+            snapshot = self._snapshots.get(cache_key)
+            if snapshot is not None and snapshot.source_fingerprint == source_fingerprint:
+                _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
+                return dict(snapshot.response)
+
+        top_opportunities = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=limit_value)
         by_sport: dict[str, list[dict[str, object]]] = {}
         for recommendation in top_opportunities:
             sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
             by_sport.setdefault(sport_key, []).append(dict(recommendation))
 
+        response_build_started_at = time.perf_counter()
         analysis_result = run_routed_intelligence_pipeline(request_payload)
         if hasattr(analysis_result, "to_dict"):
             analysis = analysis_result.to_dict()
@@ -247,9 +489,25 @@ class IntelligenceStateService:
             "top_opportunities": top_opportunities,
             "by_sport": by_sport,
             "analysis": analysis,
+            "candidate_pool": candidate_pool,
         }
         if analysis:
             response["response"] = analysis
+        _log_stage_timing("response_building", (time.perf_counter() - response_build_started_at) * 1000.0)
+        with self._condition:
+            snapshot = IntelligenceSnapshot(
+                key=cache_key,
+                payload=dict(request_payload),
+                response=dict(response),
+                computed_at=_utc_now(),
+                source_fingerprint=source_fingerprint,
+            )
+            self._snapshots[snapshot.key] = snapshot
+            self._snapshots.move_to_end(snapshot.key)
+            self._latest_key = snapshot.key
+            self._trim_ordered_dict(self._snapshots, self._max_snapshots)
+            self._persist_locked()
+        _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
         return response
 
     def _is_stale(self, snapshot: IntelligenceSnapshot) -> bool:
@@ -286,6 +544,7 @@ class IntelligenceStateService:
                 payload=dict(raw_snapshot.get("payload") or {}),
                 response=dict(response),
                 computed_at=str(raw_snapshot.get("computed_at") or _utc_now()),
+                source_fingerprint=str(raw_snapshot.get("source_fingerprint") or ""),
             )
             self._snapshots[snapshot.key] = snapshot
         self._latest_key = str(payload.get("latest_key") or "").strip() or (next(reversed(self._snapshots)) if self._snapshots else None)
@@ -300,6 +559,7 @@ class IntelligenceStateService:
                     "payload": snapshot.payload,
                     "response": snapshot.response,
                     "computed_at": snapshot.computed_at,
+                    "source_fingerprint": snapshot.source_fingerprint,
                 }
                 for key, snapshot in self._snapshots.items()
             },
@@ -319,7 +579,11 @@ def queue_intelligence_state_refresh(payload: dict[str, Any]) -> str:
 
 
 def get_latest_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True) -> dict[str, Any] | None:
-    return _INTELLIGENCE_STATE_SERVICE.get_response(payload, refresh=refresh, wait=wait)
+    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload)
+
+
+def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload)
 
 
 def intelligence_state_status() -> dict[str, Any]:

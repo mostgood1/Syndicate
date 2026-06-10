@@ -1,6 +1,6 @@
 {
   "date": "2026-06-10",
-  "generatedAt": "2026-06-10T16:49:01-05:00",
+  "generatedAt": "2026-06-10T17:22:53-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -16,20 +16,20 @@
   },
   "counts": {
     "games": 15,
-    "live": 4,
+    "live": 8,
     "final": 0,
-    "pregame": 11,
+    "pregame": 7,
     "props": 57,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 2.0,
-    "totalMs": 1087.6,
-    "snapshotLoadMs": 2.5,
-    "simContextLoadMs": 1.1,
+    "marketRefreshMs": 1.5,
+    "totalMs": 3349.9,
+    "snapshotLoadMs": 3.4,
+    "simContextLoadMs": 1.5,
     "propEvalMs": 0.5,
-    "gameLensMs": 1.0,
+    "gameLensMs": 1.6,
     "gameCount": 15,
     "liveGameCount": 2,
     "feedFetchCount": 15,
@@ -779,21 +779,6 @@
               "tone": "strong",
               "detail": "Foster Griffin Over 16.5 Outs | Odds -112 | Edge 38.9%",
               "hitProb": 0.879
-            }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.1. Current 5.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.44,
-              "source": "live",
-              "actual": 5.0
             }
           ]
         },
@@ -2192,21 +2177,6 @@
               "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.274
             }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "strong",
-              "detail": "Live projection 1.2. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.545,
-              "source": "live",
-              "actual": 1.0
-            }
           ]
         },
         "home": {
@@ -2819,8 +2789,8 @@
     {
       "gamePk": 824831,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "5:35 PM",
       "matchup": {
@@ -3582,6 +3552,47 @@
               "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.22
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.2. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.432,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.5. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.804,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 7.4. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.725,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -3633,6 +3644,34 @@
               "tone": "soft",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.231
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.3. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.64,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.6. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.634,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }
@@ -3960,8 +3999,8 @@
     {
       "gamePk": 823372,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "5:40 PM",
       "matchup": {
@@ -4450,6 +4489,21 @@
               "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.201
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.3. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.719,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -4501,6 +4555,34 @@
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.26
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.0. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.583,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.9. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.804,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }
@@ -4621,8 +4703,8 @@
     {
       "gamePk": 823856,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "5:40 PM",
       "matchup": {
@@ -6200,6 +6282,47 @@
               "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.292
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.3. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.635,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 19.9. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.749,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.3. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.582,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -6229,6 +6352,21 @@
               "tone": "soft",
               "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
               "hitProb": 0.241
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.2. Current 0.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.781,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }
@@ -7174,8 +7312,8 @@
     {
       "gamePk": 824266,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "5:40 PM",
       "matchup": {

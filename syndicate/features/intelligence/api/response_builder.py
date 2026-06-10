@@ -15,6 +15,48 @@ from syndicate.features.intelligence.signals.normalization import _safe_text
 MAX_CORRELATION_THRESHOLD = 0.65
 
 
+def _has_live_signal(candidate: dict[str, Any]) -> bool:
+    live_projection = _safe_text(candidate.get("live_projection"), "")
+    return bool(
+        candidate.get("hero_live_box")
+        or candidate.get("hero_sim_box")
+        or (live_projection and live_projection != "-")
+        or candidate.get("live_total") is not None
+    )
+
+
+def _recommendation_state(candidate: dict[str, Any]) -> str:
+    game_state = candidate.get("game_state") if isinstance(candidate.get("game_state"), dict) else {}
+    status = _safe_text(
+        candidate.get("status_display")
+        or candidate.get("status_context")
+        or game_state.get("detailed")
+        or game_state.get("abstract"),
+        "",
+    ).lower()
+    live_flag = candidate.get("is_live") if isinstance(candidate.get("is_live"), bool) else None
+    if "final" in status or "completed" in status:
+        return "final"
+    if "warmup" in status or "scheduled" in status or "pregame" in status:
+        return "pregame"
+    if ("live" in status or "in progress" in status) and live_flag and _has_live_signal(candidate):
+        return "live"
+    if live_flag and _has_live_signal(candidate):
+        return "live"
+    if "live" in status or "in progress" in status:
+        return "stale"
+    return "pregame"
+
+
+def _response_state(candidate: dict[str, Any]) -> str:
+    state = _recommendation_state(candidate)
+    if state in {"final", "stale"}:
+        return state
+    if state == "live" and not _has_live_signal(candidate):
+        return "stale"
+    return state
+
+
 def _frontend_display_name(candidate: dict[str, Any]) -> str:
     reasoning = _safe_text(
         candidate.get("reasoning") or candidate.get("reasoning_text") or candidate.get("summary") or candidate.get("rationale"),
@@ -229,6 +271,8 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
             },
         )
 
+    visible_recommendations = [dict(candidate) for candidate in recommendations if _response_state(candidate) not in {"final", "stale"}]
+
     def _frontend_parlay(parlay: dict[str, Any]) -> dict[str, Any]:
         correlation_profile = parlay.get("correlation_profile") if isinstance(parlay.get("correlation_profile"), dict) else {}
         return {
@@ -260,7 +304,7 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
         return recommendation
 
     ordered_recommendations = sorted(
-        [dict(candidate) for candidate in recommendations],
+        visible_recommendations,
         key=lambda item: (
             _numeric_hint(item.get("adjusted_score") or item.get("score") or item.get("source_summary_score") or item.get("edge")) or 0.0,
             _numeric_hint(item.get("expected_value") or item.get("ev_current") or item.get("ev")) or 0.0,

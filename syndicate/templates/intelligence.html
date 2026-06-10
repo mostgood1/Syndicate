@@ -5,6 +5,7 @@
 
 {% block content %}
 <section style="max-width:1200px; margin:auto; margin-bottom:20px;">
+  <div id="intelligence-refresh-status" style="margin-bottom:10px;"></div>
   <div id="top-opportunities"></div>
 </section>
 
@@ -46,6 +47,32 @@ let lastVersion = null;
 let warmKickoffStarted = false;
 let loadIntelligenceScheduled = false;
 let lastResponseTimestamp = null;
+let hasRenderedIntelligence = false;
+let currentIntelligenceRequest = null;
+
+function refreshStatusElement() {
+  return document.getElementById("intelligence-refresh-status");
+}
+
+function setRefreshStatus(message, tone = "idle") {
+  const element = refreshStatusElement();
+  if (!element) {
+    return;
+  }
+  const styles = {
+    idle: { background: "rgba(255,255,255,.06)", border: "rgba(255,255,255,.12)", color: "#e5e7eb" },
+    loading: { background: "rgba(59,130,246,.14)", border: "rgba(59,130,246,.28)", color: "#dbeafe" },
+    refreshing: { background: "rgba(168,85,247,.14)", border: "rgba(168,85,247,.28)", color: "#efe0ff" },
+    error: { background: "rgba(239,68,68,.14)", border: "rgba(239,68,68,.28)", color: "#ffd4d4" },
+  };
+  const style = styles[tone] || styles.idle;
+  element.innerHTML = `
+    <span style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:${style.background}; color:${style.color}; border:1px solid ${style.border}; font-size:11px; font-weight:600; letter-spacing:.02em;">
+      <span style="width:7px; height:7px; border-radius:999px; background:${style.color}; display:inline-block;"></span>
+      ${message}
+    </span>
+  `;
+}
 
 function numericValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -104,6 +131,152 @@ function renderUpdatedLine(item) {
   return updatedAt
     ? `<div style="font-size:11px; opacity:.62; margin-top:6px;">Updated ${updatedAt}</div>`
     : "";
+}
+
+function displayTeam(item) {
+  return String(item.team || item.team_name || item.player_team || "—").trim() || "—";
+}
+
+function displayMatchup(item) {
+  return String(item.matchup || item.event_matchup || "—").trim() || "—";
+}
+
+function displayLine(item) {
+  const line = item.line ?? item.market_data?.current_line ?? item.market_context?.current_line;
+  const text = String(line ?? "").trim();
+  return text || "—";
+}
+
+function displayOdds(item) {
+  const odds = item.odds ?? item.odds_current ?? item.market_context?.american_odds;
+  if (odds === null || odds === undefined || odds === "") {
+    return "—";
+  }
+  const numeric = Number(odds);
+  if (Number.isFinite(numeric)) {
+    return numeric > 0 ? `+${numeric}` : `${numeric}`;
+  }
+  return String(odds).trim() || "—";
+}
+
+function displayActualProp(item) {
+  const selection = String(item.selection || item.pick || "").trim();
+  const line = displayLine(item);
+  const market = String(item.market || item.market_key || "").trim();
+  if (selection) {
+    const pieces = [selection];
+    if (line && line !== "—") {
+      pieces.push(line);
+    }
+    if (market && market.toLowerCase() !== selection.toLowerCase()) {
+      pieces.push(market.replace(/_/g, " "));
+    }
+    return pieces.join(" ").trim();
+  }
+  return String(
+    item.detail ||
+    item.writeup ||
+    item.summary ||
+    item.surface_title ||
+    item.surface ||
+    item.market ||
+    "—"
+  ).trim() || "—";
+}
+
+function formatSettlementValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "—";
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1);
+  }
+  return String(value).trim() || "—";
+}
+
+function displayActualValue(item) {
+  const settlement = item.settlement && typeof item.settlement === "object" ? item.settlement : {};
+  return formatSettlementValue(
+    settlement.actual ??
+    item.actual ??
+    item.actual_value ??
+    item.actual_so_far ??
+    item.current_actual ??
+    item.live_actual
+  );
+}
+
+function displayActualText(item) {
+  const actual = displayActualValue(item);
+  if (actual !== "—" && actual !== "-") {
+    return actual;
+  }
+  const state = recommendationState(item);
+  if (state === "live" || state === "stale") {
+    return "live data unavailable";
+  }
+  if (state === "final") {
+    return "settled without current count";
+  }
+  return "—";
+}
+
+function displaySettlementSummary(item) {
+  const settlement = item.settlement && typeof item.settlement === "object" ? item.settlement : {};
+  const status = String(
+    settlement.status ||
+    item.settlement_status ||
+    item.outcome_state ||
+    ""
+  ).trim().toLowerCase();
+  const statusLabel = String(settlement.status_label || "").trim() || (status ? status.charAt(0).toUpperCase() + status.slice(1) : "");
+  const actual = displayActualValue(item);
+  const result = String(settlement.result || item.settlement_result || item.result || "").trim();
+  const pieces = [];
+
+  if (statusLabel) {
+    pieces.push(statusLabel);
+  }
+  if (actual !== "—" && actual !== "-") {
+    pieces.push(`Actual ${actual}`);
+  }
+  if (result) {
+    pieces.push(result.charAt(0).toUpperCase() + result.slice(1));
+  }
+
+  return pieces.length ? pieces.join(" · ") : "—";
+}
+
+function displayGameStatus(item) {
+  return String(
+    item.status_display ||
+    item.status_context ||
+    item.game_state?.detailed ||
+    item.game_state?.abstract ||
+    item.outcome_state ||
+    "—"
+  ).trim() || "—";
+}
+
+function renderPropFacts(item, compact = false) {
+  const style = compact
+    ? "font-size:11px; opacity:.78; display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;"
+    : "display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-top:10px; font-size:12px; opacity:.88;";
+  return `
+    <div style="${style}">
+      <div><strong>Name:</strong> ${displayTitle(item)}</div>
+      <div><strong>Team:</strong> ${displayTeam(item)}</div>
+      <div><strong>Matchup:</strong> ${displayMatchup(item)}</div>
+      <div><strong>Game Status:</strong> ${displayGameStatus(item)}</div>
+      <div><strong>Line:</strong> ${displayLine(item)}</div>
+      <div><strong>Sport:</strong> ${String(item.sport || item.sport_slug || "—").trim() || "—"}</div>
+      <div><strong>Odds:</strong> ${displayOdds(item)}</div>
+      ${(displayActualValue(item) !== "—" || recommendationState(item) !== "pregame") ? `<div><strong>Actual:</strong> ${displayActualText(item)}</div>` : ""}
+      ${(displaySettlementSummary(item) !== "—") ? `<div><strong>Settlement:</strong> ${displaySettlementSummary(item)}</div>` : ""}
+      <div><strong>Actual Prop:</strong> ${displayActualProp(item)}</div>
+    </div>
+  `;
 }
 
 function renderRefreshStamp() {
@@ -169,8 +342,8 @@ function renderBadge(label) {
 
 function renderCardBadges(item) {
   const badges = [];
-  const tag = String(item.tag || item.timing || item.phase || "").trim().toUpperCase();
-  const sportState = item.is_live || tag === "LIVE" ? "LIVE" : (tag === "PREGAME" ? "PREGAME" : null);
+  const state = recommendationState(item);
+  const sportState = state === "live" ? "LIVE" : (state === "pregame" ? "PREGAME" : null);
   if (sportState) {
     badges.push(renderBadge(sportState));
   }
@@ -223,34 +396,50 @@ function normalizeIntelligenceResponse(response) {
   };
 }
 
-function isLiveRecommendation(item) {
+function hasLiveSignal(item) {
   if (!item || typeof item !== "object") {
     return false;
   }
-  if (typeof item.is_live === "boolean") {
-    return item.is_live;
+  const liveProjection = String(item.live_projection ?? "").trim();
+  return Boolean(
+    item.hero_live_box ||
+    item.hero_sim_box ||
+    (liveProjection && liveProjection !== "-") ||
+    (item.live_total !== null && item.live_total !== undefined)
+  );
+}
+
+function recommendationState(item) {
+  if (!item || typeof item !== "object") {
+    return "unknown";
   }
-  const timing = String(item.timing || item.phase || item.tag || "").trim().toUpperCase();
-  if (timing === "LIVE") {
-    return true;
+  const status = String(item.status_display || item.status_context || item.game_state?.detailed || item.game_state?.abstract || "").trim().toLowerCase();
+  const liveFlag = typeof item.is_live === "boolean" ? item.is_live : null;
+
+  if (status.includes("final") || status.includes("completed")) {
+    return "final";
   }
-  const candidateType = String(item.candidate_type || item.market_type || "").trim().toLowerCase();
-  return candidateType === "live";
+  if (status.includes("warmup") || status.includes("scheduled") || status.includes("pregame")) {
+    return "pregame";
+  }
+  if ((status.includes("live") || status.includes("in progress")) && liveFlag && hasLiveSignal(item)) {
+    return "live";
+  }
+  if (liveFlag && hasLiveSignal(item)) {
+    return "live";
+  }
+  if (status.includes("live") || status.includes("in progress")) {
+    return "stale";
+  }
+  return "pregame";
+}
+
+function isLiveRecommendation(item) {
+  return recommendationState(item) === "live";
 }
 
 function isPregameRecommendation(item) {
-  if (!item || typeof item !== "object") {
-    return false;
-  }
-  if (typeof item.is_live === "boolean") {
-    return !item.is_live;
-  }
-  const timing = String(item.timing || item.phase || item.tag || "").trim().toUpperCase();
-  if (timing === "PREGAME") {
-    return true;
-  }
-  const candidateType = String(item.candidate_type || item.market_type || "").trim().toLowerCase();
-  return candidateType === "pregame" || candidateType === "prop" || candidateType === "game";
+  return recommendationState(item) === "pregame";
 }
 
 function renderLoadingState() {
@@ -307,6 +496,10 @@ function renderLoadingState() {
       <div style="opacity:.8;color:white;padding:8px 0;">Loading parlays…</div>
     `;
   }
+
+  setRefreshStatus("Loading intelligence…", "loading");
+
+  setRefreshStatus("Loading intelligence…", "loading");
 }
 
 function renderEmptyState() {
@@ -438,9 +631,11 @@ function renderIntelligence(response) {
 
   const topLiveOpportunities = (data.topLiveOpportunities || []).slice(0, 5);
 
-  // ✅ Split by tag
+  // ✅ Split by activity state
   const liveRecs = allRecs.filter(isLiveRecommendation);
-  const pregameRecs = allRecs.filter((item) => isPregameRecommendation(item) && !isLiveRecommendation(item));
+  const pregameRecs = allRecs.filter(isPregameRecommendation);
+  const activeTopOpportunities = topOpportunities.filter((item) => recommendationState(item) !== "stale" && recommendationState(item) !== "final");
+  const activeTopLiveOpportunities = topLiveOpportunities.filter(isLiveRecommendation);
 
   function renderSection(title, recs) {
     if (!recs.length) {
@@ -528,6 +723,7 @@ function renderIntelligence(response) {
                 <div>Bet Size: ${betSize}</div>
               </div>
 
+              ${renderPropFacts(p, true)}
               ${renderUpdatedLine(p)}
               ${renderCardBadges(p)}
 
@@ -695,6 +891,7 @@ function renderIntelligence(response) {
               <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:12px; opacity:.82;">
                 <div><strong>Confidence:</strong> ${confidence}</div>
               </div>
+              ${renderPropFacts(item, true)}
               ${renderUpdatedLine(item)}
               ${renderCardBadges(item)}
               ${indicatorChips.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px;">${indicatorChips.join("")}</div>` : ""}
@@ -708,11 +905,11 @@ function renderIntelligence(response) {
 
   // ✅ Render sections
   if (topOpportunitiesEl) {
-    topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(topOpportunities);
+    topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(activeTopOpportunities);
   }
 
   if (scannerEl) {
-    scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", topLiveOpportunities);
+    scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", activeTopLiveOpportunities);
   }
 
   picksEl.innerHTML = `
@@ -736,12 +933,20 @@ function renderIntelligence(response) {
         <div style="font-weight:600;">Parlay</div>
         <div style="opacity:.75; margin-top:4px;">Edge: ${typeof p.combined_edge === "number" ? (p.combined_edge * 100).toFixed(1) + "%" : "—"}</div>
         ${renderUpdatedLine(p)}
-        ${Array.isArray(p.legs) && p.legs.length ? `<div style="opacity:.65; margin-top:6px; font-size:12px;">${p.legs.map((leg) => `${leg.sport || ""} ${leg.selection || leg.pick || leg.market || ""}`.trim()).join(" · ")}</div>` : ""}
+        ${Array.isArray(p.legs) && p.legs.length ? `<div style="display:grid; gap:8px; margin-top:10px;">${p.legs.map((leg) => `
+          <div style="padding:10px; border-radius:10px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);">
+            <div style="font-weight:600;">${displayTitle(leg)}</div>
+            ${renderPropFacts(leg, true)}
+          </div>
+        `).join("")}</div>` : ""}
       </div>
     `).join("");
   } else {
     parlaysEl.innerHTML = `<div style="opacity:.6;">No parlays available</div>`;
   }
+
+  hasRenderedIntelligence = true;
+  setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Updated", "idle");
 }
 
 function kickOffWarmQuery() {
@@ -756,9 +961,23 @@ function kickOffWarmQuery() {
   }).catch(() => {});
 }
 
-async function loadIntelligence() {
+async function loadIntelligence(options = {}) {
+  const background = Boolean(options.background);
+  if (currentIntelligenceRequest) {
+    return currentIntelligenceRequest;
+  }
+
+  if (background && !hasRenderedIntelligence) {
+    return null;
+  }
+
+  if (background) {
+    setRefreshStatus("Refreshing intelligence…", "refreshing");
+  }
+
+  currentIntelligenceRequest = (async () => {
   try {
-    if (lastVersion === null) {
+    if (!hasRenderedIntelligence && lastVersion === null) {
       renderLoadingState();
       kickOffWarmQuery();
     }
@@ -769,7 +988,11 @@ async function loadIntelligence() {
     });
 
     if (!res.ok) {
-      renderErrorState("Failed to load data");
+      if (!hasRenderedIntelligence) {
+        renderErrorState("Failed to load data");
+      } else {
+        setRefreshStatus("Refresh failed", "error");
+      }
       return;
     }
 
@@ -777,6 +1000,9 @@ async function loadIntelligence() {
     const version = json.version ?? null;
 
     if (version !== null && version === lastVersion) {
+      if (background) {
+        setRefreshStatus(lastResponseTimestamp ? `Updated ${formatTimestamp(lastResponseTimestamp)}` : "Up to date", "idle");
+      }
       return;
     }
 
@@ -793,7 +1019,11 @@ async function loadIntelligence() {
     );
 
     if (!response || Object.keys(response).length === 0 || !hasOpportunityData) {
-      renderEmptyState();
+      if (!hasRenderedIntelligence) {
+        renderEmptyState();
+      } else {
+        setRefreshStatus("No new intelligence yet", "idle");
+      }
       if (warmKickoffStarted) {
         kickOffWarmQuery();
       }
@@ -802,8 +1032,17 @@ async function loadIntelligence() {
 
     renderIntelligence(response);
   } catch (err) {
-    renderErrorState("Failed to load data");
+    if (!hasRenderedIntelligence) {
+      renderErrorState("Failed to load data");
+    } else {
+      setRefreshStatus("Refresh failed", "error");
+    }
+  } finally {
+    currentIntelligenceRequest = null;
   }
+  })();
+
+  return currentIntelligenceRequest;
 }
 
 function scheduleIntelligencePolling() {
@@ -812,20 +1051,20 @@ function scheduleIntelligencePolling() {
   }
   loadIntelligenceScheduled = true;
   window.loadIntelligence = loadIntelligence;
-  void loadIntelligence();
+  void loadIntelligence({ background: false });
   window.setInterval(() => {
     kickOffWarmQuery();
-    void loadIntelligence();
+    void loadIntelligence({ background: true });
   }, 15000);
   document.addEventListener("DOMContentLoaded", () => {
-    void loadIntelligence();
+    void loadIntelligence({ background: false });
   });
   window.addEventListener("focus", () => {
-    void loadIntelligence();
+    void loadIntelligence({ background: true });
   });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
-      void loadIntelligence();
+      void loadIntelligence({ background: true });
     }
   });
 }

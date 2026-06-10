@@ -8,7 +8,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
 
-from pipeline.intelligence_state import get_latest_intelligence_state_response
+from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.shared.timezone import central_today_iso
@@ -284,15 +284,9 @@ def intelligence_home():
 def intelligence_query_api():
     global LAST_RESULT
     payload = request.get_json(silent=True) or {}
-    force_refresh = bool(payload.get("force_refresh"))
     user_profile = _normalize_user_profile(payload)
 
-    cached_response = get_latest_intelligence_state_response(payload, refresh=force_refresh, wait=force_refresh)
-    if cached_response is None or not bool(cached_response.get("ok", True)):
-        queue_intelligence_state_refresh(dict(payload))
-        refreshed_response = get_latest_intelligence_state_response(payload, refresh=True, wait=True)
-        if refreshed_response is not None:
-            cached_response = refreshed_response
+    cached_response = read_latest_intelligence_state_response(payload)
     if cached_response is None:
         cached_response = _load_response_cache_state()
     if cached_response is None:

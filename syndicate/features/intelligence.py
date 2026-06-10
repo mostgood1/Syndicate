@@ -4166,6 +4166,30 @@ def _candidate_rationale(candidate: dict[str, Any]) -> str:
     return " ".join(notes) or "The prop sits above the local model threshold with enough context to justify a sportsbook-facing recommendation."
 
 
+def _candidate_live_actual_value(candidate: dict[str, Any]) -> float | None:
+    if _safe_text(candidate.get("sport_slug"), "").lower() != "mlb":
+        return None
+    game_pk = _safe_int(candidate.get("game_pk"))
+    context_label = _safe_text(candidate.get("context_label"), "")
+    if game_pk is None or not context_label:
+        return None
+    try:
+        from syndicate.blueprints.home import _mlb_actual_payload_for_candidate
+        from syndicate.blueprints.home import _mlb_prop_actual_value
+    except Exception:
+        return None
+    try:
+        actual_payload = _mlb_actual_payload_for_candidate(context_label, int(game_pk), {})
+    except Exception:
+        actual_payload = None
+    if not isinstance(actual_payload, dict):
+        return None
+    try:
+        return _mlb_prop_actual_value(candidate, actual_payload)
+    except Exception:
+        return None
+
+
 def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
@@ -4207,6 +4231,7 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "status_display": _safe_text(candidate.get("status_display"), "-"),
         "status_context": _safe_text(candidate.get("status_context"), "-"),
         "state_note": _safe_text(candidate.get("state_note"), ""),
+        "settlement": _candidate_settlement_summary(candidate),
         "href": candidate.get("href"),
         "href_label": _safe_text(candidate.get("href_label"), "Open board"),
         "rationale": _candidate_rationale(candidate),
@@ -4257,6 +4282,70 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
     pills = candidate.get("display_pills") if isinstance(candidate.get("display_pills"), list) else []
     output["display_pills"] = [str(item).strip() for item in pills if str(item).strip()][:6]
     return output
+
+
+def _candidate_settlement_summary(candidate: dict[str, Any]) -> dict[str, Any]:
+    status_text = _safe_text(
+        candidate.get("status_display")
+        or candidate.get("status_context")
+        or candidate.get("game_state")
+        or "",
+        "",
+    ).lower()
+    actual_value = _safe_text(
+        candidate.get("actual")
+        or candidate.get("actual_value")
+        or candidate.get("actual_so_far")
+        or candidate.get("current_actual")
+        or candidate.get("live_actual"),
+        "-",
+    )
+    if actual_value in {"", "-"}:
+        live_actual_value = _candidate_live_actual_value(candidate)
+        if live_actual_value is not None:
+            actual_value = _safe_text(live_actual_value, "-")
+    line_value = _numeric_hint(candidate.get("line"))
+    actual_numeric = _numeric_hint(actual_value)
+    is_final = bool(candidate.get("is_final")) or any(token in status_text for token in ("final", "completed", "settled", "graded"))
+    is_live = bool(candidate.get("is_live"))
+
+    if is_final:
+        status = "settled"
+    elif is_live:
+        status = "live"
+    elif actual_value not in {"", "-"}:
+        status = "resolved"
+    else:
+        status = "pending"
+
+    result = _safe_text(candidate.get("settlement_result") or candidate.get("result"), "")
+    if not result and status == "settled" and actual_numeric is not None and line_value is not None:
+        selection_text = _safe_text(candidate.get("selection") or candidate.get("pick"), "").lower()
+        over_selected = selection_text.startswith("over") or " over " in selection_text
+        under_selected = selection_text.startswith("under") or " under " in selection_text
+        if actual_numeric == line_value:
+            result = "push"
+        elif over_selected:
+            result = "won" if actual_numeric > line_value else "lost"
+        elif under_selected:
+            result = "won" if actual_numeric < line_value else "lost"
+
+    status_label = {
+        "live": "Live",
+        "resolved": "Resolved",
+        "settled": "Settled",
+        "pending": "Pending",
+    }.get(status, status.title() if status else "")
+
+    return {
+        "status": status,
+        "status_label": status_label,
+        "actual": actual_value,
+        "line": _safe_text(candidate.get("line"), "-"),
+        "result": result,
+        "is_live": is_live,
+        "is_final": is_final,
+    }
 
 
 
