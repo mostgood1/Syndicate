@@ -1928,48 +1928,83 @@ function Assert-AdvancedDataReady {
                 }
             }
             $smartSimFiles = @(Get-ChildItem -Path $processedRoot -File -Filter ("smart_sim_{0}_*.json" -f $DateValue) -ErrorAction SilentlyContinue)
-            if ($smartSimFiles.Count -eq 0) {
-                throw "NBA advanced-data gate failed: missing smart_sim artifacts for $DateValue"
-            }
             $advancedFiles = @(Get-ChildItem -Path $processedRoot -File -Filter 'team_advanced_stats_*.csv' -ErrorAction SilentlyContinue)
             if ($advancedFiles.Count -eq 0) {
                 throw 'NBA advanced-data gate failed: missing mirrored team_advanced_stats artifacts'
             }
-            $foundNonBaselinePace = $false
-            $foundUsableSmartSimPayload = $false
-            foreach ($smartSimFile in $smartSimFiles) {
-                try {
-                    $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-                    $homePace = Convert-ToDoubleOrNull $payload.home_pace
-                    $awayPace = Convert-ToDoubleOrNull $payload.away_pace
-                    if (($null -ne $homePace -and [Math]::Abs($homePace - 100.0) -gt 0.01) -or ($null -ne $awayPace -and [Math]::Abs($awayPace - 100.0) -gt 0.01)) {
-                        $foundNonBaselinePace = $true
-                        break
-                    }
+            if ($smartSimFiles.Count -gt 0) {
+                $foundNonBaselinePace = $false
+                $foundUsableSmartSimPayload = $false
+                foreach ($smartSimFile in $smartSimFiles) {
+                    try {
+                        $payload = Get-Content -Path $smartSimFile.FullName -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                        $homePace = Convert-ToDoubleOrNull $payload.home_pace
+                        $awayPace = Convert-ToDoubleOrNull $payload.away_pace
+                        if (($null -ne $homePace -and [Math]::Abs($homePace - 100.0) -gt 0.01) -or ($null -ne $awayPace -and [Math]::Abs($awayPace - 100.0) -gt 0.01)) {
+                            $foundNonBaselinePace = $true
+                            break
+                        }
 
-                    $quarters = @()
-                    if ($null -ne $payload.quarters) {
-                        $quarters = @($payload.quarters)
-                    }
-                    $homePlayers = @()
-                    $awayPlayers = @()
-                    if ($null -ne $payload.players) {
-                        if ($null -ne $payload.players.home) {
-                            $homePlayers = @($payload.players.home)
+                        $quarters = @()
+                        if ($null -ne $payload.quarters) {
+                            $quarters = @($payload.quarters)
                         }
-                        if ($null -ne $payload.players.away) {
-                            $awayPlayers = @($payload.players.away)
+                        $homePlayers = @()
+                        $awayPlayers = @()
+                        if ($null -ne $payload.players) {
+                            if ($null -ne $payload.players.home) {
+                                $homePlayers = @($payload.players.home)
+                            }
+                            if ($null -ne $payload.players.away) {
+                                $awayPlayers = @($payload.players.away)
+                            }
+                        }
+                        if ($quarters.Count -gt 0 -or $homePlayers.Count -gt 0 -or $awayPlayers.Count -gt 0) {
+                            $foundUsableSmartSimPayload = $true
                         }
                     }
-                    if ($quarters.Count -gt 0 -or $homePlayers.Count -gt 0 -or $awayPlayers.Count -gt 0) {
-                        $foundUsableSmartSimPayload = $true
+                    catch {
                     }
                 }
-                catch {
+                if (-not $foundNonBaselinePace -and -not $foundUsableSmartSimPayload) {
+                    throw "NBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
                 }
             }
-            if (-not $foundNonBaselinePace -and -not $foundUsableSmartSimPayload) {
-                throw "NBA advanced-data gate failed: smart_sim pace remained at baseline for all artifacts on $DateValue"
+            else {
+                $liveLensProjections = @(Get-ChildItem -Path $processedRoot -File -Filter ("live_lens_projections_{0}.jsonl" -f $DateValue) -ErrorAction SilentlyContinue)
+                if ($liveLensProjections.Count -eq 0) {
+                    throw "NBA advanced-data gate failed: missing live_lens projections artifacts for $DateValue"
+                }
+                $liveSnapshotRoot = Join-Path $processedRoot 'live_snapshots'
+                $liveLinesFiles = @(Get-ChildItem -Path $liveSnapshotRoot -File -Filter ("live_lines_{0}.jsonl" -f $DateValue) -ErrorAction SilentlyContinue)
+                $livePlayerLensFiles = @(Get-ChildItem -Path $liveSnapshotRoot -File -Filter ("live_player_lens_{0}.jsonl" -f $DateValue) -ErrorAction SilentlyContinue)
+                if ($liveLinesFiles.Count -eq 0 -or $livePlayerLensFiles.Count -eq 0) {
+                    throw "NBA advanced-data gate failed: missing live snapshot artifacts for $DateValue"
+                }
+                $foundUsableLiveLensPayload = $false
+                foreach ($projectionFile in $liveLensProjections) {
+                    try {
+                        $projectionLines = @(Get-Content -Path $projectionFile.FullName -ErrorAction Stop)
+                        foreach ($projectionLine in $projectionLines) {
+                            if ([string]::IsNullOrWhiteSpace($projectionLine)) {
+                                continue
+                            }
+                            $projection = $projectionLine | ConvertFrom-Json -ErrorAction Stop
+                            if (($null -ne $projection.proj) -or ($null -ne $projection.sim_mu) -or ($null -ne $projection.strength)) {
+                                $foundUsableLiveLensPayload = $true
+                                break
+                            }
+                        }
+                        if ($foundUsableLiveLensPayload) {
+                            break
+                        }
+                    }
+                    catch {
+                    }
+                }
+                if (-not $foundUsableLiveLensPayload) {
+                    throw "NBA advanced-data gate failed: live_lens projections were empty for $DateValue"
+                }
             }
             return
         }

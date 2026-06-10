@@ -128,6 +128,16 @@ class UnifiedDailyUpdatePublishTests(unittest.TestCase):
         self.assertIn("odds_${SportName}_player_props_opening_${DateValue}.csv", content)
         self.assertIn("odds_${SportName}_player_props_history_${DateValue}.csv", content)
 
+    def test_nba_advanced_gate_includes_live_lens_fallback_artifacts(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "unified_daily_update.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("live_lens_projections_${DateValue}.jsonl", content)
+        self.assertIn("live_snapshots/live_lines_${DateValue}.jsonl", content)
+        self.assertIn("live_snapshots/live_player_lens_${DateValue}.jsonl", content)
+        self.assertIn("missing live_lens projections artifacts", content)
+
     def test_non_basketball_force_publish_paths_include_tracking_roots(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
