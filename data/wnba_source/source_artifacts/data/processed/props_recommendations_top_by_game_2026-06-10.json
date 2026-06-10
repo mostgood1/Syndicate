@@ -1,0 +1,259 @@
+{
+  "date": "2026-06-10",
+  "data": [
+    {
+      "game_key": "LAS@SEA",
+      "game_id": "112",
+      "player": "Kelsey Plum",
+      "team": "LAS",
+      "team_tricode": "LAS",
+      "opponent": "SEA",
+      "score": 97.55068930108813,
+      "score_adj": 97.55068930108813,
+      "tier": "High",
+      "model": {
+        "pts": 28.18,
+        "reb": 2.04,
+        "ast": 7.27,
+        "threes": 3.77,
+        "stl": 0.7726344999999999,
+        "blk": 0.6321554999999999,
+        "tov": 2.107185,
+        "pra": 37.49,
+        "pr": 30.22,
+        "pa": 35.45,
+        "ra": 9.309999999999999
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 2.5,
+        "price": 120.0,
+        "edge": 0.4434122240958552,
+        "ev": 0.9755068930108812,
+        "ev_pct": 97.55068930108813,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 97.6%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.8 vs line 2.5 (+1.3)"
+    },
+    {
+      "game_key": "LAS@SEA",
+      "game_id": "112",
+      "player": "Natisha Hiedeman",
+      "team": "SEA",
+      "team_tricode": "SEA",
+      "opponent": "LAS",
+      "score": 45.71679199166021,
+      "score_adj": 45.71679199166021,
+      "tier": "High",
+      "model": {
+        "pts": 17.325121568627452,
+        "reb": 1.2936815686274508,
+        "ast": 4.957837385620914,
+        "threes": 2.547363137254901,
+        "stl": 0.3218117647058823,
+        "blk": 0.0,
+        "tov": 1.2872470588235294,
+        "pra": 23.57664052287582,
+        "pr": 18.618803137254904,
+        "pa": 22.282958954248365,
+        "ra": 6.251518954248365
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": -141.0,
+        "edge": 0.26747168758606177,
+        "ev": 0.4571679199166021,
+        "ev_pct": 45.71679199166021,
+        "book": "draftkings",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 45.7%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.5 vs line 1.5 (+1.0)"
+    },
+    {
+      "game_key": "LAS@SEA",
+      "game_id": "112",
+      "player": "Awa Fam",
+      "team": "SEA",
+      "team_tricode": "SEA",
+      "opponent": "LAS",
+      "score": 42.21153846130895,
+      "score_adj": 42.21153846130895,
+      "tier": "High",
+      "model": {
+        "pts": 3.6,
+        "reb": 0.72,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.2683999999999999,
+        "blk": 0.2195999999999999,
+        "tov": 0.732,
+        "pra": 4.32,
+        "pr": 4.32,
+        "pa": 3.6,
+        "ra": 0.72
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -104.0,
+        "edge": 0.2151960784302025,
+        "ev": 0.4221153846130895,
+        "ev_pct": 42.21153846130895,
+        "book": "fanduel",
+        "p_win": 0.9319193061817169,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 42.2%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 3.6 vs line 10.5 (-6.9)"
+    },
+    {
+      "game_key": "CON@TOR",
+      "game_id": "48",
+      "player": "Saniya Rivers",
+      "team": "CON",
+      "team_tricode": "CON",
+      "opponent": "TOR",
+      "score": 38.058140627906845,
+      "score_adj": 38.058140627906845,
+      "tier": "High",
+      "model": {
+        "pts": 5.116666666666666,
+        "reb": 2.532222222222222,
+        "ast": 3.784444444444445,
+        "threes": 0.1844444444444444,
+        "stl": 0.4524116666666666,
+        "blk": 0.3701549999999999,
+        "tov": 1.23385,
+        "pra": 11.433333333333334,
+        "pr": 7.648888888888888,
+        "pa": 8.901111111111112,
+        "ra": 6.316666666666666
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 8.5,
+        "price": -110.0,
+        "edge": 0.19935216519379773,
+        "ev": 0.38058140627906845,
+        "ev_pct": 38.058140627906845,
+        "book": "fanduel",
+        "p_win": 0.9043909300885923,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 38.1%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.1 vs line 8.5 (-3.4)"
+    },
+    {
+      "game_key": "CON@TOR",
+      "game_id": "48",
+      "player": "Laura Juskaite",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "CON",
+      "score": 36.73115760722221,
+      "score_adj": 36.73115760722221,
+      "tier": "High",
+      "model": {
+        "pts": 6.926666666666667,
+        "reb": 3.3600000000000003,
+        "ast": 1.2544444444444445,
+        "threes": 0.7833333333333332,
+        "stl": 0.492256111111111,
+        "blk": 0.4027549999999999,
+        "tov": 1.3425166666666664,
+        "pra": 11.54111111111111,
+        "pr": 10.286666666666667,
+        "pa": 8.181111111111111,
+        "ra": 4.614444444444445
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 10.5,
+        "price": -110.0,
+        "edge": 0.19240130175211634,
+        "ev": 0.3673115760722221,
+        "ev_pct": 36.73115760722221,
+        "book": "draftkings",
+        "p_win": 0.8911210998817459,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 36.7%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 6.9 vs line 10.5 (-3.6)"
+    },
+    {
+      "game_key": "CON@TOR",
+      "game_id": "48",
+      "player": "Aaliyah Edwards",
+      "team": "CON",
+      "team_tricode": "CON",
+      "opponent": "TOR",
+      "score": 36.09641108357169,
+      "score_adj": 36.09641108357169,
+      "tier": "High",
+      "model": {
+        "pts": 8.9,
+        "reb": 3.9366666666666665,
+        "ast": 1.261111111111111,
+        "threes": 0.0,
+        "stl": 0.4625683333333332,
+        "blk": 0.3784649999999999,
+        "tov": 1.2615499999999995,
+        "pra": 14.097777777777775,
+        "pr": 12.836666666666666,
+        "pa": 10.161111111111111,
+        "ra": 5.197777777777778
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 19.5,
+        "price": -114.0,
+        "edge": 0.19228929268818573,
+        "ev": 0.3609641108357169,
+        "ev_pct": 36.09641108357169,
+        "book": "fanduel",
+        "p_win": 0.8936743912095486,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 36.1%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 8.9 vs line 19.5 (-10.6)"
+    }
+  ]
+}
