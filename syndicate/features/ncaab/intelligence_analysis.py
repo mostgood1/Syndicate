@@ -82,7 +82,7 @@ def build_ncaab_matchup_analysis_views(
         "title": "Top NCAAB matchup targets",
         "table": {
             "title": "Top college basketball matchup targets",
-            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "score", "market_fit_score", "analysis_shape", "tempo_bucket_signal", "volatility_signal", "role_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
+            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "analysis_shape", "tempo_bucket_signal", "volatility_signal", "role_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
             "rows": table_rows,
         },
         "chart": {

@@ -491,6 +491,26 @@ def _compute_props_edges_file_only_local(
     return out
 
 
+def _standardize_edge_columns(edges):
+    if edges is None:
+        return edges
+    columns_attr = getattr(edges, "columns", None)
+    columns = list(columns_attr) if columns_attr is not None else []
+    if getattr(edges, "empty", False):
+        return edges
+
+    out = edges.copy()
+    if "expected_value" not in columns and "ev" in columns:
+        out["expected_value"] = out["ev"]
+    if "edge_pct" not in columns and "edge" in columns:
+        out["edge_pct"] = out["edge"] * 100.0
+    if "model_probability" not in columns and "model_prob" in columns:
+        out["model_probability"] = out["model_prob"]
+    if "market_probability" not in columns and "implied_prob" in columns:
+        out["market_probability"] = out["implied_prob"]
+    return out
+
+
 def _normalize_bookmaker_key(book: object) -> str:
     try:
         raw = str(book or "").strip().lower()
@@ -585,6 +605,7 @@ def export_props_edges_local(
             )
 
             edges = _filter_player_prop_bookmakers_df(edges, bookmakers)
+            edges = _standardize_edge_columns(edges)
             edges = edges[(edges["edge"] >= 0.0) & (edges["ev"] >= 0.0)].copy()
             if edges.empty:
                 raise ValueError(f"No edges computed for {date_str} (missing odds or predictions).")

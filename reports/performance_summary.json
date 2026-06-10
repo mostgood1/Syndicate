@@ -1,0 +1,26 @@
+{
+  "by_market": {},
+  "by_probability_bucket": [],
+  "by_sport": {},
+  "generated_at": "2026-06-10T14:44:49Z",
+  "overall": {
+    "decisive_count": 0,
+    "roi": null,
+    "settled_count": 0,
+    "total_bets": 0,
+    "total_pnl": 0,
+    "win_rate": null
+  },
+  "prediction_ledger": {
+    "prediction_ledger_count": 0,
+    "used_as_fallback": false
+  },
+  "schema_version": 1,
+  "source": {
+    "evaluation_ledger_count": 2,
+    "evaluation_ledger_path": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\intelligence\\evaluation_ledger.jsonl",
+    "prediction_ledger_count": 0,
+    "prediction_ledger_path": null,
+    "used_prediction_ledger_fallback": false
+  }
+}

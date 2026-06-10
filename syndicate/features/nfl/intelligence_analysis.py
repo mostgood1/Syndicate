@@ -59,7 +59,7 @@ def build_football_market_analysis_views(
         "title": "Top football market targets",
         "table": {
             "title": "Top football market targets",
-            "columns": ["rank", "label", "sport", "matchup", "market_label", "pick", "line", "projected", "odds", "score", "market_fit_score", "implied_probability", "off_epa_signal", "target_share_signal", "pass_rate_signal", "air_yards_signal", "why"],
+            "columns": ["rank", "label", "sport", "matchup", "market_label", "pick", "line", "projected", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "implied_probability", "off_epa_signal", "target_share_signal", "pass_rate_signal", "air_yards_signal", "why"],
             "rows": table_rows,
         },
         "chart": {

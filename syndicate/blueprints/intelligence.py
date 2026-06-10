@@ -3,6 +3,9 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request
 
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
+from syndicate.features.intelligence import collect_all_recommendations
+from syndicate.features.intelligence import rank_global_recommendations
+from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.shared.timezone import central_today_iso
 
@@ -147,11 +150,82 @@ def intelligence_home():
 
 @intelligence_bp.post("/api/intelligence/query")
 def intelligence_query_api():
+    global LAST_RESULT
     print("✅ SERVING LAST RESULT")
-    return jsonify({
+    payload = request.get_json(silent=True) or {}
+    top_opportunities = rank_global_recommendations(
+        collect_all_recommendations(),
+        limit=int(payload.get("limit") or 10) if str(payload.get("limit") or "").strip() else 10,
+    )
+    by_sport: dict[str, list[dict[str, object]]] = {}
+    for recommendation in top_opportunities:
+        sport_key = str(recommendation.get("sport") or recommendation.get("sport_slug") or "unknown").strip().lower() or "unknown"
+        by_sport.setdefault(sport_key, []).append(recommendation)
+
+    analysis: dict[str, object] | None = None
+    routed_metadata: dict[str, object] = {}
+    question = str(payload.get("question") or "").strip()
+    if question:
+        try:
+            routed_result = run_routed_intelligence_pipeline(payload)
+            if hasattr(routed_result, "to_dict"):
+                routed_result = routed_result.to_dict()
+            if isinstance(routed_result, dict):
+                routed_metadata = dict(routed_result)
+        except Exception:
+            routed_metadata = {}
+
+        analysis = run_intelligence_query(
+            question,
+            selected_date=str(payload.get("date") or payload.get("selected_date") or "").strip() or None,
+            mode=str(payload.get("mode") or "").strip() or None,
+            sport=str(payload.get("sport") or "").strip() or None,
+            limit=payload.get("limit"),
+            timing=str(payload.get("timing") or "").strip() or None,
+            include_props=payload.get("include_props"),
+            include_games=payload.get("include_games"),
+            force_refresh=bool(payload.get("force_refresh")),
+        )
+        selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip()
+        if selected_date:
+            analysis["selected_date"] = selected_date
+        analysis["question"] = question
+        lowered_question = question.lower()
+        if "parlay" in lowered_question:
+            analysis["headline"] = "The Syndicate parlay builder"
+        elif "live" in lowered_question:
+            analysis["headline"] = "The Syndicate live board brief"
+        elif "pregame" in lowered_question:
+            analysis["headline"] = "The Syndicate pregame board brief"
+        elif "comparison" in lowered_question and "vs" in lowered_question:
+            analysis["headline"] = "The Syndicate comparison"
+        else:
+            analysis.setdefault("headline", "The Syndicate brief")
+        for key in (
+            "parsed_request",
+            "readiness_gate",
+            "analysis_views",
+            "board_notes",
+            "summary",
+            "preferences",
+            "evaluation_record",
+            "structured_response",
+            "local_only",
+        ):
+            value = routed_metadata.get(key)
+            if value is not None and (key not in analysis or analysis.get(key) in (None, {}, [], "")):
+                analysis[key] = value
+
+    response = {
         "ok": True,
-        "response": LAST_RESULT
-    })
+        "top_opportunities": top_opportunities,
+        "by_sport": by_sport,
+        "analysis": analysis,
+    }
+    if analysis is not None:
+        response["response"] = analysis
+    LAST_RESULT = dict(response)
+    return jsonify(response)
 
 @intelligence_bp.get("/intelligence/run")
 def run_intelligence():

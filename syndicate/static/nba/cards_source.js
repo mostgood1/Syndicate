@@ -241,6 +241,43 @@
     return Number.isFinite(number) ? `${number.toFixed(digits)}%` : '--';
   }
 
+  function formatPercentLike(value, digits = 1, signed = false) {
+    const number = toFiniteNumber(value);
+    if (number == null) {
+      return '';
+    }
+    const scaled = Math.abs(number) <= 1.5 ? number * 100 : number;
+    const text = `${Math.abs(scaled).toFixed(digits)}%`;
+    if (scaled < 0) {
+      return `-${text}`;
+    }
+    return signed ? `+${text}` : text;
+  }
+
+  function recommendationMetaText(row) {
+    const bits = [];
+    const expectedValue = toFiniteNumber(row?.expected_value ?? row?.expectedValue ?? row?.ev_pct ?? row?.evPct);
+    if (expectedValue != null) {
+      bits.push(`Expected value ${formatPercentLike(expectedValue, 1, true)}`);
+    }
+
+    const confidence = toFiniteNumber(row?.confidence ?? row?.model_confidence ?? row?.confidence_score);
+    if (confidence != null) {
+      bits.push(`Confidence ${formatPercentLike(confidence, 0)}`);
+    }
+
+    const historicalContext = row?.historical_context ?? row?.historicalContext;
+    if (historicalContext && typeof historicalContext === 'object') {
+      const roi = toFiniteNumber(historicalContext.roi_segment ?? historicalContext.roi ?? historicalContext.segment_roi);
+      const sampleSize = toFiniteNumber(historicalContext.sample_size ?? historicalContext.sampleSize ?? historicalContext.samples ?? historicalContext.sample_count);
+      if (roi != null && sampleSize != null) {
+        bits.push(`Historical ROI ${formatPercentLike(roi, 1, true)} (${fmtInteger(sampleSize)} samples)`);
+      }
+    }
+
+    return bits.join(' · ');
+  }
+
   function fmtCurrency(value, digits = 0) {
     const number = Number(value);
     if (!Number.isFinite(number)) {
@@ -3860,6 +3897,9 @@
           main: row.display_pick || row.selection || 'No play',
           probability: row.p_win,
           ev: row.ev_pct,
+          expectedValue: row.expected_value ?? row.expectedValue ?? row.ev_pct,
+          confidence: row.confidence ?? row.model_confidence ?? row.confidence_score,
+          historicalContext: row.historical_context ?? row.historicalContext,
           sub: row.basketball_summary || row.why_explain || `Score ${fmtNumber(row.recommendation_priority_score ?? row.score, 1)}`,
           bucket: row.card_bucket || 'playable',
           stakeAmount: row.stake_amount,
@@ -4285,7 +4325,7 @@
       const footLeft = row.summary || `${row.teamTri} · ${fmtAmerican(row.price)} ${row.book || ''}`.trim();
       const footRight = isLiveRow
         ? `${liveRowFreshnessText(row, row.statusLabel || 'Live')}`
-        : `${row.teamTri} | ${row.marketLabel}`;
+        : [`${row.teamTri} | ${row.marketLabel}`, recommendationMetaText(row)].filter(Boolean).join(' | ');
       return `
         <button class="cards-prop-overview-card" type="button" data-prop-select="${escapeHtml(row.key)}" data-card-target="${escapeHtml(id)}">
           <div class="cards-lens-head">
@@ -5471,6 +5511,9 @@
             price: pick.price,
             book: pick.book,
             evPct: pick.ev_pct ?? row.ev_pct,
+            expectedValue: pick.expected_value ?? pick.expectedValue ?? row.expected_value ?? row.expectedValue,
+            confidence: pick.confidence ?? row.confidence ?? row.model_confidence ?? row.confidence_score,
+            historicalContext: pick.historical_context ?? pick.historicalContext ?? row.historical_context ?? row.historicalContext,
             pWin: pick.p_win ?? row.p_win,
             simMu: pick.sim_mu,
             simSd: pick.sim_sd,
@@ -5636,7 +5679,7 @@
           return `
             <button class="cards-prop-button ${tierClass} ${selectedKey === row.key ? 'is-active' : ''}" type="button" data-prop-select="${escapeHtml(row.key)}" data-card-target="${escapeHtml(cardId(game))}">
               <div class="cards-prop-button-main">${escapeHtml(row.player || 'Player')} ${escapeHtml(row.marketLabel)} ${escapeHtml(row.side)} ${fmtNumber(row.line, 1)}</div>
-              <small>${escapeHtml(supportingCopy)}</small>
+              <small>${escapeHtml([supportingCopy, recommendationMetaText(row)].filter(Boolean).join(' | '))}</small>
             </button>
           `;
         }).join('')}
@@ -5777,7 +5820,9 @@
   }
 
   function renderLensReasons(selected) {
-    const reasons = safeArray(selected?.reasons).slice(0, 6);
+    const reasons = (Array.isArray(selected?.reasoning) && selected.reasoning.length
+      ? selected.reasoning
+      : safeArray(selected?.reasons)).slice(0, 3);
     const pills = reasons.map((reason) => `<span class="cards-source-meta-pill">${escapeHtml(reason)}</span>`).join('');
     const summary = String(selected?.summary || '').trim();
     if (!summary && !pills) {
@@ -5921,7 +5966,7 @@
         <div>
           <div class="cards-lens-label">Prop lens</div>
           <div class="cards-lens-main">${escapeHtml(selected.player)} - ${escapeHtml(`${selected.marketLabel} ${selected.side} ${fmtNumber(selected.line, 1)}`)}</div>
-          <div class="cards-subcopy">${escapeHtml(`${propTierLabel(selected)} | ${game.away_tri} at ${game.home_tri}`)}</div>
+          <div class="cards-subcopy">${escapeHtml([propTierLabel(selected), recommendationMetaText(selected), `${game.away_tri} at ${game.home_tri}`].filter(Boolean).join(' | '))}</div>
         </div>
         <span class="cards-lens-badge ${selected.bucket === 'live' ? 'is-live' : ''}">${escapeHtml(badgeLabel)}</span>
       </div>

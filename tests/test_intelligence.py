@@ -18,6 +18,7 @@ from syndicate.features.intelligence import _latest_matching_path
 from syndicate.features.intelligence import _parlay_matches_preferences
 from syndicate.features.intelligence import _parlay_rank_score
 from syndicate.features.intelligence import _query_preferences
+from syndicate.features.intelligence import get_top_live_opportunities
 from syndicate.features.intelligence import run_intelligence_query
 
 
@@ -874,6 +875,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(result.get("headline"), "The Syndicate parlay builder")
         self.assertGreaterEqual(len(result.get("recommendations") or []), 2)
         self.assertGreaterEqual(len(result.get("parlays") or []), 1)
+        self.assertIn("top_live_opportunities", result)
+        self.assertGreaterEqual(len(result.get("top_live_opportunities") or []), 1)
         first = (result.get("recommendations") or [])[0]
         self.assertIn("rationale", first)
         self.assertIn(first.get("candidate_type"), {"prop", "game"})
@@ -900,6 +903,47 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(parsed_request.get("chips"))
         self.assertIn("$100 bankroll", parsed_request.get("chips") or [])
         self.assertIn("Max 20% exposure", parsed_request.get("chips") or [])
+
+    def test_get_top_live_opportunities_ranks_positive_ev_globally(self) -> None:
+        opportunities = get_top_live_opportunities(
+            [
+                {
+                    "selection": "NBA Over",
+                    "sport": "NBA",
+                    "market": "points",
+                    "ev_current": 0.08,
+                    "ev_delta": 0.01,
+                    "confidence": 0.64,
+                    "adjusted_score": 91.0,
+                },
+                {
+                    "selection": "MLB Under",
+                    "sport": "MLB",
+                    "market": "strikeouts",
+                    "ev_current": 0.11,
+                    "ev_delta": 0.03,
+                    "confidence": 0.59,
+                    "adjusted_score": 88.0,
+                },
+                {
+                    "selection": "NHL Over",
+                    "sport": "NHL",
+                    "market": "shots",
+                    "ev_current": -0.02,
+                    "ev_delta": 0.04,
+                    "confidence": 0.7,
+                    "adjusted_score": 95.0,
+                },
+            ],
+            limit=2,
+        )
+
+        self.assertEqual(len(opportunities), 2)
+        self.assertEqual(opportunities[0]["selection"], "MLB Under")
+        self.assertEqual(opportunities[0]["sport_slug"], "mlb")
+        self.assertGreater(opportunities[0]["ev_current"], 0.0)
+        self.assertGreater(opportunities[0]["ev_delta"], opportunities[1]["ev_delta"])
+        self.assertNotIn("NHL Over", [item["selection"] for item in opportunities])
 
     def test_intelligence_query_api_returns_player_analysis_payload(self) -> None:
         advanced_rows = [

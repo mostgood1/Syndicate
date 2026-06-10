@@ -92,7 +92,7 @@ def build_basketball_matchup_analysis_views(
         "title": "Top NBA matchup targets",
         "table": {
             "title": "Top NBA matchup-backed targets",
-            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "analysis_shape", "pace_signal", "usage_signal", "shot_profile_signal", "role_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
+            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "analysis_shape", "pace_signal", "usage_signal", "shot_profile_signal", "role_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
             "rows": table_rows,
         },
         "chart": {

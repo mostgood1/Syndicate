@@ -14,6 +14,7 @@ from syndicate.features.shared.source_roots import repo_root_from
 SCHEMA_VERSION = 1
 MODEL_VERSION = "recommendation-engine-v1"
 DEFAULT_EVALUATION_LEDGER = repo_root_from(__file__) / "reports" / "intelligence" / "evaluation_ledger.jsonl"
+DEFAULT_PERFORMANCE_SUMMARY = repo_root_from(__file__) / "reports" / "intelligence" / "performance_summary.json"
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,31 @@ def _coerce_probability(value: Any) -> float | None:
     return None
 
 
+def _probability_from_simulation_payload(payload: Mapping[str, Any]) -> float | None:
+    for source_key in ("simulation", "sim", "sim_results", "sim_summary", "market_context"):
+        source = _copy_mapping(payload.get(source_key))
+        if not source:
+            continue
+        for key in (
+            "model_probability",
+            "win_probability",
+            "hit_rate",
+            "win_rate",
+            "success_rate",
+            "probability",
+        ):
+            probability = _coerce_probability(source.get(key))
+            if probability is not None:
+                return probability
+        distributions = source.get("probability_distributions") or source.get("distribution")
+        if isinstance(distributions, Mapping):
+            for key in ("win", "over", "success", "hit"):
+                probability = _coerce_probability(distributions.get(key))
+                if probability is not None:
+                    return probability
+    return None
+
+
 def _parse_american_odds(value: Any) -> float | None:
     text = str(value or "").strip().replace("+", "")
     if not text or text == "-":
@@ -106,6 +132,141 @@ def _parse_american_odds(value: Any) -> float | None:
         return 100.0 / (numeric + 100.0)
     absolute = abs(numeric)
     return absolute / (absolute + 100.0)
+
+
+def _current_odds_value(candidate: Mapping[str, Any]) -> Any | None:
+    live_markers = (
+        candidate.get("is_live"),
+        candidate.get("live_refresh"),
+        candidate.get("live"),
+        str(candidate.get("refresh_mode") or "").strip().lower() == "live",
+    )
+    has_live_marker = any(bool(marker) for marker in live_markers)
+    for key in ("current_odds", "live_odds", "odds_current", "current_price", "current_market_odds"):
+        value = candidate.get(key)
+        if value not in {None, ""}:
+            return value
+    market_context = _copy_mapping(candidate.get("market_context"))
+    for key in ("current_odds", "live_odds", "odds_current", "current_price", "current_market_odds"):
+        value = market_context.get(key)
+        if value not in {None, ""}:
+            return value
+    if has_live_marker:
+        return candidate.get("odds")
+    return None
+
+
+def _repriced_probabilities(candidate: Mapping[str, Any], *, model_probability: float | None = None) -> dict[str, Any]:
+    current_odds = _current_odds_value(candidate)
+    if current_odds is None:
+        return {
+            "odds": None,
+            "market_probability": None,
+            "implied_probability": None,
+            "edge": None,
+            "edge_pct": None,
+            "expected_value": None,
+        }
+    implied_probability = _parse_american_odds(current_odds)
+    if implied_probability is None:
+        return {
+            "odds": current_odds,
+            "market_probability": None,
+            "implied_probability": None,
+            "edge": None,
+            "edge_pct": None,
+            "expected_value": None,
+        }
+
+    resolved_model_probability = _coerce_probability(model_probability)
+    if resolved_model_probability is None:
+        resolved_model_probability = _coerce_probability(candidate.get("model_probability"))
+    if resolved_model_probability is None:
+        resolved_model_probability = _coerce_probability(candidate.get("fair_probability"))
+    if resolved_model_probability is None:
+        resolved_model_probability = _coerce_probability(candidate.get("confidence"))
+
+    expected_value = _coerce_float(candidate.get("expected_value"))
+    edge = _coerce_float(candidate.get("edge"))
+    edge_pct = _coerce_float(candidate.get("edge_pct"))
+    if implied_probability is not None and resolved_model_probability is not None:
+        edge = round(resolved_model_probability - implied_probability, 4)
+        edge_pct = round(edge * 100.0, 2)
+        if implied_probability > 0.0:
+            expected_value = round((resolved_model_probability / implied_probability) - 1.0, 4)
+    elif edge is None:
+        edge = _coerce_float(candidate.get("edge"))
+
+    return {
+        "odds": current_odds,
+        "market_probability": implied_probability,
+        "implied_probability": implied_probability,
+        "edge": edge,
+        "edge_pct": edge_pct,
+        "expected_value": expected_value,
+    }
+
+
+def _tracking_snapshot(
+    candidate: Mapping[str, Any],
+    *,
+    live_pricing: Mapping[str, Any] | None = None,
+    model_probability: float | None = None,
+) -> dict[str, Any]:
+    open_odds = candidate.get("odds")
+    open_ev = _coerce_float(candidate.get("ev_open"))
+    if open_ev is None:
+        ev_pct = _coerce_float(candidate.get("ev_pct"))
+        if ev_pct is not None:
+            open_ev = round(float(ev_pct) / 100.0, 4)
+    if open_ev is None:
+        open_implied_for_ev = _parse_american_odds(open_odds)
+        resolved_model_probability = _coerce_probability(model_probability)
+        if resolved_model_probability is None:
+            resolved_model_probability = _coerce_probability(candidate.get("model_probability"))
+        if resolved_model_probability is None:
+            resolved_model_probability = _coerce_probability(candidate.get("fair_probability"))
+        if resolved_model_probability is None:
+            resolved_model_probability = _coerce_probability(candidate.get("confidence"))
+        if open_implied_for_ev is not None and resolved_model_probability is not None and open_implied_for_ev > 0.0:
+            open_ev = round((float(resolved_model_probability) / float(open_implied_for_ev)) - 1.0, 4)
+    if open_ev is None:
+        open_ev = _coerce_float(candidate.get("expected_value"))
+    if open_ev is None:
+        open_ev = _coerce_float(candidate.get("ev"))
+
+    current_odds = None
+    current_ev = None
+    if isinstance(live_pricing, Mapping):
+        current_odds = live_pricing.get("odds")
+        current_ev = _coerce_float(live_pricing.get("expected_value"))
+
+    if current_odds is None:
+        current_odds = _current_odds_value(candidate)
+    if current_odds is None:
+        current_odds = open_odds
+
+    if current_ev is None:
+        current_ev = open_ev
+
+    open_implied = _parse_american_odds(open_odds)
+    current_implied = _parse_american_odds(current_odds)
+    line_movement_impact = None
+    if open_implied is not None and current_implied is not None:
+        line_movement_impact = round(float(open_implied) - float(current_implied), 4)
+
+    ev_delta = None
+    if open_ev is not None and current_ev is not None:
+        ev_delta = round(float(current_ev) - float(open_ev), 4)
+
+    return {
+        "odds_open": open_odds,
+        "odds_current": current_odds,
+        "ev_open": round(float(open_ev), 4) if open_ev is not None else None,
+        "ev_current": round(float(current_ev), 4) if current_ev is not None else None,
+        "ev_delta": ev_delta,
+        "line_movement_impact": line_movement_impact,
+    }
 
 
 def _load_records_from_ledger(ledger_path: Path | str | None = None) -> list[dict[str, Any]]:
@@ -124,6 +285,172 @@ def _load_records_from_ledger(ledger_path: Path | str | None = None) -> list[dic
         if isinstance(payload, dict):
             records.append(payload)
     return records
+
+
+def _load_performance_summary(ledger_path: Path | str | None = None) -> dict[str, Any] | None:
+    candidates: list[Path] = []
+    if ledger_path is not None:
+        ledger_file = Path(ledger_path)
+        candidates.extend(
+            [
+                ledger_file.parent.parent / "performance_summary.json",
+                ledger_file.parent / "performance_summary.json",
+            ]
+        )
+    candidates.extend(
+        [
+            DEFAULT_PERFORMANCE_SUMMARY,
+            repo_root_from(__file__) / "reports" / "performance_summary.json",
+            repo_root_from(__file__) / "data" / "performance_summary.json",
+        ]
+    )
+    seen: set[str] = set()
+    for path in candidates:
+        normalized = str(path.resolve())
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        if not path.exists():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def _summary_context_for_candidate(summary: Mapping[str, Any] | None, *, sport: str | None, market: str | None) -> dict[str, Any] | None:
+    if not isinstance(summary, Mapping):
+        return None
+
+    sport_key = str(sport or "").strip().lower()
+    market_key = str(market or "").strip().lower()
+    if not sport_key or not market_key:
+        return None
+
+    sport_market_summary = summary.get("by_sport_market")
+    if isinstance(sport_market_summary, Mapping):
+        sport_bucket = sport_market_summary.get(sport_key)
+        if isinstance(sport_bucket, Mapping):
+            market_bucket = sport_bucket.get(market_key)
+            if isinstance(market_bucket, Mapping):
+                roi_segment = _coerce_float(market_bucket.get("roi_segment") or market_bucket.get("roi"))
+                sample_size = _coerce_float(market_bucket.get("sample_size") or market_bucket.get("settled_count") or market_bucket.get("total_bets"))
+                if roi_segment is not None or sample_size is not None:
+                    return {
+                        "roi_segment": round(roi_segment, 4) if roi_segment is not None else None,
+                        "sample_size": int(sample_size) if sample_size is not None and sample_size > 0 else None,
+                    }
+
+    segments = summary.get("segments")
+    if isinstance(segments, list):
+        for segment in segments:
+            if not isinstance(segment, Mapping):
+                continue
+            segment_sport = str(segment.get("sport") or segment.get("sport_slug") or "").strip().lower()
+            segment_market = str(segment.get("market") or segment.get("market_type") or segment.get("market_key") or "").strip().lower()
+            if segment_sport != sport_key or segment_market != market_key:
+                continue
+            roi_segment = _coerce_float(segment.get("roi_segment") or segment.get("roi") or segment.get("roi_pct"))
+            sample_size = _coerce_float(segment.get("sample_size") or segment.get("settled_count") or segment.get("total_bets") or segment.get("count"))
+            return {
+                "roi_segment": round(roi_segment, 4) if roi_segment is not None else None,
+                "sample_size": int(sample_size) if sample_size is not None and sample_size > 0 else None,
+            }
+
+    return None
+
+
+def _bounded_multiplier(value: float | None, *, lower: float = 0.9, upper: float = 1.1) -> float:
+    if value is None:
+        return 1.0
+    return max(lower, min(upper, round(float(value), 4)))
+
+
+def _roi_multiplier(roi: float | None, *, scale: float, cap: float) -> float:
+    if roi is None:
+        return 1.0
+    adjustment = max(-cap, min(cap, float(roi) * scale))
+    return 1.0 + adjustment
+
+
+def _bucket_range(label: str) -> tuple[float, float] | None:
+    text = str(label or "").strip()
+    if "-" not in text:
+        return None
+    left, right = text.split("-", 1)
+    try:
+        return float(left), float(right)
+    except Exception:
+        return None
+
+
+def _confidence_bucket_row(summary: Mapping[str, Any] | None, probability: float | None) -> Mapping[str, Any] | None:
+    if not isinstance(summary, Mapping) or probability is None:
+        return None
+    buckets = summary.get("by_probability_bucket")
+    if not isinstance(buckets, list) or not buckets:
+        return None
+    nearest: tuple[float, dict[str, Any]] | None = None
+    for bucket in buckets:
+        if not isinstance(bucket, Mapping):
+            continue
+        bucket_row = dict(bucket)
+        bounds = _bucket_range(str(bucket_row.get("bucket") or bucket_row.get("label") or ""))
+        if bounds is None:
+            continue
+        start, end = bounds
+        center = (start + end) / 2.0
+        distance = abs(probability - center)
+        if nearest is None or distance < nearest[0]:
+            nearest = (distance, bucket_row)
+        if start <= probability <= end:
+            return bucket_row
+    return nearest[1] if nearest is not None else None
+
+
+def _performance_multiplier_for_candidate(
+    summary: Mapping[str, Any] | None,
+    *,
+    sport: str | None,
+    market: str | None,
+    probability: float | None,
+) -> dict[str, Any]:
+    if not isinstance(summary, Mapping):
+        return {"performance_multiplier": 1.0, "performance_context": None}
+
+    sport_key = str(sport or "").strip().lower()
+    market_key = str(market or "").strip().lower()
+    sport_block = _copy_mapping((summary.get("by_sport") or {}).get(sport_key)) if sport_key else {}
+    market_block = _copy_mapping((summary.get("by_market") or {}).get(market_key)) if market_key else {}
+
+    sport_roi = _coerce_float(sport_block.get("roi")) if sport_block else None
+    market_roi = _coerce_float(market_block.get("roi")) if market_block else None
+
+    bucket_row = _confidence_bucket_row(summary, probability)
+    bucket_label = str(bucket_row.get("bucket") or bucket_row.get("label") or "") if isinstance(bucket_row, Mapping) else ""
+    bucket_predicted = _coerce_probability(bucket_row.get("predicted_probability")) if isinstance(bucket_row, Mapping) else None
+    bucket_actual = _coerce_probability(bucket_row.get("actual_win_rate")) if isinstance(bucket_row, Mapping) else None
+    bucket_calibration = (bucket_actual - bucket_predicted) if (bucket_actual is not None and bucket_predicted is not None) else None
+
+    sport_multiplier = _roi_multiplier(sport_roi, scale=0.25, cap=0.035)
+    market_multiplier = _roi_multiplier(market_roi, scale=0.20, cap=0.025)
+    calibration_multiplier = 1.0 if bucket_calibration is None else 1.0 + max(-0.03, min(0.03, float(bucket_calibration) * 0.55))
+    multiplier = _bounded_multiplier(sport_multiplier * market_multiplier * calibration_multiplier, lower=0.9, upper=1.1)
+
+    return {
+        "performance_multiplier": multiplier,
+        "performance_context": {
+            "sport_roi": round(sport_roi, 4) if sport_roi is not None else None,
+            "market_roi": round(market_roi, 4) if market_roi is not None else None,
+            "confidence_bucket": bucket_label or None,
+            "confidence_bucket_predicted_probability": round(bucket_predicted, 4) if bucket_predicted is not None else None,
+            "confidence_bucket_actual_win_rate": round(bucket_actual, 4) if bucket_actual is not None else None,
+            "confidence_bucket_calibration": round(bucket_calibration, 4) if bucket_calibration is not None else None,
+        },
+    }
 
 
 def _record_market(record: Mapping[str, Any]) -> str | None:
@@ -228,6 +555,59 @@ def calculate_edge(candidate: Mapping[str, Any], *, fair_probability: float | No
         "implied_probability": round(float(implied_probability), 4) if implied_probability is not None else None,
         "edge": edge,
     }
+
+def _standardize_recommendation_fields(
+    payload: Mapping[str, Any],
+    *,
+    edge: float | None = None,
+    fair_probability: float | None = None,
+    implied_probability: float | None = None,
+) -> dict[str, Any]:
+    standardized = dict(payload)
+
+    expected_value = _coerce_float(standardized.get("expected_value"))
+    if expected_value is None:
+        expected_value = _coerce_float(standardized.get("ev"))
+    if expected_value is None:
+        ev_pct = _coerce_float(standardized.get("ev_pct"))
+        if ev_pct is not None:
+            expected_value = round(float(ev_pct) / 100.0, 4)
+
+    edge_pct = _coerce_float(standardized.get("edge_pct"))
+    if edge_pct is None:
+        edge_pct = _coerce_float(standardized.get("adjusted_edge"))
+    if edge_pct is None:
+        edge_value = _coerce_float(standardized.get("edge"))
+        if edge_value is not None:
+            edge_pct = round(float(edge_value) * 100.0, 2)
+    if edge_pct is None and edge is not None:
+        edge_pct = round(float(edge) * 100.0, 2)
+
+    model_probability = _coerce_probability(standardized.get("model_probability"))
+    if model_probability is None:
+        model_probability = _coerce_probability(standardized.get("model_prob"))
+    if model_probability is None:
+        model_probability = _probability_from_simulation_payload(standardized)
+    if model_probability is None:
+        model_probability = fair_probability
+
+    market_probability = _coerce_probability(standardized.get("market_probability"))
+    if market_probability is None:
+        market_probability = _coerce_probability(standardized.get("implied_probability"))
+    if market_probability is None:
+        market_probability = _coerce_probability(standardized.get("implied_prob"))
+    if market_probability is None:
+        market_probability = implied_probability
+
+    standardized.update(
+        {
+            "expected_value": expected_value,
+            "edge_pct": edge_pct,
+            "model_probability": model_probability,
+            "market_probability": market_probability,
+        }
+    )
+    return standardized
 
 
 def _normalize_policy_name(value: Any) -> str:
@@ -494,7 +874,8 @@ def filter_candidates(
     for candidate in candidate_rows:
         market = _market(candidate)
         market_profile = _market_profile(history_rows, sport=sport, market=market)
-        edge_data = calculate_edge(candidate)
+        live_pricing = _repriced_probabilities(candidate)
+        edge_data = calculate_edge(candidate, implied_probability=live_pricing["implied_probability"])
         fair_probability = edge_data["fair_probability"]
         implied_probability = edge_data["implied_probability"]
         edge = edge_data["edge"]
@@ -520,6 +901,10 @@ def filter_candidates(
                 "fair_probability": fair_probability,
                 "implied_probability": implied_probability,
                 "edge": edge,
+                "expected_value": live_pricing["expected_value"] if live_pricing["expected_value"] is not None else _coerce_float(candidate.get("expected_value")),
+                "model_probability": _coerce_probability(candidate.get("model_probability")) or _probability_from_simulation_payload(candidate) or fair_probability,
+                "market_probability": live_pricing["market_probability"] if live_pricing["market_probability"] is not None else implied_probability,
+                "edge_pct": live_pricing["edge_pct"] if live_pricing["edge_pct"] is not None else (round(float(edge) * 100.0, 2) if edge is not None else None),
                 "recommendation_id": candidate.get("recommendation_id") or f"reco_{uuid.uuid4().hex[:12]}",
                 "model_version": str(candidate.get("model_version") or MODEL_VERSION),
                 "risk_flags": [
@@ -535,7 +920,7 @@ def filter_candidates(
                 "sport_profile": sport_profile,
             }
         )
-        filtered.append(enriched)
+        filtered.append(_standardize_recommendation_fields(enriched, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
     return filtered
 
 
@@ -554,6 +939,7 @@ def rank_recommendations(
         experiment_key = _candidate_policy_key(candidate_rows, sport=sport)
     selected_policy = _normalize_policy_name(policy or select_policy(evaluation_records or _load_records_from_ledger(ledger_path), sport=sport, experiment_key=experiment_key))
     policy_spec = _policy_spec(selected_policy)
+    performance_summary = _load_performance_summary(ledger_path=ledger_path)
     filtered_candidates = filter_candidates(
         candidate_rows,
         sport=sport,
@@ -567,8 +953,11 @@ def rank_recommendations(
     for candidate in filtered_candidates:
         market = str(candidate.get("market") or "market").strip().lower() or "market"
         market_profile = _market_profile(history_rows, sport=sport, market=market)
-        edge = candidate.get("edge")
         fair_probability = float(candidate.get("fair_probability") or 0.5)
+        model_probability = _coerce_probability(candidate.get("model_probability")) or _probability_from_simulation_payload(candidate) or fair_probability
+        live_pricing = _repriced_probabilities(candidate, model_probability=model_probability)
+        tracking_snapshot = _tracking_snapshot(candidate, live_pricing=live_pricing, model_probability=model_probability)
+        edge = live_pricing["edge"] if live_pricing["edge"] is not None else candidate.get("edge")
         confidence = _coerce_probability(candidate.get("confidence")) or fair_probability
         base_score = _coerce_float(candidate.get("score")) or 0.0
         market_fit_score = _coerce_float(candidate.get("market_fit_score")) or 0.0
@@ -577,7 +966,7 @@ def rank_recommendations(
         edge_bonus = float(edge or 0.0) * 100.0
         calibration_error = float(market_profile.get("calibration_error") or sport_profile.get("calibration_error") or 0.0)
         roi = _coerce_float(market_profile.get("metrics", {}).get("roi")) or 0.0
-        adjusted_score = (
+        core_adjusted_score = (
             base_score * sport_strength * market_strength * (0.85 + policy_spec.confidence_weight * 0.30)
             + market_fit_score * (0.20 + policy_spec.market_fit_weight * 0.60)
             + edge_bonus * (0.50 + policy_spec.edge_weight)
@@ -585,6 +974,14 @@ def rank_recommendations(
             + roi * 20.0 * (0.70 + policy_spec.roi_weight)
             - calibration_error * 12.0 * (0.65 + policy_spec.calibration_weight)
         )
+        performance_profile = _performance_multiplier_for_candidate(
+            performance_summary,
+            sport=str(candidate.get("sport") or candidate.get("sport_slug") or sport or "").strip().lower() or None,
+            market=market,
+            probability=model_probability,
+        )
+        performance_multiplier = float(performance_profile.get("performance_multiplier") or 1.0)
+        adjusted_score = core_adjusted_score * performance_multiplier
         reasoning = str(candidate.get("rationale") or candidate.get("summary") or candidate.get("writeup") or candidate.get("name") or "Recommendation built from the current board.").strip()
         risk_factors = list(candidate.get("risk_factors") or [])
         for note in candidate.get("risk_flags") or []:
@@ -600,6 +997,32 @@ def rank_recommendations(
                 f"Calibration error {calibration_error:.3f}",
             ]
         )
+        historical_context = _summary_context_for_candidate(
+            performance_summary,
+            sport=str(candidate.get("sport") or candidate.get("sport_slug") or sport or "").strip().lower() or None,
+            market=market,
+        )
+        market_probability = _coerce_probability(candidate.get("market_probability"))
+        if market_probability is None:
+            market_probability = _coerce_probability(candidate.get("implied_probability"))
+        implied_probability = _coerce_probability(candidate.get("implied_probability"))
+        edge_pct = _coerce_float(candidate.get("edge_pct"))
+        if edge_pct is None and edge is not None:
+            edge_pct = round(float(edge) * 100.0, 2)
+        expected_value = _coerce_float(candidate.get("expected_value"))
+        reasoning_items: list[str] = []
+        if reasoning:
+            reasoning_items.append(reasoning)
+        if model_probability is not None and market_probability is not None:
+            if edge_pct is not None:
+                reasoning_items.append(f"Model {model_probability:.3f} vs market {market_probability:.3f} ({edge_pct:+.2f} pts)")
+            else:
+                reasoning_items.append(f"Model {model_probability:.3f} vs market {market_probability:.3f}")
+        if isinstance(historical_context, Mapping):
+            if historical_context.get("roi_segment") is not None and historical_context.get("sample_size") is not None:
+                reasoning_items.append(f"Historical ROI {historical_context['roi_segment']:+.3f} across {historical_context['sample_size']} settled bets")
+            elif historical_context.get("sample_size") is not None:
+                reasoning_items.append(f"Historical sample size {historical_context['sample_size']} settled bets")
         recommendation = dict(candidate)
         recommendation.update(
             {
@@ -608,14 +1031,29 @@ def rank_recommendations(
                 "event_id": candidate.get("event_id") or _event_id(candidate),
                 "market": market,
                 "selection": candidate.get("selection") or _selection(candidate),
-                "odds": candidate.get("odds"),
+                "odds": tracking_snapshot["odds_current"] if tracking_snapshot["odds_current"] is not None else tracking_snapshot["odds_open"],
+                "odds_open": tracking_snapshot["odds_open"],
+                "odds_current": tracking_snapshot["odds_current"],
                 "fair_probability": round(fair_probability, 4),
                 "edge": round(float(edge or 0.0), 4),
                 "confidence": round(max(0.05, min(0.99, confidence * sport_strength * market_strength)), 2),
+                "expected_value": live_pricing["expected_value"] if live_pricing["expected_value"] is not None else expected_value,
+                "ev_open": tracking_snapshot["ev_open"],
+                "ev_current": tracking_snapshot["ev_current"],
+                "ev_delta": tracking_snapshot["ev_delta"],
+                "line_movement_impact": tracking_snapshot["line_movement_impact"],
+                "edge_pct": edge_pct,
+                "model_probability": round(model_probability, 4) if model_probability is not None else None,
+                "market_probability": round((live_pricing["market_probability"] if live_pricing["market_probability"] is not None else market_probability), 4) if (live_pricing["market_probability"] is not None or market_probability is not None) else None,
                 "model_version": str(candidate.get("model_version") or MODEL_VERSION),
-                "reasoning": reasoning,
+                "reasoning_text": reasoning,
+                "reasoning": reasoning_items,
                 "risk_factors": risk_factors[:5],
                 "confidence_drivers": confidence_drivers[:5],
+                "historical_context": historical_context,
+                "performance_context": performance_profile.get("performance_context"),
+                "performance_multiplier": round(performance_multiplier, 4),
+                "core_adjusted_score": round(core_adjusted_score, 3),
                 "historical_profile": {
                     "sport": sport_profile,
                     "market": market_profile,
@@ -625,11 +1063,12 @@ def rank_recommendations(
                 "adjusted_score": round(adjusted_score, 3),
             }
         )
-        scored.append(recommendation)
+        scored.append(_standardize_recommendation_fields(recommendation, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
 
     scored.sort(
         key=lambda item: (
             float(item.get("adjusted_score") or 0.0),
+            float(item.get("expected_value") or 0.0),
             float(item.get("edge") or 0.0),
             float(item.get("confidence") or 0.0),
             float(item.get("score") or 0.0),

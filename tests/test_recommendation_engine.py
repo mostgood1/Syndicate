@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from syndicate.features.shared.intelligence_evaluation import build_artifact_metadata
 from syndicate.features.shared.recommendation_engine import calculate_edge
@@ -87,6 +90,248 @@ class RecommendationEngineTests(unittest.TestCase):
         self.assertAlmostEqual(edge["fair_probability"], 0.58, places=2)
         self.assertIsNotNone(edge["implied_probability"])
         self.assertGreater(edge["edge"], 0.0)
+
+    def test_rank_recommendations_standardizes_probability_fields(self) -> None:
+        ranked = rank_recommendations(
+            [
+                {
+                    "name": "Jayson Tatum Over 28.5 Points",
+                    "event_id": "game-1",
+                    "market": "points",
+                    "selection": "Over 28.5",
+                    "odds": "+100",
+                    "score": 86.0,
+                    "confidence": 0.63,
+                    "model_probability": 0.58,
+                    "ev_pct": 12.0,
+                }
+            ],
+            sport="nba",
+            evaluation_records=[],
+        )
+
+        self.assertEqual(len(ranked), 1)
+        self.assertAlmostEqual(ranked[0]["expected_value"], 0.12, places=2)
+        self.assertAlmostEqual(ranked[0]["edge_pct"], 8.0, places=2)
+        self.assertAlmostEqual(ranked[0]["model_probability"], 0.58, places=2)
+        self.assertAlmostEqual(ranked[0]["market_probability"], 0.5, places=2)
+
+    def test_rank_recommendations_applies_bounded_performance_multiplier(self) -> None:
+        def _rank_with_summary(summary: dict[str, object]) -> dict[str, object]:
+            with TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                ledger_path = root / "reports" / "intelligence" / "evaluation_ledger.jsonl"
+                ledger_path.parent.mkdir(parents=True, exist_ok=True)
+                (root / "reports" / "performance_summary.json").write_text(json.dumps(summary), encoding="utf-8")
+
+                ranked = rank_recommendations(
+                    [
+                        {
+                            "name": "Jayson Tatum Over 28.5 Points",
+                            "event_id": "game-1",
+                            "market": "points",
+                            "selection": "Over 28.5",
+                            "odds": "+100",
+                            "score": 86.0,
+                            "confidence": 0.63,
+                            "model_probability": 0.62,
+                        }
+                    ],
+                    sport="nba",
+                    ledger_path=ledger_path,
+                    evaluation_records=[],
+                )
+
+            return ranked[0]
+
+        positive = _rank_with_summary(
+            {
+                "schema_version": 1,
+                "by_sport": {"nba": {"roi": 0.18}},
+                "by_market": {"points": {"roi": 0.12}},
+                "by_probability_bucket": [
+                    {"bucket": "0.60-0.70", "predicted_probability": 0.62, "actual_win_rate": 0.70, "roi": 0.09}
+                ],
+            }
+        )
+        negative = _rank_with_summary(
+            {
+                "schema_version": 1,
+                "by_sport": {"nba": {"roi": -0.18}},
+                "by_market": {"points": {"roi": -0.12}},
+                "by_probability_bucket": [
+                    {"bucket": "0.60-0.70", "predicted_probability": 0.62, "actual_win_rate": 0.54, "roi": -0.09}
+                ],
+            }
+        )
+
+        self.assertGreater(positive["performance_multiplier"], 1.0)
+        self.assertLess(negative["performance_multiplier"], 1.0)
+        self.assertGreater(positive["adjusted_score"], positive["core_adjusted_score"])
+        self.assertLess(negative["adjusted_score"], negative["core_adjusted_score"])
+        self.assertGreater(positive["adjusted_score"], negative["adjusted_score"])
+
+    def test_rank_recommendations_reprices_live_current_odds(self) -> None:
+        ranked = rank_recommendations(
+            [
+                {
+                    "name": "Jayson Tatum Over 28.5 Points",
+                    "event_id": "game-1",
+                    "market": "points",
+                    "selection": "Over 28.5",
+                    "odds": "+100",
+                    "current_odds": "+150",
+                    "score": 86.0,
+                    "is_live": True,
+                    "model_probability": 0.60,
+                }
+            ],
+            sport="nba",
+            evaluation_records=[],
+        )
+
+        self.assertEqual(len(ranked), 1)
+        self.assertAlmostEqual(ranked[0]["market_probability"], 0.4, places=2)
+        self.assertAlmostEqual(ranked[0]["expected_value"], 0.5, places=2)
+        self.assertAlmostEqual(ranked[0]["ev_open"], 0.2, places=2)
+        self.assertAlmostEqual(ranked[0]["ev_current"], 0.5, places=2)
+        self.assertAlmostEqual(ranked[0]["ev_delta"], 0.3, places=2)
+        self.assertEqual(ranked[0]["odds_open"], "+100")
+        self.assertEqual(ranked[0]["odds_current"], "+150")
+        self.assertAlmostEqual(ranked[0]["line_movement_impact"], 0.1, places=2)
+        self.assertAlmostEqual(ranked[0]["edge"], 0.2, places=2)
+
+    def test_rank_recommendations_preserves_pregame_expected_value(self) -> None:
+        ranked = rank_recommendations(
+            [
+                {
+                    "name": "Jayson Tatum Over 28.5 Points",
+                    "event_id": "game-1",
+                    "market": "points",
+                    "selection": "Over 28.5",
+                    "odds": "+100",
+                    "score": 86.0,
+                    "model_probability": 0.58,
+                    "ev_pct": 12.0,
+                }
+            ],
+            sport="nba",
+            evaluation_records=[],
+        )
+
+        self.assertEqual(len(ranked), 1)
+        self.assertAlmostEqual(ranked[0]["expected_value"], 0.12, places=2)
+
+    def test_rank_recommendations_derives_model_probability_from_simulation_distribution(self) -> None:
+        ranked = rank_recommendations(
+            [
+                {
+                    "name": "Jayson Tatum Over 28.5 Points",
+                    "event_id": "game-1",
+                    "market": "points",
+                    "selection": "Over 28.5",
+                    "odds": "+100",
+                    "score": 86.0,
+                    "simulation": {"probability_distributions": {"win": 0.64, "loss": 0.36}},
+                }
+            ],
+            sport="nba",
+            evaluation_records=[],
+        )
+
+        self.assertEqual(len(ranked), 1)
+        self.assertAlmostEqual(ranked[0]["model_probability"], 0.64, places=2)
+
+    def test_rank_recommendations_derives_model_probability_from_sim_hit_rate(self) -> None:
+        ranked = rank_recommendations(
+            [
+                {
+                    "name": "Jayson Tatum Over 28.5 Points",
+                    "event_id": "game-1",
+                    "market": "points",
+                    "selection": "Over 28.5",
+                    "odds": "+100",
+                    "score": 86.0,
+                    "sim": {"hit_rate": 0.57},
+                }
+            ],
+            sport="nba",
+            evaluation_records=[],
+        )
+
+        self.assertEqual(len(ranked), 1)
+        self.assertAlmostEqual(ranked[0]["model_probability"], 0.57, places=2)
+
+    def test_rank_recommendations_attaches_historical_context_from_performance_summary(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            ledger_path = root / "reports" / "intelligence" / "evaluation_ledger.jsonl"
+            ledger_path.parent.mkdir(parents=True, exist_ok=True)
+            (root / "reports" / "performance_summary.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "by_sport_market": {
+                            "nba": {
+                                "points": {"roi_segment": 0.142, "sample_size": 28, "total_bets": 28, "settled_count": 28},
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            ranked = rank_recommendations(
+                [
+                    {
+                        "name": "Jayson Tatum Over 28.5 Points",
+                        "event_id": "game-1",
+                        "sport": "nba",
+                        "market": "points",
+                        "selection": "Over 28.5",
+                        "odds": "+100",
+                        "score": 86.0,
+                        "confidence": 0.63,
+                        "model_probability": 0.58,
+                        "ev_pct": 12.0,
+                    }
+                ],
+                sport="nba",
+                ledger_path=ledger_path,
+                evaluation_records=[],
+            )
+
+        self.assertEqual(len(ranked), 1)
+        self.assertEqual(ranked[0]["historical_context"], {"roi_segment": 0.142, "sample_size": 28})
+
+    def test_rank_recommendations_leaves_historical_context_null_without_summary_match(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            ledger_path = root / "reports" / "intelligence" / "evaluation_ledger.jsonl"
+            ledger_path.parent.mkdir(parents=True, exist_ok=True)
+
+            ranked = rank_recommendations(
+                [
+                    {
+                        "name": "Jayson Tatum Over 28.5 Points",
+                        "event_id": "game-1",
+                        "sport": "nba",
+                        "market": "points",
+                        "selection": "Over 28.5",
+                        "odds": "+100",
+                        "score": 86.0,
+                        "confidence": 0.63,
+                        "model_probability": 0.58,
+                        "ev_pct": 12.0,
+                    }
+                ],
+                sport="nba",
+                ledger_path=ledger_path,
+                evaluation_records=[],
+            )
+
+        self.assertEqual(len(ranked), 1)
+        self.assertIsNone(ranked[0]["historical_context"])
 
     def test_policy_specific_filtering_changes_threshold_behavior(self) -> None:
         candidate = {

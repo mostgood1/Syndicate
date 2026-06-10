@@ -27,6 +27,8 @@
   <!-- RIGHT COLUMN -->
   <div>
 
+    <div id="scanner"></div>
+
     <div id="picks"></div>
 
   </div>
@@ -71,10 +73,13 @@ async function loadIntelligence() {
     `;
 
     // ===== PICKS =====
+    const scannerEl = document.getElementById("scanner");
     const picksEl = document.getElementById("picks");
 
     const allRecs = (response.recommendations || [])
       .sort((a, b) => (b.edge || 0) - (a.edge || 0));
+
+    const topLiveOpportunities = (response.top_live_opportunities || []).slice(0, 5);
 
     // ✅ Split by tag
     const liveRecs = allRecs.filter(r => r.tag === "LIVE");
@@ -140,7 +145,61 @@ async function loadIntelligence() {
       `;
     }
 
+    function renderScannerSection(title, recs) {
+      if (!recs.length) {
+        return "";
+      }
+
+      return `
+        <div style="margin-bottom:25px;">
+          <h3 style="margin-bottom:10px;">${title}</h3>
+          ${recs.map((p, i) => {
+            const evCurrent = typeof p.ev_current === "number" ? (p.ev_current * 100).toFixed(1) : "—";
+            const evDelta = typeof p.ev_delta === "number" ? (p.ev_delta * 100).toFixed(1) : null;
+            const lineImpact = typeof p.line_movement_impact === "number" ? (p.line_movement_impact * 100).toFixed(1) : null;
+            const confidence = typeof p.confidence === "number" ? Math.round(p.confidence * 100) + "%" : "—";
+            const edge = typeof p.edge === "number" ? (p.edge * 100).toFixed(1) + "%" : "—";
+            const color = typeof p.ev_delta === "number" && p.ev_delta > 0 ? "#2ecc71" : "#f39c12";
+            const badge = p.movement_label || (evDelta ? (Number(evDelta) > 0 ? "Edge improving" : "Edge softening") : "Positive EV");
+
+            return `
+              <div style="
+                background:#141414;
+                color:white;
+                padding:16px;
+                border-radius:12px;
+                margin-bottom:10px;
+                border-left:6px solid ${color};
+              ">
+                <div style="display:flex; justify-content:space-between; gap:12px;">
+                  <div style="font-size:16px; font-weight:600;">${i === 0 ? "⚡ " : ""}${p.selection}</div>
+                  <div style="font-weight:600;color:${color};">EV ${evCurrent}%</div>
+                </div>
+
+                <div style="font-size:12px; margin-top:4px; opacity:.7;">
+                  ${p.sport} | ${p.market} | ${badge}
+                </div>
+
+                <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; font-size:12px; opacity:.9;">
+                  <div>Confidence: ${confidence}</div>
+                  <div>Edge: ${edge}</div>
+                  ${evDelta ? `<div>EV change: ${Number(evDelta) > 0 ? "+" : ""}${evDelta}%</div>` : ""}
+                  ${lineImpact ? `<div>Line impact: ${Number(lineImpact) > 0 ? "+" : ""}${lineImpact}%</div>` : ""}
+                </div>
+
+                ${p.reasoning ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">${p.reasoning}</div>` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
     // ✅ Render sections
+    if (scannerEl) {
+      scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", topLiveOpportunities);
+    }
+
     picksEl.innerHTML = `
       ${renderSection("🔥 Live Opportunities", liveRecs)}
       ${renderSection("📊 Pregame Edges", pregameRecs)}

@@ -12,6 +12,42 @@ from syndicate.features.nhl.intelligence_analysis import build_hockey_prop_analy
 from syndicate.features.wnba.intelligence_analysis import build_wnba_matchup_analysis_views
 
 
+def _analysis_table_sort_options(table: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = table.get("rows") if isinstance(table.get("rows"), list) else []
+    columns = {str(column).strip().lower() for column in (table.get("columns") or []) if str(column).strip()}
+    row_keys = set()
+    for row in rows:
+        if isinstance(row, dict):
+            row_keys.update(str(key).strip().lower() for key in row.keys() if str(key).strip())
+    available = columns | row_keys
+    sort_options: list[dict[str, Any]] = []
+    for key, label in (
+        ("score", "Score"),
+        ("expected_value", "Expected value"),
+        ("confidence", "Confidence"),
+    ):
+        if key in available:
+            sort_options.append({"key": key, "label": label, "direction": "desc"})
+    return sort_options
+
+
+def _augment_analysis_view_sorting(view: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(view, dict):
+        return view
+    table = view.get("table") if isinstance(view.get("table"), dict) else None
+    if not table:
+        return view
+    sort_options = _analysis_table_sort_options(table)
+    if not sort_options:
+        return view
+    augmented_table = dict(table)
+    augmented_table["sort_options"] = sort_options
+    augmented_table["default_sort"] = sort_options[0]
+    augmented_view = dict(view)
+    augmented_view["table"] = augmented_table
+    return augmented_view
+
+
 def build_generic_market_analysis_views(
     candidates: list[dict[str, Any]],
     preferences: dict[str, Any],
@@ -80,7 +116,7 @@ def build_generic_market_analysis_views(
         "title": title,
         "table": {
             "title": title,
-            "columns": ["rank", "label", "sport", "matchup", "market", "market_key", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "advanced_signal_score", "source_summary_score", "surface", "why"],
+            "columns": ["rank", "label", "sport", "matchup", "market", "market_key", "pick", "line", "projected", "live_projection", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "advanced_signal_score", "source_summary_score", "surface", "why"],
             "rows": table_rows,
         },
         "chart": {
@@ -104,55 +140,55 @@ def build_analysis_views(
     advanced_signal_text,
 ) -> dict[str, Any] | None:
     return (
-        build_mlb_home_run_analysis_views(candidates, preferences)
-        or build_mlb_prop_analysis_views(
+        _augment_analysis_view_sorting(build_mlb_home_run_analysis_views(candidates, preferences))
+        or _augment_analysis_view_sorting(build_mlb_prop_analysis_views(
             candidates,
             preferences,
             safe_text=safe_text,
             candidate_market_focuses=candidate_market_focuses,
             advanced_signal_text=advanced_signal_text,
             mlb_statcast_market_text=mlb_statcast_market_text,
-        )
-        or build_basketball_matchup_analysis_views(
+        ))
+        or _augment_analysis_view_sorting(build_basketball_matchup_analysis_views(
             candidates,
             preferences,
             safe_text=safe_text,
             candidate_market_focuses=candidate_market_focuses,
             advanced_signal_text=advanced_signal_text,
-        )
-        or build_wnba_matchup_analysis_views(
+        ))
+        or _augment_analysis_view_sorting(build_wnba_matchup_analysis_views(
             candidates,
             preferences,
             safe_text=safe_text,
             candidate_market_focuses=candidate_market_focuses,
             advanced_signal_text=advanced_signal_text,
-        )
-        or build_ncaab_matchup_analysis_views(
+        ))
+        or _augment_analysis_view_sorting(build_ncaab_matchup_analysis_views(
             candidates,
             preferences,
             safe_text=safe_text,
             candidate_market_focuses=candidate_market_focuses,
             advanced_signal_text=advanced_signal_text,
-        )
-        or build_football_market_analysis_views(
+        ))
+        or _augment_analysis_view_sorting(build_football_market_analysis_views(
             candidates,
             preferences,
             safe_text=safe_text,
             candidate_market_focuses=candidate_market_focuses,
             advanced_signal_text=advanced_signal_text,
-        )
-        or build_hockey_prop_analysis_views(
+        ))
+        or _augment_analysis_view_sorting(build_hockey_prop_analysis_views(
             candidates,
             preferences,
             safe_text=safe_text,
             candidate_market_focuses=candidate_market_focuses,
             advanced_signal_text=advanced_signal_text,
-        )
-        or build_generic_market_analysis_views(
+        ))
+        or _augment_analysis_view_sorting(build_generic_market_analysis_views(
             candidates,
             preferences,
             safe_text=safe_text,
             candidate_market_focuses=candidate_market_focuses,
             advanced_signal_text=advanced_signal_text,
-        )
+        ))
     )

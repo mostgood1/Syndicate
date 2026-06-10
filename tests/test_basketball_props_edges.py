@@ -32,6 +32,12 @@ class _FakeSeries:
     def map(self, func) -> "_FakeSeries":
         return _FakeSeries([func(value) for value in self.values])
 
+    def __mul__(self, other: float) -> "_FakeSeries":
+        return _FakeSeries([value * other for value in self.values])
+
+    def __rmul__(self, other: float) -> "_FakeSeries":
+        return self.__mul__(other)
+
     def isin(self, allowed: set[str]) -> _FakeMask:
         return _FakeMask([value in allowed for value in self.values])
 
@@ -102,8 +108,8 @@ class BasketballPropsEdgesTests(unittest.TestCase):
                 local_calls.append(dict(kwargs))
                 return _FakeFrame(
                     [
-                        {"stat": "reb", "edge": 0.04, "ev": 0.05, "bookmaker": "fd"},
-                        {"stat": "pts", "edge": 0.08, "ev": 0.12, "bookmaker": "dk"},
+                        {"stat": "reb", "edge": 0.04, "ev": 0.05, "model_prob": 0.54, "implied_prob": 0.50, "bookmaker": "fd"},
+                        {"stat": "pts", "edge": 0.08, "ev": 0.12, "model_prob": 0.58, "implied_prob": 0.50, "bookmaker": "dk"},
                     ]
                 )
 
@@ -132,6 +138,10 @@ class BasketballPropsEdgesTests(unittest.TestCase):
         self.assertEqual(written_rows[1]["stat"], "reb")
         self.assertEqual(written_rows[0]["bookmaker"], "draftkings")
         self.assertEqual(written_rows[1]["bookmaker"], "fanduel")
+        self.assertEqual(written_rows[0]["expected_value"], "0.12")
+        self.assertEqual(written_rows[0]["edge_pct"], "8.0")
+        self.assertEqual(written_rows[0]["model_probability"], "0.58")
+        self.assertEqual(written_rows[0]["market_probability"], "0.5")
 
 
 if __name__ == "__main__":

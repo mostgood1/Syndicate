@@ -108,6 +108,30 @@
     if (num == null) return '-';
     return `${(num * 100).toFixed(digits == null ? 1 : digits)}%`;
   }
+  function formatPercentLike(value, digits, signed) {
+    const num = toNumber(value);
+    if (num == null) return '';
+    const scaled = Math.abs(num) <= 1.5 ? num * 100 : num;
+    const fixed = Math.abs(scaled).toFixed(digits == null ? 1 : digits);
+    if (scaled < 0) return `-${fixed}%`;
+    return signed ? `+${fixed}%` : `${fixed}%`;
+  }
+  function recommendationMetaText(row) {
+    const bits = [];
+    const expectedValue = toNumber(row?.expected_value ?? row?.expectedValue ?? row?.ev_pct ?? row?.evPct);
+    if (expectedValue != null) bits.push(`EV ${formatPercentLike(expectedValue, 1, true)}`);
+    const confidence = toNumber(row?.confidence ?? row?.model_confidence ?? row?.confidence_score ?? row?.model_prob);
+    if (confidence != null) bits.push(`Confidence ${formatPercentLike(confidence, 0)}`);
+    const historicalContext = row?.historical_context ?? row?.historicalContext;
+    if (historicalContext && typeof historicalContext === 'object') {
+      const roi = toNumber(historicalContext.roi_segment ?? historicalContext.roi ?? historicalContext.segment_roi);
+      const sampleSize = toNumber(historicalContext.sample_size ?? historicalContext.sampleSize ?? historicalContext.samples ?? historicalContext.sample_count);
+      if (roi != null && sampleSize != null) {
+        bits.push(`Historical ROI ${formatPercentLike(roi, 1, true)} (${formatNumber(sampleSize, 0)} samples)`);
+      }
+    }
+    return bits.join(' | ');
+  }
 
   function formatCurrency(value, digits) {
     const num = toNumber(value);
@@ -352,6 +376,92 @@
     return `<span class="season-detail-chip ${tone ? `is-${escapeHtml(tone)}` : ''}"><span class="season-detail-chip-label">${escapeHtml(label)}</span><span class="season-detail-chip-value">${escapeHtml(String(value))}</span></span>`;
   }
 
+  function lineMovementDelta(row) {
+    return toNumber(
+      row?.line_move
+      ?? row?.lineMove
+      ?? row?.open_line_move
+      ?? row?.openLineMove
+      ?? row?.market_move
+      ?? row?.marketMove
+    );
+  }
+
+  function evChangeDelta(row) {
+    return toNumber(
+      row?.ev_delta
+      ?? row?.evDelta
+      ?? row?.expected_value_delta
+      ?? row?.expectedValueDelta
+      ?? row?.expected_value_change
+      ?? row?.expectedValueChange
+    );
+  }
+
+  function signalStrengthDelta(row) {
+    const explicitDelta = toNumber(
+      row?.signal_strength_delta
+      ?? row?.signalStrengthDelta
+      ?? row?.signal_strength_change
+      ?? row?.signalStrengthChange
+      ?? row?.signal_delta
+      ?? row?.signalDelta
+    );
+    if (explicitDelta != null) return explicitDelta;
+
+    const current = toNumber(
+      row?.signal_strength_current
+      ?? row?.signalStrengthCurrent
+      ?? row?.signal_strength
+      ?? row?.signalStrength
+      ?? insightValue(row, 'model', 'signal_strength')
+      ?? insightValue(row, 'model', 'edge_sigma')
+    );
+    const open = toNumber(
+      row?.signal_strength_open
+      ?? row?.signalStrengthOpen
+      ?? row?.open_signal_strength
+      ?? row?.openSignalStrength
+    );
+    if (current != null && open != null) return current - open;
+    return null;
+  }
+
+  function buildLiveIndicatorChips(row) {
+    const chips = [];
+
+    const lineDelta = lineMovementDelta(row);
+    if (lineDelta != null) {
+      const selection = String(row?.selection || row?.pick || row?.side || '').trim().toLowerCase();
+      const isAgainstPosition = selection === 'over'
+        ? lineDelta > 0
+        : selection === 'under'
+          ? lineDelta < 0
+          : null;
+      const arrow = lineDelta > 0 ? '↑' : '↓';
+      const value = isAgainstPosition === null
+        ? `${arrow} ${formatSignedNumber(lineDelta, 1)}`
+        : `${arrow} ${isAgainstPosition ? 'Line moving against position' : 'Line moving with position'} (${formatSignedNumber(lineDelta, 1)})`;
+      chips.push(statChip('Line', value, isAgainstPosition === null ? 'neutral' : (isAgainstPosition ? 'bad' : 'good')));
+    }
+
+    const evDelta = evChangeDelta(row);
+    if (evDelta != null) {
+      const arrow = evDelta > 0 ? '↑' : '↓';
+      const value = `${arrow} ${evDelta > 0 ? 'Edge improving' : 'Edge softening'} (${formatSignedPercentPoints(evDelta, 1)})`;
+      chips.push(statChip('EV', value, evDelta > 0 ? 'good' : 'bad'));
+    }
+
+    const signalDelta = signalStrengthDelta(row);
+    if (signalDelta != null) {
+      const arrow = signalDelta > 0 ? '↑' : '↓';
+      const value = `${arrow} ${signalDelta > 0 ? 'Signal strength improving' : 'Signal strength cooling'} (${formatSignedPercentPoints(signalDelta, 1)})`;
+      chips.push(statChip('Signal', value, signalDelta > 0 ? 'good' : 'bad'));
+    }
+
+    return chips.filter(Boolean);
+  }
+
   function buildPropInsightChips(row) {
     if (String(row?.market || '') !== 'player_props') return [];
     const chips = [];
@@ -372,6 +482,14 @@
     const last10Hit = toNumber(insightValue(row, 'history', 'last10_hit'));
     const oppHit = toNumber(insightValue(row, 'history', 'opponent_hit'));
     const winProb = toNumber(insightValue(row, 'model', 'win_prob'));
+    const confidence = toNumber(row?.confidence ?? insightValue(row, 'model', 'confidence') ?? winProb);
+    const historicalContext = row?.historical_context ?? row?.historicalContext;
+    const roi = historicalContext && typeof historicalContext === 'object'
+      ? toNumber(historicalContext.roi_segment ?? historicalContext.roi ?? historicalContext.segment_roi)
+      : null;
+    const sampleSize = historicalContext && typeof historicalContext === 'object'
+      ? toNumber(historicalContext.sample_size ?? historicalContext.sampleSize ?? historicalContext.samples ?? historicalContext.sample_count)
+      : null;
 
     if (baseline != null && line != null) chips.push(statChip('Model', `${formatNumber(baseline, 1)} vs ${formatLine(line)}`, baseline >= line ? 'good' : 'neutral'));
     if (last5 != null) chips.push(statChip('L5', formatNumber(last5, 1), 'neutral'));
@@ -391,6 +509,8 @@
     if (last10Hit != null) chips.push(statChip('L10 Hit', formatPercent(last10Hit, 0), last10Hit >= 0.55 ? 'good' : 'neutral'));
     if (oppHit != null && oppGames > 0) chips.push(statChip('Vs Opp Hit', formatPercent(oppHit, 0), oppHit >= 0.55 ? 'good' : 'neutral'));
     if (winProb != null) chips.push(statChip('Model Win', formatPercent(winProb, 0), winProb >= 0.55 ? 'good' : 'neutral'));
+    if (confidence != null) chips.push(statChip('Confidence', formatPercentLike(confidence, 0), confidence >= 0.55 ? 'good' : 'neutral'));
+    if (roi != null && sampleSize != null) chips.push(statChip('Historical ROI', `${formatPercentLike(roi, 1, true)} (${formatNumber(sampleSize, 0)} samples)`, roi >= 0 ? 'good' : 'neutral'));
     return chips.filter(Boolean).slice(0, 8);
   }
 
@@ -513,6 +633,7 @@
   function rowDetailHtml(row) {
     const summary = row?.reason_summary || rowDetail(row);
     const chips = buildPropInsightChips(row);
+    const liveIndicatorChips = buildLiveIndicatorChips(row);
     const recap = buildRecapParagraph(row);
     const fallback = [];
     if (!recap) {
@@ -524,6 +645,7 @@
     return `
       <div class="season-pick-detail">
         ${shouldShowSummary(row, chips, recap) ? `<div class="season-pick-summary">${escapeHtml(summary || 'Official card recommendation')}</div>` : ''}
+        ${liveIndicatorChips.length ? `<div class="season-detail-chip-row">${liveIndicatorChips.join('')}</div>` : ''}
         ${chips.length ? `<div class="season-detail-chip-row">${chips.join('')}</div>` : ''}
         ${recap ? `<p class="season-detail-paragraph season-detail-recap">${escapeHtml(recap)}</p>` : ''}
         ${fallback.join('')}
@@ -643,8 +765,11 @@
   }
 
   function rowDetail(row) {
-    const reasons = Array.isArray(row?.reasons) ? row.reasons.filter(Boolean) : [];
-    if (reasons.length) return reasons[0];
+    const reasoning = Array.isArray(row?.reasoning) && row.reasoning.length
+      ? row.reasoning
+      : (Array.isArray(row?.reasons) ? row.reasons : []);
+    const reasons = reasoning.filter(Boolean).slice(0, 3);
+    if (reasons.length) return reasons.join(' · ');
     if (row?.reason_summary) return row.reason_summary;
     const bits = [];
     if (toNumber(row?.ev) != null) bits.push(`EV ${formatUnits(row.ev, 2)}`);

@@ -138,6 +138,46 @@
     return text;
   }
 
+  function formatPercentLike(value, digits, signed) {
+    const num = toNumber(value);
+    if (num == null) return "";
+    const scaled = Math.abs(num) <= 1.5 ? num * 100 : num;
+    const fixed = Math.abs(scaled).toFixed(digits == null ? 1 : digits);
+    if (scaled < 0) return `-${fixed}%`;
+    return signed ? `+${fixed}%` : `${fixed}%`;
+  }
+
+  function recommendationMetaText(reco) {
+    const bits = [];
+    const expectedValue = toNumber(reco?.expected_value ?? reco?.expectedValue ?? reco?.ev_pct);
+    if (expectedValue != null) bits.push(`EV ${formatPercentLike(expectedValue, 1, true)}`);
+
+    const confidence = toNumber(reco?.confidence ?? reco?.model_confidence ?? reco?.confidence_score);
+    if (confidence != null) bits.push(`Confidence ${formatPercentLike(confidence, 0)}`);
+
+    const historicalContext = reco?.historical_context ?? reco?.historicalContext;
+    if (historicalContext && typeof historicalContext === "object") {
+      const roi = toNumber(historicalContext.roi_segment ?? historicalContext.roi ?? historicalContext.segment_roi);
+      const sampleSize = toNumber(historicalContext.sample_size ?? historicalContext.sampleSize ?? historicalContext.samples ?? historicalContext.sample_count);
+      if (roi != null && sampleSize != null) {
+        bits.push(`Historical ROI ${formatPercentLike(roi, 1, true)} (${formatNumber(sampleSize, 0)} samples)`);
+      }
+    }
+
+    return bits.join(" | ");
+  }
+
+  function recommendationReasoningText(reco) {
+    const source = Array.isArray(reco?.reasoning) && reco.reasoning.length
+      ? reco.reasoning
+      : (Array.isArray(reco?.reasons) ? reco.reasons : []);
+    const items = source
+      .map((item) => String(item == null ? "" : item).trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    return items.join(" · ");
+  }
+
   function dailyBudgetDollars() {
     const url = new URL(window.location.href);
     const raw = url.searchParams.get("dailyBudget") || url.searchParams.get("daily_budget") || "500";
@@ -608,6 +648,7 @@
         game?.start_time ? `First pitch ${game.start_time}` : "",
         String(game?.status?.abstract || "").trim(),
       ].filter(Boolean).join(" | ");
+      const reasoningText = recommendationReasoningText(reco);
       return `
         <tr>
           <td>
@@ -621,6 +662,7 @@
           <td>
             <div class="season-betting-cell-main">${escapeHtml(bettingSelectionLabel(reco, item.awayAbbr, item.homeAbbr))}</div>
             <div class="season-betting-cell-sub">${escapeHtml(bettingDetailText(reco))}</div>
+            ${reasoningText ? `<div class="season-betting-cell-sub">${escapeHtml(reasoningText)}</div>` : ''}
           </td>
           <td>${escapeHtml(formatOdds(reco?.odds))}</td>
           <td>${escapeHtml(bettingStakeText(reco))}</td>
@@ -648,6 +690,7 @@
         game?.start_time ? `First pitch ${game.start_time}` : "",
         String(game?.status?.abstract || "").trim(),
       ].filter(Boolean).join(" | ");
+      const reasoningText = recommendationReasoningText(reco);
       return `
         <article class="betting-card-mobile-entry">
           <div class="betting-card-mobile-head">
@@ -666,6 +709,7 @@
               <div class="betting-card-mobile-label">Odds</div>
               <div class="betting-card-mobile-value">${escapeHtml(formatOdds(reco?.odds))}</div>
             </div>
+            ${reasoningText ? `<div class="season-inline-note">${escapeHtml(reasoningText)}</div>` : ''}
             <div class="betting-card-mobile-stat">
               <div class="betting-card-mobile-label">Stake</div>
               <div class="betting-card-mobile-value">${escapeHtml(bettingStakeText(reco))}</div>
@@ -765,6 +809,7 @@
       const settlement = reco?.settlement || null;
       const profitText = settlement ? formatUnits(settlement.profit_u, 2) : "-";
       const actualText = settlement && settlement.actual != null ? `Actual ${formatLine(settlement.actual)}` : "Settlement unavailable";
+      const metaText = recommendationMetaText(reco);
       return `
         <tr>
           <td>
@@ -775,7 +820,10 @@
             <div class="season-betting-cell-main">${escapeHtml(bettingSelectionLabel(reco, awayAbbr, homeAbbr))}</div>
             <div class="season-betting-cell-sub">${escapeHtml(bettingDetailText(reco))}</div>
           </td>
-          <td>${escapeHtml(formatOdds(reco?.odds))}</td>
+          <td>
+            <div class="season-betting-cell-main">${escapeHtml(formatOdds(reco?.odds))}</div>
+            ${metaText ? `<div class="season-betting-cell-sub">${escapeHtml(metaText)}</div>` : ''}
+          </td>
           <td>${escapeHtml(bettingStakeText(reco))}</td>
           <td>${escapeHtml(formatSignedPercentPoints(reco?.edge, 1))}</td>
           <td><span class="season-ticket-pill ${tone}" style="${seasonTicketPillStyle(tone)}">${escapeHtml(bettingResultLabel(reco))}</span></td>
@@ -793,6 +841,7 @@
       const settlement = reco?.settlement || null;
       const profitText = settlement ? formatUnits(settlement.profit_u, 2) : "-";
       const actualText = settlement && settlement.actual != null ? `Actual ${formatLine(settlement.actual)}` : "Settlement unavailable";
+      const metaText = recommendationMetaText(reco);
       return `
         <article class="betting-card-mobile-entry">
           <div class="betting-card-mobile-head">
@@ -811,6 +860,7 @@
               <div class="betting-card-mobile-label">Odds</div>
               <div class="betting-card-mobile-value">${escapeHtml(formatOdds(reco?.odds))}</div>
             </div>
+            ${metaText ? `<div class="season-inline-note">${escapeHtml(metaText)}</div>` : ''}
             <div class="betting-card-mobile-stat">
               <div class="betting-card-mobile-label">Stake</div>
               <div class="betting-card-mobile-value">${escapeHtml(bettingStakeText(reco))}</div>

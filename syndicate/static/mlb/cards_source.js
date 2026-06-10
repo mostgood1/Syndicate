@@ -272,7 +272,9 @@
   }
 
   function recoReasonList(reco) {
-    const reasons = Array.isArray(reco?.reasons) ? reco.reasons : [];
+    const reasons = Array.isArray(reco?.reasoning) && reco.reasoning.length
+      ? reco.reasoning
+      : (Array.isArray(reco?.reasons) ? reco.reasons : []);
     const cleaned = reasons
       .map((row) => String(row == null ? "" : row).trim())
       .filter(Boolean);
@@ -288,8 +290,45 @@
     return texts[0] || "";
   }
 
+  function formatPercentLike(value, digits = 1, signed = false) {
+    const num = toNumber(value);
+    if (num == null) {
+      return "";
+    }
+    const scaled = Math.abs(num) <= 1.5 ? num * 100 : num;
+    const text = `${Math.abs(scaled).toFixed(digits)}%`;
+    if (scaled < 0) {
+      return `-${text}`;
+    }
+    return signed ? `+${text}` : text;
+  }
+
+  function recommendationMetaText(reco) {
+    const bits = [];
+    const expectedValue = toNumber(reco?.expected_value ?? reco?.expectedValue ?? reco?.ev_pct ?? reco?.evPct);
+    if (expectedValue != null) {
+      bits.push(`Expected value ${formatPercentLike(expectedValue, 1, true)}`);
+    }
+
+    const confidence = toNumber(reco?.confidence ?? reco?.model_confidence ?? reco?.confidence_score);
+    if (confidence != null) {
+      bits.push(`Confidence ${formatPercentLike(confidence, 0)}`);
+    }
+
+    const historicalContext = reco?.historical_context ?? reco?.historicalContext;
+    if (historicalContext && typeof historicalContext === "object") {
+      const roi = toNumber(historicalContext.roi_segment ?? historicalContext.roi ?? historicalContext.segment_roi);
+      const sampleSize = toNumber(historicalContext.sample_size ?? historicalContext.sampleSize ?? historicalContext.samples ?? historicalContext.sample_count);
+      if (roi != null && sampleSize != null) {
+        bits.push(`Historical ROI ${formatPercentLike(roi, 1, true)} (${formatNumber(sampleSize, 0)} samples)`);
+      }
+    }
+
+    return bits.join(" · ");
+  }
+
   function renderRecoReasons(reco) {
-    const texts = recoReasonList(reco).slice(0, 4);
+    const texts = recoReasonList(reco).slice(0, 3);
     if (!texts.length) return "";
     return `
       <div class="cards-panel-card cards-prop-stack">
@@ -2304,6 +2343,7 @@
       const reco = stateObj.reco;
       const liveEdgeClass = stateObj.liveEdge == null ? "" : (stateObj.liveEdge >= 0 ? "is-positive" : "is-negative");
       const reasonText = recoReasonText(reco);
+      const metaText = recommendationMetaText(reco);
       return `
         <div class="cards-prop-overview-card">
           <div class="cards-lens-head">
@@ -2324,6 +2364,7 @@
           <div class="cards-prop-overview-foot">
             <span>${escapeHtml(stateObj.modelMean == null ? 'Model mean -' : `Model mean ${formatLine(stateObj.modelMean)}`)}</span>
             <span>${escapeHtml(`${liveRowFreshnessText(reco, stateObj.tierLabel)} | ${formatOdds(reco?.odds)}`)}</span>
+            ${metaText ? `<span>${escapeHtml(metaText)}</span>` : ''}
           </div>
         </div>`;
     }
@@ -2412,7 +2453,7 @@
         return `
           <button type="button" class="cards-prop-button ${buttonTierClass} ${isActive ? "is-active" : ""}" data-prop-key="${escapeHtml(key)}" data-prop-board="${escapeHtml(boardValue)}">
             ${escapeHtml(propOwnerName(row) || "Player")} ${escapeHtml(marketLabelLong(row))}
-            <small>${escapeHtml(`${propRowFreshnessText(row, card, tierLabel)} | ${formatOdds(row?.odds)} | ${formatPropEdge(row)}`)}</small>
+            <small>${escapeHtml([propRowFreshnessText(row, card, tierLabel), formatOdds(row?.odds), formatPropEdge(row), recommendationMetaText(row)].filter(Boolean).join(' | '))}</small>
           </button>`;
       })
       .join("")}</div>`;
@@ -2591,7 +2632,7 @@
           <div>
             <div class="cards-lens-label">Prop lens</div>
             <div class="cards-lens-main">${escapeHtml(propOwnerName(selected))} - ${escapeHtml(marketLabelLong(selected))}</div>
-            <div class="cards-subcopy">${escapeHtml(tierLabel)} | ${escapeHtml(card?.away?.abbr || "Away")} at ${escapeHtml(card?.home?.abbr || "Home")}</div>
+            <div class="cards-subcopy">${escapeHtml([tierLabel, recommendationMetaText(selected), `${card?.away?.abbr || "Away"} at ${card?.home?.abbr || "Home"}`].filter(Boolean).join(' | '))}</div>
           </div>
           <span class="cards-lens-badge ${escapeHtml(badge.className)}">${escapeHtml(badge.label)}</span>
         </div>

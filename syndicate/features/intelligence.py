@@ -1574,6 +1574,38 @@ def _mlb_home_run_analysis_views(candidates: list[dict[str, Any]], preferences: 
 def _candidate_analysis_row(candidate: dict[str, Any], index: int) -> dict[str, Any]:
     market_context = candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {}
     market_fit = candidate.get("market_fit") if isinstance(candidate.get("market_fit"), dict) else {}
+    if "historical_context" in candidate:
+        historical_context = candidate.get("historical_context") if isinstance(candidate.get("historical_context"), dict) else {"roi_segment": None, "sample_size": None}
+        roi_segment_value = historical_context.get("roi_segment")
+        sample_size_value = historical_context.get("sample_size")
+    else:
+        historical_profile = candidate.get("historical_profile") if isinstance(candidate.get("historical_profile"), dict) else {}
+        market_profile = historical_profile.get("market") if isinstance(historical_profile.get("market"), dict) else {}
+        sport_profile = historical_profile.get("sport") if isinstance(historical_profile.get("sport"), dict) else {}
+        historical_source = market_profile if int(market_profile.get("sample_size") or 0) > 0 else sport_profile
+        historical_metrics = historical_source.get("metrics") if isinstance(historical_source.get("metrics"), dict) else {}
+        roi_segment = historical_metrics.get("roi")
+        sample_size = historical_source.get("sample_size") or historical_metrics.get("sample_size") or historical_metrics.get("settled_count")
+        try:
+            roi_segment_value = float(roi_segment) if roi_segment is not None else None
+        except Exception:
+            roi_segment_value = None
+        try:
+            sample_size_value = int(sample_size) if sample_size is not None else None
+        except Exception:
+            sample_size_value = None
+    model_probability = _numeric_hint(candidate.get("model_probability") or market_context.get("model_probability") or candidate.get("confidence"))
+    market_probability = _numeric_hint(candidate.get("market_probability") or market_context.get("implied_probability") or candidate.get("implied_probability"))
+    edge_value = candidate.get("edge_pct")
+    if edge_value is None:
+        raw_edge = candidate.get("edge")
+        if isinstance(raw_edge, (int, float)):
+            edge_value = float(raw_edge) * 100.0
+    expected_value = candidate.get("expected_value")
+    try:
+        expected_value = float(expected_value) if expected_value is not None else None
+    except Exception:
+        expected_value = None
     why = (
         _safe_text(market_fit.get("market_fit_note"), "")
         or _advanced_signal_text(candidate, limit=3)
@@ -1581,6 +1613,18 @@ def _candidate_analysis_row(candidate: dict[str, Any], index: int) -> dict[str, 
         or _safe_text(candidate.get("detail"), "")
         or _safe_text(candidate.get("summary"), "")
     )
+    reasoning: list[str] = []
+    if why:
+        reasoning.append(why)
+    if model_probability is not None and market_probability is not None:
+        if isinstance(edge_value, (int, float)):
+            reasoning.append(f"Model {model_probability:.3f} vs market {market_probability:.3f} ({float(edge_value):+.2f} pts)")
+        else:
+            reasoning.append(f"Model {model_probability:.3f} vs market {market_probability:.3f}")
+    if roi_segment_value is not None and sample_size_value is not None:
+        reasoning.append(f"Historical ROI {roi_segment_value:+.3f} across {sample_size_value} settled bets")
+    elif sample_size_value is not None:
+        reasoning.append(f"Historical sample size {sample_size_value} settled bets")
     return {
         "rank": index,
         "label": _safe_text(candidate.get("name"), "Play"),
@@ -1601,6 +1645,15 @@ def _candidate_analysis_row(candidate: dict[str, Any], index: int) -> dict[str, 
         "market_fit_score": round(float(market_fit.get("market_fit_score") or 0.0), 2),
         "price_edge_pct": market_context.get("price_edge_pct"),
         "implied_probability": market_context.get("implied_probability"),
+        "expected_value": expected_value,
+        "edge_pct": round(float(edge_value), 2) if isinstance(edge_value, (int, float)) else None,
+        "model_probability": model_probability,
+        "market_probability": market_probability,
+        "historical_context": {
+            "roi_segment": roi_segment_value,
+            "sample_size": sample_size_value,
+        },
+        "reasoning": reasoning[:3],
         "why": why or "Local board and model context support this angle.",
     }
 
@@ -1630,7 +1683,7 @@ def _basketball_matchup_analysis_views(candidates: list[dict[str, Any]], prefere
         "title": "Top basketball matchup targets",
         "table": {
             "title": "Top matchup-backed basketball targets",
-            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "score", "market_fit_score", "why"],
+            "columns": ["rank", "label", "sport", "matchup", "market", "pick", "line", "projected", "live_projection", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "why"],
             "rows": table_rows,
         },
         "chart": {
@@ -1654,7 +1707,7 @@ def _football_market_analysis_views(candidates: list[dict[str, Any]], preference
         "title": "Top football market targets",
         "table": {
             "title": "Top football market targets",
-            "columns": ["rank", "label", "sport", "matchup", "market_label", "pick", "line", "projected", "odds", "score", "market_fit_score", "implied_probability", "why"],
+            "columns": ["rank", "label", "sport", "matchup", "market_label", "pick", "line", "projected", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "implied_probability", "why"],
             "rows": table_rows,
         },
         "chart": {
@@ -1678,7 +1731,7 @@ def _hockey_prop_analysis_views(candidates: list[dict[str, Any]], preferences: d
         "title": "Top hockey prop targets",
         "table": {
             "title": "Top hockey prop targets",
-            "columns": ["rank", "label", "matchup", "market_label", "pick", "line", "live_projection", "odds", "score", "market_fit_score", "why"],
+            "columns": ["rank", "label", "matchup", "market_label", "pick", "line", "live_projection", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "why"],
             "rows": table_rows,
         },
         "chart": {
@@ -1721,7 +1774,7 @@ def _comparison_analysis_views(candidates: list[dict[str, Any]], preferences: di
         "title": "Target comparison",
         "table": {
             "title": "Side-by-side comparison",
-            "columns": ["rank", "subject", "sport", "matchup", "market", "pick", "line", "odds", "confidence", "score", "market_fit_score", "why"],
+            "columns": ["rank", "subject", "sport", "matchup", "market", "pick", "line", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "why"],
             "rows": table_rows,
         },
         "chart": {
@@ -4332,6 +4385,76 @@ def _frontend_portfolio(recommendations: list[dict[str, Any]]) -> dict[str, Any]
     }
 
 
+def get_top_live_opportunities(
+    recommendations: list[dict[str, Any]],
+    *,
+    limit: int = 5,
+    improving_only: bool = False,
+) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for recommendation in recommendations:
+        if not isinstance(recommendation, dict):
+            continue
+        ev_current = _numeric_hint(
+            recommendation.get("ev_current")
+            or recommendation.get("expected_value")
+            or recommendation.get("expectedValue")
+            or recommendation.get("ev")
+        )
+        if ev_current is None or ev_current <= 0:
+            continue
+        ev_delta = _numeric_hint(
+            recommendation.get("ev_delta")
+            or recommendation.get("evDelta")
+            or recommendation.get("expected_value_delta")
+            or recommendation.get("expectedValueDelta")
+            or recommendation.get("expected_value_change")
+            or recommendation.get("expectedValueChange")
+        )
+        if improving_only and (ev_delta is None or ev_delta <= 0):
+            continue
+        line_movement_impact = _numeric_hint(
+            recommendation.get("line_movement_impact")
+            or recommendation.get("lineMovementImpact")
+            or recommendation.get("line_move")
+            or recommendation.get("lineMove")
+        )
+        candidates.append(
+            {
+                "selection": _safe_text(recommendation.get("selection") or recommendation.get("pick") or recommendation.get("name"), "Play"),
+                "sport": _safe_text(recommendation.get("sport"), "Sport"),
+                "sport_slug": _safe_text(recommendation.get("sport_slug") or recommendation.get("sport"), "sport").lower(),
+                "market": _safe_text(recommendation.get("market") or recommendation.get("market_key"), "Market"),
+                "odds_open": recommendation.get("odds_open") or recommendation.get("odds"),
+                "odds_current": recommendation.get("odds_current") or recommendation.get("odds"),
+                "ev_open": _numeric_hint(recommendation.get("ev_open") or recommendation.get("expected_value_open")),
+                "ev_current": ev_current,
+                "ev_delta": ev_delta,
+                "line_movement_impact": line_movement_impact,
+                "confidence": _numeric_hint(recommendation.get("confidence")),
+                "edge": _numeric_hint(recommendation.get("edge")),
+                "adjusted_score": _numeric_hint(recommendation.get("adjusted_score") or recommendation.get("score")),
+                "reasoning": recommendation.get("reasoning") or recommendation.get("reasoning_text") or recommendation.get("summary") or recommendation.get("rationale"),
+                "movement_label": (
+                    "Edge improving" if (ev_delta is not None and ev_delta > 0)
+                    else "Edge softening" if (ev_delta is not None and ev_delta < 0)
+                    else None
+                ),
+            }
+        )
+
+    candidates.sort(
+        key=lambda item: (
+            float(item.get("ev_current") or 0.0),
+            float(item.get("ev_delta") or 0.0),
+            float(item.get("adjusted_score") or 0.0),
+            float(item.get("confidence") or 0.0),
+        ),
+        reverse=True,
+    )
+    return candidates[: max(0, int(limit))]
+
+
 def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     generated_parlays = _build_parlays(
         recommendations,
@@ -4354,7 +4477,33 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
             "correlation_score": correlation_profile.get("max_correlation") if correlation_profile else None,
         }
 
-    pick_payloads = [_frontend_pick(candidate) for candidate in recommendations]
+    def _frontend_recommendation(candidate: dict[str, Any]) -> dict[str, Any]:
+        recommendation = dict(candidate)
+        if not _safe_text(recommendation.get("rationale"), ""):
+            rationale = recommendation.get("reasoning_text") or recommendation.get("summary") or recommendation.get("writeup")
+            if rationale:
+                recommendation["rationale"] = rationale
+        if not recommendation.get("advanced_inputs") and recommendation.get("advanced_context"):
+            recommendation["advanced_inputs"] = recommendation.get("advanced_context")
+        if recommendation.get("advanced_ready") is None and isinstance(recommendation.get("advanced_gate"), dict):
+            recommendation["advanced_ready"] = bool(recommendation.get("advanced_gate", {}).get("ready"))
+        if recommendation.get("advanced_inputs") or recommendation.get("advanced_context") or recommendation.get("advanced_ready"):
+            rationale_text = _safe_text(recommendation.get("rationale"), "")
+            if rationale_text and "advanced drivers in play" not in rationale_text.lower():
+                recommendation["rationale"] = f"Advanced drivers in play. {rationale_text}"
+        return recommendation
+
+    ordered_recommendations = sorted(
+        [dict(candidate) for candidate in recommendations],
+        key=lambda item: (
+            _numeric_hint(item.get("adjusted_score") or item.get("score") or item.get("source_summary_score") or item.get("edge")) or 0.0,
+            _numeric_hint(item.get("expected_value") or item.get("ev_current") or item.get("ev")) or 0.0,
+            _numeric_hint(item.get("confidence")) or 0.0,
+        ),
+        reverse=True,
+    )
+    pick_payloads = [_frontend_pick(candidate) for candidate in ordered_recommendations]
+    recommendation_payloads = [_frontend_recommendation(candidate) for candidate in ordered_recommendations]
     movement_deltas = [float(item.get("edge_delta")) for item in pick_payloads if item.get("edge_delta") is not None]
     movement_edge_delta = round(sum(movement_deltas) / float(len(movement_deltas)), 4) if movement_deltas else None
     if movement_edge_delta is None:
@@ -4367,8 +4516,10 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
         movement_trend = "flat"
 
     response = {
+        "recommendations": recommendation_payloads,
         "picks": pick_payloads,
-        "portfolio": _frontend_portfolio(recommendations),
+        "top_live_opportunities": get_top_live_opportunities(ordered_recommendations, limit=5),
+        "portfolio": _frontend_portfolio(ordered_recommendations),
         "parlays": [_frontend_parlay(parlay) for parlay in generated_parlays],
         "movement": {
             "edge_delta": movement_edge_delta,
@@ -5406,6 +5557,34 @@ def _has_mlb_home_run_candidates(candidates: list[dict[str, Any]]) -> bool:
         _safe_text(candidate.get("sport_slug"), "").lower() == "mlb" and "home_runs" in _candidate_market_focuses(candidate)
         for candidate in candidates
     )
+
+
+def collect_all_recommendations(*, selected_date: str | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
+    response = run_intelligence_query(
+        "top edges today",
+        selected_date=selected_date,
+        force_refresh=force_refresh,
+    )
+    recommendations = response.get("recommendations") if isinstance(response, dict) else []
+    if not isinstance(recommendations, list):
+        return []
+    return [dict(recommendation) for recommendation in recommendations if isinstance(recommendation, dict)]
+
+
+def rank_global_recommendations(recommendations: list[dict[str, Any]], *, limit: int | None = None) -> list[dict[str, Any]]:
+    ranked = sorted(
+        [dict(recommendation) for recommendation in recommendations if isinstance(recommendation, dict)],
+        key=lambda recommendation: (
+            float(recommendation.get("adjusted_score") or recommendation.get("score") or recommendation.get("rank_score") or 0.0),
+            float(recommendation.get("ev_current") or recommendation.get("expected_value") or recommendation.get("ev") or 0.0),
+            float(recommendation.get("ev_delta") or 0.0),
+            float(recommendation.get("confidence") or 0.0),
+        ),
+        reverse=True,
+    )
+    if limit is None:
+        return ranked
+    return ranked[: max(int(limit), 0)]
 
 
 def run_intelligence_query(

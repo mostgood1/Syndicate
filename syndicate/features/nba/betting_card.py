@@ -13,6 +13,62 @@ from syndicate.features.nba.sources import season_betting_card_day_path
 from syndicate.features.nba.sources import season_betting_card_manifest_path
 
 
+def _safe_float(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace(",", "")
+    if not text:
+        return None
+    try:
+        return float(text)
+    except Exception:
+        return None
+
+
+def _safe_probability(value: Any) -> float | None:
+    probability = _safe_float(value)
+    if probability is None:
+        return None
+    if probability > 1.0:
+        probability /= 100.0
+    if probability < 0.0:
+        return None
+    return max(0.0, min(1.0, probability))
+
+
+def _enrich_recommendation_like_payload(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        enriched = {key: _enrich_recommendation_like_payload(value) for key, value in payload.items()}
+        if any(key in enriched for key in ("recommendation_id", "pick", "selection", "name")) and any(key in enriched for key in ("odds", "score", "line", "projected", "live_projection")):
+            historical_context = enriched.get("historical_context") if isinstance(enriched.get("historical_context"), dict) else {"roi_segment": None, "sample_size": None}
+            if "expected_value" not in enriched:
+                enriched["expected_value"] = _safe_float(enriched.get("expected_value"))
+            if "edge_pct" not in enriched:
+                edge_value = _safe_float(enriched.get("edge"))
+                enriched["edge_pct"] = round(edge_value * 100.0, 2) if edge_value is not None else None
+            if "confidence" not in enriched:
+                enriched["confidence"] = _safe_probability(enriched.get("confidence"))
+            if "model_probability" not in enriched:
+                enriched["model_probability"] = _safe_probability(enriched.get("model_probability") or enriched.get("confidence"))
+            if "market_probability" not in enriched:
+                enriched["market_probability"] = _safe_probability(enriched.get("market_probability") or enriched.get("implied_probability"))
+            enriched["historical_context"] = historical_context
+            if "reasoning" not in enriched:
+                reasoning = enriched.get("reasoning_text") or enriched.get("rationale") or enriched.get("why")
+                if isinstance(reasoning, list):
+                    enriched["reasoning"] = reasoning
+                elif reasoning:
+                    enriched["reasoning"] = [str(reasoning)]
+                else:
+                    enriched["reasoning"] = []
+        return enriched
+    if isinstance(payload, list):
+        return [_enrich_recommendation_like_payload(item) for item in payload]
+    return payload
+
+
 def _artifact_root() -> Path:
     env_value = str(os.environ.get("SYNDICATE_NBA_ARTIFACT_ROOT") or "").strip()
     if env_value:
@@ -86,7 +142,7 @@ def build_season_betting_card_manifest_payload(season: int, profile: str, select
     )
     if not isinstance(payload, dict):
         return None
-    return _normalize_payload_routes(payload, selected_date)
+    return _enrich_recommendation_like_payload(_normalize_payload_routes(payload, selected_date))
 
 
 @lru_cache(maxsize=256)
@@ -107,7 +163,7 @@ def build_season_betting_card_day_payload(
     )
     if not isinstance(payload, dict):
         return None
-    return _normalize_payload_routes(payload, date_str)
+    return _enrich_recommendation_like_payload(_normalize_payload_routes(payload, date_str))
 
 
 @lru_cache(maxsize=1)

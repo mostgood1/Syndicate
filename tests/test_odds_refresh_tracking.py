@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from syndicate.features.shared.odds_refresh_tracking import sync_post_refresh_tracking_for_source_root
+from syndicate.features.shared.odds_refresh_tracking import refresh_impacted_recommendations_for_tracking
 
 
 class OddsRefreshTrackingTests(unittest.TestCase):
@@ -138,6 +139,64 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             manifest_path = Path(result["artifacts"]["source_manifest"]["manifest_path"])
             self.assertTrue(manifest_path.exists())
+
+    def test_refresh_impacted_recommendations_updates_only_matching_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            processed_root = root / "data" / "processed"
+            tracking_root = root / "tracking"
+            processed_root.mkdir(parents=True)
+            tracking_root.mkdir(parents=True)
+
+            signals_path = tracking_root / "odds_nba_player_props_movement_signals_2026-06-07.csv"
+            signals_path.write_text(
+                "event_id,player_name,market,selection,line_move,implied_move\n"
+                "game-1,Player One,points,Over 28.5,0.8,0.03\n",
+                encoding="utf-8",
+            )
+            recommendation_path = processed_root / "recommendations_slate_2026-06-07.json"
+            recommendation_path.write_text(
+                json.dumps(
+                    {
+                        "data": [
+                            {
+                                "event_id": "game-1",
+                                "sport": "nba",
+                                "market": "points",
+                                "selection": "Over 28.5",
+                                "score": 86.0,
+                                "simulation": {"probability_distributions": {"win": 0.64, "loss": 0.36}},
+                            },
+                            {
+                                "event_id": "game-2",
+                                "sport": "nba",
+                                "market": "moneyline",
+                                "selection": "Home",
+                                "score": 81.0,
+                                "model_probability": 0.52,
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = refresh_impacted_recommendations_for_tracking(
+                sport="nba",
+                source_root=root,
+                date_str="2026-06-07",
+                tracking_meta={"signals_path": str(signals_path)},
+            )
+
+            payload = json.loads(recommendation_path.read_text(encoding="utf-8"))
+            rows = payload["data"]
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["files_updated"], 1)
+            self.assertEqual(result["rows_updated"], 1)
+            self.assertEqual(rows[0]["model_probability"], 0.64)
+            self.assertEqual(rows[1]["model_probability"], 0.52)
+            self.assertIn("lightweight_refresh", payload)
 
 
 if __name__ == "__main__":

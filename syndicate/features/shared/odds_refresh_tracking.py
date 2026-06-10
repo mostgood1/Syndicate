@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import pandas as pd
 
 from syndicate.features.shared.basketball_props_tracking import sync_basketball_props_tracking_for_source_root
+from syndicate.features.shared.recommendation_engine import build_recommendation_output
 
 
 def _utc_now() -> str:
@@ -37,11 +38,222 @@ def _write_json(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _read_json_payload(path: Path) -> Any:
+    try:
+        if not path.exists():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 def _choose_existing(candidates: list[Path]) -> Path | None:
     for candidate in candidates:
         if candidate.exists():
             return candidate
     return None
+
+
+def _movement_signal_paths_from_meta(meta: Mapping[str, Any] | None) -> list[Path]:
+    paths: list[Path] = []
+    if not isinstance(meta, Mapping):
+        return paths
+    direct_path = meta.get("signals_path") or meta.get("movement_path")
+    if isinstance(direct_path, str) and direct_path.strip():
+        paths.append(Path(direct_path).expanduser())
+    artifacts = meta.get("artifacts")
+    if isinstance(artifacts, Mapping):
+        for artifact in artifacts.values():
+            if not isinstance(artifact, Mapping):
+                continue
+            for key in ("signals_path", "movement_path"):
+                value = artifact.get(key)
+                if isinstance(value, str) and value.strip():
+                    paths.append(Path(value).expanduser())
+    unique_paths: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        normalized = str(path.resolve()) if path.exists() else str(path)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_paths.append(path)
+    return unique_paths
+
+
+def _normalize_signal_token(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return text
+
+
+def _candidate_signal_tokens(row: Mapping[str, Any]) -> set[str]:
+    tokens: set[str] = set()
+    for key in (
+        "event_key",
+        "event_id",
+        "game_id",
+        "game_pk",
+        "matchup",
+        "subject_key",
+        "player_name",
+        "player_key",
+        "team",
+        "team_key",
+        "market",
+        "selection",
+        "name",
+    ):
+        token = _normalize_signal_token(row.get(key))
+        if token:
+            tokens.add(token)
+    return tokens
+
+
+def _payload_rows(payload: Any) -> tuple[list[dict[str, Any]], str]:
+    if isinstance(payload, list):
+        return [dict(row) for row in payload if isinstance(row, Mapping)], "list"
+    if isinstance(payload, dict):
+        for key in ("data", "recommendations", "rows", "items"):
+            rows = payload.get(key)
+            if isinstance(rows, list):
+                return [dict(row) for row in rows if isinstance(row, Mapping)], key
+    return [], ""
+
+
+def _update_payload_rows(payload: Any, rows: list[dict[str, Any]], container_key: str) -> Any:
+    if isinstance(payload, list):
+        return rows
+    if isinstance(payload, dict) and container_key:
+        updated = dict(payload)
+        updated[container_key] = rows
+        return updated
+    return payload
+
+
+def _recommendation_paths_for_refresh(*, source_root: Path, sport: str, date_str: str) -> list[Path]:
+    candidates = [
+        source_root / "data" / "processed" / f"recommendations_slate_{date_str}.json",
+        source_root / "data" / "processed" / f"props_recommendations_top_by_game_{date_str}.json",
+        source_root / "data" / "processed" / f"recommendations_{date_str}.json",
+        source_root / "api" / "recommendations" / f"recommendations_{date_str}.json",
+        source_root / "data" / "api" / "recommendations" / f"recommendations_{date_str}.json",
+        source_root / "source_artifacts" / "api" / "recommendations" / f"recommendations_{date_str}.json",
+    ]
+    if sport in {"nba", "wnba"}:
+        candidates.extend(
+            [
+                source_root / "data" / "processed" / f"recommendations_slate_{date_str}.json",
+                source_root / "data" / "processed" / f"props_recommendations_top_by_game_{date_str}.json",
+            ]
+        )
+    unique_candidates: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = str(candidate.resolve()) if candidate.exists() else str(candidate)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        if candidate.exists():
+            unique_candidates.append(candidate)
+    return unique_candidates
+
+
+def refresh_impacted_recommendations_for_tracking(*, sport: str, source_root: Path, date_str: str, tracking_meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    signal_paths = _movement_signal_paths_from_meta(tracking_meta)
+    if not signal_paths:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "no_movement_signals",
+            "files_updated": 0,
+            "rows_updated": 0,
+            "signals_rows": 0,
+        }
+
+    signal_tokens: set[str] = set()
+    signals_rows = 0
+    for path in signal_paths:
+        try:
+            frame = pd.read_csv(path)
+        except Exception:
+            continue
+        if frame.empty:
+            continue
+        if "movement_signals" not in path.name:
+            candidate_mask = pd.Series(False, index=frame.index)
+            if "movement_significant" in frame.columns:
+                candidate_mask = candidate_mask | frame["movement_significant"].fillna(False).astype(bool)
+            if "line_move" in frame.columns:
+                candidate_mask = candidate_mask | pd.to_numeric(frame["line_move"], errors="coerce").abs().fillna(0.0).ge(0.5)
+            if "implied_move" in frame.columns:
+                candidate_mask = candidate_mask | pd.to_numeric(frame["implied_move"], errors="coerce").abs().fillna(0.0).ge(0.02)
+            if "price_move" in frame.columns:
+                candidate_mask = candidate_mask | pd.to_numeric(frame["price_move"], errors="coerce").abs().fillna(0.0).ge(10.0)
+            frame = frame.loc[candidate_mask].copy()
+        if frame.empty:
+            continue
+        signals_rows += int(len(frame))
+        for _, row in frame.iterrows():
+            signal_tokens.update(_candidate_signal_tokens(row))
+
+    if not signal_tokens:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "no_signal_tokens",
+            "files_updated": 0,
+            "rows_updated": 0,
+            "signals_rows": int(signals_rows),
+        }
+
+    files_updated = 0
+    rows_updated = 0
+    updated_files: list[str] = []
+    recommendation_paths = _recommendation_paths_for_refresh(source_root=source_root, sport=sport, date_str=date_str)
+    for recommendation_path in recommendation_paths:
+        payload = _read_json_payload(recommendation_path)
+        rows, container_key = _payload_rows(payload)
+        if not rows:
+            continue
+
+        changed = False
+        for index, row in enumerate(rows):
+            row_tokens = _candidate_signal_tokens(row)
+            if not row_tokens or signal_tokens.isdisjoint(row_tokens):
+                continue
+            rows[index] = build_recommendation_output(row, sport=sport)
+            changed = True
+            rows_updated += 1
+
+        if not changed:
+            continue
+
+        updated_payload = _update_payload_rows(payload, rows, container_key)
+        if isinstance(updated_payload, dict):
+            updated_payload["lightweight_refresh"] = {
+                "sport": sport,
+                "date": date_str,
+                "updated_at": _utc_now(),
+                "signals_rows": int(signals_rows),
+                "rows_updated": int(rows_updated),
+            }
+        _write_json(recommendation_path, updated_payload)
+        files_updated += 1
+        try:
+            updated_files.append(str(recommendation_path.relative_to(source_root)))
+        except Exception:
+            updated_files.append(str(recommendation_path))
+
+    return {
+        "ok": True,
+        "skipped": False,
+        "reason": None,
+        "files_updated": int(files_updated),
+        "rows_updated": int(rows_updated),
+        "signals_rows": int(signals_rows),
+        "signal_paths": [str(path) for path in signal_paths],
+        "updated_files": updated_files,
+    }
 
 
 def _coalesce_series(df: pd.DataFrame, candidates: list[str], default: Any = "") -> pd.Series:
@@ -389,7 +601,16 @@ def _infer_nfl_week_scope(source_root: Path) -> tuple[str, Path | None]:
 def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str: str) -> dict[str, Any]:
     slug = str(sport or "").strip().lower()
     if slug in {"nba", "wnba"}:
-        return sync_basketball_props_tracking_for_source_root(sport=slug, source_root=source_root, date_str=date_str)
+        results = sync_basketball_props_tracking_for_source_root(sport=slug, source_root=source_root, date_str=date_str)
+        if bool(results.get("ok")):
+            results["artifacts"] = dict(results.get("artifacts") or {})
+            results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
+                sport=slug,
+                source_root=source_root,
+                date_str=date_str,
+                tracking_meta=results,
+            )
+        return results
 
     tracking_root = source_root / "tracking"
     results: dict[str, Any] = {"ok": True, "sport": slug, "date": date_str, "tracking_root": str(tracking_root), "artifacts": {}}
@@ -417,6 +638,12 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             key_cols=["event_key", "book", "market", "selection"],
             line_col="line",
             price_cols=["price"],
+        )
+        results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
+            sport=slug,
+            source_root=source_root,
+            date_str=date_str,
+            tracking_meta=results,
         )
         return results
 
@@ -446,6 +673,12 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             key_cols=["event_key", "market", "selection"],
             line_col="line",
             price_cols=["price"],
+        )
+        results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
+            sport=slug,
+            source_root=source_root,
+            date_str=date_str,
+            tracking_meta=results,
         )
         return results
 
@@ -484,6 +717,12 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             line_col="line",
             price_cols=["price"],
         )
+        results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
+            sport=slug,
+            source_root=source_root,
+            date_str=date_str,
+            tracking_meta=results,
+        )
         return results
 
     if slug == "ncaab":
@@ -499,6 +738,12 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             key_cols=["event_key", "book", "market", "selection"],
             line_col="line",
             price_cols=["price"],
+        )
+        results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
+            sport=slug,
+            source_root=source_root,
+            date_str=date_str,
+            tracking_meta=results,
         )
         return results
 
@@ -521,6 +766,12 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             "manifest_path": str(manifest_path),
             "predicted_totals_files": len(latest_predicted),
         }
+        results["artifacts"]["recommendations_refresh"] = refresh_impacted_recommendations_for_tracking(
+            sport=slug,
+            source_root=source_root,
+            date_str=date_str,
+            tracking_meta=results,
+        )
         return results
 
     return {"ok": False, "sport": slug, "date": date_str, "error": f"unsupported_sport:{slug}"}

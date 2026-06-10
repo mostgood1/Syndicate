@@ -35,7 +35,7 @@ def build_hockey_prop_analysis_views(
         "title": "Top hockey prop targets",
         "table": {
             "title": "Top hockey prop targets",
-            "columns": ["rank", "label", "matchup", "market_label", "pick", "line", "live_projection", "odds", "score", "market_fit_score", "why"],
+            "columns": ["rank", "label", "matchup", "market_label", "pick", "line", "live_projection", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "why"],
             "rows": table_rows,
         },
         "chart": {

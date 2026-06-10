@@ -94,7 +94,7 @@ def build_wnba_matchup_analysis_views(
         "title": "Top WNBA matchup targets",
         "table": {
             "title": "Top WNBA matchup-backed targets",
-            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "score", "market_fit_score", "analysis_shape", "team_environment_signal", "possession_profile_signal", "matchup_pressure_signal", "rotation_pressure_signal", "live_shift_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
+            "columns": ["rank", "label", "matchup", "market", "pick", "line", "projected", "odds", "expected_value", "edge_pct", "confidence", "model_probability", "market_probability", "historical_context", "reasoning", "score", "market_fit_score", "analysis_shape", "team_environment_signal", "possession_profile_signal", "matchup_pressure_signal", "rotation_pressure_signal", "live_shift_signal", "last5_delta_signal", "last10_delta_signal", "last_game_delta_signal", "workload_delta_signal", "why"],
             "rows": table_rows,
         },
         "chart": {
