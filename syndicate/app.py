@@ -21,9 +21,8 @@ def create_app() -> Flask:
         static_folder="static",
     )
 
-    app.config.setdefault(
-        "SYNDICATE_SPORTS",
-        [
+    if not app.config.get("SYNDICATE_SPORTS"):
+        app.config["SYNDICATE_SPORTS"] = [
             {
                 "slug": "mlb",
                 "name": "MLB",
@@ -143,8 +142,7 @@ def create_app() -> Flask:
                     "fallback_surfaces": [],
                 },
             },
-        ],
-    )
+        ]
 
     @app.context_processor
     def inject_syndicate_sports() -> dict[str, object]:

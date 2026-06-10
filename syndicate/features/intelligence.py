@@ -2077,6 +2077,8 @@ def _query_preferences(
     lowered = str(question or "").lower()
     explicit_mode = str(mode or "").strip().lower()
     explicit_sport = str(sport or "").strip().lower()
+    if explicit_sport in {"all", "any", "everything", "*"}:
+        explicit_sport = ""
     explicit_timing = str(timing or "").strip().lower()
     explicit_include_props = include_props
     explicit_include_games = include_games
@@ -3987,6 +3989,7 @@ def _greedy_low_correlation_selection(
 
 
 def _candidate_confidence(candidate: dict[str, Any]) -> float:
+    source_confidence = _pct_hint(candidate.get("confidence"))
     relevant_signals = [signal for signal in _relevant_advanced_signals(candidate) if isinstance(signal, dict)]
     signal_count = len(relevant_signals)
     direction_votes: list[int] = []
@@ -4017,6 +4020,8 @@ def _candidate_confidence(candidate: dict[str, Any]) -> float:
 
     signal_count_factor = min(1.0, float(signal_count) / 6.0)
     confidence = 0.20 + (signal_count_factor * 0.35) + (agreement * 0.30) + (readiness_ratio * 0.20) - missing_penalty
+    if source_confidence is not None:
+        confidence = max(confidence, float(source_confidence) / 100.0)
     return round(max(0.0, min(1.0, confidence)), 2)
 
 

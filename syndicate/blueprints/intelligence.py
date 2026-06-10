@@ -438,26 +438,6 @@ def intelligence_query_api():
                 },
             }
             return jsonify(_versioned_query_response(cached_response))
-        empty_response = {
-            "ok": True,
-            "top_opportunities": [],
-            "by_sport": {},
-            "analysis": {
-                "recommendations": [],
-                "picks": [],
-                "portfolio": {},
-                "parlays": [],
-                "top_live_opportunities": [],
-            },
-            "response": {
-                "recommendations": [],
-                "picks": [],
-                "portfolio": {},
-                "parlays": [],
-                "top_live_opportunities": [],
-            },
-        }
-        return jsonify(_versioned_query_response(empty_response))
 
     top_opportunities = rank_global_recommendations(
         collect_all_recommendations(force_refresh=force_refresh),
@@ -546,7 +526,7 @@ def intelligence_query_warm_api():
 
     app = current_app._get_current_object()
     warm_payload = dict(payload)
-    warm_payload["force_refresh"] = True
+    warm_payload["force_refresh"] = False
     thread = threading.Thread(target=_warm_intelligence_query_cache, args=(app, warm_payload), daemon=True)
     thread.start()
     return jsonify({"ok": True, "queued": True})

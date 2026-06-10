@@ -1027,6 +1027,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                                     json={
                                         "question": "Analyze Jayson Tatum tonight",
                                         "date": "2026-06-04",
+                                        "force_refresh": True,
                                     },
                                 )
 
@@ -1039,6 +1040,37 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(reliability_items)
         self.assertLess(structured.get("confidence") or 0.0, 0.72)
         self.assertTrue(any("calibration" in note.lower() for note in structured.get("risks") or []))
+
+    def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
+        advanced_rows = [
+            {
+                "label": "Team advanced stats",
+                "metrics": ["Pace", "Offensive rating", "Shot profile"],
+                "path": "data/nba_source/data/processed/team_advanced_stats_2026.csv",
+                "exists": True,
+                "tracked": True,
+                "inside_repo": True,
+            }
+        ]
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=advanced_rows):
+                    with patch("syndicate.features.intelligence.load_artifact_manifests", return_value=[]):
+                        response = self.client.post(
+                            "/api/intelligence/query",
+                            json={
+                                "question": "What are the best live bets?",
+                                "date": "2026-06-04",
+                                "force_refresh": True,
+                            },
+                        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        result = payload.get("response") or {}
+        self.assertTrue(result.get("recommendations"))
+        self.assertGreater(len(result.get("recommendations") or []), 0)
+        self.assertTrue((result.get("structured_response") or {}).get("summary"))
 
     def test_intelligence_query_api_resolves_preview_date_and_preserves_contract(self) -> None:
         advanced_rows = [

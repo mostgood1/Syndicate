@@ -1,6 +1,6 @@
 {
   "date": "2026-06-10",
-  "generatedAt": "2026-06-10T13:51:44-05:00",
+  "generatedAt": "2026-06-10T14:45:09-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -16,20 +16,20 @@
   },
   "counts": {
     "games": 15,
-    "live": 2,
+    "live": 3,
     "final": 0,
-    "pregame": 13,
+    "pregame": 12,
     "props": 57,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 2.2,
-    "totalMs": 1423.4,
-    "snapshotLoadMs": 2.0,
-    "simContextLoadMs": 1.7,
+    "marketRefreshMs": 5.8,
+    "totalMs": 928.2,
+    "snapshotLoadMs": 1.8,
+    "simContextLoadMs": 0.7,
     "propEvalMs": 0.1,
-    "gameLensMs": 1.1,
+    "gameLensMs": 1.0,
     "gameCount": 15,
     "liveGameCount": 2,
     "feedFetchCount": 15,
@@ -57,8 +57,8 @@
           "name": "Tampa Bay Rays"
         },
         "score": {
-          "away": 0,
-          "home": 0
+          "away": 1,
+          "home": 5
         },
         "liveText": "Jake Bennett vs Drew Rasmussen | 1 official pick(s) | +1 playable"
       },
@@ -592,8 +592,8 @@
       "simContextAvailable": false,
       "snapshotAvailable": true,
       "score": {
-        "away": 0,
-        "home": 0
+        "away": 1,
+        "home": 5
       },
       "market_tiles": [
         {
@@ -989,8 +989,8 @@
           "name": "Cleveland Guardians"
         },
         "score": {
-          "away": 0,
-          "home": 1
+          "away": 6,
+          "home": 3
         },
         "liveText": "Carlos Rod\u00f3n vs Parker Messick | +5 playable"
       },
@@ -1842,8 +1842,8 @@
       "simContextAvailable": false,
       "snapshotAvailable": true,
       "score": {
-        "away": 0,
-        "home": 1
+        "away": 6,
+        "home": 3
       },
       "market_tiles": [
         {
@@ -1961,34 +1961,6 @@
               "tone": "strong",
               "detail": "Carlos Rod\u00f3n Over 17.5 Outs | Odds -105 | Edge 28.7%",
               "hitProb": 0.758
-            }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.0. Current 5.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.387,
-              "source": "live",
-              "actual": 5.0
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "strong",
-              "detail": "Live projection 4.6. Current 4.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.62,
-              "source": "live",
-              "actual": 4.0
             }
           ]
         },
@@ -2508,8 +2480,8 @@
     {
       "gamePk": 823215,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Pre-Game"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "2:45 PM",
       "matchup": {
@@ -3249,6 +3221,47 @@
               "detail": "Foster Griffin Over 16.5 Outs | Odds -112 | Edge 38.9%",
               "hitProb": 0.879
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.4. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.44,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 17",
+              "stat": "outs",
+              "target": 17,
+              "targets": [
+                17
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.3. Current 0.0. Starter still active in live game state. Supported ladders: 17 Last supported rung: 17",
+              "hitProb": 0.854,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.9. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.667,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -3302,6 +3315,48 @@
               "tone": "solid",
               "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.269
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                5,
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.2. Current 0.0. Starter still active in live game state. Supported ladders: 5/6 Last supported rung: 6",
+              "hitProb": 0.431,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 20.3. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.776,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.1. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.569,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }
@@ -6400,7 +6455,7 @@
       "gamePk": 823372,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "5:40 PM",
       "matchup": {
@@ -9614,7 +9669,7 @@
       "gamePk": 824266,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "5:40 PM",
       "matchup": {
@@ -11611,7 +11666,7 @@
       "gamePk": 823618,
       "status": {
         "abstract": "Preview",
-        "detailed": "Scheduled"
+        "detailed": "Pre-Game"
       },
       "startTime": "6:10 PM",
       "matchup": {
