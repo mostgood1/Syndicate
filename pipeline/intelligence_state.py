@@ -525,16 +525,11 @@ class IntelligenceStateService:
                 candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
                 with self._condition:
                     current_snapshot = self._snapshots.get(_payload_key(payload_to_process))
-                    if current_snapshot is not None and current_snapshot.source_fingerprint == source_fingerprint:
-                        self._latest_key = current_snapshot.key
-                        self._condition.notify_all()
-                        self._condition.wait(timeout=self._interval_seconds)
-                        continue
                 if self._app is not None:
                     with self._app.app_context():
-                        response = self._compute_response(payload_to_process)
+                        response = self._compute_response(payload_to_process, force_refresh=True)
                 else:
-                    response = self._compute_response(payload_to_process)
+                    response = self._compute_response(payload_to_process, force_refresh=True)
             except Exception as exc:
                 response = {
                     "ok": False,
@@ -560,7 +555,7 @@ class IntelligenceStateService:
                 self._condition.notify_all()
                 self._condition.wait(timeout=self._interval_seconds)
 
-    def _compute_response(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def _compute_response(self, payload: dict[str, Any], *, force_refresh: bool = False) -> dict[str, Any]:
         request_started_at = time.perf_counter()
         request_payload = dict(payload)
         question = str(request_payload.get("question") or "").strip() or "top edges today"
@@ -577,7 +572,7 @@ class IntelligenceStateService:
         candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
         with self._condition:
             snapshot = self._snapshots.get(cache_key)
-            if snapshot is not None and snapshot.source_fingerprint == source_fingerprint:
+            if not force_refresh and snapshot is not None and snapshot.source_fingerprint == source_fingerprint:
                 _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
                 return dict(snapshot.response)
 

@@ -10,6 +10,7 @@ from flask import Flask
 
 from pipeline.intelligence_state import IntelligenceSnapshot
 from pipeline.intelligence_state import IntelligenceStateService
+from pipeline.intelligence_state import _payload_key
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.intelligence import intelligence_query_api
 
@@ -137,6 +138,45 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(mocked_collect.call_count, 2)
         self.assertEqual(mocked_rank.call_count, 2)
         self.assertEqual(mocked_pipeline.call_count, 2)
+
+    def test_background_refresh_recomputes_when_snapshot_fingerprint_matches(self) -> None:
+        service = IntelligenceStateService()
+        service._interval_seconds = 0
+        payload = {"question": "top edges today", "date": "2026-06-10", "limit": 5}
+        normalized = service._normalize_payload(payload)
+        snapshot_key = _payload_key(normalized)
+
+        service._pending_keys[snapshot_key] = normalized
+        service._snapshots[snapshot_key] = IntelligenceSnapshot(
+            key=snapshot_key,
+            payload=dict(normalized),
+            response={"ok": True},
+            computed_at="2026-06-10T00:00:00Z",
+            source_fingerprint="fingerprint-1",
+        )
+        service._latest_key = snapshot_key
+
+        calls = {"count": 0}
+
+        def fake_source_fingerprint(selected_date: str | None) -> str:
+            return "fingerprint-1"
+
+        def fake_build_candidate_pool(selected_date: str | None, source_fingerprint: str) -> dict[str, object]:
+            return {"candidates": []}
+
+        def fake_compute_response(request_payload: dict[str, object]) -> dict[str, object]:
+            calls["count"] += 1
+            service._stop.set()
+            return {"ok": True}
+
+        service._source_state_fingerprint = fake_source_fingerprint
+        service._build_candidate_pool = fake_build_candidate_pool
+        service._compute_response = fake_compute_response
+        service._persist_locked = lambda: None
+
+        service._background_loop()
+
+        self.assertEqual(calls["count"], 1)
 
     def test_build_candidate_pool_skips_sports_without_manifests(self) -> None:
         service = IntelligenceStateService()
