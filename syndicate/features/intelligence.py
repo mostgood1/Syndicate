@@ -2862,7 +2862,7 @@ def _advanced_input_specs_for_sport(sport: dict[str, Any]) -> list[dict[str, Any
 def build_intelligence_status(*, selected_date: str | None = None, force_refresh: bool = False) -> dict[str, Any]:
     if force_refresh:
         _tracked_repo_files.cache_clear()
-    overview = _status_overview_rows(selected_date=selected_date)
+    overview = build_intelligence_overview(selected_date=selected_date, force_refresh=force_refresh)
     tracked = _tracked_repo_files()
     sports_status: list[dict[str, Any]] = []
     tracked_ok_count = 0
@@ -5574,6 +5574,8 @@ def run_intelligence_query(
     }
     shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
     candidates = [dict(recommendation) for recommendation in shared_recommendations]
+    if not candidates:
+        candidates = collect_candidates(overview, preferences)
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}

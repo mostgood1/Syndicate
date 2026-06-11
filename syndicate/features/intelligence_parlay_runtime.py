@@ -356,34 +356,16 @@ def build_parlays(
     smart_max_leg_count = max(2, min(3, max_leg_count))
     if smart_min_leg_count > smart_max_leg_count:
         smart_min_leg_count, smart_max_leg_count = smart_max_leg_count, smart_min_leg_count
+    same_game_parlay = _safe_text(resolved_preferences.get("parlay_type"), "standard") == "same_game"
 
     ranked_pool = sorted(candidate_pool, key=_candidate_portfolio_score, reverse=True)
-    seed_window = ranked_pool[: max(6, min(len(ranked_pool), limit * 2 + 4))]
-    for seed in seed_window:
-        for target_leg_count in range(smart_min_leg_count, smart_max_leg_count + 1):
-            group = [seed]
-            available = [candidate for candidate in ranked_pool if candidate is not seed]
-            while len(group) < target_leg_count and available:
-                best_next = None
-                best_next_score = float("-inf")
-                for candidate in available:
-                    trial = tuple(group + [candidate])
-                    if not parlay_matches_preferences_fn(trial, resolved_preferences):
-                        continue
-                    if not _parlay_is_low_correlation(trial, correlation_threshold):
-                        continue
-                    trial_score = _candidate_portfolio_score(candidate)
-                    trial_score -= sum(abs(_candidate_correlation_score(candidate, existing)) for existing in group) * 0.9
-                    if trial_score > best_next_score:
-                        best_next_score = trial_score
-                        best_next = candidate
-                if best_next is None:
-                    break
-                group.append(best_next)
-                available = [candidate for candidate in available if candidate is not best_next]
-            if len(group) != target_leg_count:
+    search_window = ranked_pool[: max(8, min(len(ranked_pool), limit * 3 + 5))]
+    for target_leg_count in range(smart_min_leg_count, smart_max_leg_count + 1):
+        for legs in combinations(search_window, target_leg_count):
+            if not parlay_matches_preferences_fn(legs, resolved_preferences):
                 continue
-            legs = tuple(group)
+            if not same_game_parlay and not _parlay_is_low_correlation(legs, correlation_threshold):
+                continue
             identity = tuple(sorted(parlay_identity(leg) for leg in legs))
             if identity in seen:
                 continue

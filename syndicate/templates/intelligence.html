@@ -4,6 +4,21 @@
 {% block page_title %}Intelligence{% endblock %}
 
 {% block content %}
+<section style="max-width:1200px; margin:auto; margin-bottom:18px;">
+  <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10); border-radius:16px; padding:16px 18px; color:#e5e7eb;">
+    <div>
+      <div style="opacity:.72; text-transform:uppercase; letter-spacing:.04em; font-size:11px;">Initial board</div>
+      <div style="font-size:18px; font-weight:700; margin-top:4px;">Prompt The Syndicate</div>
+      <div style="opacity:.72; font-size:13px; margin-top:4px;">Portfolio summary and live recommendations load from the routed intelligence response.</div>
+    </div>
+    <form id="intel-query-form" style="display:flex; gap:10px; align-items:center; margin:0;">
+      <a href="/intelligence/status" style="color:#dbeafe; text-decoration:none; font-size:13px; opacity:.9;">View data coverage page</a>
+      <button type="submit" style="appearance:none; border:none; border-radius:999px; padding:10px 16px; background:linear-gradient(135deg, #7c3aed, #2563eb); color:white; font-weight:700; cursor:pointer;">Prompt The Syndicate</button>
+    </form>
+  </div>
+  <script id="initial-intelligence-response" type="application/json">{{ initial_intelligence_response | default({}) | tojson }}</script>
+</section>
+
 <section style="max-width:1200px; margin:auto; margin-bottom:20px;">
   <div id="intelligence-refresh-status" style="margin-bottom:10px;"></div>
   <div id="intelligence-board-summary" style="margin-bottom:10px;"></div>
@@ -173,6 +188,29 @@ function renderUpdatedLine(item) {
   return updatedAt
     ? `<div style="font-size:11px; opacity:.62; margin-top:6px;">Updated ${updatedAt}</div>`
     : "";
+}
+
+function renderSupportingEvidence(response) {
+  const data = response && typeof response === "object" ? response : {};
+  const headline = String(data.headline || data.summary || "").trim();
+  const summary = String(data.summary || "").trim();
+  const portfolio = data.portfolio && typeof data.portfolio === "object" ? data.portfolio : {};
+  const evidenceBits = [];
+  if (headline) {
+    evidenceBits.push(`<div style="font-size:18px; font-weight:700; margin-bottom:6px;">${escapeHtml(headline)}</div>`);
+  }
+  if (summary) {
+    evidenceBits.push(`<div style="opacity:.82; line-height:1.45;">${escapeHtml(summary)}</div>`);
+  }
+  evidenceBits.push(`<div style="margin-top:10px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Portfolio summary</div>`);
+  evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
+    [
+      portfolio.total_exposure !== undefined && portfolio.total_exposure !== null && portfolio.total_exposure !== "" ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Exposure ${escapeHtml(portfolio.total_exposure)}</span>` : "",
+      portfolio.risk_label ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">${escapeHtml(portfolio.risk_label)}</span>` : "",
+      portfolio.diversification_score !== undefined && portfolio.diversification_score !== null && portfolio.diversification_score !== "" ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Diversification ${escapeHtml(portfolio.diversification_score)}</span>` : "",
+    ].filter(Boolean).join("") +
+    `</div>`);
+  return evidenceBits.join("");
 }
 
 function displayTeam(item) {
@@ -708,6 +746,14 @@ function renderIntelligence(response) {
   }
 
   const data = normalizeIntelligenceResponse(response);
+  const initialEvidenceEl = document.getElementById("top-opportunities");
+  if (initialEvidenceEl) {
+    initialEvidenceEl.innerHTML = `
+      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
+        ${renderSupportingEvidence(data)}
+      </div>
+    `;
+  }
 
   // ===== PORTFOLIO =====
   const portfolio = data.portfolio || {};

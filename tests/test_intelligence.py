@@ -760,6 +760,32 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         app = create_app()
         app.config.update(TESTING=True)
         self.client = app.test_client()
+        self._shared_recommendations_patcher = patch(
+            "syndicate.features.intelligence.collect_all_recommendations",
+            return_value=[],
+        )
+        self._shared_recommendations_patcher.start()
+        self._artifact_manifests_patcher = patch(
+            "syndicate.features.intelligence.load_artifact_manifests",
+            return_value=[],
+        )
+        self._artifact_manifests_patcher.start()
+        self._reliability_profile_patcher = patch(
+            "syndicate.features.shared.intelligence_evaluation.build_reliability_profile",
+            return_value={"sample_size": 0, "metrics": {}},
+        )
+        self._reliability_profile_patcher.start()
+        self._simulation_patcher = patch(
+            "syndicate.features.simulation_engine.SimulationEngine.run_simulation",
+            return_value={},
+        )
+        self._simulation_patcher.start()
+
+    def tearDown(self) -> None:
+        self._shared_recommendations_patcher.stop()
+        self._artifact_manifests_patcher.stop()
+        self._reliability_profile_patcher.stop()
+        self._simulation_patcher.stop()
 
     def test_query_preferences_parses_exact_parlay_leg_count(self) -> None:
         preferences = _query_preferences("Build me a four-leg parlay from the best NBA edges")

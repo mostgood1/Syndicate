@@ -8,9 +8,14 @@ from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
 
+from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from syndicate.features.intelligence import build_intelligence_status
+from syndicate.features.intelligence import _market_focus_labels
+from syndicate.features.intelligence import _parlay_request_summary
+from syndicate.features.intelligence import _query_preferences
+from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
@@ -111,6 +116,60 @@ def _unwrap_response_payload(payload: dict[str, object] | None) -> dict[str, obj
     ):
         current = dict(current.get("response") or {})
     return current
+
+
+def _board_headline_for_question(question: str, response_payload: dict[str, object]) -> str | None:
+    headline = str(response_payload.get("headline") or "").strip()
+    if headline:
+        return headline
+
+    preferences: dict[str, object] = {}
+    try:
+        preferences = _query_preferences(question)
+    except Exception:
+        preferences = {}
+
+    intent = str(preferences.get("intent") or response_payload.get("preferences", {}).get("intent") or "").strip().lower()
+    if intent == "parlay":
+        return "The Syndicate parlay builder"
+    if intent == "live_bets":
+        return "The Syndicate live board brief"
+    if intent == "pregame_bets":
+        return "The Syndicate pregame board brief"
+
+    requested_markets = preferences.get("requested_markets") if isinstance(preferences.get("requested_markets"), list) else []
+    if requested_markets:
+        first_market = str(requested_markets[0] or "").strip().lower()
+        if first_market:
+            return f"The Syndicate {first_market} board"
+
+    requested_subjects = preferences.get("requested_subjects") if isinstance(preferences.get("requested_subjects"), list) else []
+    if bool(preferences.get("comparison_requested")) and len(requested_subjects) >= 2:
+        first_subject = " ".join(part.capitalize() for part in str(requested_subjects[0]).split())
+        second_subject = " ".join(part.capitalize() for part in str(requested_subjects[1]).split())
+        if first_subject and second_subject:
+            return f"The Syndicate comparison: {first_subject} vs {second_subject}"
+
+    return "The Syndicate brief"
+
+
+def _parsed_request_for_question(question: str, payload: dict[str, object]) -> dict[str, object]:
+    try:
+        preferences = dict(_query_preferences(
+            question,
+            mode=payload.get("mode"),
+            sport=payload.get("sport"),
+            limit=payload.get("limit"),
+            timing=payload.get("timing"),
+            include_props=payload.get("include_props"),
+            include_games=payload.get("include_games"),
+        ))
+        parsed_request = dict(_parlay_request_summary(preferences))
+    except Exception:
+        parsed_request = {}
+    if question and not parsed_request.get("question"):
+        parsed_request["question"] = question
+    return parsed_request
 
 
 def _is_board_response(payload: dict[str, object] | None) -> bool:
@@ -300,44 +359,94 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
-    return render_template("intelligence.html")
+    initial_response: dict[str, Any] = {}
+    try:
+        pipeline_result = run_routed_intelligence_pipeline({"question": DEFAULT_QUESTION, "mode": "live"})
+        if hasattr(pipeline_result, "to_dict"):
+            initial_response = dict(pipeline_result.to_dict() or {})
+        elif isinstance(pipeline_result, dict):
+            initial_response = dict(pipeline_result)
+    except Exception:
+        initial_response = {}
+    return render_template("intelligence.html", initial_intelligence_response=initial_response)
 
 
 @intelligence_bp.post("/api/intelligence/query")
 def intelligence_query_api():
     global LAST_RESULT
     payload = request.get_json(silent=True) or {}
+    question = str(payload.get("question") or "").strip()
+    if not question:
+        return jsonify({"ok": False, "error": "question is required."}), 400
     user_profile = _normalize_user_profile(payload)
     want_refresh = bool(payload.get("force_refresh")) or bool(payload.get("background"))
 
-    if want_refresh and not bool(payload.get("background")):
-        queue_intelligence_state_refresh(dict(payload))
-        cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
-    else:
-        cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
-        if cached_response is None:
+    response_payload: dict[str, object] | None = None
+    try:
+        board_result = run_intelligence_query(
+            question,
+            selected_date=str(payload.get("date") or payload.get("selected_date") or "").strip() or None,
+            mode=str(payload.get("mode") or "").strip() or None,
+            sport=str(payload.get("sport") or "").strip() or None,
+            limit=payload.get("limit"),
+            timing=str(payload.get("timing") or "").strip() or None,
+            include_props=payload.get("include_props"),
+            include_games=payload.get("include_games"),
+            force_refresh=bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else False,
+        )
+        if isinstance(board_result, dict):
+            response_payload = dict(board_result)
+    except Exception:
+        response_payload = None
+
+    if not isinstance(response_payload, dict) or not response_payload:
+        if want_refresh and not bool(payload.get("background")):
+            queue_intelligence_state_refresh(dict(payload))
+            cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
+        else:
+            cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
+            if cached_response is None:
+                cached_response = _load_response_cache_state()
+        if not _is_board_response(cached_response):
             cached_response = _load_response_cache_state()
-    if not _is_board_response(cached_response):
-        cached_response = _load_response_cache_state()
-    if not _is_board_response(cached_response) or cached_response.get("ok") is False:
-        queue_intelligence_state_refresh(dict(payload))
-        cached_response = {
-            "ok": True,
-            "top_opportunities": [],
-            "by_sport": {},
-            "analysis": None,
-        }
-    if cached_response is None:
-        cached_response = {
-            "ok": True,
-            "top_opportunities": [],
-            "by_sport": {},
-            "analysis": None,
-        }
+        if not _is_board_response(cached_response) or cached_response.get("ok") is False:
+            queue_intelligence_state_refresh(dict(payload))
+            cached_response = {
+                "ok": True,
+                "top_opportunities": [],
+                "by_sport": {},
+                "analysis": None,
+            }
+        if cached_response is None:
+            cached_response = {
+                "ok": True,
+                "top_opportunities": [],
+                "by_sport": {},
+                "analysis": None,
+            }
+        response_payload = _unwrap_response_payload(cached_response)
 
-    cached_response = _unwrap_response_payload(cached_response)
+    board_headline = _board_headline_for_question(question, response_payload)
+    parsed_request = _parsed_request_for_question(question, payload)
+    if board_headline:
+        response_payload = dict(response_payload)
+        response_payload["headline"] = board_headline
+        if parsed_request:
+            response_payload["parsed_request"] = dict(parsed_request)
+        nested_response = response_payload.get("response")
+        if isinstance(nested_response, dict):
+            nested_response = dict(nested_response)
+            nested_response.setdefault("headline", board_headline)
+            if parsed_request:
+                nested_response["parsed_request"] = dict(parsed_request)
+            response_payload["response"] = nested_response
+    if "response" not in response_payload:
+        response_payload["response"] = dict(response_payload)
 
-    response = _apply_user_profile_to_response(dict(cached_response), user_profile)
+    response = _apply_user_profile_to_response(dict(response_payload), user_profile)
+    response = dict(response)
+    if "response" not in response:
+        response["response"] = dict(response)
     LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
     versioned_response = _versioned_query_response(response)
     if user_profile is None:
@@ -373,4 +482,7 @@ def intelligence_status_api():
         status = build_intelligence_status(selected_date=selected_date)
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc), "selected_date": selected_date}), 500
-    return jsonify({"ok": True, "status": status})
+    response_payload = {"ok": True, "status": status}
+    if isinstance(status, dict):
+        response_payload.update(status)
+    return jsonify(response_payload)
