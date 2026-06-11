@@ -103,6 +103,15 @@ def _load_response_cache_state() -> dict[str, object] | None:
     return None
 
 
+def _unwrap_response_payload(payload: dict[str, object] | None) -> dict[str, object]:
+    current = dict(payload or {})
+    while isinstance(current.get("response"), dict) and (
+        "version" in current or "timestamp" in current
+    ):
+        current = dict(current.get("response") or {})
+    return current
+
+
 def _store_response_cache_state(state: dict[str, object]) -> None:
     try:
         _QUERY_RESPONSE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -312,6 +321,8 @@ def intelligence_query_api():
             "by_sport": {},
             "analysis": None,
         }
+
+    cached_response = _unwrap_response_payload(cached_response)
 
     response = _apply_user_profile_to_response(dict(cached_response), user_profile)
     LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})

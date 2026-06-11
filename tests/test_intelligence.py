@@ -1116,21 +1116,25 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
     def test_intelligence_query_api_force_refresh_queues_refresh_and_returns_cached_response(self) -> None:
         cached_response = {
-            "ok": True,
+            "version": 116,
+            "timestamp": "2026-06-11T04:09:58.646260+00:00",
             "response": {
-                "structured_response": {
-                    "summary": "Cached answer",
-                    "key_factors": ["pace"],
-                    "risks": ["variance"],
-                    "confidence": 0.61,
-                    "supporting_data": [],
-                    "recommendations": [{"recommendation_id": "rec-1", "event_id": "evt-1", "reasoning": "cached", "risk_factors": [], "confidence_drivers": []}],
-                    "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
+                "ok": True,
+                "response": {
+                    "structured_response": {
+                        "summary": "Cached answer",
+                        "key_factors": ["pace"],
+                        "risks": ["variance"],
+                        "confidence": 0.61,
+                        "supporting_data": [],
+                        "recommendations": [{"recommendation_id": "rec-1", "event_id": "evt-1", "reasoning": "cached", "risk_factors": [], "confidence_drivers": []}],
+                        "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
+                    },
+                    "selected_date": "2026-06-04",
+                    "query_type": "player_analysis",
                 },
-                "selected_date": "2026-06-04",
-                "query_type": "player_analysis",
+                "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
             },
-            "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
         }
 
         with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
