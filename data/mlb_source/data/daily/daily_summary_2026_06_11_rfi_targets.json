@@ -1,7 +1,7 @@
 {
   "date": "2026-06-11",
   "season": 2026,
-  "generated_at": "2026-06-11T07:49:46.599627",
+  "generated_at": "2026-06-11T19:26:37.955987",
   "tool": "tools/daily_update_multi_profile.py",
   "locked": true,
   "source_profile": "game_recos",
@@ -14,32 +14,56 @@
     "yrfi_min_side_lead_prob": 0.24
   },
   "counts": {
-    "rows": 1,
-    "games": 1
+    "rows": 2,
+    "games": 2
   },
   "signals": [
     {
-      "game_pk": 824827,
+      "game_pk": 823619,
       "date": "2026-06-11",
-      "away": "Seattle Mariners",
-      "home": "Baltimore Orioles",
-      "away_abbr": "SEA",
-      "home_abbr": "BAL",
-      "away_team_id": 136,
-      "home_team_id": 110,
+      "away": "St. Louis Cardinals",
+      "home": "New York Mets",
+      "away_abbr": "STL",
+      "home_abbr": "NYM",
+      "away_team_id": 138,
+      "home_team_id": 121,
       "starter_names": {
-        "away": "Bryan Woo",
-        "home": "Kyle Bradish"
+        "away": "Hunter Dobbins",
+        "home": "Christian Scott"
+      },
+      "signal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.20 | side lead 27.9%",
+        "detail": "Season filter qualified: only 49.3% simulated NRFI, 1.20 expected first-inning runs, and one side reaches a 27.9% chance to be ahead after one.",
+        "nrfiProb": 0.493,
+        "yrfiProb": 0.507,
+        "meanTotalRuns": 1.197,
+        "maxSideLeadProb": 0.279
+      }
+    },
+    {
+      "game_pk": 823855,
+      "date": "2026-06-11",
+      "away": "Arizona Diamondbacks",
+      "home": "Miami Marlins",
+      "away_abbr": "AZ",
+      "home_abbr": "MIA",
+      "away_team_id": 109,
+      "home_team_id": 146,
+      "starter_names": {
+        "away": "Merrill Kelly",
+        "home": "Tyler Phillips"
       },
       "signal": {
         "label": "F1 NRFI",
         "tone": "nrfi",
-        "summary": "0-run sim 63.8% | F1 mean 0.79",
-        "detail": "Season filter qualified: simulated scoreless first inning 63.8% with only 0.79 expected runs in the opening frame.",
-        "nrfiProb": 0.638,
-        "yrfiProb": 0.362,
-        "meanTotalRuns": 0.789,
-        "maxSideLeadProb": 0.181
+        "summary": "0-run sim 60.9% | F1 mean 0.79",
+        "detail": "Season filter qualified: simulated scoreless first inning 60.9% with only 0.79 expected runs in the opening frame.",
+        "nrfiProb": 0.609,
+        "yrfiProb": 0.391,
+        "meanTotalRuns": 0.788,
+        "maxSideLeadProb": 0.193
       }
     }
   ]
