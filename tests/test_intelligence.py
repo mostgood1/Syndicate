@@ -1114,17 +1114,17 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertLess(structured.get("confidence") or 0.0, 0.72)
         self.assertTrue(any("calibration" in note.lower() for note in structured.get("risks") or []))
 
-    def test_intelligence_query_api_force_refresh_uses_direct_compute_path(self) -> None:
-        computed_response = {
+    def test_intelligence_query_api_force_refresh_queues_refresh_and_returns_cached_response(self) -> None:
+        cached_response = {
             "ok": True,
             "response": {
                 "structured_response": {
-                    "summary": "Fresh answer",
+                    "summary": "Cached answer",
                     "key_factors": ["pace"],
                     "risks": ["variance"],
-                    "confidence": 0.71,
+                    "confidence": 0.61,
                     "supporting_data": [],
-                    "recommendations": [{"recommendation_id": "rec-1", "event_id": "evt-1", "reasoning": "fresh", "risk_factors": [], "confidence_drivers": []}],
+                    "recommendations": [{"recommendation_id": "rec-1", "event_id": "evt-1", "reasoning": "cached", "risk_factors": [], "confidence_drivers": []}],
                     "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
                 },
                 "selected_date": "2026-06-04",
@@ -1133,9 +1133,10 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             "player_analysis": {"player": "Jayson Tatum", "matchup": "BOS at NYK"},
         }
 
-        with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=computed_response) as compute_mock:
-            with patch("syndicate.blueprints.intelligence.get_intelligence_state_response") as cached_mock:
-                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response") as latest_mock:
+        with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
+            with patch("syndicate.blueprints.intelligence.get_intelligence_state_response") as get_mock:
+                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=cached_response) as latest_mock:
+                    get_mock.return_value = cached_response
                     with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
                         with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
                             with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
@@ -1155,9 +1156,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn("timestamp", payload)
         self.assertEqual((payload.get("response", {}) or {}).get("response", {}).get("selected_date"), "2026-06-04")
         self.assertEqual((payload.get("response", {}) or {}).get("response", {}).get("query_type"), "player_analysis")
-        compute_mock.assert_called_once()
-        cached_mock.assert_not_called()
-        latest_mock.assert_not_called()
+        queue_mock.assert_called_once()
+        latest_mock.assert_called_once()
+        get_mock.assert_not_called()
 
     def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
         advanced_rows = [
