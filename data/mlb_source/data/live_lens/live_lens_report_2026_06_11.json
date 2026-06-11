@@ -1,6 +1,6 @@
 {
   "date": "2026-06-11",
-  "generatedAt": "2026-06-11T17:09:38-05:00",
+  "generatedAt": "2026-06-11T17:19:03-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -16,20 +16,20 @@
   },
   "counts": {
     "games": 8,
-    "live": 5,
+    "live": 6,
     "final": 0,
-    "pregame": 3,
+    "pregame": 2,
     "props": 25,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 1.5,
-    "totalMs": 53.2,
-    "snapshotLoadMs": 2.4,
-    "simContextLoadMs": 0.5,
-    "propEvalMs": 0.5,
-    "gameLensMs": 0.5,
+    "marketRefreshMs": 1.4,
+    "totalMs": 115.6,
+    "snapshotLoadMs": 2.2,
+    "simContextLoadMs": 0.8,
+    "propEvalMs": 0.9,
+    "gameLensMs": 0.6,
     "gameCount": 8,
     "liveGameCount": 1,
     "feedFetchCount": 8,
@@ -1093,7 +1093,7 @@
                 2
               ],
               "tone": "strong",
-              "detail": "Live projection 1.3. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "detail": "Live projection 1.2. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.512,
               "source": "live",
               "actual": 1.0
@@ -1541,8 +1541,8 @@
     {
       "gamePk": 823371,
       "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
+        "abstract": "Live",
+        "detailed": "Warmup"
       },
       "startTime": "5:40 PM",
       "matchup": {
@@ -2491,6 +2491,60 @@
               "detail": "Justin Wrobleski Over 17.5 Outs | Odds -132 | Edge 32.4%",
               "hitProb": 0.856
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.5. Current 0.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.681,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 18",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Live projection 21.4. Current 0.0. Starter still active in live game state. Supported ladders: 18 Last supported rung: 18",
+              "hitProb": 0.845,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.5. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.6,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.9. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.57,
+              "source": "live",
+              "actual": 0.0
+            }
           ]
         },
         "home": {
@@ -2586,6 +2640,61 @@
               "tone": "strong",
               "detail": "Mitch Keller Over 15.5 Outs | Odds -112 | Edge 40.0%",
               "hitProb": 0.894
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                4,
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 5.1. Current 0.0. Starter still active in live game state. Supported ladders: 4/5 Last supported rung: 5",
+              "hitProb": 0.619,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "O up to 16",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Live projection 19.9. Current 0.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
+              "hitProb": 0.856,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 7.0. Current 0.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.685,
+              "source": "live",
+              "actual": 0.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.8. Current 0.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.553,
+              "source": "live",
+              "actual": 0.0
             }
           ]
         }

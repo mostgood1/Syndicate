@@ -33,11 +33,12 @@
       }
     },
     "nhl_artifact_bundle:2026-06-11": {
-      "inputHash": "866427e21d58f0b975a249a03ca8cf6f737742142fa9e2733c83a997355f0364",
-      "updatedAt": "2026-06-11T19:58:49.837838",
+      "inputHash": "7cb102d200c1d0b2e021ec34660abaf662609b820b7d8fd87201349f4803151e",
+      "updatedAt": "2026-06-11T22:24:28.567245",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-11\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-11\\oddsapi.csv",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-06-11.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_sim_2026-06-11.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\recommendations_sim_2026-06-11.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-11.csv",
@@ -52,7 +53,6 @@
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\shifts_2026-06-11.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\co_toi_shifts_2026-06-11.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-11.csv",
-        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-06-11.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-11.csv"
       ],
       "metadata": {
@@ -61,8 +61,8 @@
       }
     },
     "nhl_artifact_bundle:2026-06-12": {
-      "inputHash": "24c5e5cdaffdb086d0b5a86a8109e92904bcbf806b669dbae04fcae7b03c4da3",
-      "updatedAt": "2026-06-11T19:58:49.861757",
+      "inputHash": "4730db26d0323fe03ac32b1abfafc4e39bb2134505bdb99503ce8c6a389a8f5f",
+      "updatedAt": "2026-06-11T22:24:28.586866",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-12\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-12\\oddsapi.csv",
