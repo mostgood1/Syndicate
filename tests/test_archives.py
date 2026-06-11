@@ -84,6 +84,46 @@ from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snap
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
 
 
+class NhlCardsPayloadTests(unittest.TestCase):
+    def test_props_cards_payload_keeps_recent_movement_slice(self) -> None:
+        row = {
+            "player": "Nathan MacKinnon",
+            "team": "COL",
+            "opp": "TOR",
+            "market": "SOG",
+            "side": "Over",
+            "book": "fd",
+            "ev": 0.083,
+            "prob": 0.612,
+            "line": 3.5,
+            "price": -115,
+            "edge_reasons": "Recent line movement",
+            "last_seen_at": "2026-05-20T18:15:00Z",
+            "movement_history": [
+                {"timestamp": "2026-05-20T16:00:00Z", "line": 3.0, "price": -105, "movement": "up"},
+                {"timestamp": "2026-05-20T16:20:00Z", "line": 3.1, "price": -108, "movement": "up"},
+                {"timestamp": "2026-05-20T16:40:00Z", "line": 3.2, "price": -110, "movement": "up"},
+                {"timestamp": "2026-05-20T17:00:00Z", "line": 3.3, "price": -112, "movement": "up"},
+                {"timestamp": "2026-05-20T17:20:00Z", "line": 3.4, "price": -114, "movement": "up"},
+                {"timestamp": "2026-05-20T17:40:00Z", "line": 3.5, "price": -115, "movement": "up"},
+            ],
+        }
+
+        with patch("syndicate.features.nhl.cards._props_recommendation_rows", return_value=([row], "memory.csv")), patch(
+            "syndicate.features.nhl.cards._player_identity_maps_for_date",
+            return_value=({}, {}),
+        ):
+            payload = build_nhl_props_cards_payload("2026-05-20")
+
+        self.assertTrue(payload["ok"])
+        self.assertEqual(len(payload["cards"]), 1)
+        card = payload["cards"][0]
+        self.assertEqual(card["last_updated"], "2026-05-20T18:15:00Z")
+        self.assertEqual(len(card["movement_history"]), 5)
+        self.assertEqual(card["movement_history"][0]["timestamp"], "2026-05-20T16:20:00Z")
+        self.assertEqual(card["movement_history"][-1]["timestamp"], "2026-05-20T17:40:00Z")
+
+
 class DateArchiveHelperTests(unittest.TestCase):
     def test_rank_board_preserves_explicit_source_title_for_sample_backed_contexts(self) -> None:
         context = build_rank_page_context(

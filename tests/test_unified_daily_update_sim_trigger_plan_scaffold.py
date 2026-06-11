@@ -10,7 +10,8 @@ class UnifiedDailyUpdateSimTriggerPlanScaffoldTests(unittest.TestCase):
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
         content = script_path.read_text(encoding="utf-8")
 
+        self.assertIn("oddsHistoryTriggerPlan = @(", content)
         self.assertIn("simTriggerPlan = @(", content)
-        self.assertIn("trigger = 'planned'", content)
-        self.assertIn("status = if ($DryRun) { 'dry_run' } else { 'pending' }", content)
-        self.assertIn("simulation compute is foundational", content)
+        self.assertIn("trigger = $_.trigger", content)
+        self.assertIn("priorityScoring = $_.priorityScoring", content)
+        self.assertIn("maxDeltaDetected = $_.maxDeltaDetected", content)

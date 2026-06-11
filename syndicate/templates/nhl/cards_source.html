@@ -2435,6 +2435,64 @@
       return String(Math.round(Number(x)));
     }
 
+    function formatTimeSince(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      const parsed = new Date(text);
+      if (Number.isNaN(parsed.getTime())) return '';
+      const diffMs = Date.now() - parsed.getTime();
+      if (!Number.isFinite(diffMs)) return '';
+      if (diffMs <= 60000) return 'just now';
+      const diffMins = Math.round(diffMs / 60000);
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.round(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.round(diffHours / 24);
+      return `${diffDays}d ago`;
+    }
+
+    function movementArrow(delta) {
+      const value = Number(delta);
+      if (!Number.isFinite(value) || value === 0) return '→';
+      return value > 0 ? '↑' : '↓';
+    }
+
+    function movementHistoryValues(history, key) {
+      if (!Array.isArray(history) || !history.length) return [];
+      return history
+        .slice(-5)
+        .map((entry) => Number(entry && (entry[key] ?? entry.line ?? entry.cur ?? entry.value)))
+        .filter((value) => Number.isFinite(value));
+    }
+
+    function movementTrendFromHistory(history, key) {
+      const values = movementHistoryValues(history, key);
+      if (values.length < 2) return '';
+      const arrows = [];
+      for (let index = 1; index < values.length; index += 1) {
+        arrows.push(movementArrow(values[index] - values[index - 1]));
+      }
+      return arrows.join('');
+    }
+
+    function movementSummaryText(movement, history, key, updatedAt) {
+      if (!movement || typeof movement !== 'object') return '';
+      const delta = Number.isFinite(Number(movement.d_prev)) ? Number(movement.d_prev) : Number(movement.d_open);
+      const parts = [];
+      if (Number.isFinite(delta)) {
+        parts.push(`${movementArrow(delta)} ${key === 'line' ? fmt(delta, 1) : fmt(delta, 0)}`.trim());
+      }
+      const trend = movementTrendFromHistory(history, key);
+      if (trend) {
+        parts.push(`Trend ${trend}`);
+      }
+      const age = formatTimeSince(movement.last_updated || updatedAt);
+      if (age) {
+        parts.push(`Changed ${age}`);
+      }
+      return parts.join(' · ');
+    }
+
     function parseSortValue(txt, type) {
       const s = String(txt || '').trim();
       if (!s || s === '—') return null;
@@ -4766,6 +4824,8 @@
 
           const mvLine = (c && c.movement && c.movement.line) ? _renderMove(c.movement.line, 'line') : '';
           const mvPrice = (c && c.movement && c.movement.price) ? _renderMove(c.movement.price, 'price') : '';
+          const mvLineSummary = movementSummaryText(c && c.movement && c.movement.line, c && c.movement_history, 'line', c && c.last_updated);
+          const mvPriceSummary = movementSummaryText(c && c.movement && c.movement.price, c && c.movement_history, 'price', c && c.last_updated);
           const whoImg = headshot
             ? `<img class="p-img" src="${escHtml(headshot)}" alt="${escHtml(player)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';" />`
             : (teamLogo
@@ -4795,8 +4855,8 @@
               <div class="p-meta-card"><span>Open / prev</span><strong>${escHtml(`L ${openLineTxt}/${prevLineTxt} | P ${openPriceTxt}/${prevPriceTxt}`)}</strong></div>
             </div>
             ${(reasonSummary || reasonList.length) ? `<div class="p-reasons">${reasonSummary ? `<div class="p-reason">${escHtml(reasonSummary)}</div>` : ''}${reasonList.map((text) => `<div class="p-reason">${escHtml(text)}</div>`).join('')}</div>` : ''}
-            ${mvLine ? `<div class="p-move">Line ${escHtml(mvLine)}</div>` : ''}
-            ${mvPrice ? `<div class="p-move">Price ${escHtml(mvPrice)}</div>` : ''}
+            ${mvLine || mvLineSummary ? `<div class="p-move">Line ${escHtml(mvLine)}${mvLineSummary ? ` · ${escHtml(mvLineSummary)}` : ''}</div>` : ''}
+            ${mvPrice || mvPriceSummary ? `<div class="p-move">Price ${escHtml(mvPrice)}${mvPriceSummary ? ` · ${escHtml(mvPriceSummary)}` : ''}</div>` : ''}
             ${(c && c.has_snapshot === false) && payload && payload.snapshot_bookmaker ? `<div class="p-note">Movement snapshots are currently tracked on ${escHtml(String(payload.snapshot_bookmaker).toUpperCase())}; this recommendation is from ${escHtml(book.toUpperCase() || 'another book')}.</div>` : ''}
             ${drivers ? `<div>${renderDriverPills(drivers, 2, false)}</div>` : ''}
             </article>`);

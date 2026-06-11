@@ -81,6 +81,67 @@ def _utc_now_iso() -> str:
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
 
+def _market_id_token(value: object) -> str:
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode()
+    text = re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_")
+    return text.lower()
+
+
+def _market_id_line_token(value: object) -> str:
+    if value in (None, "", "-"):
+        return "na"
+    number = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if pd.notna(number):
+        number_value = float(number)
+        if number_value.is_integer():
+            return str(int(number_value))
+        return format(number_value, "g")
+    token = _market_id_token(value)
+    return token or "na"
+
+
+def _nhl_market_id(*, date: str, away_team: object, home_team: object, market_type: object, entity: object, line: object) -> str:
+    return "NHL:{date}:{away}@{home}:{market_type}:{entity}:{line}".format(
+        date=str(date or "").strip(),
+        away=_team_abbr(away_team) or _market_id_token(away_team).upper() or "AWAY",
+        home=_team_abbr(home_team) or _market_id_token(home_team).upper() or "HOME",
+        market_type=_market_id_token(market_type) or "market",
+        entity=_market_id_token(entity) or "entity",
+        line=_market_id_line_token(line),
+    )
+
+
+def _nhl_team_market_type(market: object, outcome_name: object) -> str:
+    market_key = _market_id_token(market)
+    outcome_key = _market_id_token(outcome_name)
+    if market_key == "h2h":
+        return f"moneyline_{outcome_key or 'team'}"
+    if market_key in {"spreads", "spread"}:
+        return f"spread_{outcome_key or 'team'}"
+    if market_key in {"totals", "total"}:
+        return f"total_{outcome_key or 'team'}"
+    return market_key or "team_odds"
+
+
+def _nhl_team_market_line(market: object, outcome_price: object, outcome_point: object) -> object:
+    market_key = _market_id_token(market)
+    if market_key == "h2h":
+        return outcome_price
+    return outcome_point if outcome_point not in (None, "") else outcome_price
+
+
+def _nhl_scoreboard_line(home_goals: object, away_goals: object) -> object:
+    home = pd.to_numeric(pd.Series([home_goals]), errors="coerce").iloc[0]
+    away = pd.to_numeric(pd.Series([away_goals]), errors="coerce").iloc[0]
+    if pd.isna(home) and pd.isna(away):
+        return None
+    home_value = float(home) if pd.notna(home) else 0.0
+    away_value = float(away) if pd.notna(away) else 0.0
+    return home_value + away_value
+
+
 def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -237,6 +298,23 @@ def write_scoreboard_snapshot(*, artifact_root: Path, date: str) -> Path:
     client = NhlWebClient()
     rows = client.scoreboard_day(date)
     frame = pd.DataFrame(rows)
+    if not frame.empty:
+        frame["home_team"] = frame.get("home")
+        frame["away_team"] = frame.get("away")
+        frame["market_type"] = "scoreboard"
+        frame["entity"] = "GAME"
+        frame["line"] = frame.apply(lambda row: _nhl_scoreboard_line(row.get("home_goals"), row.get("away_goals")), axis=1)
+        frame["market_id"] = frame.apply(
+            lambda row: _nhl_market_id(
+                date=date,
+                away_team=row.get("away_team"),
+                home_team=row.get("home_team"),
+                market_type=row.get("market_type"),
+                entity=row.get("entity"),
+                line=row.get("line"),
+            ),
+            axis=1,
+        )
     if out_path.exists():
         existing = _read_csv_if_exists(out_path)
         if not existing.empty and "gamePk" in existing.columns and "gamePk" in frame.columns:
@@ -254,19 +332,35 @@ def _date_range_utc(day: datetime) -> tuple[datetime, datetime]:
 def _flatten_team_odds(event: dict, bookmaker: dict, market: dict) -> List[dict]:
     rows: List[dict] = []
     for outcome in market.get("outcomes") or []:
+        selection = str(outcome.get("name") or "").strip().lower()
+        line_value = _nhl_team_market_line(market.get("key"), outcome.get("price"), outcome.get("point"))
+        market_type = _nhl_team_market_type(market.get("key"), outcome.get("name"))
         rows.append(
             {
                 "event_id": event.get("id"),
                 "commence_time": event.get("commence_time"),
                 "home": str(event.get("home_team") or "").strip(),
                 "away": str(event.get("away_team") or "").strip(),
+                "home_team": str(event.get("home_team") or "").strip(),
+                "away_team": str(event.get("away_team") or "").strip(),
                 "bookmaker_key": bookmaker.get("key"),
                 "bookmaker": bookmaker.get("title"),
                 "book_last_update": bookmaker.get("last_update"),
                 "market": market.get("key"),
+                "market_type": market_type,
+                "entity": "TEAM" if market.get("key") == "h2h" else selection or "TEAM",
                 "outcome_name": outcome.get("name"),
                 "outcome_price": outcome.get("price"),
                 "outcome_point": outcome.get("point"),
+                "line": line_value,
+                "market_id": _nhl_market_id(
+                    date=str(event.get("commence_time") or "")[:10] or "",
+                    away_team=event.get("away_team"),
+                    home_team=event.get("home_team"),
+                    market_type=market_type,
+                    entity=("TEAM" if market.get("key") == "h2h" else selection or "TEAM"),
+                    line=line_value,
+                ),
             }
         )
     return rows
@@ -291,6 +385,8 @@ def collect_oddsapi_team_odds(date: str, *, markets: Optional[Iterable[str]] = N
     frame = pd.DataFrame(rows)
     if not frame.empty:
         frame["date"] = date
+        if "market_id" not in frame.columns:
+            frame["market_id"] = None
     return frame
 
 
@@ -300,7 +396,7 @@ def write_team_odds(df: pd.DataFrame, *, artifact_root: Path, date: str, source:
     parquet_path = out_dir / f"{source}.parquet"
     out_dir.mkdir(parents=True, exist_ok=True)
     existing = _read_csv_if_exists(csv_path)
-    keys = ["event_id", "bookmaker_key", "market", "outcome_name", "outcome_point"]
+    keys = ["market_id"] if "market_id" in existing.columns or (df is not None and not df.empty and "market_id" in df.columns) else ["event_id", "bookmaker_key", "market", "outcome_name", "outcome_point"]
     if existing.empty:
         merged = df.copy()
     elif df.empty:
@@ -624,8 +720,11 @@ def normalize_player_names(raw: pd.DataFrame, roster_df: Optional[pd.DataFrame])
 
 def combine_over_under(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
-        return pd.DataFrame(columns=["date", "player_id", "player_name", "team", "market", "line", "over_price", "under_price", "book", "first_seen_at", "last_seen_at", "is_current"])
+        return pd.DataFrame(columns=["date", "player_id", "player_name", "team", "home_team", "away_team", "market", "market_type", "entity", "line", "over_price", "under_price", "book", "first_seen_at", "last_seen_at", "is_current"])
     working = df[df["market"].isin(["SOG", "GOALS", "SAVES", "ASSISTS", "POINTS", "BLOCKS"])].copy()
+    for column in ["player_id", "home_team", "away_team"]:
+        if column not in working.columns:
+            working[column] = None
     grouped_rows: List[Dict] = []
     now_iso = _utc_now_iso()
 
@@ -647,7 +746,11 @@ def combine_over_under(df: pd.DataFrame) -> pd.DataFrame:
                 "player_id": over_row["player_id"].dropna().iloc[0] if not over_row.empty and over_row["player_id"].dropna().shape[0] else (under_row["player_id"].dropna().iloc[0] if not under_row.empty and under_row["player_id"].dropna().shape[0] else None),
                 "player_name": (over_row["player"].iloc[0] if not over_row.empty else (under_row["player"].iloc[0] if not under_row.empty else None)),
                 "team": (over_row["team"].iloc[0] if not over_row.empty else (under_row["team"].iloc[0] if not under_row.empty else None)),
+                "home_team": (over_row["home_team"].iloc[0] if not over_row.empty and "home_team" in over_row.columns else (under_row["home_team"].iloc[0] if not under_row.empty and "home_team" in under_row.columns else None)),
+                "away_team": (over_row["away_team"].iloc[0] if not over_row.empty and "away_team" in over_row.columns else (under_row["away_team"].iloc[0] if not under_row.empty and "away_team" in under_row.columns else None)),
                 "market": market,
+                "market_type": _market_id_token(market),
+                "entity": _market_id_token(over_row["player"].iloc[0] if not over_row.empty else (under_row["player"].iloc[0] if not under_row.empty else None)),
                 "line": line,
                 "over_price": int(over_row["odds"].iloc[0]) if not over_row.empty and pd.notna(over_row["odds"].iloc[0]) else None,
                 "under_price": int(under_row["odds"].iloc[0]) if not under_row.empty and pd.notna(under_row["odds"].iloc[0]) else None,
@@ -655,6 +758,14 @@ def combine_over_under(df: pd.DataFrame) -> pd.DataFrame:
                 "first_seen_at": over_row["collected_at"].iloc[0] if not over_row.empty else (under_row["collected_at"].iloc[0] if not under_row.empty else now_iso),
                 "last_seen_at": now_iso,
                 "is_current": True,
+                "market_id": _nhl_market_id(
+                    date=date,
+                    away_team=(over_row["away_team"].iloc[0] if not over_row.empty and "away_team" in over_row.columns else (under_row["away_team"].iloc[0] if not under_row.empty and "away_team" in under_row.columns else None)),
+                    home_team=(over_row["home_team"].iloc[0] if not over_row.empty and "home_team" in over_row.columns else (under_row["home_team"].iloc[0] if not under_row.empty and "home_team" in under_row.columns else None)),
+                    market_type=_market_id_token(market),
+                    entity=_market_id_token(over_row["player"].iloc[0] if not over_row.empty else (under_row["player"].iloc[0] if not under_row.empty else None)),
+                    line=line,
+                ),
             }
         )
     return pd.DataFrame(grouped_rows)
@@ -671,7 +782,7 @@ def write_props(df: pd.DataFrame, *, artifact_root: Path, date: str, source: str
             existing.to_csv(csv_path, index=False)
         return str(parquet_path if parquet_path.exists() else csv_path)
     working = df.copy() if df is not None else pd.DataFrame()
-    for column in ["date", "player_id", "player_name", "team", "market", "line", "over_price", "under_price", "book", "first_seen_at", "last_seen_at", "is_current"]:
+    for column in ["date", "player_id", "player_name", "team", "home_team", "away_team", "market", "market_type", "entity", "line", "over_price", "under_price", "book", "first_seen_at", "last_seen_at", "is_current", "market_id"]:
         if column not in working.columns:
             working[column] = None
         if column not in existing.columns:
@@ -691,7 +802,7 @@ def write_props(df: pd.DataFrame, *, artifact_root: Path, date: str, source: str
     subset = ["date", "_merge_key", "market", "line", "book"]
     merged = pd.concat([existing, working], ignore_index=True)
     merged.sort_values(["date", "last_seen_at"], inplace=True)
-    merged = merged.drop_duplicates(subset=subset, keep="last")
+    merged = merged.drop_duplicates(subset=["market_id"] if "market_id" in merged.columns else subset, keep="last")
     current_keys = working[subset].drop_duplicates().copy()
     current_keys["__cur"] = True
     merged = merged.merge(current_keys, on=subset, how="left")

@@ -11,7 +11,8 @@ class UnifiedDailyUpdateSimNoOpDetectionTests(unittest.TestCase):
         content = script_path.read_text(encoding="utf-8")
 
         self.assertIn("function Get-SimExecutionNoOpDecision", content)
-        self.assertIn("Sim stage no-op: all planned event fingerprints are unchanged; skipping simulation stage.", content)
+        self.assertIn("Get-OddsHistoryTriggerDecision -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow", content)
+        self.assertIn("skip_heavy_computation", content)
         self.assertIn("$shouldRunSimExecution = $false", content)
         self.assertIn("if ($simExecutionNoOpDecision -eq $false) {", content)
 
@@ -20,6 +21,6 @@ class UnifiedDailyUpdateSimNoOpDetectionTests(unittest.TestCase):
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
         content = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("if ($currentFingerprintByKey[$planKey] -ne $previousFingerprint) {", content)
+        self.assertIn("if (@($oddsHistoryDecisions | Where-Object { [bool]$_.runSimulation -or [bool]$_.priorityScoring }).Count -gt 0) {", content)
         self.assertIn("return $true", content)
         self.assertIn("if ($shouldRunSimExecution) {", content)

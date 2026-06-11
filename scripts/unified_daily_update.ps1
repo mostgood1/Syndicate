@@ -358,6 +358,152 @@ function Get-RunPlanDecisionValue {
     return $Fallback
 }
 
+function Get-OddsHistoryPathForSport {
+    param(
+        [string]$RepoRoot,
+        [string]$Sport
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RepoRoot) -or [string]::IsNullOrWhiteSpace($Sport)) {
+        return $null
+    }
+
+    switch ($Sport.ToLowerInvariant()) {
+        'mlb' { return Join-Path $RepoRoot 'data\mlb_source\tracking\odds_history.json' }
+        'nba' { return Join-Path $RepoRoot 'data\nba_source\tracking\odds_history.json' }
+        'wnba' { return Join-Path $RepoRoot 'data\wnba_source\tracking\odds_history.json' }
+        'nhl' { return Join-Path $RepoRoot 'data\nhl_source\tracking\odds_history.json' }
+        'nfl' { return Join-Path $RepoRoot 'data\nfl_source\tracking\odds_history.json' }
+        'ncaaf' { return Join-Path $RepoRoot 'data\ncaaf_source\tracking\odds_history.json' }
+        'ncaab' { return Join-Path $RepoRoot 'data\ncaab_source\tracking\odds_history.json' }
+        default { return $null }
+    }
+}
+
+function Get-OddsHistoryTriggerDecision {
+    param(
+        [string]$RepoRoot,
+        [string]$DateValue,
+        [string]$Sport,
+        [string]$Workflow,
+        [double]$DeltaThreshold = 0.5
+    )
+
+    $historyPath = Get-OddsHistoryPathForSport -RepoRoot $RepoRoot -Sport $Sport
+    if ([string]::IsNullOrWhiteSpace($historyPath) -or -not (Test-Path -LiteralPath $historyPath)) {
+        return $null
+    }
+
+    try {
+        $payload = Get-Content -Path $historyPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
+
+    $markets = @()
+    if ($null -ne $payload.markets) {
+        $markets = @($payload.markets.PSObject.Properties)
+    }
+
+    if ($markets.Count -eq 0) {
+        return [ordered]@{
+            sport = $Sport
+            workflow = $Workflow
+            date = $DateValue
+            oddsHistoryPath = $historyPath
+            hasLineMovement = $false
+            maxDeltaDetected = $null
+            lastOddsUpdateTimestamp = $null
+            runSimulation = $false
+            priorityScoring = $false
+            skipHeavyComputation = $true
+            trigger = 'skip_heavy_computation'
+            reason = 'flat_history'
+        }
+    }
+
+    $hasLineMovement = $false
+    $runSimulation = $false
+    $priorityScoring = $false
+    $maxDeltaDetected = $null
+    $lastOddsUpdateTimestamp = $null
+    $trigger = 'skip_heavy_computation'
+    $reason = 'flat_history'
+
+    foreach ($marketProperty in $markets) {
+        $state = $marketProperty.Value
+        if ($null -eq $state) {
+            continue
+        }
+
+        $delta = $state.delta
+        if ($null -eq $delta -and $null -ne $state.last_line -and $null -ne $state.previous_line) {
+            try {
+                $delta = [double]$state.last_line - [double]$state.previous_line
+            }
+            catch {
+                $delta = $null
+            }
+        }
+
+        if ($null -ne $delta) {
+            $hasLineMovement = $true
+            $absoluteDelta = [math]::Abs([double]$delta)
+            if ($null -eq $maxDeltaDetected -or $absoluteDelta -gt $maxDeltaDetected) {
+                $maxDeltaDetected = $absoluteDelta
+            }
+            if ($absoluteDelta -gt $DeltaThreshold) {
+                $runSimulation = $true
+                $trigger = 'simulation'
+                $reason = 'delta_threshold'
+            }
+        }
+
+        $history = @($state.history)
+        if ($history.Count -ge 2) {
+            $lastEntry = $history[-1]
+            $previousEntry = $history[-2]
+            $lastMovement = [string]$lastEntry.movement
+            $previousMovement = [string]$previousEntry.movement
+            if (($lastMovement -eq 'up' -or $lastMovement -eq 'down') -and $lastMovement -eq $previousMovement) {
+                $priorityScoring = $true
+                if (-not $runSimulation) {
+                    $trigger = 'priority_scoring'
+                    $reason = 'rapid_consecutive_movement'
+                }
+            }
+        }
+
+        $stateUpdatedAt = [string]$state.last_updated
+        if (-not [string]::IsNullOrWhiteSpace($stateUpdatedAt)) {
+            if ([string]::IsNullOrWhiteSpace($lastOddsUpdateTimestamp) -or $stateUpdatedAt -gt $lastOddsUpdateTimestamp) {
+                $lastOddsUpdateTimestamp = $stateUpdatedAt
+            }
+        }
+    }
+
+    if (-not $hasLineMovement) {
+        $trigger = 'skip_heavy_computation'
+        $reason = 'flat_history'
+    }
+
+    return [ordered]@{
+        sport = $Sport
+        workflow = $Workflow
+        date = $DateValue
+        oddsHistoryPath = $historyPath
+        hasLineMovement = $hasLineMovement
+        maxDeltaDetected = $maxDeltaDetected
+        lastOddsUpdateTimestamp = $lastOddsUpdateTimestamp
+        runSimulation = $runSimulation -or $priorityScoring
+        priorityScoring = $priorityScoring
+        skipHeavyComputation = -not $hasLineMovement
+        trigger = $trigger
+        reason = $reason
+    }
+}
+
 function Get-SimExecutionDecision {
     param(
         [string]$RepoRoot,
@@ -391,57 +537,29 @@ function Get-SimExecutionDecision {
         return $true
     }
 
-    $artifactPatterns = @()
+    $oddsHistoryDecisions = @()
     foreach ($step in @($SourceSteps)) {
         $sport = [string]$step.Sport
         $workflow = [string]$step.Workflow
-        switch ($sport.ToLowerInvariant()) {
-            'mlb' {
-                if ($workflow -eq 'vendored_daily_update') {
-                    $artifactPatterns += @(
-                        (Join-Path $RepoRoot ("data\mlb_source\data\daily\sims\{0}\sim_*.json" -f $DateValue)),
-                        (Join-Path $RepoRoot ("data\mlb_source\source_artifacts\data\daily\sims\{0}\sim_*.json" -f $DateValue))
-                    )
-                }
-            }
-            'nba' {
-                if ($workflow -eq 'vendored_daily_update') {
-                    $artifactPatterns += @(
-                        (Join-Path $RepoRoot ("data\nba_source\data\processed\smart_sim_{0}_*.json" -f $DateValue)),
-                        (Join-Path $RepoRoot ("data\nba_source\source_artifacts\data\processed\smart_sim_{0}_*.json" -f $DateValue))
-                    )
-                }
-            }
-            'wnba' {
-                if ($workflow -eq 'vendored_daily_update') {
-                    $artifactPatterns += @(
-                        (Join-Path $RepoRoot ("data\wnba_source\data\processed\smart_sim_{0}_*.json" -f $DateValue)),
-                        (Join-Path $RepoRoot ("data\wnba_source\source_artifacts\data\processed\smart_sim_{0}_*.json" -f $DateValue))
-                    )
-                }
-            }
-            'nhl' {
-                if ($workflow -eq 'vendored_daily_update') {
-                    $artifactPatterns += @(
-                        (Join-Path $RepoRoot ("data\nhl_source\data\processed\smart_sim_{0}_*.json" -f $DateValue)),
-                        (Join-Path $RepoRoot ("data\nhl_source\source_artifacts\data\processed\smart_sim_{0}_*.json" -f $DateValue))
-                    )
-                }
-            }
+        $decision = Get-OddsHistoryTriggerDecision -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow
+        if ($null -ne $decision) {
+            $oddsHistoryDecisions += $decision
         }
     }
 
-    if ($artifactPatterns.Count -eq 0) {
+    if ($oddsHistoryDecisions.Count -eq 0) {
         return $null
     }
 
-    foreach ($artifactPattern in @($artifactPatterns | Select-Object -Unique)) {
-        if (-not (Test-Path -Path $artifactPattern)) {
-            return $true
-        }
+    if (@($oddsHistoryDecisions | Where-Object { [bool]$_.runSimulation -or [bool]$_.priorityScoring }).Count -gt 0) {
+        return $true
     }
 
-    return $false
+    if (@($oddsHistoryDecisions | Where-Object { -not [bool]$_.skipHeavyComputation }).Count -eq 0) {
+        return $false
+    }
+
+    return $null
 }
 
 function Get-SimEventArtifactPaths {
@@ -1373,7 +1491,7 @@ function Get-SimExecutionNoOpDecision {
         return $null
     }
 
-    $currentFingerprintByKey = @{}
+    $oddsHistoryDecisions = @()
     foreach ($eventPlan in $eventPlans) {
         $sport = [string]$eventPlan.sport
         $workflow = [string]$eventPlan.workflow
@@ -1381,27 +1499,25 @@ function Get-SimExecutionNoOpDecision {
             continue
         }
 
-        $planKey = ($sport.ToLowerInvariant() + '|' + $workflow.ToLowerInvariant())
-        if (-not $currentFingerprintByKey.ContainsKey($planKey)) {
-            $currentFingerprint = Get-EventInputFingerprint -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow
-            if ([string]::IsNullOrWhiteSpace([string]$currentFingerprint)) {
-                return $null
-            }
-
-            $currentFingerprintByKey[$planKey] = [string]$currentFingerprint
-        }
-
-        $previousFingerprint = [string]$eventPlan.inputFingerprint
-        if ([string]::IsNullOrWhiteSpace($previousFingerprint)) {
-            return $null
-        }
-
-        if ($currentFingerprintByKey[$planKey] -ne $previousFingerprint) {
-            return $true
+        $decision = Get-OddsHistoryTriggerDecision -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow
+        if ($null -ne $decision) {
+            $oddsHistoryDecisions += $decision
         }
     }
 
-    return $false
+    if ($oddsHistoryDecisions.Count -eq 0) {
+        return $null
+    }
+
+    if (@($oddsHistoryDecisions | Where-Object { [bool]$_.runSimulation -or [bool]$_.priorityScoring }).Count -gt 0) {
+        return $true
+    }
+
+    if (@($oddsHistoryDecisions | Where-Object { -not [bool]$_.skipHeavyComputation }).Count -eq 0) {
+        return $false
+    }
+
+    return $null
 }
 
 function Get-EventSimExecutionDecision {
@@ -3385,6 +3501,12 @@ if (Test-Path -LiteralPath $latestManifestPath) {
     }
 }
 
+$oddsHistoryTriggerPlan = @(
+    $sourceSteps | ForEach-Object {
+        Get-OddsHistoryTriggerDecision -RepoRoot $repoRoot -DateValue $Date -Sport $_.Sport -Workflow $_.Workflow
+    }
+)
+
 $runManifest = [ordered]@{
     date = $Date
     generatedAt = (Get-Date).ToString('o')
@@ -3410,6 +3532,7 @@ $runManifest = [ordered]@{
         oddsPhase = $OddsPhase
         oddsSports = $OddsSports
         oddsRegions = $OddsRegions
+        oddsHistoryTriggerPlan = @($oddsHistoryTriggerPlan)
     }
     runState = [ordered]@{
         currentStage = 'queued'
@@ -3430,7 +3553,27 @@ $runManifest = [ordered]@{
         [ordered]@{ stage = 'manifest_generation'; decision = 'planned'; status = if ($DryRun) { 'dry_run' } else { 'pending' } }
         [ordered]@{ stage = 'git_publish'; decision = if ($SkipGitPush) { 'skipped' } else { 'planned' }; status = if ($SkipGitPush) { 'skipped' } else { if ($DryRun) { 'dry_run' } else { 'pending' } } }
     )
-    simTriggerPlan = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; trigger = 'planned'; status = if ($DryRun) { 'dry_run' } else { 'pending' }; reason = 'simulation compute is foundational and deferred until source-stage completion' } })
+    simTriggerPlan = @(
+        $oddsHistoryTriggerPlan | ForEach-Object {
+            if ($null -eq $_) {
+                return [ordered]@{ trigger = 'planned'; status = if ($DryRun) { 'dry_run' } else { 'pending' }; reason = 'simulation compute is foundational and deferred until source-stage completion' }
+            }
+
+            [ordered]@{
+                sport = $_.sport
+                workflow = $_.workflow
+                trigger = $_.trigger
+                status = if ($DryRun) { 'dry_run' } else { 'pending' }
+                reason = $_.reason
+                hasLineMovement = $_.hasLineMovement
+                maxDeltaDetected = $_.maxDeltaDetected
+                lastOddsUpdateTimestamp = $_.lastOddsUpdateTimestamp
+                priorityScoring = $_.priorityScoring
+                runSimulation = $_.runSimulation
+                oddsHistoryPath = $_.oddsHistoryPath
+            }
+        }
+    )
     statusArtifact = [ordered]@{
         format = 'json'
         scope = 'daily_update'

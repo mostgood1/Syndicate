@@ -14,10 +14,17 @@ class OddsRefreshTrackingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             props_root = root / "data" / "props" / "player_props_lines" / "date=2026-06-07"
+            team_root = root / "data" / "odds" / "team" / "date=2026-06-07"
             props_root.mkdir(parents=True)
+            team_root.mkdir(parents=True)
             (props_root / "oddsapi.csv").write_text(
                 "player_name,market,book,line,over_price,last_seen_at\n"
                 "Player One,POINTS,draftkings,2.5,-110,2026-06-07T12:00:00Z\n",
+                encoding="utf-8",
+            )
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\n"
+                "Home,Away,draftkings,total,over,6.5,-110\n",
                 encoding="utf-8",
             )
 
@@ -26,6 +33,55 @@ class OddsRefreshTrackingTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertFalse(result.get("skipped", False))
             self.assertTrue((root / "tracking" / "odds_nhl_player_props_opening_2026-06-07.csv").exists())
+            history_path = root / "tracking" / "odds_history.json"
+            self.assertTrue(history_path.exists())
+
+            history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+            market_key = next(key for key in history_payload["markets"] if "selection=over" in key)
+            self.assertEqual(len(history_payload["markets"][market_key]["history"]), 1)
+            first_state = history_payload["markets"][market_key]
+            first_entry = first_state["history"][0]
+            self.assertEqual(first_entry["market_id"], market_key)
+            self.assertEqual(first_entry["sport"], "nhl")
+            self.assertEqual(first_entry["event_id"], "Away@Home")
+            self.assertEqual(first_entry["market_type"], "total")
+            self.assertEqual(first_entry["entity"], "over")
+            self.assertEqual(first_entry["line"], 6.5)
+            self.assertEqual(first_entry["odds"], -110)
+            self.assertEqual(first_entry["timestamp"], first_entry["captured_at"])
+            self.assertEqual(first_state["last_line"], 6.5)
+            self.assertEqual(first_state["movement"], "flat")
+            self.assertIsNone(first_state["delta"])
+            self.assertIsNone(first_state["percent_change"])
+
+            (team_root / "oddsapi.csv").write_text(
+                "home_team,away_team,bookmaker,market,selection,line,price\n"
+                "Home,Away,draftkings,total,over,7.0,-110\n",
+                encoding="utf-8",
+            )
+
+            result = sync_post_refresh_tracking_for_source_root(sport="nhl", source_root=root, date_str="2026-06-07")
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["artifacts"]["odds_history"]["entries_appended"], 1)
+            history_payload = json.loads(history_path.read_text(encoding="utf-8"))
+            market_state = history_payload["markets"][market_key]
+            self.assertEqual(len(market_state["history"]), 2)
+            latest_entry = market_state["history"][-1]
+            self.assertEqual(latest_entry["market_id"], market_key)
+            self.assertEqual(latest_entry["sport"], "nhl")
+            self.assertEqual(latest_entry["event_id"], "Away@Home")
+            self.assertEqual(latest_entry["market_type"], "total")
+            self.assertEqual(latest_entry["entity"], "over")
+            self.assertEqual(latest_entry["line"], 7.0)
+            self.assertEqual(latest_entry["odds"], -110)
+            self.assertEqual(latest_entry["timestamp"], latest_entry["captured_at"])
+            self.assertEqual(market_state["last_line"], 7.0)
+            self.assertEqual(market_state["movement"], "up")
+            self.assertAlmostEqual(market_state["delta"], 0.5)
+            self.assertAlmostEqual(market_state["percent_change"], 7.6923076923, places=6)
+            self.assertNotEqual(market_state["history"][0]["current_line"], market_state["history"][1]["current_line"])
+            self.assertEqual(market_state["history"][1]["movement"], "up")
 
     def test_sync_nfl_tracking_reads_source_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

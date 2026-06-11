@@ -9,6 +9,28 @@
         "reused": false,
         "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts"
       }
+    },
+    "nhl_artifact_bundle:2026-05-22": {
+      "inputHash": "13133df73de397075cf1bcea730b4ca753fa12b3e21d8eb5da0bac37261b6b11",
+      "updatedAt": "2026-06-11T17:48:32.811376",
+      "outputs": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_projections_all_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_boxscores_sim_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_boxscores_sim_hist_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_boxscores_sim_samples_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_recommendations_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\roster_snapshot_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\injuries_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\shifts_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\co_toi_shifts_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_predictions_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\odds\\team\\date=2026-05-22\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\props\\player_props_lines\\date=2026-05-22\\oddsapi.csv"
+      ],
+      "metadata": {
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle",
+        "date": "2026-05-22"
+      }
     }
   }
 }

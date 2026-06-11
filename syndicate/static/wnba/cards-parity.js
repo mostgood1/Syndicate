@@ -204,6 +204,64 @@
     return `${number > 0 ? '+' : ''}${number.toFixed(digits)}`;
   }
 
+  function formatTimeSince(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const diffMs = Date.now() - parsed.getTime();
+    if (!Number.isFinite(diffMs)) return '';
+    if (diffMs <= 60000) return 'just now';
+    const diffMins = Math.round(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.round(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.round(diffHours / 24);
+    return `${diffDays}d ago`;
+  }
+
+  function movementArrow(delta) {
+    const number = Number(delta);
+    if (!Number.isFinite(number) || number === 0) return '→';
+    return number > 0 ? '↑' : '↓';
+  }
+
+  function movementHistoryValues(history, key) {
+    if (!Array.isArray(history) || !history.length) return [];
+    return history
+      .slice(-5)
+      .map((entry) => Number(entry && (entry[key] ?? entry.line ?? entry.cur ?? entry.value)))
+      .filter((value) => Number.isFinite(value));
+  }
+
+  function movementTrendFromHistory(history, key) {
+    const values = movementHistoryValues(history, key);
+    if (values.length < 2) return '';
+    const arrows = [];
+    for (let index = 1; index < values.length; index += 1) {
+      arrows.push(movementArrow(values[index] - values[index - 1]));
+    }
+    return arrows.join('');
+  }
+
+  function movementSummaryText(movement, history, key, updatedAt) {
+    if (!movement || typeof movement !== 'object') return '';
+    const delta = Number.isFinite(Number(movement.d_prev)) ? Number(movement.d_prev) : Number(movement.d_open);
+    const parts = [];
+    if (Number.isFinite(delta)) {
+      parts.push(`${movementArrow(delta)} ${key === 'line' ? fmtSigned(delta, 1) : fmtSigned(delta, 0)}`.trim());
+    }
+    const trend = movementTrendFromHistory(history, key);
+    if (trend) {
+      parts.push(`Trend ${trend}`);
+    }
+    const age = formatTimeSince(movement.last_updated || updatedAt);
+    if (age) {
+      parts.push(`Changed ${age}`);
+    }
+    return parts.join(' · ');
+  }
+
   function fmtMinutesPlayed(value) {
     const raw = String(value ?? '').trim();
     if (!raw) {
@@ -3041,6 +3099,8 @@
         ? 'cards-chip--accent'
         : (actionLabel === 'WATCH' || actionLabel === 'MEDIUM' ? 'cards-chip--warm' : '');
       const liveProjection = liveProjectionSummary(safeItem);
+      const movementLine = movementSummaryText(safeItem?.movement?.line, safeItem?.movement_history, 'line', safeItem?.last_updated);
+      const movementPrice = movementSummaryText(safeItem?.movement?.price, safeItem?.movement_history, 'price', safeItem?.last_updated);
       return `
         <article class="cards-props-strip-card">
           <div class="cards-props-strip-card__top">
@@ -3061,6 +3121,7 @@
             <div class="cards-props-strip-card__play">${escapeHtml(market)} ${escapeHtml(side)} ${Number.isFinite(line) ? fmtNumber(line, 1) : '--'}</div>
             ${liveProjection ? `<div class="cards-props-strip-card__projection">${escapeHtml(liveProjection)}</div>` : ''}
             <div class="cards-props-strip-card__sub">${escapeHtml(stripSecondaryText(safeItem))}</div>
+            ${(movementLine || movementPrice) ? `<div class="cards-props-strip-card__sub is-muted">${escapeHtml([movementLine, movementPrice].filter(Boolean).join(' · '))}</div>` : ''}
             <div class="cards-strip-pills">
               ${actionLabel ? `<span class="cards-chip ${actionClass}">${escapeHtml(actionLabel)}</span>` : ''}
               ${Number.isFinite(price) ? `<span class="cards-chip">${escapeHtml(fmtAmerican(price))}</span>` : ''}
@@ -3216,6 +3277,8 @@
               first_seen_at: row?.first_seen_at,
               last_seen_at: row?.last_seen_at,
               odds_refreshed_at: row?.odds_refreshed_at || gameOddsRefreshedAt,
+              movement_history: row?.movement_history || row?.line_history || row?.line_movement || [],
+              last_updated: row?.last_seen_at || row?.odds_refreshed_at || gameOddsRefreshedAt || null,
               seen_observations: row?.seen_observations,
               pregame_team_total_ratio: row?.pregame_team_total_ratio,
               pregame_game_total_ratio: row?.pregame_game_total_ratio,

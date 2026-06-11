@@ -42,6 +42,38 @@ class IntelligenceEvaluationTests(unittest.TestCase):
         self.assertTrue(bundle["recommendations"][0]["recommendation_id"].startswith("rec_"))
         self.assertEqual(bundle["artifact_metadata"]["sport"], "nba")
 
+    def test_build_intelligence_evaluation_bundle_includes_line_movement_metadata(self) -> None:
+        bundle = build_intelligence_evaluation_bundle(
+            query={
+                "question": "preview the slate",
+                "selected_date": "2026-06-11",
+                "sport": "nhl",
+            },
+            response={
+                "selected_date": "2026-06-11",
+                "recommendations": [
+                    {
+                        "name": "Home Team Over 6.5",
+                        "pick": "Over 6.5",
+                        "line": 6.5,
+                        "movement": {"delta": 0.0, "trend": "flat", "last_updated": "2026-06-11T12:00:00Z"},
+                    },
+                    {
+                        "name": "Away Team Under 2.5",
+                        "pick": "Under 2.5",
+                        "line": 2.5,
+                        "movement": {"delta": -0.5, "trend": "down", "last_updated": "2026-06-11T14:30:00Z"},
+                    },
+                ],
+            },
+            persist=False,
+        )
+
+        metadata = bundle["artifact_metadata"]
+        self.assertTrue(metadata["has_line_movement"])
+        self.assertAlmostEqual(metadata["max_delta_detected"], 0.5)
+        self.assertEqual(metadata["last_odds_update_timestamp"], "2026-06-11T14:30:00Z")
+
     def test_build_intelligence_evaluation_bundle_appends_only_changed_event_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"

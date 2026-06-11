@@ -8,7 +8,11 @@ from typing import Any, Mapping
 import pandas as pd
 
 from syndicate.features.shared.basketball_props_tracking import sync_basketball_props_tracking_for_source_root
+from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
+
+
+_ODDS_HISTORY_LIMIT = 50
 
 
 def _utc_now() -> str:
@@ -36,6 +40,606 @@ def _read_json(path: Path) -> Any:
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _odds_history_path(tracking_root: Path) -> Path:
+    return tracking_root / "odds_history.json"
+
+
+def _odds_history_artifact_path(source_root: Path, sport: str) -> Path:
+    return source_root / "artifacts" / sport / "odds_history.json"
+
+
+def _json_safe(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    if hasattr(value, "item"):
+        try:
+            return _json_safe(value.item())
+        except Exception:
+            pass
+    return str(value)
+
+
+def _line_number(value: Any) -> float | None:
+    if value in (None, "", "-"):
+        return None
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _movement_direction(delta: float | None) -> str:
+    if delta is None or delta == 0:
+        return "flat"
+    return "up" if delta > 0 else "down"
+
+
+def _percent_change(current_line: float | None, previous_line: float | None) -> float | None:
+    if current_line is None or previous_line in (None, 0):
+        return None
+    try:
+        return ((current_line - previous_line) / abs(previous_line)) * 100.0
+    except Exception:
+        return None
+
+
+def _primary_line_value(row: Mapping[str, Any]) -> float | None:
+    for key in (
+        "line",
+        "point",
+        "spread",
+        "total",
+        "price",
+        "odds",
+        "home_odds",
+        "away_odds",
+        "over_odds",
+        "under_odds",
+        "home_ml",
+        "away_ml",
+        "home_line",
+        "away_line",
+        "home_puck_line",
+        "away_puck_line",
+        "home_puck_odds",
+        "away_puck_odds",
+        "over_price",
+        "under_price",
+    ):
+        current_value = _line_number(row.get(key))
+        if current_value is not None:
+            return current_value
+    return None
+
+
+def _primary_odds_value(row: Mapping[str, Any]) -> float | None:
+    for key in (
+        "odds",
+        "price",
+        "home_odds",
+        "away_odds",
+        "over_odds",
+        "under_odds",
+        "home_ml",
+        "away_ml",
+        "home_spread_price",
+        "away_spread_price",
+        "home_puck_odds",
+        "away_puck_odds",
+        "over_price",
+        "under_price",
+    ):
+        current_value = _line_number(row.get(key))
+        if current_value is not None:
+            return current_value
+    return None
+
+
+def _odds_history_market_states(payload: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
+    if not isinstance(payload, Mapping):
+        return {}
+    markets = payload.get("markets")
+    if isinstance(markets, dict) and markets:
+        return {str(key): value for key, value in markets.items() if isinstance(value, dict)}
+    states: dict[str, dict[str, Any]] = {}
+    for key, value in payload.items():
+        if key in {"sport", "date", "updated_at", "history_limit", "markets"}:
+            continue
+        if isinstance(value, dict) and isinstance(value.get("history"), list):
+            states[str(key)] = value
+    return states
+
+
+def _canonical_market_type(row: Mapping[str, Any]) -> str | None:
+    for key in ("market_type", "market", "selection", "period"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
+def _canonical_entity(row: Mapping[str, Any]) -> str | None:
+    for key in (
+        "entity",
+        "player_name",
+        "player",
+        "team",
+        "team_key",
+        "subject_key",
+        "selection",
+        "matchup",
+        "home_team",
+        "away_team",
+        "name",
+        "title",
+        "label",
+    ):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
+def _canonical_event_id(row: Mapping[str, Any]) -> str | None:
+    for key in ("event_id", "event_key", "game_id", "game_pk"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    matchup = str(row.get("matchup") or "").strip()
+    if matchup:
+        return matchup
+    home_team = str(row.get("home_team") or "").strip()
+    away_team = str(row.get("away_team") or "").strip()
+    if home_team and away_team:
+        return f"{away_team}@{home_team}"
+    return None
+
+
+def _canonical_odds_record(*, row: Mapping[str, Any], market_key: str, sport: str, timestamp: str, current_line: float | None) -> dict[str, Any]:
+    event_id = _canonical_event_id(row)
+    market_type = _canonical_market_type(row)
+    entity = _canonical_entity(row)
+    market_id = str(row.get("market_id") or "").strip() or market_key
+    odds_value = _primary_odds_value(row)
+    return {
+        "market_id": market_id,
+        "sport": sport,
+        "event_id": event_id,
+        "market_type": market_type,
+        "entity": entity,
+        "line": current_line,
+        "odds": odds_value,
+        "timestamp": timestamp,
+    }
+
+
+def _odds_history_line_snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    snapshot: dict[str, Any] = {}
+    for key in (
+        "line",
+        "point",
+        "spread",
+        "total",
+        "price",
+        "odds",
+        "home_odds",
+        "away_odds",
+        "over_odds",
+        "under_odds",
+        "home_ml",
+        "away_ml",
+        "home_line",
+        "away_line",
+        "home_puck_line",
+        "away_puck_line",
+        "home_puck_odds",
+        "away_puck_odds",
+        "over_price",
+        "under_price",
+    ):
+        value = row.get(key)
+        if value in (None, "", "-"):
+            continue
+        snapshot[key] = _json_safe(value)
+    return snapshot or None
+
+
+def _odds_history_market_key(row: Mapping[str, Any]) -> str | None:
+    market_id = str(row.get("market_id") or "").strip()
+    if market_id:
+        return market_id
+    parts: list[str] = []
+    for key in (
+        "event_key",
+        "event_id",
+        "game_id",
+        "game_pk",
+        "matchup",
+        "home_team",
+        "away_team",
+        "player_key",
+        "player_name",
+        "team_key",
+        "team",
+        "market",
+        "selection",
+        "book",
+        "bookmaker",
+    ):
+        value = str(row.get(key) or "").strip()
+        if value:
+            parts.append(f"{key}={value}")
+    if not parts:
+        fallback = str(row.get("name") or row.get("title") or row.get("label") or "").strip()
+        if fallback:
+            parts.append(f"name={fallback}")
+    return "|".join(parts) if parts else None
+
+
+def _market_rows_from_mapping(payload: Mapping[str, Any], *, context: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    merged_context = dict(context or {})
+    for key in (
+        "event_key",
+        "event_id",
+        "game_id",
+        "game_pk",
+        "matchup",
+        "home_team",
+        "away_team",
+        "player_key",
+        "player_name",
+        "team_key",
+        "team",
+        "market",
+        "selection",
+        "book",
+        "bookmaker",
+        "date",
+        "sport",
+    ):
+        value = payload.get(key)
+        if value in (None, ""):
+            continue
+        merged_context.setdefault(key, value)
+
+    rows: list[dict[str, Any]] = []
+    if _odds_history_line_snapshot(payload):
+        rows.append({**merged_context, **dict(payload)})
+
+    for key in ("games", "rows", "items"):
+        nested = payload.get(key)
+        if isinstance(nested, list):
+            for item in nested:
+                if isinstance(item, Mapping):
+                    rows.extend(_market_rows_from_mapping(item, context=merged_context))
+
+    for key in ("lines", "markets", "props", "player_props", "team_odds", "hitter_props", "pitcher_props"):
+        nested = payload.get(key)
+        if isinstance(nested, Mapping):
+            for nested_key, nested_value in nested.items():
+                nested_context = dict(merged_context)
+                if nested_key and not nested_context.get("market"):
+                    nested_context["market"] = str(nested_key)
+                if isinstance(nested_value, Mapping):
+                    rows.extend(_market_rows_from_mapping(nested_value, context=nested_context))
+                elif isinstance(nested_value, list):
+                    for item in nested_value:
+                        if isinstance(item, Mapping):
+                            rows.extend(_market_rows_from_mapping(item, context=nested_context))
+        elif isinstance(nested, list):
+            for item in nested:
+                if isinstance(item, Mapping):
+                    rows.extend(_market_rows_from_mapping(item, context=merged_context))
+
+    return rows
+
+
+def _odds_history_rows_from_json(path: Path) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if isinstance(payload, list):
+        rows: list[dict[str, Any]] = []
+        for item in payload:
+            if isinstance(item, Mapping):
+                rows.extend(_market_rows_from_mapping(item))
+        return rows
+    if isinstance(payload, Mapping):
+        return _market_rows_from_mapping(payload)
+    return []
+
+
+def _odds_history_rows_from_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return rows
+    for line in lines:
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            payload = json.loads(text)
+        except Exception:
+            continue
+        if isinstance(payload, Mapping):
+            rows.extend(_market_rows_from_mapping(payload))
+        elif isinstance(payload, list):
+            for item in payload:
+                if isinstance(item, Mapping):
+                    rows.extend(_market_rows_from_mapping(item))
+    return rows
+
+
+def _odds_history_rows_from_csv(path: Path) -> list[dict[str, Any]]:
+    try:
+        frame = pd.read_csv(path)
+    except Exception:
+        return []
+    if frame.empty:
+        return []
+    return [dict(row) for row in frame.to_dict(orient="records") if isinstance(row, Mapping)]
+
+
+def _odds_history_snapshot_paths(*, sport: str, source_root: Path, date_str: str) -> list[Path]:
+    slug = str(sport or "").strip().lower()
+    date_slug = str(date_str or "").strip().replace("-", "_")
+    candidates: list[Path] = []
+
+    def add(*parts: str) -> None:
+        candidate = source_root.joinpath(*parts)
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    if slug == "mlb":
+        for snapshot_dir in (
+            source_root / "source_artifacts" / "data" / "daily" / "snapshots" / date_str,
+            source_root / "data" / "daily" / "snapshots" / date_str,
+        ):
+            rel_parts = snapshot_dir.relative_to(source_root).parts
+            add(*rel_parts, f"oddsapi_game_lines_{date_slug}.json")
+            add(*rel_parts, f"oddsapi_hitter_props_{date_slug}.json")
+            add(*rel_parts, f"oddsapi_pitcher_props_{date_slug}.json")
+        return [path for path in candidates if path.exists() and path.is_file()]
+
+    if slug in {"nba", "wnba"}:
+        for prefix_root in (
+            source_root / "data" / "processed",
+            source_root / "source_artifacts" / "data" / "processed",
+        ):
+            rel_parts = prefix_root.relative_to(source_root).parts
+            add(*rel_parts, "live_snapshots", f"live_lines_{date_str}.jsonl")
+            add(*rel_parts, f"live_lens_signals_{date_str}.jsonl")
+            add(*rel_parts, f"live_lens_projections_{date_str}.jsonl")
+        return [path for path in candidates if path.exists() and path.is_file()]
+
+    if slug == "nhl":
+        for base_parts in (
+            ("data", "odds", "games", f"date={date_str}", "scoreboard.csv"),
+            ("data", "odds", "team", f"date={date_str}", "oddsapi.csv"),
+            ("data", "props", "player_props_lines", f"date={date_str}", "oddsapi.csv"),
+        ):
+            add(*base_parts)
+            add("source_artifacts", *base_parts)
+        return [path for path in candidates if path.exists() and path.is_file()]
+
+    if slug == "nfl":
+        season, week = _infer_nfl_week_scope(source_root)
+        add(f"real_betting_lines_{date_str.replace('-', '_')}.json")
+        add("source_artifacts", f"real_betting_lines_{date_str.replace('-', '_')}.json")
+        add(f"oddsapi_player_props_{season}_wk{week}.csv")
+        add("source_artifacts", f"oddsapi_player_props_{season}_wk{week}.csv")
+        return [path for path in candidates if path.exists() and path.is_file()]
+
+    if slug == "ncaab":
+        for base_parts in (
+            ("raw_outputs", "by_date", date_str, f"odds_{date_str}.csv"),
+            ("source_artifacts", "raw_outputs", "by_date", date_str, f"odds_{date_str}.csv"),
+            ("api", "live_lines", f"live_lines_{date_str}.json"),
+            ("data", "api", "live_lines", f"live_lines_{date_str}.json"),
+            ("source_artifacts", "api", "live_lines", f"live_lines_{date_str}.json"),
+        ):
+            add(*base_parts)
+        return [path for path in candidates if path.exists() and path.is_file()]
+
+    if slug == "ncaaf":
+        artifact_root = source_root / "source_artifacts"
+        if artifact_root.exists():
+            for candidate in sorted(artifact_root.glob("college_football_schedule_*_predicted_totals_enhanced*.csv")):
+                if candidate.is_file():
+                    candidates.append(candidate)
+        return candidates
+
+    return []
+
+
+def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: str) -> dict[str, Any]:
+    slug = str(sport or "").strip().lower()
+    tracking_root = source_root / "tracking"
+    history_path = _odds_history_path(tracking_root)
+    artifact_history_path = _odds_history_artifact_path(source_root, slug)
+    candidates = _odds_history_snapshot_paths(sport=slug, source_root=source_root, date_str=date_str)
+    if not candidates:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "no_odds_snapshots",
+            "sport": slug,
+            "date": date_str,
+            "history_path": str(history_path),
+            "files_scanned": 0,
+            "entries_appended": 0,
+        }
+
+    existing: dict[str, Any] = {}
+    for candidate_path in (artifact_history_path, history_path):
+        try:
+            if candidate_path.exists():
+                payload = json.loads(candidate_path.read_text(encoding="utf-8"))
+                if isinstance(payload, dict):
+                    existing = payload
+                    break
+        except Exception:
+            continue
+
+    markets = _odds_history_market_states(existing)
+
+    now = _utc_now()
+    entries_appended = 0
+    files_scanned = 0
+    seen_current_lines: set[tuple[str, float]] = set()
+
+    for candidate in candidates:
+        files_scanned += 1
+        suffix = candidate.suffix.lower()
+        if suffix == ".csv":
+            rows = _odds_history_rows_from_csv(candidate)
+        elif suffix == ".jsonl":
+            rows = _odds_history_rows_from_jsonl(candidate)
+        else:
+            rows = _odds_history_rows_from_json(candidate)
+        if not rows:
+            continue
+
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            market_key = _odds_history_market_key(row)
+            line_snapshot = _odds_history_line_snapshot(row)
+            current_line = _primary_line_value(row)
+            if not market_key or not line_snapshot or current_line is None:
+                continue
+            dedupe_key = (market_key, current_line)
+            if dedupe_key in seen_current_lines:
+                continue
+            seen_current_lines.add(dedupe_key)
+
+            market_state = markets.get(market_key)
+            if not isinstance(market_state, dict):
+                market_state = {"history": []}
+            history = market_state.get("history")
+            if not isinstance(history, list):
+                history = []
+
+            previous_line = _line_number(market_state.get("last_line"))
+            if previous_line is None and history:
+                previous_line = _line_number((history[-1] or {}).get("current_line"))
+
+            if previous_line is not None and current_line == previous_line and history:
+                markets[market_key] = market_state
+                continue
+
+            try:
+                source_path = str(candidate.relative_to(source_root))
+            except Exception:
+                source_path = str(candidate)
+
+            delta = current_line - previous_line if previous_line is not None else None
+            movement = _movement_direction(delta)
+            percent_change = _percent_change(current_line, previous_line)
+            canonical_record = _canonical_odds_record(
+                row=row,
+                market_key=market_key,
+                sport=slug,
+                timestamp=now,
+                current_line=current_line,
+            )
+            canonical_row = attach_market_id(
+                {key: value for key, value in row.items() if key not in {"history", "markets"}},
+                sport=slug,
+                event_id=canonical_record.get("event_id"),
+                market_type=canonical_record.get("market_type"),
+                entity=canonical_record.get("entity"),
+                line=current_line,
+            )
+
+            history.append(
+                {
+                    "captured_at": now,
+                    "timestamp": now,
+                    "sport": slug,
+                    "date": date_str,
+                    "source_path": source_path,
+                    "market_key": market_key,
+                    "market_id": canonical_row.get("market_id"),
+                    **canonical_record,
+                    "previous_line": previous_line,
+                    "current_line": current_line,
+                    "last_odds": _primary_odds_value(row),
+                    "delta": delta,
+                    "delta_line": delta,
+                    "percent_change": percent_change,
+                    "movement": movement,
+                    "line": _json_safe(line_snapshot),
+                    "row": _json_safe(canonical_row),
+                }
+            )
+            if len(history) > _ODDS_HISTORY_LIMIT:
+                history = history[-_ODDS_HISTORY_LIMIT:]
+            market_state["history"] = history
+            market_state["last_line"] = current_line
+            market_state["previous_line"] = previous_line
+            market_state["last_odds"] = _primary_odds_value(row)
+            market_state["delta"] = delta
+            market_state["delta_line"] = delta
+            market_state["percent_change"] = percent_change
+            market_state["movement"] = movement
+            market_state["last_updated"] = now
+            market_state["last_source_path"] = source_path
+            markets[market_key] = market_state
+            entries_appended += 1
+
+    if not entries_appended and history_path.exists():
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "no_line_changes",
+            "sport": slug,
+            "date": date_str,
+            "history_path": str(history_path),
+            "files_scanned": int(files_scanned),
+            "entries_appended": 0,
+        }
+
+    payload = {
+        "sport": slug,
+        "date": date_str,
+        "updated_at": now,
+        "history_limit": _ODDS_HISTORY_LIMIT,
+        "markets": markets,
+    }
+    payload.update(markets)
+    _write_json(history_path, payload)
+    _write_json(artifact_history_path, payload)
+    return {
+        "ok": True,
+        "skipped": False,
+        "reason": None,
+        "sport": slug,
+        "date": date_str,
+        "history_path": str(history_path),
+        "artifact_history_path": str(artifact_history_path),
+        "files_scanned": int(files_scanned),
+        "entries_appended": int(entries_appended),
+        "markets_tracked": len(markets),
+    }
 
 
 def _read_json_payload(path: Path) -> Any:
@@ -610,6 +1214,7 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
                 date_str=date_str,
                 tracking_meta=results,
             )
+            results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
         return results
 
     tracking_root = source_root / "tracking"
@@ -645,6 +1250,7 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             date_str=date_str,
             tracking_meta=results,
         )
+        results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
         return results
 
     if slug == "nfl":
@@ -680,6 +1286,7 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             date_str=date_str,
             tracking_meta=results,
         )
+        results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
         return results
 
     if slug == "mlb":
@@ -723,6 +1330,7 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             date_str=date_str,
             tracking_meta=results,
         )
+        results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
         return results
 
     if slug == "ncaab":
@@ -745,6 +1353,7 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             date_str=date_str,
             tracking_meta=results,
         )
+        results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
         return results
 
     if slug == "ncaaf":
@@ -772,6 +1381,7 @@ def sync_sport_post_refresh_tracking(*, sport: str, source_root: Path, date_str:
             date_str=date_str,
             tracking_meta=results,
         )
+        results["artifacts"]["odds_history"] = _sync_odds_history_for_refresh(sport=slug, source_root=source_root, date_str=date_str)
         return results
 
     return {"ok": False, "sport": slug, "date": date_str, "error": f"unsupported_sport:{slug}"}

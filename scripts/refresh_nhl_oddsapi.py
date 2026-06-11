@@ -14,15 +14,15 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from syndicate.features.shared.refresh_state_store import build_input_hash
-from syndicate.features.shared.refresh_state_store import path_fingerprint
-from syndicate.features.shared.refresh_state_store import record_refresh_state
-from syndicate.features.shared.refresh_state_store import should_recompute
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.refresh_state_store import build_input_hash
+from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import record_refresh_state
+from syndicate.features.shared.refresh_state_store import should_recompute
 
 PROCESSED_FILES = (
     "predictions_{date}.csv",
@@ -374,6 +374,44 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
     return copied
 
 
+def _materialize_collected_only_artifact_bundle(*, artifact_root: Path, date_str: str) -> dict[str, object]:
+    processed_root = artifact_root / "data" / "processed"
+    live_lens_root = artifact_root / "data" / "live_lens"
+    odds_games_root = artifact_root / "data" / "odds" / "games" / f"date={date_str}"
+    odds_team_root = artifact_root / "data" / "odds" / "team" / f"date={date_str}"
+    props_root = artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}"
+
+    copied: dict[str, object] = {}
+    scoreboard_destination = odds_games_root / "scoreboard.csv"
+    if scoreboard_destination.exists() and scoreboard_destination.is_file():
+        copied["scoreboard_path"] = str(scoreboard_destination)
+
+    team_paths = [str(path) for path in (odds_team_root / "oddsapi.csv", odds_team_root / "oddsapi.parquet") if path.exists()]
+    if team_paths:
+        copied["team_odds_paths"] = team_paths
+
+    props_paths = [str(path) for path in (props_root / "oddsapi.csv", props_root / "oddsapi.parquet") if path.exists()]
+    if props_paths:
+        copied["props_line_paths"] = props_paths
+
+    for template in PROCESSED_FILES:
+        filename = template.format(date=date_str)
+        destination = processed_root / filename
+        if destination.exists():
+            copied.setdefault("processed_files", []).append(str(destination))
+
+    for template in LIVE_LENS_FILES:
+        filename = template.format(date=date_str)
+        processed_destination = processed_root / filename
+        live_lens_destination = live_lens_root / filename
+        if processed_destination.exists():
+            copied.setdefault("live_lens_processed_files", []).append(str(processed_destination))
+        if live_lens_destination.exists():
+            copied.setdefault("live_lens_files", []).append(str(live_lens_destination))
+
+    return copied
+
+
 def _write_smart_sim_bundle(*, artifact_root: Path, date_str: str, copied: dict[str, object]) -> Path:
     processed_root = artifact_root / "data" / "processed"
     processed_root.mkdir(parents=True, exist_ok=True)
@@ -465,6 +503,7 @@ def main() -> int:
     artifact_root = Path(args.artifact_root).resolve()
     target_dates = _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))
     warnings: list[str] = []
+    mode = str(args.mode or "full").strip().lower()
 
     try:
         for target_date in target_dates:
@@ -474,7 +513,7 @@ def main() -> int:
                 team_markets=str(args.team_markets or "h2h,spreads,totals"),
                 props_source=str(args.props_source or "oddsapi"),
             )
-        if str(args.mode or "full").strip().lower() == "full" and source_root is not None and _source_cli_generation_enabled():
+        if mode == "full" and source_root is not None and _source_cli_generation_enabled():
             try:
                 _run_source_generation_multi(
                     source_root=source_root,
@@ -488,14 +527,14 @@ def main() -> int:
                 if missing_by_date:
                     raise
                 warnings.append(f"source generation skipped: {exc}")
-        elif source_root is not None:
+        elif source_root is not None and mode == "full":
             warnings.append("source generation disabled by default (set SYNDICATE_NHL_SOURCE_CLI_GENERATION=1 to enable)")
     except Exception as exc:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
 
-    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date) if str(args.mode or "full").strip().lower() == "full" else {}
-    if str(args.mode or "full").strip().lower() == "full":
+    copied = _materialize_collected_only_artifact_bundle(artifact_root=artifact_root, date_str=args.date) if mode == "fast" else _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
+    if mode == "full":
         smart_sim_bundle_path = _write_smart_sim_bundle(artifact_root=artifact_root, date_str=args.date, copied=copied)
         copied.setdefault("smart_sim_files", []).append(str(smart_sim_bundle_path))
     missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
@@ -529,13 +568,14 @@ def main() -> int:
         )
         return 1
     lookahead_runs = []
-    for target_date in _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))[1:]:
-        lookahead_runs.append(
-            {
-                "date": target_date,
-                "artifact_bundle_files": _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=target_date),
-            }
-        )
+    if mode == "full":
+        for target_date in _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))[1:]:
+            lookahead_runs.append(
+                {
+                    "date": target_date,
+                    "artifact_bundle_files": _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=target_date),
+                }
+            )
     print(
         json.dumps(
             {

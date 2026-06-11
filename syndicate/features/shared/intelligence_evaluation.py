@@ -113,6 +113,57 @@ def _numeric_line(value: Any) -> float | None:
     return _coerce_float(value)
 
 
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _movement_context(recommendation: Mapping[str, Any]) -> dict[str, Any]:
+    movement = recommendation.get("movement") if isinstance(recommendation.get("movement"), Mapping) else {}
+    odds_history = recommendation.get("odds_history") if isinstance(recommendation.get("odds_history"), Mapping) else {}
+
+    delta = _first_present(
+        _coerce_float(movement.get("delta")),
+        _coerce_float(movement.get("edge_delta")),
+        _coerce_float(recommendation.get("delta")),
+        _coerce_float(odds_history.get("delta")),
+    )
+    trend = str(
+        movement.get("trend")
+        or movement.get("recent_movement_trend")
+        or recommendation.get("recent_movement_trend")
+        or odds_history.get("movement")
+        or recommendation.get("movement")
+        or ""
+    ).strip().lower() or None
+
+    last_odds_update_timestamp = (
+        str(movement.get("last_updated") or "").strip()
+        or str(recommendation.get("last_updated") or "").strip()
+        or str(odds_history.get("last_updated") or "").strip()
+        or None
+    )
+
+    return {
+        "delta": delta,
+        "trend": trend,
+        "last_odds_update_timestamp": last_odds_update_timestamp,
+    }
+
+
+def _timestamp_key(value: Any) -> tuple[int, str]:
+    text = str(value or "").strip()
+    if not text:
+        return (0, "")
+    normalized = text.replace("Z", "+00:00")
+    try:
+        return (1, datetime.fromisoformat(normalized).astimezone(timezone.utc).isoformat())
+    except Exception:
+        return (1, text)
+
+
 def _artifact_manifest_summary(*, selected_date: str | None = None, sport: str | None = None) -> dict[str, Any]:
     sport_slugs = [sport] if sport else None
     manifests = load_artifact_manifests(selected_date=selected_date, sport_slugs=sport_slugs)
@@ -135,6 +186,9 @@ def build_artifact_metadata(*, query: Any, response: Any) -> dict[str, Any]:
     supporting_evidence = response_payload.get("supporting_evidence") if isinstance(response_payload.get("supporting_evidence"), Mapping) else {}
     top_recommendation = recommendations[0] if recommendations and isinstance(recommendations[0], Mapping) else {}
     policy_comparison = top_recommendation.get("historical_profile", {}).get("policy_comparison") if isinstance(top_recommendation.get("historical_profile"), Mapping) else None
+    movement_contexts = [_movement_context(item) for item in recommendations if isinstance(item, Mapping)]
+    deltas = [abs(context["delta"]) for context in movement_contexts if context.get("delta") is not None]
+    update_timestamps = [context["last_odds_update_timestamp"] for context in movement_contexts if context.get("last_odds_update_timestamp")]
     manifest_summary = _artifact_manifest_summary(selected_date=selected_date, sport=sport)
     return {
         "selected_date": selected_date,
@@ -148,6 +202,10 @@ def build_artifact_metadata(*, query: Any, response: Any) -> dict[str, Any]:
         "board_note_count": len(_copy_sequence(response_payload.get("board_notes"))),
         "supporting_evidence_title": supporting_evidence.get("title") if isinstance(supporting_evidence, Mapping) else None,
         "local_only": response_payload.get("local_only"),
+        "has_line_movement": any((context.get("delta") not in (None, 0)) or context.get("trend") in {"up", "down"} for context in movement_contexts),
+        "max_delta_detected": max(deltas) if deltas else None,
+        "max_delta_line": max(deltas) if deltas else None,
+        "last_odds_update_timestamp": max(update_timestamps, key=_timestamp_key) if update_timestamps else None,
         "manifest_summary": manifest_summary,
     }
 

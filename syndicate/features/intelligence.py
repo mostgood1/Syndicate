@@ -35,6 +35,7 @@ from syndicate.features.nhl.sources import processed_path as nhl_processed_path
 from syndicate.features.nhl.sources import props_lines_snapshot_path as nhl_props_lines_snapshot_path
 from syndicate.features.nhl.sources import recommendation_path as nhl_recommendation_path
 from syndicate.features.nhl.sources import scoreboard_snapshot_path as nhl_scoreboard_snapshot_path
+from syndicate.features.wnba.sources import default_wnba_source_root
 from syndicate.features.intelligence_analysis_views import build_analysis_views as _runtime_build_analysis_views
 from syndicate.features.bankroll_manager import compute_bet_size as _compute_bet_size
 from syndicate.features.bankroll_manager import build_portfolio as _build_portfolio
@@ -2363,6 +2364,264 @@ def _mlb_repo_artifact_path(*parts: str) -> Path:
     return default_mlb_source_root().joinpath(*parts)
 
 
+def _odds_history_tracking_root_for_sport(slug: str) -> Path | None:
+    sport_slug = _safe_text(slug, "").lower()
+    if sport_slug == "mlb":
+        return default_mlb_source_root()
+    if sport_slug == "nba":
+        return nba_processed_path("team_advanced_stats_2026.csv").parents[2]
+    if sport_slug == "wnba":
+        return default_wnba_source_root()
+    if sport_slug == "nhl":
+        return nhl_processed_path("odds_history_placeholder.csv").parents[2]
+    if sport_slug == "nfl":
+        return nfl_sources.default_nfl_source_root()
+    if sport_slug == "ncaaf":
+        return ncaaf_sources.default_ncaaf_source_root()
+    if sport_slug == "ncaab":
+        roots = ncaab_sources._source_roots()
+        return roots[0] if roots else None
+    return None
+
+
+def _odds_history_path_for_sport(slug: str) -> Path | None:
+    root = _odds_history_tracking_root_for_sport(slug)
+    if root is None:
+        return None
+    return root / "tracking" / "odds_history.json"
+
+
+def _load_odds_history_payload_for_sport(slug: str) -> dict[str, Any] | None:
+    path = _odds_history_path_for_sport(slug)
+    if path is None or not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    payloads: dict[str, dict[str, Any]] = {}
+    for sport in overview:
+        if not isinstance(sport, dict):
+            continue
+        slug = _safe_text(sport.get("slug"), "sport").lower()
+        if not slug or slug in payloads:
+            continue
+        payload = _load_odds_history_payload_for_sport(slug)
+        if isinstance(payload, dict):
+            payloads[slug] = payload
+    return payloads
+
+
+def _parse_odds_history_market_key(market_key: Any) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for part in str(market_key or "").split("|"):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        normalized_key = _safe_text(key, "").lower()
+        normalized_value = _normalized_market_text(value)
+        if normalized_key and normalized_value:
+            parsed[normalized_key] = normalized_value
+    return parsed
+
+
+def _candidate_selection_text(candidate: dict[str, Any]) -> str:
+    return _normalized_market_text(_safe_text(candidate.get("pick"), _safe_text(candidate.get("name"), "")))
+
+
+def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: Any, state: Mapping[str, Any]) -> float:
+    parsed_key = _parse_odds_history_market_key(market_key)
+    if not parsed_key:
+        return 0.0
+
+    score = 0.0
+    candidate_matchup = _normalized_market_text(_safe_text(candidate.get("matchup"), ""))
+    candidate_market = _normalized_market_text(_safe_text(candidate.get("market"), ""))
+    candidate_subject = _normalized_market_text(_safe_text(_candidate_subject_key(candidate), ""))
+    candidate_team = _normalized_market_text(_safe_text(_candidate_team_key(candidate), ""))
+    candidate_selection = _candidate_selection_text(candidate)
+    candidate_selection_direction = _candidate_selection_direction(candidate)
+    candidate_selection_hint = "over" if candidate_selection_direction > 0 else "under" if candidate_selection_direction < 0 else ""
+    entry_event = " ".join(
+        _safe_text(parsed_key.get(field), "")
+        for field in ("event_key", "event_id", "matchup", "home_team", "away_team", "player_name", "player_key", "team", "team_key")
+    ).strip()
+    entry_market = _safe_text(parsed_key.get("market"), "")
+    entry_selection = _safe_text(parsed_key.get("selection"), "")
+    entry_book = _safe_text(parsed_key.get("bookmaker") or parsed_key.get("book"), "")
+
+    for value in (candidate_matchup, candidate_subject, candidate_team, candidate_selection):
+        if not value or not entry_event:
+            continue
+        if value == entry_event or value in entry_event or entry_event in value:
+            score += 2.0
+
+    if candidate_market and entry_market:
+        if candidate_market == entry_market or candidate_market in entry_market or entry_market in candidate_market:
+            score += 3.0
+
+    if candidate_selection and entry_selection:
+        if candidate_selection == entry_selection or candidate_selection in entry_selection or entry_selection in candidate_selection:
+            score += 2.5
+    if candidate_selection_hint and entry_selection and candidate_selection_hint in entry_selection:
+        score += 1.0
+
+    if entry_book and _normalized_market_text(_safe_text(candidate.get("book"), _safe_text(candidate.get("bookmaker"), ""))):
+        candidate_book = _normalized_market_text(_safe_text(candidate.get("book"), _safe_text(candidate.get("bookmaker"), "")))
+        if candidate_book == entry_book or candidate_book in entry_book or entry_book in candidate_book:
+            score += 0.5
+
+    candidate_line = _numeric_hint(candidate.get("line"))
+    state_line = _numeric_hint(state.get("last_line"))
+    if candidate_line is not None and state_line is not None:
+        score += max(0.0, 1.5 - min(abs(candidate_line - state_line), 1.5))
+
+    return score
+
+
+def _candidate_odds_history_state(candidate: dict[str, Any], odds_history: dict[str, Any] | None) -> tuple[str, dict[str, Any] | None]:
+    markets = (odds_history or {}).get("markets") if isinstance(odds_history, dict) else {}
+    if not isinstance(markets, dict) or not markets:
+        return "", None
+
+    best_key = ""
+    best_state: dict[str, Any] | None = None
+    best_score = 0.0
+    for market_key, state in markets.items():
+        if not isinstance(state, dict):
+            continue
+        score = _candidate_odds_history_match_score(candidate, market_key, state)
+        if score > best_score:
+            best_key = str(market_key)
+            best_score = score
+            best_state = state
+
+    if best_score <= 0.0:
+        return "", None
+    return best_key, best_state
+
+
+def _candidate_odds_history_context(candidate: dict[str, Any], odds_history: dict[str, Any] | None) -> dict[str, Any] | None:
+    market_key, history_state = _candidate_odds_history_state(candidate, odds_history)
+    market_data = candidate.get("market_data") if isinstance(candidate.get("market_data"), dict) else {}
+    movement_history = market_data.get("movement_history") if isinstance(market_data.get("movement_history"), list) else []
+    opening_line = _numeric_hint(market_data.get("opening_line"))
+    current_line = _numeric_hint(market_data.get("current_line"))
+
+    if history_state is None:
+        if opening_line is None and current_line is None and not movement_history:
+            return None
+        if current_line is None:
+            current_line = _numeric_hint(candidate.get("line"))
+        previous_line = opening_line
+        if previous_line is None and len(movement_history) >= 2:
+            previous_line = _numeric_hint(movement_history[-2].get("line"))
+            if current_line is None:
+                current_line = _numeric_hint(movement_history[-1].get("line"))
+        if current_line is None and movement_history:
+            current_line = _numeric_hint(movement_history[-1].get("line"))
+        if previous_line is None and current_line is not None and movement_history:
+            previous_line = _numeric_hint(movement_history[0].get("line"))
+        if current_line is None and previous_line is None:
+            return None
+        delta = current_line - previous_line if current_line is not None and previous_line is not None else None
+        percent_change = None
+        if current_line is not None and previous_line not in (None, 0):
+            percent_change = ((current_line - previous_line) / abs(previous_line)) * 100.0
+        trend = "flat"
+        if delta is not None:
+            if delta > 0:
+                trend = "up"
+            elif delta < 0:
+                trend = "down"
+        return {
+            "market_key": market_key or None,
+            "last_line": current_line if current_line is not None else previous_line,
+            "previous_line": previous_line,
+            "delta": delta,
+            "movement": trend,
+            "trend": trend,
+            "recent_movement_trend": trend,
+            "percent_change": percent_change,
+            "last_updated": None,
+            "history": movement_history,
+        }
+
+    history = history_state.get("history") if isinstance(history_state.get("history"), list) else []
+    last_line = _numeric_hint(history_state.get("last_line"))
+    previous_line = _numeric_hint(history_state.get("previous_line"))
+    delta = _numeric_hint(history_state.get("delta"))
+    percent_change = _numeric_hint(history_state.get("percent_change"))
+    movement = _safe_text(history_state.get("movement"), "flat") or "flat"
+    last_updated = _safe_text(history_state.get("last_updated"), "") or None
+
+    if last_line is None and current_line is not None:
+        last_line = current_line
+    if previous_line is None and len(history) >= 2:
+        previous_line = _numeric_hint((history[-2] or {}).get("current_line"))
+    if delta is None and last_line is not None and previous_line is not None:
+        delta = last_line - previous_line
+    if percent_change is None and last_line is not None and previous_line not in (None, 0):
+        percent_change = ((last_line - previous_line) / abs(previous_line)) * 100.0
+    if movement == "flat" and delta is not None:
+        if delta > 0:
+            movement = "up"
+        elif delta < 0:
+            movement = "down"
+
+    return {
+        "market_key": market_key or None,
+        "last_line": last_line,
+        "previous_line": previous_line,
+        "delta": delta,
+        "movement": movement,
+        "trend": movement,
+        "recent_movement_trend": movement,
+        "percent_change": percent_change,
+        "last_updated": last_updated,
+        "history": history,
+    }
+
+
+def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
+    enriched: list[dict[str, Any]] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        payload = dict(candidate)
+        payload = _attach_market_data(payload)
+        sport_slug = _safe_text(payload.get("sport_slug"), "sport").lower()
+        odds_history = (odds_history_by_sport or {}).get(sport_slug) if isinstance(odds_history_by_sport, dict) else None
+        movement_context = _candidate_odds_history_context(payload, odds_history)
+        if movement_context:
+            market_data = payload.get("market_data") if isinstance(payload.get("market_data"), dict) else {}
+            if movement_context.get("history") and not market_data.get("movement_history"):
+                market_data["movement_history"] = movement_context.get("history")
+            market_data["movement"] = movement_context
+            payload["market_data"] = market_data
+            payload["movement"] = movement_context
+            payload["delta"] = movement_context.get("delta")
+            payload["percent_change"] = movement_context.get("percent_change")
+            payload["recent_movement_trend"] = movement_context.get("recent_movement_trend")
+            payload["last_updated"] = movement_context.get("last_updated")
+            payload["odds_history"] = {
+                "market_key": movement_context.get("market_key"),
+                "last_line": movement_context.get("last_line"),
+                "previous_line": movement_context.get("previous_line"),
+                "delta": movement_context.get("delta"),
+                "movement": movement_context.get("movement"),
+                "trend": movement_context.get("trend") or movement_context.get("movement"),
+                "percent_change": movement_context.get("percent_change"),
+                "last_updated": movement_context.get("last_updated"),
+            }
+        enriched.append(payload)
+    return enriched
+
+
 def _path_status(path: Path, tracked: set[str]) -> dict[str, Any]:
     relative_path = _relative_repo_path(path)
     inside_repo = not Path(relative_path).is_absolute() and not relative_path.startswith("..")
@@ -3808,7 +4067,8 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                     continue
                 candidates.append(artifact_candidate)
 
-    candidates = [_attach_market_data(candidate) for candidate in candidates]
+    odds_history_by_sport = _odds_history_payloads_by_sport(overview)
+    candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
 
     candidates = _filter_candidates_to_requested_markets(candidates, preferences.get("requested_markets") or [])
     candidates = [
@@ -3867,6 +4127,7 @@ def _apply_advanced_context_to_candidates(
                 "current_line": (candidate.get("market_data") or {}).get("current_line"),
                 "opening_line": (candidate.get("market_data") or {}).get("opening_line"),
                 "movement_history": (candidate.get("market_data") or {}).get("movement_history"),
+                "movement": candidate.get("movement"),
                 "odds": candidate.get("odds"),
                 "confidence": candidate.get("confidence"),
                 "edge": candidate.get("edge"),
@@ -4227,6 +4488,11 @@ def _candidate_summary(candidate: dict[str, Any]) -> dict[str, Any]:
         "confidence": _safe_text(candidate.get("confidence"), "-"),
         "projected": _safe_text(candidate.get("projected"), "-"),
         "live_projection": _safe_text(candidate.get("live_projection"), "-"),
+        "movement": candidate.get("movement") if isinstance(candidate.get("movement"), dict) else None,
+        "delta": candidate.get("delta"),
+        "percent_change": candidate.get("percent_change"),
+        "recent_movement_trend": _safe_text(candidate.get("recent_movement_trend") or (candidate.get("movement") or {}).get("trend"), "flat"),
+        "last_updated": candidate.get("last_updated") or (candidate.get("movement") or {}).get("last_updated"),
         "actual": _safe_text(candidate.get("actual"), "-"),
         "status_display": _safe_text(candidate.get("status_display"), "-"),
         "status_context": _safe_text(candidate.get("status_context"), "-"),
@@ -4448,6 +4714,14 @@ def build_pick_card_view(pick: dict[str, Any]) -> dict[str, Any]:
     visual = pick.get("visual") if isinstance(pick.get("visual"), dict) else {}
     movement = pick.get("movement") if isinstance(pick.get("movement"), dict) else {}
     probabilities = pick.get("probabilities") if isinstance(pick.get("probabilities"), dict) else {}
+    delta_value = movement.get("delta")
+    delta_display = movement.get("delta_display") or movement.get("edge_delta")
+    if delta_display is None and delta_value is not None:
+        delta_display = f"{float(delta_value):+g}"
+    percent_change_value = movement.get("percent_change")
+    percent_change_display = movement.get("percent_change_display")
+    if percent_change_display is None and percent_change_value is not None:
+        percent_change_display = f"{float(percent_change_value):.2f}%"
     return {
         "title": _safe_text(pick.get("selection") or pick.get("pick") or pick.get("name"), "Play"),
         "edge_display": pick.get("edge_display") or pick.get("edge"),
@@ -4466,8 +4740,10 @@ def build_pick_card_view(pick: dict[str, Any]) -> dict[str, Any]:
             visual.get("risk_tier"),
         ],
         "movement": {
-            "trend": _safe_text(movement.get("trend"), "flat"),
-            "delta_display": movement.get("delta_display") or movement.get("edge_delta"),
+            "trend": _safe_text(movement.get("trend") or pick.get("recent_movement_trend"), "flat"),
+            "delta_display": delta_display,
+            "percent_change_display": percent_change_display,
+            "last_updated": movement.get("last_updated") or pick.get("last_updated"),
         },
     }
 
@@ -5382,8 +5658,11 @@ def _log_candidate_pipeline(
         _log_json_event(logging.DEBUG, "intelligence_candidate_decision", **payload)
 
 
-def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any]) -> list[dict[str, Any]]:
-    return _collect_candidates(overview, preferences)
+def collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, Any], odds_history_by_sport: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    if odds_history_by_sport is None:
+        odds_history_by_sport = _odds_history_payloads_by_sport(overview)
+    candidates = _collect_candidates(overview, preferences)
+    return _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
 
 
 def score_candidate(
@@ -5469,6 +5748,7 @@ def rank_candidates(
 def collect_all_recommendations(*, selected_date: str | None = None, force_refresh: bool = False, log_pipeline: bool = True) -> list[dict[str, Any]]:
     effective_date = _effective_date(selected_date or central_today_iso())
     overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
+    odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     tracked = _tracked_repo_files()
     preferences = _query_preferences(
         "top edges today",
@@ -5483,7 +5763,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
-    candidates = collect_candidates(overview, preferences)
+    candidates = collect_candidates(overview, preferences, odds_history_by_sport)
     if _query_needs_mlb_home_run_candidates(preferences) and not _has_mlb_home_run_candidates(candidates):
         for sport_row in overview:
             if not isinstance(sport_row, dict):
@@ -5510,6 +5790,7 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
             ):
                 continue
             candidates.append(candidate)
+    candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
     ranked_recommendations = rank_candidates(
@@ -5566,6 +5847,7 @@ def run_intelligence_query(
     )
     effective_date = _effective_date(selected_date or preferences.get("requested_date"))
     overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
+    odds_history_by_sport = _odds_history_payloads_by_sport(overview)
     tracked = _tracked_repo_files()
     advanced_by_sport = {
         _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)
@@ -5575,7 +5857,7 @@ def run_intelligence_query(
     shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
     candidates = [dict(recommendation) for recommendation in shared_recommendations]
     if not candidates:
-        candidates = collect_candidates(overview, preferences)
+        candidates = collect_candidates(overview, preferences, odds_history_by_sport)
     resolved_requested_subjects = _resolved_requested_subjects(question, candidates)
     if resolved_requested_subjects != (preferences.get("requested_subjects") or []):
         preferences = {**preferences, "requested_subjects": resolved_requested_subjects}
@@ -5587,6 +5869,7 @@ def run_intelligence_query(
     resolved_analysis_focus = _analysis_focus_from_resolved_candidates(question, candidates, preferences)
     if resolved_analysis_focus and resolved_analysis_focus != preferences.get("analysis_focus"):
         preferences = {**preferences, "analysis_focus": resolved_analysis_focus}
+    candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
     ranked_recommendations = rank_candidates(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=None)

@@ -741,6 +741,40 @@ def _props_movement_from_recommendation(line_value: float | None, price_value: f
     }
 
 
+def _recent_movement_history(row: dict[str, Any], *, line_value: float | None, price_value: float | None) -> list[dict[str, Any]]:
+    raw_history = row.get("movement_history") or row.get("line_history") or row.get("line_movement")
+    history: list[dict[str, Any]] = []
+    if isinstance(raw_history, list):
+        for item in raw_history[-5:]:
+            if not isinstance(item, dict):
+                continue
+            history.append(
+                {
+                    "timestamp": item.get("timestamp") or item.get("last_updated") or item.get("at") or item.get("time"),
+                    "line": _safe_float(item.get("line") or item.get("value") or item.get("current_line") or item.get("cur")),
+                    "price": _safe_float(item.get("price") or item.get("value") or item.get("current_price") or item.get("cur_price")),
+                    "movement": str(item.get("movement") or item.get("trend") or "").strip().lower() or None,
+                }
+            )
+        history = [entry for entry in history if entry.get("line") is not None or entry.get("price") is not None]
+        if history:
+            return history
+
+    open_line = _safe_float(row.get("open_line") or row.get("line_open") or row.get("opening_line"))
+    prev_line = _safe_float(row.get("prev_line") or row.get("line_prev") or row.get("previous_line"))
+    open_price = _safe_float(row.get("open_price") or row.get("price_open") or row.get("opening_price"))
+    prev_price = _safe_float(row.get("prev_price") or row.get("price_prev") or row.get("previous_price"))
+
+    if open_line is not None:
+        history.append({"timestamp": None, "line": open_line, "price": open_price, "movement": "flat"})
+    if prev_line is not None and (open_line is None or prev_line != open_line):
+        history.append({"timestamp": None, "line": prev_line, "price": prev_price, "movement": None})
+    if line_value is not None:
+        history.append({"timestamp": None, "line": line_value, "price": price_value, "movement": None})
+
+    return [entry for entry in history if entry.get("line") is not None or entry.get("price") is not None]
+
+
 def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[str, Any]:
     requested_date, resolved_date, lookahead_applied = _resolve_cards_date(selected_date)
     rows, source_path = _props_recommendation_rows(resolved_date)
@@ -785,6 +819,8 @@ def build_props_cards_payload(selected_date: str | None, top: int = 12) -> dict[
                 "reason_summary": _prop_reason_summary(row),
                 "reasons": _split_reason_tokens(row.get("edge_reasons")),
                 "movement": _props_movement_from_recommendation(line_value, price_value),
+                "movement_history": _recent_movement_history(row, line_value=line_value, price_value=price_value),
+                "last_updated": str(row.get("last_seen_at") or row.get("odds_refreshed_at") or row.get("updated_at") or row.get("timestamp") or "").strip() or None,
                 "has_snapshot": False,
                 "has_current_snapshot": False,
                 "has_movement": False,

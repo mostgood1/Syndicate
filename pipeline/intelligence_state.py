@@ -18,6 +18,7 @@ from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
+from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -152,6 +153,45 @@ class IntelligenceStateService:
         for sport_candidates in candidate_pools.values():
             merged.extend(dict(candidate) for candidate in sport_candidates if isinstance(candidate, dict))
         return merged
+
+    def _odds_history_roots_for_sport(self, sport_slug: str) -> list[Path]:
+        roots: list[Path] = []
+        for base in (REPO_ROOT / "data" / f"{sport_slug}_source", REPO_ROOT / f"{sport_slug}_source"):
+            if base.exists() and base not in roots:
+                roots.append(base)
+        return roots
+
+    def _odds_history_paths_for_sport(self, sport_slug: str) -> list[Path]:
+        paths: list[Path] = []
+        for root in self._odds_history_roots_for_sport(sport_slug):
+            for candidate in (root / "artifacts" / sport_slug / "odds_history.json", root / "tracking" / "odds_history.json"):
+                if candidate not in paths:
+                    paths.append(candidate)
+        return paths
+
+    def _load_odds_history_payload_for_sport(self, sport_slug: str) -> dict[str, Any] | None:
+        for path in self._odds_history_paths_for_sport(sport_slug):
+            if not path.exists():
+                continue
+            payload = read_json_file(path)
+            if isinstance(payload, dict):
+                return payload
+        return None
+
+    @staticmethod
+    def _odds_history_market_states(payload: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+        if not isinstance(payload, dict):
+            return {}
+        markets = payload.get("markets")
+        if isinstance(markets, dict) and markets:
+            return {str(key): value for key, value in markets.items() if isinstance(value, dict)}
+        states: dict[str, dict[str, Any]] = {}
+        for key, value in payload.items():
+            if key in {"sport", "date", "updated_at", "history_limit", "markets"}:
+                continue
+            if isinstance(value, dict) and isinstance(value.get("history"), list):
+                states[str(key)] = value
+        return states
 
     def _source_state_fingerprint(self, selected_date: str | None) -> str:
         if self._app is not None:
@@ -343,12 +383,22 @@ class IntelligenceStateService:
             candidate_entry["precomputed_features"] = self._candidate_precomputed_features(candidate_entry)
             candidate_entry["preliminary_scores"] = self._candidate_preliminary_scores(candidate_entry)
             candidate_entry["source_fingerprint"] = source_fingerprint
+            candidate_entry = attach_market_id(
+                candidate_entry,
+                sport=candidate_entry.get("sport_slug") or candidate_entry.get("sport"),
+                event_id=candidate_entry.get("event_id") or candidate_entry.get("matchup") or candidate_entry.get("game_id"),
+                market_type=candidate_entry.get("market_type") or candidate_entry.get("market") or candidate_entry.get("selection") or candidate_entry.get("period"),
+                entity=candidate_entry.get("entity") or candidate_entry.get("player_name") or candidate_entry.get("player") or candidate_entry.get("team") or candidate_entry.get("selection"),
+                line=candidate_entry.get("line") or candidate_entry.get("market_line") or candidate_entry.get("prop_line"),
+            )
             candidate_entries.append(candidate_entry)
         _log_stage_timing("candidate_building", (time.perf_counter() - candidate_build_started_at) * 1000.0)
 
         manifests = self._available_sport_manifests(selected_date)
         candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
         for sport_slug, manifest in manifests.items():
+            odds_history_payload = self._load_odds_history_payload_for_sport(sport_slug)
+            odds_history_markets = self._odds_history_market_states(odds_history_payload)
             sport_candidates: list[dict[str, Any]] = []
             for candidate in candidate_entries:
                 candidate_sport = str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower()
@@ -359,6 +409,22 @@ class IntelligenceStateService:
                 sport_candidate["sport_manifest_status"] = str(manifest.get("status") or "").strip() or None
                 sport_candidate["sport_manifest_artifact_paths"] = [str(path).strip() for path in (manifest.get("artifact_paths") or []) if str(path).strip()] if isinstance(manifest.get("artifact_paths"), list) else []
                 sport_candidate["sport_manifest_metadata"] = dict(manifest.get("metadata") or {}) if isinstance(manifest.get("metadata"), dict) else {}
+                market_id = str(sport_candidate.get("market_id") or "").strip()
+                history_state = odds_history_markets.get(market_id) if market_id else None
+                if history_state:
+                    history_rows = history_state.get("history") if isinstance(history_state.get("history"), list) else []
+                    sport_candidate["delta_line"] = history_state.get("delta_line")
+                    sport_candidate["movement"] = history_state.get("movement")
+                    sport_candidate["last_updated"] = history_state.get("last_updated")
+                    sport_candidate["odds_history"] = {
+                        "market_id": market_id,
+                        "last_line": history_state.get("last_line"),
+                        "last_odds": history_state.get("last_odds"),
+                        "delta_line": history_state.get("delta_line"),
+                        "movement": history_state.get("movement"),
+                        "last_updated": history_state.get("last_updated"),
+                        "recent_trend": history_rows[-3:],
+                    }
                 sport_candidates.append(sport_candidate)
             if not sport_candidates:
                 continue
@@ -381,6 +447,7 @@ class IntelligenceStateService:
                     "metadata": dict(manifest.get("metadata") or {}) if isinstance(manifest.get("metadata"), dict) else {},
                     "candidate_count": len(candidate_pools.get(sport_slug, [])),
                     "candidates": candidate_pools.get(sport_slug, []),
+                    "odds_history": self._load_odds_history_payload_for_sport(sport_slug),
                 }
                 for sport_slug, manifest in manifests.items()
                 if sport_slug in candidate_pools

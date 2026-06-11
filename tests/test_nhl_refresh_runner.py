@@ -6,6 +6,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
+
+from syndicate import local_nhl_odds as nhl_odds
+
 
 class NhlRefreshRunnerTests(unittest.TestCase):
     def _load_module(self):
@@ -16,6 +20,13 @@ class NhlRefreshRunnerTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
+
+    def test_script_bootstraps_repo_root_before_syndicate_imports(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "refresh_nhl_oddsapi.py"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertLess(content.index("sys.path.insert(0, str(REPO_ROOT))"), content.index("from syndicate.features.shared.refresh_state_store import build_input_hash"))
 
     def test_main_calls_source_cli_functions_directly(self) -> None:
         module = self._load_module()
@@ -35,7 +46,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(Path(tmp_dir) / "bundle"),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation", return_value=None), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
         self.assertEqual(rc, 0)
@@ -79,7 +90,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(artifact_root),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation", return_value=None), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -111,7 +122,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
                 (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").write_text("player\nProp Skater\n", encoding="utf-8")
 
-            def _fake_run_source_generation(*, source_root, artifact_root, date_str):
+            def _fake_run_source_generation(*, source_root, artifact_root, date_str, props_boxscore_n_sims, days_ahead):
                 processed_root = artifact_root / "data" / "processed"
                 processed_root.mkdir(parents=True, exist_ok=True)
                 (processed_root / f"props_boxscores_sim_{date_str}.csv").write_text("player\nSkater\n", encoding="utf-8")
@@ -128,7 +139,7 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(artifact_root),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation", side_effect=_fake_run_source_generation), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", side_effect=_fake_run_source_generation), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
@@ -154,8 +165,81 @@ class NhlRefreshRunnerTests(unittest.TestCase):
                 "--artifact-root",
                 str(artifact_root),
             ]
-            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch("sys.argv", argv):
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", return_value=None), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch("sys.argv", argv):
                 rc = module.main()
 
             self.assertEqual(rc, 0)
             self.assertTrue((artifact_root / "data" / "odds" / "games" / "date=2026-05-22" / "scoreboard.csv").exists())
+
+    def test_fast_mode_uses_collected_artifacts_only(self) -> None:
+        module = self._load_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            artifact_root = Path(tmp_dir) / "bundle"
+            calls: list[str] = []
+
+            def _fake_collect_owned_nhl_artifacts(*, artifact_root, date_str, team_markets, props_source):
+                calls.append("collect")
+                (artifact_root / "data" / "odds" / "games" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
+                (artifact_root / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv").write_text("game_id\n1\n", encoding="utf-8")
+                (artifact_root / "data" / "odds" / "team" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
+                (artifact_root / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.csv").write_text("market_id\nNHL:2026-05-22:AWAY@HOME:moneyline:TEAM:-120\n", encoding="utf-8")
+                (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}").mkdir(parents=True, exist_ok=True)
+                (artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv").write_text("market_id\nNHL:2026-05-22:AWAY@HOME:player_points:nathan_mackinnon:3.5\n", encoding="utf-8")
+
+            argv = [
+                "refresh_nhl_oddsapi.py",
+                "--date",
+                "2026-05-22",
+                "--artifact-root",
+                str(artifact_root),
+                "--mode",
+                "fast",
+            ]
+            with patch.object(module, "_collect_owned_nhl_artifacts", side_effect=_fake_collect_owned_nhl_artifacts), patch.object(module, "_run_source_generation_multi", side_effect=AssertionError("source generation should not run in fast mode")), patch.object(module, "_materialize_artifact_bundle", side_effect=AssertionError("full bundle materialization should not run in fast mode")), patch.object(module, "_missing_required_artifacts", return_value=[]), patch.object(module, "_lineup_quality_issues", return_value=[]), patch.object(module, "_write_smart_sim_bundle", side_effect=AssertionError("smart sim bundle should not run in fast mode")), patch("sys.argv", argv):
+                rc = module.main()
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, ["collect"])
+
+
+class NhlMarketIdTests(unittest.TestCase):
+    def test_nhl_market_id_helpers_cover_team_props_and_scoreboard_rows(self) -> None:
+        team_rows = nhl_odds._flatten_team_odds(
+            {"id": "game-1", "home_team": "Colorado Avalanche", "away_team": "Toronto Maple Leafs", "commence_time": "2026-05-22T00:00:00Z"},
+            {"key": "fanduel", "title": "FanDuel", "last_update": "2026-05-22T00:10:00Z"},
+            {"key": "h2h", "outcomes": [{"name": "Toronto Maple Leafs", "price": 120}, {"name": "Colorado Avalanche", "price": -135}]},
+        )
+        self.assertTrue(all(str(row.get("market_id") or "").startswith("NHL:2026-05-22:TOR@COL:moneyline") for row in team_rows))
+
+        props_input = pd.DataFrame([
+            {
+                "date": "2026-05-22",
+                "player": "Nathan MacKinnon",
+                "team": "COL",
+                "home_team": "Colorado Avalanche",
+                "away_team": "Toronto Maple Leafs",
+                "market": "POINTS",
+                "line": 3.5,
+                "odds": -115,
+                "side": "OVER",
+                "book": "fanduel",
+                "collected_at": "2026-05-22T00:10:00Z",
+            }
+        ])
+        props_output = nhl_odds.combine_over_under(props_input)
+        self.assertEqual(len(props_output), 1)
+        self.assertEqual(props_output.iloc[0]["market_id"], "NHL:2026-05-22:TOR@COL:points:nathan_mackinnon:3.5")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+
+            class _FakeClient:
+                def scoreboard_day(self, date: str):
+                    return [{"gamePk": 1, "home": "Colorado Avalanche", "away": "Toronto Maple Leafs", "home_goals": 3, "away_goals": 2, "gameState": "LIVE"}]
+
+            with patch.object(nhl_odds, "NhlWebClient", return_value=_FakeClient()):
+                scoreboard_path = nhl_odds.write_scoreboard_snapshot(artifact_root=root, date="2026-05-22")
+
+            scoreboard_frame = pd.read_csv(scoreboard_path)
+            self.assertEqual(scoreboard_frame.loc[0, "market_id"], "NHL:2026-05-22:TOR@COL:scoreboard:game:5")

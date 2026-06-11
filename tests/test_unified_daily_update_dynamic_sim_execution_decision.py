@@ -14,14 +14,16 @@ class UnifiedDailyUpdateDynamicSimExecutionDecisionTests(unittest.TestCase):
         self.assertIn("if (-not (Test-Path -LiteralPath $LatestManifestPath)) {", content)
         self.assertIn("$null -eq $latestManifest.runState", content)
         self.assertIn("return $true", content)
+        self.assertIn("function Get-OddsHistoryTriggerDecision", content)
 
     def test_existing_artifacts_decision_skips_when_markers_exist(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "scripts" / "unified_daily_update.ps1"
         content = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("if ($artifactPatterns.Count -eq 0) {", content)
+        self.assertIn("Get-OddsHistoryTriggerDecision -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow", content)
+        self.assertIn("$oddsHistoryDecisions = @()", content)
         self.assertIn("return $null", content)
-        self.assertIn("if (-not (Test-Path -Path $artifactPattern)) {", content)
+        self.assertIn("trigger = 'skip_heavy_computation'", content)
         self.assertIn("return $true", content)
         self.assertIn("return $false", content)

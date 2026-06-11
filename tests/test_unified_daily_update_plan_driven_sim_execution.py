@@ -13,5 +13,6 @@ class UnifiedDailyUpdatePlanDrivenSimExecutionTests(unittest.TestCase):
         self.assertIn("Get-SimExecutionDecision", content)
         self.assertIn("simExecution = $simExecutionDecision", content)
         self.assertIn("stage = 'sim_execution'", content)
+        self.assertIn("oddsHistoryTriggerPlan = @(", content)
         self.assertIn("$shouldRunSimExecution = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'simExecution' -Fallback ([bool](-not $SkipSourceUpdates))", content)
         self.assertIn("if ($shouldRunSimExecution) {", content)
