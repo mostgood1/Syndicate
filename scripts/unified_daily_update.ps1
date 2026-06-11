@@ -389,6 +389,11 @@ function Get-OddsHistoryTriggerDecision {
         [double]$DeltaThreshold = 0.5
     )
 
+    $scheduleCheck = $null
+    if ($Sport -eq 'nhl') {
+        $scheduleCheck = Get-NhlScheduledGamesCheck -DateValue $DateValue
+    }
+
     $historyPath = Get-OddsHistoryPathForSport -RepoRoot $RepoRoot -Sport $Sport
     if ([string]::IsNullOrWhiteSpace($historyPath) -or -not (Test-Path -LiteralPath $historyPath)) {
         return $null
@@ -488,6 +493,15 @@ function Get-OddsHistoryTriggerDecision {
         $reason = 'flat_history'
     }
 
+    $skipHeavyComputation = -not $hasLineMovement
+    if ($Sport -eq 'nhl' -and $null -ne $scheduleCheck -and $scheduleCheck.known -and [int]$scheduleCheck.count -gt 0) {
+        $skipHeavyComputation = $false
+        if (-not $runSimulation -and -not $priorityScoring) {
+            $trigger = 'scheduled_slate'
+            $reason = 'game_present_without_line_movement'
+        }
+    }
+
     return [ordered]@{
         sport = $Sport
         workflow = $Workflow
@@ -498,7 +512,7 @@ function Get-OddsHistoryTriggerDecision {
         lastOddsUpdateTimestamp = $lastOddsUpdateTimestamp
         runSimulation = $runSimulation -or $priorityScoring
         priorityScoring = $priorityScoring
-        skipHeavyComputation = -not $hasLineMovement
+        skipHeavyComputation = $skipHeavyComputation
         trigger = $trigger
         reason = $reason
     }

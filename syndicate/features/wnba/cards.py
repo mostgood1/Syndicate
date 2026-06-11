@@ -2995,9 +2995,13 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
         context_for_event_ids = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
         context_games = context_for_event_ids.get("games") if isinstance(context_for_event_ids.get("games"), list) else []
         games_by_matchup: dict[tuple[str, str], dict[str, Any]] = {}
+        allowed_event_ids: set[str] = set()
         for cards_game in context_games:
             if not isinstance(cards_game, dict):
                 continue
+            event_id = str(cards_game.get("event_id") or "").strip()
+            if event_id:
+                allowed_event_ids.add(event_id)
             away_tri = _canonical_wnba_tri(
                 str(
                     cards_game.get("away_tri")
@@ -3010,11 +3014,19 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                     cards_game.get("home_tri")
                     or ((cards_game.get("home") or {}).get("abbr") if isinstance(cards_game.get("home"), dict) else "")
                     or ""
-                ).strip().upper()
+
+        filtered_public_games: list[dict[str, Any]] = []
+        for game in public_payload.get("games") or []:
             )
             if away_tri and home_tri:
+            event_id = str(game.get("event_id") or "").strip()
                 games_by_matchup[(away_tri, home_tri)] = cards_game
         for game in public_payload.get("games") or []:
+            if allowed_event_ids and event_id and event_id not in allowed_event_ids:
+                if not (away_tri and home_tri and (away_tri, home_tri) in games_by_matchup):
+                    continue
+            elif allowed_event_ids and not event_id and not (away_tri and home_tri and (away_tri, home_tri) in games_by_matchup):
+                continue
             if not isinstance(game, dict):
                 continue
             away_tri = _canonical_wnba_tri(game.get("away"))
@@ -3035,7 +3047,11 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                     game["clock"] = cards_state.get("clock")
                     game["in_progress"] = bool(cards_state.get("in_progress"))
                     game["final"] = bool(cards_state.get("final"))
-        return _attach_odds_refresh_timestamp(public_payload)
+            filtered_public_games.append(game)
+        if filtered_public_games:
+            filtered_payload = dict(public_payload)
+            filtered_payload["games"] = filtered_public_games
+            return _attach_odds_refresh_timestamp(filtered_payload)
 
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     games = context.get("games") if isinstance(context.get("games"), list) else []

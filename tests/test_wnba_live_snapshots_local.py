@@ -197,6 +197,69 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("clock"), "3:27")
         self.assertEqual(game.get("period"), 4)
 
+    def test_live_state_payload_filters_public_rows_to_requested_slate(self) -> None:
+        with patch("syndicate.features.wnba.cards.central_today_iso", return_value="2026-05-21"), patch(
+            "syndicate.features.wnba.cards._remote_live_snapshot_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._local_live_state_payload",
+            return_value=None,
+        ), patch(
+            "syndicate.features.wnba.cards._public_scoreboard_live_state_payload",
+            return_value={
+                "ok": True,
+                "source": "espn_scoreboard_fallback",
+                "games": [
+                    {
+                        "event_id": "evt-1",
+                        "away": "NYL",
+                        "home": "LAS",
+                        "away_pts": 18,
+                        "home_pts": 21,
+                        "status": "Q1 09:31",
+                        "clock": "9:31",
+                        "period": 1,
+                        "in_progress": True,
+                        "final": False,
+                        "periods": [],
+                    },
+                    {
+                        "event_id": "evt-999",
+                        "away": "CHI",
+                        "home": "CON",
+                        "away_pts": 0,
+                        "home_pts": 0,
+                        "status": "Scheduled",
+                        "clock": "",
+                        "period": None,
+                        "in_progress": False,
+                        "final": False,
+                        "periods": [],
+                    },
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={
+                "games": [
+                    {
+                        "event_id": "evt-1",
+                        "away_tri": "NYL",
+                        "home_tri": "LAS",
+                        "away": {"abbr": "NYL", "score": 18},
+                        "home": {"abbr": "LAS", "score": 21},
+                        "status": "Live",
+                        "detail": "Q1 09:31",
+                        "live_state": {"in_progress": True, "final": False},
+                    }
+                ]
+            },
+        ):
+            payload = build_live_state_payload("2026-05-21", ttl=12)
+
+        self.assertEqual([game.get("event_id") for game in payload.get("games") or []], ["evt-1"])
+        self.assertEqual(len(payload.get("games") or []), 1)
+
     def test_live_lines_payload_merges_partial_local_snapshot_with_artifact(self) -> None:
         with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value={"date": "2026-05-21"}), patch(
             "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
