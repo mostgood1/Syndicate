@@ -16,3 +16,5 @@ warning: in the working copy of 'data/wnba_source/data/processed/live_lens_proje
 warning: in the working copy of 'data/wnba_source/data/live_lens/live_lens_projections_2026-06-11.jsonl', LF will be replaced by CRLF the next time Git touches it
 To https://github.com/mostgood1/Syndicate
    60cca12..b36bad7  main -> main
+To https://github.com/mostgood1/Syndicate
+   b36bad7..c2f608c  main -> main
