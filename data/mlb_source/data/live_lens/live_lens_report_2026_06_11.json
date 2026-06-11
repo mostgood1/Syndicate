@@ -1,6 +1,6 @@
 {
   "date": "2026-06-11",
-  "generatedAt": "2026-06-11T14:13:23-05:00",
+  "generatedAt": "2026-06-11T14:38:04-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -24,14 +24,14 @@
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 4.3,
-    "totalMs": 1256.6,
-    "snapshotLoadMs": 1.9,
-    "simContextLoadMs": 0.8,
-    "propEvalMs": 0.1,
-    "gameLensMs": 1.1,
+    "marketRefreshMs": 1.9,
+    "totalMs": 112.1,
+    "snapshotLoadMs": 1.6,
+    "simContextLoadMs": 0.6,
+    "propEvalMs": 0.4,
+    "gameLensMs": 0.8,
     "gameCount": 8,
-    "liveGameCount": 4,
+    "liveGameCount": 2,
     "feedFetchCount": 8,
     "persistMs": 0.0
   },
@@ -1088,1905 +1088,6 @@
       }
     },
     {
-      "gamePk": 823855,
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "startTime": "12:10 PM",
-      "matchup": {
-        "away": {
-          "abbr": "AZ",
-          "id": 109,
-          "logo": "https://www.mlbstatic.com/team-logos/109.svg",
-          "name": "Arizona Diamondbacks"
-        },
-        "home": {
-          "abbr": "MIA",
-          "id": 146,
-          "logo": "https://www.mlbstatic.com/team-logos/146.svg",
-          "name": "Miami Marlins"
-        },
-        "score": {
-          "away": 0,
-          "home": 0
-        },
-        "liveText": "Merrill Kelly vs Tyler Phillips | 1 official pick(s) | +2 playable"
-      },
-      "predictions": {
-        "first1": {
-          "away_runs_mean": 0.382,
-          "home_runs_mean": 0.482,
-          "away_win_prob": 0.175,
-          "home_win_prob": 0.22,
-          "tie_prob": 0.605
-        },
-        "first3": {
-          "away_runs_mean": 1.228,
-          "home_runs_mean": 1.615,
-          "away_win_prob": 0.296,
-          "home_win_prob": 0.442,
-          "tie_prob": 0.262
-        },
-        "first5": {
-          "away_runs_mean": 2.076,
-          "home_runs_mean": 2.645,
-          "away_win_prob": 0.356,
-          "home_win_prob": 0.48,
-          "tie_prob": 0.164
-        },
-        "full": {
-          "away_runs_mean": 3.879,
-          "home_runs_mean": 4.485,
-          "away_win_prob": 0.425,
-          "home_win_prob": 0.575,
-          "tie_prob": 0.0
-        }
-      },
-      "gameMarkets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823855,
-            "away": "Arizona Diamondbacks",
-            "home": "Miami Marlins",
-            "away_abbr": "AZ",
-            "home_abbr": "MIA",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 656976,
-            "batter_hand": "L",
-            "opponent_pitcher_id": 663969,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Tyler Phillips",
-            "opponent": "MIA",
-            "opponent_team_id": 146,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.28125,
-            "batter_bb_rate": 0.1875,
-            "batter_hr_rate": 0.0,
-            "batter_inplay_hit_rate": 0.1764705882352941,
-            "batter_xb_hit_share": 0.05,
-            "pitcher_k_rate": 0.18259441707717566,
-            "pitcher_bb_rate": 0.11445904032110928,
-            "pitcher_hr_rate": 0.010718846925743477,
-            "pitcher_inplay_hit_rate": 0.2851048951048951,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 115.0,
-            "pitcher_platoon_k_mult": 1.1587388912399494,
-            "pitcher_platoon_bb_mult": 0.9682091805399932,
-            "pitcher_platoon_hr_mult": 0.9530538172715894,
-            "pitcher_platoon_inplay_mult": 1.0345801651541167,
-            "batter_platoon_k_mult": 1.0366666666666666,
-            "batter_platoon_bb_mult": 1.0366666666666666,
-            "batter_platoon_hr_mult": 1.0,
-            "batter_platoon_inplay_mult": 1.0733333333333335,
-            "opponent_primary_pitch_type": "SI",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 4169,
-            "venue_name": "loanDepot park",
-            "roof_type": "Retractable",
-            "park_hr_mult": 1.016,
-            "park_inplay_hit_mult": 0.9936,
-            "park_xb_share_mult": 0.992,
-            "market": "hitter_hits",
-            "market_label": "Hitter Hits",
-            "market_group": "hitter_props",
-            "player_name": "Pavin Smith",
-            "team": "AZ",
-            "prop": "batter_hits",
-            "prop_market_key": "batter_hits",
-            "selection": "over",
-            "edge": 0.005095901846207673,
-            "market_line": 0.5,
-            "model_prob_over": 0.545,
-            "market_prob_over": 0.5399040981537924,
-            "market_prob_under": 0.4600959018462076,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5399040981537924,
-            "selected_side_market_prob": 0.5399040981537924,
-            "selected_side_model_prob": 0.545,
-            "mean_support": 0.238,
-            "h_mean": 0.738,
-            "pa_mean": 4.617,
-            "ab_mean": 3.918,
-            "lineup_order": 5,
-            "market_alternates": [],
-            "odds": "-137",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against MIA, he has recorded a hit in 5 of 8 games.",
-              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_hits",
-              "subject": "Pavin Smith",
-              "supporting_reasons": [
-                "Against MIA, he has recorded a hit in 5 of 8 games.",
-                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances.",
-            "rank": 2,
-            "recommendation_tier": "official"
-          }
-        ],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823855,
-            "away": "Arizona Diamondbacks",
-            "home": "Miami Marlins",
-            "away_abbr": "AZ",
-            "home_abbr": "MIA",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 518876,
-            "pitcher_name": "Merrill Kelly",
-            "team": "AZ",
-            "team_side": "away",
-            "prop": "outs",
-            "selection": "over",
-            "edge": 0.2455384615384616,
-            "market_line": 17.5,
-            "model_prob_over": 0.784,
-            "market_prob_over": 0.5384615384615384,
-            "market_prob_under": 0.46153846153846145,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5384615384615384,
-            "selected_side_market_prob": 0.5384615384615384,
-            "selected_side_model_prob": 0.784,
-            "mean_support": 2.8859999999999992,
-            "outs_mean": 20.386,
-            "market_alternates": [],
-            "odds": "-140",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 19.4 outs.",
-              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:outs",
-              "subject": "Merrill Kelly",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 19.4 outs.",
-                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume.",
-            "rank": 4,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823855,
-            "away": "Arizona Diamondbacks",
-            "home": "Miami Marlins",
-            "away_abbr": "AZ",
-            "home_abbr": "MIA",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 672640,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 518876,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Merrill Kelly",
-            "opponent": "AZ",
-            "opponent_team_id": 109,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.15611167002012075,
-            "batter_bb_rate": 0.03469148222669349,
-            "batter_hr_rate": 0.017345741113346747,
-            "batter_inplay_hit_rate": 0.3825811965811966,
-            "batter_xb_hit_share": 0.23076923076923078,
-            "pitcher_k_rate": 0.14285714285714285,
-            "pitcher_bb_rate": 0.09136310223266746,
-            "pitcher_hr_rate": 0.04918583179452744,
-            "pitcher_inplay_hit_rate": 0.30892828525641025,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 93.0,
-            "pitcher_platoon_k_mult": 1.1671568627450981,
-            "pitcher_platoon_bb_mult": 0.8631328415610617,
-            "pitcher_platoon_hr_mult": 0.78,
-            "pitcher_platoon_inplay_mult": 1.0122153063199053,
-            "batter_platoon_k_mult": 1.0756005805926079,
-            "batter_platoon_bb_mult": 1.0426742342456286,
-            "batter_platoon_hr_mult": 1.0426742342456286,
-            "batter_platoon_inplay_mult": 0.9321230660588631,
-            "opponent_primary_pitch_type": "CH",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 4169,
-            "venue_name": "loanDepot park",
-            "roof_type": "Retractable",
-            "park_hr_mult": 1.016,
-            "park_inplay_hit_mult": 0.9936,
-            "park_xb_share_mult": 0.992,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Otto Lopez",
-            "team": "MIA",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "over",
-            "edge": 0.02513773654173479,
-            "market_line": 1.5,
-            "model_prob_over": 0.454,
-            "market_prob_over": 0.4288622634582652,
-            "market_prob_under": 0.5711377365417348,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4288622634582652,
-            "selected_side_market_prob": 0.4288622634582652,
-            "selected_side_model_prob": 0.454,
-            "mean_support": 0.18500000000000005,
-            "tb_mean": 1.685,
-            "pa_mean": 4.788,
-            "ab_mean": 4.258,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "+118",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
-              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Otto Lopez",
-              "supporting_reasons": [
-                "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
-                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
-            "rank": 6,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      },
-      "gameLens": [
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "badge": "No bet",
-          "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 0.38 - MIA 0.48 | Total 0.86",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 0.86,
-            "homeMargin": 0.1
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 0.86,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.1,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "badge": "No bet",
-          "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 1.23 - MIA 1.61 | Total 2.84",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 2.84,
-            "homeMargin": 0.39
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 2.84,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.39,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "badge": "No bet",
-          "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 2.08 - MIA 2.65 | Total 4.72",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 4.72,
-            "homeMargin": 0.57
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 4.72,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.57,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "Full game",
-          "closed": false,
-          "badge": "No bet",
-          "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 3.88 - MIA 4.49 | Total 8.36",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 8.36,
-            "homeMargin": 0.61
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 8.36,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.61,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "First 1",
-          "closed": false,
-          "badge": "",
-          "score": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
-          "subtitle": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
-          "reason": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
-          "projection": {
-            "total": 17.5,
-            "homeMargin": 22.0
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 17.5,
-              "reason": "AZ 17.5% | MIA 22.0% | Tie 60.5%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first3",
-          "label": "First 3",
-          "closed": false,
-          "badge": "",
-          "score": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
-          "subtitle": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
-          "reason": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
-          "projection": {
-            "total": 29.6,
-            "homeMargin": 44.2
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 29.6,
-              "reason": "AZ 29.6% | MIA 44.2% | Tie 26.2%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first5",
-          "label": "First 5",
-          "closed": false,
-          "badge": "",
-          "score": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
-          "subtitle": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
-          "reason": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
-          "projection": {
-            "total": 35.6,
-            "homeMargin": 48.0
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 35.6,
-              "reason": "AZ 35.6% | MIA 48.0% | Tie 16.4%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full game",
-          "closed": false,
-          "badge": "",
-          "score": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
-          "subtitle": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
-          "reason": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
-          "projection": {
-            "total": 42.5,
-            "homeMargin": 57.5
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 42.5,
-              "reason": "AZ 42.5% | MIA 57.5% | Tie 0.0%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        }
-      ],
-      "props": [
-        {
-          "playerName": "Merrill Kelly",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 17.5,
-          "odds": "-140",
-          "modelProbOver": 0.784,
-          "estimatedWinProb": 0.784,
-          "rankingScore": 0.2455384615384616
-        },
-        {
-          "playerName": "Otto Lopez",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+118",
-          "modelProbOver": 0.454,
-          "estimatedWinProb": 0.454,
-          "rankingScore": 0.02513773654173479
-        },
-        {
-          "playerName": "Pavin Smith",
-          "selection": "Over",
-          "marketLabel": "Hitter Hits",
-          "market": "hitter_hits",
-          "line": 0.5,
-          "odds": "-137",
-          "modelProbOver": 0.545,
-          "estimatedWinProb": 0.545,
-          "rankingScore": 0.005095901846207673
-        }
-      ],
-      "liveProps": [
-        {
-          "playerName": "Merrill Kelly",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 17.5,
-          "odds": "-140",
-          "modelProbOver": 0.784,
-          "estimatedWinProb": 0.784,
-          "rankingScore": 0.2455384615384616
-        },
-        {
-          "playerName": "Otto Lopez",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+118",
-          "modelProbOver": 0.454,
-          "estimatedWinProb": 0.454,
-          "rankingScore": 0.02513773654173479
-        },
-        {
-          "playerName": "Pavin Smith",
-          "selection": "Over",
-          "marketLabel": "Hitter Hits",
-          "market": "hitter_hits",
-          "line": 0.5,
-          "odds": "-137",
-          "modelProbOver": 0.545,
-          "estimatedWinProb": 0.545,
-          "rankingScore": 0.005095901846207673
-        }
-      ],
-      "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "playerName": "Merrill Kelly",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 17.5,
-          "odds": "-140",
-          "modelProbOver": 0.784,
-          "estimatedWinProb": 0.784,
-          "rankingScore": 0.2455384615384616
-        },
-        {
-          "playerName": "Otto Lopez",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+118",
-          "modelProbOver": 0.454,
-          "estimatedWinProb": 0.454,
-          "rankingScore": 0.02513773654173479
-        },
-        {
-          "playerName": "Pavin Smith",
-          "selection": "Over",
-          "marketLabel": "Hitter Hits",
-          "market": "hitter_hits",
-          "line": 0.5,
-          "odds": "-137",
-          "modelProbOver": 0.545,
-          "estimatedWinProb": 0.545,
-          "rankingScore": 0.005095901846207673
-        }
-      ],
-      "simContextAvailable": false,
-      "snapshotAvailable": true,
-      "score": {
-        "away": 0,
-        "home": 0
-      },
-      "market_tiles": [
-        {
-          "label": "Game total",
-          "title": "No total play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Pitcher props",
-          "title": "Merrill Kelly Over 17.5 Outs",
-          "sub": "Playable only | -140"
-        },
-        {
-          "label": "Hitter props",
-          "title": "Pavin Smith Over 0.5 Batter Hits",
-          "sub": "-137"
-        }
-      ],
-      "probable": {
-        "away": {
-          "id": 518876,
-          "fullName": "Merrill Kelly",
-          "ladderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.306
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.29
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Merrill Kelly Over 17.5 Outs | Odds -140 | Edge 24.6%",
-              "hitProb": 0.784
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.306
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.29
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Merrill Kelly Over 17.5 Outs | Odds -140 | Edge 24.6%",
-              "hitProb": 0.784
-            }
-          ]
-        },
-        "home": {
-          "id": null,
-          "fullName": "Tyler Phillips",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.278
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.242
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.278
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.242
-            }
-          ]
-        }
-      },
-      "markets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823855,
-            "away": "Arizona Diamondbacks",
-            "home": "Miami Marlins",
-            "away_abbr": "AZ",
-            "home_abbr": "MIA",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 656976,
-            "batter_hand": "L",
-            "opponent_pitcher_id": 663969,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Tyler Phillips",
-            "opponent": "MIA",
-            "opponent_team_id": 146,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.28125,
-            "batter_bb_rate": 0.1875,
-            "batter_hr_rate": 0.0,
-            "batter_inplay_hit_rate": 0.1764705882352941,
-            "batter_xb_hit_share": 0.05,
-            "pitcher_k_rate": 0.18259441707717566,
-            "pitcher_bb_rate": 0.11445904032110928,
-            "pitcher_hr_rate": 0.010718846925743477,
-            "pitcher_inplay_hit_rate": 0.2851048951048951,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 115.0,
-            "pitcher_platoon_k_mult": 1.1587388912399494,
-            "pitcher_platoon_bb_mult": 0.9682091805399932,
-            "pitcher_platoon_hr_mult": 0.9530538172715894,
-            "pitcher_platoon_inplay_mult": 1.0345801651541167,
-            "batter_platoon_k_mult": 1.0366666666666666,
-            "batter_platoon_bb_mult": 1.0366666666666666,
-            "batter_platoon_hr_mult": 1.0,
-            "batter_platoon_inplay_mult": 1.0733333333333335,
-            "opponent_primary_pitch_type": "SI",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 4169,
-            "venue_name": "loanDepot park",
-            "roof_type": "Retractable",
-            "park_hr_mult": 1.016,
-            "park_inplay_hit_mult": 0.9936,
-            "park_xb_share_mult": 0.992,
-            "market": "hitter_hits",
-            "market_label": "Hitter Hits",
-            "market_group": "hitter_props",
-            "player_name": "Pavin Smith",
-            "team": "AZ",
-            "prop": "batter_hits",
-            "prop_market_key": "batter_hits",
-            "selection": "over",
-            "edge": 0.005095901846207673,
-            "market_line": 0.5,
-            "model_prob_over": 0.545,
-            "market_prob_over": 0.5399040981537924,
-            "market_prob_under": 0.4600959018462076,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5399040981537924,
-            "selected_side_market_prob": 0.5399040981537924,
-            "selected_side_model_prob": 0.545,
-            "mean_support": 0.238,
-            "h_mean": 0.738,
-            "pa_mean": 4.617,
-            "ab_mean": 3.918,
-            "lineup_order": 5,
-            "market_alternates": [],
-            "odds": "-137",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against MIA, he has recorded a hit in 5 of 8 games.",
-              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_hits",
-              "subject": "Pavin Smith",
-              "supporting_reasons": [
-                "Against MIA, he has recorded a hit in 5 of 8 games.",
-                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances.",
-            "rank": 2,
-            "recommendation_tier": "official"
-          }
-        ],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823855,
-            "away": "Arizona Diamondbacks",
-            "home": "Miami Marlins",
-            "away_abbr": "AZ",
-            "home_abbr": "MIA",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 518876,
-            "pitcher_name": "Merrill Kelly",
-            "team": "AZ",
-            "team_side": "away",
-            "prop": "outs",
-            "selection": "over",
-            "edge": 0.2455384615384616,
-            "market_line": 17.5,
-            "model_prob_over": 0.784,
-            "market_prob_over": 0.5384615384615384,
-            "market_prob_under": 0.46153846153846145,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5384615384615384,
-            "selected_side_market_prob": 0.5384615384615384,
-            "selected_side_model_prob": 0.784,
-            "mean_support": 2.8859999999999992,
-            "outs_mean": 20.386,
-            "market_alternates": [],
-            "odds": "-140",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 19.4 outs.",
-              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:outs",
-              "subject": "Merrill Kelly",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 19.4 outs.",
-                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume.",
-            "rank": 4,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823855,
-            "away": "Arizona Diamondbacks",
-            "home": "Miami Marlins",
-            "away_abbr": "AZ",
-            "home_abbr": "MIA",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 672640,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 518876,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Merrill Kelly",
-            "opponent": "AZ",
-            "opponent_team_id": 109,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.15611167002012075,
-            "batter_bb_rate": 0.03469148222669349,
-            "batter_hr_rate": 0.017345741113346747,
-            "batter_inplay_hit_rate": 0.3825811965811966,
-            "batter_xb_hit_share": 0.23076923076923078,
-            "pitcher_k_rate": 0.14285714285714285,
-            "pitcher_bb_rate": 0.09136310223266746,
-            "pitcher_hr_rate": 0.04918583179452744,
-            "pitcher_inplay_hit_rate": 0.30892828525641025,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 93.0,
-            "pitcher_platoon_k_mult": 1.1671568627450981,
-            "pitcher_platoon_bb_mult": 0.8631328415610617,
-            "pitcher_platoon_hr_mult": 0.78,
-            "pitcher_platoon_inplay_mult": 1.0122153063199053,
-            "batter_platoon_k_mult": 1.0756005805926079,
-            "batter_platoon_bb_mult": 1.0426742342456286,
-            "batter_platoon_hr_mult": 1.0426742342456286,
-            "batter_platoon_inplay_mult": 0.9321230660588631,
-            "opponent_primary_pitch_type": "CH",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 4169,
-            "venue_name": "loanDepot park",
-            "roof_type": "Retractable",
-            "park_hr_mult": 1.016,
-            "park_inplay_hit_mult": 0.9936,
-            "park_xb_share_mult": 0.992,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Otto Lopez",
-            "team": "MIA",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "over",
-            "edge": 0.02513773654173479,
-            "market_line": 1.5,
-            "model_prob_over": 0.454,
-            "market_prob_over": 0.4288622634582652,
-            "market_prob_under": 0.5711377365417348,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4288622634582652,
-            "selected_side_market_prob": 0.4288622634582652,
-            "selected_side_model_prob": 0.454,
-            "mean_support": 0.18500000000000005,
-            "tb_mean": 1.685,
-            "pa_mean": 4.788,
-            "ab_mean": 4.258,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "+118",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
-              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Otto Lopez",
-              "supporting_reasons": [
-                "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
-                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
-            "rank": 6,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      }
-    },
-    {
-      "gamePk": 824265,
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "startTime": "12:10 PM",
-      "matchup": {
-        "away": {
-          "abbr": "MIN",
-          "id": 142,
-          "logo": "https://www.mlbstatic.com/team-logos/142.svg",
-          "name": "Minnesota Twins"
-        },
-        "home": {
-          "abbr": "DET",
-          "id": 116,
-          "logo": "https://www.mlbstatic.com/team-logos/116.svg",
-          "name": "Detroit Tigers"
-        },
-        "score": {
-          "away": 0,
-          "home": 0
-        },
-        "liveText": "Zebby Matthews vs Keider Montero | 1 official pick(s) | +2 playable"
-      },
-      "predictions": {
-        "first1": {
-          "away_runs_mean": 0.386,
-          "home_runs_mean": 0.605,
-          "away_win_prob": 0.182,
-          "home_win_prob": 0.249,
-          "tie_prob": 0.569
-        },
-        "first3": {
-          "away_runs_mean": 1.251,
-          "home_runs_mean": 1.577,
-          "away_win_prob": 0.307,
-          "home_win_prob": 0.413,
-          "tie_prob": 0.28
-        },
-        "first5": {
-          "away_runs_mean": 2.2,
-          "home_runs_mean": 2.56,
-          "away_win_prob": 0.365,
-          "home_win_prob": 0.469,
-          "tie_prob": 0.166
-        },
-        "full": {
-          "away_runs_mean": 4.177,
-          "home_runs_mean": 4.454,
-          "away_win_prob": 0.444,
-          "home_win_prob": 0.556,
-          "tie_prob": 0.0
-        }
-      },
-      "gameMarkets": {
-        "totals": null,
-        "ml": {
-          "date": "2026-06-11",
-          "game_pk": 824265,
-          "away": "Minnesota Twins",
-          "home": "Detroit Tigers",
-          "away_abbr": "MIN",
-          "home_abbr": "DET",
-          "double_header": "N",
-          "game_number": 1,
-          "event_id": "103e4247d0f4067efa75745bdf3a2a55",
-          "commence_time": "2026-06-11T17:11:00Z",
-          "market": "ml",
-          "selection": "home",
-          "edge": 0.02745769622833838,
-          "model_prob": 0.556,
-          "selected_side_model_prob": 0.556,
-          "selected_side_market_prob": 0.5285423037716617,
-          "market_no_vig_prob": 0.5285423037716617,
-          "odds": "-122",
-          "stake_u": 1.0,
-          "sim_sample_size": 1000,
-          "baseball_reasons": [
-            "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
-            "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
-          ],
-          "explanation_diagnostic": {
-            "status": "supported",
-            "flag_sparse_support": false,
-            "support_min_reasons": 2,
-            "baseball_reasons_n": 2,
-            "reason_sentences_n": 4,
-            "market": "ml",
-            "subject": "MIN @ DET",
-            "supporting_reasons": [
-              "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
-              "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
-            ]
-          },
-          "reasons": [
-            "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs."
-          ],
-          "reason_summary": "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs.",
-          "rank": 1,
-          "recommendation_tier": "official"
-        },
-        "pitcherProps": [],
-        "hitterProps": [],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 824265,
-            "away": "Minnesota Twins",
-            "home": "Detroit Tigers",
-            "away_abbr": "MIN",
-            "home_abbr": "DET",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 805673,
-            "pitcher_name": "Zebby Matthews",
-            "team": "MIN",
-            "team_side": "away",
-            "prop": "outs",
-            "selection": "over",
-            "edge": 0.32418644067796615,
-            "market_line": 17.5,
-            "model_prob_over": 0.803,
-            "market_prob_over": 0.4788135593220339,
-            "market_prob_under": 0.521186440677966,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4788135593220339,
-            "selected_side_market_prob": 0.4788135593220339,
-            "selected_side_model_prob": 0.803,
-            "mean_support": 3.059000000000001,
-            "outs_mean": 20.559,
-            "market_alternates": [],
-            "odds": "-105",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 18.2 outs.",
-              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:outs",
-              "subject": "Zebby Matthews",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 18.2 outs.",
-                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
-            "rank": 2,
-            "recommendation_tier": "candidate"
-          },
-          {
-            "date": "2026-06-11",
-            "game_pk": 824265,
-            "away": "Minnesota Twins",
-            "home": "Detroit Tigers",
-            "away_abbr": "MIN",
-            "home_abbr": "DET",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 805673,
-            "pitcher_name": "Zebby Matthews",
-            "team": "MIN",
-            "team_side": "away",
-            "prop": "strikeouts",
-            "selection": "over",
-            "edge": 0.16674193548387095,
-            "market_line": 4.5,
-            "model_prob_over": 0.699,
-            "market_prob_over": 0.532258064516129,
-            "market_prob_under": 0.4677419354838709,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.532258064516129,
-            "selected_side_market_prob": 0.532258064516129,
-            "selected_side_model_prob": 0.699,
-            "mean_support": 1.1589999999999998,
-            "so_mean": 5.659,
-            "market_alternates": [],
-            "odds": "-132",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 5.2 strikeouts.",
-              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:strikeouts",
-              "subject": "Zebby Matthews",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 5.2 strikeouts.",
-                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
-            "rank": 7,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": []
-      },
-      "gameLens": [
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "badge": "No bet",
-          "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 0.39 - DET 0.6 | Total 0.99",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 0.99,
-            "homeMargin": 0.22
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 0.99,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.22,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "badge": "No bet",
-          "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 1.25 - DET 1.58 | Total 2.83",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 2.83,
-            "homeMargin": 0.33
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 2.83,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.33,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "badge": "No bet",
-          "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 2.2 - DET 2.56 | Total 4.76",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 4.76,
-            "homeMargin": 0.36
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 4.76,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.36,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "Full game",
-          "closed": false,
-          "badge": "ML bet",
-          "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 4.18 - DET 4.45 | Total 8.63",
-          "reason": "Official full-game recommendation surfaced from the saved market payload.",
-          "projection": {
-            "total": 8.63,
-            "homeMargin": 0.28
-          },
-          "markets": {
-            "total": {
-              "pick": "DET ML",
-              "line": 8.63,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.28,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "First 1",
-          "closed": false,
-          "badge": "",
-          "score": "MIN 18.2% | DET 24.9% | Tie 56.9%",
-          "subtitle": "MIN 18.2% | DET 24.9% | Tie 56.9%",
-          "reason": "MIN 18.2% | DET 24.9% | Tie 56.9%",
-          "projection": {
-            "total": 18.2,
-            "homeMargin": 24.9
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 18.2,
-              "reason": "MIN 18.2% | DET 24.9% | Tie 56.9%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first3",
-          "label": "First 3",
-          "closed": false,
-          "badge": "",
-          "score": "MIN 30.7% | DET 41.3% | Tie 28.0%",
-          "subtitle": "MIN 30.7% | DET 41.3% | Tie 28.0%",
-          "reason": "MIN 30.7% | DET 41.3% | Tie 28.0%",
-          "projection": {
-            "total": 30.7,
-            "homeMargin": 41.3
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 30.7,
-              "reason": "MIN 30.7% | DET 41.3% | Tie 28.0%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first5",
-          "label": "First 5",
-          "closed": false,
-          "badge": "",
-          "score": "MIN 36.5% | DET 46.9% | Tie 16.6%",
-          "subtitle": "MIN 36.5% | DET 46.9% | Tie 16.6%",
-          "reason": "MIN 36.5% | DET 46.9% | Tie 16.6%",
-          "projection": {
-            "total": 36.5,
-            "homeMargin": 46.9
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 36.5,
-              "reason": "MIN 36.5% | DET 46.9% | Tie 16.6%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full game",
-          "closed": false,
-          "badge": "",
-          "score": "MIN 44.4% | DET 55.6% | Tie 0.0%",
-          "subtitle": "MIN 44.4% | DET 55.6% | Tie 0.0%",
-          "reason": "MIN 44.4% | DET 55.6% | Tie 0.0%",
-          "projection": {
-            "total": 44.4,
-            "homeMargin": 55.6
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 44.4,
-              "reason": "MIN 44.4% | DET 55.6% | Tie 0.0%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        }
-      ],
-      "props": [
-        {
-          "playerName": "Zebby Matthews",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 17.5,
-          "odds": "-105",
-          "modelProbOver": 0.803,
-          "estimatedWinProb": 0.803,
-          "rankingScore": 0.32418644067796615
-        },
-        {
-          "playerName": "Zebby Matthews",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 4.5,
-          "odds": "-132",
-          "modelProbOver": 0.699,
-          "estimatedWinProb": 0.699,
-          "rankingScore": 0.16674193548387095
-        }
-      ],
-      "liveProps": [
-        {
-          "playerName": "Zebby Matthews",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 17.5,
-          "odds": "-105",
-          "modelProbOver": 0.803,
-          "estimatedWinProb": 0.803,
-          "rankingScore": 0.32418644067796615
-        },
-        {
-          "playerName": "Zebby Matthews",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 4.5,
-          "odds": "-132",
-          "modelProbOver": 0.699,
-          "estimatedWinProb": 0.699,
-          "rankingScore": 0.16674193548387095
-        }
-      ],
-      "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "playerName": "Zebby Matthews",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 17.5,
-          "odds": "-105",
-          "modelProbOver": 0.803,
-          "estimatedWinProb": 0.803,
-          "rankingScore": 0.32418644067796615
-        },
-        {
-          "playerName": "Zebby Matthews",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 4.5,
-          "odds": "-132",
-          "modelProbOver": 0.699,
-          "estimatedWinProb": 0.699,
-          "rankingScore": 0.16674193548387095
-        }
-      ],
-      "simContextAvailable": false,
-      "snapshotAvailable": true,
-      "score": {
-        "away": 0,
-        "home": 0
-      },
-      "market_tiles": [
-        {
-          "label": "Game total",
-          "title": "No total play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Moneyline",
-          "title": "DET -122",
-          "sub": "model 55.6%"
-        },
-        {
-          "label": "Pitcher props",
-          "title": "Zebby Matthews Over 17.5 Outs",
-          "sub": "Playable only | -105"
-        },
-        {
-          "label": "Hitter props",
-          "title": "No locked hitter prop",
-          "sub": "Off card"
-        }
-      ],
-      "probable": {
-        "away": {
-          "id": 805673,
-          "fullName": "Zebby Matthews",
-          "ladderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.301
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.251
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Zebby Matthews Over 17.5 Outs | Odds -105 | Edge 32.4%",
-              "hitProb": 0.803
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.301
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.251
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Zebby Matthews Over 17.5 Outs | Odds -105 | Edge 32.4%",
-              "hitProb": 0.803
-            }
-          ]
-        },
-        "home": {
-          "id": null,
-          "fullName": "Keider Montero",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.218
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.285
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.218
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.285
-            }
-          ]
-        }
-      },
-      "markets": {
-        "totals": null,
-        "ml": {
-          "date": "2026-06-11",
-          "game_pk": 824265,
-          "away": "Minnesota Twins",
-          "home": "Detroit Tigers",
-          "away_abbr": "MIN",
-          "home_abbr": "DET",
-          "double_header": "N",
-          "game_number": 1,
-          "event_id": "103e4247d0f4067efa75745bdf3a2a55",
-          "commence_time": "2026-06-11T17:11:00Z",
-          "market": "ml",
-          "selection": "home",
-          "edge": 0.02745769622833838,
-          "model_prob": 0.556,
-          "selected_side_model_prob": 0.556,
-          "selected_side_market_prob": 0.5285423037716617,
-          "market_no_vig_prob": 0.5285423037716617,
-          "odds": "-122",
-          "stake_u": 1.0,
-          "sim_sample_size": 1000,
-          "baseball_reasons": [
-            "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
-            "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
-          ],
-          "explanation_diagnostic": {
-            "status": "supported",
-            "flag_sparse_support": false,
-            "support_min_reasons": 2,
-            "baseball_reasons_n": 2,
-            "reason_sentences_n": 4,
-            "market": "ml",
-            "subject": "MIN @ DET",
-            "supporting_reasons": [
-              "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
-              "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
-            ]
-          },
-          "reasons": [
-            "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs."
-          ],
-          "reason_summary": "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs.",
-          "rank": 1,
-          "recommendation_tier": "official"
-        },
-        "pitcherProps": [],
-        "hitterProps": [],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 824265,
-            "away": "Minnesota Twins",
-            "home": "Detroit Tigers",
-            "away_abbr": "MIN",
-            "home_abbr": "DET",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 805673,
-            "pitcher_name": "Zebby Matthews",
-            "team": "MIN",
-            "team_side": "away",
-            "prop": "outs",
-            "selection": "over",
-            "edge": 0.32418644067796615,
-            "market_line": 17.5,
-            "model_prob_over": 0.803,
-            "market_prob_over": 0.4788135593220339,
-            "market_prob_under": 0.521186440677966,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4788135593220339,
-            "selected_side_market_prob": 0.4788135593220339,
-            "selected_side_model_prob": 0.803,
-            "mean_support": 3.059000000000001,
-            "outs_mean": 20.559,
-            "market_alternates": [],
-            "odds": "-105",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 18.2 outs.",
-              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:outs",
-              "subject": "Zebby Matthews",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 18.2 outs.",
-                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
-            "rank": 2,
-            "recommendation_tier": "candidate"
-          },
-          {
-            "date": "2026-06-11",
-            "game_pk": 824265,
-            "away": "Minnesota Twins",
-            "home": "Detroit Tigers",
-            "away_abbr": "MIN",
-            "home_abbr": "DET",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 805673,
-            "pitcher_name": "Zebby Matthews",
-            "team": "MIN",
-            "team_side": "away",
-            "prop": "strikeouts",
-            "selection": "over",
-            "edge": 0.16674193548387095,
-            "market_line": 4.5,
-            "model_prob_over": 0.699,
-            "market_prob_over": 0.532258064516129,
-            "market_prob_under": 0.4677419354838709,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.532258064516129,
-            "selected_side_market_prob": 0.532258064516129,
-            "selected_side_model_prob": 0.699,
-            "mean_support": 1.1589999999999998,
-            "so_mean": 5.659,
-            "market_alternates": [],
-            "odds": "-132",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 5.2 strikeouts.",
-              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:strikeouts",
-              "subject": "Zebby Matthews",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 5.2 strikeouts.",
-                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
-            "rank": 7,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": []
-      }
-    },
-    {
       "gamePk": 824346,
       "status": {
         "abstract": "Live",
@@ -3753,6 +1854,47 @@
               "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.205
             }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "strong",
+              "detail": "Live projection 4.6. Current 1.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.665,
+              "source": "live",
+              "actual": 1.0
+            },
+            {
+              "label": "O up to 16",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Live projection 16.3. Current 4.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
+              "hitProb": 0.819,
+              "source": "live",
+              "actual": 4.0
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.0. Current 1.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.699,
+              "source": "live",
+              "actual": 1.0
+            }
           ]
         },
         "home": {
@@ -3804,6 +1946,34 @@
               "tone": "soft",
               "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.238
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "strong",
+              "detail": "Live projection 4.3. Current 2.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.736,
+              "source": "live",
+              "actual": 2.0
+            },
+            {
+              "label": "O up to 16",
+              "stat": "outs",
+              "target": 16,
+              "targets": [
+                16
+              ],
+              "tone": "strong",
+              "detail": "Live projection 16.6. Current 6.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
+              "hitProb": 0.787,
+              "source": "live",
+              "actual": 6.0
             }
           ]
         }
@@ -8668,6 +6838,1905 @@
           }
         ],
         "extraPitcherProps": [],
+        "extraHitterProps": []
+      }
+    },
+    {
+      "gamePk": 823855,
+      "status": {
+        "abstract": "Live",
+        "detailed": "In Progress"
+      },
+      "startTime": "12:10 PM",
+      "matchup": {
+        "away": {
+          "abbr": "AZ",
+          "id": 109,
+          "logo": "https://www.mlbstatic.com/team-logos/109.svg",
+          "name": "Arizona Diamondbacks"
+        },
+        "home": {
+          "abbr": "MIA",
+          "id": 146,
+          "logo": "https://www.mlbstatic.com/team-logos/146.svg",
+          "name": "Miami Marlins"
+        },
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Merrill Kelly vs Tyler Phillips | 1 official pick(s) | +2 playable"
+      },
+      "predictions": {
+        "first1": {
+          "away_runs_mean": 0.382,
+          "home_runs_mean": 0.482,
+          "away_win_prob": 0.175,
+          "home_win_prob": 0.22,
+          "tie_prob": 0.605
+        },
+        "first3": {
+          "away_runs_mean": 1.228,
+          "home_runs_mean": 1.615,
+          "away_win_prob": 0.296,
+          "home_win_prob": 0.442,
+          "tie_prob": 0.262
+        },
+        "first5": {
+          "away_runs_mean": 2.076,
+          "home_runs_mean": 2.645,
+          "away_win_prob": 0.356,
+          "home_win_prob": 0.48,
+          "tie_prob": 0.164
+        },
+        "full": {
+          "away_runs_mean": 3.879,
+          "home_runs_mean": 4.485,
+          "away_win_prob": 0.425,
+          "home_win_prob": 0.575,
+          "tie_prob": 0.0
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "away": "Arizona Diamondbacks",
+            "home": "Miami Marlins",
+            "away_abbr": "AZ",
+            "home_abbr": "MIA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 656976,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 663969,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Tyler Phillips",
+            "opponent": "MIA",
+            "opponent_team_id": 146,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.28125,
+            "batter_bb_rate": 0.1875,
+            "batter_hr_rate": 0.0,
+            "batter_inplay_hit_rate": 0.1764705882352941,
+            "batter_xb_hit_share": 0.05,
+            "pitcher_k_rate": 0.18259441707717566,
+            "pitcher_bb_rate": 0.11445904032110928,
+            "pitcher_hr_rate": 0.010718846925743477,
+            "pitcher_inplay_hit_rate": 0.2851048951048951,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 115.0,
+            "pitcher_platoon_k_mult": 1.1587388912399494,
+            "pitcher_platoon_bb_mult": 0.9682091805399932,
+            "pitcher_platoon_hr_mult": 0.9530538172715894,
+            "pitcher_platoon_inplay_mult": 1.0345801651541167,
+            "batter_platoon_k_mult": 1.0366666666666666,
+            "batter_platoon_bb_mult": 1.0366666666666666,
+            "batter_platoon_hr_mult": 1.0,
+            "batter_platoon_inplay_mult": 1.0733333333333335,
+            "opponent_primary_pitch_type": "SI",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 4169,
+            "venue_name": "loanDepot park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.016,
+            "park_inplay_hit_mult": 0.9936,
+            "park_xb_share_mult": 0.992,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Pavin Smith",
+            "team": "AZ",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.005095901846207673,
+            "market_line": 0.5,
+            "model_prob_over": 0.545,
+            "market_prob_over": 0.5399040981537924,
+            "market_prob_under": 0.4600959018462076,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5399040981537924,
+            "selected_side_market_prob": 0.5399040981537924,
+            "selected_side_model_prob": 0.545,
+            "mean_support": 0.238,
+            "h_mean": 0.738,
+            "pa_mean": 4.617,
+            "ab_mean": 3.918,
+            "lineup_order": 5,
+            "market_alternates": [],
+            "odds": "-137",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against MIA, he has recorded a hit in 5 of 8 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Pavin Smith",
+              "supporting_reasons": [
+                "Against MIA, he has recorded a hit in 5 of 8 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances.",
+            "rank": 2,
+            "recommendation_tier": "official"
+          }
+        ],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "away": "Arizona Diamondbacks",
+            "home": "Miami Marlins",
+            "away_abbr": "AZ",
+            "home_abbr": "MIA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 518876,
+            "pitcher_name": "Merrill Kelly",
+            "team": "AZ",
+            "team_side": "away",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.2455384615384616,
+            "market_line": 17.5,
+            "model_prob_over": 0.784,
+            "market_prob_over": 0.5384615384615384,
+            "market_prob_under": 0.46153846153846145,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5384615384615384,
+            "selected_side_market_prob": 0.5384615384615384,
+            "selected_side_model_prob": 0.784,
+            "mean_support": 2.8859999999999992,
+            "outs_mean": 20.386,
+            "market_alternates": [],
+            "odds": "-140",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 19.4 outs.",
+              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Merrill Kelly",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 19.4 outs.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume.",
+            "rank": 4,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "away": "Arizona Diamondbacks",
+            "home": "Miami Marlins",
+            "away_abbr": "AZ",
+            "home_abbr": "MIA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 672640,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 518876,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Merrill Kelly",
+            "opponent": "AZ",
+            "opponent_team_id": 109,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.15611167002012075,
+            "batter_bb_rate": 0.03469148222669349,
+            "batter_hr_rate": 0.017345741113346747,
+            "batter_inplay_hit_rate": 0.3825811965811966,
+            "batter_xb_hit_share": 0.23076923076923078,
+            "pitcher_k_rate": 0.14285714285714285,
+            "pitcher_bb_rate": 0.09136310223266746,
+            "pitcher_hr_rate": 0.04918583179452744,
+            "pitcher_inplay_hit_rate": 0.30892828525641025,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 93.0,
+            "pitcher_platoon_k_mult": 1.1671568627450981,
+            "pitcher_platoon_bb_mult": 0.8631328415610617,
+            "pitcher_platoon_hr_mult": 0.78,
+            "pitcher_platoon_inplay_mult": 1.0122153063199053,
+            "batter_platoon_k_mult": 1.0756005805926079,
+            "batter_platoon_bb_mult": 1.0426742342456286,
+            "batter_platoon_hr_mult": 1.0426742342456286,
+            "batter_platoon_inplay_mult": 0.9321230660588631,
+            "opponent_primary_pitch_type": "CH",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 4169,
+            "venue_name": "loanDepot park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.016,
+            "park_inplay_hit_mult": 0.9936,
+            "park_xb_share_mult": 0.992,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Otto Lopez",
+            "team": "MIA",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "over",
+            "edge": 0.02513773654173479,
+            "market_line": 1.5,
+            "model_prob_over": 0.454,
+            "market_prob_over": 0.4288622634582652,
+            "market_prob_under": 0.5711377365417348,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4288622634582652,
+            "selected_side_market_prob": 0.4288622634582652,
+            "selected_side_model_prob": 0.454,
+            "mean_support": 0.18500000000000005,
+            "tb_mean": 1.685,
+            "pa_mean": 4.788,
+            "ab_mean": 4.258,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "+118",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
+              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Otto Lopez",
+              "supporting_reasons": [
+                "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
+            "rank": 6,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      },
+      "gameLens": [
+        {
+          "key": "first1",
+          "label": "F1",
+          "closed": false,
+          "badge": "No bet",
+          "score": "AZ 0 - MIA 0",
+          "subtitle": "AZ 0.38 - MIA 0.48 | Total 0.86",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 0.86,
+            "homeMargin": 0.1
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 0.86,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.1,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "F3",
+          "closed": false,
+          "badge": "No bet",
+          "score": "AZ 0 - MIA 0",
+          "subtitle": "AZ 1.23 - MIA 1.61 | Total 2.84",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 2.84,
+            "homeMargin": 0.39
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 2.84,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.39,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "F5",
+          "closed": false,
+          "badge": "No bet",
+          "score": "AZ 0 - MIA 0",
+          "subtitle": "AZ 2.08 - MIA 2.65 | Total 4.72",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 4.72,
+            "homeMargin": 0.57
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 4.72,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.57,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "Full game",
+          "closed": false,
+          "badge": "No bet",
+          "score": "AZ 0 - MIA 0",
+          "subtitle": "AZ 3.88 - MIA 4.49 | Total 8.36",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 8.36,
+            "homeMargin": 0.61
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 8.36,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.61,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first1",
+          "label": "First 1",
+          "closed": false,
+          "badge": "",
+          "score": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
+          "subtitle": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
+          "reason": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
+          "projection": {
+            "total": 17.5,
+            "homeMargin": 22.0
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 17.5,
+              "reason": "AZ 17.5% | MIA 22.0% | Tie 60.5%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first3",
+          "label": "First 3",
+          "closed": false,
+          "badge": "",
+          "score": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
+          "subtitle": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
+          "reason": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
+          "projection": {
+            "total": 29.6,
+            "homeMargin": 44.2
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 29.6,
+              "reason": "AZ 29.6% | MIA 44.2% | Tie 26.2%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first5",
+          "label": "First 5",
+          "closed": false,
+          "badge": "",
+          "score": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
+          "subtitle": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
+          "reason": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
+          "projection": {
+            "total": 35.6,
+            "homeMargin": 48.0
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 35.6,
+              "reason": "AZ 35.6% | MIA 48.0% | Tie 16.4%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "full",
+          "label": "Full game",
+          "closed": false,
+          "badge": "",
+          "score": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
+          "subtitle": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
+          "reason": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
+          "projection": {
+            "total": 42.5,
+            "homeMargin": 57.5
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 42.5,
+              "reason": "AZ 42.5% | MIA 57.5% | Tie 0.0%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        }
+      ],
+      "props": [
+        {
+          "playerName": "Merrill Kelly",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 17.5,
+          "odds": "-140",
+          "modelProbOver": 0.784,
+          "estimatedWinProb": 0.784,
+          "rankingScore": 0.2455384615384616
+        },
+        {
+          "playerName": "Otto Lopez",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+118",
+          "modelProbOver": 0.454,
+          "estimatedWinProb": 0.454,
+          "rankingScore": 0.02513773654173479
+        },
+        {
+          "playerName": "Pavin Smith",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-137",
+          "modelProbOver": 0.545,
+          "estimatedWinProb": 0.545,
+          "rankingScore": 0.005095901846207673
+        }
+      ],
+      "liveProps": [
+        {
+          "playerName": "Merrill Kelly",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 17.5,
+          "odds": "-140",
+          "modelProbOver": 0.784,
+          "estimatedWinProb": 0.784,
+          "rankingScore": 0.2455384615384616
+        },
+        {
+          "playerName": "Otto Lopez",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+118",
+          "modelProbOver": 0.454,
+          "estimatedWinProb": 0.454,
+          "rankingScore": 0.02513773654173479
+        },
+        {
+          "playerName": "Pavin Smith",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-137",
+          "modelProbOver": 0.545,
+          "estimatedWinProb": 0.545,
+          "rankingScore": 0.005095901846207673
+        }
+      ],
+      "archivedLiveProps": [],
+      "trackedProps": [
+        {
+          "playerName": "Merrill Kelly",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 17.5,
+          "odds": "-140",
+          "modelProbOver": 0.784,
+          "estimatedWinProb": 0.784,
+          "rankingScore": 0.2455384615384616
+        },
+        {
+          "playerName": "Otto Lopez",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+118",
+          "modelProbOver": 0.454,
+          "estimatedWinProb": 0.454,
+          "rankingScore": 0.02513773654173479
+        },
+        {
+          "playerName": "Pavin Smith",
+          "selection": "Over",
+          "marketLabel": "Hitter Hits",
+          "market": "hitter_hits",
+          "line": 0.5,
+          "odds": "-137",
+          "modelProbOver": 0.545,
+          "estimatedWinProb": 0.545,
+          "rankingScore": 0.005095901846207673
+        }
+      ],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "score": {
+        "away": 0,
+        "home": 0
+      },
+      "market_tiles": [
+        {
+          "label": "Game total",
+          "title": "No total play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Moneyline",
+          "title": "No ML play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Pitcher props",
+          "title": "Merrill Kelly Over 17.5 Outs",
+          "sub": "Playable only | -140"
+        },
+        {
+          "label": "Hitter props",
+          "title": "Pavin Smith Over 0.5 Batter Hits",
+          "sub": "-137"
+        }
+      ],
+      "probable": {
+        "away": {
+          "id": 518876,
+          "fullName": "Merrill Kelly",
+          "ladderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.306
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.29
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Merrill Kelly Over 17.5 Outs | Odds -140 | Edge 24.6%",
+              "hitProb": 0.784
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.306
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.29
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Merrill Kelly Over 17.5 Outs | Odds -140 | Edge 24.6%",
+              "hitProb": 0.784
+            }
+          ]
+        },
+        "home": {
+          "id": null,
+          "fullName": "Tyler Phillips",
+          "ladderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.278
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.242
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.278
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.242
+            }
+          ]
+        }
+      },
+      "markets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "away": "Arizona Diamondbacks",
+            "home": "Miami Marlins",
+            "away_abbr": "AZ",
+            "home_abbr": "MIA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 656976,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 663969,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Tyler Phillips",
+            "opponent": "MIA",
+            "opponent_team_id": 146,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.28125,
+            "batter_bb_rate": 0.1875,
+            "batter_hr_rate": 0.0,
+            "batter_inplay_hit_rate": 0.1764705882352941,
+            "batter_xb_hit_share": 0.05,
+            "pitcher_k_rate": 0.18259441707717566,
+            "pitcher_bb_rate": 0.11445904032110928,
+            "pitcher_hr_rate": 0.010718846925743477,
+            "pitcher_inplay_hit_rate": 0.2851048951048951,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 115.0,
+            "pitcher_platoon_k_mult": 1.1587388912399494,
+            "pitcher_platoon_bb_mult": 0.9682091805399932,
+            "pitcher_platoon_hr_mult": 0.9530538172715894,
+            "pitcher_platoon_inplay_mult": 1.0345801651541167,
+            "batter_platoon_k_mult": 1.0366666666666666,
+            "batter_platoon_bb_mult": 1.0366666666666666,
+            "batter_platoon_hr_mult": 1.0,
+            "batter_platoon_inplay_mult": 1.0733333333333335,
+            "opponent_primary_pitch_type": "SI",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 4169,
+            "venue_name": "loanDepot park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.016,
+            "park_inplay_hit_mult": 0.9936,
+            "park_xb_share_mult": 0.992,
+            "market": "hitter_hits",
+            "market_label": "Hitter Hits",
+            "market_group": "hitter_props",
+            "player_name": "Pavin Smith",
+            "team": "AZ",
+            "prop": "batter_hits",
+            "prop_market_key": "batter_hits",
+            "selection": "over",
+            "edge": 0.005095901846207673,
+            "market_line": 0.5,
+            "model_prob_over": 0.545,
+            "market_prob_over": 0.5399040981537924,
+            "market_prob_under": 0.4600959018462076,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5399040981537924,
+            "selected_side_market_prob": 0.5399040981537924,
+            "selected_side_model_prob": 0.545,
+            "mean_support": 0.238,
+            "h_mean": 0.738,
+            "pa_mean": 4.617,
+            "ab_mean": 3.918,
+            "lineup_order": 5,
+            "market_alternates": [],
+            "odds": "-137",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against MIA, he has recorded a hit in 5 of 8 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_hits",
+              "subject": "Pavin Smith",
+              "supporting_reasons": [
+                "Against MIA, he has recorded a hit in 5 of 8 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances.",
+            "rank": 2,
+            "recommendation_tier": "official"
+          }
+        ],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "away": "Arizona Diamondbacks",
+            "home": "Miami Marlins",
+            "away_abbr": "AZ",
+            "home_abbr": "MIA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 518876,
+            "pitcher_name": "Merrill Kelly",
+            "team": "AZ",
+            "team_side": "away",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.2455384615384616,
+            "market_line": 17.5,
+            "model_prob_over": 0.784,
+            "market_prob_over": 0.5384615384615384,
+            "market_prob_under": 0.46153846153846145,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5384615384615384,
+            "selected_side_market_prob": 0.5384615384615384,
+            "selected_side_model_prob": 0.784,
+            "mean_support": 2.8859999999999992,
+            "outs_mean": 20.386,
+            "market_alternates": [],
+            "odds": "-140",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 19.4 outs.",
+              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Merrill Kelly",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 19.4 outs.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume.",
+            "rank": 4,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "away": "Arizona Diamondbacks",
+            "home": "Miami Marlins",
+            "away_abbr": "AZ",
+            "home_abbr": "MIA",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 672640,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 518876,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Merrill Kelly",
+            "opponent": "AZ",
+            "opponent_team_id": 109,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.15611167002012075,
+            "batter_bb_rate": 0.03469148222669349,
+            "batter_hr_rate": 0.017345741113346747,
+            "batter_inplay_hit_rate": 0.3825811965811966,
+            "batter_xb_hit_share": 0.23076923076923078,
+            "pitcher_k_rate": 0.14285714285714285,
+            "pitcher_bb_rate": 0.09136310223266746,
+            "pitcher_hr_rate": 0.04918583179452744,
+            "pitcher_inplay_hit_rate": 0.30892828525641025,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 93.0,
+            "pitcher_platoon_k_mult": 1.1671568627450981,
+            "pitcher_platoon_bb_mult": 0.8631328415610617,
+            "pitcher_platoon_hr_mult": 0.78,
+            "pitcher_platoon_inplay_mult": 1.0122153063199053,
+            "batter_platoon_k_mult": 1.0756005805926079,
+            "batter_platoon_bb_mult": 1.0426742342456286,
+            "batter_platoon_hr_mult": 1.0426742342456286,
+            "batter_platoon_inplay_mult": 0.9321230660588631,
+            "opponent_primary_pitch_type": "CH",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 4169,
+            "venue_name": "loanDepot park",
+            "roof_type": "Retractable",
+            "park_hr_mult": 1.016,
+            "park_inplay_hit_mult": 0.9936,
+            "park_xb_share_mult": 0.992,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Otto Lopez",
+            "team": "MIA",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "over",
+            "edge": 0.02513773654173479,
+            "market_line": 1.5,
+            "model_prob_over": 0.454,
+            "market_prob_over": 0.4288622634582652,
+            "market_prob_under": 0.5711377365417348,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4288622634582652,
+            "selected_side_market_prob": 0.4288622634582652,
+            "selected_side_model_prob": 0.454,
+            "mean_support": 0.18500000000000005,
+            "tb_mean": 1.685,
+            "pa_mean": 4.788,
+            "ab_mean": 4.258,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "+118",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
+              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Otto Lopez",
+              "supporting_reasons": [
+                "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
+            "rank": 6,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      }
+    },
+    {
+      "gamePk": 824265,
+      "status": {
+        "abstract": "Live",
+        "detailed": "In Progress"
+      },
+      "startTime": "12:10 PM",
+      "matchup": {
+        "away": {
+          "abbr": "MIN",
+          "id": 142,
+          "logo": "https://www.mlbstatic.com/team-logos/142.svg",
+          "name": "Minnesota Twins"
+        },
+        "home": {
+          "abbr": "DET",
+          "id": 116,
+          "logo": "https://www.mlbstatic.com/team-logos/116.svg",
+          "name": "Detroit Tigers"
+        },
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Zebby Matthews vs Keider Montero | 1 official pick(s) | +2 playable"
+      },
+      "predictions": {
+        "first1": {
+          "away_runs_mean": 0.386,
+          "home_runs_mean": 0.605,
+          "away_win_prob": 0.182,
+          "home_win_prob": 0.249,
+          "tie_prob": 0.569
+        },
+        "first3": {
+          "away_runs_mean": 1.251,
+          "home_runs_mean": 1.577,
+          "away_win_prob": 0.307,
+          "home_win_prob": 0.413,
+          "tie_prob": 0.28
+        },
+        "first5": {
+          "away_runs_mean": 2.2,
+          "home_runs_mean": 2.56,
+          "away_win_prob": 0.365,
+          "home_win_prob": 0.469,
+          "tie_prob": 0.166
+        },
+        "full": {
+          "away_runs_mean": 4.177,
+          "home_runs_mean": 4.454,
+          "away_win_prob": 0.444,
+          "home_win_prob": 0.556,
+          "tie_prob": 0.0
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": {
+          "date": "2026-06-11",
+          "game_pk": 824265,
+          "away": "Minnesota Twins",
+          "home": "Detroit Tigers",
+          "away_abbr": "MIN",
+          "home_abbr": "DET",
+          "double_header": "N",
+          "game_number": 1,
+          "event_id": "103e4247d0f4067efa75745bdf3a2a55",
+          "commence_time": "2026-06-11T17:11:00Z",
+          "market": "ml",
+          "selection": "home",
+          "edge": 0.02745769622833838,
+          "model_prob": 0.556,
+          "selected_side_model_prob": 0.556,
+          "selected_side_market_prob": 0.5285423037716617,
+          "market_no_vig_prob": 0.5285423037716617,
+          "odds": "-122",
+          "stake_u": 1.0,
+          "sim_sample_size": 1000,
+          "baseball_reasons": [
+            "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
+            "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
+          ],
+          "explanation_diagnostic": {
+            "status": "supported",
+            "flag_sparse_support": false,
+            "support_min_reasons": 2,
+            "baseball_reasons_n": 2,
+            "reason_sentences_n": 4,
+            "market": "ml",
+            "subject": "MIN @ DET",
+            "supporting_reasons": [
+              "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
+              "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
+            ]
+          },
+          "reasons": [
+            "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs."
+          ],
+          "reason_summary": "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs.",
+          "rank": 1,
+          "recommendation_tier": "official"
+        },
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "away": "Minnesota Twins",
+            "home": "Detroit Tigers",
+            "away_abbr": "MIN",
+            "home_abbr": "DET",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 805673,
+            "pitcher_name": "Zebby Matthews",
+            "team": "MIN",
+            "team_side": "away",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.32418644067796615,
+            "market_line": 17.5,
+            "model_prob_over": 0.803,
+            "market_prob_over": 0.4788135593220339,
+            "market_prob_under": 0.521186440677966,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4788135593220339,
+            "selected_side_market_prob": 0.4788135593220339,
+            "selected_side_model_prob": 0.803,
+            "mean_support": 3.059000000000001,
+            "outs_mean": 20.559,
+            "market_alternates": [],
+            "odds": "-105",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 18.2 outs.",
+              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Zebby Matthews",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 18.2 outs.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "rank": 2,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "away": "Minnesota Twins",
+            "home": "Detroit Tigers",
+            "away_abbr": "MIN",
+            "home_abbr": "DET",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 805673,
+            "pitcher_name": "Zebby Matthews",
+            "team": "MIN",
+            "team_side": "away",
+            "prop": "strikeouts",
+            "selection": "over",
+            "edge": 0.16674193548387095,
+            "market_line": 4.5,
+            "model_prob_over": 0.699,
+            "market_prob_over": 0.532258064516129,
+            "market_prob_under": 0.4677419354838709,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.532258064516129,
+            "selected_side_market_prob": 0.532258064516129,
+            "selected_side_model_prob": 0.699,
+            "mean_support": 1.1589999999999998,
+            "so_mean": 5.659,
+            "market_alternates": [],
+            "odds": "-132",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 5.2 strikeouts.",
+              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:strikeouts",
+              "subject": "Zebby Matthews",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 5.2 strikeouts.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "rank": 7,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": []
+      },
+      "gameLens": [
+        {
+          "key": "first1",
+          "label": "F1",
+          "closed": false,
+          "badge": "No bet",
+          "score": "MIN 0 - DET 0",
+          "subtitle": "MIN 0.39 - DET 0.6 | Total 0.99",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 0.99,
+            "homeMargin": 0.22
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 0.99,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.22,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "F3",
+          "closed": false,
+          "badge": "No bet",
+          "score": "MIN 0 - DET 0",
+          "subtitle": "MIN 1.25 - DET 1.58 | Total 2.83",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 2.83,
+            "homeMargin": 0.33
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 2.83,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.33,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "F5",
+          "closed": false,
+          "badge": "No bet",
+          "score": "MIN 0 - DET 0",
+          "subtitle": "MIN 2.2 - DET 2.56 | Total 4.76",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 4.76,
+            "homeMargin": 0.36
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 4.76,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.36,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "Full game",
+          "closed": false,
+          "badge": "ML bet",
+          "score": "MIN 0 - DET 0",
+          "subtitle": "MIN 4.18 - DET 4.45 | Total 8.63",
+          "reason": "Official full-game recommendation surfaced from the saved market payload.",
+          "projection": {
+            "total": 8.63,
+            "homeMargin": 0.28
+          },
+          "markets": {
+            "total": {
+              "pick": "DET ML",
+              "line": 8.63,
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.28,
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
+            }
+          }
+        },
+        {
+          "key": "first1",
+          "label": "First 1",
+          "closed": false,
+          "badge": "",
+          "score": "MIN 18.2% | DET 24.9% | Tie 56.9%",
+          "subtitle": "MIN 18.2% | DET 24.9% | Tie 56.9%",
+          "reason": "MIN 18.2% | DET 24.9% | Tie 56.9%",
+          "projection": {
+            "total": 18.2,
+            "homeMargin": 24.9
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 18.2,
+              "reason": "MIN 18.2% | DET 24.9% | Tie 56.9%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first3",
+          "label": "First 3",
+          "closed": false,
+          "badge": "",
+          "score": "MIN 30.7% | DET 41.3% | Tie 28.0%",
+          "subtitle": "MIN 30.7% | DET 41.3% | Tie 28.0%",
+          "reason": "MIN 30.7% | DET 41.3% | Tie 28.0%",
+          "projection": {
+            "total": 30.7,
+            "homeMargin": 41.3
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 30.7,
+              "reason": "MIN 30.7% | DET 41.3% | Tie 28.0%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first5",
+          "label": "First 5",
+          "closed": false,
+          "badge": "",
+          "score": "MIN 36.5% | DET 46.9% | Tie 16.6%",
+          "subtitle": "MIN 36.5% | DET 46.9% | Tie 16.6%",
+          "reason": "MIN 36.5% | DET 46.9% | Tie 16.6%",
+          "projection": {
+            "total": 36.5,
+            "homeMargin": 46.9
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 36.5,
+              "reason": "MIN 36.5% | DET 46.9% | Tie 16.6%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "full",
+          "label": "Full game",
+          "closed": false,
+          "badge": "",
+          "score": "MIN 44.4% | DET 55.6% | Tie 0.0%",
+          "subtitle": "MIN 44.4% | DET 55.6% | Tie 0.0%",
+          "reason": "MIN 44.4% | DET 55.6% | Tie 0.0%",
+          "projection": {
+            "total": 44.4,
+            "homeMargin": 55.6
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 44.4,
+              "reason": "MIN 44.4% | DET 55.6% | Tie 0.0%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        }
+      ],
+      "props": [
+        {
+          "playerName": "Zebby Matthews",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 17.5,
+          "odds": "-105",
+          "modelProbOver": 0.803,
+          "estimatedWinProb": 0.803,
+          "rankingScore": 0.32418644067796615
+        },
+        {
+          "playerName": "Zebby Matthews",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 4.5,
+          "odds": "-132",
+          "modelProbOver": 0.699,
+          "estimatedWinProb": 0.699,
+          "rankingScore": 0.16674193548387095
+        }
+      ],
+      "liveProps": [
+        {
+          "playerName": "Zebby Matthews",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 17.5,
+          "odds": "-105",
+          "modelProbOver": 0.803,
+          "estimatedWinProb": 0.803,
+          "rankingScore": 0.32418644067796615
+        },
+        {
+          "playerName": "Zebby Matthews",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 4.5,
+          "odds": "-132",
+          "modelProbOver": 0.699,
+          "estimatedWinProb": 0.699,
+          "rankingScore": 0.16674193548387095
+        }
+      ],
+      "archivedLiveProps": [],
+      "trackedProps": [
+        {
+          "playerName": "Zebby Matthews",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 17.5,
+          "odds": "-105",
+          "modelProbOver": 0.803,
+          "estimatedWinProb": 0.803,
+          "rankingScore": 0.32418644067796615
+        },
+        {
+          "playerName": "Zebby Matthews",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 4.5,
+          "odds": "-132",
+          "modelProbOver": 0.699,
+          "estimatedWinProb": 0.699,
+          "rankingScore": 0.16674193548387095
+        }
+      ],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "score": {
+        "away": 0,
+        "home": 0
+      },
+      "market_tiles": [
+        {
+          "label": "Game total",
+          "title": "No total play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Moneyline",
+          "title": "DET -122",
+          "sub": "model 55.6%"
+        },
+        {
+          "label": "Pitcher props",
+          "title": "Zebby Matthews Over 17.5 Outs",
+          "sub": "Playable only | -105"
+        },
+        {
+          "label": "Hitter props",
+          "title": "No locked hitter prop",
+          "sub": "Off card"
+        }
+      ],
+      "probable": {
+        "away": {
+          "id": 805673,
+          "fullName": "Zebby Matthews",
+          "ladderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.301
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.251
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Zebby Matthews Over 17.5 Outs | Odds -105 | Edge 32.4%",
+              "hitProb": 0.803
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.301
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.251
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Zebby Matthews Over 17.5 Outs | Odds -105 | Edge 32.4%",
+              "hitProb": 0.803
+            }
+          ]
+        },
+        "home": {
+          "id": null,
+          "fullName": "Keider Montero",
+          "ladderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.218
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.285
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.218
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.285
+            }
+          ]
+        }
+      },
+      "markets": {
+        "totals": null,
+        "ml": {
+          "date": "2026-06-11",
+          "game_pk": 824265,
+          "away": "Minnesota Twins",
+          "home": "Detroit Tigers",
+          "away_abbr": "MIN",
+          "home_abbr": "DET",
+          "double_header": "N",
+          "game_number": 1,
+          "event_id": "103e4247d0f4067efa75745bdf3a2a55",
+          "commence_time": "2026-06-11T17:11:00Z",
+          "market": "ml",
+          "selection": "home",
+          "edge": 0.02745769622833838,
+          "model_prob": 0.556,
+          "selected_side_model_prob": 0.556,
+          "selected_side_market_prob": 0.5285423037716617,
+          "market_no_vig_prob": 0.5285423037716617,
+          "odds": "-122",
+          "stake_u": 1.0,
+          "sim_sample_size": 1000,
+          "baseball_reasons": [
+            "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
+            "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
+          ],
+          "explanation_diagnostic": {
+            "status": "supported",
+            "flag_sparse_support": false,
+            "support_min_reasons": 2,
+            "baseball_reasons_n": 2,
+            "reason_sentences_n": 4,
+            "market": "ml",
+            "subject": "MIN @ DET",
+            "supporting_reasons": [
+              "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
+              "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
+            ]
+          },
+          "reasons": [
+            "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs."
+          ],
+          "reason_summary": "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs.",
+          "rank": 1,
+          "recommendation_tier": "official"
+        },
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "away": "Minnesota Twins",
+            "home": "Detroit Tigers",
+            "away_abbr": "MIN",
+            "home_abbr": "DET",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 805673,
+            "pitcher_name": "Zebby Matthews",
+            "team": "MIN",
+            "team_side": "away",
+            "prop": "outs",
+            "selection": "over",
+            "edge": 0.32418644067796615,
+            "market_line": 17.5,
+            "model_prob_over": 0.803,
+            "market_prob_over": 0.4788135593220339,
+            "market_prob_under": 0.521186440677966,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4788135593220339,
+            "selected_side_market_prob": 0.4788135593220339,
+            "selected_side_model_prob": 0.803,
+            "mean_support": 3.059000000000001,
+            "outs_mean": 20.559,
+            "market_alternates": [],
+            "odds": "-105",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 18.2 outs.",
+              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:outs",
+              "subject": "Zebby Matthews",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 18.2 outs.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "rank": 2,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "away": "Minnesota Twins",
+            "home": "Detroit Tigers",
+            "away_abbr": "MIN",
+            "home_abbr": "DET",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 805673,
+            "pitcher_name": "Zebby Matthews",
+            "team": "MIN",
+            "team_side": "away",
+            "prop": "strikeouts",
+            "selection": "over",
+            "edge": 0.16674193548387095,
+            "market_line": 4.5,
+            "model_prob_over": 0.699,
+            "market_prob_over": 0.532258064516129,
+            "market_prob_under": 0.4677419354838709,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.532258064516129,
+            "selected_side_market_prob": 0.532258064516129,
+            "selected_side_model_prob": 0.699,
+            "mean_support": 1.1589999999999998,
+            "so_mean": 5.659,
+            "market_alternates": [],
+            "odds": "-132",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 5.2 strikeouts.",
+              "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:strikeouts",
+              "subject": "Zebby Matthews",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 5.2 strikeouts.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+            "rank": 7,
+            "recommendation_tier": "candidate"
+          }
+        ],
         "extraHitterProps": []
       }
     }
