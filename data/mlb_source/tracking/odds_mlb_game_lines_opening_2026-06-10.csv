@@ -1,0 +1,197 @@
+event_key,segment,market,selection,line,price,snapshot_ts
+Arizona Diamondbacks @ Miami Marlins,first7,spread_away,away,8.5,-310,2026-06-11T00:51:28Z
+Arizona Diamondbacks @ Miami Marlins,first7,spread_home,home,-8.5,+210,2026-06-11T00:51:28Z
+Arizona Diamondbacks @ Miami Marlins,first7,total,over,8.5,+100,2026-06-11T00:51:28Z
+Arizona Diamondbacks @ Miami Marlins,first7,total,under,8.5,-130,2026-06-11T00:51:28Z
+Arizona Diamondbacks @ Miami Marlins,full,spread_away,away,7.5,+125,2026-06-11T00:51:28Z
+Arizona Diamondbacks @ Miami Marlins,full,spread_home,home,-7.5,-165,2026-06-11T00:51:28Z
+Arizona Diamondbacks @ Miami Marlins,full,total,over,9.5,+125,2026-06-11T00:51:28Z
+Arizona Diamondbacks @ Miami Marlins,full,total,under,9.5,-165,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first5,moneyline,away,,+143,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first5,moneyline,home,,-199,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first5,spread_away,away,0.5,-244,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first5,spread_home,home,-0.5,+172,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first5,total,over,0.5,-117,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first5,total,under,0.5,-117,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first7,moneyline,away,,+355,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first7,moneyline,home,,-604,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first7,spread_away,away,1.5,-103,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first7,spread_home,home,-1.5,-133,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first7,total,over,3.5,-133,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,first7,total,under,3.5,-103,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,full,moneyline,away,,+230,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,full,moneyline,home,,-300,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,full,spread_away,away,1.5,-115,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,full,spread_home,home,-1.5,-115,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,full,total,over,5.5,-110,2026-06-11T00:51:28Z
+Atlanta Braves @ Chicago White Sox,full,total,under,5.5,-120,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first1,moneyline,away,,+190,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first1,moneyline,home,,+310,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first1,spread_away,away,0.5,-575,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first1,spread_home,home,-0.5,+375,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first1,total,over,0.5,-155,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first1,total,under,0.5,+120,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first3,moneyline,away,,-166,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first3,moneyline,home,,+130,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first3,spread_away,away,-0.5,-110,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first3,spread_home,home,0.5,-120,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first3,total,over,3.5,-120,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first3,total,under,3.5,-110,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first5,moneyline,away,,-175,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first5,moneyline,home,,+135,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first5,spread_away,away,-0.5,-130,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first5,spread_home,home,0.5,+100,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first5,total,over,6.5,-110,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first5,total,under,6.5,-120,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first7,moneyline,away,,-188,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first7,moneyline,home,,+145,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first7,spread_away,away,-1.5,+100,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first7,spread_home,home,1.5,-130,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first7,total,over,9.5,-105,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,first7,total,under,9.5,-125,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,full,moneyline,away,,-162,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,full,moneyline,home,,+124,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,full,spread_away,away,-1.5,-108,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,full,spread_home,home,1.5,-120,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,full,total,over,11.5,-101,2026-06-11T00:51:28Z
+Chicago Cubs @ Colorado Rockies,full,total,under,11.5,-128,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first1,moneyline,away,,+275,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first1,moneyline,home,,+280,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first1,spread_away,away,-0.5,+265,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first1,spread_home,home,0.5,-380,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first1,total,over,0.5,-120,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first1,total,under,0.5,-110,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first3,moneyline,away,,+100,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first3,moneyline,home,,-130,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first3,spread_away,away,0.5,-166,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first3,spread_home,home,-0.5,+130,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first3,total,over,2.5,-120,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first3,total,under,2.5,-110,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first5,moneyline,away,,+105,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first5,moneyline,home,,-135,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first5,spread_away,away,0.5,-135,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first5,spread_home,home,-0.5,+105,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first5,total,over,4.5,-115,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first5,total,under,4.5,-115,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first7,moneyline,away,,+100,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first7,moneyline,home,,-130,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first7,spread_away,away,0.5,-125,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first7,spread_home,home,-0.5,-105,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first7,total,over,6.5,-125,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,first7,total,under,6.5,-105,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,full,moneyline,away,,+104,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,full,moneyline,home,,-125,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,full,spread_away,away,1.5,-194,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,full,spread_home,home,-1.5,+159,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,full,total,over,9.0,-101,2026-06-11T00:51:28Z
+Houston Astros @ Los Angeles Angels,full,total,under,9.0,-120,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,first7,spread_away,away,-4.5,-600,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,first7,spread_home,home,4.5,+360,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,first7,total,over,7.5,+230,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,first7,total,under,7.5,-320,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,full,moneyline,away,,-8000,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,full,moneyline,home,,+2200,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,full,spread_away,away,-4.5,-230,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,full,spread_home,home,4.5,+170,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,full,total,over,8.5,-130,2026-06-11T00:51:28Z
+Los Angeles Dodgers @ Pittsburgh Pirates,full,total,under,8.5,+100,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first1,moneyline,away,,+210,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first1,moneyline,home,,+190,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first1,spread_away,away,0.5,-250,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first1,spread_home,home,-0.5,+185,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first1,total,over,1.5,-105,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first1,total,under,1.5,-125,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first3,moneyline,away,,-115,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first3,moneyline,home,,-115,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first3,spread_away,away,0.5,-140,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first3,spread_home,home,-0.5,+110,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first3,total,over,4.5,-125,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first3,total,under,4.5,-105,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first5,moneyline,away,,-110,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first5,moneyline,home,,-120,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first5,spread_away,away,0.5,-130,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first5,spread_home,home,-0.5,+100,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first5,total,over,8.5,+100,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first5,total,under,8.5,-130,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first7,moneyline,away,,-110,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first7,moneyline,home,,-120,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first7,spread_away,away,0.5,-130,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first7,spread_home,home,-0.5,+100,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first7,total,over,11.5,-120,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,first7,total,under,11.5,-110,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,full,moneyline,away,,-108,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,full,moneyline,home,,-112,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,full,spread_away,away,-1.5,+136,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,full,spread_home,home,1.5,-164,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,full,total,over,15.0,-104,2026-06-11T00:51:28Z
+Milwaukee Brewers @ Athletics,full,total,under,15.0,-116,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first5,moneyline,away,,+139,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first5,moneyline,home,,-194,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first5,spread_away,away,0.5,-148,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first5,spread_home,home,-0.5,+108,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first5,total,over,3.5,-160,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first5,total,under,3.5,+116,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first7,moneyline,away,,+126,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first7,moneyline,home,,-174,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first7,spread_away,away,0.5,-117,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first7,spread_home,home,-0.5,-117,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first7,total,over,6.5,-103,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,first7,total,under,6.5,-133,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,full,moneyline,away,,+125,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,full,moneyline,home,,-160,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,full,spread_away,away,1.5,-200,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,full,spread_home,home,-1.5,+160,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,full,total,over,8.5,-110,2026-06-11T00:51:28Z
+Minnesota Twins @ Detroit Tigers,full,total,under,8.5,-120,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,first7,moneyline,away,,-5000,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,first7,moneyline,home,,+3000,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,first7,spread_away,away,-5.5,-200,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,first7,spread_home,home,5.5,+140,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,first7,total,over,7.5,+105,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,first7,total,under,7.5,-140,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,full,moneyline,away,,-4000,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,full,moneyline,home,,+1500,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,full,spread_away,away,-5.5,-130,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,full,spread_home,home,5.5,+100,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,full,total,over,9.5,+100,2026-06-11T00:51:28Z
+Philadelphia Phillies @ Toronto Blue Jays,full,total,under,9.5,-130,2026-06-11T00:51:28Z
+Seattle Mariners @ Baltimore Orioles,full,moneyline,away,,+4000,2026-06-11T00:51:28Z
+Seattle Mariners @ Baltimore Orioles,full,moneyline,home,,-20000,2026-06-11T00:51:28Z
+Seattle Mariners @ Baltimore Orioles,full,spread_away,away,4.5,+230,2026-06-11T00:51:28Z
+Seattle Mariners @ Baltimore Orioles,full,spread_home,home,-4.5,-320,2026-06-11T00:51:28Z
+Seattle Mariners @ Baltimore Orioles,full,total,over,9.5,-165,2026-06-11T00:51:28Z
+Seattle Mariners @ Baltimore Orioles,full,total,under,9.5,+125,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first5,spread_away,away,-5.5,-320,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first5,spread_home,home,5.5,+230,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first5,total,over,11.5,+185,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first5,total,under,11.5,-270,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first7,moneyline,away,,-5000,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first7,moneyline,home,,+1600,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first7,spread_away,away,-5.5,-170,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first7,spread_home,home,5.5,+120,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first7,total,over,10.5,-450,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,first7,total,under,10.5,+310,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,full,moneyline,away,,-5000,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,full,moneyline,home,,+1700,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,full,spread_away,away,-5.5,-150,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,full,spread_home,home,5.5,+115,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,full,total,over,13.5,-150,2026-06-11T00:51:28Z
+St. Louis Cardinals @ New York Mets,full,total,under,13.5,+115,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first5,moneyline,away,,-304,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first5,moneyline,home,,+208,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first5,spread_away,away,-0.5,-166,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first5,spread_home,home,0.5,+120,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first5,total,over,5.5,+100,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first5,total,under,5.5,-137,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first7,moneyline,away,,-214,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first7,moneyline,home,,+152,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first7,spread_away,away,-1.5,+108,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first7,spread_home,home,1.5,-148,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first7,total,over,7.5,-125,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,first7,total,under,7.5,-109,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,full,moneyline,away,,-170,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,full,moneyline,home,,+135,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,full,spread_away,away,-1.5,-110,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,full,spread_home,home,1.5,-120,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,full,total,over,10.5,+100,2026-06-11T00:51:28Z
+Texas Rangers @ Kansas City Royals,full,total,under,10.5,-130,2026-06-11T00:51:28Z

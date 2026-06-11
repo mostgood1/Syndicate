@@ -6,16 +6,26 @@ import os
 import subprocess
 import sys
 import shutil
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
+from threading import Lock
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = REPO_ROOT.parent
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
+from syndicate.features.shared.manifest import publish_sport_manifest
+
+
+_PUBLISH_MANIFEST_LOCK = Lock()
 
 
 @dataclass(frozen=True)
@@ -634,6 +644,49 @@ def _sync_post_refresh_tracking_step(*, sport: str, source_root: Path, date_str:
         }
 
 
+def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+
+    def add_path(value: Any) -> None:
+        path_text = str(value or "").strip()
+        if not path_text or path_text in seen:
+            return
+        seen.add(path_text)
+        paths.append(path_text)
+
+    def walk(value: Any, key_name: str = "") -> None:
+        if isinstance(value, dict):
+            for nested_key, nested_value in value.items():
+                nested_key_text = str(nested_key or "").strip().lower()
+                if nested_key_text in {
+                    "path",
+                    "manifest_path",
+                    "latest_path",
+                    "run_summary_path",
+                    "stdout_path",
+                    "stderr_path",
+                    "output_path",
+                    "source_manifest",
+                    "artifact_root",
+                    "source_root",
+                    "cwd",
+                }:
+                    add_path(nested_value)
+                elif nested_key_text in {"artifact_paths", "updated_files", "signal_paths"} and isinstance(nested_value, list):
+                    for item in nested_value:
+                        add_path(item)
+                walk(nested_value, nested_key_text)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item, key_name)
+        elif isinstance(value, str) and key_name in {"output", "file", "manifest", "artifact", "path"}:
+            add_path(value)
+
+    walk(sport_result)
+    return paths
+
+
 def _validate_source_root(spec: SportSpec) -> str | None:
     if spec.slug == "mlb":
         source_root = _local_mlb_bundle_root()
@@ -737,6 +790,129 @@ def _filter_steps(steps: Sequence[RefreshStep], phase: str) -> list[RefreshStep]
     return [step for step in steps if phase in step.phases]
 
 
+def _publish_sport_manifest_threadsafe(*, sport: str, artifact_paths: list[str], metadata: dict[str, Any]) -> dict[str, Any]:
+    with _PUBLISH_MANIFEST_LOCK:
+        return publish_sport_manifest(
+            sport=sport,
+            artifact_paths=artifact_paths,
+            metadata=metadata,
+        )
+
+
+def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str) -> dict[str, Any]:
+    spec = REGISTRY[sport]
+    if spec.slug == "mlb":
+        source_root = _local_mlb_bundle_root()
+    elif spec.slug in {"nba", "wnba"}:
+        vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
+        source_root = _basketball_source_root(spec.slug, vendor_repo_name)
+    else:
+        source_root = _source_repo_root(spec.slug, spec.source_repo_name)
+
+    generation_mode = "source_repo"
+    if execution_mode == "source" and spec.slug == "mlb":
+        generation_mode = "local_artifact_bundle"
+    if execution_mode == "source" and spec.slug in {"ncaaf", "nhl", "nba", "wnba"}:
+        generation_mode = "local_artifact_bundle"
+    elif execution_mode == "source" and spec.slug == "ncaab":
+        generation_mode = "local_raw_outputs"
+
+    sport_result: dict[str, Any] = {
+        "sport": sport,
+        "source_repo": str(source_root),
+        "source_root_env_var": _source_root_env_var(spec.slug),
+        "notes": spec.notes,
+        "generation_mode": generation_mode if execution_mode == "source" else "none",
+        "ingestion_mode": None if args.skip_mirror else "mirror_script",
+        "generation": _generation_payload(spec, execution_mode=execution_mode, source_root=source_root),
+        "ingestion": _ingestion_payload(spec, skip_mirror=bool(args.skip_mirror), execution_mode=execution_mode),
+        "refresh_steps": [],
+        "mirror": None,
+        "ok": True,
+    }
+
+    refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase)
+    if refresh_steps and any(_step_requires_source_root(step) for step in refresh_steps):
+        source_error = _validate_source_root(spec)
+        if source_error is not None:
+            sport_result["ok"] = False
+            sport_result["error"] = source_error
+            return sport_result
+
+    for step in refresh_steps:
+        step_result = _run_command(step, dry_run=bool(args.dry_run))
+        sport_result["refresh_steps"].append(step_result)
+        sport_result["generation"]["steps"].append(step_result)
+        if not step_result["ok"]:
+            sport_result["ok"] = False
+            if not args.continue_on_error:
+                return sport_result
+
+    if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
+        tracking_result = _sync_post_refresh_tracking_step(
+            sport=spec.slug,
+            source_root=_post_refresh_root(spec),
+            date_str=args.date,
+            dry_run=bool(args.dry_run),
+        )
+        sport_result["post_refresh"] = tracking_result
+        sport_result["generation"]["post_refresh"] = tracking_result
+        if not tracking_result["ok"]:
+            sport_result["ok"] = False
+            if not args.continue_on_error:
+                return sport_result
+
+    if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
+        if _hosted_source_mode_writes_directly(spec=spec, execution_mode=execution_mode, mirror_only=execution_mode == "ingest"):
+            timestamp = _utc_now()
+            mirror_result = {
+                "name": spec.mirror_script_name.replace(".ps1", ""),
+                "description": "Skipped mirror script because source mode already writes directly into SYNDICATE_DATA_ROOT.",
+                "cwd": str(REPO_ROOT),
+                "command": [],
+                "return_code": 0,
+                "started_at": timestamp,
+                "finished_at": timestamp,
+                "stdout": "",
+                "stderr": "",
+                "ok": True,
+                "dry_run": bool(args.dry_run),
+                "skipped": True,
+            }
+        else:
+            mirror_result = _run_command(
+                _mirror_command(
+                    spec.mirror_script_name,
+                    date=args.date,
+                    sport=spec.slug,
+                    mirror_only=execution_mode == "ingest",
+                ),
+                dry_run=bool(args.dry_run),
+            )
+        sport_result["mirror"] = mirror_result
+        if isinstance(sport_result.get("ingestion"), dict):
+            sport_result["ingestion"]["step"] = mirror_result
+        if not mirror_result["ok"]:
+            sport_result["ok"] = False
+            if not args.continue_on_error:
+                return sport_result
+
+    published_manifest = _publish_sport_manifest_threadsafe(
+        sport=spec.slug,
+        artifact_paths=_sport_artifact_paths(sport_result),
+        metadata={
+            "date": args.date,
+            "phase": args.phase,
+            "execution_mode": execution_mode,
+            "ok": bool(sport_result.get("ok")),
+            "post_refresh_ok": bool((sport_result.get("post_refresh") or {}).get("ok")) if isinstance(sport_result.get("post_refresh"), dict) else None,
+            "mirror_ok": bool((sport_result.get("mirror") or {}).get("ok")) if isinstance(sport_result.get("mirror"), dict) else None,
+        },
+    )
+    sport_result["sport_manifest"] = published_manifest
+    return sport_result
+
+
 def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     selected = _parse_sports(args.sports)
     execution_mode = _resolve_execution_mode(getattr(args, "execution_mode", None), mirror_only=bool(args.mirror_only))
@@ -753,121 +929,47 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     }
 
     any_failure = False
-    for sport in selected:
-        spec = REGISTRY[sport]
-        if spec.slug == "mlb":
-            source_root = _local_mlb_bundle_root()
-        elif spec.slug in {"nba", "wnba"}:
-            vendor_repo_name = "nba_betting_repo" if spec.slug == "nba" else "wnba_betting_repo"
-            source_root = _basketball_source_root(spec.slug, vendor_repo_name)
-        else:
-            source_root = _source_repo_root(spec.slug, spec.source_repo_name)
-        generation_mode = "source_repo"
-        if execution_mode == "source" and spec.slug == "mlb":
-            generation_mode = "local_artifact_bundle"
-        if execution_mode == "source" and spec.slug in {"ncaaf", "nhl", "nba", "wnba"}:
-            generation_mode = "local_artifact_bundle"
-        elif execution_mode == "source" and spec.slug == "ncaab":
-            generation_mode = "local_raw_outputs"
-        sport_result: dict[str, Any] = {
-            "sport": sport,
-            "source_repo": str(source_root),
-            "source_root_env_var": _source_root_env_var(spec.slug),
-            "notes": spec.notes,
-            "generation_mode": generation_mode if execution_mode == "source" else "none",
-            "ingestion_mode": None if args.skip_mirror else "mirror_script",
-            "generation": _generation_payload(spec, execution_mode=execution_mode, source_root=source_root),
-            "ingestion": _ingestion_payload(spec, skip_mirror=bool(args.skip_mirror), execution_mode=execution_mode),
-            "refresh_steps": [],
-            "mirror": None,
-            "ok": True,
-        }
-
-        refresh_steps = [] if execution_mode == "ingest" else _filter_steps(spec.step_builder(args), args.phase)
-        if refresh_steps and any(_step_requires_source_root(step) for step in refresh_steps):
-            source_error = _validate_source_root(spec)
-            if source_error is not None:
+    max_workers = min(len(selected), 4)
+    if max_workers <= 1:
+        for sport in selected:
+            sport_result = _run_sport_refresh(args, sport, execution_mode)
+            if not sport_result.get("ok"):
                 any_failure = True
-                sport_result["ok"] = False
-                sport_result["error"] = source_error
-                summary["results"].append(sport_result)
-                if not args.continue_on_error:
-                    summary["finished_at"] = _utc_now()
-                    summary["ok"] = False
-                    return summary
-                continue
+            summary["results"].append(sport_result)
+            if not args.continue_on_error and not sport_result.get("ok"):
+                summary["finished_at"] = _utc_now()
+                summary["ok"] = False
+                return summary
+    else:
+        results_by_sport: dict[str, dict[str, Any]] = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_run_sport_refresh, args, sport, execution_mode): sport for sport in selected}
+            for future in as_completed(futures):
+                sport = futures[future]
+                try:
+                    sport_result = future.result()
+                except Exception as exc:
+                    sport_result = {
+                        "sport": sport,
+                        "ok": False,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                results_by_sport[sport] = sport_result
+                if not sport_result.get("ok"):
+                    any_failure = True
+                if not args.continue_on_error and not sport_result.get("ok"):
+                    break
 
-        for step in refresh_steps:
-            step_result = _run_command(step, dry_run=bool(args.dry_run))
-            sport_result["refresh_steps"].append(step_result)
-            sport_result["generation"]["steps"].append(step_result)
-            if not step_result["ok"]:
+        for sport in selected:
+            sport_result = results_by_sport.get(sport)
+            if sport_result is None:
+                sport_result = {"sport": sport, "ok": False, "error": "Refresh did not complete."}
                 any_failure = True
-                sport_result["ok"] = False
-                if not args.continue_on_error:
-                    summary["results"].append(sport_result)
-                    summary["finished_at"] = _utc_now()
-                    summary["ok"] = False
-                    return summary
-
-        if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
-            tracking_result = _sync_post_refresh_tracking_step(
-                sport=spec.slug,
-                source_root=_post_refresh_root(spec),
-                date_str=args.date,
-                dry_run=bool(args.dry_run),
-            )
-            sport_result["post_refresh"] = tracking_result
-            sport_result["generation"]["post_refresh"] = tracking_result
-            if not tracking_result["ok"]:
-                any_failure = True
-                sport_result["ok"] = False
-                if not args.continue_on_error:
-                    summary["results"].append(sport_result)
-                    summary["finished_at"] = _utc_now()
-                    summary["ok"] = False
-                    return summary
-
-        if not args.skip_mirror and (execution_mode == "ingest" or sport_result["ok"]):
-            if _hosted_source_mode_writes_directly(spec=spec, execution_mode=execution_mode, mirror_only=execution_mode == "ingest"):
-                timestamp = _utc_now()
-                mirror_result = {
-                    "name": spec.mirror_script_name.replace(".ps1", ""),
-                    "description": "Skipped mirror script because source mode already writes directly into SYNDICATE_DATA_ROOT.",
-                    "cwd": str(REPO_ROOT),
-                    "command": [],
-                    "return_code": 0,
-                    "started_at": timestamp,
-                    "finished_at": timestamp,
-                    "stdout": "",
-                    "stderr": "",
-                    "ok": True,
-                    "dry_run": bool(args.dry_run),
-                    "skipped": True,
-                }
-            else:
-                mirror_result = _run_command(
-                    _mirror_command(
-                        spec.mirror_script_name,
-                        date=args.date,
-                        sport=spec.slug,
-                        mirror_only=execution_mode == "ingest",
-                    ),
-                    dry_run=bool(args.dry_run),
-                )
-            sport_result["mirror"] = mirror_result
-            if isinstance(sport_result.get("ingestion"), dict):
-                sport_result["ingestion"]["step"] = mirror_result
-            if not mirror_result["ok"]:
-                any_failure = True
-                sport_result["ok"] = False
-                if not args.continue_on_error:
-                    summary["results"].append(sport_result)
-                    summary["finished_at"] = _utc_now()
-                    summary["ok"] = False
-                    return summary
-
-        summary["results"].append(sport_result)
+            summary["results"].append(sport_result)
+            if not args.continue_on_error and not sport_result.get("ok"):
+                summary["finished_at"] = _utc_now()
+                summary["ok"] = False
+                return summary
 
     summary["finished_at"] = _utc_now()
     summary["ok"] = not any_failure

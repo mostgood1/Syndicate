@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from flask import Flask
+from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
 from syndicate.blueprints.home import home_bp
 from syndicate.blueprints.intelligence import intelligence_bp
 from syndicate.blueprints.ops import ops_bp
@@ -151,6 +152,7 @@ def create_app() -> Flask:
 
     app.register_blueprint(home_bp)
     app.register_blueprint(intelligence_bp)
+    app.register_blueprint(ask_the_syndicate_bp)
     app.register_blueprint(ops_bp)
     app.register_blueprint(mlb_bp)
     app.register_blueprint(nba_bp)

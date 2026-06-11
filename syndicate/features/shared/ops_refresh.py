@@ -72,7 +72,17 @@ def _load_mirror_manifest_summaries_from_current_data_root() -> list[dict[str, A
 def _pid_is_running(pid: int | None) -> bool:
     if pid is None or pid <= 0:
         return False
-    if os.name != "nt":
+    if os.name == "nt":
+        try:
+            os.kill(int(pid), 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        except OSError:
+            return False
+        return True
+    else:
         stat_path = Path("/proc") / str(pid) / "stat"
         if stat_path.exists():
             try:
@@ -81,15 +91,15 @@ def _pid_is_running(pid: int | None) -> bool:
                     return False
             except OSError:
                 pass
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        except OSError:
+            return False
         return True
-    except OSError:
-        return False
-    return True
 
 
 def _resolve_launch_mode() -> str:
@@ -138,9 +148,15 @@ def _derive_refresh_runtime_state(
     manifest_state = str(manifest.get("state") or "").strip().lower()
     odds_refresh_payload = ((artifacts.get("odds_refresh") or {}).get("payload") if isinstance(artifacts.get("odds_refresh"), dict) else None)
     odds_refresh_stderr = ((artifacts.get("odds_refresh_stderr") or {}).get("payload") if isinstance(artifacts.get("odds_refresh_stderr"), dict) else None)
-    pid_running = _pid_is_running(pid)
     launch_owner = str(manifest.get("launchOwner") or "").strip() or None
     external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else None
+
+    pid_running = False
+    if pid is not None:
+        try:
+            pid_running = _pid_is_running(pid)
+        except Exception:
+            pid_running = False
 
     state = manifest_state or "unknown"
     detail = "No refresh run has been recorded yet."
@@ -238,8 +254,12 @@ def _assert_no_active_refresh_run() -> None:
     state = str(manifest.get("state") or "").strip().lower()
     pid_raw = manifest.get("pid")
     pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
-    if _pid_is_running(pid):
-        raise ValueError(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.")
+    if pid is not None:
+        try:
+            if _pid_is_running(pid):
+                raise ValueError(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.")
+        except Exception:
+            pass
     external_runner = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else {}
     queue_state = str(external_runner.get("queue_state") or "").strip().lower()
     if state == "pending_external":

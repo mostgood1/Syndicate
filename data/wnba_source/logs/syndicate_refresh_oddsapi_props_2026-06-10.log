@@ -1,0 +1,37 @@
+[2026-06-11T01:20:50] $ 'c:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league wnba --date 2026-06-10 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-06-10.csv' --regions us
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py:193: Pandas4Warning: Timestamp.utcnow is deprecated and will be removed in a future version. Use Timestamp.now('UTC') instead.
+  snapshot_ts = pd.Timestamp.utcnow().isoformat()
+Wrote C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\raw\odds_wnba_player_props_2026-06-10.csv with 445 rows.
+[2026-06-11T01:20:52] Materialized processed OddsAPI props snapshot alias: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\oddsapi_player_props_2026-06-10.csv (rows=445)
+[2026-06-11T01:20:52] Generating required game predictions artifact via source bootstrap: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\predictions_2026-06-10.csv
+[2026-06-11T01:20:52] $ 'c:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Saved schedule to 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.json and 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.csv
+{'rows': 350, 'unique_dates': 119}
+[2026-06-11T01:21:28] Seeded fallback game odds slate from props snapshot: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\game_odds_2026-06-10.csv (rows=2)
+[2026-06-11T01:21:28] $ 'c:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-06-10
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:13493: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+No games found on 2026-06-10 (API down and no history/schedule fallback).
+[2026-06-11T01:21:30] Rebuilt predictions slate from local game odds for 2026-06-10: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\predictions_2026-06-10.csv (rows=2)
+[2026-06-11T01:21:30] Generated game predictions at C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\predictions_2026-06-10.csv (rows=2)
+[WARN] Props model artifacts missing; using priors + rolling-stat fallback predictions
+[2026-06-11T01:21:39] $ 'c:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli fetch-schedule
+─────────────────────────────── Fetch Schedule ────────────────────────────────
+Saved schedule to 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.json and 
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\proc
+essed\schedule_2026.csv
+{'rows': 350, 'unique_dates': 119}
+[2026-06-11T01:22:12] $ 'c:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m wnba_betting.cli predict-date --date 2026-06-10
+─────────────────────────────── Predict (Date) ────────────────────────────────
+C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\src\wnba_betting\cli.py:13493: DeprecationWarning: ScoreboardV2 has known issues with line score data for 2025-26 season games (October 22 - December 25, 2025). Please use ScoreboardV3 instead. ScoreboardV3 is fully backward compatible and works for all historical seasons. See: https://github.com/swar/nba_api/issues/596
+  sb = scoreboardv2.ScoreboardV2(game_date=date_str, day_offset=0, timeout=30)
+No games found on 2026-06-10 (API down and no history/schedule fallback).
+[2026-06-11T01:22:14] Built local game_cards from game_odds fallback: C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\wnba_betting_repo\data\processed\game_cards_2026-06-10.csv (rows=2)

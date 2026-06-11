@@ -1,0 +1,14 @@
+{
+  "sport": "wnba",
+  "last_updated": "2026-06-11T01:42:59+00:00",
+  "artifact_paths": [],
+  "status": "complete",
+  "metadata": {
+    "date": "2026-06-07",
+    "phase": "live",
+    "execution_mode": "source",
+    "ok": true,
+    "post_refresh_ok": true,
+    "mirror_ok": null
+  }
+}

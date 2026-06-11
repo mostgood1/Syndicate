@@ -1,0 +1,20 @@
+{
+  "07d4432ec00b42ec8fe4245fe75c387a": {
+    "status": "running",
+    "start_time": "2026-06-11T01:40:56+00:00",
+    "current_step": "mlb_refresh"
+  },
+  "5a21a5eb6be4488fb99e0294fde0b392": {
+    "status": "running",
+    "start_time": "2026-06-11T01:41:18+00:00",
+    "current_step": "mlb_refresh",
+    "launch_result": {
+      "ok": true,
+      "pid": 4321,
+      "run_stamp": "20260520_123000",
+      "date": "2026-05-20",
+      "state": "running"
+    },
+    "pid": 4321
+  }
+}

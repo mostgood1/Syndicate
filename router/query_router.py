@@ -25,11 +25,15 @@ class QueryRouter:
         re.compile(r"\bbreak down\s+(?P<subject>.+?)(?:\s+(?:tonight|today|right now)\b|$)", re.IGNORECASE),
         re.compile(r"\bhow does\s+(?P<subject>.+?)\s+look(?:\s+(?:tonight|today|right now))?\b", re.IGNORECASE),
         re.compile(r"\bhow is\s+(?P<subject>.+?)\s+looking(?:\s+(?:tonight|today|right now))?\b", re.IGNORECASE),
+        re.compile(r"\bbest\s+(?P<subject>.+?\btargets?)(?:\s+(?:tonight|today|right now)\b|$)", re.IGNORECASE),
+        re.compile(r"\b(?:best|top)\s+(?:strikeout|strikeouts|k's?|home run|home runs|hr|hit|hits|rbi|total bases?|saves?|shots?|points?|rebounds?|assists?).*", re.IGNORECASE),
+        re.compile(r"\b(?:strikeout|strikeouts|k's?|home run|home runs|hr|hit|hits|rbi|total bases?|saves?|shots?|points?|rebounds?|assists?)\s+props?\b", re.IGNORECASE),
     )
     _PREVIEW_PATTERNS = (
         re.compile(r"\bpreview\b.*\bgame\b", re.IGNORECASE),
         re.compile(r"\bgame preview\b", re.IGNORECASE),
         re.compile(r"\bwhat should i know about\b.*\bgame\b", re.IGNORECASE),
+        re.compile(r"\bwhat do you think (?:of|about)\s+(?P<subject>.+?)(?:\s+(?:tonight|today|right now)\b|\s+game\b|$)", re.IGNORECASE),
     )
     _LIVE_PATTERNS = (
         re.compile(r"\blive\b", re.IGNORECASE),
@@ -86,6 +90,7 @@ class QueryRouter:
         if not normalized_question:
             return None
         patterns = (
+            re.compile(r"\bwhat do you think (?:of|about)\s+(?P<subject>.+?)(?:\s+(?:tonight|today|right now)\b|\s+game\b|$)", re.IGNORECASE),
             re.compile(r"\bpreview(?: the)? (?P<subject>.+?) game(?: tonight)?\b", re.IGNORECASE),
             re.compile(r"\bpreview(?: the)? (?P<subject>.+?) tonight\b", re.IGNORECASE),
             re.compile(r"\bwhat should i know about(?: the)? (?P<subject>.+?) game(?: tonight| today)?\b", re.IGNORECASE),
@@ -106,6 +111,18 @@ class QueryRouter:
         normalized_question = str(question or "").strip()
         if not normalized_question:
             return None
+        prop_patterns = (
+            re.compile(r"\bbest\s+(?P<subject>.+?\btargets?)(?:\s+(?:tonight|today|right now)\b|$)", re.IGNORECASE),
+            re.compile(r"\b(?:strikeout|strikeouts|k's?|home run|home runs|hr|hit|hits|rbi|total bases?|saves?|shots?|points?|rebounds?|assists?)\s+props?\b", re.IGNORECASE),
+        )
+        for pattern in prop_patterns:
+            match = pattern.search(normalized_question)
+            if not match:
+                continue
+            subject = str(match.groupdict().get("subject") or match.group(0) or "").strip().strip(" .?!,;:\"")
+            if subject.lower().startswith(("the ", "a ", "an ")):
+                subject = re.sub(r"^(?:the|a|an)\s+", "", subject, flags=re.IGNORECASE).strip()
+            return subject or None
         for pattern in QueryRouter._PLAYER_ANALYSIS_PATTERNS:
             match = pattern.search(normalized_question)
             if not match:

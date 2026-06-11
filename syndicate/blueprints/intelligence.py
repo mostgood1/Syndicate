@@ -9,9 +9,12 @@ from typing import Any
 from flask import Blueprint, jsonify, render_template, request
 
 from pipeline.intelligence_state import read_latest_intelligence_state_response
+from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.shared.timezone import central_today_iso
+from syndicate.features.shared.ops_refresh import launch_refresh_run
+from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 
 
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
@@ -285,10 +288,21 @@ def intelligence_query_api():
     global LAST_RESULT
     payload = request.get_json(silent=True) or {}
     user_profile = _normalize_user_profile(payload)
+    want_refresh = bool(payload.get("force_refresh")) or bool(payload.get("background"))
 
-    cached_response = read_latest_intelligence_state_response(payload)
+    cached_response = get_intelligence_state_response(payload, refresh=want_refresh, wait=not bool(payload.get("background")))
+    if cached_response is None:
+        cached_response = read_latest_intelligence_state_response(payload)
     if cached_response is None:
         cached_response = _load_response_cache_state()
+    if cached_response is None or cached_response.get("ok") is False:
+        queue_intelligence_state_refresh(dict(payload))
+        cached_response = {
+            "ok": True,
+            "top_opportunities": [],
+            "by_sport": {},
+            "analysis": None,
+        }
     if cached_response is None:
         cached_response = {
             "ok": True,
@@ -314,8 +328,16 @@ def intelligence_query_warm_api():
 
 @intelligence_bp.get("/intelligence/run")
 def run_intelligence():
-    queue_intelligence_state_refresh(_intelligence_page_payload(central_today_iso()))
-    return {"ok": True}
+    selected_date = central_today_iso()
+    launch_result: dict[str, Any] | None = None
+    launched = False
+    try:
+        launch_result = launch_refresh_run(date=selected_date)
+        launched = True
+    except Exception:
+        launch_result = load_latest_refresh_status()
+    queue_intelligence_state_refresh(_intelligence_page_payload(selected_date))
+    return jsonify({"ok": True, "selected_date": selected_date, "launched": launched, "refresh": launch_result, "queued": True})
 
 
 @intelligence_bp.get("/api/intelligence/status")

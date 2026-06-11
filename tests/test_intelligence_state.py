@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import unittest
 import json
+import tempfile
+import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from flask import Flask
@@ -85,29 +87,37 @@ class IntelligenceStateTests(unittest.TestCase):
                 }
             ],
         }
-        changed_status = {
-            **base_status,
-            "sports": [
-                {
-                    **base_status["sports"][0],
-                    "context_label": "2026-06-11",
-                }
-            ],
-        }
 
-        with patch("pipeline.intelligence_state.build_intelligence_status", side_effect=[base_status, base_status, changed_status]):
-            with patch("pipeline.intelligence_state.collect_all_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_collect:
-                with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
-                    with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"headline": "Test", "recommendations": []}) as mocked_pipeline:
-                        with patch("pipeline.intelligence_state.logger.info") as mocked_logger:
-                            first = service._compute_response(payload)
-                            second = service._compute_response(payload)
-                            third = service._compute_response(payload)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            manifests_root = reports_root / "manifests"
+            manifests_root.mkdir(parents=True, exist_ok=True)
+            manifest_path = manifests_root / "mlb.json"
+            manifest_path.write_text(
+                '{"sport":"mlb","last_updated":"2026-06-10T10:00:00Z","artifact_paths":["reports/intelligence/example.json"],"status":"complete"}',
+                encoding="utf-8",
+            )
+
+            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                with patch("pipeline.intelligence_state.build_intelligence_status", return_value=base_status):
+                    with patch("pipeline.intelligence_state.collect_all_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_collect:
+                        with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport": "MLB", "market": "Hits", "score": 91.0}]) as mocked_rank:
+                            with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value={"headline": "Test", "recommendations": []}) as mocked_pipeline:
+                                with patch("pipeline.intelligence_state.logger.info") as mocked_logger:
+                                    first = service._compute_response(payload)
+                                    second = service._compute_response(payload)
+                                    manifest_path.write_text(
+                                        '{"sport":"mlb","last_updated":"2026-06-10T10:05:00Z","artifact_paths":["reports/intelligence/example.json","reports/intelligence/extra.json"],"status":"complete"}',
+                                        encoding="utf-8",
+                                    )
+                                    third = service._compute_response(payload)
 
         self.assertEqual(first, second)
         self.assertEqual(first["top_opportunities"], third["top_opportunities"])
         self.assertIn("candidate_pool", first)
         self.assertEqual(first["candidate_pool"]["candidate_count"], 1)
+        self.assertEqual(set(first["candidate_pool"]["candidate_pools"].keys()), {"mlb"})
+        self.assertEqual(first["candidate_pool"]["global_pool"], first["candidate_pool"]["candidates"])
         self.assertEqual(first["candidate_pool"]["candidates"][0]["candidate_id"], second["candidate_pool"]["candidates"][0]["candidate_id"])
         self.assertEqual(first["candidate_pool"]["candidates"][0]["candidate_id"], third["candidate_pool"]["candidates"][0]["candidate_id"])
         logged_stages = []
@@ -127,3 +137,66 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(mocked_collect.call_count, 2)
         self.assertEqual(mocked_rank.call_count, 2)
         self.assertEqual(mocked_pipeline.call_count, 2)
+
+    def test_build_candidate_pool_skips_sports_without_manifests(self) -> None:
+        service = IntelligenceStateService()
+        status = {
+            "selected_date": "2026-06-10",
+            "tracked_summary": {"tracked_ok": 1, "tracked_total": 1},
+            "advanced_summary": {"tracked_ok": 1, "tracked_total": 1},
+            "readiness_gate": {"ok": True},
+            "sports": [
+                {
+                    "slug": "mlb",
+                    "name": "MLB",
+                    "context_label": "2026-06-10",
+                    "data_health": "ready",
+                    "active_today": True,
+                    "tracked_ready": True,
+                    "advanced_ready": True,
+                    "advanced_gate": {"ready": True},
+                    "data_warnings": [],
+                    "artifacts": [],
+                    "advanced_inputs": [],
+                },
+                {
+                    "slug": "nba",
+                    "name": "NBA",
+                    "context_label": "2026-06-10",
+                    "data_health": "ready",
+                    "active_today": True,
+                    "tracked_ready": True,
+                    "advanced_ready": True,
+                    "advanced_gate": {"ready": True},
+                    "data_warnings": [],
+                    "artifacts": [],
+                    "advanced_inputs": [],
+                },
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            manifests_root = reports_root / "manifests"
+            manifests_root.mkdir(parents=True, exist_ok=True)
+            (manifests_root / "mlb.json").write_text(
+                '{"sport":"mlb","last_updated":"2026-06-10T10:00:00Z","artifact_paths":["reports/intelligence/mlb.json"],"status":"complete"}',
+                encoding="utf-8",
+            )
+
+            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                with patch("pipeline.intelligence_state.build_intelligence_status", return_value=status):
+                    with patch(
+                        "pipeline.intelligence_state.collect_all_recommendations",
+                        return_value=[
+                            {"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0},
+                            {"name": "NBA Play", "sport": "NBA", "market": "Points", "score": 89.0},
+                        ],
+                    ):
+                        pool = service._build_candidate_pool("2026-06-10", "fingerprint-1")
+
+        self.assertEqual(pool["candidate_count"], 1)
+        self.assertEqual(set(pool["candidate_pools"].keys()), {"mlb"})
+        self.assertEqual(pool["candidate_pools"]["mlb"]["last_updated"], "2026-06-10T10:00:00Z")
+        self.assertEqual(pool["global_pool"][0]["name"], "MLB Play")
+        self.assertEqual(pool["candidates"], pool["global_pool"])

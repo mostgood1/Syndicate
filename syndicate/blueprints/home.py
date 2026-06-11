@@ -4152,7 +4152,11 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
 @home_bp.get("/")
 def home():
     return render_template("home.html")
-        
+
+
+@home_bp.get("/syndicate")
+def syndicate():
+    return render_template("syndicate.html", show_app_header=False)
 
 
 @home_bp.get("/api/home")

@@ -840,6 +840,23 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         build_overview.assert_called_once()
         self.assertEqual(build_overview.call_args.kwargs.get("selected_date"), "2026-06-04")
 
+    def test_run_intelligence_launches_full_refresh(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        with patch("syndicate.blueprints.intelligence.central_today_iso", return_value="2026-06-10"):
+            with patch("syndicate.blueprints.intelligence.launch_refresh_run", return_value={"ok": True, "pid": 4321, "state": "running"}) as mocked_launch:
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    response = app.test_client().get("/intelligence/run")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["launched"])
+        self.assertEqual(payload["refresh"]["pid"], 4321)
+        mocked_launch.assert_called_once_with(date="2026-06-10")
+        mocked_queue.assert_called_once()
+
     def test_query_preferences_does_not_infer_nba_from_wnba_token(self) -> None:
         preferences = _query_preferences("Explain the best WNBA matchup targets today with a table and chart.")
 
@@ -3909,3 +3926,27 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn('Portfolio summary', body)
         self.assertIn('Player A over 1.5 hits', body)
         self.assertIn('2-leg parlay', body)
+
+    def test_source_fingerprint_changes_when_sport_manifest_updates(self) -> None:
+        from pipeline.intelligence_state import IntelligenceStateService
+
+        service = IntelligenceStateService()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            reports_root = Path(tmp_dir) / "reports"
+            manifests_root = reports_root / "manifests"
+            manifests_root.mkdir(parents=True, exist_ok=True)
+            manifest_path = manifests_root / "nba.json"
+            manifest_path.write_text('{"sport":"nba","last_updated":"2026-06-07T10:00:00Z","artifact_paths":["a.csv"],"status":"complete"}', encoding="utf-8")
+
+            with patch(
+                "pipeline.intelligence_state.build_intelligence_status",
+                return_value={"selected_date": "2026-06-07", "sports": [{"slug": "nba", "artifacts": [], "advanced_inputs": []}], "tracked_summary": {}, "advanced_summary": {}, "readiness_gate": {}},
+            ), patch(
+                "pipeline.intelligence_state.load_latest_refresh_status",
+                return_value={"refresh_status": {"manifest": {}, "runtime": {}, "artifacts": {}}},
+            ), patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
+                first_fingerprint = service._source_state_fingerprint("2026-06-07")
+                manifest_path.write_text('{"sport":"nba","last_updated":"2026-06-07T10:01:00Z","artifact_paths":["a.csv","b.csv"],"status":"complete"}', encoding="utf-8")
+                second_fingerprint = service._source_state_fingerprint("2026-06-07")
+
+        self.assertNotEqual(first_fingerprint, second_fingerprint)

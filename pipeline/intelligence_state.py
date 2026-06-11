@@ -17,7 +17,9 @@ from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import rank_global_recommendations
+from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.shared.refresh_state_store import read_json_file
+from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.timezone import central_today_iso
@@ -82,8 +84,8 @@ class IntelligenceStateService:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._running = False
-        self._interval_seconds = max(10, _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 15))
-        self._wait_timeout_seconds = max(10, self._interval_seconds * 2)
+        self._interval_seconds = max(10, _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30))
+        self._wait_timeout_seconds = 30
         self._max_snapshots = max(5, _env_int("SYNDICATE_INTELLIGENCE_MAX_SNAPSHOTS", 12))
         self._snapshots: OrderedDict[str, IntelligenceSnapshot] = OrderedDict()
         self._watched_payloads: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -111,8 +113,56 @@ class IntelligenceStateService:
             "mtime_ns": int(stat_result.st_mtime_ns),
         }
 
-    def _source_state_fingerprint(self, selected_date: str | None) -> str:
+    def _sport_manifest_signature(self, sport_slug: str) -> dict[str, Any]:
+        manifest_path = reports_root() / "manifests" / f"{str(sport_slug or '').strip().lower()}.json"
+        signature = self._artifact_signature(str(manifest_path))
+        manifest = read_json_file(manifest_path) if manifest_path.exists() else None
+        if isinstance(manifest, dict):
+            signature.update(
+                {
+                    "sport": str(manifest.get("sport") or "").strip().lower(),
+                    "last_updated": str(manifest.get("last_updated") or "").strip(),
+                    "status": str(manifest.get("status") or "").strip().lower(),
+                    "artifact_path_count": len(manifest.get("artifact_paths") or []) if isinstance(manifest.get("artifact_paths"), list) else 0,
+                }
+            )
+        return signature
+
+    def _available_sport_manifests(self, selected_date: str | None) -> OrderedDict[str, dict[str, Any]]:
         status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+        manifests: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        for sport in status.get("sports") if isinstance(status.get("sports"), list) else []:
+            if not isinstance(sport, dict):
+                continue
+            sport_slug = str(sport.get("slug") or "").strip().lower()
+            if not sport_slug or sport_slug in manifests:
+                continue
+            manifest_path = reports_root() / "manifests" / f"{sport_slug}.json"
+            if not manifest_path.exists():
+                continue
+            manifest = read_json_file(manifest_path)
+            if not isinstance(manifest, dict):
+                continue
+            manifests[sport_slug] = manifest
+        return manifests
+
+    @staticmethod
+    def _merge_candidate_pools(candidate_pools: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+        merged: list[dict[str, Any]] = []
+        for sport_candidates in candidate_pools.values():
+            merged.extend(dict(candidate) for candidate in sport_candidates if isinstance(candidate, dict))
+        return merged
+
+    def _source_state_fingerprint(self, selected_date: str | None) -> str:
+        if self._app is not None:
+            with self._app.app_context():
+                status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+        else:
+            status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+        refresh_status = load_latest_refresh_status()
+        refresh_manifest = refresh_status.get("refresh_status", {}).get("manifest") if isinstance(refresh_status.get("refresh_status"), dict) else {}
+        refresh_runtime = refresh_status.get("refresh_status", {}).get("runtime") if isinstance(refresh_status.get("refresh_status"), dict) else {}
+        refresh_artifacts = refresh_status.get("refresh_status", {}).get("artifacts") if isinstance(refresh_status.get("refresh_status"), dict) else {}
         sports_payload: list[dict[str, Any]] = []
         for sport in status.get("sports") if isinstance(status.get("sports"), list) else []:
             if not isinstance(sport, dict):
@@ -159,9 +209,31 @@ class IntelligenceStateService:
             )
         payload = {
             "selected_date": status.get("selected_date") or selected_date,
+            "refresh_run": {
+                "run_stamp": refresh_manifest.get("runStamp") if isinstance(refresh_manifest, dict) else None,
+                "state": refresh_manifest.get("state") if isinstance(refresh_manifest, dict) else None,
+                "finished_at": refresh_manifest.get("finishedAt") if isinstance(refresh_manifest, dict) else None,
+                "runtime_state": refresh_runtime.get("state") if isinstance(refresh_runtime, dict) else None,
+                "runtime_detail": refresh_runtime.get("detail") if isinstance(refresh_runtime, dict) else None,
+                "artifacts": {
+                    key: {
+                        "exists": bool(value.get("exists")),
+                        "path": str(value.get("path") or ""),
+                        "size": value.get("size"),
+                        "payload_hash": hashlib.sha256(json.dumps(value.get("payload"), sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")).hexdigest() if value.get("payload") is not None else None,
+                    }
+                    for key, value in refresh_artifacts.items()
+                    if isinstance(value, dict)
+                },
+            },
             "tracked_summary": status.get("tracked_summary") if isinstance(status.get("tracked_summary"), dict) else {},
             "advanced_summary": status.get("advanced_summary") if isinstance(status.get("advanced_summary"), dict) else {},
             "readiness_gate": status.get("readiness_gate") if isinstance(status.get("readiness_gate"), dict) else {},
+            "sport_manifests": [
+                self._sport_manifest_signature(str(sport.get("slug") or ""))
+                for sport in sports_payload
+                if isinstance(sport, dict) and str(sport.get("slug") or "").strip()
+            ],
             "sports": sports_payload,
         }
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
@@ -255,7 +327,11 @@ class IntelligenceStateService:
             if cached_pool is not None:
                 return json.loads(json.dumps(cached_pool, default=str))
 
-        raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+        if self._app is not None:
+            with self._app.app_context():
+                raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+        else:
+            raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
@@ -270,11 +346,47 @@ class IntelligenceStateService:
             candidate_entries.append(candidate_entry)
         _log_stage_timing("candidate_building", (time.perf_counter() - candidate_build_started_at) * 1000.0)
 
+        manifests = self._available_sport_manifests(selected_date)
+        candidate_pools: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+        for sport_slug, manifest in manifests.items():
+            sport_candidates: list[dict[str, Any]] = []
+            for candidate in candidate_entries:
+                candidate_sport = str(candidate.get("sport_slug") or candidate.get("sport") or "").strip().lower()
+                if candidate_sport != sport_slug:
+                    continue
+                sport_candidate = dict(candidate)
+                sport_candidate["sport_manifest_last_updated"] = str(manifest.get("last_updated") or "").strip() or None
+                sport_candidate["sport_manifest_status"] = str(manifest.get("status") or "").strip() or None
+                sport_candidate["sport_manifest_artifact_paths"] = [str(path).strip() for path in (manifest.get("artifact_paths") or []) if str(path).strip()] if isinstance(manifest.get("artifact_paths"), list) else []
+                sport_candidate["sport_manifest_metadata"] = dict(manifest.get("metadata") or {}) if isinstance(manifest.get("metadata"), dict) else {}
+                sport_candidates.append(sport_candidate)
+            if not sport_candidates:
+                continue
+            candidate_pools[sport_slug] = sport_candidates
+
+        global_pool = self._merge_candidate_pools(candidate_pools)
+        if not candidate_pools:
+            global_pool = []
+
         pool = {
             "selected_date": selected_date,
             "source_fingerprint": source_fingerprint,
-            "candidate_count": len(candidate_entries),
-            "candidates": candidate_entries,
+            "candidate_count": len(global_pool),
+            "candidate_pools": {
+                sport_slug: {
+                    "sport": sport_slug,
+                    "last_updated": str(manifest.get("last_updated") or "").strip() or None,
+                    "status": str(manifest.get("status") or "").strip() or None,
+                    "artifact_paths": [str(path).strip() for path in (manifest.get("artifact_paths") or []) if str(path).strip()] if isinstance(manifest.get("artifact_paths"), list) else [],
+                    "metadata": dict(manifest.get("metadata") or {}) if isinstance(manifest.get("metadata"), dict) else {},
+                    "candidate_count": len(candidate_pools.get(sport_slug, [])),
+                    "candidates": candidate_pools.get(sport_slug, []),
+                }
+                for sport_slug, manifest in manifests.items()
+                if sport_slug in candidate_pools
+            },
+            "global_pool": global_pool,
+            "candidates": global_pool,
         }
         with self._condition:
             self._candidate_pools[cache_key] = pool
@@ -446,7 +558,7 @@ class IntelligenceStateService:
                 self._trim_ordered_dict(self._snapshots, self._max_snapshots)
                 self._persist_locked()
                 self._condition.notify_all()
-            self._condition.wait(timeout=self._interval_seconds)
+                self._condition.wait(timeout=self._interval_seconds)
 
     def _compute_response(self, payload: dict[str, Any]) -> dict[str, Any]:
         request_started_at = time.perf_counter()
@@ -476,7 +588,11 @@ class IntelligenceStateService:
             by_sport.setdefault(sport_key, []).append(dict(recommendation))
 
         response_build_started_at = time.perf_counter()
-        analysis_result = run_routed_intelligence_pipeline(request_payload)
+        if self._app is not None:
+            with self._app.app_context():
+                analysis_result = run_routed_intelligence_pipeline(request_payload)
+        else:
+            analysis_result = run_routed_intelligence_pipeline(request_payload)
         if hasattr(analysis_result, "to_dict"):
             analysis = analysis_result.to_dict()
         elif isinstance(analysis_result, dict):
@@ -580,6 +696,14 @@ def queue_intelligence_state_refresh(payload: dict[str, Any]) -> str:
 
 def get_latest_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True) -> dict[str, Any] | None:
     return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload)
+
+
+def get_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True) -> dict[str, Any] | None:
+    return _INTELLIGENCE_STATE_SERVICE.get_response(payload, refresh=refresh, wait=wait)
+
+
+def compute_intelligence_state_response(payload: dict[str, Any]) -> dict[str, Any]:
+    return _INTELLIGENCE_STATE_SERVICE._compute_response(payload)
 
 
 def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:

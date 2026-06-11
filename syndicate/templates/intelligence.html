@@ -6,6 +6,7 @@
 {% block content %}
 <section style="max-width:1200px; margin:auto; margin-bottom:20px;">
   <div id="intelligence-refresh-status" style="margin-bottom:10px;"></div>
+  <div id="intelligence-board-summary" style="margin-bottom:10px;"></div>
   <div id="top-opportunities"></div>
 </section>
 
@@ -44,7 +45,7 @@
 {% block extra_scripts %}
 <script>
 let lastVersion = null;
-let warmKickoffStarted = false;
+let warmKickoffInFlight = false;
 let loadIntelligenceScheduled = false;
 let lastResponseTimestamp = null;
 let hasRenderedIntelligence = false;
@@ -80,6 +81,47 @@ function numericValue(value) {
 
 function displayTitle(item) {
   return String(item.display_name || item.player_name || item.name || item.subject_key || item.pick || item.selection || item.market || "—").trim();
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char] || char));
+}
+
+function syndicateQuestionForItem(item) {
+  const title = displayTitle(item);
+  const context = displayContext(item);
+  if (title && title !== "—") {
+    return context ? `What do you think about ${title} (${context})?` : `What do you think about ${title}?`;
+  }
+  if (context) {
+    return `What do you think about ${context}?`;
+  }
+  return "What do you think about this pick?";
+}
+
+function syndicateContextForItem(item) {
+  return {
+    sport: String(item && (item.sport_slug || item.sport) || "").trim(),
+    sport_slug: String(item && (item.sport_slug || item.sport) || "").trim(),
+    market: String(item && (item.market || item.market_key || item.market_label) || "").trim(),
+    candidate_type: String(item && item.candidate_type || "").trim(),
+    selection: String(item && (item.selection || item.pick) || "").trim(),
+    matchup: String(item && item.matchup || "").trim(),
+    player_name: String(item && (item.player_name || item.name) || "").trim(),
+    name: String(item && (item.display_name || item.name) || "").trim(),
+  };
+}
+
+function openSyndicateFromItem(item) {
+  const question = syndicateQuestionForItem(item);
+  const url = `/syndicate?question=${encodeURIComponent(question)}`;
+  window.location.assign(url);
 }
 
 function displayContext(item) {
@@ -207,6 +249,57 @@ function displayActualValue(item) {
   );
 }
 
+function displayLiveProjection(item) {
+  const projection = item.live_projection ?? item.live_total ?? item.projected_live ?? item.projected;
+  if (projection === null || projection === undefined || projection === "") {
+    return "—";
+  }
+  const numeric = Number(projection);
+  if (Number.isFinite(numeric)) {
+    return Number.isInteger(numeric) ? `${numeric}` : numeric.toFixed(1);
+  }
+  return String(projection).trim() || "—";
+}
+
+function displayMovementSummary(item) {
+  const movement = item.movement && typeof item.movement === "object" ? item.movement : {};
+  const pieces = [];
+  const trend = String(movement.trend || item.movement_trend || item.odds_trend || "").trim();
+  const deltaDisplay = String(movement.delta_display || item.movement_delta_display || item.edge_delta_display || "").trim();
+  const history = Array.isArray(item.movement_history) ? item.movement_history : (Array.isArray(item.market_data?.movement_history) ? item.market_data.movement_history : []);
+  const oddsNow = displayOdds(item);
+  const oddsOpen = item.odds_open ?? item.market_context?.opening_odds ?? item.market_context?.odds_open;
+  const lineOpen = item.line_open ?? item.market_context?.opening_line ?? item.market_context?.line_open;
+
+  if (trend) {
+    pieces.push(trend);
+  }
+  if (deltaDisplay) {
+    pieces.push(deltaDisplay);
+  }
+  if (oddsOpen !== null && oddsOpen !== undefined && oddsOpen !== "" && oddsNow !== "—") {
+    const openText = displayOdds({ odds: oddsOpen });
+    if (openText !== oddsNow) {
+      pieces.push(`Odds ${openText} → ${oddsNow}`);
+    }
+  }
+  if (lineOpen !== null && lineOpen !== undefined && lineOpen !== "") {
+    const openText = displayLine({ line: lineOpen, market_data: {}, market_context: {} });
+    const currentLine = displayLine(item);
+    if (openText !== "—" && currentLine !== "—" && openText !== currentLine) {
+      pieces.push(`Line ${openText} → ${currentLine}`);
+    }
+  }
+  if (history.length) {
+    pieces.push(`${history.length} moves tracked`);
+  }
+  if (oddsNow !== "—") {
+    pieces.push(`Odds ${oddsNow}`);
+  }
+
+  return pieces.length ? pieces.join(" · ") : "—";
+}
+
 function displayActualText(item) {
   const actual = displayActualValue(item);
   if (actual !== "—" && actual !== "-") {
@@ -272,6 +365,8 @@ function renderPropFacts(item, compact = false) {
       <div><strong>Line:</strong> ${displayLine(item)}</div>
       <div><strong>Sport:</strong> ${String(item.sport || item.sport_slug || "—").trim() || "—"}</div>
       <div><strong>Odds:</strong> ${displayOdds(item)}</div>
+      ${(displayLiveProjection(item) !== "—") ? `<div><strong>Live Projection:</strong> ${displayLiveProjection(item)}</div>` : ""}
+      ${(displayMovementSummary(item) !== "—") ? `<div><strong>Movement:</strong> ${displayMovementSummary(item)}</div>` : ""}
       ${(displayActualValue(item) !== "—" || recommendationState(item) !== "pregame") ? `<div><strong>Actual:</strong> ${displayActualText(item)}</div>` : ""}
       ${(displaySettlementSummary(item) !== "—") ? `<div><strong>Settlement:</strong> ${displaySettlementSummary(item)}</div>` : ""}
       <div><strong>Actual Prop:</strong> ${displayActualProp(item)}</div>
@@ -546,6 +641,9 @@ function renderEmptyState() {
   if (parlaysEl) {
     parlaysEl.innerHTML = `<div style="opacity:.65;color:white;">No opportunities available</div>`;
   }
+
+  hasRenderedIntelligence = true;
+  setRefreshStatus("Up to date", "idle");
 }
 
 function renderErrorState(message) {
@@ -693,8 +791,23 @@ function renderIntelligence(response) {
             ? (p.recommended_bet_size * 100).toFixed(1) + "%"
             : "—";
 
+          const question = syndicateQuestionForItem(p);
+          const syndicateContext = syndicateContextForItem(p);
+
           return `
-            <div style="
+            <div
+              role="link"
+              tabindex="0"
+              data-syndicate-question="${escapeHtml(question)}"
+              data-syndicate-sport="${escapeHtml(syndicateContext.sport)}"
+              data-syndicate-sport-slug="${escapeHtml(syndicateContext.sport_slug)}"
+              data-syndicate-market="${escapeHtml(syndicateContext.market)}"
+              data-syndicate-candidate-type="${escapeHtml(syndicateContext.candidate_type)}"
+              data-syndicate-selection="${escapeHtml(syndicateContext.selection)}"
+              data-syndicate-matchup="${escapeHtml(syndicateContext.matchup)}"
+              data-syndicate-player-name="${escapeHtml(syndicateContext.player_name)}"
+              data-syndicate-name="${escapeHtml(syndicateContext.name)}"
+              style="
               background:${theme.background};
               color:white;
               padding:16px;
@@ -702,6 +815,7 @@ function renderIntelligence(response) {
               margin-bottom:10px;
               border-left:6px solid ${theme.color};
               border:1px solid ${theme.border};
+              cursor:pointer;
             ">
 
               <div style="display:flex; justify-content:space-between;">
@@ -728,6 +842,8 @@ function renderIntelligence(response) {
               ${renderCardBadges(p)}
 
               ${liveIndicatorChips(p)}
+
+              <div style="margin-top:10px; font-size:11px; opacity:.75; letter-spacing:.02em; text-transform:uppercase;">Open in Ask The Syndicate</div>
 
             </div>
           `;
@@ -917,9 +1033,83 @@ function renderIntelligence(response) {
     ${renderSection("📊 Pregame Props", pregameRecs)}
   `;
 
+  const syndicatePickCards = picksEl.querySelectorAll("[data-syndicate-question]");
+  syndicatePickCards.forEach((card) => {
+    const question = String(card.getAttribute("data-syndicate-question") || "").trim();
+    const navigateToSyndicate = () => {
+      const params = new URLSearchParams();
+      const fields = [
+        ["question", question],
+        ["sport", card.getAttribute("data-syndicate-sport")],
+        ["sport_slug", card.getAttribute("data-syndicate-sport-slug")],
+        ["market", card.getAttribute("data-syndicate-market")],
+        ["candidate_type", card.getAttribute("data-syndicate-candidate-type")],
+        ["selection", card.getAttribute("data-syndicate-selection")],
+        ["matchup", card.getAttribute("data-syndicate-matchup")],
+        ["player_name", card.getAttribute("data-syndicate-player-name")],
+        ["name", card.getAttribute("data-syndicate-name")],
+      ];
+      fields.forEach(([key, value]) => {
+        const text = String(value || "").trim();
+        if (text) {
+          params.set(key, text);
+        }
+      });
+      window.location.assign(params.toString() ? `/syndicate?${params.toString()}` : "/syndicate");
+    };
+
+    card.addEventListener("click", navigateToSyndicate);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        navigateToSyndicate();
+      }
+    });
+  });
+
   // ===== PARLAYS =====
   const parlaysEl = document.getElementById("parlays");
   const parlays = data.parlays || [];
+
+  const boardSummaryEl = document.getElementById("intelligence-board-summary");
+  if (boardSummaryEl) {
+    const trackedOddsCount = [...activeTopOpportunities, ...allRecs].filter((item) => Boolean(
+      item && (
+        item.odds_open !== undefined ||
+        item.odds_current !== undefined ||
+        item.odds !== undefined ||
+        item.line_open !== undefined ||
+        item.line !== undefined ||
+        item.movement_history
+      )
+    )).length;
+    const liveProjectionCount = [...activeTopOpportunities, ...allRecs].filter((item) => {
+      const projection = displayLiveProjection(item);
+      return projection !== "—" && projection !== "-";
+    }).length;
+    const summaryParts = [
+      `${activeTopOpportunities.length} top picks`,
+      `${liveRecs.length} live`,
+      `${pregameRecs.length} pregame`,
+      `${parlays.length} parlays`,
+    ];
+    if (trackedOddsCount > 0) {
+      summaryParts.push(`${trackedOddsCount} odds tracked`);
+    }
+    if (liveProjectionCount > 0) {
+      summaryParts.push(`${liveProjectionCount} live projections`);
+    }
+    if (portfolio.total_exposure !== undefined && portfolio.total_exposure !== null && portfolio.total_exposure !== "") {
+      summaryParts.push(`Exposure ${portfolio.total_exposure}`);
+    }
+    boardSummaryEl.innerHTML = `
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10); color:#e5e7eb; font-size:12px; font-weight:600;">
+        <span style="opacity:.72; text-transform:uppercase; letter-spacing:.04em;">Board</span>
+        <span>${summaryParts.join(" · ")}</span>
+        <span style="opacity:.72;">Odds/opps refresh every 30s</span>
+      </div>
+    `;
+  }
 
   if (parlays.length) {
     parlaysEl.innerHTML = parlays.map(p => `
@@ -950,15 +1140,16 @@ function renderIntelligence(response) {
 }
 
 function kickOffWarmQuery() {
-  if (warmKickoffStarted) {
+  if (warmKickoffInFlight) {
     return;
   }
-  warmKickoffStarted = true;
-  void fetch("/api/intelligence/query/warm", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ question: "top edges today" })
-  }).catch(() => {});
+  warmKickoffInFlight = true;
+  setRefreshStatus("Refreshing odds/opportunities…", "refreshing");
+  void fetch("/intelligence/run", {
+    method: "GET",
+  }).catch(() => {}).finally(() => {
+    warmKickoffInFlight = false;
+  });
 }
 
 async function loadIntelligence(options = {}) {
@@ -984,7 +1175,7 @@ async function loadIntelligence(options = {}) {
     const res = await fetch("/api/intelligence/query", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ question: "top edges today", force_refresh: false })
+      body: JSON.stringify({ question: "top edges today", force_refresh: true, background })
     });
 
     if (!res.ok) {
@@ -1024,9 +1215,7 @@ async function loadIntelligence(options = {}) {
       } else {
         setRefreshStatus("No new intelligence yet", "idle");
       }
-      if (warmKickoffStarted) {
-        kickOffWarmQuery();
-      }
+      kickOffWarmQuery();
       return;
     }
 
@@ -1055,7 +1244,7 @@ function scheduleIntelligencePolling() {
   window.setInterval(() => {
     kickOffWarmQuery();
     void loadIntelligence({ background: true });
-  }, 15000);
+  }, 30000);
   document.addEventListener("DOMContentLoaded", () => {
     void loadIntelligence({ background: false });
   });

@@ -825,11 +825,11 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
 
         # ✅ Safety: ensure structure exists
         if not raw_response or not isinstance(raw_response, dict):
-            print("⚠️ Invalid raw_response — using fallback")
+            print("Invalid raw_response - using fallback")
             raw_response = {}
 
     except Exception as e:
-        print("❌ intelligence_call failed:", e)
+        print("intelligence_call failed:", e)
 
         # ✅ Guaranteed fallback (never break UI)
         raw_response = {
@@ -990,14 +990,14 @@ def _run_intelligence_query_with_retry(normalized_request: IntelligencePipelineR
             if attempt:
                 retry_count += 1
 
-            print(f"⚠️ Calling black box intelligence (attempt {attempt + 1})")
+            print(f"Calling black box intelligence (attempt {attempt + 1})")
 
             start = time.time()
 
             result = _call_black_box_intelligence(normalized_request)
 
             duration = time.time() - start
-            print(f"✅ Black box returned in {round(duration, 2)}s")
+            print(f"Black box returned in {round(duration, 2)}s")
 
             # ✅ Fail fast if empty / invalid
             if not result:
@@ -1008,7 +1008,7 @@ def _run_intelligence_query_with_retry(normalized_request: IntelligencePipelineR
         except Exception as exc:  # noqa: BLE001
             last_error = exc
 
-            print(f"❌ Attempt {attempt + 1} failed: {str(exc)}")
+            print(f"Attempt {attempt + 1} failed: {str(exc)}")
 
             if attempt == 0:
                 _log_json_event(

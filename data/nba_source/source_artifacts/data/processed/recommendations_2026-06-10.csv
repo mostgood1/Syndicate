@@ -1,3 +1,3 @@
 market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
-ATS,New York Knicks,New York Knicks,San Antonio Spurs,2026-06-10,0.039,-110.0,0.52381,3.9,2.0,1.9,-2.0,,Medium
-TOTAL,Over,New York Knicks,San Antonio Spurs,2026-06-10,0.0141,-110.0,0.52381,1.41,216.5,,,217.91,Low
+ATS,New York Knicks,New York Knicks,San Antonio Spurs,2026-06-10,0.039782,-110.0,0.52381,3.978217,2.0,1.978217,-2.0,,Medium
+TOTAL,Over,New York Knicks,San Antonio Spurs,2026-06-10,0.0231,-110.0,0.52381,2.31003,216.0,,,218.31003,Medium

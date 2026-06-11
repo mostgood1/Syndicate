@@ -1,0 +1,640 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Ask The Syndicate{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --bg0: #070b14;
+    --bg1: #0a1020;
+    --panel: rgba(13, 20, 38, 0.92);
+    --panel2: rgba(16, 26, 49, 0.92);
+    --line: rgba(148, 163, 184, 0.18);
+    --line-strong: rgba(148, 163, 184, 0.3);
+    --text: #f6f8ff;
+    --muted: #a8b3cf;
+    --muted-soft: #7f8aaa;
+    --teal: #9af3de;
+    --gold: #ffbf69;
+    --blue: #8eb6ff;
+    --shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    --shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.26);
+  }
+
+  body.syndicate-body {
+    background:
+      radial-gradient(circle at top left, rgba(154, 243, 222, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 191, 105, 0.11), transparent 24%),
+      radial-gradient(circle at 50% 0%, rgba(142, 182, 255, 0.1), transparent 28%),
+      linear-gradient(180deg, var(--bg0), var(--bg1) 42%, #060910 100%);
+    color: var(--text);
+  }
+
+  body.syndicate-body .cards-shell {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 28px 18px 36px;
+  }
+
+  .syndicate-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(290px, 0.95fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .syndicate-hero,
+  .syndicate-panel,
+  .syndicate-rail-card,
+  .syndicate-result {
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--panel), var(--panel2));
+    box-shadow: var(--shadow);
+    border-radius: 22px;
+    backdrop-filter: blur(16px);
+  }
+
+  .syndicate-hero { padding: 22px; position: relative; overflow: hidden; }
+  .syndicate-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at top right, rgba(255, 191, 105, 0.14), transparent 25%),
+      radial-gradient(circle at bottom left, rgba(154, 243, 222, 0.08), transparent 34%);
+    pointer-events: none;
+  }
+  .syndicate-hero__content, .syndicate-panel__content, .syndicate-rail-card__content, .syndicate-result__content { position: relative; z-index: 1; }
+
+  .syndicate-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .syndicate-brand__logo {
+    width: 50px; height: 50px; border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(135deg, rgba(154, 243, 222, 0.14), rgba(255, 191, 105, 0.10));
+    box-shadow: var(--shadow-soft); object-fit: cover;
+  }
+  .syndicate-kicker { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+  .syndicate-title { margin: 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.02; letter-spacing: -0.04em; }
+  .syndicate-subtitle { margin: 12px 0 0; max-width: 62ch; color: var(--muted); font-size: 15px; line-height: 1.6; }
+
+  .syndicate-input-shell { margin-top: 20px; display: grid; gap: 10px; }
+  .syndicate-input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+  .syndicate-input {
+    width: 100%; min-height: 62px; padding: 18px;
+    border-radius: 18px; border: 1px solid var(--line-strong);
+    background: rgba(7, 12, 24, 0.75); color: var(--text); font-size: 16px; outline: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+  .syndicate-input::placeholder { color: var(--muted-soft); }
+  .syndicate-input:focus { border-color: rgba(154, 243, 222, 0.55); box-shadow: 0 0 0 4px rgba(154, 243, 222, 0.12); }
+  .syndicate-button {
+    min-height: 62px; padding: 0 18px; border: 0; border-radius: 18px;
+    background: linear-gradient(135deg, var(--teal), var(--gold)); color: #061018; font-weight: 800; font-size: 15px;
+    cursor: pointer; box-shadow: 0 16px 28px rgba(255, 191, 105, 0.18);
+  }
+  .syndicate-button:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+  .syndicate-meta-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  .syndicate-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .syndicate-pill { padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: #e9efff; font-size: 12px; }
+
+  .syndicate-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; margin-top: 18px; }
+  .syndicate-result { min-height: 420px; overflow: hidden; }
+  .syndicate-panel, .syndicate-rail-card { padding: 18px; }
+  .syndicate-section-title { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted-soft); }
+  .recent-list { display: grid; gap: 10px; }
+  .recent-item { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); border-radius: 16px; padding: 12px; cursor: pointer; }
+  .recent-item:hover { border-color: rgba(154, 243, 222, 0.5); background: rgba(154, 243, 222, 0.06); }
+  .recent-item__question { font-size: 14px; line-height: 1.4; margin: 0 0 6px; color: var(--text); }
+  .recent-item__meta { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+
+  .result-empty, .result-loading, .result-error { min-height: 420px; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+  .result-empty__card, .result-error__card { max-width: 540px; display: grid; gap: 14px; }
+  .result-kicker { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+  .result-title { margin: 0; font-size: 26px; color: var(--text); letter-spacing: -0.03em; }
+  .result-copy { margin: 0; line-height: 1.7; color: var(--muted); }
+
+  .schema-header { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 20px 20px 14px; border-bottom: 1px solid var(--line); }
+  .schema-type { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--gold); }
+  .schema-question { margin: 4px 0 0; font-size: 20px; line-height: 1.25; letter-spacing: -0.03em; }
+  .schema-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.04); color: #edf3ff; font-size: 12px; white-space: nowrap; }
+  .schema-body { padding: 20px; display: grid; gap: 16px; }
+  .schema-grid { display: grid; gap: 12px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .stat-card, .soft-card { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); border-radius: 16px; padding: 14px; }
+  .stat-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; }
+  .stat-value { font-size: 19px; color: var(--text); letter-spacing: -0.02em; }
+  .stat-subvalue { margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .list-grid { display: grid; gap: 10px; }
+  .list-item { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); border-radius: 16px; padding: 14px; }
+  .list-item__title { margin: 0 0 4px; font-size: 14px; color: var(--text); }
+  .list-item__meta { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.55; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: #eaf0ff; font-size: 12px; }
+  .mini-note { font-size: 12px; color: var(--muted); line-height: 1.65; }
+  .hidden-json { display: none; }
+  .stacked-section { display: grid; gap: 12px; }
+  .empty-hint { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 999px; border: 1px dashed var(--line-strong); color: var(--muted); font-size: 12px; }
+  .schema-divider { height: 1px; background: var(--line); margin: 4px 0; }
+  .schema-footer { padding: 0 20px 20px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 1080px) { .syndicate-page, .syndicate-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) {
+    body.syndicate-body .cards-shell { padding: 16px 12px 28px; }
+    .syndicate-hero, .syndicate-panel, .syndicate-rail-card, .syndicate-result { border-radius: 18px; }
+    .syndicate-input-row { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .list-item { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="syndicate-page">
+  <section class="syndicate-panel">
+    <div class="syndicate-panel__content">
+      <div class="syndicate-hero">
+        <div class="syndicate-hero__content">
+          <div class="syndicate-brand">
+            <img class="syndicate-brand__logo" src="{{ url_for('static', filename='shared/syndicate-logo.png') }}" alt="Syndicate logo" />
+            <div>
+              <div class="syndicate-kicker">Ask The Syndicate</div>
+              <div class="syndicate-meta-row" style="margin-top:4px;">
+                <span class="syndicate-pill">Analysis</span>
+                <span class="syndicate-pill">Matchups</span>
+                <span class="syndicate-pill">Edges</span>
+              </div>
+            </div>
+          </div>
+          <h1 class="syndicate-title">Ask The Syndicate</h1>
+          <p class="syndicate-subtitle">Put the model to work on bets, matchups, and market shape. The response is structured, deterministic, and grounded in the intelligence engine.</p>
+
+          <form id="syndicate-form" class="syndicate-input-shell" autocomplete="off">
+            <label class="hidden-json" for="syndicate-question">Question</label>
+            <div class="syndicate-input-row">
+              <input id="syndicate-question" class="syndicate-input" type="text" placeholder="What do you think of Celtics -4.5?" maxlength="500" />
+              <button id="syndicate-submit" class="syndicate-button" type="submit">Ask Syndicate</button>
+            </div>
+            <div class="syndicate-meta-row">
+              <span id="syndicate-status">Ready</span>
+              <span>Enter to submit · Recent questions stay local to this browser</span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="syndicate-grid">
+        <section class="syndicate-result" aria-live="polite">
+          <div id="syndicate-result-root" class="syndicate-result__content">
+            <div class="result-empty">
+              <div class="result-empty__card">
+                <div class="result-kicker">Structured response</div>
+                <h2 class="result-title">Start with a question</h2>
+                <p class="result-copy">Try a bet angle, a matchup ask, or a market summary. The results panel will render a clean schema instead of a text blob.</p>
+                <div class="chip-row">
+                  <button class="chip" type="button" data-example="What do you think of this spread?">Spread read</button>
+                  <button class="chip" type="button" data-example="Lakers vs Celtics">Matchup analysis</button>
+                  <button class="chip" type="button" data-example="top edges today">Market summary</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="syndicate-rail-card">
+          <div class="syndicate-rail-card__content">
+            <div class="syndicate-section-title">Recent queries</div>
+            <div id="recent-queries" class="recent-list">
+              <div class="empty-hint">No recent queries yet.</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const recentStorageKey = "syndicate.recentQueries";
+  const questionInput = document.getElementById("syndicate-question");
+  const submitButton = document.getElementById("syndicate-submit");
+  const statusElement = document.getElementById("syndicate-status");
+  const resultRoot = document.getElementById("syndicate-result-root");
+  const recentRoot = document.getElementById("recent-queries");
+
+  function esc(value) {
+    const text = String(value == null ? "" : value);
+    return text.replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char] || char));
+  }
+
+  function setStatus(message) {
+    if (statusElement) statusElement.textContent = message;
+  }
+
+  function setLoading(isLoading) {
+    if (submitButton) {
+      submitButton.disabled = isLoading;
+      submitButton.textContent = isLoading ? "Thinking…" : "Ask Syndicate";
+    }
+    if (questionInput) questionInput.disabled = isLoading;
+  }
+
+  function formatTimestamp(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+  }
+
+  function getRecentQueries() {
+    try {
+      const raw = localStorage.getItem(recentStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function setRecentQueries(items) {
+    try {
+      localStorage.setItem(recentStorageKey, JSON.stringify(items.slice(0, 6)));
+    } catch (_) {}
+  }
+
+  function renderRecentQueries() {
+    if (!recentRoot) return;
+    const items = getRecentQueries();
+    if (!items.length) {
+      recentRoot.innerHTML = '<div class="empty-hint">No recent queries yet.</div>';
+      return;
+    }
+    recentRoot.innerHTML = items.map((item) => `
+      <div class="recent-item" role="button" tabindex="0" data-question="${esc(item.question || "")}">
+        <p class="recent-item__question">${esc(item.question || "")}</p>
+        <div class="recent-item__meta">
+          <span>${esc(item.schema_type || item.intent || "analysis")}</span>
+          <span>${esc(formatTimestamp(item.timestamp) || "just now")}</span>
+        </div>
+      </div>
+    `).join("");
+    recentRoot.querySelectorAll(".recent-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        const question = String(item.getAttribute("data-question") || "").trim();
+        if (questionInput) { questionInput.value = question; questionInput.focus(); }
+      });
+      item.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          item.click();
+        }
+      });
+    });
+  }
+
+  function addRecentQuery(entry) {
+    const current = getRecentQueries();
+    const filtered = current.filter((item) => String(item.question || "").trim() !== String(entry.question || "").trim());
+    filtered.unshift(entry);
+    setRecentQueries(filtered);
+    renderRecentQueries();
+  }
+
+  function getPageContext() {
+    try {
+      const url = new URL(window.location.href);
+      const context = {};
+      const passThroughKeys = [
+        "date",
+        "selected_date",
+        "sport",
+        "sport_slug",
+        "market",
+        "candidate_type",
+        "selection",
+        "matchup",
+        "player_name",
+        "name",
+        "preview_subject",
+        "player_subject",
+      ];
+      passThroughKeys.forEach((key) => {
+        const value = String(url.searchParams.get(key) || "").trim();
+        if (value) {
+          context[key] = value;
+        }
+      });
+      return context;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function safeText(value, fallback = "—") {
+    const text = String(value == null ? "" : value).trim();
+    return text || fallback;
+  }
+
+  function toPercent(value) {
+    if (value == null || value === "") return "—";
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return safeText(value);
+    return numeric <= 1 ? `${(numeric * 100).toFixed(1)}%` : `${numeric.toFixed(1)}%`;
+  }
+
+  function renderLoading(message) {
+    if (!resultRoot) return;
+    resultRoot.innerHTML = `
+      <div class="result-loading">
+        <div class="result-empty__card">
+          <div class="result-kicker">Working</div>
+          <h2 class="result-title">${esc(message || "Thinking through the board…")}</h2>
+          <p class="result-copy">The engine is scoring candidates and assembling the structured response.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderError(message) {
+    if (!resultRoot) return;
+    resultRoot.innerHTML = `
+      <div class="result-error">
+        <div class="result-error__card">
+          <div class="result-kicker">Error</div>
+          <h2 class="result-title">Unable to load response</h2>
+          <p class="result-copy">${esc(message || "The API returned an unexpected response.")}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTimeout(message, question) {
+    if (!resultRoot) return;
+    resultRoot.innerHTML = `
+      <div class="result-error">
+        <div class="result-error__card">
+          <div class="result-kicker">Still working</div>
+          <h2 class="result-title">${esc(message || "The request is taking longer than expected.")}</h2>
+          <p class="result-copy">${esc(question ? `Question queued: ${question}` : "The engine is still processing this request.")}</p>
+          <div class="chip-row" style="justify-content:center;">
+            <button class="chip" type="button" id="retry-syndicate-query">Retry</button>
+          </div>
+        </div>
+      </div>
+    `;
+    const retryButton = document.getElementById("retry-syndicate-query");
+    if (retryButton) {
+      retryButton.addEventListener("click", () => submitQuestion(question || (questionInput ? questionInput.value : "")));
+    }
+  }
+
+  function schemaPayload(response) {
+    if (!response || typeof response !== "object") return {};
+    if (response.schema && typeof response.schema === "object") return response.schema;
+    if (response.structured_response && typeof response.structured_response === "object") return response.structured_response;
+    return {};
+  }
+
+  function renderBetAnalysis(schema) {
+    const explanation = schema.explanation || {};
+    const steps = Array.isArray(explanation.reasoning_steps) ? explanation.reasoning_steps : [];
+    return `
+      <div class="schema-header">
+        <div>
+          <p class="schema-type">Bet Analysis</p>
+          <h2 class="schema-question">${esc(schema.selection || "Top selection")}</h2>
+        </div>
+        <span class="schema-badge">${esc(safeText(schema.recommendation, "No recommendation provided"))}</span>
+      </div>
+      <div class="schema-body">
+        <div class="stats-grid">
+          <div class="stat-card"><span class="stat-label">Model Probability</span><div class="stat-value">${esc(toPercent(schema.model_probability))}</div></div>
+          <div class="stat-card"><span class="stat-label">Market Probability</span><div class="stat-value">${esc(toPercent(schema.market_probability))}</div></div>
+          <div class="stat-card"><span class="stat-label">Edge</span><div class="stat-value">${esc(safeText(schema.edge))}</div></div>
+          <div class="stat-card"><span class="stat-label">EV</span><div class="stat-value">${esc(safeText(schema.EV))}</div></div>
+          <div class="stat-card"><span class="stat-label">Confidence</span><div class="stat-value">${esc(toPercent(schema.confidence))}</div></div>
+          <div class="stat-card"><span class="stat-label">Selection</span><div class="stat-value">${esc(safeText(schema.selection))}</div></div>
+        </div>
+        <div class="soft-card">
+          <div class="syndicate-section-title">Explanation</div>
+          <p class="mini-note">${esc(safeText(explanation.summary, schema.recommendation || ""))}</p>
+          <div class="schema-divider"></div>
+          <div class="chip-row">${steps.length ? steps.map((item) => `<span class="chip">${esc(item.note || item.reasoning || item.label || item.title || item)}</span>`).join("") : '<span class="chip">No supporting steps returned</span>'}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMatchupAnalysis(schema) {
+    const sim = schema.simulation_summary || {};
+    const insight = schema.market_insight || {};
+    const edges = Array.isArray(schema.key_edges) ? schema.key_edges : [];
+    const teams = Array.isArray(schema.teams) ? schema.teams : [];
+    const hidden = Array.isArray(schema.hidden_factors) ? schema.hidden_factors : [];
+    return `
+      <div class="schema-header">
+        <div>
+          <p class="schema-type">Matchup Analysis</p>
+          <h2 class="schema-question">${esc(teams.join(" vs ") || "Matchup overview")}</h2>
+        </div>
+        <span class="schema-badge">Win Probability ${esc(toPercent(schema.win_probability))}</span>
+      </div>
+      <div class="schema-body">
+        <div class="chip-row">${teams.length ? teams.map((team) => `<span class="chip">${esc(team)}</span>`).join("") : '<span class="chip">No teams detected</span>'}</div>
+        <div class="soft-card">
+          <div class="syndicate-section-title">Simulation Summary</div>
+          <p class="mini-note">${esc(safeText(sim.summary, ""))}</p>
+          <div class="stats-grid" style="margin-top:12px;">
+            <div class="stat-card"><span class="stat-label">Analysis Focus</span><div class="stat-value">${esc(safeText(sim.analysis_focus, schema.schema_type || "analysis"))}</div></div>
+            <div class="stat-card"><span class="stat-label">Rows Considered</span><div class="stat-value">${esc(safeText(sim.rows_considered))}</div></div>
+          </div>
+        </div>
+        <div class="stacked-section">
+          <div class="syndicate-section-title">Key Edges</div>
+          ${edges.length ? edges.map((edge) => `
+            <div class="list-item">
+              <div>
+                <p class="list-item__title">${esc(edge.selection || edge.label || "Edge")}</p>
+                <p class="list-item__meta">${esc(safeText(edge.recommendation || edge.reasoning || edge.summary, "No detail returned."))}</p>
+              </div>
+              <div class="chip-row" style="justify-content:flex-end;">
+                <span class="chip">Model ${esc(toPercent(edge.model_probability))}</span>
+                <span class="chip">Market ${esc(toPercent(edge.market_probability))}</span>
+                <span class="chip">EV ${esc(safeText(edge.EV))}</span>
+              </div>
+            </div>
+          `).join("") : '<div class="empty-hint">No key edges were returned.</div>'}
+        </div>
+        <div class="soft-card">
+          <div class="syndicate-section-title">Hidden Factors</div>
+          <div class="chip-row">${hidden.length ? hidden.map((item) => `<span class="chip">${esc(item.factor || item.label || item)}</span>`).join("") : '<span class="chip">None surfaced</span>'}</div>
+        </div>
+        <div class="soft-card">
+          <div class="syndicate-section-title">Market Insight</div>
+          <p class="mini-note">${esc(safeText(insight.summary, ""))}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMarketSummary(schema) {
+    const opportunities = Array.isArray(schema.top_opportunities) ? schema.top_opportunities : [];
+    const rationale = schema.rationale_summary || {};
+    return `
+      <div class="schema-header">
+        <div>
+          <p class="schema-type">Market Summary</p>
+          <h2 class="schema-question">Top Opportunities</h2>
+        </div>
+        <span class="schema-badge">${esc(opportunities.length)} opportunities</span>
+      </div>
+      <div class="schema-body">
+        <div class="list-grid">
+          ${opportunities.length ? opportunities.map((item) => `
+            <div class="list-item">
+              <div>
+                <p class="list-item__title">${esc(item.selection || item.label || "Opportunity")}</p>
+                <p class="list-item__meta">${esc(safeText(item.recommendation || item.summary || "No rationale returned."))}</p>
+              </div>
+              <div class="chip-row" style="justify-content:flex-end;">
+                <span class="chip">Model ${esc(toPercent(item.model_probability))}</span>
+                <span class="chip">Market ${esc(toPercent(item.market_probability))}</span>
+                <span class="chip">EV ${esc(safeText(item.EV))}</span>
+              </div>
+            </div>
+          `).join("") : '<div class="empty-hint">No opportunities were returned.</div>'}
+        </div>
+        <div class="soft-card">
+          <div class="syndicate-section-title">Rationale Summary</div>
+          <p class="mini-note">${esc(safeText(rationale.summary, ""))}</p>
+          <div class="schema-divider"></div>
+          <div class="chip-row">${(Array.isArray(rationale.board_notes) ? rationale.board_notes : []).map((item) => `<span class="chip">${esc(item)}</span>`).join("") || '<span class="chip">No board notes</span>'}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderSchema(response) {
+    if (!resultRoot) return;
+    const schema = schemaPayload(response);
+    const schemaType = String((response && response.schema_type) || schema.schema_type || (response && response.intent) || "bet_analysis").trim();
+    const question = String((response && response.question) || "").trim();
+    const headerNote = String((response && response.query_type) || schemaType || "").replace(/_/g, " ");
+
+    let body = "";
+    if (schemaType === "matchup_analysis") {
+      body = renderMatchupAnalysis(schema);
+    } else if (schemaType === "market_summary") {
+      body = renderMarketSummary(schema);
+    } else {
+      body = renderBetAnalysis(schema);
+    }
+
+    resultRoot.innerHTML = `
+      <article class="syndicate-result__content">
+        ${body}
+        <div class="schema-footer">${esc(headerNote)} · ${esc(question)}</div>
+      </article>
+    `;
+  }
+
+  async function submitQuestion(question) {
+    const trimmed = String(question || "").trim();
+    if (!trimmed) {
+      setStatus("Enter a question first");
+      return;
+    }
+    setLoading(true);
+    setStatus("Thinking…");
+    renderLoading("Scoring candidates and shaping the response…");
+
+    const controller = new AbortController();
+    const timeoutMs = 12000;
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch("/api/syndicate/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: trimmed, context: getPageContext() }),
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error((payload && payload.error) || "The Syndicate API returned an error.");
+      }
+      renderSchema(payload);
+      setStatus(`Loaded ${safeText(payload.schema_type || payload.intent || "analysis")}`);
+      addRecentQuery({
+        question: trimmed,
+        intent: payload.intent || "analysis",
+        schema_type: payload.schema_type || payload.intent || "analysis",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        renderTimeout("The response is taking too long.", trimmed);
+        setStatus("Timed out");
+      } else {
+        renderError(error && error.message ? error.message : "Failed to load response.");
+        setStatus("Error");
+      }
+    } finally {
+      window.clearTimeout(timeoutId);
+      setLoading(false);
+    }
+  }
+
+  document.getElementById("syndicate-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitQuestion(questionInput ? questionInput.value : "");
+  });
+
+  document.querySelectorAll("[data-example]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const example = String(button.getAttribute("data-example") || "").trim();
+      if (questionInput) {
+        questionInput.value = example;
+        questionInput.focus();
+      }
+      submitQuestion(example);
+    });
+  });
+
+  (function hydrateQuestionFromUrl() {
+    try {
+      const url = new URL(window.location.href);
+      const question = String(url.searchParams.get("question") || "").trim();
+      if (!question) {
+        return;
+      }
+      if (questionInput) {
+        questionInput.value = question;
+        questionInput.focus();
+      }
+      setStatus("Question loaded");
+      const context = getPageContext();
+      const hasContext = Object.keys(context).length > 0;
+      if (hasContext) {
+        const contextBits = [];
+        if (context.sport || context.sport_slug) contextBits.push(context.sport || context.sport_slug);
+        if (context.market) contextBits.push(context.market);
+        if (context.selection) contextBits.push(context.selection);
+        if (context.matchup) contextBits.push(context.matchup);
+        if (context.player_name && !contextBits.includes(context.player_name)) contextBits.push(context.player_name);
+        const banner = document.createElement("div");
+        banner.className = "mini-note";
+        banner.style.marginTop = "6px";
+        banner.textContent = contextBits.filter(Boolean).join(" · ");
+        const shell = document.getElementById("syndicate-form");
+        if (shell && !document.getElementById("syndicate-context-banner")) {
+          banner.id = "syndicate-context-banner";
+          shell.appendChild(banner);
+        }
+      }
+    } catch (_) {}
+  })();
+
+  renderRecentQueries();
+</script>
+{% endblock %}

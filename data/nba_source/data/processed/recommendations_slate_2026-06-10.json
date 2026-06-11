@@ -16,31 +16,31 @@
           "display_pick": "New York Knicks -2.0",
           "selection": "New York Knicks",
           "price": -110.0,
-          "score": 3.9,
-          "ev_pct": 3.9,
-          "win_prob": 0.56281,
-          "p_win": 0.56281,
-          "basketball_summary": "Model margin 1.9 vs market -2.0",
+          "score": 3.978217,
+          "ev_pct": 3.9781999999999997,
+          "win_prob": 0.563592,
+          "p_win": 0.563592,
+          "basketball_summary": "Model margin 2.0 vs market -2.0",
           "top_play_reasons": [
-            "Edge 3.9",
-            "EV 3.9%"
+            "Edge 4.0",
+            "EV 4.0%"
           ],
           "matchup": "SAS @ NYK"
         },
         {
           "market": "TOTAL",
           "team": "Total",
-          "display_pick": "Over 216.5",
+          "display_pick": "Over 216.0",
           "selection": "Over",
           "price": -110.0,
-          "score": 1.41,
-          "ev_pct": 1.41,
-          "win_prob": 0.53791,
-          "p_win": 0.53791,
-          "basketball_summary": "Model total 217.9 vs line 216.5",
+          "score": 2.31003,
+          "ev_pct": 2.31,
+          "win_prob": 0.54691,
+          "p_win": 0.54691,
+          "basketball_summary": "Model total 218.3 vs line 216.0",
           "top_play_reasons": [
-            "Edge 1.4",
-            "EV 1.4%"
+            "Edge 2.3",
+            "EV 2.3%"
           ],
           "matchup": "SAS @ NYK"
         }
