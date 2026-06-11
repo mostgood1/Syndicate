@@ -1,6 +1,6 @@
 {
   "date": "2026-06-11",
-  "generatedAt": "2026-06-11T17:25:02-05:00",
+  "generatedAt": "2026-06-11T17:26:03-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -25,10 +25,10 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 1.5,
-    "totalMs": 52.9,
+    "totalMs": 53.9,
     "snapshotLoadMs": 2.3,
     "simContextLoadMs": 0.4,
-    "propEvalMs": 0.5,
+    "propEvalMs": 0.6,
     "gameLensMs": 0.5,
     "gameCount": 8,
     "liveGameCount": 1,
@@ -1082,21 +1082,6 @@
               "tone": "soft",
               "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
               "hitProb": 0.247
-            }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "BB up to 2",
-              "stat": "walks_allowed",
-              "target": 2,
-              "targets": [
-                2
-              ],
-              "tone": "strong",
-              "detail": "Live projection 1.2. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
-              "hitProb": 0.512,
-              "source": "live",
-              "actual": 1.0
             }
           ]
         }

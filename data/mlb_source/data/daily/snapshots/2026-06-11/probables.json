@@ -2,7 +2,7 @@
   "date": "2026-06-11",
   "season": 2026,
   "spring_mode": false,
-  "generated_at": "2026-06-11T19:22:42.323173",
+  "generated_at": "2026-06-11T21:50:35.522672",
   "games": [
     {
       "idx": 0,
@@ -464,11 +464,11 @@
         "abbr": "CWS"
       },
       "away_probable_id": 527048,
-      "home_probable_id": null,
+      "home_probable_id": 641743,
       "away_source": "feed_gameData_probablePitchers",
-      "home_source": "none",
+      "home_source": "feed_gameData_probablePitchers",
       "away_confidence": 0.75,
-      "home_confidence": 0.0,
+      "home_confidence": 0.75,
       "away_validation": {
         "status": "ok",
         "selected_id": 527048,
@@ -488,28 +488,32 @@
         "rejected_candidates": []
       },
       "home_validation": {
-        "status": "none",
-        "selected_id": null,
-        "selected_name": "",
-        "selected_source": "none",
+        "status": "ok",
+        "selected_id": 641743,
+        "selected_name": "Anthony Kay",
+        "selected_source": "feed_gameData_probablePitchers",
         "override_reason": "",
-        "roster_team_ids": [],
-        "registry_team_ids": [],
-        "on_expected_team": false,
+        "roster_team_ids": [
+          145
+        ],
+        "registry_team_ids": [
+          145
+        ],
+        "on_expected_team": true,
         "on_opponent_team": false,
-        "on_expected_registry_team": false,
+        "on_expected_registry_team": true,
         "on_opponent_registry_team": false,
         "rejected_candidates": []
       },
       "raw": {
         "away_schedule_id": 527048,
-        "home_schedule_id": null,
+        "home_schedule_id": 641743,
         "away_schedule_name": "Mart\u00edn P\u00e9rez",
-        "home_schedule_name": "",
+        "home_schedule_name": "Anthony Kay",
         "away_feed_id": 527048,
-        "home_feed_id": null,
+        "home_feed_id": 641743,
         "away_feed_name": "Mart\u00edn P\u00e9rez",
-        "home_feed_name": ""
+        "home_feed_name": "Anthony Kay"
       }
     }
   ]

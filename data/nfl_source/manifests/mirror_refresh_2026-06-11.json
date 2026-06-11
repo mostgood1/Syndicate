@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "nfl",
     "date":  "2026-06-11",
-    "refreshedAtUtc":  "2026-06-11T20:00:49.9881937Z",
+    "refreshedAtUtc":  "2026-06-11T22:26:14.6794718Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NFL",
