@@ -65,6 +65,16 @@ let loadIntelligenceScheduled = false;
 let lastResponseTimestamp = null;
 let hasRenderedIntelligence = false;
 let currentIntelligenceRequest = null;
+const initialIntelligenceResponseScript = document.getElementById("initial-intelligence-response");
+let initialIntelligenceResponse = {};
+
+try {
+  initialIntelligenceResponse = initialIntelligenceResponseScript && initialIntelligenceResponseScript.textContent
+    ? JSON.parse(initialIntelligenceResponseScript.textContent)
+    : {};
+} catch (err) {
+  initialIntelligenceResponse = {};
+}
 
 function refreshStatusElement() {
   return document.getElementById("intelligence-refresh-status");
@@ -1199,9 +1209,11 @@ function kickOffWarmQuery() {
   }
   warmKickoffInFlight = true;
   setRefreshStatus("Refreshing odds/opportunities…", "refreshing");
-  void fetch("/intelligence/run", {
-    method: "GET",
+  void fetch("/api/intelligence/query/warm", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
     cache: "no-store",
+    body: JSON.stringify({ question: "top edges today", background: true, force_refresh: false }),
   }).catch(() => {}).finally(() => {
     warmKickoffInFlight = false;
   });
@@ -1225,13 +1237,12 @@ async function loadIntelligence(options = {}) {
   try {
     if (!hasRenderedIntelligence && lastVersion === null) {
       renderLoadingState();
-      kickOffWarmQuery();
     }
     const res = await fetch("/api/intelligence/query", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       cache: "no-store",
-      body: JSON.stringify({ question: "top edges today", background, force_refresh: !background })
+      body: JSON.stringify({ question: "top edges today", background, force_refresh: false })
     });
 
     if (!res.ok) {
@@ -1296,14 +1307,20 @@ function scheduleIntelligencePolling() {
   }
   loadIntelligenceScheduled = true;
   window.loadIntelligence = loadIntelligence;
-  void loadIntelligence({ background: false });
+  if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
+    lastVersion = initialIntelligenceResponse.version ?? lastVersion;
+    lastResponseTimestamp = initialIntelligenceResponse.timestamp ?? lastResponseTimestamp;
+    renderIntelligence(unwrapVersionedIntelligenceResponse(initialIntelligenceResponse.response || initialIntelligenceResponse));
+  } else {
+    renderEmptyState();
+    kickOffWarmQuery();
+  }
+  kickOffWarmQuery();
+  void loadIntelligence({ background: true });
   window.setInterval(() => {
     kickOffWarmQuery();
     void loadIntelligence({ background: true });
   }, 30000);
-  document.addEventListener("DOMContentLoaded", () => {
-    void loadIntelligence({ background: false });
-  });
   window.addEventListener("focus", () => {
     void loadIntelligence({ background: true });
   });

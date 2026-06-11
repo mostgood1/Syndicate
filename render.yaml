@@ -45,7 +45,7 @@ services:
       - key: SYNDICATE_NHL_SOURCE_CLI_GENERATION
         value: "false"
       - key: WEB_CONCURRENCY
-        value: "3"
+        value: "1"
       - key: GUNICORN_THREADS
         value: "2"
       - key: GUNICORN_TIMEOUT
@@ -55,9 +55,11 @@ services:
       - key: GUNICORN_KEEPALIVE
         value: "5"
       - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "1"
-      - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
+        value: "0"
+      - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
         value: "true"
+      - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
+        value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
         value: "30"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from flask import Flask
 from syndicate.blueprints.ask_the_syndicate import ask_the_syndicate_bp
 from syndicate.blueprints.home import home_bp
@@ -15,6 +17,13 @@ from syndicate.blueprints.sports import sports_bp
 from syndicate.blueprints.wnba import wnba_bp
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
 from pipeline.intelligence_state import start_intelligence_state_background_loop
+
+
+def _env_bool(name: str, *, default: bool = False) -> bool:
+    raw = str(os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return bool(default)
+    return raw in {"1", "true", "yes", "on"}
 
 def create_app() -> Flask:
     app = Flask(
@@ -162,8 +171,10 @@ def create_app() -> Flask:
     app.register_blueprint(ncaaf_bp)
     app.register_blueprint(ncaab_bp)
     app.register_blueprint(sports_bp)
-    start_live_refresh_background_loop()
-    start_intelligence_state_background_loop(app)
+    if _env_bool("SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP", default=False):
+        start_live_refresh_background_loop()
+    if _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
+        start_intelligence_state_background_loop(app)
     return app
 
 

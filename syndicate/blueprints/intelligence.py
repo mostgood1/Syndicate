@@ -8,8 +8,8 @@ from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
 
-from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from pipeline.intelligence_state import get_intelligence_state_response
+from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import _market_focus_labels
@@ -182,6 +182,16 @@ def _is_board_response(payload: dict[str, object] | None) -> bool:
     if isinstance(analysis, dict) and any(key in analysis for key in ("recommendations", "picks", "top_live_opportunities", "parlays", "portfolio")):
         return True
     return False
+
+
+def _cached_intelligence_response(payload: dict[str, object]) -> dict[str, object] | None:
+    cached_response = read_latest_intelligence_state_response(payload)
+    if _is_board_response(cached_response):
+        return dict(cached_response or {})
+    cached_response = _load_response_cache_state()
+    if _is_board_response(cached_response):
+        return dict(cached_response or {})
+    return None
 
 
 def _store_response_cache_state(state: dict[str, object]) -> None:
@@ -359,13 +369,13 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
+    payload = _intelligence_page_payload(central_today_iso())
     initial_response: dict[str, Any] = {}
     try:
-        pipeline_result = run_routed_intelligence_pipeline({"question": DEFAULT_QUESTION, "mode": "live"})
-        if hasattr(pipeline_result, "to_dict"):
-            initial_response = dict(pipeline_result.to_dict() or {})
-        elif isinstance(pipeline_result, dict):
-            initial_response = dict(pipeline_result)
+        cached_response = _cached_intelligence_response(payload)
+        if cached_response is not None:
+            initial_response = dict(cached_response)
+        queue_intelligence_state_refresh(dict(payload))
     except Exception:
         initial_response = {}
     return render_template("intelligence.html", initial_intelligence_response=initial_response)
@@ -383,24 +393,46 @@ def intelligence_query_api():
 
     response_payload: dict[str, object] | None = None
     try:
-        board_result = run_intelligence_query(
-            question,
-            selected_date=str(payload.get("date") or payload.get("selected_date") or "").strip() or None,
-            mode=str(payload.get("mode") or "").strip() or None,
-            sport=str(payload.get("sport") or "").strip() or None,
-            limit=payload.get("limit"),
-            timing=str(payload.get("timing") or "").strip() or None,
-            include_props=payload.get("include_props"),
-            include_games=payload.get("include_games"),
-            force_refresh=bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else False,
-        )
-        if isinstance(board_result, dict):
-            response_payload = dict(board_result)
+        selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
+        cache_payload = dict(payload)
+        if selected_date:
+            cache_payload["date"] = selected_date
+        cached_response = _cached_intelligence_response(cache_payload)
+        if question == DEFAULT_QUESTION and cached_response is not None:
+            response_payload = dict(cached_response)
+            if want_refresh:
+                queue_intelligence_state_refresh(dict(payload))
+        else:
+            board_result = run_intelligence_query(
+                question,
+                selected_date=selected_date,
+                mode=str(payload.get("mode") or "").strip() or None,
+                sport=str(payload.get("sport") or "").strip() or None,
+                limit=payload.get("limit"),
+                timing=str(payload.get("timing") or "").strip() or None,
+                include_props=payload.get("include_props"),
+                include_games=payload.get("include_games"),
+                force_refresh=bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else False,
+            )
+            if isinstance(board_result, dict):
+                response_payload = dict(board_result)
     except Exception:
         response_payload = None
 
     if not isinstance(response_payload, dict) or not response_payload:
-        if want_refresh and not bool(payload.get("background")):
+        if question == DEFAULT_QUESTION:
+            if want_refresh and not bool(payload.get("background")):
+                queue_intelligence_state_refresh(dict(payload))
+            cached_response = _cached_intelligence_response(dict(payload))
+            if cached_response is None:
+                cached_response = {
+                    "ok": True,
+                    "top_opportunities": [],
+                    "by_sport": {},
+                    "analysis": None,
+                }
+            response_payload = _unwrap_response_payload(cached_response)
+        elif want_refresh and not bool(payload.get("background")):
             queue_intelligence_state_refresh(dict(payload))
             cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
         else:
