@@ -1115,6 +1115,24 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(any("calibration" in note.lower() for note in structured.get("risks") or []))
 
     def test_intelligence_query_api_force_refresh_queues_refresh_and_returns_cached_response(self) -> None:
+        state_response = {
+            "top_opportunities": [
+                {
+                    "sport": "NBA",
+                    "sport_slug": "nba",
+                    "name": "Jayson Tatum Over 28.5",
+                    "recommendation_id": "rec-1",
+                    "query_type": "board",
+                }
+            ],
+            "by_sport": {"nba": [{"sport": "NBA", "name": "Jayson Tatum Over 28.5"}]},
+            "analysis": {
+                "recommendations": [{"recommendation_id": "rec-1", "name": "Jayson Tatum Over 28.5"}],
+                "top_live_opportunities": [],
+                "parlays": [],
+                "portfolio": {},
+            },
+        }
         cached_response = {
             "version": 116,
             "timestamp": "2026-06-11T04:09:58.646260+00:00",
@@ -1138,28 +1156,30 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
 
         with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
-            with patch("syndicate.blueprints.intelligence._load_response_cache_state", return_value=cached_response) as cache_mock:
-                with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
-                    with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
-                        with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
-                            with patch("syndicate.features.intelligence.load_artifact_manifests", return_value=[]):
-                                response = self.client.post(
-                                    "/api/intelligence/query",
-                                    json={
-                                        "question": "Analyze Jayson Tatum tonight",
-                                        "date": "2026-06-04",
-                                        "force_refresh": True,
-                                    },
-                                )
+            with patch("syndicate.blueprints.intelligence.get_intelligence_state_response", return_value=state_response) as state_mock:
+                with patch("syndicate.blueprints.intelligence._load_response_cache_state", return_value=cached_response) as cache_mock:
+                    with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+                        with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                            with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                                with patch("syndicate.features.intelligence.load_artifact_manifests", return_value=[]):
+                                    response = self.client.post(
+                                        "/api/intelligence/query",
+                                        json={
+                                            "question": "Analyze Jayson Tatum tonight",
+                                            "date": "2026-06-04",
+                                            "force_refresh": True,
+                                        },
+                                    )
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
-        self.assertEqual((payload.get("response", {}) or {}).get("response", {}).get("selected_date"), "2026-06-04")
-        self.assertEqual((payload.get("response", {}) or {}).get("response", {}).get("query_type"), "player_analysis")
+        self.assertTrue((payload.get("response", {}) or {}).get("top_opportunities"))
+        self.assertEqual((payload.get("response", {}) or {}).get("top_opportunities", [])[0].get("name"), "Jayson Tatum Over 28.5")
         queue_mock.assert_called_once()
-        cache_mock.assert_called_once()
+        state_mock.assert_called_once()
+        cache_mock.assert_not_called()
 
     def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
         advanced_rows = [

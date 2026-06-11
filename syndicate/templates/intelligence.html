@@ -491,6 +491,14 @@ function normalizeIntelligenceResponse(response) {
   };
 }
 
+function unwrapVersionedIntelligenceResponse(response) {
+  let current = response && typeof response === "object" ? response : {};
+  while (current && typeof current === "object" && current.version !== undefined && current.timestamp !== undefined && current.response && typeof current.response === "object") {
+    current = current.response;
+  }
+  return current && typeof current === "object" ? current : {};
+}
+
 function hasLiveSignal(item) {
   if (!item || typeof item !== "object") {
     return false;
@@ -1202,7 +1210,7 @@ async function loadIntelligence(options = {}) {
     lastVersion = version;
     lastResponseTimestamp = json.timestamp ?? lastResponseTimestamp;
 
-    const response = json.response || {};
+    const response = unwrapVersionedIntelligenceResponse(json.response || {});
     const data = normalizeIntelligenceResponse(response);
     const hasOpportunityData = Boolean(
       (Array.isArray(data.topOpportunities) && data.topOpportunities.length) ||
