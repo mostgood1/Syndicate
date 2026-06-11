@@ -1,0 +1,3231 @@
+{
+  "season": 2026,
+  "date": "2026-06-11",
+  "profile": "retuned",
+  "available_profiles": [],
+  "found": true,
+  "games": [
+    {
+      "game_pk": 823619,
+      "game_date": "2026-06-11T17:10:00Z",
+      "start_time": "12:10 PM",
+      "official_date": "2026-06-11",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 138,
+        "abbr": "STL",
+        "name": "St. Louis Cardinals"
+      },
+      "home": {
+        "id": 121,
+        "abbr": "NYM",
+        "name": "New York Mets"
+      },
+      "starter_names": {
+        "away": "Hunter Dobbins",
+        "home": "Christian Scott"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823619,
+              "away": "St. Louis Cardinals",
+              "home": "New York Mets",
+              "away_abbr": "STL",
+              "home_abbr": "NYM",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 666182,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 690928,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Hunter Dobbins",
+              "opponent": "STL",
+              "opponent_team_id": 138,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.1818783375899698,
+              "batter_bb_rate": 0.06547771070350591,
+              "batter_hr_rate": 0.014554794520547944,
+              "batter_inplay_hit_rate": 0.2652008456659619,
+              "batter_xb_hit_share": 0.14754098360655737,
+              "pitcher_k_rate": 0.2641509433962264,
+              "pitcher_bb_rate": 0.1320754716981132,
+              "pitcher_hr_rate": 0.018867924528301886,
+              "pitcher_inplay_hit_rate": 0.3125,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 1.0906593406593408,
+              "pitcher_platoon_bb_mult": 0.8075,
+              "pitcher_platoon_hr_mult": 1.275,
+              "pitcher_platoon_inplay_mult": 0.89,
+              "batter_platoon_k_mult": 1.0326054062093937,
+              "batter_platoon_bb_mult": 0.912374585679843,
+              "batter_platoon_hr_mult": 0.78,
+              "batter_platoon_inplay_mult": 1.0098257324402153,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 3289,
+              "venue_name": "Citi Field",
+              "roof_type": "Open",
+              "park_hr_mult": 1.0246666666666666,
+              "park_inplay_hit_mult": 0.9901333333333333,
+              "park_xb_share_mult": 0.9876666666666667,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Bo Bichette",
+              "team": "NYM",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.1468654897672238,
+              "market_line": 1.5,
+              "model_prob_over": 0.314,
+              "market_prob_over": 0.46086548976722386,
+              "market_prob_under": 0.5391345102327761,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.46086548976722386,
+              "selected_side_market_prob": 0.5391345102327761,
+              "selected_side_model_prob": 0.6859999999999999,
+              "mean_support": 0.272,
+              "tb_mean": 1.228,
+              "pa_mean": 4.727,
+              "ab_mean": 4.26,
+              "lineup_order": 2,
+              "market_alternates": [],
+              "odds": "-136",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Bo Bichette",
+                "supporting_reasons": [
+                  "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
+                  "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
+              "rank": 2,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823619,
+              "away": "St. Louis Cardinals",
+              "home": "New York Mets",
+              "away_abbr": "STL",
+              "home_abbr": "NYM",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 690928,
+              "pitcher_name": "Hunter Dobbins",
+              "team": "STL",
+              "team_side": "away",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.3319072681704261,
+              "market_line": 3.5,
+              "model_prob_over": 0.794,
+              "market_prob_over": 0.46209273182957394,
+              "market_prob_under": 0.5379072681704261,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.46209273182957394,
+              "selected_side_market_prob": 0.46209273182957394,
+              "selected_side_model_prob": 0.794,
+              "mean_support": 1.6449999999999996,
+              "so_mean": 5.145,
+              "market_alternates": [],
+              "odds": "+102",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 3.4 strikeouts.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Hunter Dobbins",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 3.4 strikeouts.",
+                  "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume.",
+              "rank": 3,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823619,
+              "away": "St. Louis Cardinals",
+              "home": "New York Mets",
+              "away_abbr": "STL",
+              "home_abbr": "NYM",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 666182,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 690928,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Hunter Dobbins",
+              "opponent": "STL",
+              "opponent_team_id": 138,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.1818783375899698,
+              "batter_bb_rate": 0.06547771070350591,
+              "batter_hr_rate": 0.014554794520547944,
+              "batter_inplay_hit_rate": 0.2652008456659619,
+              "batter_xb_hit_share": 0.14754098360655737,
+              "pitcher_k_rate": 0.2641509433962264,
+              "pitcher_bb_rate": 0.1320754716981132,
+              "pitcher_hr_rate": 0.018867924528301886,
+              "pitcher_inplay_hit_rate": 0.3125,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 94.0,
+              "pitcher_platoon_k_mult": 1.0906593406593408,
+              "pitcher_platoon_bb_mult": 0.8075,
+              "pitcher_platoon_hr_mult": 1.275,
+              "pitcher_platoon_inplay_mult": 0.89,
+              "batter_platoon_k_mult": 1.0326054062093937,
+              "batter_platoon_bb_mult": 0.912374585679843,
+              "batter_platoon_hr_mult": 0.78,
+              "batter_platoon_inplay_mult": 1.0098257324402153,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 3289,
+              "venue_name": "Citi Field",
+              "roof_type": "Open",
+              "park_hr_mult": 1.0246666666666666,
+              "park_inplay_hit_mult": 0.9901333333333333,
+              "park_xb_share_mult": 0.9876666666666667,
+              "market": "hitter_runs",
+              "market_label": "Hitter Runs",
+              "market_group": "hitter_props",
+              "player_name": "Bo Bichette",
+              "team": "NYM",
+              "prop": "batter_runs_scored",
+              "prop_market_key": "batter_runs_scored",
+              "selection": "under",
+              "edge": 0.13579859484777512,
+              "market_line": 0.5,
+              "model_prob_over": 0.332,
+              "market_prob_over": 0.46779859484777514,
+              "market_prob_under": 0.5322014051522248,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.46779859484777514,
+              "selected_side_market_prob": 0.5322014051522248,
+              "selected_side_model_prob": 0.6679999999999999,
+              "mean_support": 0.10699999999999998,
+              "r_mean": 0.393,
+              "pa_mean": 4.727,
+              "ab_mean": 4.26,
+              "lineup_order": 2,
+              "market_alternates": [],
+              "odds": "-135",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against STL, he has been held scoreless in 7 of 8 games.",
+                "Over his last 10 games, he has been held scoreless in 7 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_runs",
+                "subject": "Bo Bichette",
+                "supporting_reasons": [
+                  "Against STL, he has been held scoreless in 7 of 8 games.",
+                  "Over his last 10 games, he has been held scoreless in 7 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "candidate"
+            }
+          ]
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "market": "hitter_total_bases",
+            "player_name": "Bo Bichette",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "market": "pitcher_props",
+            "player_name": "Hunter Dobbins",
+            "selection": "over",
+            "market_line": 3.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "market": "hitter_runs",
+            "player_name": "Bo Bichette",
+            "selection": "under",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "market": "hitter_total_bases",
+            "player_name": "Bo Bichette",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "market": "pitcher_props",
+            "player_name": "Hunter Dobbins",
+            "selection": "over",
+            "market_line": 3.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "market": "hitter_runs",
+            "player_name": "Bo Bichette",
+            "selection": "under",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 2,
+          "pitcher": 0,
+          "hitter": 1,
+          "extra_pitcher": 1,
+          "extra_hitter": 1
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    },
+    {
+      "game_pk": 823855,
+      "game_date": "2026-06-11T17:10:00Z",
+      "start_time": "12:10 PM",
+      "official_date": "2026-06-11",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 109,
+        "abbr": "AZ",
+        "name": "Arizona Diamondbacks"
+      },
+      "home": {
+        "id": 146,
+        "abbr": "MIA",
+        "name": "Miami Marlins"
+      },
+      "starter_names": {
+        "away": "Merrill Kelly",
+        "home": "Tyler Phillips"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823855,
+              "away": "Arizona Diamondbacks",
+              "home": "Miami Marlins",
+              "away_abbr": "AZ",
+              "home_abbr": "MIA",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 656976,
+              "batter_hand": "L",
+              "opponent_pitcher_id": 663969,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Tyler Phillips",
+              "opponent": "MIA",
+              "opponent_team_id": 146,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.28125,
+              "batter_bb_rate": 0.1875,
+              "batter_hr_rate": 0.0,
+              "batter_inplay_hit_rate": 0.1764705882352941,
+              "batter_xb_hit_share": 0.05,
+              "pitcher_k_rate": 0.18259441707717566,
+              "pitcher_bb_rate": 0.11445904032110928,
+              "pitcher_hr_rate": 0.010718846925743477,
+              "pitcher_inplay_hit_rate": 0.2851048951048951,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 115.0,
+              "pitcher_platoon_k_mult": 1.1587388912399494,
+              "pitcher_platoon_bb_mult": 0.9682091805399932,
+              "pitcher_platoon_hr_mult": 0.9530538172715894,
+              "pitcher_platoon_inplay_mult": 1.0345801651541167,
+              "batter_platoon_k_mult": 1.0366666666666666,
+              "batter_platoon_bb_mult": 1.0366666666666666,
+              "batter_platoon_hr_mult": 1.0,
+              "batter_platoon_inplay_mult": 1.0733333333333335,
+              "opponent_primary_pitch_type": "SI",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 4169,
+              "venue_name": "loanDepot park",
+              "roof_type": "Retractable",
+              "park_hr_mult": 1.016,
+              "park_inplay_hit_mult": 0.9936,
+              "park_xb_share_mult": 0.992,
+              "market": "hitter_hits",
+              "market_label": "Hitter Hits",
+              "market_group": "hitter_props",
+              "player_name": "Pavin Smith",
+              "team": "AZ",
+              "prop": "batter_hits",
+              "prop_market_key": "batter_hits",
+              "selection": "over",
+              "edge": 0.005095901846207673,
+              "market_line": 0.5,
+              "model_prob_over": 0.545,
+              "market_prob_over": 0.5399040981537924,
+              "market_prob_under": 0.4600959018462076,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5399040981537924,
+              "selected_side_market_prob": 0.5399040981537924,
+              "selected_side_model_prob": 0.545,
+              "mean_support": 0.238,
+              "h_mean": 0.738,
+              "pa_mean": 4.617,
+              "ab_mean": 3.918,
+              "lineup_order": 5,
+              "market_alternates": [],
+              "odds": "-137",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against MIA, he has recorded a hit in 5 of 8 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_hits",
+                "subject": "Pavin Smith",
+                "supporting_reasons": [
+                  "Against MIA, he has recorded a hit in 5 of 8 games.",
+                  "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 54.5% of sims, while the market is pricing it closer to 54.0%. Against MIA, he has recorded a hit in 5 of 8 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 0.7 batter hits against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances.",
+              "rank": 2,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823855,
+              "away": "Arizona Diamondbacks",
+              "home": "Miami Marlins",
+              "away_abbr": "AZ",
+              "home_abbr": "MIA",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 518876,
+              "pitcher_name": "Merrill Kelly",
+              "team": "AZ",
+              "team_side": "away",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.2455384615384616,
+              "market_line": 17.5,
+              "model_prob_over": 0.784,
+              "market_prob_over": 0.5384615384615384,
+              "market_prob_under": 0.46153846153846145,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5384615384615384,
+              "selected_side_market_prob": 0.5384615384615384,
+              "selected_side_model_prob": 0.784,
+              "mean_support": 2.8859999999999992,
+              "outs_mean": 20.386,
+              "market_alternates": [],
+              "odds": "-140",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 19.4 outs.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Merrill Kelly",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 19.4 outs.",
+                  "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 78.4% of sims, while the market is pricing it closer to 53.8%. Across his last 5 starts, he has averaged 19.4 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.4 outs against a line of 17.5. If he stays on his normal starter path, the matchup against MIA gives him a fair shot to reach full workload volume.",
+              "rank": 4,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823855,
+              "away": "Arizona Diamondbacks",
+              "home": "Miami Marlins",
+              "away_abbr": "AZ",
+              "home_abbr": "MIA",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 672640,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 518876,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Merrill Kelly",
+              "opponent": "AZ",
+              "opponent_team_id": 109,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.15611167002012075,
+              "batter_bb_rate": 0.03469148222669349,
+              "batter_hr_rate": 0.017345741113346747,
+              "batter_inplay_hit_rate": 0.3825811965811966,
+              "batter_xb_hit_share": 0.23076923076923078,
+              "pitcher_k_rate": 0.14285714285714285,
+              "pitcher_bb_rate": 0.09136310223266746,
+              "pitcher_hr_rate": 0.04918583179452744,
+              "pitcher_inplay_hit_rate": 0.30892828525641025,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 93.0,
+              "pitcher_platoon_k_mult": 1.1671568627450981,
+              "pitcher_platoon_bb_mult": 0.8631328415610617,
+              "pitcher_platoon_hr_mult": 0.78,
+              "pitcher_platoon_inplay_mult": 1.0122153063199053,
+              "batter_platoon_k_mult": 1.0756005805926079,
+              "batter_platoon_bb_mult": 1.0426742342456286,
+              "batter_platoon_hr_mult": 1.0426742342456286,
+              "batter_platoon_inplay_mult": 0.9321230660588631,
+              "opponent_primary_pitch_type": "CH",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 4169,
+              "venue_name": "loanDepot park",
+              "roof_type": "Retractable",
+              "park_hr_mult": 1.016,
+              "park_inplay_hit_mult": 0.9936,
+              "park_xb_share_mult": 0.992,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Otto Lopez",
+              "team": "MIA",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "over",
+              "edge": 0.02513773654173479,
+              "market_line": 1.5,
+              "model_prob_over": 0.454,
+              "market_prob_over": 0.4288622634582652,
+              "market_prob_under": 0.5711377365417348,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4288622634582652,
+              "selected_side_market_prob": 0.4288622634582652,
+              "selected_side_model_prob": 0.454,
+              "mean_support": 0.18500000000000005,
+              "tb_mean": 1.685,
+              "pa_mean": 4.788,
+              "ab_mean": 4.258,
+              "lineup_order": 2,
+              "market_alternates": [],
+              "odds": "+118",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Otto Lopez",
+                "supporting_reasons": [
+                  "Against AZ, he has cleared 1.5 total bases in 6 of 8 games.",
+                  "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.9%. Against AZ, he has cleared 1.5 total bases in 6 of 8 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
+              "rank": 6,
+              "recommendation_tier": "candidate"
+            }
+          ]
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "market": "hitter_hits",
+            "player_name": "Pavin Smith",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "market": "pitcher_props",
+            "player_name": "Merrill Kelly",
+            "selection": "over",
+            "market_line": 17.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "market": "hitter_total_bases",
+            "player_name": "Otto Lopez",
+            "selection": "over",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "market": "hitter_hits",
+            "player_name": "Pavin Smith",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "market": "pitcher_props",
+            "player_name": "Merrill Kelly",
+            "selection": "over",
+            "market_line": 17.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823855,
+            "market": "hitter_total_bases",
+            "player_name": "Otto Lopez",
+            "selection": "over",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 2,
+          "pitcher": 0,
+          "hitter": 1,
+          "extra_pitcher": 1,
+          "extra_hitter": 1
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    },
+    {
+      "game_pk": 824265,
+      "game_date": "2026-06-11T17:10:00Z",
+      "start_time": "12:10 PM",
+      "official_date": "2026-06-11",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 142,
+        "abbr": "MIN",
+        "name": "Minnesota Twins"
+      },
+      "home": {
+        "id": 116,
+        "abbr": "DET",
+        "name": "Detroit Tigers"
+      },
+      "starter_names": {
+        "away": "Zebby Matthews",
+        "home": "Keider Montero"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": {
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "away": "Minnesota Twins",
+            "home": "Detroit Tigers",
+            "away_abbr": "MIN",
+            "home_abbr": "DET",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": "103e4247d0f4067efa75745bdf3a2a55",
+            "commence_time": "2026-06-11T17:11:00Z",
+            "market": "ml",
+            "selection": "home",
+            "edge": 0.02745769622833838,
+            "model_prob": 0.556,
+            "selected_side_model_prob": 0.556,
+            "selected_side_market_prob": 0.5285423037716617,
+            "market_no_vig_prob": 0.5285423037716617,
+            "odds": "-122",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
+              "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 4,
+              "market": "ml",
+              "subject": "MIN @ DET",
+              "supporting_reasons": [
+                "Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing.",
+                "The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs."
+            ],
+            "reason_summary": "The model lands on the home side in 55.6% of sims, while the market is pricing it closer to 52.9%. Across his last 5 starts, Keider Montero has allowed about 3 earned runs per outing. The projected lineup is mostly 3 left-handed, 3 right-handed, and 3 switch-hitting, and the power risk also comes in lighter than baseline. DET wins this matchup in about 55.6% of model runs.",
+            "rank": 1,
+            "recommendation_tier": "official"
+          },
+          "pitcherProps": [],
+          "hitterProps": [],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 824265,
+              "away": "Minnesota Twins",
+              "home": "Detroit Tigers",
+              "away_abbr": "MIN",
+              "home_abbr": "DET",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 805673,
+              "pitcher_name": "Zebby Matthews",
+              "team": "MIN",
+              "team_side": "away",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.32418644067796615,
+              "market_line": 17.5,
+              "model_prob_over": 0.803,
+              "market_prob_over": 0.4788135593220339,
+              "market_prob_under": 0.521186440677966,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4788135593220339,
+              "selected_side_market_prob": 0.4788135593220339,
+              "selected_side_model_prob": 0.803,
+              "mean_support": 3.059000000000001,
+              "outs_mean": 20.559,
+              "market_alternates": [],
+              "odds": "-105",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 18.2 outs.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Zebby Matthews",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 18.2 outs.",
+                  "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 80.3% of sims, while the market is pricing it closer to 47.9%. Across his last 5 starts, he has averaged 18.2 outs. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.6 outs against a line of 17.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+              "rank": 2,
+              "recommendation_tier": "candidate"
+            },
+            {
+              "date": "2026-06-11",
+              "game_pk": 824265,
+              "away": "Minnesota Twins",
+              "home": "Detroit Tigers",
+              "away_abbr": "MIN",
+              "home_abbr": "DET",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 805673,
+              "pitcher_name": "Zebby Matthews",
+              "team": "MIN",
+              "team_side": "away",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.16674193548387095,
+              "market_line": 4.5,
+              "model_prob_over": 0.699,
+              "market_prob_over": 0.532258064516129,
+              "market_prob_under": 0.4677419354838709,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.532258064516129,
+              "selected_side_market_prob": 0.532258064516129,
+              "selected_side_model_prob": 0.699,
+              "mean_support": 1.1589999999999998,
+              "so_mean": 5.659,
+              "market_alternates": [],
+              "odds": "-132",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 5.2 strikeouts.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Zebby Matthews",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 5.2 strikeouts.",
+                  "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 69.9% of sims, while the market is pricing it closer to 53.2%. Across his last 5 starts, he has averaged 5.2 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.7 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against DET gives him a fair shot to reach full workload volume.",
+              "rank": 7,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "market": "pitcher_props",
+            "player_name": "Zebby Matthews",
+            "selection": "over",
+            "market_line": 17.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "market": "pitcher_props",
+            "player_name": "Zebby Matthews",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "market": "ml",
+            "player_name": null,
+            "selection": "home",
+            "market_line": null,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "market": "pitcher_props",
+            "player_name": "Zebby Matthews",
+            "selection": "over",
+            "market_line": 17.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824265,
+            "market": "pitcher_props",
+            "player_name": "Zebby Matthews",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 2,
+          "pitcher": 0,
+          "hitter": 0,
+          "extra_pitcher": 2,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    },
+    {
+      "game_pk": 824101,
+      "game_date": "2026-06-11T18:10:00Z",
+      "start_time": "1:10 PM",
+      "official_date": "2026-06-11",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 140,
+        "abbr": "TEX",
+        "name": "Texas Rangers"
+      },
+      "home": {
+        "id": 118,
+        "abbr": "KC",
+        "name": "Kansas City Royals"
+      },
+      "starter_names": {
+        "away": "Kumar Rocker",
+        "home": "Michael Wacha"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 824101,
+              "away": "Texas Rangers",
+              "home": "Kansas City Royals",
+              "away_abbr": "TEX",
+              "home_abbr": "KC",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 521692,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 677958,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Kumar Rocker",
+              "opponent": "TEX",
+              "opponent_team_id": 140,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.18608490566037736,
+              "batter_bb_rate": 0.045990566037735846,
+              "batter_hr_rate": 0.03136792452830189,
+              "batter_inplay_hit_rate": 0.1932741116751269,
+              "batter_xb_hit_share": 0.125,
+              "pitcher_k_rate": 0.18674724342663274,
+              "pitcher_bb_rate": 0.10212892281594571,
+              "pitcher_hr_rate": 0.022798982188295167,
+              "pitcher_inplay_hit_rate": 0.2894048303622772,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 93.0,
+              "pitcher_platoon_k_mult": 0.9534456856870845,
+              "pitcher_platoon_bb_mult": 0.8642576964601714,
+              "pitcher_platoon_hr_mult": 0.8623740842490842,
+              "pitcher_platoon_inplay_mult": 0.9582604290732908,
+              "batter_platoon_k_mult": 1.050129959532403,
+              "batter_platoon_bb_mult": 0.8749381751919824,
+              "batter_platoon_hr_mult": 0.9840254188771421,
+              "batter_platoon_inplay_mult": 0.9726794591769735,
+              "opponent_primary_pitch_type": "SL",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 7,
+              "venue_name": "Kauffman Stadium",
+              "roof_type": "Open",
+              "park_hr_mult": 1.006,
+              "park_inplay_hit_mult": 0.9976,
+              "park_xb_share_mult": 0.997,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Salvador Perez",
+              "team": "KC",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.17080816034359336,
+              "market_line": 1.5,
+              "model_prob_over": 0.273,
+              "market_prob_over": 0.4438081603435934,
+              "market_prob_under": 0.5561918396564066,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4438081603435934,
+              "selected_side_market_prob": 0.5561918396564066,
+              "selected_side_model_prob": 0.727,
+              "mean_support": 0.353,
+              "tb_mean": 1.147,
+              "pa_mean": 4.421,
+              "ab_mean": 3.85,
+              "lineup_order": 5,
+              "market_alternates": [],
+              "odds": "-148",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against TEX, he has been held to one total base or fewer in 6 of 10 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games.",
+                "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching."
+              ],
+              "explanation_diagnostic": {
+                "status": "strong",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 3,
+                "reason_sentences_n": 6,
+                "market": "hitter_total_bases",
+                "subject": "Salvador Perez",
+                "supporting_reasons": [
+                  "Against TEX, he has been held to one total base or fewer in 6 of 10 games.",
+                  "Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games.",
+                  "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 72.7% of sims, while the market is pricing it closer to 55.6%. Against TEX, he has been held to one total base or fewer in 6 of 10 games. Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching. The model baseline comes in around 1.1 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.4 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 72.7% of sims, while the market is pricing it closer to 55.6%. Against TEX, he has been held to one total base or fewer in 6 of 10 games. Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching. The model baseline comes in around 1.1 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.4 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            },
+            {
+              "date": "2026-06-11",
+              "game_pk": 824101,
+              "away": "Texas Rangers",
+              "home": "Kansas City Royals",
+              "away_abbr": "TEX",
+              "home_abbr": "KC",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 608369,
+              "batter_hand": "L",
+              "opponent_pitcher_id": 608379,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Michael Wacha",
+              "opponent": "KC",
+              "opponent_team_id": 118,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.27622131147540985,
+              "batter_bb_rate": 0.11004508196721312,
+              "batter_hr_rate": 0.03891803278688525,
+              "batter_inplay_hit_rate": 0.17778646415010052,
+              "batter_xb_hit_share": 0.1935483870967742,
+              "pitcher_k_rate": 0.20455117826947292,
+              "pitcher_bb_rate": 0.07836841158481742,
+              "pitcher_hr_rate": 0.02731606404029502,
+              "pitcher_inplay_hit_rate": 0.28880308880308875,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 91.0,
+              "pitcher_platoon_k_mult": 1.0553350099292726,
+              "pitcher_platoon_bb_mult": 1.0746506544051946,
+              "pitcher_platoon_hr_mult": 0.9770856642422341,
+              "pitcher_platoon_inplay_mult": 0.9519379844961242,
+              "batter_platoon_k_mult": 0.944356222583091,
+              "batter_platoon_bb_mult": 1.0014981141137747,
+              "batter_platoon_hr_mult": 1.1322473346309154,
+              "batter_platoon_inplay_mult": 0.9939294671030333,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 7,
+              "venue_name": "Kauffman Stadium",
+              "roof_type": "Open",
+              "park_hr_mult": 1.006,
+              "park_inplay_hit_mult": 0.9976,
+              "park_xb_share_mult": 0.997,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Corey Seager",
+              "team": "TEX",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.20193417378121759,
+              "market_line": 1.5,
+              "model_prob_over": 0.323,
+              "market_prob_over": 0.5249341737812177,
+              "market_prob_under": 0.47506582621878246,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5249341737812177,
+              "selected_side_market_prob": 0.47506582621878246,
+              "selected_side_model_prob": 0.677,
+              "mean_support": 0.20100000000000007,
+              "tb_mean": 1.299,
+              "pa_mean": 4.966,
+              "ab_mean": 4.347,
+              "lineup_order": 2,
+              "market_alternates": [],
+              "odds": "-104",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against KC, he has been held to one total base or fewer in 5 of 9 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Corey Seager",
+                "supporting_reasons": [
+                  "Against KC, he has been held to one total base or fewer in 5 of 9 games.",
+                  "Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 67.7% of sims, while the market is pricing it closer to 47.5%. Against KC, he has been held to one total base or fewer in 5 of 9 games. Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games. The model baseline comes in around 1.3 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 67.7% of sims, while the market is pricing it closer to 47.5%. Against KC, he has been held to one total base or fewer in 5 of 9 games. Over his last 10 games, he has been held to one total base or fewer in 9 of 10 games. The model baseline comes in around 1.3 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances.",
+              "rank": 3,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 824101,
+              "away": "Texas Rangers",
+              "home": "Kansas City Royals",
+              "away_abbr": "TEX",
+              "home_abbr": "KC",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 677958,
+              "pitcher_name": "Kumar Rocker",
+              "team": "TEX",
+              "team_side": "away",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.2741151832460732,
+              "market_line": 3.5,
+              "model_prob_over": 0.816,
+              "market_prob_over": 0.5418848167539267,
+              "market_prob_under": 0.4581151832460733,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5418848167539267,
+              "selected_side_market_prob": 0.5418848167539267,
+              "selected_side_model_prob": 0.816,
+              "mean_support": 1.79,
+              "so_mean": 5.29,
+              "market_alternates": [],
+              "odds": "-138",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 4.4 strikeouts.",
+                "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Kumar Rocker",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 4.4 strikeouts.",
+                  "His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 81.6% of sims, while the market is pricing it closer to 54.2%. Across his last 5 starts, he has averaged 4.4 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.3 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against KC gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 81.6% of sims, while the market is pricing it closer to 54.2%. Across his last 5 starts, he has averaged 4.4 strikeouts. His modeled workload cap still reaches roughly 93 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.3 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against KC gives him a fair shot to reach full workload volume.",
+              "rank": 1,
+              "recommendation_tier": "candidate"
+            },
+            {
+              "date": "2026-06-11",
+              "game_pk": 824101,
+              "away": "Texas Rangers",
+              "home": "Kansas City Royals",
+              "away_abbr": "TEX",
+              "home_abbr": "KC",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 608379,
+              "pitcher_name": "Michael Wacha",
+              "team": "KC",
+              "team_side": "home",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.16332975406996886,
+              "market_line": 4.5,
+              "model_prob_over": 0.659,
+              "market_prob_over": 0.4956702459300312,
+              "market_prob_under": 0.5043297540699688,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4956702459300312,
+              "selected_side_market_prob": 0.4956702459300312,
+              "selected_side_model_prob": 0.659,
+              "mean_support": 0.9720000000000004,
+              "so_mean": 5.472,
+              "market_alternates": [],
+              "odds": "-108",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 5 strikeouts.",
+                "His modeled workload cap still reaches roughly 91 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Michael Wacha",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 5 strikeouts.",
+                  "His modeled workload cap still reaches roughly 91 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 65.9% of sims, while the market is pricing it closer to 49.6%. Across his last 5 starts, he has averaged 5 strikeouts. His modeled workload cap still reaches roughly 91 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.5 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 65.9% of sims, while the market is pricing it closer to 49.6%. Across his last 5 starts, he has averaged 5 strikeouts. His modeled workload cap still reaches roughly 91 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.5 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against TEX gives him a fair shot to reach full workload volume.",
+              "rank": 8,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 824101,
+              "away": "Texas Rangers",
+              "home": "Kansas City Royals",
+              "away_abbr": "TEX",
+              "home_abbr": "KC",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 694671,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 608379,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Michael Wacha",
+              "opponent": "KC",
+              "opponent_team_id": 118,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.23853744939271254,
+              "batter_bb_rate": 0.06482793522267206,
+              "batter_hr_rate": 0.021609311740890688,
+              "batter_inplay_hit_rate": 0.28024513338139867,
+              "batter_xb_hit_share": 0.2727272727272727,
+              "pitcher_k_rate": 0.20455117826947292,
+              "pitcher_bb_rate": 0.07836841158481742,
+              "pitcher_hr_rate": 0.02731606404029502,
+              "pitcher_inplay_hit_rate": 0.28880308880308875,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 91.0,
+              "pitcher_platoon_k_mult": 0.9244965262509894,
+              "pitcher_platoon_bb_mult": 0.9144353265235854,
+              "pitcher_platoon_hr_mult": 1.0421962462956866,
+              "pitcher_platoon_inplay_mult": 1.0474625144175318,
+              "batter_platoon_k_mult": 0.8983339815895242,
+              "batter_platoon_bb_mult": 0.92133315985775,
+              "batter_platoon_hr_mult": 0.8034998698933125,
+              "batter_platoon_inplay_mult": 1.0678453344005183,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 7,
+              "venue_name": "Kauffman Stadium",
+              "roof_type": "Open",
+              "park_hr_mult": 1.006,
+              "park_inplay_hit_mult": 0.9976,
+              "park_xb_share_mult": 0.997,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Wyatt Langford",
+              "team": "TEX",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.09206582621878234,
+              "market_line": 1.5,
+              "model_prob_over": 0.383,
+              "market_prob_over": 0.47506582621878246,
+              "market_prob_under": 0.5249341737812177,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.47506582621878246,
+              "selected_side_market_prob": 0.5249341737812177,
+              "selected_side_model_prob": 0.617,
+              "mean_support": 0.018999999999999906,
+              "tb_mean": 1.481,
+              "pa_mean": 4.638,
+              "ab_mean": 4.123,
+              "lineup_order": 5,
+              "market_alternates": [],
+              "odds": "-129",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against KC, he has been held to one total base or fewer in 6 of 9 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 6 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Wyatt Langford",
+                "supporting_reasons": [
+                  "Against KC, he has been held to one total base or fewer in 6 of 9 games.",
+                  "Over his last 10 games, he has been held to one total base or fewer in 6 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 61.7% of sims, while the market is pricing it closer to 52.5%. Against KC, he has been held to one total base or fewer in 6 of 9 games. Over his last 10 games, he has been held to one total base or fewer in 6 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 61.7% of sims, while the market is pricing it closer to 52.5%. Against KC, he has been held to one total base or fewer in 6 of 9 games. Over his last 10 games, he has been held to one total base or fewer in 6 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.6 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "candidate"
+            }
+          ]
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "hitter_total_bases",
+            "player_name": "Salvador Perez",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "hitter_total_bases",
+            "player_name": "Corey Seager",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "pitcher_props",
+            "player_name": "Kumar Rocker",
+            "selection": "over",
+            "market_line": 3.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "pitcher_props",
+            "player_name": "Michael Wacha",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "hitter_total_bases",
+            "player_name": "Wyatt Langford",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "hitter_total_bases",
+            "player_name": "Salvador Perez",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "hitter_total_bases",
+            "player_name": "Corey Seager",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "pitcher_props",
+            "player_name": "Kumar Rocker",
+            "selection": "over",
+            "market_line": 3.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "pitcher_props",
+            "player_name": "Michael Wacha",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824101,
+            "market": "hitter_total_bases",
+            "player_name": "Wyatt Langford",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 2,
+          "playable": 3,
+          "pitcher": 0,
+          "hitter": 2,
+          "extra_pitcher": 2,
+          "extra_hitter": 1
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    },
+    {
+      "game_pk": 823371,
+      "game_date": "2026-06-11T22:40:00Z",
+      "start_time": "5:40 PM",
+      "official_date": "2026-06-11",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 119,
+        "abbr": "LAD",
+        "name": "Los Angeles Dodgers"
+      },
+      "home": {
+        "id": 134,
+        "abbr": "PIT",
+        "name": "Pittsburgh Pirates"
+      },
+      "starter_names": {
+        "away": "Justin Wrobleski",
+        "home": "Mitch Keller"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823371,
+              "away": "Los Angeles Dodgers",
+              "home": "Pittsburgh Pirates",
+              "away_abbr": "LAD",
+              "home_abbr": "PIT",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 656605,
+              "pitcher_name": "Mitch Keller",
+              "team": "PIT",
+              "team_side": "home",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.43415322580645166,
+              "market_line": 15.5,
+              "model_prob_over": 0.915,
+              "market_prob_over": 0.4808467741935484,
+              "market_prob_under": 0.5191532258064516,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4808467741935484,
+              "selected_side_market_prob": 0.4808467741935484,
+              "selected_side_model_prob": 0.915,
+              "mean_support": 5.338999999999999,
+              "outs_mean": 20.839,
+              "market_alternates": [],
+              "odds": "-106",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 15.6 outs.",
+                "His modeled workload cap still reaches roughly 90 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Mitch Keller",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 15.6 outs.",
+                  "His modeled workload cap still reaches roughly 90 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 91.5% of sims, while the market is pricing it closer to 48.1%. Across his last 5 starts, he has averaged 15.6 outs. His modeled workload cap still reaches roughly 90 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.8 outs against a line of 15.5. If he stays on his normal starter path, the matchup against LAD gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 91.5% of sims, while the market is pricing it closer to 48.1%. Across his last 5 starts, he has averaged 15.6 outs. His modeled workload cap still reaches roughly 90 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 20.8 outs against a line of 15.5. If he stays on his normal starter path, the matchup against LAD gives him a fair shot to reach full workload volume.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            }
+          ],
+          "hitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823371,
+              "away": "Los Angeles Dodgers",
+              "home": "Pittsburgh Pirates",
+              "away_abbr": "LAD",
+              "home_abbr": "PIT",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 693304,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 680736,
+              "opponent_pitcher_hand": "L",
+              "opponent_pitcher_name": "Justin Wrobleski",
+              "opponent": "LAD",
+              "opponent_team_id": 119,
+              "lineup_source": "projected_rotowire_default_vs_lhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.1759157894736842,
+              "batter_bb_rate": 0.06229473684210526,
+              "batter_hr_rate": 0.012063157894736842,
+              "batter_inplay_hit_rate": 0.35227272727272724,
+              "batter_xb_hit_share": 0.15942028985507245,
+              "pitcher_k_rate": 0.16456086649399576,
+              "pitcher_bb_rate": 0.04826936661172592,
+              "pitcher_hr_rate": 0.016279726866023074,
+              "pitcher_inplay_hit_rate": 0.26184637367729974,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 96.0,
+              "pitcher_platoon_k_mult": 0.9706486437826645,
+              "pitcher_platoon_bb_mult": 1.0225824243167054,
+              "pitcher_platoon_hr_mult": 0.78,
+              "pitcher_platoon_inplay_mult": 0.9717723732543729,
+              "batter_platoon_k_mult": 1.1904858784107228,
+              "batter_platoon_bb_mult": 1.1925000000000001,
+              "batter_platoon_hr_mult": 0.78,
+              "batter_platoon_inplay_mult": 0.9496129032258065,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 31,
+              "venue_name": "PNC Park",
+              "roof_type": "Open",
+              "park_hr_mult": 1.044,
+              "park_inplay_hit_mult": 0.9824,
+              "park_xb_share_mult": 0.978,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Nick Gonzales",
+              "team": "PIT",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.09292552251987052,
+              "market_line": 1.5,
+              "model_prob_over": 0.356,
+              "market_prob_over": 0.44892552251987045,
+              "market_prob_under": 0.5510744774801295,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.44892552251987045,
+              "selected_side_market_prob": 0.5510744774801295,
+              "selected_side_model_prob": 0.644,
+              "mean_support": 0.17900000000000005,
+              "tb_mean": 1.321,
+              "pa_mean": 4.834,
+              "ab_mean": 4.301,
+              "lineup_order": 1,
+              "market_alternates": [],
+              "odds": "-144",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against LAD, he has been held to one total base or fewer in 5 of 5 games.",
+                "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Nick Gonzales",
+                "supporting_reasons": [
+                  "Against LAD, he has been held to one total base or fewer in 5 of 5 games.",
+                  "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 64.4% of sims, while the market is pricing it closer to 55.1%. Against LAD, he has been held to one total base or fewer in 5 of 5 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching. The model baseline comes in around 1.3 batter total bases against a line of 1.5. He is projected to hit in the 1 spot, which points to about 4.8 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 64.4% of sims, while the market is pricing it closer to 55.1%. Against LAD, he has been held to one total base or fewer in 5 of 5 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against L-handed pitching. The model baseline comes in around 1.3 batter total bases against a line of 1.5. He is projected to hit in the 1 spot, which points to about 4.8 plate appearances.",
+              "rank": 5,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823371,
+              "away": "Los Angeles Dodgers",
+              "home": "Pittsburgh Pirates",
+              "away_abbr": "LAD",
+              "home_abbr": "PIT",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 680736,
+              "pitcher_name": "Justin Wrobleski",
+              "team": "LAD",
+              "team_side": "away",
+              "prop": "outs",
+              "selection": "over",
+              "edge": 0.3422154150197628,
+              "market_line": 18.5,
+              "model_prob_over": 0.756,
+              "market_prob_over": 0.4137845849802372,
+              "market_prob_under": 0.5862154150197628,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4137845849802372,
+              "selected_side_market_prob": 0.4137845849802372,
+              "selected_side_model_prob": 0.756,
+              "mean_support": 3.001999999999999,
+              "outs_mean": 21.502,
+              "market_alternates": [
+                {
+                  "line": 17.5,
+                  "over_odds": "-180",
+                  "under_odds": "+125",
+                  "_src": "oddsapi"
+                }
+              ],
+              "odds": "+126",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "The projected lineup is mostly 2 left-handed, 4 right-handed, and 3 switch-hitting, and the damage profile is lighter than average.",
+                "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:outs",
+                "subject": "Justin Wrobleski",
+                "supporting_reasons": [
+                  "The projected lineup is mostly 2 left-handed, 4 right-handed, and 3 switch-hitting, and the damage profile is lighter than average.",
+                  "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 75.6% of sims, while the market is pricing it closer to 41.4%. The projected lineup is mostly 2 left-handed, 4 right-handed, and 3 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.5 outs against a line of 18.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 75.6% of sims, while the market is pricing it closer to 41.4%. The projected lineup is mostly 2 left-handed, 4 right-handed, and 3 switch-hitting, and the damage profile is lighter than average. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 21.5 outs against a line of 18.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume.",
+              "rank": 5,
+              "recommendation_tier": "candidate"
+            },
+            {
+              "date": "2026-06-11",
+              "game_pk": 823371,
+              "away": "Los Angeles Dodgers",
+              "home": "Pittsburgh Pirates",
+              "away_abbr": "LAD",
+              "home_abbr": "PIT",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "market": "pitcher_props",
+              "pitcher_id": 680736,
+              "pitcher_name": "Justin Wrobleski",
+              "team": "LAD",
+              "team_side": "away",
+              "prop": "strikeouts",
+              "selection": "over",
+              "edge": 0.15899115603284897,
+              "market_line": 4.5,
+              "model_prob_over": 0.701,
+              "market_prob_over": 0.542008843967151,
+              "market_prob_under": 0.45799115603284907,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.542008843967151,
+              "selected_side_market_prob": 0.542008843967151,
+              "selected_side_model_prob": 0.701,
+              "mean_support": 1.0830000000000002,
+              "so_mean": 5.583,
+              "market_alternates": [],
+              "odds": "-132",
+              "stake_u": 1.0,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Across his last 5 starts, he has averaged 5.8 strikeouts.",
+                "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "pitcher_props:strikeouts",
+                "subject": "Justin Wrobleski",
+                "supporting_reasons": [
+                  "Across his last 5 starts, he has averaged 5.8 strikeouts.",
+                  "His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 70.1% of sims, while the market is pricing it closer to 54.2%. Across his last 5 starts, he has averaged 5.8 strikeouts. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.6 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume."
+              ],
+              "reason_summary": "The model lands on the over side in 70.1% of sims, while the market is pricing it closer to 54.2%. Across his last 5 starts, he has averaged 5.8 strikeouts. His modeled workload cap still reaches roughly 96 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.6 strikeouts against a line of 4.5. If he stays on his normal starter path, the matchup against PIT gives him a fair shot to reach full workload volume.",
+              "rank": 6,
+              "recommendation_tier": "candidate"
+            }
+          ],
+          "extraHitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 823371,
+              "away": "Los Angeles Dodgers",
+              "home": "Pittsburgh Pirates",
+              "away_abbr": "LAD",
+              "home_abbr": "PIT",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 668804,
+              "batter_hand": "S",
+              "opponent_pitcher_id": 680736,
+              "opponent_pitcher_hand": "L",
+              "opponent_pitcher_name": "Justin Wrobleski",
+              "opponent": "LAD",
+              "opponent_team_id": 119,
+              "lineup_source": "projected_rotowire_default_vs_lhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.2069580535065507,
+              "batter_bb_rate": 0.157640647363206,
+              "batter_hr_rate": 0.02756523175162391,
+              "batter_inplay_hit_rate": 0.31709896249002395,
+              "batter_xb_hit_share": 0.25,
+              "pitcher_k_rate": 0.16456086649399576,
+              "pitcher_bb_rate": 0.04826936661172592,
+              "pitcher_hr_rate": 0.016279726866023074,
+              "pitcher_inplay_hit_rate": 0.26184637367729974,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 96.0,
+              "pitcher_platoon_k_mult": 0.9706486437826645,
+              "pitcher_platoon_bb_mult": 1.0225824243167054,
+              "pitcher_platoon_hr_mult": 0.78,
+              "pitcher_platoon_inplay_mult": 0.9717723732543729,
+              "batter_platoon_k_mult": 0.9535345305491626,
+              "batter_platoon_bb_mult": 1.0008865049448359,
+              "batter_platoon_hr_mult": 1.275,
+              "batter_platoon_inplay_mult": 1.0654586214665414,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 31,
+              "venue_name": "PNC Park",
+              "roof_type": "Open",
+              "park_hr_mult": 1.044,
+              "park_inplay_hit_mult": 0.9824,
+              "park_xb_share_mult": 0.978,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Bryan Reynolds",
+              "team": "PIT",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.03480158617759521,
+              "market_line": 1.5,
+              "model_prob_over": 0.406,
+              "market_prob_over": 0.44080158617759524,
+              "market_prob_under": 0.5591984138224048,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.44080158617759524,
+              "selected_side_market_prob": 0.5591984138224048,
+              "selected_side_model_prob": 0.594,
+              "mean_support": 0.018999999999999906,
+              "tb_mean": 1.481,
+              "pa_mean": 4.608,
+              "ab_mean": 3.95,
+              "lineup_order": 3,
+              "market_alternates": [],
+              "odds": "-149",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against LAD, he has been held to one total base or fewer in 5 of 8 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Bryan Reynolds",
+                "supporting_reasons": [
+                  "Against LAD, he has been held to one total base or fewer in 5 of 8 games.",
+                  "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 59.4% of sims, while the market is pricing it closer to 55.9%. Against LAD, he has been held to one total base or fewer in 5 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 3 spot, which points to about 4.6 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 59.4% of sims, while the market is pricing it closer to 55.9%. Against LAD, he has been held to one total base or fewer in 5 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 3 spot, which points to about 4.6 plate appearances.",
+              "rank": 3,
+              "recommendation_tier": "candidate"
+            }
+          ]
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "pitcher_props",
+            "player_name": "Mitch Keller",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "hitter_total_bases",
+            "player_name": "Nick Gonzales",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "pitcher_props",
+            "player_name": "Justin Wrobleski",
+            "selection": "over",
+            "market_line": 18.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "pitcher_props",
+            "player_name": "Justin Wrobleski",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "hitter_total_bases",
+            "player_name": "Bryan Reynolds",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "pitcher_props",
+            "player_name": "Mitch Keller",
+            "selection": "over",
+            "market_line": 15.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "hitter_total_bases",
+            "player_name": "Nick Gonzales",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "pitcher_props",
+            "player_name": "Justin Wrobleski",
+            "selection": "over",
+            "market_line": 18.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "pitcher_props",
+            "player_name": "Justin Wrobleski",
+            "selection": "over",
+            "market_line": 4.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 823371,
+            "market": "hitter_total_bases",
+            "player_name": "Bryan Reynolds",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "counts": {
+          "official": 2,
+          "playable": 3,
+          "pitcher": 1,
+          "hitter": 1,
+          "extra_pitcher": 2,
+          "extra_hitter": 1
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": true
+        }
+      }
+    },
+    {
+      "game_pk": 824827,
+      "game_date": "2026-06-11T23:05:00Z",
+      "start_time": "6:05 PM",
+      "official_date": "2026-06-11",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 136,
+        "abbr": "SEA",
+        "name": "Seattle Mariners"
+      },
+      "home": {
+        "id": 110,
+        "abbr": "BAL",
+        "name": "Baltimore Orioles"
+      },
+      "starter_names": {
+        "away": "Bryan Woo",
+        "home": "Kyle Bradish"
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 824827,
+              "away": "Seattle Mariners",
+              "home": "Baltimore Orioles",
+              "away_abbr": "SEA",
+              "home_abbr": "BAL",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 677594,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 680694,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Kyle Bradish",
+              "opponent": "BAL",
+              "opponent_team_id": 110,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.2089473684210526,
+              "batter_bb_rate": 0.07074392712550608,
+              "batter_hr_rate": 0.04557945344129555,
+              "batter_inplay_hit_rate": 0.25243055555555555,
+              "batter_xb_hit_share": 0.2,
+              "pitcher_k_rate": 0.22552865951130396,
+              "pitcher_bb_rate": 0.11684174469056863,
+              "pitcher_hr_rate": 0.025620004567252795,
+              "pitcher_inplay_hit_rate": 0.3410147051127741,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 92.0,
+              "pitcher_platoon_k_mult": 0.9599130205854656,
+              "pitcher_platoon_bb_mult": 1.0063080230626404,
+              "pitcher_platoon_hr_mult": 1.2306399857384793,
+              "pitcher_platoon_inplay_mult": 1.082056440115276,
+              "batter_platoon_k_mult": 1.051992522393286,
+              "batter_platoon_bb_mult": 0.9380863896741973,
+              "batter_platoon_hr_mult": 0.78,
+              "batter_platoon_inplay_mult": 1.0645381441117343,
+              "opponent_primary_pitch_type": "SI",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 2,
+              "venue_name": "Oriole Park at Camden Yards",
+              "roof_type": "Open",
+              "park_hr_mult": 1.0326666666666666,
+              "park_inplay_hit_mult": 0.9869333333333333,
+              "park_xb_share_mult": 0.9836666666666667,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Julio Rodr\u00edguez",
+              "team": "SEA",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.13223291740938803,
+              "market_line": 1.5,
+              "model_prob_over": 0.344,
+              "market_prob_over": 0.47623291740938806,
+              "market_prob_under": 0.523767082590612,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.47623291740938806,
+              "selected_side_market_prob": 0.523767082590612,
+              "selected_side_model_prob": 0.656,
+              "mean_support": 0.14300000000000002,
+              "tb_mean": 1.357,
+              "pa_mean": 4.938,
+              "ab_mean": 4.386,
+              "lineup_order": 2,
+              "market_alternates": [],
+              "odds": "-129",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against BAL, he has been held to one total base or fewer in 6 of 9 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 8 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Julio Rodr\u00edguez",
+                "supporting_reasons": [
+                  "Against BAL, he has been held to one total base or fewer in 6 of 9 games.",
+                  "Over his last 10 games, he has been held to one total base or fewer in 8 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 65.6% of sims, while the market is pricing it closer to 52.4%. Against BAL, he has been held to one total base or fewer in 6 of 9 games. Over his last 10 games, he has been held to one total base or fewer in 8 of 10 games. The model baseline comes in around 1.4 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.9 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 65.6% of sims, while the market is pricing it closer to 52.4%. Against BAL, he has been held to one total base or fewer in 6 of 9 games. Over his last 10 games, he has been held to one total base or fewer in 8 of 10 games. The model baseline comes in around 1.4 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.9 plate appearances.",
+              "rank": 4,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824827,
+            "market": "hitter_total_bases",
+            "player_name": "Julio Rodr\u00edguez",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824827,
+            "market": "hitter_total_bases",
+            "player_name": "Julio Rodr\u00edguez",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "counts": {
+          "official": 1,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 1,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": false
+        }
+      }
+    },
+    {
+      "game_pk": 824589,
+      "game_date": "2026-06-11T23:40:00Z",
+      "start_time": "6:40 PM",
+      "official_date": "2026-06-11",
+      "status": {
+        "abstract": "Preview",
+        "detailed": "Scheduled"
+      },
+      "away": {
+        "id": 144,
+        "abbr": "ATL",
+        "name": "Atlanta Braves"
+      },
+      "home": {
+        "id": 145,
+        "abbr": "CWS",
+        "name": "Chicago White Sox"
+      },
+      "starter_names": {
+        "away": "Mart\u00edn P\u00e9rez",
+        "home": ""
+      },
+      "matchup": {
+        "isLive": false,
+        "isFinal": false,
+        "liveText": "",
+        "displayState": "Scheduled",
+        "inning": null,
+        "halfInning": "",
+        "count": {
+          "balls": null,
+          "strikes": null,
+          "outs": null
+        },
+        "batter": "",
+        "pitcher": "",
+        "score": {
+          "away": null,
+          "home": null
+        }
+      },
+      "betting": {
+        "markets": {
+          "totals": null,
+          "ml": null,
+          "pitcherProps": [],
+          "hitterProps": [
+            {
+              "date": "2026-06-11",
+              "game_pk": 824589,
+              "away": "Atlanta Braves",
+              "home": "Chicago White Sox",
+              "away_abbr": "ATL",
+              "home_abbr": "CWS",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 643289,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 663436,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Davis Martin",
+              "opponent": "CWS",
+              "opponent_team_id": 145,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.58,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.15208333333333332,
+              "batter_bb_rate": 0.07607142857142857,
+              "batter_hr_rate": 0.028035714285714285,
+              "batter_inplay_hit_rate": 0.271138938580799,
+              "batter_xb_hit_share": 0.2459016393442623,
+              "pitcher_k_rate": 0.2520367412140575,
+              "pitcher_bb_rate": 0.055541134185303515,
+              "pitcher_hr_rate": 0.009188631522896697,
+              "pitcher_inplay_hit_rate": 0.3238369611609048,
+              "pitcher_availability_mult": 0.35,
+              "pitcher_stamina_pitches": 92.0,
+              "pitcher_platoon_k_mult": 1.045151323086674,
+              "pitcher_platoon_bb_mult": 0.9751363173347715,
+              "pitcher_platoon_hr_mult": 0.9034588917059037,
+              "pitcher_platoon_inplay_mult": 1.1293542009884678,
+              "batter_platoon_k_mult": 1.0949698979146671,
+              "batter_platoon_bb_mult": 0.9565637989294579,
+              "batter_platoon_hr_mult": 1.0747717960160657,
+              "batter_platoon_inplay_mult": 1.0568103511472766,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 4,
+              "venue_name": "Rate Field",
+              "roof_type": "Open",
+              "park_hr_mult": 1.03,
+              "park_inplay_hit_mult": 0.988,
+              "park_xb_share_mult": 0.985,
+              "market": "hitter_runs",
+              "market_label": "Hitter Runs",
+              "market_group": "hitter_props",
+              "player_name": "Mauricio Dub\u00f3n",
+              "team": "ATL",
+              "prop": "batter_runs_scored",
+              "prop_market_key": "batter_runs_scored",
+              "selection": "under",
+              "edge": 0.12882111572153065,
+              "market_line": 0.5,
+              "model_prob_over": 0.323,
+              "market_prob_over": 0.45182111572153066,
+              "market_prob_under": 0.5481788842784694,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.45182111572153066,
+              "selected_side_market_prob": 0.5481788842784694,
+              "selected_side_model_prob": 0.677,
+              "mean_support": 0.122,
+              "r_mean": 0.378,
+              "pa_mean": 4.502,
+              "ab_mean": 3.991,
+              "lineup_order": 5,
+              "market_alternates": [],
+              "odds": "-145",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against CWS, he has been held scoreless in 5 of 5 games.",
+                "Over his last 10 games, he has been held scoreless in 6 of 10 games."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_runs",
+                "subject": "Mauricio Dub\u00f3n",
+                "supporting_reasons": [
+                  "Against CWS, he has been held scoreless in 5 of 5 games.",
+                  "Over his last 10 games, he has been held scoreless in 6 of 10 games."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 67.7% of sims, while the market is pricing it closer to 54.8%. Against CWS, he has been held scoreless in 5 of 5 games. Over his last 10 games, he has been held scoreless in 6 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 67.7% of sims, while the market is pricing it closer to 54.8%. Against CWS, he has been held scoreless in 5 of 5 games. Over his last 10 games, he has been held scoreless in 6 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            },
+            {
+              "date": "2026-06-11",
+              "game_pk": 824589,
+              "away": "Atlanta Braves",
+              "home": "Chicago White Sox",
+              "away_abbr": "ATL",
+              "home_abbr": "CWS",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 656537,
+              "batter_hand": "R",
+              "opponent_pitcher_id": 527048,
+              "opponent_pitcher_hand": "L",
+              "opponent_pitcher_name": "Mart\u00edn P\u00e9rez",
+              "opponent": "ATL",
+              "opponent_team_id": 144,
+              "lineup_source": "projected_rotowire_default_vs_lhp",
+              "lineup_confidence": 0.66,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.33195340501792114,
+              "batter_bb_rate": 0.07094982078853046,
+              "batter_hr_rate": 0.04261648745519713,
+              "batter_inplay_hit_rate": 0.24182389937106918,
+              "batter_xb_hit_share": 0.058823529411764705,
+              "pitcher_k_rate": 0.21546764346764347,
+              "pitcher_bb_rate": 0.0903907203907204,
+              "pitcher_hr_rate": 0.025963369963369964,
+              "pitcher_inplay_hit_rate": 0.2611690569317688,
+              "pitcher_availability_mult": 1.0,
+              "pitcher_stamina_pitches": 95.0,
+              "pitcher_platoon_k_mult": 0.960517487589818,
+              "pitcher_platoon_bb_mult": 1.0584695393759287,
+              "pitcher_platoon_hr_mult": 0.9795922686230248,
+              "pitcher_platoon_inplay_mult": 0.995281726552007,
+              "batter_platoon_k_mult": 0.9554824190173097,
+              "batter_platoon_bb_mult": 0.9755564450875714,
+              "batter_platoon_hr_mult": 1.275,
+              "batter_platoon_inplay_mult": 1.0032281306013426,
+              "opponent_primary_pitch_type": "CH",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 4,
+              "venue_name": "Rate Field",
+              "roof_type": "Open",
+              "park_hr_mult": 1.03,
+              "park_inplay_hit_mult": 0.988,
+              "park_xb_share_mult": 0.985,
+              "market": "hitter_hits",
+              "market_label": "Hitter Hits",
+              "market_group": "hitter_props",
+              "player_name": "Derek Hill",
+              "team": "CWS",
+              "prop": "batter_hits",
+              "prop_market_key": "batter_hits",
+              "selection": "over",
+              "edge": 0.03116829533116172,
+              "market_line": 0.5,
+              "model_prob_over": 0.586,
+              "market_prob_over": 0.5548317046688382,
+              "market_prob_under": 0.4451682953311618,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.5548317046688382,
+              "selected_side_market_prob": 0.5548317046688382,
+              "selected_side_model_prob": 0.586,
+              "mean_support": 0.33499999999999996,
+              "h_mean": 0.835,
+              "pa_mean": 4.14,
+              "ab_mean": 3.665,
+              "lineup_order": 7,
+              "market_alternates": [],
+              "odds": "-146",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against ATL, he has recorded a hit in 5 of 9 games.",
+                "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_hits",
+                "subject": "Derek Hill",
+                "supporting_reasons": [
+                  "Against ATL, he has recorded a hit in 5 of 9 games.",
+                  "The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline."
+                ]
+              },
+              "reasons": [
+                "The model lands on the over side in 58.6% of sims, while the market is pricing it closer to 55.5%. Against ATL, he has recorded a hit in 5 of 9 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances."
+              ],
+              "reason_summary": "The model lands on the over side in 58.6% of sims, while the market is pricing it closer to 55.5%. Against ATL, he has recorded a hit in 5 of 9 games. The handedness matchup leans his way here, with his expected damage against L-handed pitching grading above baseline. The model baseline comes in around 0.8 batter hits against a line of 0.5. He is projected to hit in the 7 spot, which points to about 4.1 plate appearances.",
+              "rank": 1,
+              "recommendation_tier": "official"
+            },
+            {
+              "date": "2026-06-11",
+              "game_pk": 824589,
+              "away": "Atlanta Braves",
+              "home": "Chicago White Sox",
+              "away_abbr": "ATL",
+              "home_abbr": "CWS",
+              "double_header": "N",
+              "game_number": 1,
+              "event_id": null,
+              "commence_time": null,
+              "batter_id": 645277,
+              "batter_hand": "S",
+              "opponent_pitcher_id": 663436,
+              "opponent_pitcher_hand": "R",
+              "opponent_pitcher_name": "Davis Martin",
+              "opponent": "CWS",
+              "opponent_team_id": 145,
+              "lineup_source": "projected_rotowire_default_vs_rhp",
+              "lineup_confidence": 0.58,
+              "lineup_status": "projected",
+              "batter_k_rate": 0.12410899121580037,
+              "batter_bb_rate": 0.07075756728025513,
+              "batter_hr_rate": 0.03392827169473508,
+              "batter_inplay_hit_rate": 0.2736761083743842,
+              "batter_xb_hit_share": 0.1780821917808219,
+              "pitcher_k_rate": 0.2520367412140575,
+              "pitcher_bb_rate": 0.055541134185303515,
+              "pitcher_hr_rate": 0.009188631522896697,
+              "pitcher_inplay_hit_rate": 0.3238369611609048,
+              "pitcher_availability_mult": 0.35,
+              "pitcher_stamina_pitches": 92.0,
+              "pitcher_platoon_k_mult": 1.045151323086674,
+              "pitcher_platoon_bb_mult": 0.9751363173347715,
+              "pitcher_platoon_hr_mult": 0.9034588917059037,
+              "pitcher_platoon_inplay_mult": 1.1293542009884678,
+              "batter_platoon_k_mult": 1.1925000000000001,
+              "batter_platoon_bb_mult": 1.1925000000000001,
+              "batter_platoon_hr_mult": 1.0122197523144263,
+              "batter_platoon_inplay_mult": 0.9686257752423256,
+              "opponent_primary_pitch_type": "FF",
+              "weather_source": "statsapi_live_feed",
+              "weather_wind_direction": "unknown",
+              "weather_hr_mult": 1.0,
+              "weather_inplay_hit_mult": 1.0,
+              "weather_xb_share_mult": 1.0,
+              "park_source": "statsapi_live_feed",
+              "venue_id": 4,
+              "venue_name": "Rate Field",
+              "roof_type": "Open",
+              "park_hr_mult": 1.03,
+              "park_inplay_hit_mult": 0.988,
+              "park_xb_share_mult": 0.985,
+              "market": "hitter_total_bases",
+              "market_label": "Hitter Total Bases",
+              "market_group": "hitter_props",
+              "player_name": "Ozzie Albies",
+              "team": "ATL",
+              "prop": "batter_total_bases",
+              "prop_market_key": "batter_total_bases",
+              "selection": "under",
+              "edge": 0.09040796963946873,
+              "market_line": 1.5,
+              "model_prob_over": 0.365,
+              "market_prob_over": 0.4554079696394686,
+              "market_prob_under": 0.5445920303605313,
+              "market_prob_mode": "no_vig_two_way",
+              "market_no_vig_prob_over": 0.4554079696394686,
+              "selected_side_market_prob": 0.5445920303605313,
+              "selected_side_model_prob": 0.635,
+              "mean_support": 0.06800000000000006,
+              "tb_mean": 1.432,
+              "pa_mean": 4.826,
+              "ab_mean": 4.25,
+              "lineup_order": 2,
+              "market_alternates": [],
+              "odds": "-140",
+              "stake_u": 0.5,
+              "sim_sample_size": 1000,
+              "baseball_reasons": [
+                "Against CWS, he has been held to one total base or fewer in 3 of 5 games.",
+                "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching."
+              ],
+              "explanation_diagnostic": {
+                "status": "supported",
+                "flag_sparse_support": false,
+                "support_min_reasons": 2,
+                "baseball_reasons_n": 2,
+                "reason_sentences_n": 5,
+                "market": "hitter_total_bases",
+                "subject": "Ozzie Albies",
+                "supporting_reasons": [
+                  "Against CWS, he has been held to one total base or fewer in 3 of 5 games.",
+                  "The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching."
+                ]
+              },
+              "reasons": [
+                "The model lands on the under side in 63.5% of sims, while the market is pricing it closer to 54.5%. Against CWS, he has been held to one total base or fewer in 3 of 5 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching. The model baseline comes in around 1.4 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
+              ],
+              "reason_summary": "The model lands on the under side in 63.5% of sims, while the market is pricing it closer to 54.5%. Against CWS, he has been held to one total base or fewer in 3 of 5 games. The handedness matchup is a little tougher than usual, so this spot comes with more swing-and-miss risk against R-handed pitching. The model baseline comes in around 1.4 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
+              "rank": 6,
+              "recommendation_tier": "official"
+            }
+          ],
+          "extraPitcherProps": [],
+          "extraHitterProps": []
+        },
+        "results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "playable_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "all_results": {
+          "combined": {
+            "n": 0,
+            "wins": 0,
+            "losses": 0,
+            "stake_u": 0.0,
+            "profit_u": 0.0,
+            "roi": null
+          }
+        },
+        "settled_rows": [],
+        "playable_settled_rows": [],
+        "all_settled_rows": [],
+        "unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824589,
+            "market": "hitter_hits",
+            "player_name": "Derek Hill",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824589,
+            "market": "hitter_total_bases",
+            "player_name": "Ozzie Albies",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824589,
+            "market": "hitter_runs",
+            "player_name": "Mauricio Dub\u00f3n",
+            "selection": "under",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "playable_unresolved_rows": [],
+        "all_unresolved_rows": [
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824589,
+            "market": "hitter_hits",
+            "player_name": "Derek Hill",
+            "selection": "over",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824589,
+            "market": "hitter_total_bases",
+            "player_name": "Ozzie Albies",
+            "selection": "under",
+            "market_line": 1.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          },
+          {
+            "path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\daily_summary_2026_06_11_locked_policy.json",
+            "date": "2026-06-11",
+            "game_pk": 824589,
+            "market": "hitter_runs",
+            "player_name": "Mauricio Dub\u00f3n",
+            "selection": "under",
+            "market_line": 0.5,
+            "reason": "game not final",
+            "recommendation_tier": "official"
+          }
+        ],
+        "counts": {
+          "official": 3,
+          "playable": 0,
+          "pitcher": 0,
+          "hitter": 3,
+          "extra_pitcher": 0,
+          "extra_hitter": 0
+        },
+        "flags": {
+          "hasAnyRecommendations": true,
+          "hasOfficialRecommendations": true,
+          "hasPlayableCandidates": false
+        }
+      }
+    }
+  ],
+  "manifest_source": null,
+  "card_source": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_11_locked_policy.json",
+  "source_kind": "canonical_daily_fallback",
+  "summary": {
+    "date": "2026-06-11",
+    "month": "2026-06",
+    "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/daily/daily_summary_2026_06_11_locked_policy.json",
+    "selected_counts": {
+      "totals": 0,
+      "ml": 1,
+      "pitcher_props": 1,
+      "hitter_props": 9,
+      "hitter_home_runs": 0,
+      "hitter_hits": 2,
+      "hitter_strikeouts": 0,
+      "hitter_total_bases": 6,
+      "hitter_runs": 1,
+      "hitter_rbis": 0,
+      "combined": 11
+    },
+    "results": {
+      "combined": {
+        "n": 0,
+        "wins": 0,
+        "losses": 0,
+        "stake_u": 0.0,
+        "profit_u": 0.0,
+        "roi": null
+      }
+    },
+    "profit_u": 0.0,
+    "roi": null,
+    "settled_n": 0,
+    "unresolved_n": 11
+  },
+  "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+  "selected_counts": {
+    "totals": 0,
+    "ml": 1,
+    "pitcher_props": 1,
+    "hitter_props": 9,
+    "hitter_home_runs": 0,
+    "hitter_hits": 2,
+    "hitter_strikeouts": 0,
+    "hitter_total_bases": 6,
+    "hitter_runs": 1,
+    "hitter_rbis": 0,
+    "combined": 11
+  },
+  "results": {
+    "combined": {
+      "n": 0,
+      "wins": 0,
+      "losses": 0,
+      "stake_u": 0.0,
+      "profit_u": 0.0,
+      "roi": null
+    }
+  },
+  "cards_available": true,
+  "cards_url": "/?date=2026-06-11",
+  "artifactDate": "2026-06-11"
+}
