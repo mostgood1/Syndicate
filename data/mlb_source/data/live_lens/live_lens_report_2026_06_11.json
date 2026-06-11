@@ -1,6 +1,6 @@
 {
   "date": "2026-06-11",
-  "generatedAt": "2026-06-11T15:00:37-05:00",
+  "generatedAt": "2026-06-11T16:22:03-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -16,1243 +16,31 @@
   },
   "counts": {
     "games": 8,
-    "live": 4,
+    "live": 5,
     "final": 0,
-    "pregame": 4,
+    "pregame": 3,
     "props": 25,
     "archivedLiveProps": 0
   },
   "performance": {
     "marketsRefreshed": false,
-    "marketRefreshMs": 1.8,
-    "totalMs": 118.2,
-    "snapshotLoadMs": 1.7,
-    "simContextLoadMs": 0.7,
-    "propEvalMs": 0.5,
-    "gameLensMs": 0.7,
+    "marketRefreshMs": 1.6,
+    "totalMs": 882.3,
+    "snapshotLoadMs": 1.5,
+    "simContextLoadMs": 0.6,
+    "propEvalMs": 0.8,
+    "gameLensMs": 0.5,
     "gameCount": 8,
-    "liveGameCount": 1,
+    "liveGameCount": 2,
     "feedFetchCount": 8,
     "persistMs": 0.0
   },
   "games": [
     {
-      "gamePk": 824346,
+      "gamePk": 824101,
       "status": {
         "abstract": "Live",
         "detailed": "In Progress"
-      },
-      "startTime": "2:10 PM",
-      "matchup": {
-        "away": {
-          "abbr": "CHC",
-          "id": 112,
-          "logo": "https://www.mlbstatic.com/team-logos/112.svg",
-          "name": "Chicago Cubs"
-        },
-        "home": {
-          "abbr": "COL",
-          "id": 115,
-          "logo": "https://www.mlbstatic.com/team-logos/115.svg",
-          "name": "Colorado Rockies"
-        },
-        "score": {
-          "away": 0,
-          "home": 0
-        },
-        "liveText": "Edward Cabrera vs Ryan Feltner | +3 playable"
-      },
-      "predictions": {
-        "first1": {
-          "away_runs_mean": 0.442,
-          "home_runs_mean": 0.54,
-          "away_win_prob": 0.199,
-          "home_win_prob": 0.225,
-          "tie_prob": 0.576
-        },
-        "first3": {
-          "away_runs_mean": 1.248,
-          "home_runs_mean": 1.567,
-          "away_win_prob": 0.315,
-          "home_win_prob": 0.419,
-          "tie_prob": 0.266
-        },
-        "first5": {
-          "away_runs_mean": 2.139,
-          "home_runs_mean": 2.702,
-          "away_win_prob": 0.355,
-          "home_win_prob": 0.496,
-          "tie_prob": 0.149
-        },
-        "full": {
-          "away_runs_mean": 4.349,
-          "home_runs_mean": 4.62,
-          "away_win_prob": 0.447,
-          "home_win_prob": 0.553,
-          "tie_prob": 0.0
-        }
-      },
-      "gameMarkets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [],
-        "extraPitcherProps": [],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 824346,
-            "away": "Chicago Cubs",
-            "home": "Colorado Rockies",
-            "away_abbr": "CHC",
-            "home_abbr": "COL",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 663538,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 663372,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Ryan Feltner",
-            "opponent": "COL",
-            "opponent_team_id": 115,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.0606829573934837,
-            "batter_bb_rate": 0.09578634085213032,
-            "batter_hr_rate": 0.011184210526315788,
-            "batter_inplay_hit_rate": 0.24562142857142855,
-            "batter_xb_hit_share": 0.22727272727272727,
-            "pitcher_k_rate": 0.17433419521654817,
-            "pitcher_bb_rate": 0.07672915319974144,
-            "pitcher_hr_rate": 0.038994828700711054,
-            "pitcher_inplay_hit_rate": 0.2819196428571428,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 82.0,
-            "pitcher_platoon_k_mult": 0.8211600140899905,
-            "pitcher_platoon_bb_mult": 1.0824768323504634,
-            "pitcher_platoon_hr_mult": 1.072254455035226,
-            "pitcher_platoon_inplay_mult": 1.1003035101609924,
-            "batter_platoon_k_mult": 0.9489082710897871,
-            "batter_platoon_bb_mult": 1.0821408478174441,
-            "batter_platoon_hr_mult": 0.901160280626012,
-            "batter_platoon_inplay_mult": 0.9628935792124899,
-            "opponent_primary_pitch_type": "SL",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 19,
-            "venue_name": "Coors Field",
-            "roof_type": "Open",
-            "park_hr_mult": 0.9986666666666666,
-            "park_inplay_hit_mult": 1.0005333333333333,
-            "park_xb_share_mult": 1.0006666666666666,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Nico Hoerner",
-            "team": "CHC",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "under",
-            "edge": 0.11401350048216008,
-            "market_line": 1.5,
-            "model_prob_over": 0.389,
-            "market_prob_over": 0.5030135004821601,
-            "market_prob_under": 0.4969864995178399,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5030135004821601,
-            "selected_side_market_prob": 0.4969864995178399,
-            "selected_side_model_prob": 0.611,
-            "mean_support": 0.008999999999999897,
-            "tb_mean": 1.491,
-            "pa_mean": 4.991,
-            "ab_mean": 4.388,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "-114",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
-              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Nico Hoerner",
-              "supporting_reasons": [
-                "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
-                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances."
-            ],
-            "reason_summary": "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances.",
-            "rank": 2,
-            "recommendation_tier": "candidate"
-          },
-          {
-            "date": "2026-06-11",
-            "game_pk": 824346,
-            "away": "Chicago Cubs",
-            "home": "Colorado Rockies",
-            "away_abbr": "CHC",
-            "home_abbr": "COL",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 650489,
-            "batter_hand": "S",
-            "opponent_pitcher_id": 665795,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Edward Cabrera",
-            "opponent": "CHC",
-            "opponent_team_id": 112,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.25059541754597525,
-            "batter_bb_rate": 0.08359210129635213,
-            "batter_hr_rate": 0.014335242689176965,
-            "batter_inplay_hit_rate": 0.35425531914893615,
-            "batter_xb_hit_share": 0.21568627450980393,
-            "pitcher_k_rate": 0.21871678896761132,
-            "pitcher_bb_rate": 0.08398595647773278,
-            "pitcher_hr_rate": 0.048401126012145745,
-            "pitcher_inplay_hit_rate": 0.3652465918203689,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 89.0,
-            "pitcher_platoon_k_mult": 1.1824274259577023,
-            "pitcher_platoon_bb_mult": 0.9586379722694198,
-            "pitcher_platoon_hr_mult": 1.2222679998667647,
-            "pitcher_platoon_inplay_mult": 1.0291661476816676,
-            "batter_platoon_k_mult": 1.0645363770338958,
-            "batter_platoon_bb_mult": 1.1518206954587804,
-            "batter_platoon_hr_mult": 1.2173396424815983,
-            "batter_platoon_inplay_mult": 0.9330163496830164,
-            "opponent_primary_pitch_type": "CH",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 19,
-            "venue_name": "Coors Field",
-            "roof_type": "Open",
-            "park_hr_mult": 0.9986666666666666,
-            "park_inplay_hit_mult": 1.0005333333333333,
-            "park_xb_share_mult": 1.0006666666666666,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Willi Castro",
-            "team": "COL",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "over",
-            "edge": 0.011532194332593226,
-            "market_line": 1.5,
-            "model_prob_over": 0.465,
-            "market_prob_over": 0.4534678056674068,
-            "market_prob_under": 0.5465321943325933,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4534678056674068,
-            "selected_side_market_prob": 0.4534678056674068,
-            "selected_side_model_prob": 0.465,
-            "mean_support": 0.236,
-            "tb_mean": 1.736,
-            "pa_mean": 4.829,
-            "ab_mean": 4.228,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "+106",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
-              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "strong",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 3,
-              "reason_sentences_n": 6,
-              "market": "hitter_total_bases",
-              "subject": "Willi Castro",
-              "supporting_reasons": [
-                "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
-                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
-            "rank": 4,
-            "recommendation_tier": "candidate"
-          },
-          {
-            "date": "2026-06-11",
-            "game_pk": 824346,
-            "away": "Chicago Cubs",
-            "home": "Colorado Rockies",
-            "away_abbr": "CHC",
-            "home_abbr": "COL",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 687859,
-            "batter_hand": "L",
-            "opponent_pitcher_id": 665795,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Edward Cabrera",
-            "opponent": "CHC",
-            "opponent_team_id": 112,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.18074724377296855,
-            "batter_bb_rate": 0.07181502654144549,
-            "batter_hr_rate": 0.007172995780590717,
-            "batter_inplay_hit_rate": 0.3603967168262654,
-            "batter_xb_hit_share": 0.2878787878787879,
-            "pitcher_k_rate": 0.21871678896761132,
-            "pitcher_bb_rate": 0.08398595647773278,
-            "pitcher_hr_rate": 0.048401126012145745,
-            "pitcher_inplay_hit_rate": 0.3652465918203689,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 89.0,
-            "pitcher_platoon_k_mult": 0.8516482805772677,
-            "pitcher_platoon_bb_mult": 1.0412033375596816,
-            "pitcher_platoon_hr_mult": 0.78,
-            "pitcher_platoon_inplay_mult": 0.9566350600280755,
-            "batter_platoon_k_mult": 1.0746000463714354,
-            "batter_platoon_bb_mult": 1.0949317323158643,
-            "batter_platoon_hr_mult": 1.2571207430340559,
-            "batter_platoon_inplay_mult": 1.1040411571726811,
-            "opponent_primary_pitch_type": "CH",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 19,
-            "venue_name": "Coors Field",
-            "roof_type": "Open",
-            "park_hr_mult": 0.9986666666666666,
-            "park_inplay_hit_mult": 1.0005333333333333,
-            "park_xb_share_mult": 1.0006666666666666,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Troy Johnston",
-            "team": "COL",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "over",
-            "edge": 0.027458935129526907,
-            "market_line": 1.5,
-            "model_prob_over": 0.454,
-            "market_prob_over": 0.4265410648704731,
-            "market_prob_under": 0.5734589351295268,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4265410648704731,
-            "selected_side_market_prob": 0.4265410648704731,
-            "selected_side_model_prob": 0.454,
-            "mean_support": 0.16100000000000003,
-            "tb_mean": 1.661,
-            "pa_mean": 4.486,
-            "ab_mean": 4.007,
-            "lineup_order": 5,
-            "market_alternates": [],
-            "odds": "+119",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Troy Johnston",
-              "supporting_reasons": [
-                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances.",
-            "rank": 5,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      },
-      "gameLens": [
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "badge": "No bet",
-          "score": "CHC 0 - COL 0",
-          "subtitle": "CHC 0.44 - COL 0.54 | Total 0.98",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 0.98,
-            "homeMargin": 0.1
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 0.98,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.1,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "badge": "No bet",
-          "score": "CHC 0 - COL 0",
-          "subtitle": "CHC 1.25 - COL 1.57 | Total 2.81",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 2.81,
-            "homeMargin": 0.32
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 2.81,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.32,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "badge": "No bet",
-          "score": "CHC 0 - COL 0",
-          "subtitle": "CHC 2.14 - COL 2.7 | Total 4.84",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 4.84,
-            "homeMargin": 0.56
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 4.84,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.56,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "Full game",
-          "closed": false,
-          "badge": "No bet",
-          "score": "CHC 0 - COL 0",
-          "subtitle": "CHC 4.35 - COL 4.62 | Total 8.97",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 8.97,
-            "homeMargin": 0.27
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 8.97,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": 0.27,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "First 1",
-          "closed": false,
-          "badge": "",
-          "score": "CHC 19.9% | COL 22.5% | Tie 57.6%",
-          "subtitle": "CHC 19.9% | COL 22.5% | Tie 57.6%",
-          "reason": "CHC 19.9% | COL 22.5% | Tie 57.6%",
-          "projection": {
-            "total": 19.9,
-            "homeMargin": 22.5
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 19.9,
-              "reason": "CHC 19.9% | COL 22.5% | Tie 57.6%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first3",
-          "label": "First 3",
-          "closed": false,
-          "badge": "",
-          "score": "CHC 31.5% | COL 41.9% | Tie 26.6%",
-          "subtitle": "CHC 31.5% | COL 41.9% | Tie 26.6%",
-          "reason": "CHC 31.5% | COL 41.9% | Tie 26.6%",
-          "projection": {
-            "total": 31.5,
-            "homeMargin": 41.9
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 31.5,
-              "reason": "CHC 31.5% | COL 41.9% | Tie 26.6%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first5",
-          "label": "First 5",
-          "closed": false,
-          "badge": "",
-          "score": "CHC 35.5% | COL 49.6% | Tie 14.9%",
-          "subtitle": "CHC 35.5% | COL 49.6% | Tie 14.9%",
-          "reason": "CHC 35.5% | COL 49.6% | Tie 14.9%",
-          "projection": {
-            "total": 35.5,
-            "homeMargin": 49.6
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 35.5,
-              "reason": "CHC 35.5% | COL 49.6% | Tie 14.9%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full game",
-          "closed": false,
-          "badge": "",
-          "score": "CHC 44.7% | COL 55.3% | Tie 0.0%",
-          "subtitle": "CHC 44.7% | COL 55.3% | Tie 0.0%",
-          "reason": "CHC 44.7% | COL 55.3% | Tie 0.0%",
-          "projection": {
-            "total": 44.7,
-            "homeMargin": 55.3
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 44.7,
-              "reason": "CHC 44.7% | COL 55.3% | Tie 0.0%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        }
-      ],
-      "props": [
-        {
-          "playerName": "Nico Hoerner",
-          "selection": "Under",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "-114",
-          "modelProbOver": 0.389,
-          "estimatedWinProb": 0.389,
-          "rankingScore": 0.11401350048216008
-        },
-        {
-          "playerName": "Troy Johnston",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+119",
-          "modelProbOver": 0.454,
-          "estimatedWinProb": 0.454,
-          "rankingScore": 0.027458935129526907
-        },
-        {
-          "playerName": "Willi Castro",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+106",
-          "modelProbOver": 0.465,
-          "estimatedWinProb": 0.465,
-          "rankingScore": 0.011532194332593226
-        }
-      ],
-      "liveProps": [
-        {
-          "playerName": "Nico Hoerner",
-          "selection": "Under",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "-114",
-          "modelProbOver": 0.389,
-          "estimatedWinProb": 0.389,
-          "rankingScore": 0.11401350048216008
-        },
-        {
-          "playerName": "Troy Johnston",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+119",
-          "modelProbOver": 0.454,
-          "estimatedWinProb": 0.454,
-          "rankingScore": 0.027458935129526907
-        },
-        {
-          "playerName": "Willi Castro",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+106",
-          "modelProbOver": 0.465,
-          "estimatedWinProb": 0.465,
-          "rankingScore": 0.011532194332593226
-        }
-      ],
-      "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "playerName": "Nico Hoerner",
-          "selection": "Under",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "-114",
-          "modelProbOver": 0.389,
-          "estimatedWinProb": 0.389,
-          "rankingScore": 0.11401350048216008
-        },
-        {
-          "playerName": "Troy Johnston",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+119",
-          "modelProbOver": 0.454,
-          "estimatedWinProb": 0.454,
-          "rankingScore": 0.027458935129526907
-        },
-        {
-          "playerName": "Willi Castro",
-          "selection": "Over",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "+106",
-          "modelProbOver": 0.465,
-          "estimatedWinProb": 0.465,
-          "rankingScore": 0.011532194332593226
-        }
-      ],
-      "simContextAvailable": false,
-      "snapshotAvailable": true,
-      "score": {
-        "away": 0,
-        "home": 0
-      },
-      "market_tiles": [
-        {
-          "label": "Game total",
-          "title": "No total play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Pitcher props",
-          "title": "No locked pitcher prop",
-          "sub": "Off card"
-        },
-        {
-          "label": "Hitter props",
-          "title": "Nico Hoerner Under 1.5 Batter Total Bases",
-          "sub": "Playable only | -114"
-        }
-      ],
-      "probable": {
-        "away": {
-          "id": null,
-          "fullName": "Edward Cabrera",
-          "ladderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.287
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.205
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.287
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8/9/10 Last supported rung: 10 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.205
-            }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "strong",
-              "detail": "Live projection 4.5. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.665,
-              "source": "live",
-              "actual": 3.0
-            },
-            {
-              "label": "O up to 16",
-              "stat": "outs",
-              "target": 16,
-              "targets": [
-                16
-              ],
-              "tone": "strong",
-              "detail": "Live projection 15.5. Current 9.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
-              "hitProb": 0.819,
-              "source": "live",
-              "actual": 9.0
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "strong",
-              "detail": "Live projection 5.3. Current 2.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.699,
-              "source": "live",
-              "actual": 2.0
-            }
-          ]
-        },
-        "home": {
-          "id": null,
-          "fullName": "Ryan Feltner",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "strong",
-              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.358
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.238
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "strong",
-              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.358
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.238
-            }
-          ],
-          "miniLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "strong",
-              "detail": "Live projection 3.8. Current 2.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.736,
-              "source": "live",
-              "actual": 2.0
-            },
-            {
-              "label": "O up to 16",
-              "stat": "outs",
-              "target": 16,
-              "targets": [
-                16
-              ],
-              "tone": "strong",
-              "detail": "Live projection 15.8. Current 10.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
-              "hitProb": 0.787,
-              "source": "live",
-              "actual": 10.0
-            }
-          ]
-        }
-      },
-      "markets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [],
-        "extraPitcherProps": [],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 824346,
-            "away": "Chicago Cubs",
-            "home": "Colorado Rockies",
-            "away_abbr": "CHC",
-            "home_abbr": "COL",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 663538,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 663372,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Ryan Feltner",
-            "opponent": "COL",
-            "opponent_team_id": 115,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.0606829573934837,
-            "batter_bb_rate": 0.09578634085213032,
-            "batter_hr_rate": 0.011184210526315788,
-            "batter_inplay_hit_rate": 0.24562142857142855,
-            "batter_xb_hit_share": 0.22727272727272727,
-            "pitcher_k_rate": 0.17433419521654817,
-            "pitcher_bb_rate": 0.07672915319974144,
-            "pitcher_hr_rate": 0.038994828700711054,
-            "pitcher_inplay_hit_rate": 0.2819196428571428,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 82.0,
-            "pitcher_platoon_k_mult": 0.8211600140899905,
-            "pitcher_platoon_bb_mult": 1.0824768323504634,
-            "pitcher_platoon_hr_mult": 1.072254455035226,
-            "pitcher_platoon_inplay_mult": 1.1003035101609924,
-            "batter_platoon_k_mult": 0.9489082710897871,
-            "batter_platoon_bb_mult": 1.0821408478174441,
-            "batter_platoon_hr_mult": 0.901160280626012,
-            "batter_platoon_inplay_mult": 0.9628935792124899,
-            "opponent_primary_pitch_type": "SL",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 19,
-            "venue_name": "Coors Field",
-            "roof_type": "Open",
-            "park_hr_mult": 0.9986666666666666,
-            "park_inplay_hit_mult": 1.0005333333333333,
-            "park_xb_share_mult": 1.0006666666666666,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Nico Hoerner",
-            "team": "CHC",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "under",
-            "edge": 0.11401350048216008,
-            "market_line": 1.5,
-            "model_prob_over": 0.389,
-            "market_prob_over": 0.5030135004821601,
-            "market_prob_under": 0.4969864995178399,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.5030135004821601,
-            "selected_side_market_prob": 0.4969864995178399,
-            "selected_side_model_prob": 0.611,
-            "mean_support": 0.008999999999999897,
-            "tb_mean": 1.491,
-            "pa_mean": 4.991,
-            "ab_mean": 4.388,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "-114",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
-              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Nico Hoerner",
-              "supporting_reasons": [
-                "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
-                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances."
-            ],
-            "reason_summary": "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances.",
-            "rank": 2,
-            "recommendation_tier": "candidate"
-          },
-          {
-            "date": "2026-06-11",
-            "game_pk": 824346,
-            "away": "Chicago Cubs",
-            "home": "Colorado Rockies",
-            "away_abbr": "CHC",
-            "home_abbr": "COL",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 650489,
-            "batter_hand": "S",
-            "opponent_pitcher_id": 665795,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Edward Cabrera",
-            "opponent": "CHC",
-            "opponent_team_id": 112,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.25059541754597525,
-            "batter_bb_rate": 0.08359210129635213,
-            "batter_hr_rate": 0.014335242689176965,
-            "batter_inplay_hit_rate": 0.35425531914893615,
-            "batter_xb_hit_share": 0.21568627450980393,
-            "pitcher_k_rate": 0.21871678896761132,
-            "pitcher_bb_rate": 0.08398595647773278,
-            "pitcher_hr_rate": 0.048401126012145745,
-            "pitcher_inplay_hit_rate": 0.3652465918203689,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 89.0,
-            "pitcher_platoon_k_mult": 1.1824274259577023,
-            "pitcher_platoon_bb_mult": 0.9586379722694198,
-            "pitcher_platoon_hr_mult": 1.2222679998667647,
-            "pitcher_platoon_inplay_mult": 1.0291661476816676,
-            "batter_platoon_k_mult": 1.0645363770338958,
-            "batter_platoon_bb_mult": 1.1518206954587804,
-            "batter_platoon_hr_mult": 1.2173396424815983,
-            "batter_platoon_inplay_mult": 0.9330163496830164,
-            "opponent_primary_pitch_type": "CH",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 19,
-            "venue_name": "Coors Field",
-            "roof_type": "Open",
-            "park_hr_mult": 0.9986666666666666,
-            "park_inplay_hit_mult": 1.0005333333333333,
-            "park_xb_share_mult": 1.0006666666666666,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Willi Castro",
-            "team": "COL",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "over",
-            "edge": 0.011532194332593226,
-            "market_line": 1.5,
-            "model_prob_over": 0.465,
-            "market_prob_over": 0.4534678056674068,
-            "market_prob_under": 0.5465321943325933,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4534678056674068,
-            "selected_side_market_prob": 0.4534678056674068,
-            "selected_side_model_prob": 0.465,
-            "mean_support": 0.236,
-            "tb_mean": 1.736,
-            "pa_mean": 4.829,
-            "ab_mean": 4.228,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "+106",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
-              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "strong",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 3,
-              "reason_sentences_n": 6,
-              "market": "hitter_total_bases",
-              "subject": "Willi Castro",
-              "supporting_reasons": [
-                "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
-                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
-            "rank": 4,
-            "recommendation_tier": "candidate"
-          },
-          {
-            "date": "2026-06-11",
-            "game_pk": 824346,
-            "away": "Chicago Cubs",
-            "home": "Colorado Rockies",
-            "away_abbr": "CHC",
-            "home_abbr": "COL",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 687859,
-            "batter_hand": "L",
-            "opponent_pitcher_id": 665795,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Edward Cabrera",
-            "opponent": "CHC",
-            "opponent_team_id": 112,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.18074724377296855,
-            "batter_bb_rate": 0.07181502654144549,
-            "batter_hr_rate": 0.007172995780590717,
-            "batter_inplay_hit_rate": 0.3603967168262654,
-            "batter_xb_hit_share": 0.2878787878787879,
-            "pitcher_k_rate": 0.21871678896761132,
-            "pitcher_bb_rate": 0.08398595647773278,
-            "pitcher_hr_rate": 0.048401126012145745,
-            "pitcher_inplay_hit_rate": 0.3652465918203689,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 89.0,
-            "pitcher_platoon_k_mult": 0.8516482805772677,
-            "pitcher_platoon_bb_mult": 1.0412033375596816,
-            "pitcher_platoon_hr_mult": 0.78,
-            "pitcher_platoon_inplay_mult": 0.9566350600280755,
-            "batter_platoon_k_mult": 1.0746000463714354,
-            "batter_platoon_bb_mult": 1.0949317323158643,
-            "batter_platoon_hr_mult": 1.2571207430340559,
-            "batter_platoon_inplay_mult": 1.1040411571726811,
-            "opponent_primary_pitch_type": "CH",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 19,
-            "venue_name": "Coors Field",
-            "roof_type": "Open",
-            "park_hr_mult": 0.9986666666666666,
-            "park_inplay_hit_mult": 1.0005333333333333,
-            "park_xb_share_mult": 1.0006666666666666,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Troy Johnston",
-            "team": "COL",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "over",
-            "edge": 0.027458935129526907,
-            "market_line": 1.5,
-            "model_prob_over": 0.454,
-            "market_prob_over": 0.4265410648704731,
-            "market_prob_under": 0.5734589351295268,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.4265410648704731,
-            "selected_side_market_prob": 0.4265410648704731,
-            "selected_side_model_prob": 0.454,
-            "mean_support": 0.16100000000000003,
-            "tb_mean": 1.661,
-            "pa_mean": 4.486,
-            "ab_mean": 4.007,
-            "lineup_order": 5,
-            "market_alternates": [],
-            "odds": "+119",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Troy Johnston",
-              "supporting_reasons": [
-                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
-                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances."
-            ],
-            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances.",
-            "rank": 5,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      }
-    },
-    {
-      "gamePk": 824101,
-      "status": {
-        "abstract": "Preview",
-        "detailed": "Scheduled"
       },
       "startTime": "1:10 PM",
       "matchup": {
@@ -1272,7 +60,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Kumar Rocker vs Michael Wacha | 2 official pick(s) | +3 playable"
+        "liveText": "Kumar Rocker vs Michael Wacha | 1 official pick(s) | +2 playable"
       },
       "predictions": {
         "first1": {
@@ -1747,21 +535,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "TEX 0 - KC 0",
-          "subtitle": "TEX 0.4 - KC 0.4 | Total 0.8",
+          "subtitle": "TEX 0.47 - KC 0.41 | Total 0.89",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 0.8,
-            "homeMargin": 0.0
+            "total": 0.89,
+            "homeMargin": -0.06
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 0.8,
+              "line": 0.89,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.0,
+              "homeLine": -0.06,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -1776,21 +564,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "TEX 0 - KC 0",
-          "subtitle": "TEX 1.17 - KC 1.29 | Total 2.46",
+          "subtitle": "TEX 1.39 - KC 1.38 | Total 2.77",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 2.46,
-            "homeMargin": 0.11
+            "total": 2.77,
+            "homeMargin": -0.01
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 2.46,
+              "line": 2.77,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.11,
+              "homeLine": -0.01,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -1805,21 +593,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "TEX 0 - KC 0",
-          "subtitle": "TEX 1.97 - KC 2.2 | Total 4.17",
+          "subtitle": "TEX 2.34 - KC 2.39 | Total 4.73",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 4.17,
-            "homeMargin": 0.23
+            "total": 4.73,
+            "homeMargin": 0.05
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 4.17,
+              "line": 4.73,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.23,
+              "homeLine": 0.05,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -1834,21 +622,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "TEX 0 - KC 0",
-          "subtitle": "TEX 4.23 - KC 3.71 | Total 7.94",
+          "subtitle": "TEX 4.85 - KC 4.17 | Total 9.02",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 7.94,
-            "homeMargin": -0.52
+            "total": 9.02,
+            "homeMargin": -0.68
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 7.94,
+              "line": 9.02,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.52,
+              "homeLine": -0.68,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -1862,18 +650,18 @@
           "label": "First 1",
           "closed": false,
           "badge": "",
-          "score": "TEX 18.8% | KC 18.3% | Tie 62.9%",
-          "subtitle": "TEX 18.8% | KC 18.3% | Tie 62.9%",
-          "reason": "TEX 18.8% | KC 18.3% | Tie 62.9%",
+          "score": "TEX 22.3% | KC 18.6% | Tie 59.1%",
+          "subtitle": "TEX 22.3% | KC 18.6% | Tie 59.1%",
+          "reason": "TEX 22.3% | KC 18.6% | Tie 59.1%",
           "projection": {
-            "total": 18.8,
-            "homeMargin": 18.3
+            "total": 22.3,
+            "homeMargin": 18.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 18.8,
-              "reason": "TEX 18.8% | KC 18.3% | Tie 62.9%"
+              "line": 22.3,
+              "reason": "TEX 22.3% | KC 18.6% | Tie 59.1%"
             },
             "spread": {},
             "moneyline": {}
@@ -1884,18 +672,18 @@
           "label": "First 3",
           "closed": false,
           "badge": "",
-          "score": "TEX 32.8% | KC 35.6% | Tie 31.6%",
-          "subtitle": "TEX 32.8% | KC 35.6% | Tie 31.6%",
-          "reason": "TEX 32.8% | KC 35.6% | Tie 31.6%",
+          "score": "TEX 37.1% | KC 35.7% | Tie 27.2%",
+          "subtitle": "TEX 37.1% | KC 35.7% | Tie 27.2%",
+          "reason": "TEX 37.1% | KC 35.7% | Tie 27.2%",
           "projection": {
-            "total": 32.8,
-            "homeMargin": 35.6
+            "total": 37.1,
+            "homeMargin": 35.7
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 32.8,
-              "reason": "TEX 32.8% | KC 35.6% | Tie 31.6%"
+              "line": 37.1,
+              "reason": "TEX 37.1% | KC 35.7% | Tie 27.2%"
             },
             "spread": {},
             "moneyline": {}
@@ -1906,18 +694,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "TEX 38.7% | KC 43.2% | Tie 18.1%",
-          "subtitle": "TEX 38.7% | KC 43.2% | Tie 18.1%",
-          "reason": "TEX 38.7% | KC 43.2% | Tie 18.1%",
+          "score": "TEX 41.6% | KC 41.2% | Tie 17.2%",
+          "subtitle": "TEX 41.6% | KC 41.2% | Tie 17.2%",
+          "reason": "TEX 41.6% | KC 41.2% | Tie 17.2%",
           "projection": {
-            "total": 38.7,
-            "homeMargin": 43.2
+            "total": 41.6,
+            "homeMargin": 41.2
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 38.7,
-              "reason": "TEX 38.7% | KC 43.2% | Tie 18.1%"
+              "line": 41.6,
+              "reason": "TEX 41.6% | KC 41.2% | Tie 17.2%"
             },
             "spread": {},
             "moneyline": {}
@@ -1928,18 +716,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "TEX 52.4% | KC 47.6% | Tie 0.0%",
-          "subtitle": "TEX 52.4% | KC 47.6% | Tie 0.0%",
-          "reason": "TEX 52.4% | KC 47.6% | Tie 0.0%",
+          "score": "TEX 55.4% | KC 44.6% | Tie 0.0%",
+          "subtitle": "TEX 55.4% | KC 44.6% | Tie 0.0%",
+          "reason": "TEX 55.4% | KC 44.6% | Tie 0.0%",
           "projection": {
-            "total": 52.4,
-            "homeMargin": 47.6
+            "total": 55.4,
+            "homeMargin": 44.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 52.4,
-              "reason": "TEX 52.4% | KC 47.6% | Tie 0.0%"
+              "line": 55.4,
+              "reason": "TEX 55.4% | KC 44.6% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -2142,8 +930,8 @@
         },
         {
           "label": "Hitter props",
-          "title": "Salvador Perez Under 1.5 Batter Total Bases",
-          "sub": "-148"
+          "title": "Nicky Lopez Over 0.5 Batter Hits",
+          "sub": "-136"
         }
       ],
       "probable": {
@@ -2160,7 +948,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.252
+              "hitProb": 0.264
             },
             {
               "label": "H up to 6",
@@ -2171,7 +959,18 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.24
+              "hitProb": 0.243
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.309
             }
           ],
           "pregameLadderBadges": [
@@ -2184,7 +983,7 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.252
+              "hitProb": 0.264
             },
             {
               "label": "H up to 6",
@@ -2195,7 +994,46 @@
               ],
               "tone": "soft",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.24
+              "hitProb": 0.243
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.309
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "strong",
+              "detail": "Live projection 4.2. Current 2.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.789,
+              "source": "live",
+              "actual": 2.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.6. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.595,
+              "source": "live",
+              "actual": 1.0
             }
           ]
         },
@@ -2212,7 +1050,30 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.279
+              "hitProb": 0.277
+            },
+            {
+              "label": "H up to 7",
+              "stat": "hits_allowed",
+              "target": 7,
+              "targets": [
+                6,
+                7
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6/7 Last supported rung: 7",
+              "hitProb": 0.243
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.247
             }
           ],
           "pregameLadderBadges": [
@@ -2225,7 +1086,59 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.279
+              "hitProb": 0.277
+            },
+            {
+              "label": "H up to 7",
+              "stat": "hits_allowed",
+              "target": 7,
+              "targets": [
+                6,
+                7
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6/7 Last supported rung: 7",
+              "hitProb": 0.243
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.247
+            }
+          ],
+          "miniLadderBadges": [
+            {
+              "label": "H up to 7",
+              "stat": "hits_allowed",
+              "target": 7,
+              "targets": [
+                6,
+                7
+              ],
+              "tone": "strong",
+              "detail": "Live projection 6.2. Current 5.0. Starter still active in live game state. Supported ladders: 6/7 Last supported rung: 7",
+              "hitProb": 0.494,
+              "source": "live",
+              "actual": 5.0
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "strong",
+              "detail": "Live projection 1.5. Current 1.0. Starter still active in live game state. Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.512,
+              "source": "live",
+              "actual": 1.0
             }
           ]
         }
@@ -2668,6 +1581,1195 @@
       }
     },
     {
+      "gamePk": 824346,
+      "status": {
+        "abstract": "Live",
+        "detailed": "In Progress"
+      },
+      "startTime": "2:10 PM",
+      "matchup": {
+        "away": {
+          "abbr": "CHC",
+          "id": 112,
+          "logo": "https://www.mlbstatic.com/team-logos/112.svg",
+          "name": "Chicago Cubs"
+        },
+        "home": {
+          "abbr": "COL",
+          "id": 115,
+          "logo": "https://www.mlbstatic.com/team-logos/115.svg",
+          "name": "Colorado Rockies"
+        },
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Edward Cabrera vs Ryan Feltner | 1 official pick(s) | +3 playable"
+      },
+      "predictions": {
+        "first1": {
+          "away_runs_mean": 0.442,
+          "home_runs_mean": 0.54,
+          "away_win_prob": 0.199,
+          "home_win_prob": 0.225,
+          "tie_prob": 0.576
+        },
+        "first3": {
+          "away_runs_mean": 1.248,
+          "home_runs_mean": 1.567,
+          "away_win_prob": 0.315,
+          "home_win_prob": 0.419,
+          "tie_prob": 0.266
+        },
+        "first5": {
+          "away_runs_mean": 2.139,
+          "home_runs_mean": 2.702,
+          "away_win_prob": 0.355,
+          "home_win_prob": 0.496,
+          "tie_prob": 0.149
+        },
+        "full": {
+          "away_runs_mean": 4.349,
+          "home_runs_mean": 4.62,
+          "away_win_prob": 0.447,
+          "home_win_prob": 0.553,
+          "tie_prob": 0.0
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 824346,
+            "away": "Chicago Cubs",
+            "home": "Colorado Rockies",
+            "away_abbr": "CHC",
+            "home_abbr": "COL",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 663538,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 663372,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Ryan Feltner",
+            "opponent": "COL",
+            "opponent_team_id": 115,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.0606829573934837,
+            "batter_bb_rate": 0.09578634085213032,
+            "batter_hr_rate": 0.011184210526315788,
+            "batter_inplay_hit_rate": 0.24562142857142855,
+            "batter_xb_hit_share": 0.22727272727272727,
+            "pitcher_k_rate": 0.17433419521654817,
+            "pitcher_bb_rate": 0.07672915319974144,
+            "pitcher_hr_rate": 0.038994828700711054,
+            "pitcher_inplay_hit_rate": 0.2819196428571428,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 82.0,
+            "pitcher_platoon_k_mult": 0.8211600140899905,
+            "pitcher_platoon_bb_mult": 1.0824768323504634,
+            "pitcher_platoon_hr_mult": 1.072254455035226,
+            "pitcher_platoon_inplay_mult": 1.1003035101609924,
+            "batter_platoon_k_mult": 0.9489082710897871,
+            "batter_platoon_bb_mult": 1.0821408478174441,
+            "batter_platoon_hr_mult": 0.901160280626012,
+            "batter_platoon_inplay_mult": 0.9628935792124899,
+            "opponent_primary_pitch_type": "SL",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 19,
+            "venue_name": "Coors Field",
+            "roof_type": "Open",
+            "park_hr_mult": 0.9986666666666666,
+            "park_inplay_hit_mult": 1.0005333333333333,
+            "park_xb_share_mult": 1.0006666666666666,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Nico Hoerner",
+            "team": "CHC",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "under",
+            "edge": 0.11401350048216008,
+            "market_line": 1.5,
+            "model_prob_over": 0.389,
+            "market_prob_over": 0.5030135004821601,
+            "market_prob_under": 0.4969864995178399,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5030135004821601,
+            "selected_side_market_prob": 0.4969864995178399,
+            "selected_side_model_prob": 0.611,
+            "mean_support": 0.008999999999999897,
+            "tb_mean": 1.491,
+            "pa_mean": 4.991,
+            "ab_mean": 4.388,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "-114",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
+              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Nico Hoerner",
+              "supporting_reasons": [
+                "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances."
+            ],
+            "reason_summary": "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances.",
+            "rank": 2,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-11",
+            "game_pk": 824346,
+            "away": "Chicago Cubs",
+            "home": "Colorado Rockies",
+            "away_abbr": "CHC",
+            "home_abbr": "COL",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 650489,
+            "batter_hand": "S",
+            "opponent_pitcher_id": 665795,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Edward Cabrera",
+            "opponent": "CHC",
+            "opponent_team_id": 112,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.25059541754597525,
+            "batter_bb_rate": 0.08359210129635213,
+            "batter_hr_rate": 0.014335242689176965,
+            "batter_inplay_hit_rate": 0.35425531914893615,
+            "batter_xb_hit_share": 0.21568627450980393,
+            "pitcher_k_rate": 0.21871678896761132,
+            "pitcher_bb_rate": 0.08398595647773278,
+            "pitcher_hr_rate": 0.048401126012145745,
+            "pitcher_inplay_hit_rate": 0.3652465918203689,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 89.0,
+            "pitcher_platoon_k_mult": 1.1824274259577023,
+            "pitcher_platoon_bb_mult": 0.9586379722694198,
+            "pitcher_platoon_hr_mult": 1.2222679998667647,
+            "pitcher_platoon_inplay_mult": 1.0291661476816676,
+            "batter_platoon_k_mult": 1.0645363770338958,
+            "batter_platoon_bb_mult": 1.1518206954587804,
+            "batter_platoon_hr_mult": 1.2173396424815983,
+            "batter_platoon_inplay_mult": 0.9330163496830164,
+            "opponent_primary_pitch_type": "CH",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 19,
+            "venue_name": "Coors Field",
+            "roof_type": "Open",
+            "park_hr_mult": 0.9986666666666666,
+            "park_inplay_hit_mult": 1.0005333333333333,
+            "park_xb_share_mult": 1.0006666666666666,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Willi Castro",
+            "team": "COL",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "over",
+            "edge": 0.011532194332593226,
+            "market_line": 1.5,
+            "model_prob_over": 0.465,
+            "market_prob_over": 0.4534678056674068,
+            "market_prob_under": 0.5465321943325933,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4534678056674068,
+            "selected_side_market_prob": 0.4534678056674068,
+            "selected_side_model_prob": 0.465,
+            "mean_support": 0.236,
+            "tb_mean": 1.736,
+            "pa_mean": 4.829,
+            "ab_mean": 4.228,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "+106",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
+              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "strong",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 3,
+              "reason_sentences_n": 6,
+              "market": "hitter_total_bases",
+              "subject": "Willi Castro",
+              "supporting_reasons": [
+                "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
+            "rank": 4,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-11",
+            "game_pk": 824346,
+            "away": "Chicago Cubs",
+            "home": "Colorado Rockies",
+            "away_abbr": "CHC",
+            "home_abbr": "COL",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 687859,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 665795,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Edward Cabrera",
+            "opponent": "CHC",
+            "opponent_team_id": 112,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.18074724377296855,
+            "batter_bb_rate": 0.07181502654144549,
+            "batter_hr_rate": 0.007172995780590717,
+            "batter_inplay_hit_rate": 0.3603967168262654,
+            "batter_xb_hit_share": 0.2878787878787879,
+            "pitcher_k_rate": 0.21871678896761132,
+            "pitcher_bb_rate": 0.08398595647773278,
+            "pitcher_hr_rate": 0.048401126012145745,
+            "pitcher_inplay_hit_rate": 0.3652465918203689,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 89.0,
+            "pitcher_platoon_k_mult": 0.8516482805772677,
+            "pitcher_platoon_bb_mult": 1.0412033375596816,
+            "pitcher_platoon_hr_mult": 0.78,
+            "pitcher_platoon_inplay_mult": 0.9566350600280755,
+            "batter_platoon_k_mult": 1.0746000463714354,
+            "batter_platoon_bb_mult": 1.0949317323158643,
+            "batter_platoon_hr_mult": 1.2571207430340559,
+            "batter_platoon_inplay_mult": 1.1040411571726811,
+            "opponent_primary_pitch_type": "CH",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 19,
+            "venue_name": "Coors Field",
+            "roof_type": "Open",
+            "park_hr_mult": 0.9986666666666666,
+            "park_inplay_hit_mult": 1.0005333333333333,
+            "park_xb_share_mult": 1.0006666666666666,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Troy Johnston",
+            "team": "COL",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "over",
+            "edge": 0.027458935129526907,
+            "market_line": 1.5,
+            "model_prob_over": 0.454,
+            "market_prob_over": 0.4265410648704731,
+            "market_prob_under": 0.5734589351295268,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4265410648704731,
+            "selected_side_market_prob": 0.4265410648704731,
+            "selected_side_model_prob": 0.454,
+            "mean_support": 0.16100000000000003,
+            "tb_mean": 1.661,
+            "pa_mean": 4.486,
+            "ab_mean": 4.007,
+            "lineup_order": 5,
+            "market_alternates": [],
+            "odds": "+119",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Troy Johnston",
+              "supporting_reasons": [
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances.",
+            "rank": 5,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      },
+      "gameLens": [
+        {
+          "key": "first1",
+          "label": "F1",
+          "closed": false,
+          "badge": "No bet",
+          "score": "CHC 0 - COL 0",
+          "subtitle": "CHC 0.47 - COL 0.54 | Total 1.01",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 1.01,
+            "homeMargin": 0.07
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 1.01,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.07,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "F3",
+          "closed": false,
+          "badge": "No bet",
+          "score": "CHC 0 - COL 0",
+          "subtitle": "CHC 1.31 - COL 1.46 | Total 2.77",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 2.77,
+            "homeMargin": 0.15
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 2.77,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.15,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "F5",
+          "closed": false,
+          "badge": "No bet",
+          "score": "CHC 0 - COL 0",
+          "subtitle": "CHC 2.17 - COL 2.5 | Total 4.66",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 4.66,
+            "homeMargin": 0.33
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 4.66,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": 0.33,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "Full game",
+          "closed": false,
+          "badge": "No bet",
+          "score": "CHC 0 - COL 0",
+          "subtitle": "CHC 4.49 - COL 4.41 | Total 8.9",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 8.9,
+            "homeMargin": -0.08
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 8.9,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.08,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first1",
+          "label": "First 1",
+          "closed": false,
+          "badge": "",
+          "score": "CHC 20.2% | COL 21.4% | Tie 58.4%",
+          "subtitle": "CHC 20.2% | COL 21.4% | Tie 58.4%",
+          "reason": "CHC 20.2% | COL 21.4% | Tie 58.4%",
+          "projection": {
+            "total": 20.2,
+            "homeMargin": 21.4
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 20.2,
+              "reason": "CHC 20.2% | COL 21.4% | Tie 58.4%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first3",
+          "label": "First 3",
+          "closed": false,
+          "badge": "",
+          "score": "CHC 34.9% | COL 37.4% | Tie 27.7%",
+          "subtitle": "CHC 34.9% | COL 37.4% | Tie 27.7%",
+          "reason": "CHC 34.9% | COL 37.4% | Tie 27.7%",
+          "projection": {
+            "total": 34.9,
+            "homeMargin": 37.4
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 34.9,
+              "reason": "CHC 34.9% | COL 37.4% | Tie 27.7%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first5",
+          "label": "First 5",
+          "closed": false,
+          "badge": "",
+          "score": "CHC 38.4% | COL 43.8% | Tie 17.8%",
+          "subtitle": "CHC 38.4% | COL 43.8% | Tie 17.8%",
+          "reason": "CHC 38.4% | COL 43.8% | Tie 17.8%",
+          "projection": {
+            "total": 38.4,
+            "homeMargin": 43.8
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 38.4,
+              "reason": "CHC 38.4% | COL 43.8% | Tie 17.8%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "full",
+          "label": "Full game",
+          "closed": false,
+          "badge": "",
+          "score": "CHC 48.6% | COL 51.4% | Tie 0.0%",
+          "subtitle": "CHC 48.6% | COL 51.4% | Tie 0.0%",
+          "reason": "CHC 48.6% | COL 51.4% | Tie 0.0%",
+          "projection": {
+            "total": 48.6,
+            "homeMargin": 51.4
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 48.6,
+              "reason": "CHC 48.6% | COL 51.4% | Tie 0.0%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        }
+      ],
+      "props": [
+        {
+          "playerName": "Nico Hoerner",
+          "selection": "Under",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "-114",
+          "modelProbOver": 0.389,
+          "estimatedWinProb": 0.389,
+          "rankingScore": 0.11401350048216008
+        },
+        {
+          "playerName": "Troy Johnston",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+119",
+          "modelProbOver": 0.454,
+          "estimatedWinProb": 0.454,
+          "rankingScore": 0.027458935129526907
+        },
+        {
+          "playerName": "Willi Castro",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+106",
+          "modelProbOver": 0.465,
+          "estimatedWinProb": 0.465,
+          "rankingScore": 0.011532194332593226
+        }
+      ],
+      "liveProps": [
+        {
+          "playerName": "Nico Hoerner",
+          "selection": "Under",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "-114",
+          "modelProbOver": 0.389,
+          "estimatedWinProb": 0.389,
+          "rankingScore": 0.11401350048216008
+        },
+        {
+          "playerName": "Troy Johnston",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+119",
+          "modelProbOver": 0.454,
+          "estimatedWinProb": 0.454,
+          "rankingScore": 0.027458935129526907
+        },
+        {
+          "playerName": "Willi Castro",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+106",
+          "modelProbOver": 0.465,
+          "estimatedWinProb": 0.465,
+          "rankingScore": 0.011532194332593226
+        }
+      ],
+      "archivedLiveProps": [],
+      "trackedProps": [
+        {
+          "playerName": "Nico Hoerner",
+          "selection": "Under",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "-114",
+          "modelProbOver": 0.389,
+          "estimatedWinProb": 0.389,
+          "rankingScore": 0.11401350048216008
+        },
+        {
+          "playerName": "Troy Johnston",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+119",
+          "modelProbOver": 0.454,
+          "estimatedWinProb": 0.454,
+          "rankingScore": 0.027458935129526907
+        },
+        {
+          "playerName": "Willi Castro",
+          "selection": "Over",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "+106",
+          "modelProbOver": 0.465,
+          "estimatedWinProb": 0.465,
+          "rankingScore": 0.011532194332593226
+        }
+      ],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "score": {
+        "away": 0,
+        "home": 0
+      },
+      "market_tiles": [
+        {
+          "label": "Game total",
+          "title": "No total play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Moneyline",
+          "title": "No ML play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Pitcher props",
+          "title": "No locked pitcher prop",
+          "sub": "Off card"
+        },
+        {
+          "label": "Hitter props",
+          "title": "Dansby Swanson Under 0.5 Batter Runs Scored",
+          "sub": "-135"
+        }
+      ],
+      "probable": {
+        "away": {
+          "id": null,
+          "fullName": "Edward Cabrera",
+          "ladderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.248
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.278
+            },
+            {
+              "label": "BB up to 3",
+              "stat": "walks_allowed",
+              "target": 3,
+              "targets": [
+                2,
+                3
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3",
+              "hitProb": 0.262
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 5",
+              "stat": "strikeouts",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.248
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.278
+            },
+            {
+              "label": "BB up to 3",
+              "stat": "walks_allowed",
+              "target": 3,
+              "targets": [
+                2,
+                3
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3",
+              "hitProb": 0.262
+            }
+          ]
+        },
+        "home": {
+          "id": null,
+          "fullName": "Ryan Feltner",
+          "ladderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.322
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.225
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.22
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 4/5/6 Last supported rung: 6 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.322
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.225
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.22
+            }
+          ]
+        }
+      },
+      "markets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [],
+        "extraPitcherProps": [],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 824346,
+            "away": "Chicago Cubs",
+            "home": "Colorado Rockies",
+            "away_abbr": "CHC",
+            "home_abbr": "COL",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 663538,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 663372,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Ryan Feltner",
+            "opponent": "COL",
+            "opponent_team_id": 115,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.0606829573934837,
+            "batter_bb_rate": 0.09578634085213032,
+            "batter_hr_rate": 0.011184210526315788,
+            "batter_inplay_hit_rate": 0.24562142857142855,
+            "batter_xb_hit_share": 0.22727272727272727,
+            "pitcher_k_rate": 0.17433419521654817,
+            "pitcher_bb_rate": 0.07672915319974144,
+            "pitcher_hr_rate": 0.038994828700711054,
+            "pitcher_inplay_hit_rate": 0.2819196428571428,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 82.0,
+            "pitcher_platoon_k_mult": 0.8211600140899905,
+            "pitcher_platoon_bb_mult": 1.0824768323504634,
+            "pitcher_platoon_hr_mult": 1.072254455035226,
+            "pitcher_platoon_inplay_mult": 1.1003035101609924,
+            "batter_platoon_k_mult": 0.9489082710897871,
+            "batter_platoon_bb_mult": 1.0821408478174441,
+            "batter_platoon_hr_mult": 0.901160280626012,
+            "batter_platoon_inplay_mult": 0.9628935792124899,
+            "opponent_primary_pitch_type": "SL",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 19,
+            "venue_name": "Coors Field",
+            "roof_type": "Open",
+            "park_hr_mult": 0.9986666666666666,
+            "park_inplay_hit_mult": 1.0005333333333333,
+            "park_xb_share_mult": 1.0006666666666666,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Nico Hoerner",
+            "team": "CHC",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "under",
+            "edge": 0.11401350048216008,
+            "market_line": 1.5,
+            "model_prob_over": 0.389,
+            "market_prob_over": 0.5030135004821601,
+            "market_prob_under": 0.4969864995178399,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.5030135004821601,
+            "selected_side_market_prob": 0.4969864995178399,
+            "selected_side_model_prob": 0.611,
+            "mean_support": 0.008999999999999897,
+            "tb_mean": 1.491,
+            "pa_mean": 4.991,
+            "ab_mean": 4.388,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "-114",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
+              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Nico Hoerner",
+              "supporting_reasons": [
+                "Against COL, he has been held to one total base or fewer in 5 of 7 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances."
+            ],
+            "reason_summary": "The model lands on the under side in 61.1% of sims, while the market is pricing it closer to 49.7%. Against COL, he has been held to one total base or fewer in 5 of 7 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.5 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 5.0 plate appearances.",
+            "rank": 2,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-11",
+            "game_pk": 824346,
+            "away": "Chicago Cubs",
+            "home": "Colorado Rockies",
+            "away_abbr": "CHC",
+            "home_abbr": "COL",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 650489,
+            "batter_hand": "S",
+            "opponent_pitcher_id": 665795,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Edward Cabrera",
+            "opponent": "CHC",
+            "opponent_team_id": 112,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.25059541754597525,
+            "batter_bb_rate": 0.08359210129635213,
+            "batter_hr_rate": 0.014335242689176965,
+            "batter_inplay_hit_rate": 0.35425531914893615,
+            "batter_xb_hit_share": 0.21568627450980393,
+            "pitcher_k_rate": 0.21871678896761132,
+            "pitcher_bb_rate": 0.08398595647773278,
+            "pitcher_hr_rate": 0.048401126012145745,
+            "pitcher_inplay_hit_rate": 0.3652465918203689,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 89.0,
+            "pitcher_platoon_k_mult": 1.1824274259577023,
+            "pitcher_platoon_bb_mult": 0.9586379722694198,
+            "pitcher_platoon_hr_mult": 1.2222679998667647,
+            "pitcher_platoon_inplay_mult": 1.0291661476816676,
+            "batter_platoon_k_mult": 1.0645363770338958,
+            "batter_platoon_bb_mult": 1.1518206954587804,
+            "batter_platoon_hr_mult": 1.2173396424815983,
+            "batter_platoon_inplay_mult": 0.9330163496830164,
+            "opponent_primary_pitch_type": "CH",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 19,
+            "venue_name": "Coors Field",
+            "roof_type": "Open",
+            "park_hr_mult": 0.9986666666666666,
+            "park_inplay_hit_mult": 1.0005333333333333,
+            "park_xb_share_mult": 1.0006666666666666,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Willi Castro",
+            "team": "COL",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "over",
+            "edge": 0.011532194332593226,
+            "market_line": 1.5,
+            "model_prob_over": 0.465,
+            "market_prob_over": 0.4534678056674068,
+            "market_prob_under": 0.5465321943325933,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4534678056674068,
+            "selected_side_market_prob": 0.4534678056674068,
+            "selected_side_model_prob": 0.465,
+            "mean_support": 0.236,
+            "tb_mean": 1.736,
+            "pa_mean": 4.829,
+            "ab_mean": 4.228,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "+106",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
+              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "strong",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 3,
+              "reason_sentences_n": 6,
+              "market": "hitter_total_bases",
+              "subject": "Willi Castro",
+              "supporting_reasons": [
+                "Against CHC, he has cleared 1.5 total bases in 3 of 5 games.",
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 46.5% of sims, while the market is pricing it closer to 45.3%. Against CHC, he has cleared 1.5 total bases in 3 of 5 games. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.8 plate appearances.",
+            "rank": 4,
+            "recommendation_tier": "candidate"
+          },
+          {
+            "date": "2026-06-11",
+            "game_pk": 824346,
+            "away": "Chicago Cubs",
+            "home": "Colorado Rockies",
+            "away_abbr": "CHC",
+            "home_abbr": "COL",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 687859,
+            "batter_hand": "L",
+            "opponent_pitcher_id": 665795,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Edward Cabrera",
+            "opponent": "CHC",
+            "opponent_team_id": 112,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.18074724377296855,
+            "batter_bb_rate": 0.07181502654144549,
+            "batter_hr_rate": 0.007172995780590717,
+            "batter_inplay_hit_rate": 0.3603967168262654,
+            "batter_xb_hit_share": 0.2878787878787879,
+            "pitcher_k_rate": 0.21871678896761132,
+            "pitcher_bb_rate": 0.08398595647773278,
+            "pitcher_hr_rate": 0.048401126012145745,
+            "pitcher_inplay_hit_rate": 0.3652465918203689,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 89.0,
+            "pitcher_platoon_k_mult": 0.8516482805772677,
+            "pitcher_platoon_bb_mult": 1.0412033375596816,
+            "pitcher_platoon_hr_mult": 0.78,
+            "pitcher_platoon_inplay_mult": 0.9566350600280755,
+            "batter_platoon_k_mult": 1.0746000463714354,
+            "batter_platoon_bb_mult": 1.0949317323158643,
+            "batter_platoon_hr_mult": 1.2571207430340559,
+            "batter_platoon_inplay_mult": 1.1040411571726811,
+            "opponent_primary_pitch_type": "CH",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 19,
+            "venue_name": "Coors Field",
+            "roof_type": "Open",
+            "park_hr_mult": 0.9986666666666666,
+            "park_inplay_hit_mult": 1.0005333333333333,
+            "park_xb_share_mult": 1.0006666666666666,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Troy Johnston",
+            "team": "COL",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "over",
+            "edge": 0.027458935129526907,
+            "market_line": 1.5,
+            "model_prob_over": 0.454,
+            "market_prob_over": 0.4265410648704731,
+            "market_prob_under": 0.5734589351295268,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.4265410648704731,
+            "selected_side_market_prob": 0.4265410648704731,
+            "selected_side_model_prob": 0.454,
+            "mean_support": 0.16100000000000003,
+            "tb_mean": 1.661,
+            "pa_mean": 4.486,
+            "ab_mean": 4.007,
+            "lineup_order": 5,
+            "market_alternates": [],
+            "odds": "+119",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+              "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Troy Johnston",
+              "supporting_reasons": [
+                "Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games.",
+                "The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances."
+            ],
+            "reason_summary": "The model lands on the over side in 45.4% of sims, while the market is pricing it closer to 42.7%. Over his last 10 games, he has cleared 1.5 total bases in 6 of 10 games. The handedness matchup leans his way here, with his expected damage against R-handed pitching grading above baseline. The model baseline comes in around 1.7 batter total bases against a line of 1.5. He is projected to hit in the 5 spot, which points to about 4.5 plate appearances.",
+            "rank": 5,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      }
+    },
+    {
       "gamePk": 823371,
       "status": {
         "abstract": "Preview",
@@ -2691,7 +2793,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Justin Wrobleski vs Mitch Keller | 2 official pick(s) | +3 playable"
+        "liveText": "Justin Wrobleski vs Mitch Keller | 3 official pick(s) | +5 playable"
       },
       "predictions": {
         "first1": {
@@ -3126,11 +3228,11 @@
           "closed": false,
           "badge": "No bet",
           "score": "LAD 0 - PIT 0",
-          "subtitle": "LAD 0.49 - PIT 0.39 | Total 0.89",
+          "subtitle": "LAD 0.47 - PIT 0.41 | Total 0.89",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
             "total": 0.89,
-            "homeMargin": -0.1
+            "homeMargin": -0.06
           },
           "markets": {
             "total": {
@@ -3140,7 +3242,7 @@
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.1,
+              "homeLine": -0.06,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -3155,21 +3257,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "LAD 0 - PIT 0",
-          "subtitle": "LAD 1.39 - PIT 1.09 | Total 2.48",
+          "subtitle": "LAD 1.41 - PIT 1.19 | Total 2.6",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 2.48,
-            "homeMargin": -0.3
+            "total": 2.6,
+            "homeMargin": -0.22
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 2.48,
+              "line": 2.6,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.3,
+              "homeLine": -0.22,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -3184,21 +3286,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "LAD 0 - PIT 0",
-          "subtitle": "LAD 2.34 - PIT 1.89 | Total 4.22",
+          "subtitle": "LAD 2.46 - PIT 1.91 | Total 4.37",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 4.22,
-            "homeMargin": -0.45
+            "total": 4.37,
+            "homeMargin": -0.56
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 4.22,
+              "line": 4.37,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.45,
+              "homeLine": -0.56,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -3213,21 +3315,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "LAD 0 - PIT 0",
-          "subtitle": "LAD 4.35 - PIT 3.33 | Total 7.67",
+          "subtitle": "LAD 4.61 - PIT 3.5 | Total 8.11",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 7.67,
-            "homeMargin": -1.02
+            "total": 8.11,
+            "homeMargin": -1.1
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 7.67,
+              "line": 8.11,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -1.02,
+              "homeLine": -1.1,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -3241,18 +3343,18 @@
           "label": "First 1",
           "closed": false,
           "badge": "",
-          "score": "LAD 21.9% | PIT 16.9% | Tie 61.2%",
-          "subtitle": "LAD 21.9% | PIT 16.9% | Tie 61.2%",
-          "reason": "LAD 21.9% | PIT 16.9% | Tie 61.2%",
+          "score": "LAD 22.7% | PIT 17.2% | Tie 60.1%",
+          "subtitle": "LAD 22.7% | PIT 17.2% | Tie 60.1%",
+          "reason": "LAD 22.7% | PIT 17.2% | Tie 60.1%",
           "projection": {
-            "total": 21.9,
-            "homeMargin": 16.9
+            "total": 22.7,
+            "homeMargin": 17.2
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 21.9,
-              "reason": "LAD 21.9% | PIT 16.9% | Tie 61.2%"
+              "line": 22.7,
+              "reason": "LAD 22.7% | PIT 17.2% | Tie 60.1%"
             },
             "spread": {},
             "moneyline": {}
@@ -3263,18 +3365,18 @@
           "label": "First 3",
           "closed": false,
           "badge": "",
-          "score": "LAD 41.8% | PIT 32.6% | Tie 25.6%",
-          "subtitle": "LAD 41.8% | PIT 32.6% | Tie 25.6%",
-          "reason": "LAD 41.8% | PIT 32.6% | Tie 25.6%",
+          "score": "LAD 38.4% | PIT 33.7% | Tie 27.9%",
+          "subtitle": "LAD 38.4% | PIT 33.7% | Tie 27.9%",
+          "reason": "LAD 38.4% | PIT 33.7% | Tie 27.9%",
           "projection": {
-            "total": 41.8,
-            "homeMargin": 32.6
+            "total": 38.4,
+            "homeMargin": 33.7
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 41.8,
-              "reason": "LAD 41.8% | PIT 32.6% | Tie 25.6%"
+              "line": 38.4,
+              "reason": "LAD 38.4% | PIT 33.7% | Tie 27.9%"
             },
             "spread": {},
             "moneyline": {}
@@ -3285,18 +3387,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "LAD 46.1% | PIT 36.6% | Tie 17.3%",
-          "subtitle": "LAD 46.1% | PIT 36.6% | Tie 17.3%",
-          "reason": "LAD 46.1% | PIT 36.6% | Tie 17.3%",
+          "score": "LAD 50.2% | PIT 33.9% | Tie 15.9%",
+          "subtitle": "LAD 50.2% | PIT 33.9% | Tie 15.9%",
+          "reason": "LAD 50.2% | PIT 33.9% | Tie 15.9%",
           "projection": {
-            "total": 46.1,
-            "homeMargin": 36.6
+            "total": 50.2,
+            "homeMargin": 33.9
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 46.1,
-              "reason": "LAD 46.1% | PIT 36.6% | Tie 17.3%"
+              "line": 50.2,
+              "reason": "LAD 50.2% | PIT 33.9% | Tie 15.9%"
             },
             "spread": {},
             "moneyline": {}
@@ -3307,18 +3409,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "LAD 59.2% | PIT 40.8% | Tie 0.0%",
-          "subtitle": "LAD 59.2% | PIT 40.8% | Tie 0.0%",
-          "reason": "LAD 59.2% | PIT 40.8% | Tie 0.0%",
+          "score": "LAD 60.9% | PIT 39.1% | Tie 0.0%",
+          "subtitle": "LAD 60.9% | PIT 39.1% | Tie 0.0%",
+          "reason": "LAD 60.9% | PIT 39.1% | Tie 0.0%",
           "projection": {
-            "total": 59.2,
-            "homeMargin": 40.8
+            "total": 60.9,
+            "homeMargin": 39.1
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 59.2,
-              "reason": "LAD 59.2% | PIT 40.8% | Tie 0.0%"
+              "line": 60.9,
+              "reason": "LAD 60.9% | PIT 39.1% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -3517,12 +3619,12 @@
         {
           "label": "Pitcher props",
           "title": "Mitch Keller Over 15.5 Outs",
-          "sub": "-106"
+          "sub": "-112"
         },
         {
           "label": "Hitter props",
-          "title": "Nick Gonzales Under 1.5 Batter Total Bases",
-          "sub": "-144"
+          "title": "Mookie Betts Under 1.5 Batter Total Bases",
+          "sub": "-137"
         }
       ],
       "probable": {
@@ -3539,29 +3641,40 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.313
+              "hitProb": 0.31
             },
             {
-              "label": "H up to 7",
+              "label": "H up to 6",
               "stat": "hits_allowed",
-              "target": 7,
+              "target": 6,
               "targets": [
-                7
+                6
               ],
               "tone": "soft",
-              "detail": "Supported ladders: 7/8/9 Last supported rung: 9 Supported ladders: 7 Last supported rung: 7",
-              "hitProb": 0.221
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.224
             },
             {
-              "label": "O 19+",
-              "stat": "outs",
-              "target": 19,
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
               "targets": [
-                19
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.33
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
               ],
               "tone": "strong",
-              "detail": "Justin Wrobleski Over 18.5 Outs | Odds +126 | Edge 34.2%",
-              "hitProb": 0.756
+              "detail": "Justin Wrobleski Over 17.5 Outs | Odds -132 | Edge 32.4%",
+              "hitProb": 0.856
             }
           ],
           "pregameLadderBadges": [
@@ -3574,29 +3687,40 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.313
+              "hitProb": 0.31
             },
             {
-              "label": "H up to 7",
+              "label": "H up to 6",
               "stat": "hits_allowed",
-              "target": 7,
+              "target": 6,
               "targets": [
-                7
+                6
               ],
               "tone": "soft",
-              "detail": "Supported ladders: 7/8/9 Last supported rung: 9 Supported ladders: 7 Last supported rung: 7",
-              "hitProb": 0.221
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.224
             },
             {
-              "label": "O 19+",
-              "stat": "outs",
-              "target": 19,
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
               "targets": [
-                19
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.33
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
               ],
               "tone": "strong",
-              "detail": "Justin Wrobleski Over 18.5 Outs | Odds +126 | Edge 34.2%",
-              "hitProb": 0.756
+              "detail": "Justin Wrobleski Over 17.5 Outs | Odds -132 | Edge 32.4%",
+              "hitProb": 0.856
             }
           ]
         },
@@ -3611,9 +3735,31 @@
               "targets": [
                 5
               ],
-              "tone": "solid",
+              "tone": "soft",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.259
+              "hitProb": 0.229
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.287
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.295
             },
             {
               "label": "O 16+",
@@ -3623,8 +3769,8 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Mitch Keller Over 15.5 Outs | Odds -106 | Edge 43.4%",
-              "hitProb": 0.915
+              "detail": "Mitch Keller Over 15.5 Outs | Odds -112 | Edge 40.0%",
+              "hitProb": 0.894
             }
           ],
           "pregameLadderBadges": [
@@ -3635,9 +3781,31 @@
               "targets": [
                 5
               ],
-              "tone": "solid",
+              "tone": "soft",
               "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.259
+              "hitProb": 0.229
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.287
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.295
             },
             {
               "label": "O 16+",
@@ -3647,8 +3815,8 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Mitch Keller Over 15.5 Outs | Odds -106 | Edge 43.4%",
-              "hitProb": 0.915
+              "detail": "Mitch Keller Over 15.5 Outs | Odds -112 | Edge 40.0%",
+              "hitProb": 0.894
             }
           ]
         }
@@ -4074,7 +4242,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Bryan Woo vs Kyle Bradish | 1 official pick(s)"
+        "liveText": "Bryan Woo vs Kyle Bradish | 2 official pick(s) | +2 playable"
       },
       "predictions": {
         "first1": {
@@ -4225,21 +4393,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "SEA 0 - BAL 0",
-          "subtitle": "SEA 0.42 - BAL 0.37 | Total 0.79",
+          "subtitle": "SEA 0.44 - BAL 0.42 | Total 0.87",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 0.79,
-            "homeMargin": -0.04
+            "total": 0.87,
+            "homeMargin": -0.02
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 0.79,
+              "line": 0.87,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.04,
+              "homeLine": -0.02,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -4254,21 +4422,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "SEA 0 - BAL 0",
-          "subtitle": "SEA 1.21 - BAL 1.17 | Total 2.38",
+          "subtitle": "SEA 1.3 - BAL 1.28 | Total 2.57",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 2.38,
-            "homeMargin": -0.04
+            "total": 2.57,
+            "homeMargin": -0.02
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 2.38,
+              "line": 2.57,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.04,
+              "homeLine": -0.02,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -4283,21 +4451,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "SEA 0 - BAL 0",
-          "subtitle": "SEA 2.06 - BAL 2 | Total 4.06",
+          "subtitle": "SEA 2.29 - BAL 2.26 | Total 4.55",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 4.06,
-            "homeMargin": -0.06
+            "total": 4.55,
+            "homeMargin": -0.03
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 4.06,
+              "line": 4.55,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.06,
+              "homeLine": -0.03,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -4312,21 +4480,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "SEA 0 - BAL 0",
-          "subtitle": "SEA 3.84 - BAL 3.65 | Total 7.48",
+          "subtitle": "SEA 4.39 - BAL 3.88 | Total 8.28",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 7.48,
-            "homeMargin": -0.19
+            "total": 8.28,
+            "homeMargin": -0.51
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 7.48,
+              "line": 8.28,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.19,
+              "homeLine": -0.51,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -4340,18 +4508,18 @@
           "label": "First 1",
           "closed": false,
           "badge": "",
-          "score": "SEA 18.1% | BAL 16.4% | Tie 65.5%",
-          "subtitle": "SEA 18.1% | BAL 16.4% | Tie 65.5%",
-          "reason": "SEA 18.1% | BAL 16.4% | Tie 65.5%",
+          "score": "SEA 18.6% | BAL 18.5% | Tie 62.9%",
+          "subtitle": "SEA 18.6% | BAL 18.5% | Tie 62.9%",
+          "reason": "SEA 18.6% | BAL 18.5% | Tie 62.9%",
           "projection": {
-            "total": 18.1,
-            "homeMargin": 16.4
+            "total": 18.6,
+            "homeMargin": 18.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 18.1,
-              "reason": "SEA 18.1% | BAL 16.4% | Tie 65.5%"
+              "line": 18.6,
+              "reason": "SEA 18.6% | BAL 18.5% | Tie 62.9%"
             },
             "spread": {},
             "moneyline": {}
@@ -4362,18 +4530,18 @@
           "label": "First 3",
           "closed": false,
           "badge": "",
-          "score": "SEA 33.8% | BAL 34.1% | Tie 32.1%",
-          "subtitle": "SEA 33.8% | BAL 34.1% | Tie 32.1%",
-          "reason": "SEA 33.8% | BAL 34.1% | Tie 32.1%",
+          "score": "SEA 35.3% | BAL 36.3% | Tie 28.4%",
+          "subtitle": "SEA 35.3% | BAL 36.3% | Tie 28.4%",
+          "reason": "SEA 35.3% | BAL 36.3% | Tie 28.4%",
           "projection": {
-            "total": 33.8,
-            "homeMargin": 34.1
+            "total": 35.3,
+            "homeMargin": 36.3
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 33.8,
-              "reason": "SEA 33.8% | BAL 34.1% | Tie 32.1%"
+              "line": 35.3,
+              "reason": "SEA 35.3% | BAL 36.3% | Tie 28.4%"
             },
             "spread": {},
             "moneyline": {}
@@ -4384,18 +4552,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "SEA 40.8% | BAL 41.0% | Tie 18.2%",
-          "subtitle": "SEA 40.8% | BAL 41.0% | Tie 18.2%",
-          "reason": "SEA 40.8% | BAL 41.0% | Tie 18.2%",
+          "score": "SEA 41.7% | BAL 42.6% | Tie 15.7%",
+          "subtitle": "SEA 41.7% | BAL 42.6% | Tie 15.7%",
+          "reason": "SEA 41.7% | BAL 42.6% | Tie 15.7%",
           "projection": {
-            "total": 40.8,
-            "homeMargin": 41.0
+            "total": 41.7,
+            "homeMargin": 42.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 40.8,
-              "reason": "SEA 40.8% | BAL 41.0% | Tie 18.2%"
+              "line": 41.7,
+              "reason": "SEA 41.7% | BAL 42.6% | Tie 15.7%"
             },
             "spread": {},
             "moneyline": {}
@@ -4406,18 +4574,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "SEA 47.9% | BAL 52.1% | Tie 0.0%",
-          "subtitle": "SEA 47.9% | BAL 52.1% | Tie 0.0%",
-          "reason": "SEA 47.9% | BAL 52.1% | Tie 0.0%",
+          "score": "SEA 52.5% | BAL 47.5% | Tie 0.0%",
+          "subtitle": "SEA 52.5% | BAL 47.5% | Tie 0.0%",
+          "reason": "SEA 52.5% | BAL 47.5% | Tie 0.0%",
           "projection": {
-            "total": 47.9,
-            "homeMargin": 52.1
+            "total": 52.5,
+            "homeMargin": 47.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 47.9,
-              "reason": "SEA 47.9% | BAL 52.1% | Tie 0.0%"
+              "line": 52.5,
+              "reason": "SEA 52.5% | BAL 47.5% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -4483,13 +4651,13 @@
         },
         {
           "label": "Pitcher props",
-          "title": "No locked pitcher prop",
-          "sub": "Off card"
+          "title": "Kyle Bradish Over 17.5 Outs",
+          "sub": "Playable only | -102"
         },
         {
           "label": "Hitter props",
-          "title": "Julio Rodr\u00edguez Under 1.5 Batter Total Bases",
-          "sub": "-129"
+          "title": "Jhonny Pereda Over 0.5 Batter Total Bases",
+          "sub": "-143"
         }
       ],
       "probable": {
@@ -4498,15 +4666,15 @@
           "fullName": "Bryan Woo",
           "ladderBadges": [
             {
-              "label": "K up to 6",
+              "label": "K up to 7",
               "stat": "strikeouts",
-              "target": 6,
+              "target": 7,
               "targets": [
-                6
+                7
               ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.231
+              "tone": "solid",
+              "detail": "Supported ladders: 7 Last supported rung: 7",
+              "hitProb": 0.256
             },
             {
               "label": "H up to 6",
@@ -4515,22 +4683,33 @@
               "targets": [
                 6
               ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.229
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
               "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.314
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.275
             }
           ],
           "pregameLadderBadges": [
             {
-              "label": "K up to 6",
+              "label": "K up to 7",
               "stat": "strikeouts",
-              "target": 6,
+              "target": 7,
               "targets": [
-                6
+                7
               ],
-              "tone": "soft",
-              "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.231
+              "tone": "solid",
+              "detail": "Supported ladders: 7 Last supported rung: 7",
+              "hitProb": 0.256
             },
             {
               "label": "H up to 6",
@@ -4539,14 +4718,25 @@
               "targets": [
                 6
               ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.229
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
               "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.314
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.275
             }
           ]
         },
         "home": {
-          "id": null,
+          "id": 680694,
           "fullName": "Kyle Bradish",
           "ladderBadges": [
             {
@@ -4558,7 +4748,40 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.271
+              "hitProb": 0.259
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.237
+            },
+            {
+              "label": "BB up to 3",
+              "stat": "walks_allowed",
+              "target": 3,
+              "targets": [
+                3
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 3 Last supported rung: 3",
+              "hitProb": 0.284
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Kyle Bradish Over 17.5 Outs | Odds -102 | Edge 33.6%",
+              "hitProb": 0.81
             }
           ],
           "pregameLadderBadges": [
@@ -4571,20 +4794,43 @@
               ],
               "tone": "solid",
               "detail": "Supported ladders: 6/7 Last supported rung: 7 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.271
+              "hitProb": 0.259
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.237
+            },
+            {
+              "label": "BB up to 3",
+              "stat": "walks_allowed",
+              "target": 3,
+              "targets": [
+                3
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 3 Last supported rung: 3",
+              "hitProb": 0.284
+            },
+            {
+              "label": "O 18+",
+              "stat": "outs",
+              "target": 18,
+              "targets": [
+                18
+              ],
+              "tone": "strong",
+              "detail": "Kyle Bradish Over 17.5 Outs | Odds -102 | Edge 33.6%",
+              "hitProb": 0.81
             }
           ]
         }
-      },
-      "first1BetSignal": {
-        "label": "F1 NRFI",
-        "tone": "nrfi",
-        "summary": "0-run sim 63.8% | F1 mean 0.79",
-        "detail": "Season filter qualified: simulated scoreless first inning 63.8% with only 0.79 expected runs in the opening frame.",
-        "nrfiProb": 0.638,
-        "yrfiProb": 0.362,
-        "meanTotalRuns": 0.789,
-        "maxSideLeadProb": 0.181
       },
       "markets": {
         "totals": null,
@@ -4723,7 +4969,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Mart\u00edn P\u00e9rez vs Davis Martin | 3 official pick(s)"
+        "liveText": "Mart\u00edn P\u00e9rez vs Davis Martin | 2 official pick(s) | +2 playable"
       },
       "predictions": {
         "first1": {
@@ -5109,16 +5355,16 @@
           "closed": false,
           "badge": "No bet",
           "score": "ATL 0 - CWS 0",
-          "subtitle": "ATL 1.1 - CWS 1.41 | Total 2.51",
+          "subtitle": "ATL 1.11 - CWS 1.41 | Total 2.52",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 2.51,
+            "total": 2.52,
             "homeMargin": 0.3
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 2.51,
+              "line": 2.52,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
@@ -5142,7 +5388,7 @@
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
             "total": 4.27,
-            "homeMargin": 0.4
+            "homeMargin": 0.41
           },
           "markets": {
             "total": {
@@ -5152,7 +5398,7 @@
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.4,
+              "homeLine": 0.41,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -5167,21 +5413,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "ATL 0 - CWS 0",
-          "subtitle": "ATL 3.4 - CWS 4.02 | Total 7.42",
+          "subtitle": "ATL 3.38 - CWS 4.02 | Total 7.4",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 7.42,
-            "homeMargin": 0.62
+            "total": 7.4,
+            "homeMargin": 0.64
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 7.42,
+              "line": 7.4,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.62,
+              "homeLine": 0.64,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -5239,18 +5485,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "ATL 36.5% | CWS 45.5% | Tie 18.0%",
-          "subtitle": "ATL 36.5% | CWS 45.5% | Tie 18.0%",
-          "reason": "ATL 36.5% | CWS 45.5% | Tie 18.0%",
+          "score": "ATL 36.6% | CWS 45.5% | Tie 17.9%",
+          "subtitle": "ATL 36.6% | CWS 45.5% | Tie 17.9%",
+          "reason": "ATL 36.6% | CWS 45.5% | Tie 17.9%",
           "projection": {
-            "total": 36.5,
+            "total": 36.6,
             "homeMargin": 45.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 36.5,
-              "reason": "ATL 36.5% | CWS 45.5% | Tie 18.0%"
+              "line": 36.6,
+              "reason": "ATL 36.6% | CWS 45.5% | Tie 17.9%"
             },
             "spread": {},
             "moneyline": {}
@@ -5261,18 +5507,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "ATL 42.9% | CWS 57.1% | Tie 0.0%",
-          "subtitle": "ATL 42.9% | CWS 57.1% | Tie 0.0%",
-          "reason": "ATL 42.9% | CWS 57.1% | Tie 0.0%",
+          "score": "ATL 42.7% | CWS 57.3% | Tie 0.0%",
+          "subtitle": "ATL 42.7% | CWS 57.3% | Tie 0.0%",
+          "reason": "ATL 42.7% | CWS 57.3% | Tie 0.0%",
           "projection": {
-            "total": 42.9,
-            "homeMargin": 57.1
+            "total": 42.7,
+            "homeMargin": 57.3
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 42.9,
-              "reason": "ATL 42.9% | CWS 57.1% | Tie 0.0%"
+              "line": 42.7,
+              "reason": "ATL 42.7% | CWS 57.3% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -5409,8 +5655,8 @@
         },
         {
           "label": "Hitter props",
-          "title": "Mauricio Dub\u00f3n Under 0.5 Batter Runs Scored",
-          "sub": "-145"
+          "title": "Ozzie Albies Under 1.5 Batter Total Bases",
+          "sub": "-140"
         }
       ],
       "probable": {
@@ -5439,6 +5685,17 @@
               "tone": "soft",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.213
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.287
             }
           ],
           "pregameLadderBadges": [
@@ -5463,6 +5720,17 @@
               "tone": "soft",
               "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.213
+            },
+            {
+              "label": "BB up to 2",
+              "stat": "walks_allowed",
+              "target": 2,
+              "targets": [
+                2
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 2/3 Last supported rung: 3 Supported ladders: 2 Last supported rung: 2",
+              "hitProb": 0.287
             }
           ]
         },
@@ -5814,7 +6082,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Hunter Dobbins vs Christian Scott | 1 official pick(s) | +2 playable"
+        "liveText": "Hunter Dobbins vs Christian Scott | 4 official pick(s) | +1 playable"
       },
       "predictions": {
         "first1": {
@@ -6127,21 +6395,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "STL 0 - NYM 0",
-          "subtitle": "STL 0.58 - NYM 0.39 | Total 0.98",
+          "subtitle": "STL 0.69 - NYM 0.51 | Total 1.2",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 0.98,
-            "homeMargin": -0.19
+            "total": 1.2,
+            "homeMargin": -0.18
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 0.98,
+              "line": 1.2,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.19,
+              "homeLine": -0.18,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -6156,21 +6424,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "STL 0 - NYM 0",
-          "subtitle": "STL 1.56 - NYM 1.27 | Total 2.83",
+          "subtitle": "STL 1.82 - NYM 1.59 | Total 3.41",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 2.83,
-            "homeMargin": -0.29
+            "total": 3.41,
+            "homeMargin": -0.23
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 2.83,
+              "line": 3.41,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.29,
+              "homeLine": -0.23,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -6185,21 +6453,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "STL 0 - NYM 0",
-          "subtitle": "STL 2.46 - NYM 2.09 | Total 4.56",
+          "subtitle": "STL 2.94 - NYM 2.71 | Total 5.65",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 4.56,
-            "homeMargin": -0.37
+            "total": 5.65,
+            "homeMargin": -0.23
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 4.56,
+              "line": 5.65,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.37,
+              "homeLine": -0.23,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -6212,28 +6480,28 @@
           "key": "first5",
           "label": "Full game",
           "closed": false,
-          "badge": "No bet",
+          "badge": "ML bet",
           "score": "STL 0 - NYM 0",
-          "subtitle": "STL 4.46 - NYM 3.76 | Total 8.22",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "subtitle": "STL 4.76 - NYM 4.67 | Total 9.43",
+          "reason": "Official full-game recommendation surfaced from the saved market payload.",
           "projection": {
-            "total": 8.22,
-            "homeMargin": -0.69
+            "total": 9.43,
+            "homeMargin": -0.1
           },
           "markets": {
             "total": {
-              "pick": null,
-              "line": 8.22,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              "pick": "STL ML",
+              "line": 9.43,
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
             },
             "spread": {
               "pick": null,
-              "homeLine": -0.69,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              "homeLine": -0.1,
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
             },
             "moneyline": {
               "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+              "reason": "Official full-game recommendation surfaced from the saved market payload."
             }
           }
         },
@@ -6242,18 +6510,18 @@
           "label": "First 1",
           "closed": false,
           "badge": "",
-          "score": "STL 24.9% | NYM 17.0% | Tie 58.1%",
-          "subtitle": "STL 24.9% | NYM 17.0% | Tie 58.1%",
-          "reason": "STL 24.9% | NYM 17.0% | Tie 58.1%",
+          "score": "STL 27.9% | NYM 20.5% | Tie 51.6%",
+          "subtitle": "STL 27.9% | NYM 20.5% | Tie 51.6%",
+          "reason": "STL 27.9% | NYM 20.5% | Tie 51.6%",
           "projection": {
-            "total": 24.9,
-            "homeMargin": 17.0
+            "total": 27.9,
+            "homeMargin": 20.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 24.9,
-              "reason": "STL 24.9% | NYM 17.0% | Tie 58.1%"
+              "line": 27.9,
+              "reason": "STL 27.9% | NYM 20.5% | Tie 51.6%"
             },
             "spread": {},
             "moneyline": {}
@@ -6264,18 +6532,18 @@
           "label": "First 3",
           "closed": false,
           "badge": "",
-          "score": "STL 41.9% | NYM 32.6% | Tie 25.5%",
-          "subtitle": "STL 41.9% | NYM 32.6% | Tie 25.5%",
-          "reason": "STL 41.9% | NYM 32.6% | Tie 25.5%",
+          "score": "STL 41.1% | NYM 34.5% | Tie 24.4%",
+          "subtitle": "STL 41.1% | NYM 34.5% | Tie 24.4%",
+          "reason": "STL 41.1% | NYM 34.5% | Tie 24.4%",
           "projection": {
-            "total": 41.9,
-            "homeMargin": 32.6
+            "total": 41.1,
+            "homeMargin": 34.5
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 41.9,
-              "reason": "STL 41.9% | NYM 32.6% | Tie 25.5%"
+              "line": 41.1,
+              "reason": "STL 41.1% | NYM 34.5% | Tie 24.4%"
             },
             "spread": {},
             "moneyline": {}
@@ -6286,18 +6554,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "STL 46.4% | NYM 36.6% | Tie 17.0%",
-          "subtitle": "STL 46.4% | NYM 36.6% | Tie 17.0%",
-          "reason": "STL 46.4% | NYM 36.6% | Tie 17.0%",
+          "score": "STL 46.4% | NYM 38.3% | Tie 15.3%",
+          "subtitle": "STL 46.4% | NYM 38.3% | Tie 15.3%",
+          "reason": "STL 46.4% | NYM 38.3% | Tie 15.3%",
           "projection": {
             "total": 46.4,
-            "homeMargin": 36.6
+            "homeMargin": 38.3
           },
           "markets": {
             "total": {
               "pick": null,
               "line": 46.4,
-              "reason": "STL 46.4% | NYM 36.6% | Tie 17.0%"
+              "reason": "STL 46.4% | NYM 38.3% | Tie 15.3%"
             },
             "spread": {},
             "moneyline": {}
@@ -6308,18 +6576,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "STL 54.5% | NYM 45.5% | Tie 0.0%",
-          "subtitle": "STL 54.5% | NYM 45.5% | Tie 0.0%",
-          "reason": "STL 54.5% | NYM 45.5% | Tie 0.0%",
+          "score": "STL 50.9% | NYM 49.1% | Tie 0.0%",
+          "subtitle": "STL 50.9% | NYM 49.1% | Tie 0.0%",
+          "reason": "STL 50.9% | NYM 49.1% | Tie 0.0%",
           "projection": {
-            "total": 54.5,
-            "homeMargin": 45.5
+            "total": 50.9,
+            "homeMargin": 49.1
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 54.5,
-              "reason": "STL 54.5% | NYM 45.5% | Tie 0.0%"
+              "line": 50.9,
+              "reason": "STL 50.9% | NYM 49.1% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -6446,125 +6714,39 @@
         },
         {
           "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
+          "title": "STL +105",
+          "sub": "model 49.1%"
         },
         {
           "label": "Pitcher props",
-          "title": "Hunter Dobbins Over 3.5 Strikeouts",
-          "sub": "Playable only | +102"
+          "title": "No locked pitcher prop",
+          "sub": "Off card"
         },
         {
           "label": "Hitter props",
-          "title": "Bo Bichette Under 1.5 Batter Total Bases",
-          "sub": "-136"
+          "title": "Iv\u00e1n Herrera Over 0.5 Batter Hits",
+          "sub": "+150"
         }
       ],
       "probable": {
         "away": {
-          "id": 690928,
-          "fullName": "Hunter Dobbins",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.238
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.281
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.238
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.281
-            }
-          ]
+          "id": null,
+          "fullName": "Hunter Dobbins"
         },
         "home": {
           "id": null,
-          "fullName": "Christian Scott",
-          "ladderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.334
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.308
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.334
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.308
-            }
-          ]
+          "fullName": "Christian Scott"
         }
+      },
+      "first1BetSignal": {
+        "label": "F1 YRFI",
+        "tone": "yrfi",
+        "summary": "F1 mean 1.20 | side lead 27.9%",
+        "detail": "Season filter qualified: only 49.3% simulated NRFI, 1.20 expected first-inning runs, and one side reaches a 27.9% chance to be ahead after one.",
+        "nrfiProb": 0.493,
+        "yrfiProb": 0.507,
+        "meanTotalRuns": 1.197,
+        "maxSideLeadProb": 0.279
       },
       "markets": {
         "totals": null,
@@ -6865,7 +7047,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Merrill Kelly vs Tyler Phillips | 1 official pick(s) | +2 playable"
+        "liveText": "Merrill Kelly vs Tyler Phillips"
       },
       "predictions": {
         "first1": {
@@ -7178,21 +7360,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 0.38 - MIA 0.48 | Total 0.86",
+          "subtitle": "AZ 0.4 - MIA 0.39 | Total 0.79",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 0.86,
-            "homeMargin": 0.1
+            "total": 0.79,
+            "homeMargin": -0.02
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 0.86,
+              "line": 0.79,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.1,
+              "homeLine": -0.02,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -7207,21 +7389,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 1.23 - MIA 1.61 | Total 2.84",
+          "subtitle": "AZ 1.25 - MIA 1.3 | Total 2.55",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 2.84,
-            "homeMargin": 0.39
+            "total": 2.55,
+            "homeMargin": 0.05
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 2.84,
+              "line": 2.55,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.39,
+              "homeLine": 0.05,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -7236,21 +7418,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 2.08 - MIA 2.65 | Total 4.72",
+          "subtitle": "AZ 2.1 - MIA 2.27 | Total 4.38",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 4.72,
-            "homeMargin": 0.57
+            "total": 4.38,
+            "homeMargin": 0.17
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 4.72,
+              "line": 4.38,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.57,
+              "homeLine": 0.17,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -7265,21 +7447,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "AZ 0 - MIA 0",
-          "subtitle": "AZ 3.88 - MIA 4.49 | Total 8.36",
+          "subtitle": "AZ 3.83 - MIA 3.94 | Total 7.78",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 8.36,
-            "homeMargin": 0.61
+            "total": 7.78,
+            "homeMargin": 0.11
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 8.36,
+              "line": 7.78,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.61,
+              "homeLine": 0.11,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -7293,18 +7475,18 @@
           "label": "First 1",
           "closed": false,
           "badge": "",
-          "score": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
-          "subtitle": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
-          "reason": "AZ 17.5% | MIA 22.0% | Tie 60.5%",
+          "score": "AZ 19.3% | MIA 18.1% | Tie 62.6%",
+          "subtitle": "AZ 19.3% | MIA 18.1% | Tie 62.6%",
+          "reason": "AZ 19.3% | MIA 18.1% | Tie 62.6%",
           "projection": {
-            "total": 17.5,
-            "homeMargin": 22.0
+            "total": 19.3,
+            "homeMargin": 18.1
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 17.5,
-              "reason": "AZ 17.5% | MIA 22.0% | Tie 60.5%"
+              "line": 19.3,
+              "reason": "AZ 19.3% | MIA 18.1% | Tie 62.6%"
             },
             "spread": {},
             "moneyline": {}
@@ -7315,18 +7497,18 @@
           "label": "First 3",
           "closed": false,
           "badge": "",
-          "score": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
-          "subtitle": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
-          "reason": "AZ 29.6% | MIA 44.2% | Tie 26.2%",
+          "score": "AZ 32.8% | MIA 37.6% | Tie 29.6%",
+          "subtitle": "AZ 32.8% | MIA 37.6% | Tie 29.6%",
+          "reason": "AZ 32.8% | MIA 37.6% | Tie 29.6%",
           "projection": {
-            "total": 29.6,
-            "homeMargin": 44.2
+            "total": 32.8,
+            "homeMargin": 37.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 29.6,
-              "reason": "AZ 29.6% | MIA 44.2% | Tie 26.2%"
+              "line": 32.8,
+              "reason": "AZ 32.8% | MIA 37.6% | Tie 29.6%"
             },
             "spread": {},
             "moneyline": {}
@@ -7337,18 +7519,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
-          "subtitle": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
-          "reason": "AZ 35.6% | MIA 48.0% | Tie 16.4%",
+          "score": "AZ 40.3% | MIA 43.0% | Tie 16.7%",
+          "subtitle": "AZ 40.3% | MIA 43.0% | Tie 16.7%",
+          "reason": "AZ 40.3% | MIA 43.0% | Tie 16.7%",
           "projection": {
-            "total": 35.6,
-            "homeMargin": 48.0
+            "total": 40.3,
+            "homeMargin": 43.0
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 35.6,
-              "reason": "AZ 35.6% | MIA 48.0% | Tie 16.4%"
+              "line": 40.3,
+              "reason": "AZ 40.3% | MIA 43.0% | Tie 16.7%"
             },
             "spread": {},
             "moneyline": {}
@@ -7359,18 +7541,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
-          "subtitle": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
-          "reason": "AZ 42.5% | MIA 57.5% | Tie 0.0%",
+          "score": "AZ 48.4% | MIA 51.6% | Tie 0.0%",
+          "subtitle": "AZ 48.4% | MIA 51.6% | Tie 0.0%",
+          "reason": "AZ 48.4% | MIA 51.6% | Tie 0.0%",
           "projection": {
-            "total": 42.5,
-            "homeMargin": 57.5
+            "total": 48.4,
+            "homeMargin": 51.6
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 42.5,
-              "reason": "AZ 42.5% | MIA 57.5% | Tie 0.0%"
+              "line": 48.4,
+              "reason": "AZ 48.4% | MIA 51.6% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -7502,142 +7684,34 @@
         },
         {
           "label": "Pitcher props",
-          "title": "Merrill Kelly Over 17.5 Outs",
-          "sub": "Playable only | -140"
+          "title": "No locked pitcher prop",
+          "sub": "Off card"
         },
         {
           "label": "Hitter props",
-          "title": "Pavin Smith Over 0.5 Batter Hits",
-          "sub": "-137"
+          "title": "No locked hitter prop",
+          "sub": "Off card"
         }
       ],
       "probable": {
         "away": {
-          "id": 518876,
-          "fullName": "Merrill Kelly",
-          "ladderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.306
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.29
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Merrill Kelly Over 17.5 Outs | Odds -140 | Edge 24.6%",
-              "hitProb": 0.784
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.306
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.29
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Merrill Kelly Over 17.5 Outs | Odds -140 | Edge 24.6%",
-              "hitProb": 0.784
-            }
-          ]
+          "id": null,
+          "fullName": "Merrill Kelly"
         },
         "home": {
           "id": null,
-          "fullName": "Tyler Phillips",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.278
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.242
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.278
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 5/6/7/8/9 Last supported rung: 9 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.242
-            }
-          ]
+          "fullName": "Tyler Phillips"
         }
+      },
+      "first1BetSignal": {
+        "label": "F1 NRFI",
+        "tone": "nrfi",
+        "summary": "0-run sim 60.9% | F1 mean 0.79",
+        "detail": "Season filter qualified: simulated scoreless first inning 60.9% with only 0.79 expected runs in the opening frame.",
+        "nrfiProb": 0.609,
+        "yrfiProb": 0.391,
+        "meanTotalRuns": 0.788,
+        "maxSideLeadProb": 0.193
       },
       "markets": {
         "totals": null,
@@ -7938,7 +8012,7 @@
           "away": 0,
           "home": 0
         },
-        "liveText": "Zebby Matthews vs Keider Montero | 1 official pick(s) | +2 playable"
+        "liveText": "Zebby Matthews vs Keider Montero"
       },
       "predictions": {
         "first1": {
@@ -8144,21 +8218,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 0.39 - DET 0.6 | Total 0.99",
+          "subtitle": "MIN 0.38 - DET 0.68 | Total 1.06",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 0.99,
-            "homeMargin": 0.22
+            "total": 1.06,
+            "homeMargin": 0.3
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 0.99,
+              "line": 1.06,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.22,
+              "homeLine": 0.3,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -8173,21 +8247,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 1.25 - DET 1.58 | Total 2.83",
+          "subtitle": "MIN 1.24 - DET 1.83 | Total 3.07",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 2.83,
-            "homeMargin": 0.33
+            "total": 3.07,
+            "homeMargin": 0.59
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 2.83,
+              "line": 3.07,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.33,
+              "homeLine": 0.59,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -8202,21 +8276,21 @@
           "closed": false,
           "badge": "No bet",
           "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 2.2 - DET 2.56 | Total 4.76",
+          "subtitle": "MIN 2.05 - DET 3.13 | Total 5.18",
           "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 4.76,
-            "homeMargin": 0.36
+            "total": 5.18,
+            "homeMargin": 1.09
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 4.76,
+              "line": 5.18,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.36,
+              "homeLine": 1.09,
               "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
@@ -8229,28 +8303,28 @@
           "key": "first5",
           "label": "Full game",
           "closed": false,
-          "badge": "ML bet",
+          "badge": "No bet",
           "score": "MIN 0 - DET 0",
-          "subtitle": "MIN 4.18 - DET 4.45 | Total 8.63",
-          "reason": "Official full-game recommendation surfaced from the saved market payload.",
+          "subtitle": "MIN 3.88 - DET 5.19 | Total 9.07",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
           "projection": {
-            "total": 8.63,
-            "homeMargin": 0.28
+            "total": 9.07,
+            "homeMargin": 1.31
           },
           "markets": {
             "total": {
-              "pick": "DET ML",
-              "line": 8.63,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
+              "pick": null,
+              "line": 9.07,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "spread": {
               "pick": null,
-              "homeLine": 0.28,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
+              "homeLine": 1.31,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             },
             "moneyline": {
               "pick": null,
-              "reason": "Official full-game recommendation surfaced from the saved market payload."
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
             }
           }
         },
@@ -8259,18 +8333,18 @@
           "label": "First 1",
           "closed": false,
           "badge": "",
-          "score": "MIN 18.2% | DET 24.9% | Tie 56.9%",
-          "subtitle": "MIN 18.2% | DET 24.9% | Tie 56.9%",
-          "reason": "MIN 18.2% | DET 24.9% | Tie 56.9%",
+          "score": "MIN 16.5% | DET 27.8% | Tie 55.7%",
+          "subtitle": "MIN 16.5% | DET 27.8% | Tie 55.7%",
+          "reason": "MIN 16.5% | DET 27.8% | Tie 55.7%",
           "projection": {
-            "total": 18.2,
-            "homeMargin": 24.9
+            "total": 16.5,
+            "homeMargin": 27.8
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 18.2,
-              "reason": "MIN 18.2% | DET 24.9% | Tie 56.9%"
+              "line": 16.5,
+              "reason": "MIN 16.5% | DET 27.8% | Tie 55.7%"
             },
             "spread": {},
             "moneyline": {}
@@ -8281,18 +8355,18 @@
           "label": "First 3",
           "closed": false,
           "badge": "",
-          "score": "MIN 30.7% | DET 41.3% | Tie 28.0%",
-          "subtitle": "MIN 30.7% | DET 41.3% | Tie 28.0%",
-          "reason": "MIN 30.7% | DET 41.3% | Tie 28.0%",
+          "score": "MIN 30.8% | DET 45.2% | Tie 24.0%",
+          "subtitle": "MIN 30.8% | DET 45.2% | Tie 24.0%",
+          "reason": "MIN 30.8% | DET 45.2% | Tie 24.0%",
           "projection": {
-            "total": 30.7,
-            "homeMargin": 41.3
+            "total": 30.8,
+            "homeMargin": 45.2
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 30.7,
-              "reason": "MIN 30.7% | DET 41.3% | Tie 28.0%"
+              "line": 30.8,
+              "reason": "MIN 30.8% | DET 45.2% | Tie 24.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -8303,18 +8377,18 @@
           "label": "First 5",
           "closed": false,
           "badge": "",
-          "score": "MIN 36.5% | DET 46.9% | Tie 16.6%",
-          "subtitle": "MIN 36.5% | DET 46.9% | Tie 16.6%",
-          "reason": "MIN 36.5% | DET 46.9% | Tie 16.6%",
+          "score": "MIN 30.0% | DET 53.4% | Tie 16.6%",
+          "subtitle": "MIN 30.0% | DET 53.4% | Tie 16.6%",
+          "reason": "MIN 30.0% | DET 53.4% | Tie 16.6%",
           "projection": {
-            "total": 36.5,
-            "homeMargin": 46.9
+            "total": 30.0,
+            "homeMargin": 53.4
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 36.5,
-              "reason": "MIN 36.5% | DET 46.9% | Tie 16.6%"
+              "line": 30.0,
+              "reason": "MIN 30.0% | DET 53.4% | Tie 16.6%"
             },
             "spread": {},
             "moneyline": {}
@@ -8325,18 +8399,18 @@
           "label": "Full game",
           "closed": false,
           "badge": "",
-          "score": "MIN 44.4% | DET 55.6% | Tie 0.0%",
-          "subtitle": "MIN 44.4% | DET 55.6% | Tie 0.0%",
-          "reason": "MIN 44.4% | DET 55.6% | Tie 0.0%",
+          "score": "MIN 37.2% | DET 62.8% | Tie 0.0%",
+          "subtitle": "MIN 37.2% | DET 62.8% | Tie 0.0%",
+          "reason": "MIN 37.2% | DET 62.8% | Tie 0.0%",
           "projection": {
-            "total": 44.4,
-            "homeMargin": 55.6
+            "total": 37.2,
+            "homeMargin": 62.8
           },
           "markets": {
             "total": {
               "pick": null,
-              "line": 44.4,
-              "reason": "MIN 44.4% | DET 55.6% | Tie 0.0%"
+              "line": 37.2,
+              "reason": "MIN 37.2% | DET 62.8% | Tie 0.0%"
             },
             "spread": {},
             "moneyline": {}
@@ -8430,13 +8504,13 @@
         },
         {
           "label": "Moneyline",
-          "title": "DET -122",
-          "sub": "model 55.6%"
+          "title": "No ML play",
+          "sub": "Off card"
         },
         {
           "label": "Pitcher props",
-          "title": "Zebby Matthews Over 17.5 Outs",
-          "sub": "Playable only | -105"
+          "title": "No locked pitcher prop",
+          "sub": "Off card"
         },
         {
           "label": "Hitter props",
@@ -8446,130 +8520,12 @@
       ],
       "probable": {
         "away": {
-          "id": 805673,
-          "fullName": "Zebby Matthews",
-          "ladderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.301
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.251
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Zebby Matthews Over 17.5 Outs | Odds -105 | Edge 32.4%",
-              "hitProb": 0.803
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 5",
-              "stat": "strikeouts",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7 Last supported rung: 7 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.301
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8/9 Last supported rung: 9 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.251
-            },
-            {
-              "label": "O 18+",
-              "stat": "outs",
-              "target": 18,
-              "targets": [
-                18
-              ],
-              "tone": "strong",
-              "detail": "Zebby Matthews Over 17.5 Outs | Odds -105 | Edge 32.4%",
-              "hitProb": 0.803
-            }
-          ]
+          "id": null,
+          "fullName": "Zebby Matthews"
         },
         "home": {
           "id": null,
-          "fullName": "Keider Montero",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.218
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.285
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.218
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.285
-            }
-          ]
+          "fullName": "Keider Montero"
         }
       },
       "markets": {
