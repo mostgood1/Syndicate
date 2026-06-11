@@ -8,6 +8,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
 
+from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import queue_intelligence_state_refresh
@@ -290,9 +291,12 @@ def intelligence_query_api():
     user_profile = _normalize_user_profile(payload)
     want_refresh = bool(payload.get("force_refresh")) or bool(payload.get("background"))
 
-    cached_response = get_intelligence_state_response(payload, refresh=want_refresh, wait=not bool(payload.get("background")))
-    if cached_response is None:
-        cached_response = read_latest_intelligence_state_response(payload)
+    if want_refresh and not bool(payload.get("background")):
+        cached_response = compute_intelligence_state_response(payload)
+    else:
+        cached_response = get_intelligence_state_response(payload, refresh=want_refresh, wait=not bool(payload.get("background")))
+        if cached_response is None:
+            cached_response = read_latest_intelligence_state_response(payload)
     if cached_response is None:
         cached_response = _load_response_cache_state()
     if cached_response is None or cached_response.get("ok") is False:
