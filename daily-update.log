@@ -8,3 +8,9 @@ To https://github.com/mostgood1/Syndicate
    1eb148a..e373a8e  main -> main
 To https://github.com/mostgood1/Syndicate
    e373a8e..b6d964b  main -> main
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_projections_2026-06-11.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_projections_2026-06-11.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+To https://github.com/mostgood1/Syndicate
+   b6d964b..50d91ff  main -> main

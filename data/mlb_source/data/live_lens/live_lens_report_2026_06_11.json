@@ -1,6 +1,6 @@
 {
   "date": "2026-06-11",
-  "generatedAt": "2026-06-11T14:41:37-05:00",
+  "generatedAt": "2026-06-11T14:53:37-05:00",
   "dataRoot": "data",
   "liveLensDir": "data/live_lens",
   "optimizationRegime": {
@@ -25,1068 +25,17 @@
   "performance": {
     "marketsRefreshed": false,
     "marketRefreshMs": 1.9,
-    "totalMs": 115.7,
+    "totalMs": 118.5,
     "snapshotLoadMs": 1.7,
-    "simContextLoadMs": 0.6,
-    "propEvalMs": 0.4,
-    "gameLensMs": 0.8,
+    "simContextLoadMs": 0.7,
+    "propEvalMs": 0.6,
+    "gameLensMs": 0.7,
     "gameCount": 8,
-    "liveGameCount": 2,
+    "liveGameCount": 1,
     "feedFetchCount": 8,
     "persistMs": 0.0
   },
   "games": [
-    {
-      "gamePk": 823619,
-      "status": {
-        "abstract": "Live",
-        "detailed": "In Progress"
-      },
-      "startTime": "12:10 PM",
-      "matchup": {
-        "away": {
-          "abbr": "STL",
-          "id": 138,
-          "logo": "https://www.mlbstatic.com/team-logos/138.svg",
-          "name": "St. Louis Cardinals"
-        },
-        "home": {
-          "abbr": "NYM",
-          "id": 121,
-          "logo": "https://www.mlbstatic.com/team-logos/121.svg",
-          "name": "New York Mets"
-        },
-        "score": {
-          "away": 0,
-          "home": 0
-        },
-        "liveText": "Hunter Dobbins vs Christian Scott | 1 official pick(s) | +2 playable"
-      },
-      "predictions": {
-        "first1": {
-          "away_runs_mean": 0.583,
-          "home_runs_mean": 0.394,
-          "away_win_prob": 0.249,
-          "home_win_prob": 0.17,
-          "tie_prob": 0.581
-        },
-        "first3": {
-          "away_runs_mean": 1.56,
-          "home_runs_mean": 1.266,
-          "away_win_prob": 0.419,
-          "home_win_prob": 0.326,
-          "tie_prob": 0.255
-        },
-        "first5": {
-          "away_runs_mean": 2.464,
-          "home_runs_mean": 2.092,
-          "away_win_prob": 0.464,
-          "home_win_prob": 0.366,
-          "tie_prob": 0.17
-        },
-        "full": {
-          "away_runs_mean": 4.457,
-          "home_runs_mean": 3.762,
-          "away_win_prob": 0.545,
-          "home_win_prob": 0.455,
-          "tie_prob": 0.0
-        }
-      },
-      "gameMarkets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823619,
-            "away": "St. Louis Cardinals",
-            "home": "New York Mets",
-            "away_abbr": "STL",
-            "home_abbr": "NYM",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 666182,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 690928,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Hunter Dobbins",
-            "opponent": "STL",
-            "opponent_team_id": 138,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.1818783375899698,
-            "batter_bb_rate": 0.06547771070350591,
-            "batter_hr_rate": 0.014554794520547944,
-            "batter_inplay_hit_rate": 0.2652008456659619,
-            "batter_xb_hit_share": 0.14754098360655737,
-            "pitcher_k_rate": 0.2641509433962264,
-            "pitcher_bb_rate": 0.1320754716981132,
-            "pitcher_hr_rate": 0.018867924528301886,
-            "pitcher_inplay_hit_rate": 0.3125,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 94.0,
-            "pitcher_platoon_k_mult": 1.0906593406593408,
-            "pitcher_platoon_bb_mult": 0.8075,
-            "pitcher_platoon_hr_mult": 1.275,
-            "pitcher_platoon_inplay_mult": 0.89,
-            "batter_platoon_k_mult": 1.0326054062093937,
-            "batter_platoon_bb_mult": 0.912374585679843,
-            "batter_platoon_hr_mult": 0.78,
-            "batter_platoon_inplay_mult": 1.0098257324402153,
-            "opponent_primary_pitch_type": "FF",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 3289,
-            "venue_name": "Citi Field",
-            "roof_type": "Open",
-            "park_hr_mult": 1.0246666666666666,
-            "park_inplay_hit_mult": 0.9901333333333333,
-            "park_xb_share_mult": 0.9876666666666667,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Bo Bichette",
-            "team": "NYM",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "under",
-            "edge": 0.1468654897672238,
-            "market_line": 1.5,
-            "model_prob_over": 0.314,
-            "market_prob_over": 0.46086548976722386,
-            "market_prob_under": 0.5391345102327761,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.46086548976722386,
-            "selected_side_market_prob": 0.5391345102327761,
-            "selected_side_model_prob": 0.6859999999999999,
-            "mean_support": 0.272,
-            "tb_mean": 1.228,
-            "pa_mean": 4.727,
-            "ab_mean": 4.26,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "-136",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
-              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Bo Bichette",
-              "supporting_reasons": [
-                "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
-                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
-            ],
-            "reason_summary": "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
-            "rank": 2,
-            "recommendation_tier": "official"
-          }
-        ],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823619,
-            "away": "St. Louis Cardinals",
-            "home": "New York Mets",
-            "away_abbr": "STL",
-            "home_abbr": "NYM",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 690928,
-            "pitcher_name": "Hunter Dobbins",
-            "team": "STL",
-            "team_side": "away",
-            "prop": "strikeouts",
-            "selection": "over",
-            "edge": 0.3319072681704261,
-            "market_line": 3.5,
-            "model_prob_over": 0.794,
-            "market_prob_over": 0.46209273182957394,
-            "market_prob_under": 0.5379072681704261,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.46209273182957394,
-            "selected_side_market_prob": 0.46209273182957394,
-            "selected_side_model_prob": 0.794,
-            "mean_support": 1.6449999999999996,
-            "so_mean": 5.145,
-            "market_alternates": [],
-            "odds": "+102",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 3.4 strikeouts.",
-              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:strikeouts",
-              "subject": "Hunter Dobbins",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 3.4 strikeouts.",
-                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume.",
-            "rank": 3,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823619,
-            "away": "St. Louis Cardinals",
-            "home": "New York Mets",
-            "away_abbr": "STL",
-            "home_abbr": "NYM",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 666182,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 690928,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Hunter Dobbins",
-            "opponent": "STL",
-            "opponent_team_id": 138,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.1818783375899698,
-            "batter_bb_rate": 0.06547771070350591,
-            "batter_hr_rate": 0.014554794520547944,
-            "batter_inplay_hit_rate": 0.2652008456659619,
-            "batter_xb_hit_share": 0.14754098360655737,
-            "pitcher_k_rate": 0.2641509433962264,
-            "pitcher_bb_rate": 0.1320754716981132,
-            "pitcher_hr_rate": 0.018867924528301886,
-            "pitcher_inplay_hit_rate": 0.3125,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 94.0,
-            "pitcher_platoon_k_mult": 1.0906593406593408,
-            "pitcher_platoon_bb_mult": 0.8075,
-            "pitcher_platoon_hr_mult": 1.275,
-            "pitcher_platoon_inplay_mult": 0.89,
-            "batter_platoon_k_mult": 1.0326054062093937,
-            "batter_platoon_bb_mult": 0.912374585679843,
-            "batter_platoon_hr_mult": 0.78,
-            "batter_platoon_inplay_mult": 1.0098257324402153,
-            "opponent_primary_pitch_type": "FF",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 3289,
-            "venue_name": "Citi Field",
-            "roof_type": "Open",
-            "park_hr_mult": 1.0246666666666666,
-            "park_inplay_hit_mult": 0.9901333333333333,
-            "park_xb_share_mult": 0.9876666666666667,
-            "market": "hitter_runs",
-            "market_label": "Hitter Runs",
-            "market_group": "hitter_props",
-            "player_name": "Bo Bichette",
-            "team": "NYM",
-            "prop": "batter_runs_scored",
-            "prop_market_key": "batter_runs_scored",
-            "selection": "under",
-            "edge": 0.13579859484777512,
-            "market_line": 0.5,
-            "model_prob_over": 0.332,
-            "market_prob_over": 0.46779859484777514,
-            "market_prob_under": 0.5322014051522248,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.46779859484777514,
-            "selected_side_market_prob": 0.5322014051522248,
-            "selected_side_model_prob": 0.6679999999999999,
-            "mean_support": 0.10699999999999998,
-            "r_mean": 0.393,
-            "pa_mean": 4.727,
-            "ab_mean": 4.26,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "-135",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against STL, he has been held scoreless in 7 of 8 games.",
-              "Over his last 10 games, he has been held scoreless in 7 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_runs",
-              "subject": "Bo Bichette",
-              "supporting_reasons": [
-                "Against STL, he has been held scoreless in 7 of 8 games.",
-                "Over his last 10 games, he has been held scoreless in 7 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
-            ],
-            "reason_summary": "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
-            "rank": 1,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      },
-      "gameLens": [
-        {
-          "key": "first1",
-          "label": "F1",
-          "closed": false,
-          "badge": "No bet",
-          "score": "STL 0 - NYM 0",
-          "subtitle": "STL 0.58 - NYM 0.39 | Total 0.98",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 0.98,
-            "homeMargin": -0.19
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 0.98,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.19,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first3",
-          "label": "F3",
-          "closed": false,
-          "badge": "No bet",
-          "score": "STL 0 - NYM 0",
-          "subtitle": "STL 1.56 - NYM 1.27 | Total 2.83",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 2.83,
-            "homeMargin": -0.29
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 2.83,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.29,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "F5",
-          "closed": false,
-          "badge": "No bet",
-          "score": "STL 0 - NYM 0",
-          "subtitle": "STL 2.46 - NYM 2.09 | Total 4.56",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 4.56,
-            "homeMargin": -0.37
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 4.56,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.37,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first5",
-          "label": "Full game",
-          "closed": false,
-          "badge": "No bet",
-          "score": "STL 0 - NYM 0",
-          "subtitle": "STL 4.46 - NYM 3.76 | Total 8.22",
-          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
-          "projection": {
-            "total": 8.22,
-            "homeMargin": -0.69
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 8.22,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "spread": {
-              "pick": null,
-              "homeLine": -0.69,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            },
-            "moneyline": {
-              "pick": null,
-              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
-            }
-          }
-        },
-        {
-          "key": "first1",
-          "label": "First 1",
-          "closed": false,
-          "badge": "",
-          "score": "STL 24.9% | NYM 17.0% | Tie 58.1%",
-          "subtitle": "STL 24.9% | NYM 17.0% | Tie 58.1%",
-          "reason": "STL 24.9% | NYM 17.0% | Tie 58.1%",
-          "projection": {
-            "total": 24.9,
-            "homeMargin": 17.0
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 24.9,
-              "reason": "STL 24.9% | NYM 17.0% | Tie 58.1%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first3",
-          "label": "First 3",
-          "closed": false,
-          "badge": "",
-          "score": "STL 41.9% | NYM 32.6% | Tie 25.5%",
-          "subtitle": "STL 41.9% | NYM 32.6% | Tie 25.5%",
-          "reason": "STL 41.9% | NYM 32.6% | Tie 25.5%",
-          "projection": {
-            "total": 41.9,
-            "homeMargin": 32.6
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 41.9,
-              "reason": "STL 41.9% | NYM 32.6% | Tie 25.5%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "first5",
-          "label": "First 5",
-          "closed": false,
-          "badge": "",
-          "score": "STL 46.4% | NYM 36.6% | Tie 17.0%",
-          "subtitle": "STL 46.4% | NYM 36.6% | Tie 17.0%",
-          "reason": "STL 46.4% | NYM 36.6% | Tie 17.0%",
-          "projection": {
-            "total": 46.4,
-            "homeMargin": 36.6
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 46.4,
-              "reason": "STL 46.4% | NYM 36.6% | Tie 17.0%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        },
-        {
-          "key": "full",
-          "label": "Full game",
-          "closed": false,
-          "badge": "",
-          "score": "STL 54.5% | NYM 45.5% | Tie 0.0%",
-          "subtitle": "STL 54.5% | NYM 45.5% | Tie 0.0%",
-          "reason": "STL 54.5% | NYM 45.5% | Tie 0.0%",
-          "projection": {
-            "total": 54.5,
-            "homeMargin": 45.5
-          },
-          "markets": {
-            "total": {
-              "pick": null,
-              "line": 54.5,
-              "reason": "STL 54.5% | NYM 45.5% | Tie 0.0%"
-            },
-            "spread": {},
-            "moneyline": {}
-          }
-        }
-      ],
-      "props": [
-        {
-          "playerName": "Hunter Dobbins",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 3.5,
-          "odds": "+102",
-          "modelProbOver": 0.794,
-          "estimatedWinProb": 0.794,
-          "rankingScore": 0.3319072681704261
-        },
-        {
-          "playerName": "Bo Bichette",
-          "selection": "Under",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "-136",
-          "modelProbOver": 0.314,
-          "estimatedWinProb": 0.314,
-          "rankingScore": 0.1468654897672238
-        },
-        {
-          "playerName": "Bo Bichette",
-          "selection": "Under",
-          "marketLabel": "Hitter Runs",
-          "market": "hitter_runs",
-          "line": 0.5,
-          "odds": "-135",
-          "modelProbOver": 0.332,
-          "estimatedWinProb": 0.332,
-          "rankingScore": 0.13579859484777512
-        }
-      ],
-      "liveProps": [
-        {
-          "playerName": "Hunter Dobbins",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 3.5,
-          "odds": "+102",
-          "modelProbOver": 0.794,
-          "estimatedWinProb": 0.794,
-          "rankingScore": 0.3319072681704261
-        },
-        {
-          "playerName": "Bo Bichette",
-          "selection": "Under",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "-136",
-          "modelProbOver": 0.314,
-          "estimatedWinProb": 0.314,
-          "rankingScore": 0.1468654897672238
-        },
-        {
-          "playerName": "Bo Bichette",
-          "selection": "Under",
-          "marketLabel": "Hitter Runs",
-          "market": "hitter_runs",
-          "line": 0.5,
-          "odds": "-135",
-          "modelProbOver": 0.332,
-          "estimatedWinProb": 0.332,
-          "rankingScore": 0.13579859484777512
-        }
-      ],
-      "archivedLiveProps": [],
-      "trackedProps": [
-        {
-          "playerName": "Hunter Dobbins",
-          "selection": "Over",
-          "marketLabel": "pitcher_props",
-          "market": "pitcher_props",
-          "line": 3.5,
-          "odds": "+102",
-          "modelProbOver": 0.794,
-          "estimatedWinProb": 0.794,
-          "rankingScore": 0.3319072681704261
-        },
-        {
-          "playerName": "Bo Bichette",
-          "selection": "Under",
-          "marketLabel": "Hitter Total Bases",
-          "market": "hitter_total_bases",
-          "line": 1.5,
-          "odds": "-136",
-          "modelProbOver": 0.314,
-          "estimatedWinProb": 0.314,
-          "rankingScore": 0.1468654897672238
-        },
-        {
-          "playerName": "Bo Bichette",
-          "selection": "Under",
-          "marketLabel": "Hitter Runs",
-          "market": "hitter_runs",
-          "line": 0.5,
-          "odds": "-135",
-          "modelProbOver": 0.332,
-          "estimatedWinProb": 0.332,
-          "rankingScore": 0.13579859484777512
-        }
-      ],
-      "simContextAvailable": false,
-      "snapshotAvailable": true,
-      "score": {
-        "away": 0,
-        "home": 0
-      },
-      "market_tiles": [
-        {
-          "label": "Game total",
-          "title": "No total play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Moneyline",
-          "title": "No ML play",
-          "sub": "Off card"
-        },
-        {
-          "label": "Pitcher props",
-          "title": "Hunter Dobbins Over 3.5 Strikeouts",
-          "sub": "Playable only | +102"
-        },
-        {
-          "label": "Hitter props",
-          "title": "Bo Bichette Under 1.5 Batter Total Bases",
-          "sub": "-136"
-        }
-      ],
-      "probable": {
-        "away": {
-          "id": 690928,
-          "fullName": "Hunter Dobbins",
-          "ladderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.238
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.281
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 4",
-              "stat": "strikeouts",
-              "target": 4,
-              "targets": [
-                4
-              ],
-              "tone": "soft",
-              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
-              "hitProb": 0.238
-            },
-            {
-              "label": "H up to 6",
-              "stat": "hits_allowed",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.281
-            }
-          ]
-        },
-        "home": {
-          "id": null,
-          "fullName": "Christian Scott",
-          "ladderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.334
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.308
-            }
-          ],
-          "pregameLadderBadges": [
-            {
-              "label": "K up to 6",
-              "stat": "strikeouts",
-              "target": 6,
-              "targets": [
-                6
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 6 Last supported rung: 6",
-              "hitProb": 0.334
-            },
-            {
-              "label": "H up to 5",
-              "stat": "hits_allowed",
-              "target": 5,
-              "targets": [
-                5
-              ],
-              "tone": "solid",
-              "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
-              "hitProb": 0.308
-            }
-          ]
-        }
-      },
-      "markets": {
-        "totals": null,
-        "ml": null,
-        "pitcherProps": [],
-        "hitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823619,
-            "away": "St. Louis Cardinals",
-            "home": "New York Mets",
-            "away_abbr": "STL",
-            "home_abbr": "NYM",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 666182,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 690928,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Hunter Dobbins",
-            "opponent": "STL",
-            "opponent_team_id": 138,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.1818783375899698,
-            "batter_bb_rate": 0.06547771070350591,
-            "batter_hr_rate": 0.014554794520547944,
-            "batter_inplay_hit_rate": 0.2652008456659619,
-            "batter_xb_hit_share": 0.14754098360655737,
-            "pitcher_k_rate": 0.2641509433962264,
-            "pitcher_bb_rate": 0.1320754716981132,
-            "pitcher_hr_rate": 0.018867924528301886,
-            "pitcher_inplay_hit_rate": 0.3125,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 94.0,
-            "pitcher_platoon_k_mult": 1.0906593406593408,
-            "pitcher_platoon_bb_mult": 0.8075,
-            "pitcher_platoon_hr_mult": 1.275,
-            "pitcher_platoon_inplay_mult": 0.89,
-            "batter_platoon_k_mult": 1.0326054062093937,
-            "batter_platoon_bb_mult": 0.912374585679843,
-            "batter_platoon_hr_mult": 0.78,
-            "batter_platoon_inplay_mult": 1.0098257324402153,
-            "opponent_primary_pitch_type": "FF",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 3289,
-            "venue_name": "Citi Field",
-            "roof_type": "Open",
-            "park_hr_mult": 1.0246666666666666,
-            "park_inplay_hit_mult": 0.9901333333333333,
-            "park_xb_share_mult": 0.9876666666666667,
-            "market": "hitter_total_bases",
-            "market_label": "Hitter Total Bases",
-            "market_group": "hitter_props",
-            "player_name": "Bo Bichette",
-            "team": "NYM",
-            "prop": "batter_total_bases",
-            "prop_market_key": "batter_total_bases",
-            "selection": "under",
-            "edge": 0.1468654897672238,
-            "market_line": 1.5,
-            "model_prob_over": 0.314,
-            "market_prob_over": 0.46086548976722386,
-            "market_prob_under": 0.5391345102327761,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.46086548976722386,
-            "selected_side_market_prob": 0.5391345102327761,
-            "selected_side_model_prob": 0.6859999999999999,
-            "mean_support": 0.272,
-            "tb_mean": 1.228,
-            "pa_mean": 4.727,
-            "ab_mean": 4.26,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "-136",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
-              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_total_bases",
-              "subject": "Bo Bichette",
-              "supporting_reasons": [
-                "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
-                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
-            ],
-            "reason_summary": "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
-            "rank": 2,
-            "recommendation_tier": "official"
-          }
-        ],
-        "extraPitcherProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823619,
-            "away": "St. Louis Cardinals",
-            "home": "New York Mets",
-            "away_abbr": "STL",
-            "home_abbr": "NYM",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "market": "pitcher_props",
-            "pitcher_id": 690928,
-            "pitcher_name": "Hunter Dobbins",
-            "team": "STL",
-            "team_side": "away",
-            "prop": "strikeouts",
-            "selection": "over",
-            "edge": 0.3319072681704261,
-            "market_line": 3.5,
-            "model_prob_over": 0.794,
-            "market_prob_over": 0.46209273182957394,
-            "market_prob_under": 0.5379072681704261,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.46209273182957394,
-            "selected_side_market_prob": 0.46209273182957394,
-            "selected_side_model_prob": 0.794,
-            "mean_support": 1.6449999999999996,
-            "so_mean": 5.145,
-            "market_alternates": [],
-            "odds": "+102",
-            "stake_u": 1.0,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Across his last 5 starts, he has averaged 3.4 strikeouts.",
-              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "pitcher_props:strikeouts",
-              "subject": "Hunter Dobbins",
-              "supporting_reasons": [
-                "Across his last 5 starts, he has averaged 3.4 strikeouts.",
-                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
-              ]
-            },
-            "reasons": [
-              "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume."
-            ],
-            "reason_summary": "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume.",
-            "rank": 3,
-            "recommendation_tier": "candidate"
-          }
-        ],
-        "extraHitterProps": [
-          {
-            "date": "2026-06-11",
-            "game_pk": 823619,
-            "away": "St. Louis Cardinals",
-            "home": "New York Mets",
-            "away_abbr": "STL",
-            "home_abbr": "NYM",
-            "double_header": "N",
-            "game_number": 1,
-            "event_id": null,
-            "commence_time": null,
-            "batter_id": 666182,
-            "batter_hand": "R",
-            "opponent_pitcher_id": 690928,
-            "opponent_pitcher_hand": "R",
-            "opponent_pitcher_name": "Hunter Dobbins",
-            "opponent": "STL",
-            "opponent_team_id": 138,
-            "lineup_source": "projected_rotowire_default_vs_rhp",
-            "lineup_confidence": 0.66,
-            "lineup_status": "projected",
-            "batter_k_rate": 0.1818783375899698,
-            "batter_bb_rate": 0.06547771070350591,
-            "batter_hr_rate": 0.014554794520547944,
-            "batter_inplay_hit_rate": 0.2652008456659619,
-            "batter_xb_hit_share": 0.14754098360655737,
-            "pitcher_k_rate": 0.2641509433962264,
-            "pitcher_bb_rate": 0.1320754716981132,
-            "pitcher_hr_rate": 0.018867924528301886,
-            "pitcher_inplay_hit_rate": 0.3125,
-            "pitcher_availability_mult": 1.0,
-            "pitcher_stamina_pitches": 94.0,
-            "pitcher_platoon_k_mult": 1.0906593406593408,
-            "pitcher_platoon_bb_mult": 0.8075,
-            "pitcher_platoon_hr_mult": 1.275,
-            "pitcher_platoon_inplay_mult": 0.89,
-            "batter_platoon_k_mult": 1.0326054062093937,
-            "batter_platoon_bb_mult": 0.912374585679843,
-            "batter_platoon_hr_mult": 0.78,
-            "batter_platoon_inplay_mult": 1.0098257324402153,
-            "opponent_primary_pitch_type": "FF",
-            "weather_source": "statsapi_live_feed",
-            "weather_wind_direction": "unknown",
-            "weather_hr_mult": 1.0,
-            "weather_inplay_hit_mult": 1.0,
-            "weather_xb_share_mult": 1.0,
-            "park_source": "statsapi_live_feed",
-            "venue_id": 3289,
-            "venue_name": "Citi Field",
-            "roof_type": "Open",
-            "park_hr_mult": 1.0246666666666666,
-            "park_inplay_hit_mult": 0.9901333333333333,
-            "park_xb_share_mult": 0.9876666666666667,
-            "market": "hitter_runs",
-            "market_label": "Hitter Runs",
-            "market_group": "hitter_props",
-            "player_name": "Bo Bichette",
-            "team": "NYM",
-            "prop": "batter_runs_scored",
-            "prop_market_key": "batter_runs_scored",
-            "selection": "under",
-            "edge": 0.13579859484777512,
-            "market_line": 0.5,
-            "model_prob_over": 0.332,
-            "market_prob_over": 0.46779859484777514,
-            "market_prob_under": 0.5322014051522248,
-            "market_prob_mode": "no_vig_two_way",
-            "market_no_vig_prob_over": 0.46779859484777514,
-            "selected_side_market_prob": 0.5322014051522248,
-            "selected_side_model_prob": 0.6679999999999999,
-            "mean_support": 0.10699999999999998,
-            "r_mean": 0.393,
-            "pa_mean": 4.727,
-            "ab_mean": 4.26,
-            "lineup_order": 2,
-            "market_alternates": [],
-            "odds": "-135",
-            "stake_u": 0.5,
-            "sim_sample_size": 1000,
-            "baseball_reasons": [
-              "Against STL, he has been held scoreless in 7 of 8 games.",
-              "Over his last 10 games, he has been held scoreless in 7 of 10 games."
-            ],
-            "explanation_diagnostic": {
-              "status": "supported",
-              "flag_sparse_support": false,
-              "support_min_reasons": 2,
-              "baseball_reasons_n": 2,
-              "reason_sentences_n": 5,
-              "market": "hitter_runs",
-              "subject": "Bo Bichette",
-              "supporting_reasons": [
-                "Against STL, he has been held scoreless in 7 of 8 games.",
-                "Over his last 10 games, he has been held scoreless in 7 of 10 games."
-              ]
-            },
-            "reasons": [
-              "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
-            ],
-            "reason_summary": "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
-            "rank": 1,
-            "recommendation_tier": "candidate"
-          }
-        ]
-      }
-    },
     {
       "gamePk": 824346,
       "status": {
@@ -1864,7 +813,7 @@
                 5
               ],
               "tone": "strong",
-              "detail": "Live projection 4.9. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
+              "detail": "Live projection 4.6. Current 3.0. Starter still active in live game state. Supported ladders: 5 Last supported rung: 5",
               "hitProb": 0.665,
               "source": "live",
               "actual": 3.0
@@ -1877,10 +826,10 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Live projection 16.2. Current 6.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
+              "detail": "Live projection 15.7. Current 9.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
               "hitProb": 0.819,
               "source": "live",
-              "actual": 6.0
+              "actual": 9.0
             },
             {
               "label": "H up to 6",
@@ -1890,10 +839,10 @@
                 6
               ],
               "tone": "strong",
-              "detail": "Live projection 5.8. Current 1.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
+              "detail": "Live projection 5.4. Current 2.0. Starter still active in live game state. Supported ladders: 6 Last supported rung: 6",
               "hitProb": 0.699,
               "source": "live",
-              "actual": 1.0
+              "actual": 2.0
             }
           ]
         },
@@ -1957,7 +906,7 @@
                 4
               ],
               "tone": "strong",
-              "detail": "Live projection 4.2. Current 2.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
+              "detail": "Live projection 3.9. Current 2.0. Starter still active in live game state. Supported ladders: 4 Last supported rung: 4",
               "hitProb": 0.736,
               "source": "live",
               "actual": 2.0
@@ -1970,10 +919,10 @@
                 16
               ],
               "tone": "strong",
-              "detail": "Live projection 16.1. Current 6.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
+              "detail": "Live projection 15.7. Current 9.0. Starter still active in live game state. Supported ladders: 16 Last supported rung: 16",
               "hitProb": 0.787,
               "source": "live",
-              "actual": 6.0
+              "actual": 9.0
             }
           ]
         }
@@ -6839,6 +5788,1057 @@
         ],
         "extraPitcherProps": [],
         "extraHitterProps": []
+      }
+    },
+    {
+      "gamePk": 823619,
+      "status": {
+        "abstract": "Live",
+        "detailed": "In Progress"
+      },
+      "startTime": "12:10 PM",
+      "matchup": {
+        "away": {
+          "abbr": "STL",
+          "id": 138,
+          "logo": "https://www.mlbstatic.com/team-logos/138.svg",
+          "name": "St. Louis Cardinals"
+        },
+        "home": {
+          "abbr": "NYM",
+          "id": 121,
+          "logo": "https://www.mlbstatic.com/team-logos/121.svg",
+          "name": "New York Mets"
+        },
+        "score": {
+          "away": 0,
+          "home": 0
+        },
+        "liveText": "Hunter Dobbins vs Christian Scott | 1 official pick(s) | +2 playable"
+      },
+      "predictions": {
+        "first1": {
+          "away_runs_mean": 0.583,
+          "home_runs_mean": 0.394,
+          "away_win_prob": 0.249,
+          "home_win_prob": 0.17,
+          "tie_prob": 0.581
+        },
+        "first3": {
+          "away_runs_mean": 1.56,
+          "home_runs_mean": 1.266,
+          "away_win_prob": 0.419,
+          "home_win_prob": 0.326,
+          "tie_prob": 0.255
+        },
+        "first5": {
+          "away_runs_mean": 2.464,
+          "home_runs_mean": 2.092,
+          "away_win_prob": 0.464,
+          "home_win_prob": 0.366,
+          "tie_prob": 0.17
+        },
+        "full": {
+          "away_runs_mean": 4.457,
+          "home_runs_mean": 3.762,
+          "away_win_prob": 0.545,
+          "home_win_prob": 0.455,
+          "tie_prob": 0.0
+        }
+      },
+      "gameMarkets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "away": "St. Louis Cardinals",
+            "home": "New York Mets",
+            "away_abbr": "STL",
+            "home_abbr": "NYM",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 666182,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 690928,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Dobbins",
+            "opponent": "STL",
+            "opponent_team_id": 138,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.1818783375899698,
+            "batter_bb_rate": 0.06547771070350591,
+            "batter_hr_rate": 0.014554794520547944,
+            "batter_inplay_hit_rate": 0.2652008456659619,
+            "batter_xb_hit_share": 0.14754098360655737,
+            "pitcher_k_rate": 0.2641509433962264,
+            "pitcher_bb_rate": 0.1320754716981132,
+            "pitcher_hr_rate": 0.018867924528301886,
+            "pitcher_inplay_hit_rate": 0.3125,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 94.0,
+            "pitcher_platoon_k_mult": 1.0906593406593408,
+            "pitcher_platoon_bb_mult": 0.8075,
+            "pitcher_platoon_hr_mult": 1.275,
+            "pitcher_platoon_inplay_mult": 0.89,
+            "batter_platoon_k_mult": 1.0326054062093937,
+            "batter_platoon_bb_mult": 0.912374585679843,
+            "batter_platoon_hr_mult": 0.78,
+            "batter_platoon_inplay_mult": 1.0098257324402153,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 3289,
+            "venue_name": "Citi Field",
+            "roof_type": "Open",
+            "park_hr_mult": 1.0246666666666666,
+            "park_inplay_hit_mult": 0.9901333333333333,
+            "park_xb_share_mult": 0.9876666666666667,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Bo Bichette",
+            "team": "NYM",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "under",
+            "edge": 0.1468654897672238,
+            "market_line": 1.5,
+            "model_prob_over": 0.314,
+            "market_prob_over": 0.46086548976722386,
+            "market_prob_under": 0.5391345102327761,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.46086548976722386,
+            "selected_side_market_prob": 0.5391345102327761,
+            "selected_side_model_prob": 0.6859999999999999,
+            "mean_support": 0.272,
+            "tb_mean": 1.228,
+            "pa_mean": 4.727,
+            "ab_mean": 4.26,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "-136",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
+              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Bo Bichette",
+              "supporting_reasons": [
+                "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
+            ],
+            "reason_summary": "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
+            "rank": 2,
+            "recommendation_tier": "official"
+          }
+        ],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "away": "St. Louis Cardinals",
+            "home": "New York Mets",
+            "away_abbr": "STL",
+            "home_abbr": "NYM",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 690928,
+            "pitcher_name": "Hunter Dobbins",
+            "team": "STL",
+            "team_side": "away",
+            "prop": "strikeouts",
+            "selection": "over",
+            "edge": 0.3319072681704261,
+            "market_line": 3.5,
+            "model_prob_over": 0.794,
+            "market_prob_over": 0.46209273182957394,
+            "market_prob_under": 0.5379072681704261,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.46209273182957394,
+            "selected_side_market_prob": 0.46209273182957394,
+            "selected_side_model_prob": 0.794,
+            "mean_support": 1.6449999999999996,
+            "so_mean": 5.145,
+            "market_alternates": [],
+            "odds": "+102",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 3.4 strikeouts.",
+              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:strikeouts",
+              "subject": "Hunter Dobbins",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 3.4 strikeouts.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume.",
+            "rank": 3,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "away": "St. Louis Cardinals",
+            "home": "New York Mets",
+            "away_abbr": "STL",
+            "home_abbr": "NYM",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 666182,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 690928,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Dobbins",
+            "opponent": "STL",
+            "opponent_team_id": 138,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.1818783375899698,
+            "batter_bb_rate": 0.06547771070350591,
+            "batter_hr_rate": 0.014554794520547944,
+            "batter_inplay_hit_rate": 0.2652008456659619,
+            "batter_xb_hit_share": 0.14754098360655737,
+            "pitcher_k_rate": 0.2641509433962264,
+            "pitcher_bb_rate": 0.1320754716981132,
+            "pitcher_hr_rate": 0.018867924528301886,
+            "pitcher_inplay_hit_rate": 0.3125,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 94.0,
+            "pitcher_platoon_k_mult": 1.0906593406593408,
+            "pitcher_platoon_bb_mult": 0.8075,
+            "pitcher_platoon_hr_mult": 1.275,
+            "pitcher_platoon_inplay_mult": 0.89,
+            "batter_platoon_k_mult": 1.0326054062093937,
+            "batter_platoon_bb_mult": 0.912374585679843,
+            "batter_platoon_hr_mult": 0.78,
+            "batter_platoon_inplay_mult": 1.0098257324402153,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 3289,
+            "venue_name": "Citi Field",
+            "roof_type": "Open",
+            "park_hr_mult": 1.0246666666666666,
+            "park_inplay_hit_mult": 0.9901333333333333,
+            "park_xb_share_mult": 0.9876666666666667,
+            "market": "hitter_runs",
+            "market_label": "Hitter Runs",
+            "market_group": "hitter_props",
+            "player_name": "Bo Bichette",
+            "team": "NYM",
+            "prop": "batter_runs_scored",
+            "prop_market_key": "batter_runs_scored",
+            "selection": "under",
+            "edge": 0.13579859484777512,
+            "market_line": 0.5,
+            "model_prob_over": 0.332,
+            "market_prob_over": 0.46779859484777514,
+            "market_prob_under": 0.5322014051522248,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.46779859484777514,
+            "selected_side_market_prob": 0.5322014051522248,
+            "selected_side_model_prob": 0.6679999999999999,
+            "mean_support": 0.10699999999999998,
+            "r_mean": 0.393,
+            "pa_mean": 4.727,
+            "ab_mean": 4.26,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "-135",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against STL, he has been held scoreless in 7 of 8 games.",
+              "Over his last 10 games, he has been held scoreless in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_runs",
+              "subject": "Bo Bichette",
+              "supporting_reasons": [
+                "Against STL, he has been held scoreless in 7 of 8 games.",
+                "Over his last 10 games, he has been held scoreless in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
+            ],
+            "reason_summary": "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
+            "rank": 1,
+            "recommendation_tier": "candidate"
+          }
+        ]
+      },
+      "gameLens": [
+        {
+          "key": "first1",
+          "label": "F1",
+          "closed": false,
+          "badge": "No bet",
+          "score": "STL 0 - NYM 0",
+          "subtitle": "STL 0.58 - NYM 0.39 | Total 0.98",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 0.98,
+            "homeMargin": -0.19
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 0.98,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.19,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first3",
+          "label": "F3",
+          "closed": false,
+          "badge": "No bet",
+          "score": "STL 0 - NYM 0",
+          "subtitle": "STL 1.56 - NYM 1.27 | Total 2.83",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 2.83,
+            "homeMargin": -0.29
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 2.83,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.29,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "F5",
+          "closed": false,
+          "badge": "No bet",
+          "score": "STL 0 - NYM 0",
+          "subtitle": "STL 2.46 - NYM 2.09 | Total 4.56",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 4.56,
+            "homeMargin": -0.37
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 4.56,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.37,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first5",
+          "label": "Full game",
+          "closed": false,
+          "badge": "No bet",
+          "score": "STL 0 - NYM 0",
+          "subtitle": "STL 4.46 - NYM 3.76 | Total 8.22",
+          "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation.",
+          "projection": {
+            "total": 8.22,
+            "homeMargin": -0.69
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 8.22,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "spread": {
+              "pick": null,
+              "homeLine": -0.69,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            },
+            "moneyline": {
+              "pick": null,
+              "reason": "Pregame recommendations are suppressed while this surface is under re-evaluation."
+            }
+          }
+        },
+        {
+          "key": "first1",
+          "label": "First 1",
+          "closed": false,
+          "badge": "",
+          "score": "STL 24.9% | NYM 17.0% | Tie 58.1%",
+          "subtitle": "STL 24.9% | NYM 17.0% | Tie 58.1%",
+          "reason": "STL 24.9% | NYM 17.0% | Tie 58.1%",
+          "projection": {
+            "total": 24.9,
+            "homeMargin": 17.0
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 24.9,
+              "reason": "STL 24.9% | NYM 17.0% | Tie 58.1%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first3",
+          "label": "First 3",
+          "closed": false,
+          "badge": "",
+          "score": "STL 41.9% | NYM 32.6% | Tie 25.5%",
+          "subtitle": "STL 41.9% | NYM 32.6% | Tie 25.5%",
+          "reason": "STL 41.9% | NYM 32.6% | Tie 25.5%",
+          "projection": {
+            "total": 41.9,
+            "homeMargin": 32.6
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 41.9,
+              "reason": "STL 41.9% | NYM 32.6% | Tie 25.5%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "first5",
+          "label": "First 5",
+          "closed": false,
+          "badge": "",
+          "score": "STL 46.4% | NYM 36.6% | Tie 17.0%",
+          "subtitle": "STL 46.4% | NYM 36.6% | Tie 17.0%",
+          "reason": "STL 46.4% | NYM 36.6% | Tie 17.0%",
+          "projection": {
+            "total": 46.4,
+            "homeMargin": 36.6
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 46.4,
+              "reason": "STL 46.4% | NYM 36.6% | Tie 17.0%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        },
+        {
+          "key": "full",
+          "label": "Full game",
+          "closed": false,
+          "badge": "",
+          "score": "STL 54.5% | NYM 45.5% | Tie 0.0%",
+          "subtitle": "STL 54.5% | NYM 45.5% | Tie 0.0%",
+          "reason": "STL 54.5% | NYM 45.5% | Tie 0.0%",
+          "projection": {
+            "total": 54.5,
+            "homeMargin": 45.5
+          },
+          "markets": {
+            "total": {
+              "pick": null,
+              "line": 54.5,
+              "reason": "STL 54.5% | NYM 45.5% | Tie 0.0%"
+            },
+            "spread": {},
+            "moneyline": {}
+          }
+        }
+      ],
+      "props": [
+        {
+          "playerName": "Hunter Dobbins",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 3.5,
+          "odds": "+102",
+          "modelProbOver": 0.794,
+          "estimatedWinProb": 0.794,
+          "rankingScore": 0.3319072681704261
+        },
+        {
+          "playerName": "Bo Bichette",
+          "selection": "Under",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "-136",
+          "modelProbOver": 0.314,
+          "estimatedWinProb": 0.314,
+          "rankingScore": 0.1468654897672238
+        },
+        {
+          "playerName": "Bo Bichette",
+          "selection": "Under",
+          "marketLabel": "Hitter Runs",
+          "market": "hitter_runs",
+          "line": 0.5,
+          "odds": "-135",
+          "modelProbOver": 0.332,
+          "estimatedWinProb": 0.332,
+          "rankingScore": 0.13579859484777512
+        }
+      ],
+      "liveProps": [
+        {
+          "playerName": "Hunter Dobbins",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 3.5,
+          "odds": "+102",
+          "modelProbOver": 0.794,
+          "estimatedWinProb": 0.794,
+          "rankingScore": 0.3319072681704261
+        },
+        {
+          "playerName": "Bo Bichette",
+          "selection": "Under",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "-136",
+          "modelProbOver": 0.314,
+          "estimatedWinProb": 0.314,
+          "rankingScore": 0.1468654897672238
+        },
+        {
+          "playerName": "Bo Bichette",
+          "selection": "Under",
+          "marketLabel": "Hitter Runs",
+          "market": "hitter_runs",
+          "line": 0.5,
+          "odds": "-135",
+          "modelProbOver": 0.332,
+          "estimatedWinProb": 0.332,
+          "rankingScore": 0.13579859484777512
+        }
+      ],
+      "archivedLiveProps": [],
+      "trackedProps": [
+        {
+          "playerName": "Hunter Dobbins",
+          "selection": "Over",
+          "marketLabel": "pitcher_props",
+          "market": "pitcher_props",
+          "line": 3.5,
+          "odds": "+102",
+          "modelProbOver": 0.794,
+          "estimatedWinProb": 0.794,
+          "rankingScore": 0.3319072681704261
+        },
+        {
+          "playerName": "Bo Bichette",
+          "selection": "Under",
+          "marketLabel": "Hitter Total Bases",
+          "market": "hitter_total_bases",
+          "line": 1.5,
+          "odds": "-136",
+          "modelProbOver": 0.314,
+          "estimatedWinProb": 0.314,
+          "rankingScore": 0.1468654897672238
+        },
+        {
+          "playerName": "Bo Bichette",
+          "selection": "Under",
+          "marketLabel": "Hitter Runs",
+          "market": "hitter_runs",
+          "line": 0.5,
+          "odds": "-135",
+          "modelProbOver": 0.332,
+          "estimatedWinProb": 0.332,
+          "rankingScore": 0.13579859484777512
+        }
+      ],
+      "simContextAvailable": false,
+      "snapshotAvailable": true,
+      "score": {
+        "away": 0,
+        "home": 0
+      },
+      "market_tiles": [
+        {
+          "label": "Game total",
+          "title": "No total play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Moneyline",
+          "title": "No ML play",
+          "sub": "Off card"
+        },
+        {
+          "label": "Pitcher props",
+          "title": "Hunter Dobbins Over 3.5 Strikeouts",
+          "sub": "Playable only | +102"
+        },
+        {
+          "label": "Hitter props",
+          "title": "Bo Bichette Under 1.5 Batter Total Bases",
+          "sub": "-136"
+        }
+      ],
+      "probable": {
+        "away": {
+          "id": 690928,
+          "fullName": "Hunter Dobbins",
+          "ladderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.238
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.281
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 4",
+              "stat": "strikeouts",
+              "target": 4,
+              "targets": [
+                4
+              ],
+              "tone": "soft",
+              "detail": "Supported ladders: 4/5/6/7 Last supported rung: 7 Supported ladders: 4 Last supported rung: 4",
+              "hitProb": 0.238
+            },
+            {
+              "label": "H up to 6",
+              "stat": "hits_allowed",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6/7/8 Last supported rung: 8 Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.281
+            }
+          ]
+        },
+        "home": {
+          "id": null,
+          "fullName": "Christian Scott",
+          "ladderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.334
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.308
+            }
+          ],
+          "pregameLadderBadges": [
+            {
+              "label": "K up to 6",
+              "stat": "strikeouts",
+              "target": 6,
+              "targets": [
+                6
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 6 Last supported rung: 6",
+              "hitProb": 0.334
+            },
+            {
+              "label": "H up to 5",
+              "stat": "hits_allowed",
+              "target": 5,
+              "targets": [
+                5
+              ],
+              "tone": "solid",
+              "detail": "Supported ladders: 5/6/7/8 Last supported rung: 8 Supported ladders: 5 Last supported rung: 5",
+              "hitProb": 0.308
+            }
+          ]
+        }
+      },
+      "markets": {
+        "totals": null,
+        "ml": null,
+        "pitcherProps": [],
+        "hitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "away": "St. Louis Cardinals",
+            "home": "New York Mets",
+            "away_abbr": "STL",
+            "home_abbr": "NYM",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 666182,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 690928,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Dobbins",
+            "opponent": "STL",
+            "opponent_team_id": 138,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.1818783375899698,
+            "batter_bb_rate": 0.06547771070350591,
+            "batter_hr_rate": 0.014554794520547944,
+            "batter_inplay_hit_rate": 0.2652008456659619,
+            "batter_xb_hit_share": 0.14754098360655737,
+            "pitcher_k_rate": 0.2641509433962264,
+            "pitcher_bb_rate": 0.1320754716981132,
+            "pitcher_hr_rate": 0.018867924528301886,
+            "pitcher_inplay_hit_rate": 0.3125,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 94.0,
+            "pitcher_platoon_k_mult": 1.0906593406593408,
+            "pitcher_platoon_bb_mult": 0.8075,
+            "pitcher_platoon_hr_mult": 1.275,
+            "pitcher_platoon_inplay_mult": 0.89,
+            "batter_platoon_k_mult": 1.0326054062093937,
+            "batter_platoon_bb_mult": 0.912374585679843,
+            "batter_platoon_hr_mult": 0.78,
+            "batter_platoon_inplay_mult": 1.0098257324402153,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 3289,
+            "venue_name": "Citi Field",
+            "roof_type": "Open",
+            "park_hr_mult": 1.0246666666666666,
+            "park_inplay_hit_mult": 0.9901333333333333,
+            "park_xb_share_mult": 0.9876666666666667,
+            "market": "hitter_total_bases",
+            "market_label": "Hitter Total Bases",
+            "market_group": "hitter_props",
+            "player_name": "Bo Bichette",
+            "team": "NYM",
+            "prop": "batter_total_bases",
+            "prop_market_key": "batter_total_bases",
+            "selection": "under",
+            "edge": 0.1468654897672238,
+            "market_line": 1.5,
+            "model_prob_over": 0.314,
+            "market_prob_over": 0.46086548976722386,
+            "market_prob_under": 0.5391345102327761,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.46086548976722386,
+            "selected_side_market_prob": 0.5391345102327761,
+            "selected_side_model_prob": 0.6859999999999999,
+            "mean_support": 0.272,
+            "tb_mean": 1.228,
+            "pa_mean": 4.727,
+            "ab_mean": 4.26,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "-136",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
+              "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_total_bases",
+              "subject": "Bo Bichette",
+              "supporting_reasons": [
+                "Against STL, he has been held to one total base or fewer in 7 of 8 games.",
+                "Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
+            ],
+            "reason_summary": "The model lands on the under side in 68.6% of sims, while the market is pricing it closer to 53.9%. Against STL, he has been held to one total base or fewer in 7 of 8 games. Over his last 10 games, he has been held to one total base or fewer in 7 of 10 games. The model baseline comes in around 1.2 batter total bases against a line of 1.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
+            "rank": 2,
+            "recommendation_tier": "official"
+          }
+        ],
+        "extraPitcherProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "away": "St. Louis Cardinals",
+            "home": "New York Mets",
+            "away_abbr": "STL",
+            "home_abbr": "NYM",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "market": "pitcher_props",
+            "pitcher_id": 690928,
+            "pitcher_name": "Hunter Dobbins",
+            "team": "STL",
+            "team_side": "away",
+            "prop": "strikeouts",
+            "selection": "over",
+            "edge": 0.3319072681704261,
+            "market_line": 3.5,
+            "model_prob_over": 0.794,
+            "market_prob_over": 0.46209273182957394,
+            "market_prob_under": 0.5379072681704261,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.46209273182957394,
+            "selected_side_market_prob": 0.46209273182957394,
+            "selected_side_model_prob": 0.794,
+            "mean_support": 1.6449999999999996,
+            "so_mean": 5.145,
+            "market_alternates": [],
+            "odds": "+102",
+            "stake_u": 1.0,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Across his last 5 starts, he has averaged 3.4 strikeouts.",
+              "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "pitcher_props:strikeouts",
+              "subject": "Hunter Dobbins",
+              "supporting_reasons": [
+                "Across his last 5 starts, he has averaged 3.4 strikeouts.",
+                "His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient."
+              ]
+            },
+            "reasons": [
+              "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume."
+            ],
+            "reason_summary": "The model lands on the over side in 79.4% of sims, while the market is pricing it closer to 46.2%. Across his last 5 starts, he has averaged 3.4 strikeouts. His modeled workload cap still reaches roughly 94 pitches, so the deeper-start path is still available if the outing stays efficient. The model baseline sits around 5.1 strikeouts against a line of 3.5. If he stays on his normal starter path, the matchup against NYM gives him a fair shot to reach full workload volume.",
+            "rank": 3,
+            "recommendation_tier": "candidate"
+          }
+        ],
+        "extraHitterProps": [
+          {
+            "date": "2026-06-11",
+            "game_pk": 823619,
+            "away": "St. Louis Cardinals",
+            "home": "New York Mets",
+            "away_abbr": "STL",
+            "home_abbr": "NYM",
+            "double_header": "N",
+            "game_number": 1,
+            "event_id": null,
+            "commence_time": null,
+            "batter_id": 666182,
+            "batter_hand": "R",
+            "opponent_pitcher_id": 690928,
+            "opponent_pitcher_hand": "R",
+            "opponent_pitcher_name": "Hunter Dobbins",
+            "opponent": "STL",
+            "opponent_team_id": 138,
+            "lineup_source": "projected_rotowire_default_vs_rhp",
+            "lineup_confidence": 0.66,
+            "lineup_status": "projected",
+            "batter_k_rate": 0.1818783375899698,
+            "batter_bb_rate": 0.06547771070350591,
+            "batter_hr_rate": 0.014554794520547944,
+            "batter_inplay_hit_rate": 0.2652008456659619,
+            "batter_xb_hit_share": 0.14754098360655737,
+            "pitcher_k_rate": 0.2641509433962264,
+            "pitcher_bb_rate": 0.1320754716981132,
+            "pitcher_hr_rate": 0.018867924528301886,
+            "pitcher_inplay_hit_rate": 0.3125,
+            "pitcher_availability_mult": 1.0,
+            "pitcher_stamina_pitches": 94.0,
+            "pitcher_platoon_k_mult": 1.0906593406593408,
+            "pitcher_platoon_bb_mult": 0.8075,
+            "pitcher_platoon_hr_mult": 1.275,
+            "pitcher_platoon_inplay_mult": 0.89,
+            "batter_platoon_k_mult": 1.0326054062093937,
+            "batter_platoon_bb_mult": 0.912374585679843,
+            "batter_platoon_hr_mult": 0.78,
+            "batter_platoon_inplay_mult": 1.0098257324402153,
+            "opponent_primary_pitch_type": "FF",
+            "weather_source": "statsapi_live_feed",
+            "weather_wind_direction": "unknown",
+            "weather_hr_mult": 1.0,
+            "weather_inplay_hit_mult": 1.0,
+            "weather_xb_share_mult": 1.0,
+            "park_source": "statsapi_live_feed",
+            "venue_id": 3289,
+            "venue_name": "Citi Field",
+            "roof_type": "Open",
+            "park_hr_mult": 1.0246666666666666,
+            "park_inplay_hit_mult": 0.9901333333333333,
+            "park_xb_share_mult": 0.9876666666666667,
+            "market": "hitter_runs",
+            "market_label": "Hitter Runs",
+            "market_group": "hitter_props",
+            "player_name": "Bo Bichette",
+            "team": "NYM",
+            "prop": "batter_runs_scored",
+            "prop_market_key": "batter_runs_scored",
+            "selection": "under",
+            "edge": 0.13579859484777512,
+            "market_line": 0.5,
+            "model_prob_over": 0.332,
+            "market_prob_over": 0.46779859484777514,
+            "market_prob_under": 0.5322014051522248,
+            "market_prob_mode": "no_vig_two_way",
+            "market_no_vig_prob_over": 0.46779859484777514,
+            "selected_side_market_prob": 0.5322014051522248,
+            "selected_side_model_prob": 0.6679999999999999,
+            "mean_support": 0.10699999999999998,
+            "r_mean": 0.393,
+            "pa_mean": 4.727,
+            "ab_mean": 4.26,
+            "lineup_order": 2,
+            "market_alternates": [],
+            "odds": "-135",
+            "stake_u": 0.5,
+            "sim_sample_size": 1000,
+            "baseball_reasons": [
+              "Against STL, he has been held scoreless in 7 of 8 games.",
+              "Over his last 10 games, he has been held scoreless in 7 of 10 games."
+            ],
+            "explanation_diagnostic": {
+              "status": "supported",
+              "flag_sparse_support": false,
+              "support_min_reasons": 2,
+              "baseball_reasons_n": 2,
+              "reason_sentences_n": 5,
+              "market": "hitter_runs",
+              "subject": "Bo Bichette",
+              "supporting_reasons": [
+                "Against STL, he has been held scoreless in 7 of 8 games.",
+                "Over his last 10 games, he has been held scoreless in 7 of 10 games."
+              ]
+            },
+            "reasons": [
+              "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances."
+            ],
+            "reason_summary": "The model lands on the under side in 66.8% of sims, while the market is pricing it closer to 53.2%. Against STL, he has been held scoreless in 7 of 8 games. Over his last 10 games, he has been held scoreless in 7 of 10 games. The model baseline comes in around 0.4 batter runs scored against a line of 0.5. He is projected to hit in the 2 spot, which points to about 4.7 plate appearances.",
+            "rank": 1,
+            "recommendation_tier": "candidate"
+          }
+        ]
       }
     },
     {
