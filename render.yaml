@@ -57,7 +57,7 @@ services:
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "0"
       - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
-        value: "true"
+        value: "false"
       - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
         value: "false"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
@@ -96,6 +96,57 @@ services:
         value: "30"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "30"
+
+  - type: worker
+    name: syndicate-refresh-worker
+    env: python
+    plan: standard
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/run_intelligence_worker.py
+    disk:
+      name: syndicate-data-worker
+      mountPath: /opt/render/project/data
+      sizeGB: 50
+    envVars:
+      - key: TZ
+        value: America/Chicago
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ODDS_API_KEY
+        value: 77ae1c35140c82da1675af85dde36a44
+      - key: SYNDICATE_REFRESH_LAUNCH_MODE
+        value: detached_subprocess
+      - key: SYNDICATE_REFRESH_STATE_BACKEND
+        value: keyvalue
+      - key: SYNDICATE_DATA_ROOT
+        value: /opt/render/project/data
+      - key: SYNDICATE_REPORTS_ROOT
+        value: /opt/render/project/data/reports
+      - key: SYNDICATE_BOOTSTRAP_ON_START
+        value: "0"
+      - key: SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
+        value: "true"
+      - key: SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
+        value: "true"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS
+        value: "30"
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_PHASE
+        value: live
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE
+        value: source
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
+        value: us
+      - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
+        value: "true"
+      - key: MLB_BETTING_DATA_ROOT
+        value: /opt/render/project/data/mlb_source/source_artifacts/data
+      - key: NBA_BETTING_DATA_ROOT
+        value: /opt/render/project/data/nba_source/source_artifacts/data
+      - key: WNBA_BETTING_DATA_ROOT
+        value: /opt/render/project/data/wnba_source/source_artifacts/data
+      - key: NHL_DATA_DIR
+        value: /opt/render/project/data/nhl_source/source_artifacts/data
 
   - type: cron
     name: syndicate-odds-refresh-live

@@ -19,6 +19,12 @@ class HomeHealthRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ok": True, "service": "syndicate"})
 
+    def test_api_health_alias_returns_same_payload(self) -> None:
+        response = self.client.get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True, "service": "syndicate"})
+
     def test_versionz_exposes_public_deploy_and_checkout_metadata(self) -> None:
         with patch.dict(
             os.environ,

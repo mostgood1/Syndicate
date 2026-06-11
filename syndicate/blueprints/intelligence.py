@@ -7,9 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, jsonify, render_template, request
+from flask import redirect
 
 from pipeline.intelligence_state import get_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
+from pipeline.intelligence_state import intelligence_state_status
 from pipeline.intelligence_state import queue_intelligence_state_refresh
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import _market_focus_labels
@@ -513,8 +515,24 @@ def intelligence_status_api():
     try:
         status = build_intelligence_status(selected_date=selected_date)
     except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc), "selected_date": selected_date}), 500
+        status = intelligence_state_status()
+        response_payload = {"ok": False, "error": str(exc), "selected_date": selected_date, "status": status, "cachedOnly": True}
+        if isinstance(status, dict):
+            for key, value in status.items():
+                if key in {"ok", "error", "cachedOnly", "status"}:
+                    continue
+                response_payload[key] = value
+        return jsonify(response_payload)
     response_payload = {"ok": True, "status": status}
     if isinstance(status, dict):
-        response_payload.update(status)
+        for key, value in status.items():
+            if key == "ok":
+                continue
+            response_payload[key] = value
     return jsonify(response_payload)
+
+
+@intelligence_bp.get("/intelligence/status")
+def intelligence_status_page():
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    return redirect(f"/api/intelligence/status?date={selected_date}", code=302)

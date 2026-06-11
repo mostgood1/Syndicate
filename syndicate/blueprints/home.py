@@ -145,6 +145,11 @@ def healthz():
     return jsonify(payload)
 
 
+@home_bp.get("/api/health")
+def api_health():
+    return healthz()
+
+
 @home_bp.get("/versionz")
 def versionz():
     return jsonify({"ok": True, "version": _public_detailed_version_payload()})

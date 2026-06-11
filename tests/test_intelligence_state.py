@@ -12,6 +12,7 @@ from pipeline.intelligence_state import IntelligenceSnapshot
 from pipeline.intelligence_state import IntelligenceStateService
 from pipeline.intelligence_state import _payload_key
 from syndicate.blueprints.intelligence import intelligence_bp
+from syndicate.blueprints.intelligence import intelligence_status_api
 from syndicate.blueprints.intelligence import intelligence_query_api
 
 
@@ -62,6 +63,35 @@ class IntelligenceStateTests(unittest.TestCase):
         mocked_read.assert_called_once()
         mocked_queue.assert_not_called()
         self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+
+    def test_status_endpoint_falls_back_to_cached_state_when_live_build_fails(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        cached_status = {"ok": True, "cached": True, "state": {"threadAlive": True}}
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.build_intelligence_status", side_effect=RuntimeError("boom")):
+                with patch("syndicate.blueprints.intelligence.intelligence_state_status", return_value=dict(cached_status)) as mocked_status:
+                    response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(payload["ok"])
+        self.assertTrue(payload["cachedOnly"])
+        self.assertEqual(payload["status"], cached_status)
+        mocked_status.assert_called_once()
+
+    def test_status_page_redirects_to_api_status(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        with app.test_request_context("/intelligence/status?date=2026-06-10", method="GET"):
+            response = app.view_functions["syndicate_intelligence.intelligence_status_page"]()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/api/intelligence/status?date=2026-06-10", response.location)
 
     def test_compute_response_reuses_source_cache_until_state_changes(self) -> None:
         service = IntelligenceStateService()
