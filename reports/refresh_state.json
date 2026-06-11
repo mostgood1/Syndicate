@@ -1,0 +1,14 @@
+{
+  "steps": {
+    "nba_artifact_bundle:2026-06-10:1:1": {
+      "inputHash": "be13bca8d7e30952a2eeee1f1d8d0ce33b014f642382132fb6077c870cc718d6",
+      "updatedAt": "2026-06-11T03:15:38.222688",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-10",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source\\source_artifacts"
+      }
+    }
+  }
+}

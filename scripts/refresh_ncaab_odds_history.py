@@ -12,6 +12,10 @@ import urllib.request
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from syndicate.features.shared.refresh_state_store import build_input_hash
+from syndicate.features.shared.refresh_state_store import record_refresh_state
+from syndicate.features.shared.refresh_state_store import should_recompute
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -484,6 +488,7 @@ def main() -> int:
     parser.add_argument("--markets", default="h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2")
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--mode", default="current", choices=("current", "history"))
+    parser.add_argument("--refresh-mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
 
     source_root = Path(args.source_root).resolve() if args.source_root else None
@@ -501,7 +506,33 @@ def main() -> int:
         rows = _fetch_current_rows(adapter=adapter, date_iso=date_iso, markets=str(args.markets or ""), bookmakers=args.bookmakers)
 
     out_path = out_dir / f"odds_{date_iso}.csv"
+    input_hash = build_input_hash(
+        {
+            "step": f"ncaab_odds_{args.mode}",
+            "date": date_iso,
+            "region": str(args.region or "us"),
+            "bookmakers": str(args.bookmakers or ""),
+            "markets": str(args.markets or ""),
+            "rows": rows,
+        }
+    )
+    if not should_recompute(f"ncaab_odds_{args.mode}:{date_iso}", input_hash) and out_path.exists():
+        print(f"Reused {len(rows)} odds rows at {out_path}")
+        return 0
     _write_rows(out_path, rows)
+    record_refresh_state(
+        f"ncaab_odds_{args.mode}:{date_iso}",
+        input_hash,
+        outputs=[str(out_path)],
+        metadata={
+            "date": date_iso,
+            "mode": args.mode,
+            "region": str(args.region or "us"),
+            "bookmakers": str(args.bookmakers or ""),
+            "markets": str(args.markets or ""),
+            "rows": len(rows),
+        },
+    )
     print(f"Wrote {len(rows)} odds rows to {out_path}")
     return 0
 

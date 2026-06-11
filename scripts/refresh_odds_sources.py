@@ -713,6 +713,23 @@ def _step_requires_source_root(step: RefreshStep) -> bool:
     return any(str(part) == "--source-root" for part in step.command)
 
 
+def _step_command_with_mode(step: RefreshStep, mode: str) -> tuple[str, ...]:
+    normalized_mode = str(mode or "full").strip().lower() or "full"
+    command = list(step.command)
+    if normalized_mode != "full":
+        refresh_script_names = {
+            "refresh_mlb_oddsapi.py",
+            "refresh_nba_oddsapi_props.py",
+            "refresh_wnba_oddsapi_props.py",
+            "refresh_nhl_oddsapi.py",
+            "refresh_nfl_oddsapi.py",
+            "refresh_ncaaf_oddsapi.py",
+        }
+        if any(str(part).endswith(tuple(refresh_script_names)) for part in command):
+            command.extend(["--mode", normalized_mode])
+    return tuple(command)
+
+
 def _mirror_command(script_name: str, *, date: str, sport: str | None = None, mirror_only: bool = False) -> RefreshStep:
     command = [_powershell(), "-ExecutionPolicy", "Bypass", "-File", str(REPO_ROOT / "scripts" / script_name)]
     if script_name not in {"refresh_nfl_source_mirror.ps1", "refresh_ncaaf_source_mirror.ps1"}:
@@ -801,6 +818,7 @@ def _publish_sport_manifest_threadsafe(*, sport: str, artifact_paths: list[str],
 
 def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str) -> dict[str, Any]:
     spec = REGISTRY[sport]
+    refresh_mode = str(getattr(args, "mode", "full") or "full").strip().lower() or "full"
     if spec.slug == "mlb":
         source_root = _local_mlb_bundle_root()
     elif spec.slug in {"nba", "wnba"}:
@@ -840,13 +858,40 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             return sport_result
 
     for step in refresh_steps:
-        step_result = _run_command(step, dry_run=bool(args.dry_run))
+        step_result = _run_command(
+            RefreshStep(
+                name=step.name,
+                phases=step.phases,
+                cwd=step.cwd,
+                command=_step_command_with_mode(step, refresh_mode),
+                env_updates=step.env_updates,
+                description=step.description,
+            ),
+            dry_run=bool(args.dry_run),
+        )
         sport_result["refresh_steps"].append(step_result)
         sport_result["generation"]["steps"].append(step_result)
         if not step_result["ok"]:
             sport_result["ok"] = False
             if not args.continue_on_error:
                 return sport_result
+
+    if refresh_mode == "fast":
+        published_manifest = _publish_sport_manifest_threadsafe(
+            sport=spec.slug,
+            artifact_paths=_sport_artifact_paths(sport_result),
+            metadata={
+                "date": args.date,
+                "phase": args.phase,
+                "execution_mode": execution_mode,
+                "refresh_mode": refresh_mode,
+                "ok": bool(sport_result.get("ok")),
+                "post_refresh_ok": None,
+                "mirror_ok": None,
+            },
+        )
+        sport_result["sport_manifest"] = published_manifest
+        return sport_result
 
     if execution_mode == "source" and spec.slug in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaab", "ncaaf"} and sport_result["ok"]:
         tracking_result = _sync_post_refresh_tracking_step(
@@ -904,6 +949,7 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             "date": args.date,
             "phase": args.phase,
             "execution_mode": execution_mode,
+            "refresh_mode": refresh_mode,
             "ok": bool(sport_result.get("ok")),
             "post_refresh_ok": bool((sport_result.get("post_refresh") or {}).get("ok")) if isinstance(sport_result.get("post_refresh"), dict) else None,
             "mirror_ok": bool((sport_result.get("mirror") or {}).get("ok")) if isinstance(sport_result.get("mirror"), dict) else None,
@@ -983,6 +1029,7 @@ def main() -> int:
     parser.add_argument("--date", default=datetime.now().strftime("%Y-%m-%d"), help="Target date (YYYY-MM-DD) for date-based sports.")
     parser.add_argument("--sports", default="all", help="Comma-separated sport slugs or 'all'.")
     parser.add_argument("--phase", choices=("pregame", "live", "all"), default="all")
+    parser.add_argument("--mode", choices=("fast", "full"), default="full", help="Fast mode skips expensive rebuild steps; full preserves existing behavior.")
     parser.add_argument("--regions", default="us", help="Odds regions forwarded to source refresh commands where supported.")
     parser.add_argument("--bookmakers", default="", help="Optional bookmaker filter forwarded to source refresh commands where supported.")
     parser.add_argument("--markets", default="", help="Optional market filter forwarded to source refresh commands where supported.")

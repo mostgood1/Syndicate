@@ -69,6 +69,40 @@ class RefreshStateStoreTests(unittest.TestCase):
 
             self.assertEqual(history_paths, [manifest_path.resolve()])
 
+    def test_refresh_state_hash_round_trips_and_reuses_identical_inputs(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports"),
+            },
+            clear=False,
+        ):
+            state_path = refresh_state_store.refresh_state_path()
+            input_hash = refresh_state_store.build_input_hash({"step": "nba_live_lens", "inputs": ["a", "b"]})
+
+            self.assertTrue(refresh_state_store.should_recompute("nba_live_lens", input_hash))
+            refresh_state_store.record_refresh_state(
+                "nba_live_lens",
+                input_hash,
+                outputs=[str(Path(tmp_dir) / "reports" / "nba_live_lens.jsonl")],
+                metadata={"date": "2026-06-10"},
+            )
+
+            self.assertFalse(refresh_state_store.should_recompute("nba_live_lens", input_hash))
+            self.assertEqual(
+                refresh_state_store.read_json_file(state_path),
+                {
+                    "steps": {
+                        "nba_live_lens": {
+                            "inputHash": input_hash,
+                            "outputs": [str(Path(tmp_dir) / "reports" / "nba_live_lens.jsonl")],
+                            "metadata": {"date": "2026-06-10"},
+                            "updatedAt": refresh_state_store.read_json_file(state_path)["steps"]["nba_live_lens"]["updatedAt"],
+                        }
+                    }
+                },
+            )
+
     def test_ops_status_reads_latest_manifest_and_artifacts_from_keyvalue_backend(self) -> None:
         fake_client = _FakeKeyValueClient()
         with TemporaryDirectory() as tmp_dir:

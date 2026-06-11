@@ -332,7 +332,7 @@ def run_intelligence():
     launch_result: dict[str, Any] | None = None
     launched = False
     try:
-        launch_result = launch_refresh_run(date=selected_date)
+        launch_result = launch_refresh_run(date=selected_date, mode="fast")
         launched = True
     except Exception:
         launch_result = load_latest_refresh_status()

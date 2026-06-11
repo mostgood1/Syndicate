@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import errno
+import filecmp
 import json
 import os
 import shutil
@@ -12,6 +13,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+from syndicate.features.shared.refresh_state_store import build_input_hash
+from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import record_refresh_state
+from syndicate.features.shared.refresh_state_store import should_recompute
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -74,6 +80,12 @@ def _copy_if_exists(source: Path, destination: Path) -> bool:
             return True
     except Exception:
         pass
+    if destination.exists():
+        try:
+            if destination.is_file() and filecmp.cmp(source, destination, shallow=False):
+                return True
+        except Exception:
+            pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     _copy_file_with_fallback(source, destination)
     return True
@@ -230,6 +242,45 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
     odds_team_root = artifact_root / "data" / "odds" / "team" / f"date={date_str}"
     props_root = artifact_root / "data" / "props" / "player_props_lines" / f"date={date_str}"
 
+    input_paths: list[Path] = []
+    if source_root is not None:
+        source_processed_root = source_root / "data" / "processed"
+        input_paths.extend(source_processed_root / template.format(date=date_str) for template in PROCESSED_FILES)
+        input_paths.extend(source_processed_root / template.format(date=date_str) for template in LIVE_LENS_FILES)
+        input_paths.extend(
+            [
+                source_root / "data" / "odds" / "games" / f"date={date_str}" / "scoreboard.csv",
+                source_root / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.csv",
+                source_root / "data" / "odds" / "team" / f"date={date_str}" / "oddsapi.parquet",
+                source_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.csv",
+                source_root / "data" / "props" / "player_props_lines" / f"date={date_str}" / "oddsapi.parquet",
+            ]
+        )
+    input_hash = build_input_hash({"step": "nhl_artifact_bundle", "date": date_str, "inputs": [path_fingerprint(path) for path in input_paths]})
+    if not should_recompute(f"nhl_artifact_bundle:{date_str}", input_hash):
+        copied: dict[str, object] = {}
+        for template in PROCESSED_FILES:
+            filename = template.format(date=date_str)
+            destination = processed_root / filename
+            if destination.exists():
+                copied.setdefault("processed_files", []).append(str(destination))
+        for template in LIVE_LENS_FILES:
+            filename = template.format(date=date_str)
+            processed_destination = processed_root / filename
+            live_lens_destination = live_lens_root / filename
+            if processed_destination.exists():
+                copied.setdefault("live_lens_processed_files", []).append(str(processed_destination))
+            if live_lens_destination.exists():
+                copied.setdefault("live_lens_files", []).append(str(live_lens_destination))
+        team_paths = [str(path) for path in (odds_team_root / "oddsapi.csv", odds_team_root / "oddsapi.parquet") if path.exists()]
+        if team_paths:
+            copied["team_odds_paths"] = team_paths
+        props_paths = [str(path) for path in (props_root / "oddsapi.csv", props_root / "oddsapi.parquet") if path.exists()]
+        if props_paths:
+            copied["props_line_paths"] = props_paths
+        if copied:
+            return copied
+
     copied: dict[str, object] = {}
 
     scoreboard_destination = odds_games_root / "scoreboard.csv"
@@ -313,6 +364,13 @@ def _materialize_artifact_bundle(*, source_root: Path | None, artifact_root: Pat
                 copied["props_line_paths"] = [str(path) for path in (props_root / "oddsapi.csv", props_root / "oddsapi.parquet") if path.exists()]
                 break
 
+    if copied:
+        record_refresh_state(
+            f"nhl_artifact_bundle:{date_str}",
+            input_hash,
+            outputs=[str(item) for values in copied.values() if isinstance(values, list) for item in values],
+            metadata={"artifact_root": str(artifact_root), "date": date_str},
+        )
     return copied
 
 
@@ -326,7 +384,14 @@ def _write_smart_sim_bundle(*, artifact_root: Path, date_str: str, copied: dict[
         "processed_root": str(processed_root),
         "artifact_bundle_files": copied,
     }
-    bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True), encoding="utf-8")
+    serialized = json.dumps(bundle, indent=2, sort_keys=True)
+    if bundle_path.exists() and bundle_path.is_file():
+        try:
+            if bundle_path.read_text(encoding="utf-8") == serialized:
+                return bundle_path
+        except Exception:
+            pass
+    bundle_path.write_text(serialized, encoding="utf-8")
     return bundle_path
 
 
@@ -392,6 +457,7 @@ def main() -> int:
     parser.add_argument("--props-source", default="oddsapi")
     parser.add_argument("--props-boxscore-n-sims", type=int, default=1000)
     parser.add_argument("--days-ahead", type=int, default=0)
+    parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
 
     default_source_root = _default_source_root()
@@ -408,7 +474,7 @@ def main() -> int:
                 team_markets=str(args.team_markets or "h2h,spreads,totals"),
                 props_source=str(args.props_source or "oddsapi"),
             )
-        if source_root is not None and _source_cli_generation_enabled():
+        if str(args.mode or "full").strip().lower() == "full" and source_root is not None and _source_cli_generation_enabled():
             try:
                 _run_source_generation_multi(
                     source_root=source_root,
@@ -428,9 +494,10 @@ def main() -> int:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
 
-    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
-    smart_sim_bundle_path = _write_smart_sim_bundle(artifact_root=artifact_root, date_str=args.date, copied=copied)
-    copied.setdefault("smart_sim_files", []).append(str(smart_sim_bundle_path))
+    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date) if str(args.mode or "full").strip().lower() == "full" else {}
+    if str(args.mode or "full").strip().lower() == "full":
+        smart_sim_bundle_path = _write_smart_sim_bundle(artifact_root=artifact_root, date_str=args.date, copied=copied)
+        copied.setdefault("smart_sim_files", []).append(str(smart_sim_bundle_path))
     missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
     if missing_required:
         print(

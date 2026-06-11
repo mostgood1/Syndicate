@@ -854,7 +854,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertTrue(payload["launched"])
         self.assertEqual(payload["refresh"]["pid"], 4321)
-        mocked_launch.assert_called_once_with(date="2026-06-10")
+        mocked_launch.assert_called_once_with(date="2026-06-10", mode="fast")
         mocked_queue.assert_called_once()
 
     def test_query_preferences_does_not_infer_nba_from_wnba_token(self) -> None:

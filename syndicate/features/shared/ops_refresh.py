@@ -537,6 +537,7 @@ def launch_refresh_run(
     date: str | None = None,
     sports: str | None = None,
     phase: str | None = None,
+    mode: str | None = "fast",
     regions: str | None = None,
     bookmakers: str | None = None,
     markets: str | None = None,
@@ -589,6 +590,8 @@ def launch_refresh_run(
         refresh_command.extend(["--bookmakers", bookmakers_text])
     if markets_text:
         refresh_command.extend(["--markets", markets_text])
+    refresh_mode = str(mode or "fast").strip().lower() or "fast"
+    refresh_command.extend(["--mode", refresh_mode])
     if season is not None:
         refresh_command.extend(["--season", str(season)])
     if week is not None:

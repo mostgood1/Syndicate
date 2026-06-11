@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ from syndicate.features.shared.source_roots import repo_root_from
 
 REPO_ROOT = repo_root_from(__file__)
 REPORTS_ROOT = REPO_ROOT / "reports"
+REFRESH_STATE_PATH = REPORTS_ROOT / "refresh_state.json"
 
 
 def _state_backend_kind() -> str:
@@ -89,6 +91,73 @@ def reports_root() -> Path:
     if override:
         return Path(override).expanduser().resolve()
     return REPORTS_ROOT
+
+
+def refresh_state_path() -> Path:
+    return reports_root() / "refresh_state.json"
+
+
+def _load_refresh_state() -> dict[str, Any]:
+    state = read_json_file(refresh_state_path())
+    if isinstance(state, dict):
+        return state
+    return {"steps": {}}
+
+
+def _write_refresh_state(state: dict[str, Any]) -> None:
+    write_json_file(refresh_state_path(), state)
+
+
+def build_input_hash(payload: Any) -> str:
+    encoded = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def path_fingerprint(path: Path) -> dict[str, Any]:
+    candidate = Path(path)
+    try:
+        stat_result = candidate.stat()
+    except Exception:
+        return {"path": _normalize_state_path(candidate), "missing": True}
+    return {
+        "path": _normalize_state_path(candidate),
+        "mtime_ns": int(getattr(stat_result, "st_mtime_ns", int(stat_result.st_mtime * 1_000_000_000))),
+        "size": int(stat_result.st_size),
+    }
+
+
+def should_recompute(step_name: str, input_hash: str) -> bool:
+    step_key = str(step_name or "").strip()
+    if not step_key:
+        return True
+    current_hash = str(input_hash or "").strip()
+    if not current_hash:
+        return True
+    state = _load_refresh_state()
+    steps = state.get("steps") if isinstance(state.get("steps"), dict) else {}
+    entry = steps.get(step_key) if isinstance(steps, dict) else None
+    if not isinstance(entry, dict):
+        return True
+    return str(entry.get("inputHash") or "").strip() != current_hash
+
+
+def record_refresh_state(step_name: str, input_hash: str, *, outputs: list[str] | None = None, metadata: dict[str, Any] | None = None) -> None:
+    step_key = str(step_name or "").strip()
+    current_hash = str(input_hash or "").strip()
+    if not step_key or not current_hash:
+        return
+    state = _load_refresh_state()
+    steps = state.get("steps") if isinstance(state.get("steps"), dict) else {}
+    if not isinstance(steps, dict):
+        steps = {}
+    steps[step_key] = {
+        "inputHash": current_hash,
+        "updatedAt": __import__("datetime").datetime.utcnow().isoformat(),
+        "outputs": [str(item) for item in outputs or [] if str(item or "").strip()],
+        "metadata": metadata or {},
+    }
+    state["steps"] = steps
+    _write_refresh_state(state)
 
 
 def data_root() -> Path:

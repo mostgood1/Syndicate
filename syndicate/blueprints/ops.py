@@ -88,6 +88,7 @@ def _refresh_job_worker(job_id: str, payload: dict[str, Any]) -> None:
             skip_mirror=_coerce_bool(_payload_value(payload, "skip_mirror")),
             mirror_only=_coerce_bool(_payload_value(payload, "mirror_only")),
             dry_run=_coerce_bool(_payload_value(payload, "dry_run")),
+            mode=str(_payload_value(payload, "mode", "fast") or "fast"),
         )
     except Exception as exc:
         _store_ops_job(
@@ -157,19 +158,21 @@ def _refresh_job_worker(job_id: str, payload: dict[str, Any]) -> None:
     )
 
 
-def _start_refresh_job(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[str, dict[str, Any]]:
     _assert_no_active_refresh_run()
     job_id = uuid.uuid4().hex
+    launch_payload = dict(payload)
+    launch_payload["mode"] = str(mode or "fast")
     initial_job = {
         "status": "running",
         "start_time": _utc_now(),
-        "current_step": _job_current_step(payload),
+        "current_step": _job_current_step(launch_payload),
     }
     _store_ops_job(job_id, initial_job)
 
     worker = threading.Thread(
         target=_refresh_job_worker,
-        args=(job_id, dict(payload)),
+        args=(job_id, launch_payload),
         daemon=True,
         name=f"ops-odds-refresh-{job_id[:8]}",
     )
@@ -318,7 +321,19 @@ def api_ops_odds_refresh_plan() -> Any:
 def api_ops_odds_refresh_run() -> Any:
     payload = _request_data()
     try:
-        job_id, job = _start_refresh_job(payload)
+        job_id, job = _start_refresh_job(payload, mode="fast")
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+    return jsonify({"ok": True, "status": "started", "job_id": job_id, "job": job}), 202
+
+
+@ops_bp.post("/api/ops/full-refresh/run")
+def api_ops_full_refresh_run() -> Any:
+    payload = _request_data()
+    try:
+        job_id, job = _start_refresh_job(payload, mode="full")
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -424,6 +439,7 @@ def page_ops_odds_refresh_run() -> Any:
         skip_mirror=_coerce_bool(_payload_value(payload, "skip_mirror")),
         mirror_only=_coerce_bool(_payload_value(payload, "mirror_only")),
         dry_run=_coerce_bool(_payload_value(payload, "dry_run")),
+        mode="fast",
     )
     args = {
         "date": result["date"],

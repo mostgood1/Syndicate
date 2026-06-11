@@ -28,6 +28,10 @@ from syndicate.features.shared.basketball_props_edges import export_props_edges_
 from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
+from syndicate.features.shared.refresh_state_store import build_input_hash
+from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import record_refresh_state
+from syndicate.features.shared.refresh_state_store import should_recompute
 
 
 def _json_ready(value):
@@ -692,6 +696,26 @@ def _append_log(log_file: Path, line: str) -> None:
             out.write(f"[{dt.datetime.utcnow().isoformat(timespec='seconds')}] {line.rstrip()}\n")
     except Exception:
         pass
+
+
+def _refresh_step_input_hash(*, source_root: Path, processed_root: Path, date_str: str, do_edges: bool, do_export: bool, artifact_root: Path | None = None) -> str:
+    smart_sim_paths = sorted(processed_root.glob(f"smart_sim_{date_str}_*.json"))
+    return build_input_hash(
+        {
+            "step": "wnba_refresh",
+            "date": date_str,
+            "do_edges": bool(do_edges),
+            "do_export": bool(do_export),
+            "artifact_root": str(artifact_root) if artifact_root is not None else None,
+            "inputs": [
+                path_fingerprint(source_root / "data" / "raw" / f"odds_wnba_player_props_{date_str}.csv"),
+                path_fingerprint(processed_root / f"oddsapi_player_props_{date_str}.csv"),
+                path_fingerprint(processed_root / f"game_cards_{date_str}.csv"),
+                path_fingerprint(processed_root / f"cards_sim_detail_{date_str}.json"),
+                *[path_fingerprint(path) for path in smart_sim_paths],
+            ],
+        }
+    )
 
 
 def _materialize_processed_snapshot_alias(*, processed_root: Path, date_str: str, snapshot_path: Path, log_file: Path | None = None) -> tuple[Path, int, str | None]:
@@ -2618,7 +2642,9 @@ def _run_refresh_via_cli(
     smart_sim_overwrite: bool = False,
     log_file: Path,
     started_at: str | None = None,
+    mode: str = "full",
 ) -> dict[str, object]:
+    refresh_mode = str(mode or "full").strip().lower() or "full"
     raw_root = source_root / "data" / "raw"
     processed_root = source_root / "data" / "processed"
     raw_fp = raw_root / f"odds_wnba_player_props_{date_str}.csv"
@@ -2648,6 +2674,7 @@ def _run_refresh_via_cli(
         "snapshot_alias_rows": 0,
         "duration_s": None,
         "error": None,
+        "mode": refresh_mode,
     }
     started_ts = time.time()
 
@@ -2684,7 +2711,7 @@ def _run_refresh_via_cli(
         state["error"] = f"snapshot alias write failed: {alias_error}"
 
     pred_ready = False
-    if not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
+    if refresh_mode == "full" and not state.get("error") and int(state["snapshot_rows"] or 0) > 0 and (do_edges or do_export):
         state["phase"] = "predictions"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         player_logs_ok, player_logs_error = _ensure_player_logs_for_props_refresh(
@@ -2752,7 +2779,7 @@ def _run_refresh_via_cli(
         state["rc_edges"] = None if do_edges else state.get("rc_edges")
         state["rc_export"] = None if do_export else state.get("rc_export")
 
-    if pred_ready and do_edges:
+    if refresh_mode == "full" and pred_ready and do_edges:
         state["phase"] = "edges"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         state["rc_edges"] = -1
@@ -2780,7 +2807,7 @@ def _run_refresh_via_cli(
         elif int(state["snapshot_rows"] or 0) > 0 and int(state["edges_rows"] or 0) <= 0:
             state["error"] = "props-edges produced zero rows after a non-empty snapshot"
 
-    if do_export and not state.get("error"):
+    if refresh_mode == "full" and do_export and not state.get("error"):
         state["phase"] = "export"
         state["phase_started_at"] = dt.datetime.utcnow().isoformat()
         state["rc_export"] = -1
@@ -2821,9 +2848,9 @@ def _run_refresh_via_cli(
             state["error"] = f"local game_cards builder completed without writing rows to game_cards_{date_str}.csv"
 
     state["snapshot_rows"] = int(_count_csv_rows_quick(raw_fp))
-    state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp))
-    state["edges_rows"] = int(_count_csv_rows_quick(edges_fp))
-    state["recs_rows"] = int(_count_csv_rows_quick(rec_fp))
+    state["predictions_rows"] = int(_count_csv_rows_quick(pred_fp)) if refresh_mode == "full" else int(state.get("predictions_rows") or 0)
+    state["edges_rows"] = int(_count_csv_rows_quick(edges_fp)) if refresh_mode == "full" else int(state.get("edges_rows") or 0)
+    state["recs_rows"] = int(_count_csv_rows_quick(rec_fp)) if refresh_mode == "full" else int(state.get("recs_rows") or 0)
     state["snapshot_alias_rows"] = int(_count_csv_rows_quick(Path(str(state.get("snapshot_alias_path") or ""))))
     state["phase"] = "done"
     ended = dt.datetime.utcnow().isoformat()
@@ -2836,7 +2863,7 @@ def _run_refresh_via_cli(
     return state
 
 
-def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None) -> dict[str, object] | None:
+def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None) -> dict[str, object] | None:
     raw_root = source_root / "data" / "raw"
     processed_root = source_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
@@ -2861,6 +2888,9 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
     if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
+        return None
+
+    if input_hash and should_recompute(f"wnba_refresh:{date_str}:{int(do_edges)}:{int(do_export)}", input_hash):
         return None
 
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
@@ -2894,7 +2924,7 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     }
 
 
-def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None) -> dict[str, object] | None:
+def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None) -> dict[str, object] | None:
     raw_root = artifact_root / "data" / "raw"
     processed_root = artifact_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
@@ -2919,6 +2949,9 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
     if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
+        return None
+
+    if input_hash and should_recompute(f"wnba_artifact_bundle:{date_str}:{int(do_edges)}:{int(do_export)}", input_hash):
         return None
 
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
@@ -3872,17 +3905,28 @@ def main() -> int:
     parser.add_argument("--force-refresh", action="store_true")
     parser.add_argument("--days-ahead", type=int, default=0)
     parser.add_argument("--started-at")
+    parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
 
     source_root_arg = str(args.source_root or "").strip()
     source_root = Path(source_root_arg).resolve() if source_root_arg else None
     artifact_root = str(args.artifact_root or "").strip()
+    fast_mode = str(args.mode or "full").strip().lower() == "fast"
     target_dates = _target_refresh_dates(date_str=args.date, days_ahead=int(args.days_ahead or 0))
     states: list[dict[str, object]] = []
     artifact_root_path = Path(artifact_root).resolve() if artifact_root else None
     for index, target_date in enumerate(target_dates):
         state = None
         started_at = args.started_at if index == 0 else None
+        source_root_for_inputs = source_root if source_root is not None else (artifact_root_path or Path(artifact_root or ".")).resolve()
+        refresh_input_hash = _refresh_step_input_hash(
+            source_root=source_root_for_inputs,
+            processed_root=(source_root_for_inputs / "data" / "processed"),
+            date_str=target_date,
+            do_edges=bool(args.do_edges),
+            do_export=bool(args.do_export),
+            artifact_root=artifact_root_path,
+        )
         if source_root is not None and not bool(args.force_refresh):
             state = _existing_refresh_state(
                 source_root=source_root,
@@ -3890,6 +3934,7 @@ def main() -> int:
                 do_edges=bool(args.do_edges),
                 do_export=bool(args.do_export),
                 started_at=started_at,
+                input_hash=refresh_input_hash,
             )
         if state is None and artifact_root and not bool(args.force_refresh):
             state = _existing_artifact_bundle_state(
@@ -3898,6 +3943,7 @@ def main() -> int:
                 do_edges=bool(args.do_edges),
                 do_export=bool(args.do_export),
                 started_at=started_at,
+                input_hash=refresh_input_hash,
             )
         if state is None:
             if source_root is None:
@@ -3920,6 +3966,7 @@ def main() -> int:
                 smart_sim_overwrite=bool(args.force_refresh),
                 log_file=Path(args.log_file).resolve(),
                 started_at=started_at,
+                mode=str(args.mode or "full"),
             )
             if state is None:
                 state = {
@@ -3929,7 +3976,7 @@ def main() -> int:
                 }
         if source_root is not None:
             state["playoff_transition"] = _run_playoff_transition_if_needed(source_root=source_root, date_str=target_date)
-        if artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle"):
+        if not fast_mode and artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle"):
             copied = _materialize_artifact_bundle(
                 state=state,
                 artifact_root=artifact_root_path,
@@ -3938,6 +3985,16 @@ def main() -> int:
             if copied:
                 state["artifact_bundle_root"] = str(artifact_root_path)
                 state["artifact_bundle_files"] = copied
+        if state and not state.get("error"):
+            record_refresh_state(
+                f"wnba_artifact_bundle:{target_date}:{int(bool(args.do_edges))}:{int(bool(args.do_export))}",
+                refresh_input_hash,
+                metadata={
+                    "date": target_date,
+                    "reused": bool(state.get("reused_existing_outputs") or state.get("reused_existing_artifact_bundle")),
+                    "artifact_root": str(artifact_root_path) if artifact_root_path else None,
+                },
+            )
         states.append(state)
     state = states[0] if states else {"date": str(args.date), "error": "no refresh states generated"}
     if len(states) > 1:

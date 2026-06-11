@@ -4,6 +4,7 @@ import argparse
 import errno
 import importlib
 import importlib.util
+import hashlib
 import json
 import os
 import shutil
@@ -15,6 +16,11 @@ from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 from urllib.error import HTTPError
 from urllib.error import URLError
+
+from syndicate.features.shared.refresh_state_store import build_input_hash
+from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import record_refresh_state
+from syndicate.features.shared.refresh_state_store import should_recompute
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -299,6 +305,22 @@ def _write_live_lens_reports_payload(*, source_root: Path, date_str: str, payloa
     }
 
 
+def _live_lens_input_hash(*, source_root: Path, date_str: str) -> str:
+    date_slug = _date_slug(date_str)
+    snapshot_root = source_root / "data" / "daily" / "snapshots" / str(date_str)
+    return build_input_hash(
+        {
+            "step": "mlb_live_lens",
+            "date": date_str,
+            "inputs": [
+                path_fingerprint(snapshot_root / f"oddsapi_game_lines_{date_slug}.json"),
+                path_fingerprint(snapshot_root / f"oddsapi_pitcher_props_{date_slug}.json"),
+                path_fingerprint(snapshot_root / f"oddsapi_hitter_props_{date_slug}.json"),
+            ],
+        }
+    )
+
+
 @contextmanager
 def _pushd(path: Path):
     previous = Path.cwd()
@@ -330,6 +352,39 @@ def _local_timestamp_text(value: datetime | None = None) -> str:
 def _write_json_file(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _read_json_if_exists(path: Path) -> dict[str, object] | None:
+    if not path.exists() or not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _stable_doc_hash(payload: object) -> str:
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _doc_without_retrieved_at(doc: dict[str, object] | None) -> dict[str, object] | None:
+    if not isinstance(doc, dict):
+        return None
+    cleaned = dict(doc)
+    cleaned.pop("retrieved_at", None)
+    return cleaned
+
+
+def _same_doc(existing: dict[str, object] | None, candidate: dict[str, object] | None) -> bool:
+    if not isinstance(existing, dict) or not isinstance(candidate, dict):
+        return False
+    return _stable_doc_hash(_doc_without_retrieved_at(existing)) == _stable_doc_hash(_doc_without_retrieved_at(candidate))
+
+
+def _market_entry_hash(entry: dict[str, object]) -> str:
+    return _stable_doc_hash(entry)
 
 
 def _daily_snapshot_dir(*, source_root: Path, date_str: str) -> Path:
@@ -500,15 +555,241 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
     return copied
 
 
-def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, regions: str, overwrite: bool) -> dict[str, object]:
+def fetch_live_odds_incremental(*, odds_module, source_root: Path, date_str: str, regions: str, bookmakers: str | None, hitter_markets: list[str] | None) -> dict[str, object]:
+    api_key = (
+        os.environ.get("ODDS_API_KEY")
+        or os.environ.get("ODDSAPI_KEY")
+        or os.environ.get("THEODDS_API_KEY")
+        or os.environ.get("THEODDSAPI_KEY")
+        or os.environ.get("NCAAB_THEODDS_API_KEY")
+    )
+    if not api_key:
+        raise RuntimeError("ODDS_API_KEY not set")
+
+    target_dir = source_root / "data" / "market" / "oddsapi"
+    _ensure_dir(target_dir)
+    token = _date_slug(date_str)
+    game_lines_path = target_dir / f"oddsapi_game_lines_{token}.json"
+    pitcher_props_path = target_dir / f"oddsapi_pitcher_props_{token}.json"
+    hitter_props_path = target_dir / f"oddsapi_hitter_props_{token}.json"
+
+    existing_game_lines_doc = _read_json_if_exists(game_lines_path)
+    existing_pitcher_props_doc = _read_json_if_exists(pitcher_props_path)
+    existing_hitter_props_doc = _read_json_if_exists(hitter_props_path)
+
+    live_events = list(odds_module._fetch_live_events_for_date(api_key, date_str))
+    game_market_keys = [
+        "h2h",
+        "spreads",
+        "totals",
+        "h2h_1st_1_innings",
+        "h2h_3_way_1st_1_innings",
+        "spreads_1st_1_innings",
+        "alternate_spreads_1st_1_innings",
+        "totals_1st_1_innings",
+        "alternate_totals_1st_1_innings",
+        "h2h_1st_3_innings",
+        "h2h_3_way_1st_3_innings",
+        "spreads_1st_3_innings",
+        "alternate_spreads_1st_3_innings",
+        "totals_1st_3_innings",
+        "alternate_totals_1st_3_innings",
+        "h2h_1st_5_innings",
+        "h2h_3_way_1st_5_innings",
+        "spreads_1st_5_innings",
+        "alternate_spreads_1st_5_innings",
+        "totals_1st_5_innings",
+        "alternate_totals_1st_5_innings",
+        "h2h_1st_7_innings",
+        "h2h_3_way_1st_7_innings",
+        "spreads_1st_7_innings",
+        "alternate_spreads_1st_7_innings",
+        "totals_1st_7_innings",
+        "alternate_totals_1st_7_innings",
+    ]
+    pitcher_market_keys = list(getattr(odds_module, "PITCHER_MARKET_KEY_MAP", {}).keys())
+    if hitter_markets:
+        desired_hitter_markets = [str(m).strip().lower() for m in hitter_markets if str(m).strip()]
+    else:
+        desired_hitter_markets = [str(m).strip().lower() for m in getattr(odds_module, "DEFAULT_HITTER_MARKETS", []) if str(m).strip()]
+    combined_markets = []
+    for market_name in game_market_keys + pitcher_market_keys + desired_hitter_markets:
+        market_name = str(market_name).strip().lower()
+        if market_name and market_name not in combined_markets:
+            combined_markets.append(market_name)
+
+    pitch_key_map = dict(getattr(odds_module, "PITCHER_MARKET_KEY_MAP", {}))
+    hitter_key_map = {market_name: market_name for market_name in desired_hitter_markets}
+    existing_game_rows = {
+        str(row.get("event_id") or "").strip(): row
+        for row in ((existing_game_lines_doc or {}).get("games") or [])
+        if isinstance(row, dict) and str(row.get("event_id") or "").strip()
+    }
+    game_rows: list[dict[str, object]] = []
+    pitcher_props: dict[str, dict[str, dict[str, object]]] = {}
+    hitter_props: dict[str, dict[str, dict[str, object]]] = {}
+    changed_game_rows = 0
+    reused_game_rows = 0
+
+    for event in live_events:
+        event_id = str(event.get("id") or "").strip()
+        if not event_id:
+            continue
+        try:
+            payload = odds_module._fetch_live_event_odds(
+                api_key,
+                event_id,
+                markets_csv=",".join(combined_markets),
+                regions=regions,
+                bookmakers=bookmakers,
+            )
+        except getattr(odds_module, "OddsApiLiveFetchError", RuntimeError):
+            raise
+        except Exception:
+            continue
+        if not isinstance(payload, dict):
+            continue
+
+        home_team = str(event.get("home_team") or payload.get("home_team") or "")
+        away_team = str(event.get("away_team") or payload.get("away_team") or "")
+        best_lines, bookmaker_key = odds_module._best_bookmaker_game_lines(payload, home_team=home_team, away_team=away_team)
+        if isinstance(best_lines, dict):
+            game_entry = {
+                "event_id": event_id,
+                "commence_time": event.get("commence_time") or payload.get("commence_time"),
+                "home_team": home_team,
+                "away_team": away_team,
+                "bookmaker": bookmaker_key,
+                "markets": best_lines,
+            }
+            existing_game_entry = existing_game_rows.get(event_id)
+            if _same_doc(existing_game_entry, game_entry):
+                game_rows.append(existing_game_entry or game_entry)
+                reused_game_rows += 1
+            else:
+                game_rows.append(game_entry)
+                changed_game_rows += 1
+
+        for bookmaker in (payload.get("bookmakers") or []):
+            if not isinstance(bookmaker, dict):
+                continue
+            extracted_pitcher = odds_module._extract_player_props(bookmaker.get("markets"), key_map=pitch_key_map)
+            for name, market_rows in extracted_pitcher.items():
+                dst = pitcher_props.setdefault(name, {})
+                for market_name, row in market_rows.items():
+                    dst[market_name] = odds_module._merge_prop_market_rows(dst.get(market_name, {}), row)
+            extracted_hitter = odds_module._extract_player_props(bookmaker.get("markets"), key_map=hitter_key_map)
+            for name, market_rows in extracted_hitter.items():
+                dst = hitter_props.setdefault(name, {})
+                for market_name, row in market_rows.items():
+                    dst[market_name] = odds_module._merge_prop_market_rows(dst.get(market_name, {}), row)
+
+    finalized_pitcher_props = odds_module._finalize_prop_market_map(pitcher_props)
+    finalized_hitter_props = odds_module._finalize_prop_market_map(hitter_props)
+
+    game_counts = {
+        "events_matched": int(len(live_events)),
+        "games": int(len(game_rows)),
+        "h2h_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("h2h"), dict))),
+        "totals_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("totals"), dict))),
+        "spreads_games": int(sum(1 for row in game_rows if isinstance((row.get("markets") or {}).get("spreads"), dict))),
+    }
+    pitcher_counts = dict(odds_module._prop_market_counts(finalized_pitcher_props))
+    pitcher_counts["events_matched"] = int(len(live_events))
+    hitter_counts = dict(odds_module._prop_market_counts(finalized_hitter_props))
+    hitter_counts["events_matched"] = int(len(live_events))
+
+    retrieved_at = datetime.utcnow().isoformat()
+    game_lines_doc = {
+        "date": str(date_str),
+        "mode": "live",
+        "retrieved_at": retrieved_at,
+        "games": game_rows,
+        "meta": {
+            "markets": game_market_keys,
+            "regions": str(regions or "us"),
+            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
+            "counts": game_counts,
+        },
+    }
+    pitcher_props_doc = {
+        "date": str(date_str),
+        "mode": "live",
+        "retrieved_at": retrieved_at,
+        "pitcher_props": finalized_pitcher_props,
+        "meta": {
+            "markets": pitcher_market_keys,
+            "regions": str(regions or "us"),
+            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
+            "counts": pitcher_counts,
+        },
+    }
+    hitter_props_doc = {
+        "date": str(date_str),
+        "mode": "live",
+        "retrieved_at": retrieved_at,
+        "hitter_props": finalized_hitter_props,
+        "meta": {
+            "markets": desired_hitter_markets,
+            "regions": str(regions or "us"),
+            "bookmakers": (str(bookmakers).split(",") if bookmakers else None),
+            "counts": hitter_counts,
+        },
+    }
+
+    wrote_files: list[str] = []
+    if not _same_doc(existing_game_lines_doc, game_lines_doc):
+        _write_json_file(game_lines_path, game_lines_doc)
+        wrote_files.append(str(game_lines_path))
+    if not _same_doc(existing_pitcher_props_doc, pitcher_props_doc):
+        _write_json_file(pitcher_props_path, pitcher_props_doc)
+        wrote_files.append(str(pitcher_props_path))
+    if not _same_doc(existing_hitter_props_doc, hitter_props_doc):
+        _write_json_file(hitter_props_path, hitter_props_doc)
+        wrote_files.append(str(hitter_props_path))
+
+    result = {
+        "status": "ok" if wrote_files else "skipped",
+        "date": str(date_str),
+        "mode": "live",
+        "incremental": True,
+        "out_dir": str(target_dir),
+        "game_lines_path": str(game_lines_path),
+        "pitcher_props_path": str(pitcher_props_path),
+        "hitter_props_path": str(hitter_props_path),
+        "updated_games": int(changed_game_rows),
+        "reused_games": int(reused_game_rows),
+        "written_files": wrote_files,
+        "counts": {
+            "game_lines": dict(game_counts),
+            "pitcher_props": dict(pitcher_counts),
+            "hitter_props": dict(hitter_counts),
+        },
+    }
+    if reused_game_rows and not changed_game_rows:
+        result["warnings"] = [f"reused {reused_game_rows} unchanged game rows for {date_str}"]
+    return result
+
+
+def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, regions: str, overwrite: bool, fast_mode: bool) -> dict[str, object]:
     recorded_at = _local_now()
     frozen_pregame = _freeze_oddsapi_pregame_markets(source_root=source_root, date_str=date_str)
-    result = odds_module.fetch_and_write_live_odds_for_date(
-        date_str,
-        out_dir=source_root / "data" / "market" / "oddsapi",
-        overwrite=overwrite,
-        regions=regions,
-    )
+    if fast_mode:
+        result = fetch_live_odds_incremental(
+            odds_module=odds_module,
+            source_root=source_root,
+            date_str=date_str,
+            regions=regions,
+            bookmakers=None,
+            hitter_markets=None,
+        )
+    else:
+        result = odds_module.fetch_and_write_live_odds_for_date(
+            date_str,
+            out_dir=source_root / "data" / "market" / "oddsapi",
+            overwrite=overwrite,
+            regions=regions,
+        )
 
     snapshot_dir = _daily_snapshot_dir(source_root=source_root, date_str=date_str)
     copied: dict[str, str] = {}
@@ -534,6 +815,18 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
     }
     _write_json_file(_cron_meta_dir(source_root=source_root) / "latest_refresh_oddsapi.json", meta)
 
+    if fast_mode:
+        live_lens = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
+        if live_lens is None:
+            live_lens = {
+                "ok": True,
+                "date": str(date_str),
+                "skipped": True,
+                "reason": "live_lens_artifacts_missing",
+            }
+    else:
+        live_lens = _refresh_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh")
+
     return {
         "market_refresh": {
             "ok": True,
@@ -542,7 +835,7 @@ def _refresh_source_artifacts(*, odds_module, source_root: Path, date_str: str, 
             "copied": copied,
             "archived": archived,
         },
-        "live_lens": _refresh_live_lens_artifacts(source_root=source_root, date_str=date_str, trigger="syndicate_refresh"),
+        "live_lens": live_lens,
     }
 
 
@@ -568,6 +861,11 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
 
     live_lens = None
     errors: list[str] = []
+    input_hash = _live_lens_input_hash(source_root=source_root, date_str=date_str)
+    if not should_recompute(f"mlb_live_lens:{date_str}", input_hash):
+        reused = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger=trigger)
+        if reused is not None:
+            return reused
     base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "RENDER_EXTERNAL_URL"))
     token = _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     if base_url and token:
@@ -591,6 +889,16 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
     if live_lens is None:
         detail = "; ".join(errors) if errors else "unknown live-lens failure"
         raise RuntimeError(f"MLB live-lens refresh failed without fallback: {detail}")
+    record_refresh_state(
+        f"mlb_live_lens:{date_str}",
+        input_hash,
+        metadata={"date": date_str, "trigger": trigger, "source_root": str(source_root)},
+        outputs=[
+            str(_live_lens_report_path(source_root=source_root, date_str=date_str)),
+            str(_live_lens_log_path(source_root=source_root, date_str=date_str)),
+            str(_live_prop_registry_path(source_root=source_root, date_str=date_str)),
+        ],
+    )
     return live_lens
 
 
@@ -680,13 +988,27 @@ def main() -> int:
     parser.add_argument("--artifact-root", required=False, default=str(REPO_ROOT / "data" / "mlb_source" / "source_artifacts"))
     parser.add_argument("--regions", default="us")
     parser.add_argument("--overwrite", choices=("on", "off"), default="on")
+    parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
 
     source_root = Path(args.source_root).resolve()
     artifact_root = Path(args.artifact_root).resolve()
+    fast_mode = str(args.mode or "full").strip().lower() == "fast"
 
     try:
-        if str(args.overwrite) == "off" and _source_artifacts_ready(source_root=source_root, date_str=str(args.date)):
+        if fast_mode:
+            odds_module = _load_local_fetcher()
+            with _pushd(source_root):
+                refresh_payload = _refresh_source_artifacts(
+                    odds_module=odds_module,
+                    source_root=source_root,
+                    date_str=str(args.date),
+                    regions=str(args.regions or "us"),
+                    overwrite=False,
+                    fast_mode=True,
+                )
+            refresh_payload["mode"] = "fast"
+        elif str(args.overwrite) == "off" and _source_artifacts_ready(source_root=source_root, date_str=str(args.date)):
             refresh_payload = {
                 "market_refresh": {
                     "ok": True,
@@ -705,16 +1027,17 @@ def main() -> int:
                     date_str=str(args.date),
                     regions=str(args.regions or "us"),
                     overwrite=str(args.overwrite) == "on",
+                    fast_mode=False,
                 )
     except Exception as exc:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
 
-    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=str(args.date))
+    copied = _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=str(args.date)) if str(args.mode or "full").strip().lower() == "full" else {}
     required_live_lens_paths = _required_live_lens_relative_paths(date_str=str(args.date))
     missing_source_live_lens = [str(path) for path in required_live_lens_paths if not (source_root / path).exists()]
     missing_artifact_live_lens = [str(path) for path in required_live_lens_paths if not (artifact_root / path).exists()]
-    if missing_source_live_lens or missing_artifact_live_lens:
+    if not fast_mode and (missing_source_live_lens or missing_artifact_live_lens):
         print(
             json.dumps(
                 {
@@ -731,6 +1054,10 @@ def main() -> int:
             )
         )
         return 1
+    if fast_mode and (missing_source_live_lens or missing_artifact_live_lens):
+        refresh_payload["warnings"] = list(refresh_payload.get("warnings") or []) + [
+            "fast mode skipped live-lens rebuild; existing live-lens artifacts were not fully present",
+        ]
 
     print(
         json.dumps(

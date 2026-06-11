@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import csv
 import errno
+import filecmp
 import json
 import os
 import re
@@ -14,6 +15,11 @@ from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
 from typing import Any
+
+from syndicate.features.shared.refresh_state_store import build_input_hash
+from syndicate.features.shared.refresh_state_store import path_fingerprint
+from syndicate.features.shared.refresh_state_store import record_refresh_state
+from syndicate.features.shared.refresh_state_store import should_recompute
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -101,6 +107,11 @@ ALIASES = {
 def _copy_if_exists(source: Path, destination: Path) -> bool:
     if not source.exists() or not source.is_file():
         return False
+    try:
+        if destination.exists() and destination.is_file() and filecmp.cmp(source, destination, shallow=False):
+            return True
+    except Exception:
+        pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     _copy_file_with_fallback(source, destination)
     return True
@@ -204,6 +215,16 @@ def _best_schedule_norm(raw: str, schedule_norm_set: set[str]) -> str:
 def _read_csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def _csv_row_signature(row: dict[str, Any], fieldnames: list[str]) -> tuple[str, ...]:
+    return tuple(str(row.get(name, "")) for name in fieldnames)
+
+
+def _csv_rows_equal(left_rows: list[dict[str, Any]], right_rows: list[dict[str, Any]], fieldnames: list[str]) -> bool:
+    if len(left_rows) != len(right_rows):
+        return False
+    return all(_csv_row_signature(left_row, fieldnames) == _csv_row_signature(right_row, fieldnames) for left_row, right_row in zip(left_rows, right_rows))
 
 
 def _parse_int(value: object) -> int | None:
@@ -500,6 +521,18 @@ def _merge_and_write(source_root: Path, rows: list[dict[str, Any]], season: int,
     lines_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = lines_path.with_suffix(lines_path.suffix + ".tmp")
     fieldnames = ["year", "week", "homeTeam", "awayTeam", "lines"]
+    if lines_path.exists() and lines_path.is_file():
+        try:
+            if _csv_rows_equal(old_rows, merged, fieldnames):
+                return {
+                    "written_rows": len(rows),
+                    "preserved_rows": len(preserved_same_week),
+                    "total_rows": len(merged),
+                    "path": str(lines_path),
+                    "rewritten": False,
+                }
+        except Exception:
+            pass
     with tmp_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
@@ -511,6 +544,7 @@ def _merge_and_write(source_root: Path, rows: list[dict[str, Any]], season: int,
         "preserved_rows": len(preserved_same_week),
         "total_rows": len(merged),
         "path": str(lines_path),
+        "rewritten": True,
     }
 
 
@@ -538,9 +572,39 @@ def _run_refresh(*, source_root: Path, week: int, api_key: str, debug: bool = Fa
 
 
 def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> dict[str, object]:
+    prediction_context = _prediction_context(source_root)
+    season = int(prediction_context["season"])
+    input_hash = build_input_hash(
+        {
+            "step": "ncaaf_artifact_bundle",
+            "season": season,
+            "inputs": [
+                *[path_fingerprint(source_root / "data" / name) for name in _root_files_for_season(season)],
+                path_fingerprint(Path(prediction_context["path"])),
+                *[path_fingerprint(source_root / "data" / name) for name in DIRECTORIES],
+            ],
+        }
+    )
+    if not should_recompute("ncaaf_artifact_bundle", input_hash):
+        copied: dict[str, object] = {}
+        for name in _root_files_for_season(season):
+            destination = artifact_root / name
+            if destination.exists():
+                copied.setdefault("files", []).append(str(destination))
+        source = Path(prediction_context["path"])
+        destination = artifact_root / source.name
+        if destination.exists():
+            copied.setdefault("files", []).append(str(destination))
+        for name in DIRECTORIES:
+            destination = artifact_root / name
+            if destination.exists():
+                copied.setdefault("directories", []).append(str(destination))
+        if copied:
+            return copied
+
     source_data_root = source_root / "data"
     copied: dict[str, object] = {}
-    context = _prediction_context(source_root)
+    context = prediction_context
     season = int(context["season"])
 
     for name in _root_files_for_season(season):
@@ -560,6 +624,13 @@ def _materialize_artifact_bundle(*, source_root: Path, artifact_root: Path) -> d
         if _copy_tree_if_exists(source, destination):
             copied.setdefault("directories", []).append(str(destination))
 
+    if copied:
+        record_refresh_state(
+            "ncaaf_artifact_bundle",
+            input_hash,
+            outputs=[str(item) for values in copied.values() if isinstance(values, list) for item in values],
+            metadata={"artifact_root": str(artifact_root), "season": season},
+        )
     return copied
 
 
@@ -570,6 +641,7 @@ def main() -> int:
     parser.add_argument("--week", type=int, default=None)
     parser.add_argument("--api-key", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
 
     artifact_root = Path(args.artifact_root).resolve()
@@ -581,7 +653,7 @@ def main() -> int:
     week = args.week if args.week is not None else _detect_upcoming_week(data_root)
 
     if args.week is None and _should_skip_auto_refresh(prediction_season=prediction_season, latest_game_dt=prediction_context.get("latest_game_dt")):
-        copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root)
+        copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root) if str(args.mode or "full").strip().lower() == "full" else {}
         print(
             json.dumps(
                 {
@@ -616,7 +688,7 @@ def main() -> int:
     else:
         print(json.dumps(result, indent=2))
 
-    copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root)
+    copied = _materialize_artifact_bundle(source_root=data_root, artifact_root=artifact_root) if str(args.mode or "full").strip().lower() == "full" else {}
     print(
         json.dumps(
             {
