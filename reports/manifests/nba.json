@@ -1,17 +1,17 @@
 {
   "sport": "nba",
-  "last_updated": "2026-06-11T01:40:05+00:00",
+  "last_updated": "2026-06-12T15:03:05+00:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nba_source"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-05-22",
+    "date": "2026-06-12",
     "phase": "all",
     "execution_mode": "source",
-    "ok": true,
-    "post_refresh_ok": true,
-    "mirror_ok": true
+    "refresh_mode": "full",
+    "ok": false,
+    "post_refresh_ok": null,
+    "mirror_ok": null
   }
 }
