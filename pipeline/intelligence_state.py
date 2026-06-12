@@ -449,9 +449,9 @@ class IntelligenceStateService:
 
         if self._app is not None:
             with self._app.app_context():
-                raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+                raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=False, log_pipeline=False)
         else:
-            raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=True, log_pipeline=False)
+            raw_candidates = _profile_stage("simulation_aggregation", collect_all_recommendations, selected_date=selected_date, force_refresh=False, log_pipeline=False)
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
@@ -686,9 +686,9 @@ class IntelligenceStateService:
                     current_snapshot = self._snapshots.get(_payload_key(payload_to_process))
                 if self._app is not None:
                     with self._app.app_context():
-                        response = self._compute_response(payload_to_process, force_refresh=True)
+                        response = self._compute_response(payload_to_process, force_refresh=False)
                 else:
-                    response = self._compute_response(payload_to_process, force_refresh=True)
+                    response = self._compute_response(payload_to_process, force_refresh=False)
             except Exception as exc:
                 response = {
                     "ok": False,

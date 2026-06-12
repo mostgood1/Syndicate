@@ -279,7 +279,7 @@ def _load_status_response_cache_state() -> dict[str, object] | None:
         if isinstance(payload, dict) and isinstance(payload.get("status"), dict):
             _STATUS_RESPONSE_CACHE_STATE = {
                 "selected_date": str(payload.get("selected_date") or ""),
-                "cached_at": float(payload.get("cached_at") or 0.0),
+                "source_fingerprint": str(payload.get("source_fingerprint") or ""),
                 "status": dict(payload.get("status") or {}),
             }
             return dict(_STATUS_RESPONSE_CACHE_STATE)
@@ -288,11 +288,23 @@ def _load_status_response_cache_state() -> dict[str, object] | None:
     return None
 
 
-def _store_status_response_cache_state(selected_date: str, status: dict[str, object]) -> None:
+def _status_source_fingerprint(selected_date: str) -> str:
+    try:
+        worker_state = intelligence_state_status(force_refresh=False)
+    except Exception:
+        worker_state = {}
+    if isinstance(worker_state, dict):
+        fingerprint = str(worker_state.get("latestSourceFingerprint") or "").strip()
+        if fingerprint:
+            return fingerprint
+    return _response_hash({"selected_date": str(selected_date or "").strip()})
+
+
+def _store_status_response_cache_state(selected_date: str, status: dict[str, object], *, source_fingerprint: str) -> None:
     global _STATUS_RESPONSE_CACHE_STATE
     _STATUS_RESPONSE_CACHE_STATE = {
         "selected_date": str(selected_date or "").strip(),
-        "cached_at": time.time(),
+        "source_fingerprint": str(source_fingerprint or "").strip(),
         "status": dict(status or {}),
     }
     try:
@@ -303,20 +315,19 @@ def _store_status_response_cache_state(selected_date: str, status: dict[str, obj
 
 
 def _cached_intelligence_status(selected_date: str, *, force_refresh: bool = False, cache_ttl_seconds: int = 60) -> dict[str, object]:
+    source_fingerprint = _status_source_fingerprint(selected_date)
     if not force_refresh:
         with _STATUS_RESPONSE_CACHE_LOCK:
             cached_state = _load_status_response_cache_state()
-            if isinstance(cached_state, dict) and str(cached_state.get("selected_date") or "") == str(selected_date or ""):
-                cached_at = float(cached_state.get("cached_at") or 0.0)
-                if cached_at > 0.0 and (time.time() - cached_at) <= float(cache_ttl_seconds):
-                    status = cached_state.get("status")
-                    if isinstance(status, dict):
-                        return dict(status)
+            if isinstance(cached_state, dict) and str(cached_state.get("selected_date") or "") == str(selected_date or "") and str(cached_state.get("source_fingerprint") or "") == source_fingerprint:
+                status = cached_state.get("status")
+                if isinstance(status, dict):
+                    return dict(status)
 
     status = build_intelligence_status(selected_date=selected_date)
     if isinstance(status, dict):
         with _STATUS_RESPONSE_CACHE_LOCK:
-            _store_status_response_cache_state(selected_date, status)
+            _store_status_response_cache_state(selected_date, status, source_fingerprint=source_fingerprint)
     return status
 
 

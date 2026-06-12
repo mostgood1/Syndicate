@@ -4028,8 +4028,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
 
         with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
-            with patch("syndicate.blueprints.intelligence.time.time", return_value=100.0):
-                with patch("syndicate.blueprints.intelligence._load_status_response_cache_state", return_value={"selected_date": "2026-06-10", "cached_at": 100.0, "status": cached_status}):
+            with patch("syndicate.blueprints.intelligence._status_source_fingerprint", return_value="fingerprint-1"):
+                with patch("syndicate.blueprints.intelligence._load_status_response_cache_state", return_value={"selected_date": "2026-06-10", "source_fingerprint": "fingerprint-1", "status": cached_status}):
                     with patch("syndicate.blueprints.intelligence.build_intelligence_status", side_effect=AssertionError("should not rebuild")):
                         with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
                             response = intelligence_status_api()
@@ -4043,6 +4043,30 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
+
+    def test_status_endpoint_rebuilds_when_source_fingerprint_changes(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        rebuilt_status = {"ok": True, "threadAlive": False, "cachedSnapshots": 1}
+        state_response = {
+            "ok": True,
+            "last_updated": "2026-06-11T16:05:00Z",
+            "candidate_pool": {"candidates": [{"name": "Play 1"}]},
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence._status_source_fingerprint", return_value="fingerprint-2"):
+                with patch("syndicate.blueprints.intelligence._load_status_response_cache_state", return_value={"selected_date": "2026-06-10", "source_fingerprint": "fingerprint-1", "status": {"ok": True, "threadAlive": True, "cachedSnapshots": 3}}):
+                    with patch("syndicate.blueprints.intelligence.build_intelligence_status", return_value=dict(rebuilt_status)):
+                        with patch("syndicate.blueprints.intelligence._store_status_response_cache_state") as store_cache:
+                            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
+                                response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["status"], rebuilt_status)
+        store_cache.assert_called_once()
 
     def test_intelligence_page_renders_embedded_console(self) -> None:
         fake_response = {
