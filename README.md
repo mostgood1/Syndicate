@@ -5,6 +5,8 @@
 
 Syndicate is the new unified multi-sport app that will eventually replace the separate sport-specific frontends.
 
+The official phased implementation plan for reaching the world-class target state lives in [docs/syndicate_world_class_implementation_plan.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/syndicate_world_class_implementation_plan.md).
+
 Workspace Copilot skills for intelligence planning, advanced-data analysis, live-lens debugging, readiness, deployment parity, and sport-specific question answering are documented in [docs/syndicate-skills.md](c:/Users/tempadmin/OneDrive/Coding/Syndicate/docs/syndicate-skills.md).
 
 ## Core principles

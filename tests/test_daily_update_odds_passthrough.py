@@ -34,3 +34,24 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
         self.assertIn("if ($OddsPhase) { $refreshArgs += @('-OddsPhase', $OddsPhase) }", content)
         self.assertIn("if ($OddsSports) { $refreshArgs += @('-OddsSports', $OddsSports) }", content)
         self.assertIn("if ($OddsRegions) { $refreshArgs += @('-OddsRegions', $OddsRegions) }", content)
+
+    def test_refresh_and_gate_points_all_supported_sports_at_source_artifacts(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "refresh_and_gate.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("$localMlbArtifactRoot = Join-Path $repoRoot 'data\\mlb_source\\source_artifacts'", content)
+        self.assertIn("$localNbaArtifactRoot = Join-Path $repoRoot 'data\\nba_source\\source_artifacts'", content)
+        self.assertIn("$localNhlArtifactRoot = Join-Path $repoRoot 'data\\nhl_source\\source_artifacts'", content)
+        self.assertIn("$localWnbaArtifactRoot = Join-Path $repoRoot 'data\\wnba_source\\source_artifacts'", content)
+        self.assertIn("$localNflArtifactRoot = Join-Path $repoRoot 'data\\nfl_source\\source_artifacts'", content)
+        self.assertIn("$localNcaafArtifactRoot = Join-Path $repoRoot 'data\\ncaaf_source\\source_artifacts'", content)
+
+    def test_world_class_plan_explicitly_requires_unified_standardization(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "docs" / "syndicate_world_class_implementation_plan.md"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("## Unified platform standardization", content)
+        self.assertIn("one unified logic engine", content)
+        self.assertIn("MLB, NBA, and WNBA should be treated as the maturity anchors", content)

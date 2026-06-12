@@ -41,11 +41,22 @@ from syndicate.features.shared.timezone import central_today_iso
 
 
 _MLB_TODAY_CACHE_TTL_SECONDS = 60
-_MLB_TODAY_CACHE: dict[tuple[str, str, int], dict[str, Any]] = {}
+_MLB_TODAY_CACHE: dict[tuple[str, str, int, int], dict[str, Any]] = {}
 
 
 def _today_cache_bucket() -> int:
     return int(time.time() // _MLB_TODAY_CACHE_TTL_SECONDS)
+
+
+def _path_cache_signature(path: Path | None) -> int:
+    if path is None:
+        return 0
+    try:
+        if not path.exists() or not path.is_file():
+            return 0
+        return int(path.stat().st_mtime_ns)
+    except OSError:
+        return 0
 
 
 _MLB_TEAM_META_BY_ABBR: dict[str, dict[str, Any]] = {
@@ -1755,7 +1766,12 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     today_iso = central_today_iso()
     cache_key = None
     if selected_date == today_iso:
-        cache_key = ("cards_source_payload", selected_date, _today_cache_bucket())
+        cache_key = (
+            "cards_source_payload",
+            selected_date,
+            _today_cache_bucket(),
+            _path_cache_signature(daily_artifact_path(selected_date)),
+        )
         cached_payload = _MLB_TODAY_CACHE.get(cache_key)
         if cached_payload is not None:
             return cached_payload
@@ -4212,9 +4228,15 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     prev_date = (resolved_parsed_date - timedelta(days=1)).isoformat()
     next_date = (resolved_parsed_date + timedelta(days=1)).isoformat()
     today_iso = central_today_iso()
+    summary_path = daily_artifact_path(resolved_date)
     cache_key = None
     if selected_date == today_iso:
-        cache_key = ("cards_context", selected_date, _today_cache_bucket())
+        cache_key = (
+            "cards_context",
+            selected_date,
+            _today_cache_bucket(),
+            _path_cache_signature(summary_path),
+        )
         cached_context = _MLB_TODAY_CACHE.get(cache_key)
         if cached_context is not None:
             return cached_context
@@ -4351,6 +4373,6 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "cards_stylesheet": "mlb/cards_exact.css",
         "cards_script": "mlb/board.js",
     }, sport="mlb", module="cards")
-    if cache_key is not None:
+    if cache_key is not None and games:
         _MLB_TODAY_CACHE[cache_key] = result
     return result

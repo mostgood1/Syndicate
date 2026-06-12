@@ -29,6 +29,7 @@ from syndicate.app import create_app
 from syndicate.features.mlb.cards import source_card_detail_payload
 from syndicate.features.mlb.cards import source_cards_api_payload
 from syndicate.features.mlb.cards import _apply_source_live_prop_ranking_scores
+from syndicate.features.mlb.cards import _path_cache_signature
 from syndicate.features.mlb.sources import daily_artifact_path
 from syndicate.features.mlb.sources import daily_sim_artifact_path
 from syndicate.features.mlb.sources import available_daily_summary_dates
@@ -494,6 +495,20 @@ class DateArchiveHelperTests(unittest.TestCase):
                     daily_artifact_path("2026-05-17"),
                     local_root / "data" / "daily" / "daily_summary_2026_05_17.json",
                 )
+
+    def test_mlb_today_cache_signature_tracks_file_changes(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            summary_path = Path(temp_dir) / "daily_summary_2026_06_12.json"
+            self.assertEqual(_path_cache_signature(summary_path), 0)
+
+            summary_path.write_text('{"outputs": []}', encoding="utf-8")
+            first_signature = _path_cache_signature(summary_path)
+            self.assertNotEqual(first_signature, 0)
+
+            summary_path.write_text('{"outputs": [{"game_pk": 1}]}', encoding="utf-8")
+            second_signature = _path_cache_signature(summary_path)
+            self.assertNotEqual(second_signature, 0)
+            self.assertNotEqual(first_signature, second_signature)
 
     def test_mlb_available_daily_summary_dates_do_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
