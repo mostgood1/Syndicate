@@ -687,3 +687,84 @@ To https://github.com/mostgood1/Syndicate
                         ]
 }
 NBA advanced-data gate: no scheduled games for 2026-06-12 (espn_nba_scoreboard); skipping artifact assertions
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   c5e81f0..9834fdc  main -> main
+==> WNBA vendored daily update
+    cwd: D:\a\Syndicate\Syndicate
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_wnba_oddsapi_props.py --date 2026-06-12 --source-root vendor\wnba_betting_repo --artifact-root data\wnba_source\source_artifacts --log-file D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-12\20260612_183116\wnba_props_refresh.log --force-refresh --days-ahead 0 --do-edges --do-export
+    env: APP_TZ=America/Chicago; APP_TZ_OFFSET_HOURS=-6; ODDS_API_KEY=<redacted>; REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS=1000; REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS=3; SYNDICATE_WNBA_SOURCE_APP_FALLBACK=1
+    pid: 4996
+    ... still running (30s)
+    ... still running (60s)
+    ... still running (90s)
+    ... still running (120s)
+    ... still running (150s)
+    ... still running (180s)
+    ... still running (210s)
+    ... still running (240s)
+    ... still running (270s)
+    ... still running (300s)
+    ... still running (330s)
+    ... still running (360s)
+    ... still running (390s)
+    ... still running (420s)
+    ... still running (450s)
+{
+  "artifact_bundle_files": {
+    "boxscores_history_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\boxscores_history.csv",
+    "cards_props_snapshot_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_props_snapshot_2026-06-12.json",
+    "cards_sim_detail_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_sim_detail_2026-06-12.json",
+    "edges_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_edges_2026-06-12.csv",
+    "game_cards_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-12.csv",
+    "live_lens_projections_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_projections_2026-06-12.jsonl",
+    "live_lens_tuning_override_live_lens_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\live_lens\\live_lens_tuning_override.json",
+    "live_lens_tuning_override_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_tuning_override.json",
+    "live_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_lines_2026-06-12.jsonl",
+    "live_pbp_stats_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_pbp_stats_2026-06-12.jsonl",
+    "live_player_lens_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_player_lens_2026-06-12.jsonl",
+    "live_state_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_state_2026-06-12.jsonl",
+    "predictions_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-12.csv",
+    "recommendations_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_2026-06-12.csv",
+    "recommendations_slate_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_slate_2026-06-12.json",
+    "recs_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-12.csv",
+    "smart_sim_paths": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-12_SEA_GSV.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-12_WSH_TOR.json"
+    ],
+    "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\oddsapi_player_props_2026-06-12.csv",
+    "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\raw\\odds_wnba_player_props_2026-06-12.csv",
+    "team_advanced_stats_paths": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026_asof_20260612.csv"
+    ],
+    "top_by_game_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_top_by_game_2026-06-12.json"
+  },
+  "artifact_bundle_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts",
+  "date": "2026-06-12",
+  "duration_s": 435.0298960208893,
+  "edges_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_edges_2026-06-12.csv",
+  "edges_rows": 239,
+  "ended_at": "2026-06-12T19:06:50.731205",
+  "error": "export-props-recommendations failed with exit code 1",
+  "heartbeat_at": "2026-06-12T19:06:50.731205",
+  "mode": "full",
+  "phase": "done",
+  "phase_started_at": "2026-06-12T19:06:50.731205",
+  "playoff_transition": {
+    "reason": "No regular-season schedule rows found for 2025-26",
+    "status": "skipped"
+  },
+  "predictions_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_predictions_2026-06-12.csv",
+  "predictions_rows": 78,
+  "rc_edges": 0,
+  "rc_export": 1,
+  "rc_snapshot": 0,
+  "recs_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_recommendations_2026-06-12.csv",
+  "recs_rows": 18,
+  "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\oddsapi_player_props_2026-06-12.csv",
+  "snapshot_alias_rows": 588,
+  "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\raw\\odds_wnba_player_props_2026-06-12.csv",
+  "snapshot_rows": 588,
+  "started_at": "2026-06-12T18:59:35.701309"
+}
