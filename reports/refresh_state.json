@@ -99,8 +99,8 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "1c2d688a37d77a6eea4b954311a63f0661c3709a08bb0aaa5b1ea57a57bf6efa",
-      "updatedAt": "2026-06-12T19:14:31.617123",
+      "inputHash": "9b633ab7f57f016dc64c8ebc73fa8ea8a6ebef155c166f3077f922b4b841e6c7",
+      "updatedAt": "2026-06-12T20:54:56.386723",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_12.json",
