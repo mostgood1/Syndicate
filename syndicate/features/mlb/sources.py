@@ -104,14 +104,15 @@ def daily_artifact_path(selected_date: str, suffix: str = "") -> Path:
 def available_daily_summary_dates() -> list[str]:
     dates: set[str] = set()
     pattern = "daily_summary_*.json"
-    daily_dir = default_mlb_source_root() / "data" / "daily"
-    if not daily_dir.exists():
-        return []
-    for path in daily_dir.glob(pattern):
-        match = _DATE_TOKEN_RE.search(path.name)
-        if not match or any(token in path.name for token in ("_hr_targets", "_rfi_targets", "_locked_policy")):
+    for root in _source_roots():
+        daily_dir = root / "data" / "daily"
+        if not daily_dir.exists() or not daily_dir.is_dir():
             continue
-        dates.add(f"{match.group(1)}-{match.group(2)}-{match.group(3)}")
+        for path in daily_dir.glob(pattern):
+            match = _DATE_TOKEN_RE.search(path.name)
+            if not match or any(token in path.name for token in ("_hr_targets", "_rfi_targets", "_locked_policy")):
+                continue
+            dates.add(f"{match.group(1)}-{match.group(2)}-{match.group(3)}")
     return sorted(dates)
 
 

@@ -507,6 +507,18 @@ class DateArchiveHelperTests(unittest.TestCase):
             with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
                 self.assertEqual(available_daily_summary_dates(), [])
 
+    def test_mlb_available_daily_summary_dates_include_source_artifacts_mirror(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            local_root = root / "data" / "mlb_source"
+            mirror_root = local_root / "source_artifacts"
+            mirror_file = mirror_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            mirror_file.parent.mkdir(parents=True, exist_ok=True)
+            mirror_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, mirror_root]):
+                self.assertEqual(available_daily_summary_dates(), ["2026-05-17"])
+
     def test_mlb_daily_sim_artifact_path_reconciles_from_repo_bundle_when_data_root_is_missing(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -5083,13 +5095,19 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertTrue(any(link.get("href") == "/mlb/hitter-ladders?date=2026-05-18" for link in (hitter.get("module_links") or [])))
 
     def test_archive_launch_links_and_tracker_copy(self) -> None:
-        mlb_context = build_mlb_hub_context()
-        mlb_launch_date = str(mlb_context.get("launch_date") or "")
         today_date = date.today().isoformat()
+        latest_mlb_date = "2026-06-10"
         ncaab_launch_season = ncaab_season_for_date(today_date)
         ncaab_season_launch_date = default_ncaab_season_date(ncaab_launch_season)
         ncaaf_season = default_ncaaf_season()
-        mlb_hub = self.client.get("/mlb").get_data(as_text=True)
+        with patch("syndicate.features.mlb.hub.available_daily_summary_dates", return_value=["2026-06-09", latest_mlb_date]), patch(
+            "syndicate.features.mlb.hub.date"
+        ) as mock_date:
+            mock_date.today.return_value = date(2026, 6, 11)
+            mlb_context = build_mlb_hub_context()
+            mlb_hub = self.client.get("/mlb").get_data(as_text=True)
+
+        mlb_launch_date = str(mlb_context.get("launch_date") or "")
         ncaab_hub = self.client.get("/ncaab").get_data(as_text=True)
         ncaaf_hub = self.client.get("/ncaaf").get_data(as_text=True)
         nfl_hub = self.client.get("/nfl").get_data(as_text=True)
@@ -5098,9 +5116,9 @@ class ArchiveRouteTests(unittest.TestCase):
         nba_hub = self.client.get("/nba/hub").get_data(as_text=True)
         home = self.client.get("/").get_data(as_text=True)
 
-        self.assertEqual(mlb_launch_date, today_date)
-        self.assertIn(f"/mlb/cards?date={today_date}", mlb_hub)
-        self.assertIn(f"/mlb/archive?date={today_date}", mlb_hub)
+        self.assertEqual(mlb_launch_date, latest_mlb_date)
+        self.assertIn(f"/mlb/cards?date={latest_mlb_date}", mlb_hub)
+        self.assertIn(f"/mlb/archive?date={latest_mlb_date}", mlb_hub)
         self.assertIn("daily archive", mlb_hub.lower())
         self.assertIn("Active sports", home)
         self.assertIn(f"/ncaab/cards?date={today_date}", ncaab_hub)

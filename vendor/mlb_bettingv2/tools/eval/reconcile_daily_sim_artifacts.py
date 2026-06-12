@@ -81,6 +81,34 @@ def _load_jsonish(value: str) -> Dict[str, Any]:
         return {}
 
 
+def _resolve_sim_dir(sim_dir_value: str, date_str: str) -> Path:
+    candidates: List[Path] = []
+
+    if str(sim_dir_value or "").strip():
+        explicit = Path(str(sim_dir_value)).resolve()
+        candidates.append(explicit)
+        parts = explicit.parts
+        if "source_artifacts" in parts:
+            try:
+                source_artifacts_index = parts.index("source_artifacts")
+                stripped = Path(*parts[:source_artifacts_index], *parts[source_artifacts_index + 1 :]).resolve()
+                candidates.append(stripped)
+            except Exception:
+                pass
+
+    candidates.append((_ROOT / "data" / "daily" / "sims" / str(date_str)).resolve())
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+
+    return candidates[0] if candidates else (_ROOT / "data" / "daily" / "sims" / str(date_str)).resolve()
+
+
 def _team_row(team_obj: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "team_id": _safe_int(team_obj.get("team_id")),
@@ -709,9 +737,11 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
     season = int(args.season) if int(args.season or 0) > 0 else int(str(args.date).split("-")[0])
-    sim_dir = Path(str(args.sim_dir)).resolve() if str(args.sim_dir).strip() else (_ROOT / "data" / "daily" / "sims" / str(args.date)).resolve()
+    sim_dir = _resolve_sim_dir(str(args.sim_dir), str(args.date))
     if not sim_dir.exists() or not sim_dir.is_dir():
-        raise SystemExit(f"Sim dir not found: {sim_dir}")
+        raise SystemExit(
+            f"Sim dir not found: {sim_dir}. Tried source-bundle and local mirror locations for {str(args.date)}."
+        )
 
     sim_paths = sorted(path for path in sim_dir.glob("sim_*.json") if path.is_file())
     if not sim_paths:

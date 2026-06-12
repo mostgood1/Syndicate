@@ -54,11 +54,11 @@ def build_hub_context() -> dict[str, Any]:
     archive_dates = available_daily_summary_dates()
     today_date = date.today().isoformat()
     latest_archive_date = archive_dates[-1] if archive_dates else (_latest_date("data/daily/daily_summary_*.json") or today_date)
-    cards_date = today_date
+    cards_date = latest_archive_date
     season = _season_from_date(cards_date)
-    live_lens_date = today_date
-    hr_targets_date = today_date
-    rfi_targets_date = today_date
+    live_lens_date = latest_archive_date
+    hr_targets_date = latest_archive_date
+    rfi_targets_date = latest_archive_date
     profiles = _available_betting_profiles(season)
     default_profile = next((item["profile"] for item in profiles if item["profile"] == "retuned"), profiles[0]["profile"] if profiles else "retuned")
 
@@ -75,7 +75,7 @@ def build_hub_context() -> dict[str, Any]:
             ],
         },
         {
-            "eyebrow": "Official card",
+                "body": "The primary launch links now point at the latest stored MLB slate so the hub matches the data that is actually available, while the surrounding route groups still expose the stored artifact lanes that back historical review and archive navigation.",
             "title": "Betting card profiles",
             "body": "These routes should mirror the source betting-card workflow with real profile choices, not hard-coded placeholders.",
             "links": [
