@@ -4156,7 +4156,13 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
 
 @home_bp.get("/")
 def home():
-    return render_template("home.html")
+    payload = _home_payload(selected_date=request.args.get("date"), force_refresh=True)
+    return render_template(
+        "home.html",
+        selected_home_date=payload.get("selected_date") or "",
+        sports=payload.get("sports") or [],
+        dashboard=payload.get("dashboard") or {},
+    )
 
 
 @home_bp.get("/syndicate")
