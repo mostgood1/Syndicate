@@ -99,18 +99,15 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "a2f1691672903feb27822d2d4f8d2f067999fddf433d2f32112899ea8b612f5e",
-      "updatedAt": "2026-06-12T16:29:53.319363",
+      "inputHash": "1c2d688a37d77a6eea4b954311a63f0661c3709a08bb0aaa5b1ea57a57bf6efa",
+      "updatedAt": "2026-06-12T19:14:31.617123",
       "outputs": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_05_25.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_05_29.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_05_31.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_12.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
+        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_12.json",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
       ],
       "metadata": {
-        "artifact_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\nfl_source\\source_artifacts"
+        "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts"
       }
     },
     "mlb_live_lens:2026-06-12": {
