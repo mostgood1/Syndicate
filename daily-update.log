@@ -1288,3 +1288,30 @@ To https://github.com/mostgood1/Syndicate
   },
   "fallback_used": false
 }
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   ec4bfdd..4f94817  main -> main
+Intelligence readiness audit skipped in CI for ncaab: Recommendations mirror, Live state mirror
+==> Syndicate refresh and gate
+    cwd: D:\a\Syndicate\Syndicate
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_and_gate.ps1 -Date 2026-06-12 -ArtifactsDir D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-12\20260612_183116\migration
+    env: SYNDICATE_USE_LOCAL_ARTIFACT_MIRRORS=1
+    pid: 8840
+==> MLB mirror refresh
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_mlb_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts
+==> NBA mirror refresh
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nba_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nba_source
+==> NHL mirror refresh
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nhl_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nhl_source\source_artifacts
+==> WNBA mirror refresh
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_wnba_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\wnba_source
+==> NFL mirror refresh
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nfl_source_mirror.ps1 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nfl_source\source_artifacts
+==> NCAAF mirror refresh
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_ncaaf_source_mirror.ps1 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\ncaaf_source\source_artifacts
+==> NCAAB mirror refresh
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_ncaab_source_mirror.ps1 -Date 2026-06-12
+==> Migration gate
+    py .\scripts\migration_gate.py --command-timeout-sec 600 --tests-timeout-sec 900 --smoke-timeout-sec 900 --write-dir D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-12\20260612_183116\migration
+âš ï¸ Step threw exception but continuing...
+Gate command returned non-zero exit code: 1
