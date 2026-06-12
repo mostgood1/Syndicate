@@ -1,7 +1,7 @@
 {
   "date": "2026-06-12",
   "season": 2026,
-  "generated_at": "2026-06-12T18:52:32.420532",
+  "generated_at": "2026-06-12T20:31:41.108916",
   "tool": "tools/daily_update_multi_profile.py",
   "locked": true,
   "source_profile": "game_recos",

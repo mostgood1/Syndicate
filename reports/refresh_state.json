@@ -61,8 +61,8 @@
       }
     },
     "nhl_artifact_bundle:2026-06-12": {
-      "inputHash": "c0023de1e6114ca3d26091cc8f6d177cc5d1caf07dbfc40fedf77087db323de9",
-      "updatedAt": "2026-06-12T19:13:38.432689",
+      "inputHash": "81e1e9d6071808dcfa107f1b1e732d5d5ab80059deb3b4ecbe0d0c4e6e605401",
+      "updatedAt": "2026-06-12T20:54:05.809836",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-12\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-12\\oddsapi.csv",
@@ -99,8 +99,8 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "1c2d688a37d77a6eea4b954311a63f0661c3709a08bb0aaa5b1ea57a57bf6efa",
-      "updatedAt": "2026-06-12T19:14:31.617123",
+      "inputHash": "9b633ab7f57f016dc64c8ebc73fa8ea8a6ebef155c166f3077f922b4b841e6c7",
+      "updatedAt": "2026-06-12T20:54:56.386723",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_12.json",
@@ -111,8 +111,8 @@
       }
     },
     "mlb_live_lens:2026-06-12": {
-      "inputHash": "cbfc06b3427995641a581d1771409ea0b682cc287d67f7e891321ecc7a033b1f",
-      "updatedAt": "2026-06-12T18:56:41.256989",
+      "inputHash": "65d72021619fe6d558a6ce7c144133968b16174cb33e18c984ecde43660b8b4e",
+      "updatedAt": "2026-06-12T20:36:14.701002",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_12.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_12.jsonl",
@@ -125,8 +125,8 @@
       }
     },
     "nhl_artifact_bundle:2026-06-13": {
-      "inputHash": "f95a4a5056ba95db4fa31234689f4b14fec0fce2166bb113abef8105f7ab289a",
-      "updatedAt": "2026-06-12T19:13:38.452457",
+      "inputHash": "8ed3ef18b71834b4b4e40313227a7b7dff43d768924b8bc2bc488425269163c3",
+      "updatedAt": "2026-06-12T20:54:05.832239",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-13\\oddsapi.csv",
         "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-13\\oddsapi.csv",
