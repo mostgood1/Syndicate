@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import sys
 import unicodedata
+import time
 from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -37,6 +38,14 @@ from syndicate.features.mlb.sources import load_json_file
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
+
+
+_MLB_TODAY_CACHE_TTL_SECONDS = 60
+_MLB_TODAY_CACHE: dict[tuple[str, str, int], dict[str, Any]] = {}
+
+
+def _today_cache_bucket() -> int:
+    return int(time.time() // _MLB_TODAY_CACHE_TTL_SECONDS)
 
 
 _MLB_TEAM_META_BY_ABBR: dict[str, dict[str, Any]] = {
@@ -1744,6 +1753,12 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     hr_rows = hr_targets.get("rows") if hr_targets and isinstance(hr_targets.get("rows"), list) else []
     selected_date = str(context.get("date") or "").strip()
     today_iso = central_today_iso()
+    cache_key = None
+    if selected_date == today_iso:
+        cache_key = ("cards_source_payload", selected_date, _today_cache_bucket())
+        cached_payload = _MLB_TODAY_CACHE.get(cache_key)
+        if cached_payload is not None:
+            return cached_payload
     lineups_path = daily_snapshot_lineups_path(selected_date) if selected_date else None
     game_lines_path = daily_snapshot_oddsapi_game_lines_path(selected_date) if selected_date else None
     pitcher_props_path = daily_snapshot_oddsapi_pitcher_props_path(selected_date) if selected_date else None
@@ -1954,7 +1969,7 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             if warning not in combined_market_warnings:
                 combined_market_warnings.append(warning)
 
-    return {
+    result = {
         "date": context.get("date"),
         "cards": games,
         "games": games,
@@ -1987,6 +2002,9 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
             "topRows": top_rows,
         },
     }
+    if cache_key is not None:
+        _MLB_TODAY_CACHE[cache_key] = result
+    return result
 
 
 def _live_lens_game_row(selected_date: str, game_pk: int) -> dict[str, Any] | None:
@@ -4189,12 +4207,17 @@ def _games_from_daily_summary(summary: dict[str, Any], *, betting_games: dict[in
 
 def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     available_dates = available_daily_summary_dates()
-    fallback_date = available_dates[-1] if available_dates else selected_date
-    resolved_date = selected_date if not available_dates or selected_date in available_dates else fallback_date
+    resolved_date = selected_date if not available_dates or selected_date in available_dates else selected_date
     resolved_parsed_date = _parse_iso_date(resolved_date)
     prev_date = (resolved_parsed_date - timedelta(days=1)).isoformat()
     next_date = (resolved_parsed_date + timedelta(days=1)).isoformat()
     today_iso = central_today_iso()
+    cache_key = None
+    if selected_date == today_iso:
+        cache_key = ("cards_context", selected_date, _today_cache_bucket())
+        cached_context = _MLB_TODAY_CACHE.get(cache_key)
+        if cached_context is not None:
+            return cached_context
 
     module_links = build_module_links(resolved_date, "Cards")
     module_link_labels = {
@@ -4285,7 +4308,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         if str(link.get("label") or "").strip().lower() not in module_link_labels
     ]
 
-    return apply_game_board_contract({
+    result = apply_game_board_contract({
         "requested_date": selected_date,
         "date": resolved_date,
         "prev_date": prev_date,
@@ -4328,3 +4351,6 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "cards_stylesheet": "mlb/cards_exact.css",
         "cards_script": "mlb/board.js",
     }, sport="mlb", module="cards")
+    if cache_key is not None:
+        _MLB_TODAY_CACHE[cache_key] = result
+    return result

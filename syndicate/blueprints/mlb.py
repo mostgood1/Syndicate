@@ -292,7 +292,7 @@ def root_cards():
 @mlb_bp.get("/cards")
 def cards():
     selected_date = _iso_or_today(request.args.get("date"))
-    context = build_cards_page_context(selected_date)
+    context = dict(build_cards_page_context(selected_date))
     context["show_home_link"] = False
     embed_mode = (request.args.get("embed") or "").strip().lower()
     client = (request.args.get("client") or "").strip().lower()
@@ -315,7 +315,7 @@ def cards():
 @mlb_bp.get("/api/cards")
 def api_cards():
     selected_date = _iso_or_today(request.args.get("date"))
-    context = build_cards_page_context(selected_date)
+    context = dict(build_cards_page_context(selected_date))
     payload = build_game_board_api_payload(context)
     payload.update(source_cards_api_payload(context))
     payload["app"] = _app_meta()
@@ -343,7 +343,7 @@ def api_card_detail(game_pk: int):
 @mlb_bp.get("/api/schedule")
 def api_schedule():
     selected_date = _iso_or_today(request.args.get("date"))
-    context = build_cards_page_context(selected_date)
+    context = dict(build_cards_page_context(selected_date))
     games = context.get("games") if isinstance(context.get("games"), list) else []
     payload_games = []
     for game in games:

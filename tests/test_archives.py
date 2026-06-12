@@ -4828,6 +4828,19 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual((payload.get("empty_state") or {}).get("title"), "No game cards were available for this date")
         self.assertFalse(payload.get("using_sample_data"))
 
+    def test_mlb_cards_missing_requested_date_does_not_fall_back_to_previous_slate(self) -> None:
+        with patch("syndicate.features.mlb.cards.available_daily_summary_dates", return_value=["2026-06-11"]):
+            with patch("syndicate.features.mlb.cards.load_json_file", return_value=None):
+                from syndicate.features.mlb.cards import build_cards_page_context as build_mlb_cards_page_context
+
+                context = build_mlb_cards_page_context("2026-06-12")
+
+        self.assertEqual(context.get("requested_date"), "2026-06-12")
+        self.assertEqual(context.get("date"), "2026-06-12")
+        self.assertEqual(context.get("cards_header_meta"), "Artifact-backed slate | 2026-06-12")
+        self.assertEqual((context.get("empty_state") or {}).get("title"), "No game cards were available for this date")
+        self.assertIn("Requested date: 2026-06-12", (context.get("empty_state") or {}).get("list_items") or [])
+
     def test_ncaab_season_api_exposes_archive_navigation_metadata(self) -> None:
         response = self.client.get("/ncaab/api/season/2025?date=2025-11-03")
         payload = response.get_json()
