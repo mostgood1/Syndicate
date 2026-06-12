@@ -1265,6 +1265,8 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
             away_pts=away_pts,
             home_pts=home_pts,
         )
+        away_lines = row.get("periods") if isinstance(row.get("periods"), list) else []
+        away_pts, home_pts = _repair_final_score_from_periods(away_pts, home_pts, away_lines, bool(row.get("final")))
         game_id = str(row.get("game_id") or f"{away_tri}@{home_tri}")
         sim_game = sim_index.get((away_tri, home_tri)) if isinstance(sim_index, dict) else None
         sim_payload = _source_sim_stub(game_id, sim_game if isinstance(sim_game, dict) else None, {})
@@ -1681,6 +1683,13 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
                 continue
             periods.append({"period": idx + 1, "away": away_value, "home": home_value})
 
+        if final and (away_pts is None or home_pts is None or ((away_pts or 0.0) == 0.0 and (home_pts or 0.0) == 0.0)):
+            period_away = sum(_safe_float(period.get("away")) or 0.0 for period in periods)
+            period_home = sum(_safe_float(period.get("home")) or 0.0 for period in periods)
+            if period_away > 0.0 or period_home > 0.0:
+                away_pts = period_away
+                home_pts = period_home
+
         games.append(
             {
                 "game_id": str(event_id or f"{away_tri}@{home_tri}"),
@@ -1994,6 +2003,24 @@ def _status_from_game(game: dict[str, Any]) -> dict[str, Any]:
         "period": normalized.get("period"),
         "clock": normalized.get("clock") or "",
     }
+
+
+def _repair_final_score_from_periods(
+    away_pts: float | None,
+    home_pts: float | None,
+    periods: list[dict[str, Any]],
+    final: bool,
+) -> tuple[float | None, float | None]:
+    if not final:
+        return away_pts, home_pts
+    if away_pts is not None and home_pts is not None and (away_pts or 0.0) != 0.0 and (home_pts or 0.0) != 0.0:
+        return away_pts, home_pts
+
+    period_away = sum(_safe_float(period.get("away")) or 0.0 for period in periods if isinstance(period, dict))
+    period_home = sum(_safe_float(period.get("home")) or 0.0 for period in periods if isinstance(period, dict))
+    if period_away > 0.0 or period_home > 0.0:
+        return period_away, period_home
+    return away_pts, home_pts
 
 
 def _cards_games_for_live_fallback(selected_date: str) -> list[dict[str, Any]]:
@@ -2315,12 +2342,7 @@ def _best_live_player_odds_match(
         ),
     )
     best = ranked[0] if ranked else None
-    if not isinstance(best, dict):
-        return None
-    best_line = _safe_float(best.get("line"))
-    if best_line is None or abs(best_line - row_line) > 1.5:
-        return None
-    return best
+    return best if isinstance(best, dict) else None
 
 
 def _median(values: list[float]) -> float | None:
@@ -3076,6 +3098,23 @@ def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_
                     game["clock"] = cards_state.get("clock")
                     game["in_progress"] = bool(cards_state.get("in_progress"))
                     game["final"] = bool(cards_state.get("final"))
+            period_rows = []
+            for candidate_key in ("periods", "linescores"):
+                candidate_rows = game.get(candidate_key)
+                if isinstance(candidate_rows, list) and candidate_rows:
+                    period_rows = candidate_rows
+                    break
+                live_state_rows = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+                nested_rows = live_state_rows.get(candidate_key) if isinstance(live_state_rows, dict) else []
+                if isinstance(nested_rows, list) and nested_rows:
+                    period_rows = nested_rows
+                    break
+            game["away_pts"], game["home_pts"] = _repair_final_score_from_periods(
+                _safe_float(game.get("away_pts")),
+                _safe_float(game.get("home_pts")),
+                period_rows,
+                bool(game.get("final")),
+            )
             filtered_public_games.append(game)
         if filtered_public_games:
             filtered_payload = dict(public_payload)

@@ -963,6 +963,64 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(rows[0].get("price"), -108)
         self.assertEqual(rows[0].get("line_source"), "oddsapi_player_props_fallback")
 
+    def test_live_player_lens_payload_matches_processed_odds_even_when_line_drift_is_large(self) -> None:
+        with patch(
+            "syndicate.features.wnba.cards.build_cards_page_context",
+            return_value={"date": "2026-05-21"},
+        ), patch(
+            "syndicate.features.wnba.cards._filtered_local_live_snapshot_payload",
+            return_value={
+                "ok": True,
+                "date": "2026-05-21",
+                "games": [
+                    {
+                        "event_id": "evt-2",
+                        "rows": [
+                            {
+                                "player": "Breanna Stewart",
+                                "team_tri": "NYL",
+                                "stat": "pts",
+                                "line_live": 26.5,
+                                "line_source": "live_lens_projection_artifact",
+                                "price": None,
+                                "price_over": None,
+                                "price_under": None,
+                            }
+                        ],
+                    }
+                ],
+            },
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_player_boxscore_payload",
+            return_value={"games": []},
+        ), patch(
+            "syndicate.features.wnba.cards.build_live_state_payload",
+            return_value={"games": []},
+        ), patch(
+            "syndicate.features.wnba.cards._resolve_games_for_event_ids",
+            return_value={"evt-2": {"event_id": "evt-2", "away_tri": "NYL", "home_tri": "LAS"}},
+        ), patch(
+            "syndicate.features.wnba.cards._processed_live_player_odds_index",
+            return_value={
+                ("evt-2", "BREANNA STEWART", "pts"): [
+                    {
+                        "line": 17.5,
+                        "price_over": -112,
+                        "price_under": -108,
+                        "book": "FanDuel",
+                    }
+                ]
+            },
+        ):
+            payload = build_live_player_lens_payload("2026-05-21", ["evt-2"], ttl=20)
+
+        row = ((payload.get("games") or [{}])[0].get("rows") or [{}])[0]
+        self.assertEqual(row.get("price_over"), -112)
+        self.assertEqual(row.get("price_under"), -108)
+        self.assertEqual(row.get("price"), -108)
+        self.assertEqual(row.get("book"), "FanDuel")
+        self.assertEqual(row.get("line_source"), "oddsapi_player_props_fallback")
+
 
 if __name__ == "__main__":
     unittest.main()

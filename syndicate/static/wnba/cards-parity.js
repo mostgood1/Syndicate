@@ -4705,6 +4705,9 @@
       : toFiniteNumber(context.home_pace);
     const liveAwayPoss = toFiniteNumber(liveLens?.awayPossessions);
     const liveHomePoss = toFiniteNumber(liveLens?.homePossessions);
+    const liveGamePace = Number.isFinite(Number(liveLens?.currentTotal)) && Number.isFinite(Number(liveLens?.elapsedMinutes)) && Number(liveLens?.elapsedMinutes) > 0
+      ? (Number(liveLens.currentTotal) / Number(liveLens.elapsedMinutes)) * 48
+      : null;
 
     function shootingBreakdown(bucket) {
       if (!bucket || typeof bucket !== 'object') {
@@ -4731,11 +4734,12 @@
 
     function livePaceTile(teamTri, paceValue, possessions, attempts) {
       const hasLivePossessions = Number.isFinite(Number(possessions));
+      const displayPace = Number.isFinite(Number(paceValue)) ? paceValue : liveGamePace;
       const breakdown = shootingBreakdown(attempts);
       return {
         label: `${teamTri} pace`,
-        value: fmtNumber(paceValue, 1),
-        sub: hasLivePossessions ? `Poss est ${fmtNumber(possessions, 1)}` : 'live expected possessions',
+        value: fmtNumber(displayPace, 1),
+        sub: hasLivePossessions ? `Poss est ${fmtNumber(possessions, 1)}` : (Number.isFinite(liveGamePace) ? 'Live scoring pace' : 'live expected possessions'),
         extra: breakdown ? [breakdown] : [],
       };
     }

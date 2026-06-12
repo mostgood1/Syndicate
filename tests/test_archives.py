@@ -2399,6 +2399,78 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(game.get("period"), 2)
         self.assertEqual(game.get("clock"), "4:34")
 
+    def test_wnba_public_scoreboard_live_state_recovers_final_score_from_period_lines(self) -> None:
+        from syndicate.features.wnba.cards import _public_scoreboard_live_state_payload
+
+        espn_payload = {
+            "events": [
+                {
+                    "id": "401856980",
+                    "date": "2026-06-11T23:00:00Z",
+                    "status": {
+                        "type": {
+                            "state": "post",
+                            "completed": True,
+                            "shortDetail": "Final",
+                            "period": 4,
+                            "displayClock": "",
+                        }
+                    },
+                    "competitions": [
+                        {
+                            "date": "2026-06-11T23:00:00Z",
+                            "competitors": [
+                                {
+                                    "homeAway": "away",
+                                    "team": {"abbreviation": "CHI"},
+                                    "score": "0",
+                                    "linescores": [
+                                        {"value": "14"},
+                                        {"value": "26"},
+                                        {"value": "39"},
+                                        {"value": "19"},
+                                        {"value": "8"},
+                                    ],
+                                },
+                                {
+                                    "homeAway": "home",
+                                    "team": {"abbreviation": "IND"},
+                                    "score": "0",
+                                    "linescores": [
+                                        {"value": "27"},
+                                        {"value": "19"},
+                                        {"value": "27"},
+                                        {"value": "25"},
+                                        {"value": "16"},
+                                    ],
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        class _FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps(espn_payload).encode("utf-8")
+
+        with patch("syndicate.features.wnba.cards.urllib_request.urlopen", return_value=_FakeResponse()):
+            payload = _public_scoreboard_live_state_payload("2026-06-11")
+
+        self.assertIsNotNone(payload)
+        game = (payload.get("games") or [{}])[0]
+        self.assertEqual(game.get("away_pts"), 106.0)
+        self.assertEqual(game.get("home_pts"), 114.0)
+        self.assertTrue(game.get("final"))
+        self.assertFalse(game.get("in_progress"))
+
     def test_wnba_api_source_team_logo_fetches_official_logo_without_source_proxy(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
