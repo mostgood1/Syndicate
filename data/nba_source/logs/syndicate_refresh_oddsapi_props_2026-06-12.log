@@ -4,3 +4,15 @@ ERROR: No player props fetched for 2026-06-12 and no same-day snapshot exists to
 [2026-06-12T15:00:36] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting_repo.cli export-game-cards --date 2026-06-12
 C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'nba_betting_repo.cli' (ModuleNotFoundError: No module named 'nba_betting_repo')
 [2026-06-12T15:00:36] Local game_cards build skipped for 2026-06-12: no raw team odds snapshot found
+[2026-06-12T16:23:51] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-06-12 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-06-12.csv' --regions us
+ERROR: No player props fetched for 2026-06-12 and no same-day snapshot exists to preserve
+[2026-06-12T16:23:52] Skipping local props recommendations export for 2026-06-12: props predictions were not refreshed
+[2026-06-12T16:23:52] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting_repo.cli export-game-cards --date 2026-06-12
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'nba_betting_repo.cli' (ModuleNotFoundError: No module named 'nba_betting_repo')
+[2026-06-12T16:23:52] Local game_cards build skipped for 2026-06-12: no raw team odds snapshot found
+[2026-06-12T16:29:50] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\scripts\fetch_basketball_oddsapi_props_local.py' --league nba --date 2026-06-12 --out 'C:\Users\tempadmin\OneDrive\Coding\Syndicate\vendor\nba_betting_repo\data\raw\odds_nba_player_props_2026-06-12.csv' --regions us
+ERROR: No player props fetched for 2026-06-12 and no same-day snapshot exists to preserve
+[2026-06-12T16:29:52] Skipping local props recommendations export for 2026-06-12: props predictions were not refreshed
+[2026-06-12T16:29:52] $ 'C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe' -m nba_betting_repo.cli export-game-cards --date 2026-06-12
+C:\Users\tempadmin\AppData\Local\Programs\Python\Python311-arm64\python.exe: Error while finding module specification for 'nba_betting_repo.cli' (ModuleNotFoundError: No module named 'nba_betting_repo')
+[2026-06-12T16:29:52] Local game_cards build skipped for 2026-06-12: no raw team odds snapshot found

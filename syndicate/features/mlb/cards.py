@@ -17,6 +17,7 @@ from urllib.request import urlopen
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.sources import default_mlb_source_root
+from syndicate.features.mlb.sources import available_daily_summary_dates
 from syndicate.features.mlb.sources import daily_sim_artifact_path
 from syndicate.features.mlb.sources import season_betting_card_day_path
 from syndicate.features.mlb.sources import daily_artifact_path
@@ -4187,26 +4188,29 @@ def _games_from_daily_summary(summary: dict[str, Any], *, betting_games: dict[in
 
 
 def build_cards_page_context(selected_date: str) -> dict[str, Any]:
-    parsed_date = _parse_iso_date(selected_date)
-    prev_date = (parsed_date - timedelta(days=1)).isoformat()
-    next_date = (parsed_date + timedelta(days=1)).isoformat()
+    available_dates = available_daily_summary_dates()
+    fallback_date = available_dates[-1] if available_dates else selected_date
+    resolved_date = selected_date if not available_dates or selected_date in available_dates else fallback_date
+    resolved_parsed_date = _parse_iso_date(resolved_date)
+    prev_date = (resolved_parsed_date - timedelta(days=1)).isoformat()
+    next_date = (resolved_parsed_date + timedelta(days=1)).isoformat()
     today_iso = central_today_iso()
 
-    module_links = build_module_links(selected_date, "Cards")
+    module_links = build_module_links(resolved_date, "Cards")
     module_link_labels = {
         str(link.get("label") or "").strip().lower()
         for link in module_links
         if isinstance(link, dict)
     }
 
-    summary_path = daily_artifact_path(selected_date)
+    summary_path = daily_artifact_path(resolved_date)
     summary = load_json_file(summary_path)
-    betting_games = _cards_recommendation_payload_by_game(selected_date)
+    betting_games = _cards_recommendation_payload_by_game(resolved_date)
     output_rows = summary.get("outputs") if isinstance((summary or {}).get("outputs"), list) else []
     game_pks = [int(row.get("game_pk") or 0) for row in output_rows if isinstance(row, dict) and int(row.get("game_pk") or 0)]
-    sim_games = _daily_sim_by_game(selected_date, game_pks)
-    actual_games = _daily_actual_by_game(selected_date, game_pks)
-    rfi_targets = load_json_file(daily_rfi_targets_path(selected_date))
+    sim_games = _daily_sim_by_game(resolved_date, game_pks)
+    actual_games = _daily_actual_by_game(resolved_date, game_pks)
+    rfi_targets = load_json_file(daily_rfi_targets_path(resolved_date))
     games = _games_from_daily_summary(
         summary,
         betting_games=betting_games,
@@ -4215,7 +4219,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
     latest_live_odds_refreshed_at = None
-    live_lens_report = load_json_file(live_lens_report_path(selected_date))
+    live_lens_report = load_json_file(live_lens_report_path(resolved_date))
     live_lens_rows = (live_lens_report.get("games") if isinstance((live_lens_report or {}).get("games"), list) else [])
     if live_lens_rows:
         live_lens_by_game_pk: dict[int, dict[str, Any]] = {}
@@ -4239,7 +4243,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 else game
                 for game in games
             ]
-    if selected_date == today_iso:
+    if resolved_date == today_iso:
         refresh_ts = latest_live_odds_refreshed_at or datetime.now().astimezone().isoformat(timespec="seconds")
         for game in games:
             if not isinstance(game, dict):
@@ -4248,10 +4252,10 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
                 game["oddsRefreshedAt"] = refresh_ts
                 game["odds_refreshed_at"] = refresh_ts
         latest_live_odds_refreshed_at = refresh_ts
-    _attach_cards_pregame_starter_ladder_badges(games, selected_date=selected_date)
+    _attach_cards_pregame_starter_ladder_badges(games, selected_date=resolved_date)
     _attach_cards_stateful_starter_ladder_badges(
         games,
-        selected_date=selected_date,
+        selected_date=resolved_date,
         sim_games=sim_games,
         actual_games=actual_games,
     )
@@ -4267,13 +4271,13 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     ]
 
     cards_control_links = [
-        {"label": "Pitcher ladders", "href": f"/mlb/pitcher-ladders?date={selected_date}"},
-        {"label": "Hitter ladders", "href": f"/mlb/hitter-ladders?date={selected_date}"},
-        {"label": "HR targets", "href": f"/mlb/hr-targets?date={selected_date}"},
-        {"label": "Pitcher top props", "href": f"/mlb/pitcher-top-props?date={selected_date}"},
-        {"label": "Hitter top props", "href": f"/mlb/hitter-top-props?date={selected_date}"},
-        {"label": "Season review", "href": f"/mlb/season/{selected_date[:4]}?date={selected_date}"},
-        {"label": "Betting card", "href": f"/mlb/season/{selected_date[:4]}/betting-card?date={selected_date}"},
+        {"label": "Pitcher ladders", "href": f"/mlb/pitcher-ladders?date={resolved_date}"},
+        {"label": "Hitter ladders", "href": f"/mlb/hitter-ladders?date={resolved_date}"},
+        {"label": "HR targets", "href": f"/mlb/hr-targets?date={resolved_date}"},
+        {"label": "Pitcher top props", "href": f"/mlb/pitcher-top-props?date={resolved_date}"},
+        {"label": "Hitter top props", "href": f"/mlb/hitter-top-props?date={resolved_date}"},
+        {"label": "Season review", "href": f"/mlb/season/{resolved_date[:4]}?date={resolved_date}"},
+        {"label": "Betting card", "href": f"/mlb/season/{resolved_date[:4]}/betting-card?date={resolved_date}"},
     ]
     cards_control_links = [
         link
@@ -4282,7 +4286,8 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     ]
 
     return apply_game_board_contract({
-        "date": selected_date,
+        "requested_date": selected_date,
+        "date": resolved_date,
         "prev_date": prev_date,
         "next_date": next_date,
         "module_links": module_links,
@@ -4303,17 +4308,17 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         } if not games else None,
         "header_stats": [{"label": "Games", "value": str(len(games))}],
         "cards_header_title": "MLB Game Cards",
-        "cards_header_meta": f"Artifact-backed slate | {selected_date}",
+        "cards_header_meta": f"Artifact-backed slate | {resolved_date}",
         "plain_control_ids": True,
         "source_meta_items": [
-            f"Date {selected_date}",
+            f"Date {resolved_date}",
             f"Games {len(games)}",
             Path(summary_path).name if games else "No data",
         ],
         "route_path": "/mlb/cards",
         "intro_title": "MLB Cards",
         "intro_body": "This is the first real Syndicate route expanded from the MLB app. The layout now follows the MLB card-page structure, and reusable pieces are being extracted into the shared layer immediately.",
-        "hr_targets_shelf": _hr_targets_shelf(selected_date),
+        "hr_targets_shelf": _hr_targets_shelf(resolved_date),
         "show_app_header": False,
         "show_intro": False,
         "show_source_summary": False,

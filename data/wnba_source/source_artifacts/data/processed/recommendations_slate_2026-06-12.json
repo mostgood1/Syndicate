@@ -1,0 +1,202 @@
+{
+  "date": "2026-06-12",
+  "counts": {
+    "games": 2,
+    "picks": 10
+  },
+  "per_game": [
+    {
+      "home": "WSH",
+      "away": "TOR",
+      "matchup": "TOR @ WSH",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "TOR",
+          "display_pick": "Brittney Sykes OVER 3.5",
+          "selection": "OVER 3.5",
+          "price": 124.0,
+          "score": 13.605457912168163,
+          "ev_pct": 13.605457912168163,
+          "win_prob": 0.44642857142857145,
+          "p_win": 0.44642857142857145,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 13.6%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 4 books aligned",
+            "Best line available"
+          ],
+          "matchup": "TOR @ WSH"
+        },
+        {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Sonia Citron UNDER 3.5",
+          "selection": "UNDER 3.5",
+          "price": 102.0,
+          "score": 13.155339387472475,
+          "ev_pct": 13.155339387472475,
+          "win_prob": 0.49504950495049505,
+          "p_win": 0.49504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 13.2%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "TOR @ WSH"
+        },
+        {
+          "market": "PROPS",
+          "team": "WSH",
+          "display_pick": "Georgia Amoore OVER 11.5",
+          "selection": "OVER 11.5",
+          "price": 102.0,
+          "score": 8.927121654106497,
+          "ev_pct": 8.927121654106497,
+          "win_prob": 0.49504950495049505,
+          "p_win": 0.49504950495049505,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 8.9%",
+            "Regular price range (-150 to +150)"
+          ],
+          "matchup": "TOR @ WSH"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 170.0",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -4.792962,
+          "ev_pct": 4.793,
+          "win_prob": 0.57174,
+          "p_win": 0.57174,
+          "basketball_summary": "Model total 165.2 vs line 170.0",
+          "top_play_reasons": [
+            "Edge -4.8",
+            "EV 4.8%"
+          ],
+          "matchup": "TOR @ WSH"
+        },
+        {
+          "market": "ATS",
+          "team": "Washington Mystics",
+          "display_pick": "Washington Mystics -2.0",
+          "selection": "Washington Mystics",
+          "price": -110.0,
+          "score": 3.9,
+          "ev_pct": 3.9,
+          "win_prob": 0.56281,
+          "p_win": 0.56281,
+          "basketball_summary": "Model margin 1.9 vs market -2.0",
+          "top_play_reasons": [
+            "Edge 3.9",
+            "EV 3.9%"
+          ],
+          "matchup": "TOR @ WSH"
+        }
+      ]
+    },
+    {
+      "home": "SEA",
+      "away": "GSV",
+      "matchup": "GSV @ SEA",
+      "picks": [
+        {
+          "market": "PROPS",
+          "team": "GSV",
+          "display_pick": "Veronica Burton OVER 1.5",
+          "selection": "OVER 1.5",
+          "price": 124.0,
+          "score": 62.69164838944788,
+          "ev_pct": 62.69164838944788,
+          "win_prob": 0.44642857142857145,
+          "p_win": 0.44642857142857145,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 62.7%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ SEA"
+        },
+        {
+          "market": "PROPS",
+          "team": "SEA",
+          "display_pick": "Awa Fam UNDER 9.5",
+          "selection": "UNDER 9.5",
+          "price": 100.0,
+          "score": 44.99999983642431,
+          "ev_pct": 44.99999983642431,
+          "win_prob": 0.5,
+          "p_win": 0.5,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 45.0%",
+            "Regular price range (-150 to +150)",
+            "Consensus: 3 books aligned",
+            "Best line available"
+          ],
+          "matchup": "GSV @ SEA"
+        },
+        {
+          "market": "ATS",
+          "team": "Golden State Valkyries",
+          "display_pick": "Golden State Valkyries -9.5",
+          "selection": "Golden State Valkyries",
+          "price": -110.0,
+          "score": 18.525,
+          "ev_pct": 18.525,
+          "win_prob": 0.70906,
+          "p_win": 0.70906,
+          "basketball_summary": "Model margin 9.0 vs market -9.5",
+          "top_play_reasons": [
+            "Edge 18.5",
+            "EV 18.5%"
+          ],
+          "matchup": "GSV @ SEA"
+        },
+        {
+          "market": "PROPS",
+          "team": "SEA",
+          "display_pick": "Flau'jae Johnson UNDER 2.5",
+          "selection": "UNDER 2.5",
+          "price": 122.0,
+          "score": 12.375371722282102,
+          "ev_pct": 12.375371722282102,
+          "win_prob": 0.45045045045045046,
+          "p_win": 0.45045045045045046,
+          "basketball_summary": "Prop projection -",
+          "top_play_reasons": [
+            "EV 12.4%",
+            "Regular price range (-150 to +150)",
+            "Best line available"
+          ],
+          "matchup": "GSV @ SEA"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Under 157.5",
+          "selection": "Under",
+          "price": -110.0,
+          "score": -1.430957,
+          "ev_pct": 1.431,
+          "win_prob": 0.53812,
+          "p_win": 0.53812,
+          "basketball_summary": "Model total 156.1 vs line 157.5",
+          "top_play_reasons": [
+            "Edge -1.4",
+            "EV 1.4%"
+          ],
+          "matchup": "GSV @ SEA"
+        }
+      ]
+    }
+  ]
+}

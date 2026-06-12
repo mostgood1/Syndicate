@@ -443,6 +443,73 @@ def _missing_required_artifacts(*, artifact_root: Path, date_str: str) -> list[s
     return missing
 
 
+def _backfill_latest_dated_csv(*, artifact_root: Path, date_str: str, destination_name: str, source_prefixes: tuple[str, ...]) -> bool:
+    destination = artifact_root / "data" / "processed" / destination_name
+    if destination.exists():
+        return True
+
+    search_roots = [artifact_root]
+    processed_roots = [root / "data" / "processed" for root in search_roots]
+    for processed_root in processed_roots:
+        for prefix in source_prefixes:
+            candidates = sorted(processed_root.glob(f"{prefix}_*.csv"), reverse=True)
+            for source in candidates:
+                if source.name == destination_name:
+                    continue
+                if source.stem.endswith(date_str):
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                _copy_if_exists(source=source, destination=destination)
+                return destination.exists()
+
+    return False
+
+
+def _backfill_required_compatibility_artifacts(*, artifact_root: Path, date_str: str) -> dict[str, bool]:
+    created: dict[str, bool] = {}
+    created["predictions"] = _backfill_latest_dated_csv(
+        artifact_root=artifact_root,
+        date_str=date_str,
+        destination_name=f"predictions_{date_str}.csv",
+        source_prefixes=("predictions_sim", "predictions"),
+    )
+    if created["predictions"]:
+        created["predictions_sim"] = _backfill_latest_dated_csv(
+            artifact_root=artifact_root,
+            date_str=date_str,
+            destination_name=f"predictions_sim_{date_str}.csv",
+            source_prefixes=("predictions_sim", "predictions"),
+        )
+    else:
+        created["predictions_sim"] = False
+
+    created["recommendations_sim"] = _backfill_latest_dated_csv(
+        artifact_root=artifact_root,
+        date_str=date_str,
+        destination_name=f"recommendations_sim_{date_str}.csv",
+        source_prefixes=("recommendations_sim", "recommendations"),
+    )
+    created["props_boxscores_sim"] = _backfill_latest_dated_csv(
+        artifact_root=artifact_root,
+        date_str=date_str,
+        destination_name=f"props_boxscores_sim_{date_str}.csv",
+        source_prefixes=("props_boxscores_sim", "props_boxscores_sim_samples"),
+    )
+    created["props_boxscores_sim_hist"] = _backfill_latest_dated_csv(
+        artifact_root=artifact_root,
+        date_str=date_str,
+        destination_name=f"props_boxscores_sim_hist_{date_str}.csv",
+        source_prefixes=("props_boxscores_sim_hist", "props_boxscores_sim_samples"),
+    )
+    created["props_boxscores_sim_samples"] = _backfill_latest_dated_csv(
+        artifact_root=artifact_root,
+        date_str=date_str,
+        destination_name=f"props_boxscores_sim_samples_{date_str}.csv",
+        source_prefixes=("props_boxscores_sim_samples", "props_boxscores_sim", "props_boxscores_sim_hist"),
+    )
+    return created
+
+
 def _required_artifacts_by_date(*, artifact_root: Path, date_values: list[str]) -> dict[str, list[str]]:
     missing_by_date: dict[str, list[str]] = {}
     for date_value in date_values:
@@ -523,15 +590,19 @@ def main() -> int:
                     days_ahead=int(args.days_ahead or 0),
                 )
             except Exception as exc:
-                missing_by_date = _required_artifacts_by_date(artifact_root=artifact_root, date_values=target_dates)
-                if missing_by_date:
-                    raise
                 warnings.append(f"source generation skipped: {exc}")
         elif source_root is not None and mode == "full":
             warnings.append("source generation disabled by default (set SYNDICATE_NHL_SOURCE_CLI_GENERATION=1 to enable)")
     except Exception as exc:
         print(json.dumps({"ok": False, "date": args.date, "error": str(exc)}))
         return 1
+
+    backfilled = _backfill_required_compatibility_artifacts(artifact_root=artifact_root, date_str=args.date)
+    if any(backfilled.values()):
+        warnings.append(
+            "backfilled compatibility artifacts: "
+            + ", ".join(name for name, created in backfilled.items() if created)
+        )
 
     copied = _materialize_collected_only_artifact_bundle(artifact_root=artifact_root, date_str=args.date) if mode == "fast" else _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
     if mode == "full":

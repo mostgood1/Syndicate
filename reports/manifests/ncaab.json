@@ -1,9 +1,8 @@
 {
   "sport": "ncaab",
-  "last_updated": "2026-06-12T15:00:58+00:00",
+  "last_updated": "2026-06-12T16:29:53+00:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaab_source"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
   "status": "complete",
   "metadata": {
@@ -11,8 +10,8 @@
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
-    "ok": true,
-    "post_refresh_ok": true,
+    "ok": false,
+    "post_refresh_ok": null,
     "mirror_ok": null
   }
 }

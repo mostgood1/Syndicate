@@ -1391,9 +1391,6 @@ def _build_local_live_lens_signals_artifact(*, processed_root: Path, date_str: s
                 }
             )
 
-    if not rows_out:
-        return {}
-
     raw = "\n".join(json.dumps(row, separators=(",", ":")) for row in rows_out).encode("utf-8")
     copied: dict[str, str] = {}
     for out_path, copied_key in (
@@ -3615,8 +3612,6 @@ def _export_recon_quarters_artifact(*, source_root: Path, date_str: str, process
 
 def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) -> tuple[int, Path | None]:
     boxscores_path = processed_root / f"boxscores_{date_str}.csv"
-    if not boxscores_path.exists():
-        return 0, None
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
     team_to_game_id: dict[str, str] = {}
@@ -3634,83 +3629,81 @@ def _build_local_recon_props_artifact(*, processed_root: Path, date_str: str) ->
 
     rows: list[dict[str, str]] = []
     seen_keys: set[tuple[str, str, str]] = set()
-    with boxscores_path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            normalized = {str(key or "").strip().upper(): value for key, value in (row or {}).items()}
-            game_id = str(normalized.get("GAME_ID") or normalized.get("GAMEID") or "").strip()
-            team_abbr = str(normalized.get("TEAM_ABBREVIATION") or normalized.get("TEAM") or "").strip().upper()
-            if not game_id and team_abbr:
-                game_id = str(team_to_game_id.get(team_abbr) or "").strip()
-            player_name = str(normalized.get("PLAYER_NAME") or normalized.get("PLAYER") or "").strip()
-            player_id = str(normalized.get("PLAYER_ID") or "").strip()
-            if not game_id or not player_name:
-                continue
+    if boxscores_path.exists():
+        with boxscores_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                normalized = {str(key or "").strip().upper(): value for key, value in (row or {}).items()}
+                game_id = str(normalized.get("GAME_ID") or normalized.get("GAMEID") or "").strip()
+                team_abbr = str(normalized.get("TEAM_ABBREVIATION") or normalized.get("TEAM") or "").strip().upper()
+                if not game_id and team_abbr:
+                    game_id = str(team_to_game_id.get(team_abbr) or "").strip()
+                player_name = str(normalized.get("PLAYER_NAME") or normalized.get("PLAYER") or "").strip()
+                player_id = str(normalized.get("PLAYER_ID") or "").strip()
+                if not game_id or not player_name:
+                    continue
 
-            dedupe_key = (game_id, team_abbr, player_name.casefold())
-            if dedupe_key in seen_keys:
-                continue
-            seen_keys.add(dedupe_key)
+                dedupe_key = (game_id, team_abbr, player_name.casefold())
+                if dedupe_key in seen_keys:
+                    continue
+                seen_keys.add(dedupe_key)
 
-            def _stat_value(*keys: str) -> str:
-                for key in keys:
-                    value = normalized.get(key)
-                    if value is None:
-                        continue
-                    text = str(value).strip()
-                    if text:
-                        return text
-                return ""
+                def _stat_value(*keys: str) -> str:
+                    for key in keys:
+                        value = normalized.get(key)
+                        if value is None:
+                            continue
+                        text = str(value).strip()
+                        if text:
+                            return text
+                    return ""
 
-            pts = _stat_value("PTS")
-            reb = _stat_value("REB")
-            ast = _stat_value("AST")
-            threes = _stat_value("FG3M", "FG3_M")
-            stl = _stat_value("STL")
-            blk = _stat_value("BLK")
-            tov = _stat_value("TOV", "TO")
+                pts = _stat_value("PTS")
+                reb = _stat_value("REB")
+                ast = _stat_value("AST")
+                threes = _stat_value("FG3M", "FG3_M")
+                stl = _stat_value("STL")
+                blk = _stat_value("BLK")
+                tov = _stat_value("TOV", "TO")
 
-            pra = ""
-            pr = ""
-            pa = ""
-            ra = ""
-            try:
-                pts_num = float(pts) if pts else None
-                reb_num = float(reb) if reb else None
-                ast_num = float(ast) if ast else None
-            except ValueError:
-                pts_num = reb_num = ast_num = None
-            if pts_num is not None and reb_num is not None:
-                pr = f"{pts_num + reb_num:g}"
-            if pts_num is not None and ast_num is not None:
-                pa = f"{pts_num + ast_num:g}"
-            if reb_num is not None and ast_num is not None:
-                ra = f"{reb_num + ast_num:g}"
-            if pts_num is not None and reb_num is not None and ast_num is not None:
-                pra = f"{pts_num + reb_num + ast_num:g}"
+                pra = ""
+                pr = ""
+                pa = ""
+                ra = ""
+                try:
+                    pts_num = float(pts) if pts else None
+                    reb_num = float(reb) if reb else None
+                    ast_num = float(ast) if ast else None
+                except ValueError:
+                    pts_num = reb_num = ast_num = None
+                if pts_num is not None and reb_num is not None:
+                    pr = f"{pts_num + reb_num:g}"
+                if pts_num is not None and ast_num is not None:
+                    pa = f"{pts_num + ast_num:g}"
+                if reb_num is not None and ast_num is not None:
+                    ra = f"{reb_num + ast_num:g}"
+                if pts_num is not None and reb_num is not None and ast_num is not None:
+                    pra = f"{pts_num + reb_num + ast_num:g}"
 
-            rows.append(
-                {
-                    "game_id": game_id,
-                    "player_id": player_id,
-                    "player_name": player_name,
-                    "team_abbr": team_abbr,
-                    "pts": pts,
-                    "reb": reb,
-                    "ast": ast,
-                    "threes": threes,
-                    "stl": stl,
-                    "blk": blk,
-                    "tov": tov,
-                    "pr": pr,
-                    "pa": pa,
-                    "ra": ra,
-                    "pra": pra,
-                }
-            )
-
-    if not rows:
-        return 0, None
+                rows.append(
+                    {
+                        "game_id": game_id,
+                        "player_id": player_id,
+                        "player_name": player_name,
+                        "team_abbr": team_abbr,
+                        "pts": pts,
+                        "reb": reb,
+                        "ast": ast,
+                        "threes": threes,
+                        "stl": stl,
+                        "blk": blk,
+                        "tov": tov,
+                        "pr": pr,
+                        "pa": pa,
+                        "ra": ra,
+                        "pra": pra,
+                    }
+                )
 
     out_path = processed_root / f"recon_props_{date_str}.csv"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3732,7 +3725,7 @@ def _export_recon_props_artifact(*, source_root: Path, date_str: str, processed_
     if existing:
         return existing
     local_rows, local_path = _build_local_recon_props_artifact(processed_root=processed_root, date_str=date_str)
-    if local_rows > 0 and local_path is not None:
+    if local_path is not None:
         return str(local_path)
     source = source_root / "data" / "processed" / f"recon_props_{date_str}.csv"
     if not source.exists() or not source.is_file():
