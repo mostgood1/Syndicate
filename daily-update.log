@@ -792,3 +792,57 @@ To https://github.com/mostgood1/Syndicate
   "snapshot_rows": 575,
   "started_at": "2026-06-12T20:40:14.731428"
 }
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_projections_2026-06-12.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_projections_2026-06-12.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   ee3636d..0c68406  main -> main
+==> WNBA source mirror refresh
+    cwd: D:\a\Syndicate\Syndicate
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\refresh_wnba_source_mirror.ps1 -Date 2026-06-12
+    pid: 3460
+{
+    "sport":  "wnba",
+    "date":  "2026-06-12",
+    "refreshedAtUtc":  "2026-06-12T20:48:31.7546717Z",
+    "sourceRepo":  null,
+    "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts",
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_WNBA",
+    "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_WNBA",
+    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source",
+    "usedExistingMirrorArtifacts":  false,
+    "usedArtifactBundle":  true,
+    "copiedArtifactCount":  22,
+    "artifactGroups":  {
+                           "processed":  15,
+                           "live_lens":  6,
+                           "raw":  1,
+                           "other":  0
+                       },
+    "copiedArtifacts":  [
+                            "game_cards_2026-06-12.csv",
+                            "recommendations_2026-06-12.csv",
+                            "recommendations_slate_2026-06-12.json",
+                            "cards_sim_detail_2026-06-12.json",
+                            "cards_props_snapshot_2026-06-12.json",
+                            "props_recommendations_top_by_game_2026-06-12.json",
+                            "oddsapi_player_props_2026-06-12.csv",
+                            "props_predictions_2026-06-12.csv",
+                            "props_edges_2026-06-12.csv",
+                            "props_recommendations_2026-06-12.csv",
+                            "boxscores_history.csv",
+                            "live_lens_projections_2026-06-12.jsonl",
+                            "live_lens_tuning_override.json",
+                            "smart_sim_2026-06-12_SEA_GSV.json",
+                            "smart_sim_2026-06-12_WSH_TOR.json",
+                            "live_lens\\live_lens_projections_2026-06-12.jsonl",
+                            "live_lens\\live_lens_tuning_override.json",
+                            "live_snapshots\\live_state_2026-06-12.jsonl",
+                            "live_snapshots\\live_pbp_stats_2026-06-12.jsonl",
+                            "live_snapshots\\live_lines_2026-06-12.jsonl",
+                            "live_snapshots\\live_player_lens_2026-06-12.jsonl",
+                            "raw\\odds_wnba_player_props_2026-06-12.csv"
+                        ]
+}
