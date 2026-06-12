@@ -1,7 +1,7 @@
 {
   "date": "2026-06-11",
   "season": 2026,
-  "generated_at": "2026-06-11T19:26:37.955987",
+  "generated_at": "2026-06-11T21:54:17.682425",
   "tool": "tools/daily_update_multi_profile.py",
   "locked": true,
   "source_profile": "game_recos",
@@ -34,12 +34,12 @@
       "signal": {
         "label": "F1 YRFI",
         "tone": "yrfi",
-        "summary": "F1 mean 1.20 | side lead 27.9%",
-        "detail": "Season filter qualified: only 49.3% simulated NRFI, 1.20 expected first-inning runs, and one side reaches a 27.9% chance to be ahead after one.",
-        "nrfiProb": 0.493,
-        "yrfiProb": 0.507,
-        "meanTotalRuns": 1.197,
-        "maxSideLeadProb": 0.279
+        "summary": "F1 mean 1.29 | side lead 29.7%",
+        "detail": "Season filter qualified: only 46.4% simulated NRFI, 1.29 expected first-inning runs, and one side reaches a 29.7% chance to be ahead after one.",
+        "nrfiProb": 0.464,
+        "yrfiProb": 0.536,
+        "meanTotalRuns": 1.292,
+        "maxSideLeadProb": 0.297
       }
     },
     {
@@ -58,12 +58,12 @@
       "signal": {
         "label": "F1 NRFI",
         "tone": "nrfi",
-        "summary": "0-run sim 60.9% | F1 mean 0.79",
-        "detail": "Season filter qualified: simulated scoreless first inning 60.9% with only 0.79 expected runs in the opening frame.",
-        "nrfiProb": 0.609,
-        "yrfiProb": 0.391,
-        "meanTotalRuns": 0.788,
-        "maxSideLeadProb": 0.193
+        "summary": "0-run sim 61.2% | F1 mean 0.78",
+        "detail": "Season filter qualified: simulated scoreless first inning 61.2% with only 0.78 expected runs in the opening frame.",
+        "nrfiProb": 0.612,
+        "yrfiProb": 0.388,
+        "meanTotalRuns": 0.783,
+        "maxSideLeadProb": 0.19
       }
     }
   ]
