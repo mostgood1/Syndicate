@@ -355,6 +355,15 @@ Ensure-DateJsonArtifact -RelativePath (Join-Path 'daily\top_props' ("daily_top_p
         top_props = @()
     }) | Out-Null
 
+$artifactGroups = [ordered]@{
+    daily = 0
+    eval = 0
+    live_lens = 0
+    market = 0
+    raw = 0
+    other = 0
+}
+
 # Strict contract: canonical OddsAPI snapshots must exist for the requested date.
 $requiredOddsSnapshots = @(
     (Join-Path "daily\snapshots\$Date" "oddsapi_game_lines_$dateSlug.json"),
@@ -374,6 +383,31 @@ if ($missingOddsSnapshots.Count -gt 0) {
     if ($missingDetails.Count -eq 0) {
         $missingDetails = @($requiredOddsSnapshots)
     }
+
+    $earlyManifest = [pscustomobject]@{
+        sport = 'mlb'
+        date = $Date
+        refreshedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+        sourceRepo = $sourceRoot
+        sourceArtifactRoot = $artifactRoot
+        sourceRootEnvVar = $sourceRootEnvVar
+        sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
+        destinationRoot = $destinationSportRoot
+        usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
+        usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
+        missingOddsSnapshots = @($missingDetails)
+        copiedArtifactCount = $copied.Count
+        artifactGroups = [pscustomobject]$artifactGroups
+        copiedArtifacts = @($copied)
+    }
+
+    $manifestRoot = Join-Path $destinationSportRoot 'manifests'
+    $manifestPath = Join-Path $manifestRoot ("mirror_refresh_{0}.json" -f $Date)
+    $latestManifestPath = Join-Path $manifestRoot 'mirror_refresh_latest.json'
+
+    Write-JsonFile -Path $manifestPath -Value $earlyManifest
+    Write-JsonFile -Path $latestManifestPath -Value $earlyManifest
+
     throw ("Missing MLB odds snapshot artifacts for {0}: {1}" -f $Date, ($missingDetails -join ', '))
 }
 
@@ -425,15 +459,6 @@ $liveLensRecapSource = if ($UseExistingMirrorArtifacts) { Join-Path $destDataRoo
 $liveLensRecapDest = Join-Path $destDataRoot (Join-Path 'live_lens\recaps' ("live_lens_daily_recap_{0}.json" -f $dateSlug))
 if (Copy-IfExists -SourcePath $liveLensRecapSource -DestinationPath $liveLensRecapDest) {
     $copied.Add((Join-Path 'live_lens\recaps' ("live_lens_daily_recap_{0}.json" -f $dateSlug))) | Out-Null
-}
-
-$artifactGroups = [ordered]@{
-    daily = 0
-    eval = 0
-    live_lens = 0
-    market = 0
-    raw = 0
-    other = 0
 }
 
 foreach ($artifact in $copied) {
