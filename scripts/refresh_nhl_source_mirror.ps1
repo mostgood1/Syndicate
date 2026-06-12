@@ -118,6 +118,15 @@ function Copy-TreeIfExists {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
     }
 
+    $resolvedSourcePath = (Resolve-Path $SourcePath).Path
+    $resolvedDestinationPath = $DestinationPath
+    if (Test-Path $DestinationPath) {
+        $resolvedDestinationPath = (Resolve-Path $DestinationPath).Path
+    }
+    if ($resolvedSourcePath -eq $resolvedDestinationPath) {
+        return $true
+    }
+
     Copy-Item -Path $SourcePath -Destination $DestinationPath -Recurse -Force
     return $true
 }
