@@ -114,17 +114,17 @@
       }
     },
     "mlb_live_lens:2026-06-12": {
-      "inputHash": "bdf73273726929f4c5648630120279cad493740ebe42e955cdf0d308eeed5a13",
-      "updatedAt": "2026-06-12T16:47:20.605264",
+      "inputHash": "cbfc06b3427995641a581d1771409ea0b682cc287d67f7e891321ecc7a033b1f",
+      "updatedAt": "2026-06-12T18:56:41.256989",
       "outputs": [
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2\\data\\live_lens\\live_lens_report_2026_06_12.json",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2\\data\\live_lens\\live_lens_2026_06_12.jsonl",
-        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_12.json"
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_12.json",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_12.jsonl",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_12.json"
       ],
       "metadata": {
         "date": "2026-06-12",
         "trigger": "syndicate_refresh",
-        "source_root": "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\vendor\\mlb_bettingv2"
+        "source_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts"
       }
     }
   }
