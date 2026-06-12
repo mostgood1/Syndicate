@@ -183,7 +183,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         finally:
             sys.modules.pop(spec.name, None)
 
-    def test_api_live_lens_defaults_to_persist_for_current_date(self) -> None:
+    def test_api_live_lens_does_not_auto_persist_for_current_date(self) -> None:
         from syndicate.blueprints import mlb as mlb_blueprint
         from syndicate.app import app as syndicate_app
 
@@ -195,21 +195,21 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             captured["season"] = season
             return {"date": selected_date, "games": [], "counts": {}, "generatedAt": "2026-06-03T20:15:00-05:00"}
 
-        with patch.object(mlb_blueprint, "central_today_iso", return_value="2026-06-03"), patch.object(
+        with patch.object(mlb_blueprint, "build_live_lens_page_context", side_effect=fake_build_live_lens_page_context), patch.object(
             mlb_blueprint,
-            "build_live_lens_page_context",
-            side_effect=fake_build_live_lens_page_context,
-        ), patch.object(mlb_blueprint, "build_live_lens_api_payload", return_value={"ok": True}) as mocked_payload:
+            "build_live_lens_api_payload",
+            return_value={"ok": True},
+        ) as mocked_payload:
             with syndicate_app.test_client() as client:
                 response = client.get("/mlb/api/live-lens?date=2026-06-03")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(captured["selected_date"], "2026-06-03")
-        self.assertTrue(captured["persist"])
+        self.assertFalse(captured["persist"])
         self.assertIsNone(captured["season"])
         mocked_payload.assert_called_once()
 
-    def test_build_live_lens_page_context_refreshes_current_date_status_from_feed(self) -> None:
+    def test_build_live_lens_page_context_reads_report_without_feed_refresh(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
 
         report = {
@@ -249,18 +249,13 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             live_lens_module,
             "live_lens_report_path",
             return_value=Path("report.json"),
-        ), patch.object(live_lens_module, "_mlb_vendor_client", return_value=object()), patch.object(
-            live_lens_module,
-            "fetch_game_feed_live",
-            return_value=live_feed,
         ):
             context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
 
-        self.assertEqual(context["counts"]["final"], 1)
-        self.assertEqual(context["counts"]["pregame"], 0)
-        self.assertEqual(context["games"][0]["status"]["abstract"], "Final")
-        self.assertEqual(context["games"][0]["detail"], "Final")
-        self.assertEqual(context["games"][0]["score"], {"away": 5, "home": 3})
+        self.assertEqual(context["counts"]["pregame"], 1)
+        self.assertEqual(context["games"][0]["status"]["abstract"], "Preview")
+        self.assertEqual(context["games"][0]["detail"], "Scheduled")
+        self.assertEqual(context["games"][0]["score"], {"away": 0, "home": 0})
 
     def test_live_lens_page_context_opts_into_today_ladder_refresh(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
@@ -285,7 +280,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertTrue(captured["allow_request_daily_ladders_refresh"])
         self.assertEqual(context["counts"]["games"], 0)
 
-    def test_live_lens_page_context_prefers_today_live_report_over_cards_merge(self) -> None:
+    def test_live_lens_page_context_prefers_persisted_live_report_over_cards_merge(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
 
         fresh_report = {
@@ -333,7 +328,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             "live_lens_report_path",
             return_value=Path("report.json"),
         ):
-            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=False)
+            context = live_lens_module.build_live_lens_page_context("2026-06-03", persist=True)
 
         self.assertEqual(context["games"][0]["status"]["abstract"], "Live")
         self.assertEqual(context["games"][0]["gameLens"][0]["key"], "live")

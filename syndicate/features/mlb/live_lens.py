@@ -832,12 +832,6 @@ def _cards_backed_live_lens_report(selected_date: str) -> dict[str, Any] | None:
         "source_path": str(report_path),
         "using_sample_data": bool(cards_context.get("using_sample_data", False)),
     }
-
-    try:
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    except Exception:
-        return None
     return payload
 
 
@@ -892,7 +886,7 @@ def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
     if not isinstance(payload, dict) or not isinstance(payload.get("games"), list) or not payload.get("games"):
         fallback_payload = _cards_backed_live_lens_report(selected_date)
         if fallback_payload is not None:
-            return fallback_payload
+            payload = fallback_payload
         if not isinstance(payload, dict):
             return None
     payload = _merge_cards_context_into_report(payload, selected_date)
@@ -936,25 +930,21 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     parsed_date = parse_iso_date(selected_date)
     prev_date = parsed_date.fromordinal(parsed_date.toordinal() - 1).isoformat()
     next_date = parsed_date.fromordinal(parsed_date.toordinal() + 1).isoformat()
-    current_date = datetime.now().astimezone().date().isoformat()
 
     report_path = live_lens_report_path(selected_date)
-    report = _persist_live_lens_report(selected_date) if persist or selected_date == current_date else None
+    report = _persist_live_lens_report(selected_date) if persist else None
     if not isinstance(report, dict):
         report = load_json_file(report_path)
     if (not isinstance(report, dict)) or not isinstance(report.get("games"), list) or not report.get("games"):
         fallback_report = _cards_backed_live_lens_report(selected_date)
         if fallback_report is not None:
             report = fallback_report
-    elif isinstance(report, dict):
-        report = _merge_cards_context_into_report(report, selected_date)
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
     odds_refreshed_at = datetime.now().astimezone().isoformat(timespec="seconds") if persist else None
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date
     rows = (report or {}).get("games") if isinstance((report or {}).get("games"), list) else []
     games = [_game_from_report_row(row, report_date=selected_date, generated_at=generated_at) for row in rows if isinstance(row, dict)]
-    _refresh_current_date_live_statuses(games, selected_date)
     if persist and games:
         persisted_games = [dict(game) for game in games if isinstance(game, dict)]
         persisted_counts = {
