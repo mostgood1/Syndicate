@@ -3,6 +3,43 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 
+def _normalized_movement_history(candidate: Mapping[str, Any]) -> list[dict[str, Any]]:
+    normalized = candidate.get("normalized") if isinstance(candidate.get("normalized"), Mapping) else {}
+    history_sources = [
+        candidate.get("odds_history") if isinstance(candidate.get("odds_history"), Mapping) else {},
+        candidate.get("movement") if isinstance(candidate.get("movement"), Mapping) else {},
+        candidate,
+        normalized,
+    ]
+    for source in history_sources:
+        if not isinstance(source, Mapping):
+            continue
+        history = source.get("history") if isinstance(source.get("history"), list) else None
+        if isinstance(history, list) and history:
+            normalized_history: list[dict[str, Any]] = []
+            for item in history:
+                if not isinstance(item, Mapping):
+                    continue
+                entry = _copy_mapping(item)
+                line_value = _coerce_float(entry.get("line"))
+                if line_value is None:
+                    line_value = _coerce_float(entry.get("current_line"))
+                if line_value is None:
+                    continue
+                normalized_history.append(
+                    {
+                        "timestamp": entry.get("timestamp") or entry.get("captured_at") or entry.get("updated_at") or entry.get("at") or entry.get("time"),
+                        "line": line_value,
+                        "odds": _coerce_float(entry.get("odds")),
+                        "movement": entry.get("movement") or entry.get("trend"),
+                        "source": entry.get("source") or entry.get("source_path") or entry.get("book") or entry.get("market"),
+                    }
+                )
+            if normalized_history:
+                return normalized_history
+    return []
+
+
 def _copy_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
@@ -30,8 +67,12 @@ def _first_float(candidate: Mapping[str, Any], *keys: str) -> float | None:
 
 
 def _movement_history(candidate: Mapping[str, Any], opening_line: float | None, current_line: float | None) -> list[dict[str, Any]]:
+    history = _normalized_movement_history(candidate)
+    if history:
+        return history
+
     raw_history = candidate.get("movement_history") or candidate.get("line_history") or candidate.get("line_movement")
-    history: list[dict[str, Any]] = []
+    history = []
     if isinstance(raw_history, list):
         for item in raw_history:
             if not isinstance(item, Mapping):

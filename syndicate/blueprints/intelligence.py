@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -28,8 +29,11 @@ intelligence_bp = Blueprint("syndicate_intelligence", __name__)
 DEFAULT_QUESTION = "top edges today"
 _QUERY_RESPONSE_VERSION_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "query_response_version.json"
 _QUERY_RESPONSE_CACHE_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "query_response_cache.json"
+_STATUS_RESPONSE_CACHE_PATH = Path(__file__).resolve().parents[2] / "reports" / "intelligence" / "status_response_cache.json"
 _QUERY_RESPONSE_VERSION_LOCK = threading.Lock()
+_STATUS_RESPONSE_CACHE_LOCK = threading.Lock()
 _QUERY_RESPONSE_VERSION_STATE: dict[str, object] | None = None
+_STATUS_RESPONSE_CACHE_STATE: dict[str, object] | None = None
 
 # ✅ GLOBAL CACHE
 LAST_RESULT = {
@@ -216,7 +220,7 @@ def _is_board_response(payload: dict[str, object] | None) -> bool:
 
 
 def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
-    cached_response = read_latest_intelligence_state_response(payload, force_refresh=True)
+    cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
     if _is_board_response(cached_response):
         return dict(cached_response or {}), "worker"
     cached_response = _load_response_cache_state()
@@ -262,6 +266,58 @@ def _store_response_cache_state(state: dict[str, object]) -> None:
         _QUERY_RESPONSE_CACHE_PATH.write_text(json.dumps(state, sort_keys=True), encoding="utf-8")
     except Exception:
         pass
+
+
+def _load_status_response_cache_state() -> dict[str, object] | None:
+    global _STATUS_RESPONSE_CACHE_STATE
+    if _STATUS_RESPONSE_CACHE_STATE is not None:
+        return dict(_STATUS_RESPONSE_CACHE_STATE)
+    try:
+        if not _STATUS_RESPONSE_CACHE_PATH.exists():
+            return None
+        payload = json.loads(_STATUS_RESPONSE_CACHE_PATH.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and isinstance(payload.get("status"), dict):
+            _STATUS_RESPONSE_CACHE_STATE = {
+                "selected_date": str(payload.get("selected_date") or ""),
+                "cached_at": float(payload.get("cached_at") or 0.0),
+                "status": dict(payload.get("status") or {}),
+            }
+            return dict(_STATUS_RESPONSE_CACHE_STATE)
+    except Exception:
+        return None
+    return None
+
+
+def _store_status_response_cache_state(selected_date: str, status: dict[str, object]) -> None:
+    global _STATUS_RESPONSE_CACHE_STATE
+    _STATUS_RESPONSE_CACHE_STATE = {
+        "selected_date": str(selected_date or "").strip(),
+        "cached_at": time.time(),
+        "status": dict(status or {}),
+    }
+    try:
+        _STATUS_RESPONSE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _STATUS_RESPONSE_CACHE_PATH.write_text(json.dumps(_STATUS_RESPONSE_CACHE_STATE, sort_keys=True), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _cached_intelligence_status(selected_date: str, *, force_refresh: bool = False, cache_ttl_seconds: int = 60) -> dict[str, object]:
+    if not force_refresh:
+        with _STATUS_RESPONSE_CACHE_LOCK:
+            cached_state = _load_status_response_cache_state()
+            if isinstance(cached_state, dict) and str(cached_state.get("selected_date") or "") == str(selected_date or ""):
+                cached_at = float(cached_state.get("cached_at") or 0.0)
+                if cached_at > 0.0 and (time.time() - cached_at) <= float(cache_ttl_seconds):
+                    status = cached_state.get("status")
+                    if isinstance(status, dict):
+                        return dict(status)
+
+    status = build_intelligence_status(selected_date=selected_date)
+    if isinstance(status, dict):
+        with _STATUS_RESPONSE_CACHE_LOCK:
+            _store_status_response_cache_state(selected_date, status)
+    return status
 
 
 def _number_value(value: object) -> float | None:
@@ -429,15 +485,23 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
     }
 
 
+def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, object]:
+    normalized = dict(payload or {})
+    if str(normalized.get("question") or "").strip() == DEFAULT_QUESTION:
+        normalized["date"] = str(normalized.get("date") or normalized.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+    return normalized
+
+
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
     payload = _intelligence_page_payload(central_today_iso())
     initial_response: dict[str, Any] = {}
     try:
-        cached_response, _ = _cached_intelligence_response_with_source(payload)
-        if cached_response is not None:
-            initial_response = dict(cached_response)
-        queue_intelligence_state_refresh(dict(payload))
+            cached_response, _ = _cached_intelligence_response_with_source(payload)
+            if cached_response is not None:
+                initial_response = dict(cached_response)
+            if not initial_response:
+                queue_intelligence_state_refresh(dict(payload))
     except Exception:
         initial_response = {}
     return render_template("intelligence.html", initial_intelligence_response=initial_response)
@@ -448,6 +512,7 @@ def intelligence_query_api():
     try:
         global LAST_RESULT
         payload = request.get_json(silent=True) or {}
+        payload = _normalize_default_query_payload(payload)
         question = str(payload.get("question") or "").strip()
         if not question:
             response = jsonify({"ok": False, "error": "question is required."})
@@ -557,6 +622,7 @@ def intelligence_query_api():
 @intelligence_bp.post("/api/intelligence/query/warm")
 def intelligence_query_warm_api():
     payload = request.get_json(silent=True) or {}
+    payload = _normalize_default_query_payload(payload)
     queue_intelligence_state_refresh(dict(payload))
     return jsonify({"ok": True, "queued": True})
 
@@ -579,11 +645,12 @@ def run_intelligence():
 def intelligence_status_api():
     try:
         selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-        status = build_intelligence_status(selected_date=selected_date)
+        force_refresh = str(request.args.get("refresh") or request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes", "on"}
+        status = _cached_intelligence_status(selected_date, force_refresh=force_refresh)
         _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
         return _api_error_response(exc)
-    state_snapshot = read_latest_intelligence_state_response(_intelligence_page_payload(selected_date), force_refresh=True)
+    state_snapshot = read_latest_intelligence_state_response(_intelligence_page_payload(selected_date), force_refresh=False)
     debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
     response_payload = {"ok": True, "status": status}
     if isinstance(status, dict):

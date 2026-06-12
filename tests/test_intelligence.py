@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from collections import OrderedDict
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -3941,6 +3942,36 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload.get("ok"))
 
+    def test_intelligence_query_reuses_cached_result_for_identical_request(self) -> None:
+        overview = _sample_overview()
+        candidate = {"name": "Play 1", "sport": "NBA", "market": "PTS", "score": 91.0}
+
+        with patch("syndicate.features.intelligence._INTELLIGENCE_QUERY_CACHE", OrderedDict()):
+            with patch("syndicate.features.intelligence.ENABLE_PREDICTION_TRACKING", False):
+                with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=overview):
+                    with patch("syndicate.features.intelligence._odds_history_payloads_by_sport", return_value={}):
+                        with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                            with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                                with patch("syndicate.features.intelligence.collect_all_recommendations", return_value=[candidate]) as mocked_collect:
+                                    with patch("syndicate.features.intelligence._resolved_requested_subjects", return_value=[]):
+                                        with patch("syndicate.features.intelligence._resolved_requested_markets", return_value=[]):
+                                            with patch("syndicate.features.intelligence._analysis_focus_from_resolved_candidates", return_value=None):
+                                                with patch("syndicate.features.intelligence._enrich_candidates_with_odds_history", side_effect=lambda candidates, _: candidates):
+                                                    with patch("syndicate.features.intelligence._score_candidates", side_effect=lambda candidates, advanced_by_sport, preferences: candidates):
+                                                        with patch("syndicate.features.intelligence.filter_candidates", side_effect=lambda candidates, sport=None: candidates):
+                                                            with patch("syndicate.features.intelligence.rank_candidates", side_effect=lambda candidates, sport=None, limit=None: candidates):
+                                                                with patch("syndicate.features.intelligence._greedy_low_correlation_selection", side_effect=lambda candidates, limit, threshold: candidates):
+                                                                    with patch("syndicate.features.intelligence._analysis_views_for_query", return_value={}):
+                                                                        with patch("syndicate.features.intelligence._build_supporting_evidence", return_value={}):
+                                                                            with patch("syndicate.features.intelligence._build_analysis_brief", return_value={"summary": "ok"}):
+                                                                                with patch("syndicate.features.intelligence.build_response", side_effect=lambda recommendations, parlays: {"recommendations": recommendations, "parlays": parlays}) as mocked_build_response:
+                                                                                    first = run_intelligence_query("top edges today", selected_date="2026-06-11")
+                                                                                    second = run_intelligence_query("top edges today", selected_date="2026-06-11")
+
+        self.assertEqual(first, second)
+        self.assertEqual(mocked_collect.call_count, 1)
+        self.assertEqual(mocked_build_response.call_count, 1)
+
     def test_intelligence_status_reports_tracked_artifacts(self) -> None:
         status_overview = [
             {
@@ -3984,6 +4015,34 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual((payload.get("daily_update") or {}).get("manifest", {}).get("state"), "finished")
         self.assertIn("advanced_gate", mlb_row or {})
         self.assertIn("publish_missing_inputs", (mlb_row or {}).get("advanced_gate") or {})
+
+    def test_status_endpoint_uses_cached_status_when_available(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        cached_status = {"ok": True, "threadAlive": True, "cachedSnapshots": 3}
+        state_response = {
+            "ok": True,
+            "last_updated": "2026-06-11T16:05:00Z",
+            "candidate_pool": {"candidates": [{"name": "Play 1"}]},
+        }
+
+        with app.test_request_context("/api/intelligence/status?date=2026-06-10", method="GET"):
+            with patch("syndicate.blueprints.intelligence.time.time", return_value=100.0):
+                with patch("syndicate.blueprints.intelligence._load_status_response_cache_state", return_value={"selected_date": "2026-06-10", "cached_at": 100.0, "status": cached_status}):
+                    with patch("syndicate.blueprints.intelligence.build_intelligence_status", side_effect=AssertionError("should not rebuild")):
+                        with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(state_response)):
+                            response = intelligence_status_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["status"], cached_status)
+        self.assertEqual(payload["state_last_updated"], "2026-06-11T16:05:00Z")
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual(payload["debug_source"], "worker")
+        self.assertEqual(response.headers.get("Cache-Control"), "no-cache, no-store, must-revalidate")
+        self.assertEqual(response.headers.get("Pragma"), "no-cache")
+        self.assertEqual(response.headers.get("Expires"), "0")
 
     def test_intelligence_page_renders_embedded_console(self) -> None:
         fake_response = {

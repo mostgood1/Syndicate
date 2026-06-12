@@ -1,0 +1,277 @@
+{
+  "latest_key": "2bad93c6837e7e055b5eb0b0ca207b832e731e1e005750ba2699f96febea9881",
+  "updated_at": "2026-06-12T03:09:29Z",
+  "snapshots": {
+    "2bad93c6837e7e055b5eb0b0ca207b832e731e1e005750ba2699f96febea9881": {
+      "key": "2bad93c6837e7e055b5eb0b0ca207b832e731e1e005750ba2699f96febea9881",
+      "payload": {
+        "question": "top edges today",
+        "date": "2026-06-10",
+        "limit": 5
+      },
+      "response": {
+        "ok": true,
+        "top_opportunities": [
+          {
+            "name": "Play 1",
+            "sport": "MLB",
+            "market": "Hits",
+            "score": 91.0
+          }
+        ],
+        "by_sport": {
+          "mlb": [
+            {
+              "name": "Play 1",
+              "sport": "MLB",
+              "market": "Hits",
+              "score": 91.0
+            }
+          ]
+        },
+        "analysis": {
+          "headline": "Test",
+          "recommendations": []
+        },
+        "candidate_pool": {
+          "selected_date": "2026-06-10",
+          "source_fingerprint": "733c6f98bf3b4f1a7c2f2539c240ef903b006ea0524a266c2f4b9545079f4a61",
+          "candidate_count": 1,
+          "candidate_pools": {
+            "mlb": {
+              "sport": "mlb",
+              "last_updated": "2026-06-10T10:05:00Z",
+              "status": "complete",
+              "artifact_paths": [
+                "reports/intelligence/example.json",
+                "reports/intelligence/extra.json"
+              ],
+              "metadata": {},
+              "candidate_count": 1,
+              "candidates": [
+                {
+                  "name": "Play 1",
+                  "sport": "MLB",
+                  "market": "Hits",
+                  "score": 91.0,
+                  "candidate_id": "cand_fc045114b7bfc522",
+                  "raw_inputs": {
+                    "event_id": null,
+                    "game_pk": null,
+                    "sport": "MLB",
+                    "sport_slug": null,
+                    "candidate_type": null,
+                    "market": "Hits",
+                    "market_key": null,
+                    "selection": null,
+                    "pick": null,
+                    "line": null,
+                    "odds": null,
+                    "matchup": null,
+                    "player_name": null,
+                    "name": "Play 1",
+                    "team": null,
+                    "status_display": null,
+                    "status_context": null,
+                    "game_state": null,
+                    "timestamp": null,
+                    "updated_at": null,
+                    "live_projection": null,
+                    "live_total": null,
+                    "actual": null
+                  },
+                  "precomputed_features": {
+                    "simulation": null,
+                    "market_context": null,
+                    "market_data": null,
+                    "market_fit": null,
+                    "historical_profile": null,
+                    "sport_profile": null,
+                    "performance_context": null,
+                    "advanced_gate": null,
+                    "advanced_context": [],
+                    "advanced_inputs": []
+                  },
+                  "preliminary_scores": {
+                    "score": 91.0,
+                    "adjusted_score": null,
+                    "source_summary_score": null,
+                    "edge": null,
+                    "adjusted_edge": null,
+                    "ev_current": null,
+                    "ev_delta": null,
+                    "confidence": null,
+                    "model_probability": null,
+                    "implied_probability": null
+                  },
+                  "source_fingerprint": "733c6f98bf3b4f1a7c2f2539c240ef903b006ea0524a266c2f4b9545079f4a61",
+                  "event_id": null,
+                  "market_type": "Hits",
+                  "entity": null,
+                  "line": null,
+                  "market_id": "MLB:event:HITS",
+                  "sport_manifest_last_updated": "2026-06-10T10:05:00Z",
+                  "sport_manifest_status": "complete",
+                  "sport_manifest_artifact_paths": [
+                    "reports/intelligence/example.json",
+                    "reports/intelligence/extra.json"
+                  ],
+                  "sport_manifest_metadata": {}
+                }
+              ],
+              "odds_history": null
+            }
+          },
+          "global_pool": [
+            {
+              "name": "Play 1",
+              "sport": "MLB",
+              "market": "Hits",
+              "score": 91.0,
+              "candidate_id": "cand_fc045114b7bfc522",
+              "raw_inputs": {
+                "event_id": null,
+                "game_pk": null,
+                "sport": "MLB",
+                "sport_slug": null,
+                "candidate_type": null,
+                "market": "Hits",
+                "market_key": null,
+                "selection": null,
+                "pick": null,
+                "line": null,
+                "odds": null,
+                "matchup": null,
+                "player_name": null,
+                "name": "Play 1",
+                "team": null,
+                "status_display": null,
+                "status_context": null,
+                "game_state": null,
+                "timestamp": null,
+                "updated_at": null,
+                "live_projection": null,
+                "live_total": null,
+                "actual": null
+              },
+              "precomputed_features": {
+                "simulation": null,
+                "market_context": null,
+                "market_data": null,
+                "market_fit": null,
+                "historical_profile": null,
+                "sport_profile": null,
+                "performance_context": null,
+                "advanced_gate": null,
+                "advanced_context": [],
+                "advanced_inputs": []
+              },
+              "preliminary_scores": {
+                "score": 91.0,
+                "adjusted_score": null,
+                "source_summary_score": null,
+                "edge": null,
+                "adjusted_edge": null,
+                "ev_current": null,
+                "ev_delta": null,
+                "confidence": null,
+                "model_probability": null,
+                "implied_probability": null
+              },
+              "source_fingerprint": "733c6f98bf3b4f1a7c2f2539c240ef903b006ea0524a266c2f4b9545079f4a61",
+              "event_id": null,
+              "market_type": "Hits",
+              "entity": null,
+              "line": null,
+              "market_id": "MLB:event:HITS",
+              "sport_manifest_last_updated": "2026-06-10T10:05:00Z",
+              "sport_manifest_status": "complete",
+              "sport_manifest_artifact_paths": [
+                "reports/intelligence/example.json",
+                "reports/intelligence/extra.json"
+              ],
+              "sport_manifest_metadata": {}
+            }
+          ],
+          "candidates": [
+            {
+              "name": "Play 1",
+              "sport": "MLB",
+              "market": "Hits",
+              "score": 91.0,
+              "candidate_id": "cand_fc045114b7bfc522",
+              "raw_inputs": {
+                "event_id": null,
+                "game_pk": null,
+                "sport": "MLB",
+                "sport_slug": null,
+                "candidate_type": null,
+                "market": "Hits",
+                "market_key": null,
+                "selection": null,
+                "pick": null,
+                "line": null,
+                "odds": null,
+                "matchup": null,
+                "player_name": null,
+                "name": "Play 1",
+                "team": null,
+                "status_display": null,
+                "status_context": null,
+                "game_state": null,
+                "timestamp": null,
+                "updated_at": null,
+                "live_projection": null,
+                "live_total": null,
+                "actual": null
+              },
+              "precomputed_features": {
+                "simulation": null,
+                "market_context": null,
+                "market_data": null,
+                "market_fit": null,
+                "historical_profile": null,
+                "sport_profile": null,
+                "performance_context": null,
+                "advanced_gate": null,
+                "advanced_context": [],
+                "advanced_inputs": []
+              },
+              "preliminary_scores": {
+                "score": 91.0,
+                "adjusted_score": null,
+                "source_summary_score": null,
+                "edge": null,
+                "adjusted_edge": null,
+                "ev_current": null,
+                "ev_delta": null,
+                "confidence": null,
+                "model_probability": null,
+                "implied_probability": null
+              },
+              "source_fingerprint": "733c6f98bf3b4f1a7c2f2539c240ef903b006ea0524a266c2f4b9545079f4a61",
+              "event_id": null,
+              "market_type": "Hits",
+              "entity": null,
+              "line": null,
+              "market_id": "MLB:event:HITS",
+              "sport_manifest_last_updated": "2026-06-10T10:05:00Z",
+              "sport_manifest_status": "complete",
+              "sport_manifest_artifact_paths": [
+                "reports/intelligence/example.json",
+                "reports/intelligence/extra.json"
+              ],
+              "sport_manifest_metadata": {}
+            }
+          ]
+        },
+        "response": {
+          "headline": "Test",
+          "recommendations": []
+        }
+      },
+      "computed_at": "2026-06-12T03:09:29Z",
+      "source_fingerprint": "733c6f98bf3b4f1a7c2f2539c240ef903b006ea0524a266c2f4b9545079f4a61"
+    }
+  }
+}

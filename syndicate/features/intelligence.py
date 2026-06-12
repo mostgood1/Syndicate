@@ -3,10 +3,13 @@ from __future__ import annotations
 from difflib import SequenceMatcher
 from datetime import date
 from datetime import timedelta
+from collections import OrderedDict
 from functools import lru_cache
 from itertools import combinations
+import hashlib
 import json
 import logging
+import threading
 from pathlib import Path
 import re
 import subprocess
@@ -75,6 +78,42 @@ ENABLE_PREDICTION_TRACKING = True
 _SIMULATION_ENGINE = SimulationEngine()
 MAX_CORRELATION_THRESHOLD = 0.65
 logger = logging.getLogger(__name__)
+_INTELLIGENCE_QUERY_CACHE_LOCK = threading.Lock()
+_INTELLIGENCE_QUERY_CACHE: OrderedDict[str, dict[str, Any]] = OrderedDict()
+_INTELLIGENCE_QUERY_CACHE_LIMIT = 12
+
+
+def _cache_query_response(cache_key: str, response_payload: dict[str, Any]) -> None:
+    with _INTELLIGENCE_QUERY_CACHE_LOCK:
+        _INTELLIGENCE_QUERY_CACHE[cache_key] = dict(response_payload)
+        _INTELLIGENCE_QUERY_CACHE.move_to_end(cache_key)
+        while len(_INTELLIGENCE_QUERY_CACHE) > _INTELLIGENCE_QUERY_CACHE_LIMIT:
+            _INTELLIGENCE_QUERY_CACHE.popitem(last=False)
+
+
+def _read_cached_query_response(cache_key: str) -> dict[str, Any] | None:
+    with _INTELLIGENCE_QUERY_CACHE_LOCK:
+        cached = _INTELLIGENCE_QUERY_CACHE.get(cache_key)
+        if cached is None:
+            return None
+        _INTELLIGENCE_QUERY_CACHE.move_to_end(cache_key)
+        return json.loads(json.dumps(cached, default=str))
+
+
+def _query_cache_key(*, question: str, selected_date: str, mode: str | None, sport: str | None, limit: int | None, timing: str | None, include_props: bool | None, include_games: bool | None, overview: list[dict[str, Any]]) -> str:
+    payload = {
+        "question": str(question or "").strip(),
+        "selected_date": str(selected_date or "").strip(),
+        "mode": str(mode or "").strip().lower(),
+        "sport": str(sport or "").strip().lower(),
+        "limit": int(limit) if limit is not None else None,
+        "timing": str(timing or "").strip().lower(),
+        "include_props": None if include_props is None else bool(include_props),
+        "include_games": None if include_games is None else bool(include_games),
+        "overview": overview,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 _SPORT_KEYWORDS: dict[str, set[str]] = {
@@ -5861,6 +5900,21 @@ def run_intelligence_query(
         for sport_row in overview
         if isinstance(sport_row, dict)
     }
+    cache_key = _query_cache_key(
+        question=question,
+        selected_date=effective_date,
+        mode=mode,
+        sport=sport,
+        limit=limit,
+        timing=timing,
+        include_props=include_props,
+        include_games=include_games,
+        overview=overview,
+    )
+    if not force_refresh:
+        cached_response = _read_cached_query_response(cache_key)
+        if cached_response is not None:
+            return cached_response
     shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
     candidates = [dict(recommendation) for recommendation in shared_recommendations]
     if not candidates:
@@ -6003,5 +6057,7 @@ def run_intelligence_query(
         readiness_gate,
         overview,
     )
-
-    return build_response(recommendations=recommendations, parlays=parlays)
+    final_response = build_response(recommendations=recommendations, parlays=parlays)
+    if not force_refresh:
+        _cache_query_response(cache_key, final_response)
+    return final_response

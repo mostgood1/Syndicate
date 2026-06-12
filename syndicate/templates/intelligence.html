@@ -1319,16 +1319,15 @@ function scheduleIntelligencePolling() {
   }
   loadIntelligenceScheduled = true;
   window.loadIntelligence = loadIntelligence;
+  const hasInitialResponse = Boolean(initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0);
   if (initialIntelligenceResponse && Object.keys(initialIntelligenceResponse).length > 0) {
     lastVersion = initialIntelligenceResponse.version ?? lastVersion;
     lastResponseTimestamp = initialIntelligenceResponse.timestamp ?? lastResponseTimestamp;
     renderIntelligence(unwrapVersionedIntelligenceResponse(initialIntelligenceResponse.response || initialIntelligenceResponse));
   } else {
     renderEmptyState();
-    kickOffWarmQuery();
+    void loadIntelligence();
   }
-  kickOffWarmQuery();
-  void loadIntelligence({ background: true });
   window.setInterval(() => {
     kickOffWarmQuery();
     void loadIntelligence({ background: true });

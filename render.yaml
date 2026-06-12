@@ -103,7 +103,7 @@ services:
     plan: standard
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_intelligence_worker.py
+    startCommand: python scripts/run_intelligence_worker.py & python scripts/run_refresh_worker.py --poll-seconds ${SYNDICATE_REFRESH_WORKER_POLL_SECONDS:-30} & wait
     disk:
       name: syndicate-data-worker
       mountPath: /opt/render/project/data
@@ -147,4 +147,6 @@ services:
         value: /opt/render/project/data/wnba_source/source_artifacts/data
       - key: NHL_DATA_DIR
         value: /opt/render/project/data/nhl_source/source_artifacts/data
+      - key: NHL_LIVE_LENS_DIR
+        value: /opt/render/project/data/nhl_source/source_artifacts/data/live_lens
 

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from flask import Flask
+from flask import current_app
 
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
@@ -27,6 +28,7 @@ from syndicate.features.shared.timezone import central_today_iso
 
 REPO_ROOT = repo_root_from(__file__)
 STATE_PATH = reports_root() / "intelligence" / "query_state_cache.json"
+STATUS_CACHE_PATH = reports_root() / "intelligence" / "status_response_cache.json"
 logger = logging.getLogger(__name__)
 
 
@@ -109,6 +111,7 @@ class IntelligenceStateService:
         self._watched_payloads: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._pending_keys: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._candidate_pools: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._source_fingerprints: OrderedDict[str, tuple[float, str]] = OrderedDict()
         self._latest_key: str | None = None
         self._loaded_from_disk = False
         self._app: Flask | None = None
@@ -210,12 +213,7 @@ class IntelligenceStateService:
                 states[str(key)] = value
         return states
 
-    def _source_state_fingerprint(self, selected_date: str | None) -> str:
-        if self._app is not None:
-            with self._app.app_context():
-                status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
-        else:
-            status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+    def _source_state_fingerprint_from_status(self, status: dict[str, Any], selected_date: str | None) -> str:
         refresh_status = status.get("refresh_status") if isinstance(status.get("refresh_status"), dict) else {}
         refresh_manifest = refresh_status.get("refresh_status", {}).get("manifest") if isinstance(refresh_status.get("refresh_status"), dict) else {}
         refresh_runtime = refresh_status.get("refresh_status", {}).get("runtime") if isinstance(refresh_status.get("refresh_status"), dict) else {}
@@ -295,6 +293,71 @@ class IntelligenceStateService:
         }
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _load_cached_status_payload(self, selected_date: str | None) -> dict[str, Any] | None:
+        payload = read_json_file(STATUS_CACHE_PATH)
+        if not isinstance(payload, dict):
+            return None
+        if str(payload.get("selected_date") or "").strip() != str(selected_date or "").strip():
+            return None
+        try:
+            cached_at = float(payload.get("cached_at") or 0.0)
+        except Exception:
+            return None
+        if cached_at <= 0.0 or (time.time() - cached_at) > float(self._interval_seconds):
+            return None
+        status = payload.get("status")
+        return dict(status) if isinstance(status, dict) else None
+
+    def _source_state_stamp(self, selected_date: str | None) -> str:
+        sports = []
+        if self._app is not None:
+            with self._app.app_context():
+                sports = current_app.config.get("SYNDICATE_SPORTS", [])
+        if not sports:
+            manifests_root = reports_root() / "manifests"
+            if manifests_root.exists():
+                sports = [
+                    {"slug": path.stem}
+                    for path in sorted(manifests_root.glob("*.json"))
+                    if path.is_file()
+                ]
+        payload = {
+            "selected_date": str(selected_date or "").strip(),
+            "sports": [],
+        }
+        for sport in sports if isinstance(sports, list) else []:
+            if not isinstance(sport, dict):
+                continue
+            slug = str(sport.get("slug") or "").strip().lower()
+            if not slug:
+                continue
+            payload["sports"].append({"slug": slug, **self._sport_manifest_signature(slug)})
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _source_state_fingerprint(self, selected_date: str | None) -> str:
+        cache_key = self._source_state_stamp(selected_date)
+        with self._condition:
+            cached_fingerprint = self._source_fingerprints.get(cache_key)
+            if cached_fingerprint is not None and (time.time() - float(cached_fingerprint[0])) <= float(self._interval_seconds):
+                return str(cached_fingerprint[1])
+
+        status = self._load_cached_status_payload(selected_date)
+        if status is None:
+            if self._app is not None:
+                with self._app.app_context():
+                    status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+            else:
+                status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
+
+        status_fingerprint = self._source_state_fingerprint_from_status(status if isinstance(status, dict) else {}, selected_date)
+        fingerprint = hashlib.sha256(f"{cache_key}:{status_fingerprint}".encode("utf-8")).hexdigest()
+        with self._condition:
+            self._source_fingerprints[cache_key] = (time.time(), fingerprint)
+            self._source_fingerprints.move_to_end(cache_key)
+            self._trim_ordered_dict(self._source_fingerprints, self._max_snapshots)
+        return fingerprint
 
     def _candidate_pool_key(self, selected_date: str | None, source_fingerprint: str) -> str:
         payload = {
@@ -669,13 +732,14 @@ class IntelligenceStateService:
 
         source_fingerprint = self._source_state_fingerprint(selected_date)
         cache_key = _payload_key(request_payload)
-        candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
-        candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
         with self._condition:
             snapshot = self._snapshots.get(cache_key)
             if not force_refresh and snapshot is not None and snapshot.source_fingerprint == source_fingerprint:
                 _log_stage_timing("request_total", (time.perf_counter() - request_started_at) * 1000.0)
                 return dict(snapshot.response)
+
+        candidate_pool = self._build_candidate_pool(selected_date, source_fingerprint)
+        candidates = [dict(candidate) for candidate in candidate_pool.get("candidates") if isinstance(candidate, dict)]
 
         top_opportunities = _profile_stage("candidate_scoring", rank_global_recommendations, candidates, limit=limit_value)
         by_sport: dict[str, list[dict[str, object]]] = {}
