@@ -212,6 +212,14 @@ function renderSupportingEvidence(response) {
   if (summary) {
     evidenceBits.push(`<div style="opacity:.82; line-height:1.45;">${escapeHtml(summary)}</div>`);
   }
+  if (data.state_last_updated || data.candidate_count !== undefined) {
+    evidenceBits.push(`
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; font-size:12px;">
+        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Last Updated: ${escapeHtml(data.state_last_updated || "—")}</span>
+        <span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Candidates: ${escapeHtml(data.candidate_count ?? "—")}</span>
+      </div>
+    `);
+  }
   evidenceBits.push(`<div style="margin-top:10px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Portfolio summary</div>`);
   evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
     [
@@ -536,6 +544,9 @@ function normalizeIntelligenceResponse(response) {
     topLiveOpportunities,
     portfolio,
     parlays,
+    state_last_updated: response.state_last_updated ?? analysis.state_last_updated ?? null,
+    candidate_count: response.candidate_count ?? analysis.candidate_count ?? null,
+    debug_source: response.debug_source ?? analysis.debug_source ?? null,
   };
 }
 
@@ -756,6 +767,7 @@ function renderIntelligence(response) {
   }
 
   const data = normalizeIntelligenceResponse(response);
+  console.log("[FRONTEND DATA]", data.state_last_updated, data.candidate_count);
   const initialEvidenceEl = document.getElementById("top-opportunities");
   if (initialEvidenceEl) {
     initialEvidenceEl.innerHTML = `

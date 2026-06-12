@@ -1182,6 +1182,35 @@ def _game_by_id_from_artifacts(selected_date: str, game_pk: str | int) -> tuple[
     return None, bundle
 
 
+def _dedupe_wnba_games(games: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for game in games:
+        if not isinstance(game, dict):
+            continue
+        event_id = str(game.get("event_id") or "").strip()
+        away_tri = _canonical_wnba_tri(
+            str(
+                game.get("away_tri")
+                or ((game.get("away") or {}).get("abbr") if isinstance(game.get("away"), dict) else "")
+                or ""
+            ).strip().upper()
+        )
+        home_tri = _canonical_wnba_tri(
+            str(
+                game.get("home_tri")
+                or ((game.get("home") or {}).get("abbr") if isinstance(game.get("home"), dict) else "")
+                or ""
+            ).strip().upper()
+        )
+        key = (event_id, away_tri, home_tri)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(game)
+    return deduped
+
+
 def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str, str]:
     bundle = _artifact_bundle(selected_date)
     rows = bundle["rows"]
@@ -1199,7 +1228,7 @@ def _games_from_artifacts(selected_date: str) -> tuple[list[dict[str, Any]], str
         )
         for idx, row in enumerate(rows, start=1)
     ]
-    return games, str(bundle["paths"]["cards"]), str(bundle["paths"]["recommendations"])
+    return _dedupe_wnba_games(games), str(bundle["paths"]["cards"]), str(bundle["paths"]["recommendations"])
 
 
 def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[list[dict[str, Any]], str]:
@@ -1287,7 +1316,7 @@ def _games_from_live_state_fallback(selected_date: str, ttl: int = 12) -> tuple[
                 },
             }
         )
-    return games, str(source_path or f"live_state_{selected_date}.jsonl")
+    return _dedupe_wnba_games(games), str(source_path or f"live_state_{selected_date}.jsonl")
 
 
 def _game_identity_key(game: dict[str, Any]) -> tuple[str, str, str]:

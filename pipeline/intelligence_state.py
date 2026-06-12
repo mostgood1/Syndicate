@@ -27,8 +27,15 @@ from syndicate.features.shared.timezone import central_today_iso
 
 
 REPO_ROOT = repo_root_from(__file__)
-STATE_PATH = REPO_ROOT / "reports" / "intelligence" / "query_state_cache.json"
+STATE_PATH = reports_root() / "intelligence" / "query_state_cache.json"
 logger = logging.getLogger(__name__)
+
+
+def _state_backend_kind() -> str:
+    value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "filesystem").strip().lower()
+    if value in {"redis", "keyvalue", "valkey"}:
+        return "keyvalue"
+    return "filesystem"
 
 
 def _env_int(name: str, default: int) -> int:
@@ -55,6 +62,17 @@ def _payload_key(payload: dict[str, Any]) -> str:
 
 def _utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _log_worker_state_write(state: dict[str, Any]) -> None:
+    print(
+        "[WORKER WRITE]",
+        {
+            "timestamp": _utc_now(),
+            "state_last_updated": state.get("last_updated"),
+            "candidate_count": len(state.get("candidates", [])),
+        },
+    )
 
 
 def _log_stage_timing(stage_name: str, duration_ms: float) -> None:
@@ -476,9 +494,12 @@ class IntelligenceStateService:
                 self._enqueue_locked(self._default_payload())
             return True
 
-    def status(self) -> dict[str, Any]:
+    def status(self, *, force_refresh: bool = True) -> dict[str, Any]:
         with self._lock:
+            self._sync_persisted_state_locked(force=force_refresh)
             latest_snapshot = self._snapshots.get(self._latest_key or "") if self._latest_key else None
+            latest_age_seconds = self._snapshot_age_seconds(latest_snapshot)
+            freshness_sla_seconds = int(self._interval_seconds)
             return {
                 "enabled": True,
                 "intervalSeconds": int(self._interval_seconds),
@@ -490,12 +511,17 @@ class IntelligenceStateService:
                 "cachedCandidatePools": len(self._candidate_pools),
                 "latestComputedAt": latest_snapshot.computed_at if latest_snapshot else None,
                 "latestSourceFingerprint": latest_snapshot.source_fingerprint if latest_snapshot else None,
+                "latestSnapshotAgeSeconds": latest_age_seconds,
+                "freshnessSlaSeconds": freshness_sla_seconds,
+                "freshnessStatus": "fresh" if latest_age_seconds is not None and latest_age_seconds <= freshness_sla_seconds else "stale",
+                "isFresh": bool(latest_age_seconds is not None and latest_age_seconds <= freshness_sla_seconds),
             }
 
-    def get_response(self, payload: dict[str, Any], *, refresh: bool = False, wait: bool = True) -> dict[str, Any] | None:
+    def get_response(self, payload: dict[str, Any], *, refresh: bool = False, wait: bool = True, force_refresh: bool = True) -> dict[str, Any] | None:
         normalized_payload = self._normalize_payload(payload)
         key = _payload_key(normalized_payload)
         with self._condition:
+            self._sync_persisted_state_locked(force=force_refresh)
             self._watched_payloads[key] = normalized_payload
             self._watched_payloads.move_to_end(key)
             self._trim_ordered_dict(self._watched_payloads, self._max_snapshots)
@@ -515,10 +541,11 @@ class IntelligenceStateService:
                 return dict(self._snapshots[self._latest_key].response)
         return None
 
-    def read_latest_response(self, payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    def read_latest_response(self, payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
         normalized_payload = self._normalize_payload(payload or self._default_payload())
         key = _payload_key(normalized_payload)
         with self._lock:
+            self._sync_persisted_state_locked(force=force_refresh)
             snapshot = self._snapshots.get(key)
             if snapshot is not None and not self._is_stale(snapshot):
                 return dict(snapshot.response)
@@ -545,6 +572,9 @@ class IntelligenceStateService:
             "include_games": True,
             "force_refresh": True,
         }
+
+    def _sync_persisted_state_locked(self, *, force: bool = True) -> None:
+        self._load_persisted_state_locked(force=force or _state_backend_kind() == "keyvalue")
 
     def _normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(payload or {})
@@ -613,11 +643,16 @@ class IntelligenceStateService:
                 computed_at=_utc_now(),
                 source_fingerprint=source_fingerprint or "",
             )
+            worker_state = {
+                "last_updated": snapshot.computed_at,
+                "candidates": candidate_pool.get("candidates", []) if isinstance(candidate_pool, dict) else [],
+            }
             with self._condition:
                 self._snapshots[snapshot.key] = snapshot
                 self._snapshots.move_to_end(snapshot.key)
                 self._latest_key = snapshot.key
                 self._trim_ordered_dict(self._snapshots, self._max_snapshots)
+                _log_worker_state_write(worker_state)
                 self._persist_locked()
                 self._condition.notify_all()
                 self._condition.wait(timeout=self._interval_seconds)
@@ -697,13 +732,27 @@ class IntelligenceStateService:
         return (time.time() - computed_epoch) >= self._interval_seconds
 
     @staticmethod
+    def _snapshot_age_seconds(snapshot: IntelligenceSnapshot | None) -> float | None:
+        if snapshot is None:
+            return None
+        try:
+            computed_at = time.strptime(snapshot.computed_at, "%Y-%m-%dT%H:%M:%SZ")
+            computed_epoch = time.mktime(computed_at)
+        except Exception:
+            return None
+        return round(max(0.0, time.time() - computed_epoch), 3)
+
+    @staticmethod
     def _trim_ordered_dict(items: OrderedDict[str, Any], limit: int) -> None:
         while len(items) > limit:
             items.popitem(last=False)
 
-    def _load_persisted_state_locked(self) -> None:
-        if self._loaded_from_disk:
+    def _load_persisted_state_locked(self, *, force: bool = False) -> None:
+        if self._loaded_from_disk and not force and _state_backend_kind() != "keyvalue":
             return
+        if force or _state_backend_kind() == "keyvalue":
+            self._snapshots.clear()
+            self._latest_key = None
         payload = read_json_file(STATE_PATH)
         self._loaded_from_disk = True
         if not isinstance(payload, dict):
@@ -756,21 +805,21 @@ def queue_intelligence_state_refresh(payload: dict[str, Any]) -> str:
     return _INTELLIGENCE_STATE_SERVICE.queue_refresh(payload)
 
 
-def get_latest_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True) -> dict[str, Any] | None:
-    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload)
+def get_latest_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True, force_refresh: bool = True) -> dict[str, Any] | None:
+    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload, force_refresh=force_refresh)
 
 
-def get_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True) -> dict[str, Any] | None:
-    return _INTELLIGENCE_STATE_SERVICE.get_response(payload, refresh=refresh, wait=wait)
+def get_intelligence_state_response(payload: dict[str, Any], *, refresh: bool = False, wait: bool = True, force_refresh: bool = True) -> dict[str, Any] | None:
+    return _INTELLIGENCE_STATE_SERVICE.get_response(payload, refresh=refresh, wait=wait, force_refresh=force_refresh)
 
 
 def compute_intelligence_state_response(payload: dict[str, Any]) -> dict[str, Any]:
     return _INTELLIGENCE_STATE_SERVICE._compute_response(payload)
 
 
-def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None) -> dict[str, Any] | None:
-    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload)
+def read_latest_intelligence_state_response(payload: dict[str, Any] | None = None, *, force_refresh: bool = True) -> dict[str, Any] | None:
+    return _INTELLIGENCE_STATE_SERVICE.read_latest_response(payload, force_refresh=force_refresh)
 
 
-def intelligence_state_status() -> dict[str, Any]:
-    return _INTELLIGENCE_STATE_SERVICE.status()
+def intelligence_state_status(*, force_refresh: bool = True) -> dict[str, Any]:
+    return _INTELLIGENCE_STATE_SERVICE.status(force_refresh=force_refresh)

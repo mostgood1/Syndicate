@@ -45,6 +45,35 @@ def _server_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _log_api_state_read(state: dict[str, object] | None) -> None:
+    state = state if isinstance(state, dict) else {}
+    print(
+        "[API READ]",
+        {
+            "timestamp": _server_timestamp(),
+            "state_last_updated": state.get("last_updated"),
+            "candidate_count": len(state.get("candidates", [])),
+        },
+    )
+
+
+def _api_error_response(error: Exception):
+    print("[API ERROR]", str(error))
+    response = jsonify({"error": str(error)})
+    response.status_code = 500
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
+def _no_cache_response(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 def _response_hash(payload: dict[str, object]) -> str:
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -186,14 +215,45 @@ def _is_board_response(payload: dict[str, object] | None) -> bool:
     return False
 
 
-def _cached_intelligence_response(payload: dict[str, object]) -> dict[str, object] | None:
-    cached_response = read_latest_intelligence_state_response(payload)
+def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
+    cached_response = read_latest_intelligence_state_response(payload, force_refresh=True)
     if _is_board_response(cached_response):
-        return dict(cached_response or {})
+        return dict(cached_response or {}), "worker"
     cached_response = _load_response_cache_state()
     if _is_board_response(cached_response):
-        return dict(cached_response or {})
-    return None
+        return dict(cached_response or {}), "fallback"
+    return None, "fallback"
+
+
+def _cached_intelligence_response(payload: dict[str, object]) -> dict[str, object] | None:
+    cached_response, _ = _cached_intelligence_response_with_source(payload)
+    return cached_response
+
+
+def _response_candidate_count(response_payload: dict[str, object] | None) -> int:
+    current = dict(response_payload or {})
+    candidate_pool = current.get("candidate_pool") if isinstance(current.get("candidate_pool"), dict) else {}
+    candidates = candidate_pool.get("candidates") if isinstance(candidate_pool, dict) else current.get("candidates")
+    if isinstance(candidates, list):
+        return len(candidates)
+    return 0
+
+
+def _debug_state_fields(response_payload: dict[str, object] | None, *, source: str, state_last_updated: str | None = None) -> dict[str, object]:
+    current = dict(response_payload or {})
+    derived_last_updated = str(
+        state_last_updated
+        or current.get("last_updated")
+        or current.get("latestComputedAt")
+        or current.get("computed_at")
+        or current.get("updated_at")
+        or ""
+    ).strip() or None
+    return {
+        "state_last_updated": derived_last_updated,
+        "candidate_count": _response_candidate_count(current),
+        "debug_source": source,
+    }
 
 
 def _store_response_cache_state(state: dict[str, object]) -> None:
@@ -374,7 +434,7 @@ def intelligence_home():
     payload = _intelligence_page_payload(central_today_iso())
     initial_response: dict[str, Any] = {}
     try:
-        cached_response = _cached_intelligence_response(payload)
+        cached_response, _ = _cached_intelligence_response_with_source(payload)
         if cached_response is not None:
             initial_response = dict(cached_response)
         queue_intelligence_state_refresh(dict(payload))
@@ -385,21 +445,24 @@ def intelligence_home():
 
 @intelligence_bp.post("/api/intelligence/query")
 def intelligence_query_api():
-    global LAST_RESULT
-    payload = request.get_json(silent=True) or {}
-    question = str(payload.get("question") or "").strip()
-    if not question:
-        return jsonify({"ok": False, "error": "question is required."}), 400
-    user_profile = _normalize_user_profile(payload)
-    want_refresh = bool(payload.get("force_refresh")) or bool(payload.get("background"))
-
-    response_payload: dict[str, object] | None = None
     try:
+        global LAST_RESULT
+        payload = request.get_json(silent=True) or {}
+        question = str(payload.get("question") or "").strip()
+        if not question:
+            response = jsonify({"ok": False, "error": "question is required."})
+            response.status_code = 400
+            return _no_cache_response(response)
+        user_profile = _normalize_user_profile(payload)
+        want_refresh = bool(payload.get("force_refresh")) or bool(payload.get("background"))
+
+        response_payload: dict[str, object] | None = None
         selected_date = str(payload.get("date") or payload.get("selected_date") or "").strip() or None
         cache_payload = dict(payload)
         if selected_date:
             cache_payload["date"] = selected_date
-        cached_response = _cached_intelligence_response(cache_payload)
+        cached_response, cached_source = _cached_intelligence_response_with_source(cache_payload)
+        _log_api_state_read(cached_response if isinstance(cached_response, dict) else {})
         if question == DEFAULT_QUESTION and cached_response is not None:
             response_payload = dict(cached_response)
             if want_refresh:
@@ -418,14 +481,37 @@ def intelligence_query_api():
             )
             if isinstance(board_result, dict):
                 response_payload = dict(board_result)
-    except Exception:
-        response_payload = None
 
-    if not isinstance(response_payload, dict) or not response_payload:
-        if question == DEFAULT_QUESTION:
-            if want_refresh and not bool(payload.get("background")):
+        if not isinstance(response_payload, dict) or not response_payload:
+            if question == DEFAULT_QUESTION:
+                if want_refresh and not bool(payload.get("background")):
+                    queue_intelligence_state_refresh(dict(payload))
+                cached_response = _cached_intelligence_response(dict(payload))
+                if cached_response is None:
+                    cached_response = {
+                        "ok": True,
+                        "top_opportunities": [],
+                        "by_sport": {},
+                        "analysis": None,
+                    }
+                response_payload = _unwrap_response_payload(cached_response)
+            elif want_refresh and not bool(payload.get("background")):
                 queue_intelligence_state_refresh(dict(payload))
-            cached_response = _cached_intelligence_response(dict(payload))
+                cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
+            else:
+                cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
+                if cached_response is None:
+                    cached_response = _load_response_cache_state()
+            if not _is_board_response(cached_response):
+                cached_response = _load_response_cache_state()
+            if not _is_board_response(cached_response) or cached_response.get("ok") is False:
+                queue_intelligence_state_refresh(dict(payload))
+                cached_response = {
+                    "ok": True,
+                    "top_opportunities": [],
+                    "by_sport": {},
+                    "analysis": None,
+                }
             if cached_response is None:
                 cached_response = {
                     "ok": True,
@@ -434,58 +520,38 @@ def intelligence_query_api():
                     "analysis": None,
                 }
             response_payload = _unwrap_response_payload(cached_response)
-        elif want_refresh and not bool(payload.get("background")):
-            queue_intelligence_state_refresh(dict(payload))
-            cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
-        else:
-            cached_response = get_intelligence_state_response(payload, refresh=False, wait=False)
-            if cached_response is None:
-                cached_response = _load_response_cache_state()
-        if not _is_board_response(cached_response):
-            cached_response = _load_response_cache_state()
-        if not _is_board_response(cached_response) or cached_response.get("ok") is False:
-            queue_intelligence_state_refresh(dict(payload))
-            cached_response = {
-                "ok": True,
-                "top_opportunities": [],
-                "by_sport": {},
-                "analysis": None,
-            }
-        if cached_response is None:
-            cached_response = {
-                "ok": True,
-                "top_opportunities": [],
-                "by_sport": {},
-                "analysis": None,
-            }
-        response_payload = _unwrap_response_payload(cached_response)
 
-    board_headline = _board_headline_for_question(question, response_payload)
-    parsed_request = _parsed_request_for_question(question, payload)
-    if board_headline:
-        response_payload = dict(response_payload)
-        response_payload["headline"] = board_headline
-        if parsed_request:
-            response_payload["parsed_request"] = dict(parsed_request)
-        nested_response = response_payload.get("response")
-        if isinstance(nested_response, dict):
-            nested_response = dict(nested_response)
-            nested_response.setdefault("headline", board_headline)
+        board_headline = _board_headline_for_question(question, response_payload)
+        parsed_request = _parsed_request_for_question(question, payload)
+        if board_headline:
+            response_payload = dict(response_payload)
+            response_payload["headline"] = board_headline
             if parsed_request:
-                nested_response["parsed_request"] = dict(parsed_request)
-            response_payload["response"] = nested_response
-    if "response" not in response_payload:
-        response_payload["response"] = dict(response_payload)
+                response_payload["parsed_request"] = dict(parsed_request)
+            nested_response = response_payload.get("response")
+            if isinstance(nested_response, dict):
+                nested_response = dict(nested_response)
+                nested_response.setdefault("headline", board_headline)
+                if parsed_request:
+                    nested_response["parsed_request"] = dict(parsed_request)
+                response_payload["response"] = nested_response
+        if "response" not in response_payload:
+            response_payload["response"] = dict(response_payload)
 
-    response = _apply_user_profile_to_response(dict(response_payload), user_profile)
-    response = dict(response)
-    if "response" not in response:
-        response["response"] = dict(response)
-    LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
-    versioned_response = _versioned_query_response(response)
-    if user_profile is None:
-        _store_response_cache_state(versioned_response)
-    return jsonify(versioned_response)
+        response = _apply_user_profile_to_response(dict(response_payload), user_profile)
+        response = dict(response)
+        if "response" not in response:
+            response["response"] = dict(response)
+        LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
+        debug_source = cached_source if cached_response is not None else "fallback"
+        versioned_response = _versioned_query_response(response)
+        versioned_response.update(_debug_state_fields(response, source=debug_source))
+        if user_profile is None:
+            _store_response_cache_state(versioned_response)
+        return _no_cache_response(jsonify(versioned_response))
+    except Exception as exc:
+        print("[QUERY ERROR]", exc)
+        return {"error": str(exc), "fallback": True}, 200
 
 
 @intelligence_bp.post("/api/intelligence/query/warm")
@@ -511,25 +577,22 @@ def run_intelligence():
 
 @intelligence_bp.get("/api/intelligence/status")
 def intelligence_status_api():
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     try:
+        selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
         status = build_intelligence_status(selected_date=selected_date)
+        _log_api_state_read(status if isinstance(status, dict) else {})
     except Exception as exc:
-        status = intelligence_state_status()
-        response_payload = {"ok": False, "error": str(exc), "selected_date": selected_date, "status": status, "cachedOnly": True}
-        if isinstance(status, dict):
-            for key, value in status.items():
-                if key in {"ok", "error", "cachedOnly", "status"}:
-                    continue
-                response_payload[key] = value
-        return jsonify(response_payload)
+        return _api_error_response(exc)
+    state_snapshot = read_latest_intelligence_state_response(_intelligence_page_payload(selected_date), force_refresh=True)
+    debug_source = "worker" if isinstance(state_snapshot, dict) else "fallback"
     response_payload = {"ok": True, "status": status}
     if isinstance(status, dict):
         for key, value in status.items():
             if key == "ok":
                 continue
             response_payload[key] = value
-    return jsonify(response_payload)
+    response_payload.update(_debug_state_fields(state_snapshot if isinstance(state_snapshot, dict) else {}, source=debug_source))
+    return _no_cache_response(jsonify(response_payload))
 
 
 @intelligence_bp.get("/intelligence/status")

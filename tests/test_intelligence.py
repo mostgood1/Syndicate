@@ -1089,6 +1089,22 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(payload.get("player_analysis", {}).get("player"), "Jayson Tatum")
         self.assertEqual(payload.get("player_analysis", {}).get("matchup"), structured.get("player_analysis", {}).get("matchup"))
 
+    def test_intelligence_query_api_returns_fallback_when_query_raises(self) -> None:
+        with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+            with patch("syndicate.blueprints.intelligence.run_intelligence_query", side_effect=RuntimeError("boom")):
+                response = self.client.post(
+                    "/api/intelligence/query",
+                    json={
+                        "question": "Analyze Jayson Tatum tonight",
+                        "date": "2026-06-04",
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("fallback"))
+        self.assertEqual(payload.get("error"), "boom")
+
     def test_intelligence_query_api_reflects_model_reliability_in_confidence(self) -> None:
         advanced_rows = [
             {
