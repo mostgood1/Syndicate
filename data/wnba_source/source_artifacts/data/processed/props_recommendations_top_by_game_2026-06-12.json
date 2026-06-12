@@ -87,49 +87,6 @@
       "basketball_summary": "model 3.6 vs line 9.5 (-5.9)"
     },
     {
-      "game_key": "TOR@WSH",
-      "game_id": "66",
-      "player": "Michaela Onyenwere",
-      "team": "WSH",
-      "team_tricode": "WSH",
-      "opponent": "TOR",
-      "score": 39.62962960095879,
-      "score_adj": 39.62962960095879,
-      "tier": "High",
-      "model": {
-        "pts": 2.325,
-        "reb": 0.0,
-        "ast": 0.0,
-        "threes": 0.0,
-        "stl": 0.2452999999999999,
-        "blk": 0.2006999999999999,
-        "tov": 0.6689999999999999,
-        "pra": 2.325,
-        "pr": 2.325,
-        "pa": 2.325,
-        "ra": 0.0
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 8.5,
-        "price": -108.0,
-        "edge": 0.2057692306203629,
-        "ev": 0.39629629600958793,
-        "ev_pct": 39.62962960095879,
-        "book": "fanduel",
-        "p_win": 0.9155270652403572,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 39.6%",
-        "Regular price range (-150 to +150)",
-        "Consensus: 3 books aligned",
-        "Best line available"
-      ],
-      "basketball_summary": "model 2.3 vs line 8.5 (-6.2)"
-    },
-    {
       "game_key": "GSV@SEA",
       "game_id": "132",
       "player": "Janelle Salaun",
@@ -174,54 +131,12 @@
     {
       "game_key": "TOR@WSH",
       "game_id": "66",
-      "player": "Nyara Sabally",
-      "team": "TOR",
-      "team_tricode": "TOR",
-      "opponent": "WSH",
-      "score": 30.485407424030353,
-      "score_adj": 30.485407424030353,
-      "tier": "High",
-      "model": {
-        "pts": 5.55,
-        "reb": 2.57,
-        "ast": 0.7649999999999999,
-        "threes": 0.345,
-        "stl": 0.3779434999999999,
-        "blk": 0.3092264999999999,
-        "tov": 1.0307549999999996,
-        "pra": 8.885,
-        "pr": 8.12,
-        "pa": 6.3149999999999995,
-        "ra": 3.335
-      },
-      "top_play": {
-        "market": "pts",
-        "side": "UNDER",
-        "line": 10.5,
-        "price": -125.0,
-        "edge": 0.16936337457794637,
-        "ev": 0.30485407424030353,
-        "ev_pct": 30.485407424030353,
-        "book": "williamhill_us",
-        "p_win": 0.8604096297958591,
-        "snapshot_ts": null
-      },
-      "top_play_reasons": [
-        "EV 30.5%",
-        "Regular price range (-150 to +150)",
-        "Best line available"
-      ],
-      "basketball_summary": "model 5.5 vs line 10.5 (-5.0)"
-    },
-    {
-      "game_key": "TOR@WSH",
-      "game_id": "66",
       "player": "Laura Juskaite",
       "team": "TOR",
       "team_tricode": "TOR",
       "opponent": "WSH",
-      "score": 15.198047784340451,
-      "score_adj": 15.198047784340451,
+      "score": 37.461956951959294,
+      "score_adj": 37.461956951959294,
       "tier": "High",
       "model": {
         "pts": 6.926666666666667,
@@ -237,23 +152,108 @@
         "ra": 4.614444444444445
       },
       "top_play": {
-        "market": "pr",
+        "market": "pts",
         "side": "UNDER",
-        "line": 13.5,
-        "price": -127.0,
-        "edge": 0.08502872548948182,
-        "ev": 0.15198047784340452,
-        "ev_pct": 15.198047784340451,
-        "book": "draftkings",
-        "p_win": 0.711451843482171,
+        "line": 9.5,
+        "price": -102.0,
+        "edge": 0.18916433708415092,
+        "ev": 0.37461956951959297,
+        "ev_pct": 37.461956951959294,
+        "book": "fanduel",
+        "p_win": 0.8795700645690979,
         "snapshot_ts": null
       },
       "top_play_reasons": [
-        "EV 15.2%",
+        "EV 37.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned"
+      ],
+      "basketball_summary": "model 6.9 vs line 9.5 (-2.6)"
+    },
+    {
+      "game_key": "TOR@WSH",
+      "game_id": "66",
+      "player": "Michaela Onyenwere",
+      "team": "WSH",
+      "team_tricode": "WSH",
+      "opponent": "TOR",
+      "score": 32.41735537187112,
+      "score_adj": 32.41735537187112,
+      "tier": "High",
+      "model": {
+        "pts": 2.325,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.2452999999999999,
+        "blk": 0.2006999999999999,
+        "tov": 0.6689999999999999,
+        "pra": 2.325,
+        "pr": 2.325,
+        "pa": 2.325,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 9.5,
+        "price": -121.0,
+        "edge": 0.1774886877826427,
+        "ev": 0.32417355371871115,
+        "ev_pct": 32.41735537187112,
+        "book": "williamhill_us",
+        "p_win": 0.8716848659359058,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 32.4%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.3 vs line 9.5 (-7.2)"
+    },
+    {
+      "game_key": "TOR@WSH",
+      "game_id": "66",
+      "player": "Shakira Austin",
+      "team": "WSH",
+      "team_tricode": "WSH",
+      "opponent": "TOR",
+      "score": 18.666466591639374,
+      "score_adj": 18.666466591639374,
+      "tier": "High",
+      "model": {
+        "pts": 14.056666666666665,
+        "reb": 6.226666666666666,
+        "ast": 1.84,
+        "threes": 0.3533333333333333,
+        "stl": 0.6344249999999999,
+        "blk": 0.519075,
+        "tov": 1.7302499999999998,
+        "pra": 22.12333333333333,
+        "pr": 20.28333333333333,
+        "pa": 15.896666666666665,
+        "ra": 8.066666666666666
+      },
+      "top_play": {
+        "market": "ra",
+        "side": "UNDER",
+        "line": 11.5,
+        "price": -110.0,
+        "edge": 0.09777672976573004,
+        "ev": 0.18666466591639375,
+        "ev_pct": 18.666466591639374,
+        "book": "fanduel",
+        "p_win": 0.7104741897259176,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 18.7%",
         "Regular price range (-150 to +150)",
         "Best line available"
       ],
-      "basketball_summary": "model 10.3 vs line 13.5 (-3.2)"
+      "basketball_summary": "model 8.1 vs line 11.5 (-3.4)"
     }
   ]
 }
