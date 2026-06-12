@@ -82,38 +82,6 @@ jobs:
       - name: Run archive regression suite
         run: python -m unittest tests.test_archives || true
 
-      - name: Refresh odds and gate
-        shell: pwsh
-        run: |
-          Write-Host 'Starting scripts/refresh_and_gate.ps1'
-          Write-Host "Using Date=$env:DATE"
-          Write-Host "Using BaseUrl=$(if ($env:BASE_URL) { $env:BASE_URL } else { '<empty>' })"
-          Write-Host "Using EventSimForceWindowMinutes=$env:EVENT_SIM_FORCE_WINDOW_MINUTES"
-
-          if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
-            & ./scripts/refresh_and_gate.ps1 `
-              -Date $env:DATE `
-              -RefreshOdds `
-              -OddsPhase all `
-              -OddsSports all `
-              -OddsRegions us 2>&1 | Tee-Object -FilePath refresh-and-gate.log
-          }
-          else {
-            & ./scripts/refresh_and_gate.ps1 `
-              -Date $env:DATE `
-              -BaseUrl $env:BASE_URL `
-              -RefreshOdds `
-              -OddsPhase all `
-              -OddsSports all `
-              -OddsRegions us 2>&1 | Tee-Object -FilePath refresh-and-gate.log
-          }
-
-          $exitCode = $LASTEXITCODE
-          Write-Host "scripts/refresh_and_gate.ps1 exited with code $exitCode"
-          exit $exitCode
-        env:
-          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
-      
       - name: Run daily pipeline
         shell: pwsh
         run: |
@@ -135,14 +103,20 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:BASE_URL)) {
             & ./scripts/daily_update.ps1 `
               -Date $env:DATE `
-              -SkipRefreshGate `
+              -RefreshOdds `
+              -OddsPhase all `
+              -OddsSports all `
+              -OddsRegions us `
               -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
           else {
             & ./scripts/daily_update.ps1 `
               -Date $env:DATE `
               -BaseUrl $env:BASE_URL `
-              -SkipRefreshGate `
+              -RefreshOdds `
+              -OddsPhase all `
+              -OddsSports all `
+              -OddsRegions us `
               -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
 
