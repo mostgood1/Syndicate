@@ -634,3 +634,56 @@ Metrics:
   "snapshot_rows": 0,
   "started_at": "2026-06-12T18:56:44.927313"
 }
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   839cbcf..c5e81f0  main -> main
+==> NBA source mirror refresh
+    cwd: D:\a\Syndicate\Syndicate
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\refresh_nba_source_mirror.ps1 -Date 2026-06-12
+    pid: 9800
+{
+    "sport":  "nba",
+    "date":  "2026-06-12",
+    "refreshedAtUtc":  "2026-06-12T18:58:47.3904179Z",
+    "sourceRepo":  null,
+    "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\source_artifacts",
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NBA",
+    "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_NBA",
+    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nba_source",
+    "usedExistingMirrorArtifacts":  false,
+    "usedArtifactBundle":  true,
+    "copiedArtifactCount":  23,
+    "artifactGroups":  {
+                           "processed":  13,
+                           "live_lens":  9,
+                           "raw":  1,
+                           "web":  0,
+                           "other":  0
+                       },
+    "copiedArtifacts":  [
+                            "game_cards_2026-06-10.csv",
+                            "recommendations_2026-06-10.csv",
+                            "recommendations_slate_2026-06-10.json",
+                            "cards_sim_detail_2026-06-10.json",
+                            "cards_props_snapshot_2026-06-10.json",
+                            "props_recommendations_top_by_game_2026-06-10.json",
+                            "oddsapi_player_props_2026-06-10.csv",
+                            "props_predictions_2026-06-10.csv",
+                            "props_edges_2026-06-10.csv",
+                            "props_recommendations_2026-06-10.csv",
+                            "recon_games_2026-05-28.csv",
+                            "live_player_lens_tuning_2026-05-28.csv",
+                            "live_lens_projections_2026-06-10.jsonl",
+                            "live_lens_tuning_override.json",
+                            "boxscores_history.csv",
+                            "live_lens\\live_lens_projections_2026-06-10.jsonl",
+                            "live_lens\\live_lens_tuning_override.json",
+                            "live_snapshots\\live_state_2026-06-10.jsonl",
+                            "live_snapshots\\live_pbp_stats_2026-06-10.jsonl",
+                            "live_snapshots\\live_lines_2026-06-10.jsonl",
+                            "live_snapshots\\live_player_boxscore_2026-06-05.jsonl",
+                            "live_snapshots\\live_player_lens_2026-06-10.jsonl",
+                            "raw\\odds_nba_player_props_2026-06-05.csv"
+                        ]
+}
+NBA advanced-data gate: no scheduled games for 2026-06-12 (espn_nba_scoreboard); skipping artifact assertions
