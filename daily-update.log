@@ -1,2 +1,307 @@
 Unified script using Python: C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe
 NCAAF local odds refresh skipped: SYNDICATE_SOURCE_ROOT_NCAAF is not set and the NCAAFCompare workspace repo is not available.
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   37c5b45..fd1a35b  main -> main
+==> MLB vendored daily update
+    cwd: D:\a\Syndicate\Syndicate\vendor\mlb_bettingv2
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe tools\daily_update.py --workflow ui-daily --date 2026-06-12 --season 2026 --sims 1000 --workers 3 --git-push off --validate-render-frontend off --build-next-day on
+    env: MLB_BETTING_DATA_ROOT=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data; MLB_LIVE_LENS_DIR=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\live_lens; ODDS_API_KEY=<redacted>
+    pid: 3444
+[ui-daily] Starting workflow for 2026-06-12 (season 2026, prior-day reconcile 2026-06-11, next-day on -> 2026-06-13, git-push off)
+[ui-daily] Prior-day reconciliation target: 2026-06-11 (season 2026)
+[ui-daily] Next-day forward build is queued for 2026-06-13 and will start after current-day artifact publication completes.
+[ui-daily] Refreshing prior-day StatsAPI feed/live cache for 2026-06-11...
+[ui-daily] Reconciling prior-day season report for 2026-06-11...
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\batches\season_2026_ui_daily_live\sim_vs_actual_2026-06-11.json
+Aggregate (full): {'games': 7, 'brier_home_win': 0.23164214285714288, 'mae_total_runs': 3.5667142857142857, 'mae_run_margin': 3.475857142857143}
+[ui-daily] Publishing rolling season manifests for 2026...
+[subprocess] Running in D:\a\Syndicate\Syndicate\vendor\mlb_bettingv2: C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe D:\a\Syndicate\Syndicate\vendor\mlb_bettingv2\tools\eval\build_season_betting_cards_manifest.py --season 2026 --batch-dir D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\batches\season_2026_ui_daily_live --out D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\season_betting_cards_retuned_manifest.json --recap-md D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\season_betting_cards_retuned_recap.md --cards-dir D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\locked_cards_retuned --day-payload-dir D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\betting_day_payloads_retuned --profile-name retuned --title MLB 2026 Betting Card Recap --prefer-canonical-daily on
+{
+  "manifest": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_manifest.json",
+  "recap_md": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/season_betting_cards_retuned_recap.md",
+  "cards_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
+  "cards": 1,
+  "combined": {
+    "n": 0,
+    "wins": 0,
+    "losses": 0,
+    "stake_u": 0.0,
+    "profit_u": 0.0,
+    "roi": null
+  }
+}
+[ui-daily] Building prior-day top-props artifact for 2026-06-11...
+[ui-daily] Fetching current-day OddsAPI markets for 2026-06-12...
+[ui-daily] Building current-day multi-profile outputs for 2026-06-12...
+[core] Starting daily update for 2026-06-12 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\snapshots\2026-06-12...
+[core] Fetching schedule for 2026-06-12...
+[core] Loaded 15 scheduled game(s) for 2026-06-12.
+    ... still running (30s)
+[1/15] Preparing rosters: gamePk=823370 MIA @ PIT
+    ... still running (62s)
+[1/15] Simulating (1000, workers=3): MIA @ PIT
+    ... still running (92s)
+[2/15] Preparing rosters: gamePk=822726 SEA @ WSH
+    ... still running (122s)
+[2/15] Simulating (1000, workers=3): SEA @ WSH
+    ... still running (152s)
+[3/15] Preparing rosters: gamePk=824826 SD @ BAL
+    ... still running (182s)
+[3/15] Simulating (1000, workers=3): SD @ BAL
+[4/15] Preparing rosters: gamePk=824425 DET @ CLE
+    ... still running (212s)
+    ... still running (242s)
+[4/15] Simulating (1000, workers=3): DET @ CLE
+[5/15] Preparing rosters: gamePk=824752 TEX @ BOS
+    ... still running (272s)
+    ... still running (302s)
+[5/15] Simulating (1000, workers=3): TEX @ BOS
+[6/15] Preparing rosters: gamePk=824507 AZ @ CIN
+    ... still running (332s)
+[6/15] Simulating (1000, workers=3): AZ @ CIN
+    ... still running (362s)
+[7/15] Preparing rosters: gamePk=823617 ATL @ NYM
+    ... still running (392s)
+[7/15] Simulating (1000, workers=3): ATL @ NYM
+    ... still running (422s)
+[8/15] Preparing rosters: gamePk=822803 NYY @ TOR
+    ... still running (452s)
+[8/15] Simulating (1000, workers=3): NYY @ TOR
+[9/15] Preparing rosters: gamePk=824588 LAD @ CWS
+    ... still running (482s)
+    ... still running (512s)
+[9/15] Simulating (1000, workers=3): LAD @ CWS
+[10/15] Preparing rosters: gamePk=823778 PHI @ MIL
+    ... still running (542s)
+    ... still running (572s)
+[10/15] Simulating (1000, workers=3): PHI @ MIL
+[11/15] Preparing rosters: gamePk=824102 HOU @ KC
+    ... still running (602s)
+    ... still running (632s)
+[11/15] Simulating (1000, workers=3): HOU @ KC
+[12/15] Preparing rosters: gamePk=823695 STL @ MIN
+    ... still running (662s)
+[12/15] Simulating (1000, workers=3): STL @ MIN
+    ... still running (692s)
+[13/15] Preparing rosters: gamePk=824020 TB @ LAA
+    ... still running (722s)
+[13/15] Simulating (1000, workers=3): TB @ LAA
+[14/15] Preparing rosters: gamePk=824997 COL @ ATH
+    ... still running (752s)
+    ... still running (782s)
+[14/15] Simulating (1000, workers=3): COL @ ATH
+[15/15] Preparing rosters: gamePk=823211 CHC @ SF
+    ... still running (812s)
+    ... still running (842s)
+[15/15] Simulating (1000, workers=3): CHC @ SF
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12.json
+[core] Starting daily update for 2026-06-12 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\snapshots\2026-06-12...
+[core] Fetching schedule for 2026-06-12...
+[core] Loaded 15 scheduled game(s) for 2026-06-12.
+[1/15] Preparing rosters: gamePk=823370 MIA @ PIT
+[1/15] Simulating (1000, workers=3): MIA @ PIT
+    ... still running (872s)
+[2/15] Preparing rosters: gamePk=822726 SEA @ WSH
+[2/15] Simulating (1000, workers=3): SEA @ WSH
+[3/15] Preparing rosters: gamePk=824826 SD @ BAL
+[3/15] Simulating (1000, workers=3): SD @ BAL
+[4/15] Preparing rosters: gamePk=824425 DET @ CLE
+[4/15] Simulating (1000, workers=3): DET @ CLE
+    ... still running (902s)
+[5/15] Preparing rosters: gamePk=824752 TEX @ BOS
+[5/15] Simulating (1000, workers=3): TEX @ BOS
+[6/15] Preparing rosters: gamePk=824507 AZ @ CIN
+[6/15] Simulating (1000, workers=3): AZ @ CIN
+[7/15] Preparing rosters: gamePk=823617 ATL @ NYM
+[7/15] Simulating (1000, workers=3): ATL @ NYM
+    ... still running (932s)
+[8/15] Preparing rosters: gamePk=822803 NYY @ TOR
+[8/15] Simulating (1000, workers=3): NYY @ TOR
+[9/15] Preparing rosters: gamePk=824588 LAD @ CWS
+[9/15] Simulating (1000, workers=3): LAD @ CWS
+[10/15] Preparing rosters: gamePk=823778 PHI @ MIL
+[10/15] Simulating (1000, workers=3): PHI @ MIL
+    ... still running (962s)
+[11/15] Preparing rosters: gamePk=824102 HOU @ KC
+[11/15] Simulating (1000, workers=3): HOU @ KC
+[12/15] Preparing rosters: gamePk=823695 STL @ MIN
+[12/15] Simulating (1000, workers=3): STL @ MIN
+[13/15] Preparing rosters: gamePk=824020 TB @ LAA
+[13/15] Simulating (1000, workers=3): TB @ LAA
+[14/15] Preparing rosters: gamePk=824997 COL @ ATH
+[14/15] Simulating (1000, workers=3): COL @ ATH
+    ... still running (992s)
+[15/15] Preparing rosters: gamePk=823211 CHC @ SF
+[15/15] Simulating (1000, workers=3): CHC @ SF
+Wrote top-props artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\top_props\daily_top_props_2026_06_12.json
+Wrote ladders artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\ladders\daily_ladders_2026_06_12.json
+Wrote ladder audit artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\ladders\daily_ladder_audit_2026_06_12.json
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_12.json
+[core] Starting daily update for 2026-06-12 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\snapshots\2026-06-12...
+[core] Fetching schedule for 2026-06-12...
+[core] Loaded 15 scheduled game(s) for 2026-06-12.
+    ... still running (1022s)
+[1/15] Preparing rosters: gamePk=823370 MIA @ PIT
+[1/15] Simulating (1000, workers=3): MIA @ PIT
+[2/15] Preparing rosters: gamePk=822726 SEA @ WSH
+[2/15] Simulating (1000, workers=3): SEA @ WSH
+[3/15] Preparing rosters: gamePk=824826 SD @ BAL
+[3/15] Simulating (1000, workers=3): SD @ BAL
+[4/15] Preparing rosters: gamePk=824425 DET @ CLE
+    ... still running (1052s)
+[4/15] Simulating (1000, workers=3): DET @ CLE
+[5/15] Preparing rosters: gamePk=824752 TEX @ BOS
+[5/15] Simulating (1000, workers=3): TEX @ BOS
+[6/15] Preparing rosters: gamePk=824507 AZ @ CIN
+[6/15] Simulating (1000, workers=3): AZ @ CIN
+[7/15] Preparing rosters: gamePk=823617 ATL @ NYM
+    ... still running (1082s)
+[7/15] Simulating (1000, workers=3): ATL @ NYM
+[8/15] Preparing rosters: gamePk=822803 NYY @ TOR
+[8/15] Simulating (1000, workers=3): NYY @ TOR
+[9/15] Preparing rosters: gamePk=824588 LAD @ CWS
+[9/15] Simulating (1000, workers=3): LAD @ CWS
+[10/15] Preparing rosters: gamePk=823778 PHI @ MIL
+[10/15] Simulating (1000, workers=3): PHI @ MIL
+    ... still running (1112s)
+[11/15] Preparing rosters: gamePk=824102 HOU @ KC
+[11/15] Simulating (1000, workers=3): HOU @ KC
+[12/15] Preparing rosters: gamePk=823695 STL @ MIN
+[12/15] Simulating (1000, workers=3): STL @ MIN
+[13/15] Preparing rosters: gamePk=824020 TB @ LAA
+[13/15] Simulating (1000, workers=3): TB @ LAA
+    ... still running (1142s)
+[14/15] Preparing rosters: gamePk=824997 COL @ ATH
+[14/15] Simulating (1000, workers=3): COL @ ATH
+[15/15] Preparing rosters: gamePk=823211 CHC @ SF
+[15/15] Simulating (1000, workers=3): CHC @ SF
+    ... still running (1172s)
+Wrote top-props artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\top_props\daily_top_props_2026_06_12.json
+Wrote ladders artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\ladders\daily_ladders_2026_06_12.json
+Wrote ladder audit artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\ladders\daily_ladder_audit_2026_06_12.json
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_12.json
+    ... still running (1202s)
+[multi-profile] Starting daily multi-profile build for 2026-06-12 (season 2026)
+[multi-profile] Running profile 'game_roi' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily
+[multi-profile] Finished profile 'game_roi' in 14m 07.7s (exit=0)
+[multi-profile] Running profile 'pitcher_props' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props
+[multi-profile] Finished profile 'pitcher_props' in 2m 37.2s (exit=0)
+[multi-profile] Running profile 'hitter_props' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props
+[multi-profile] Finished profile 'hitter_props' in 2m 39.5s (exit=0)
+[multi-profile] Starting locked-policy card assembly
+[multi-profile] Building locked-policy card for 2026-06-12
+[multi-profile] Locked-policy stage: game candidates (3.0s, totals=7, ml=14)
+[multi-profile] Locked-policy stage: pitcher candidates (1.0s, rows=29)
+[multi-profile] Locked-policy stage: shadow pitcher candidates (0.0s, rows=8)
+[multi-profile] Locked-policy stage: hitter candidates (39.3s, rows=420)
+[multi-profile] Locked-policy stage: shadow hitter candidates (0.2s, rows=0)
+[multi-profile] Locked-policy stage: selection and support filters (0.0s, selected=13)
+[multi-profile] Locked-policy stage: explanation diagnostics (0.0s)
+[multi-profile] Locked-policy card ready in 43.5s
+[multi-profile] Wrote locked-policy card to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_locked_policy.json in 43.6s
+[multi-profile] Wrote HR targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_hr_targets.json
+[multi-profile] Wrote RFI targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_rfi_targets.json
+[multi-profile] Wrote bundle manifest to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_profile_bundle.json in 20m 08.5s
+[multi-profile] Wrote HR targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_hr_targets.json
+[multi-profile] Wrote RFI targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_rfi_targets.json
+[multi-profile] Wrote locked-policy card: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_locked_policy.json
+[multi-profile] Recommendation source mapping:
+  games -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12.json
+  pitcher props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_12.json
+  hitter props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_12.json
+{
+  "season": 2026,
+  "dates": [],
+  "dates_checked": 0,
+  "dates_changed": 0,
+  "changed_dates": []
+}
+[ui-daily] Building current-day top-props artifact for 2026-06-12...
+[ui-daily] Building current-day ladders artifact for 2026-06-12...
+    ... still running (1232s)
+[ui-daily] Building current-day ladder audit artifact for 2026-06-12...
+[ui-daily] Building current-day season frontend artifacts for 2026-06-12...
+[ui-daily] Building next-day forward outputs for 2026-06-13...
+[ui-daily] Starting workflow for 2026-06-13 (season 2026, prior-day reconcile 2026-06-12, next-day off -> 2026-06-14, git-push off)
+[ui-daily] Prior-day reconciliation target: 2026-06-12 (season 2026)
+[ui-daily] Building prior-day top-props artifact for 2026-06-12...
+[ui-daily] Fetching current-day OddsAPI markets for 2026-06-13...
+[ui-daily] Building current-day multi-profile outputs for 2026-06-13...
+[core] Starting daily update for 2026-06-13 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\snapshots\2026-06-13...
+[core] Fetching schedule for 2026-06-13...
+[core] Loaded 15 scheduled game(s) for 2026-06-13.
+    ... still running (1262s)
+[1/15] Preparing rosters: gamePk=823694 STL @ MIN
+[1/15] Simulating (1000, workers=3): STL @ MIN
+[2/15] Preparing rosters: gamePk=822802 NYY @ TOR
+[2/15] Simulating (1000, workers=3): NYY @ TOR
+[3/15] Preparing rosters: gamePk=824828 SD @ BAL
+[3/15] Simulating (1000, workers=3): SD @ BAL
+    ... still running (1292s)
+[4/15] Preparing rosters: gamePk=822725 SEA @ WSH
+[4/15] Simulating (1000, workers=3): SEA @ WSH
+[5/15] Preparing rosters: gamePk=823369 MIA @ PIT
+[5/15] Simulating (1000, workers=3): MIA @ PIT
+    ... still running (1322s)
+[6/15] Preparing rosters: gamePk=824508 AZ @ CIN
+[6/15] Simulating (1000, workers=3): AZ @ CIN
+[7/15] Preparing rosters: gamePk=824426 DET @ CLE
+[7/15] Simulating (1000, workers=3): DET @ CLE
+[8/15] Preparing rosters: gamePk=824749 TEX @ BOS
+[8/15] Simulating (1000, workers=3): TEX @ BOS
+    ... still running (1352s)
+[9/15] Preparing rosters: gamePk=823616 ATL @ NYM
+[9/15] Simulating (1000, workers=3): ATL @ NYM
+[10/15] Preparing rosters: gamePk=824587 LAD @ CWS
+[10/15] Simulating (1000, workers=3): LAD @ CWS
+    ... still running (1382s)
+[11/15] Preparing rosters: gamePk=824100 HOU @ KC
+[11/15] Simulating (1000, workers=3): HOU @ KC
+[12/15] Preparing rosters: gamePk=823776 PHI @ MIL
+[12/15] Simulating (1000, workers=3): PHI @ MIL
+[13/15] Preparing rosters: gamePk=824995 COL @ ATH
+[13/15] Simulating (1000, workers=3): COL @ ATH
+    ... still running (1412s)
+[14/15] Preparing rosters: gamePk=823213 CHC @ SF
+[14/15] Simulating (1000, workers=3): CHC @ SF
+[15/15] Preparing rosters: gamePk=824019 TB @ LAA
+[15/15] Simulating (1000, workers=3): TB @ LAA
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13.json
+[multi-profile] Starting daily multi-profile build for 2026-06-13 (season 2026)
+[multi-profile] Running profile 'game_roi' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily
+[multi-profile] Finished profile 'game_roi' in 3m 01.8s (exit=0)
+[multi-profile] Skipping profile 'pitcher_props' -> no pitcher prop market entries in D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\market\oddsapi\oddsapi_pitcher_props_2026_06_13.json
+[multi-profile] Skipping profile 'hitter_props' -> no hitter prop market entries in D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\market\oddsapi\oddsapi_hitter_props_2026_06_13.json
+[multi-profile] Starting locked-policy card assembly
+[multi-profile] Building locked-policy card for 2026-06-13
+[multi-profile] Locked-policy stage: game candidates (2.5s, totals=8, ml=10)
+[multi-profile] Locked-policy stage: pitcher candidates (0.0s, rows=0)
+[multi-profile] Locked-policy stage: shadow pitcher candidates (0.0s, rows=0)
+[multi-profile] Locked-policy stage: hitter candidates (0.0s, rows=0)
+[multi-profile] Locked-policy stage: shadow hitter candidates (0.0s, rows=0)
+[multi-profile] Locked-policy stage: selection and support filters (0.0s, selected=1)
+[multi-profile] Locked-policy stage: explanation diagnostics (0.0s)
+[multi-profile] Locked-policy card ready in 2.5s
+[multi-profile] Wrote locked-policy card to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_locked_policy.json in 2.5s
+[multi-profile] Wrote HR targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_hr_targets.json
+[multi-profile] Wrote RFI targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_rfi_targets.json
+[multi-profile] Wrote bundle manifest to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_profile_bundle.json in 3m 04.7s
+[multi-profile] Wrote HR targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_hr_targets.json
+[multi-profile] Wrote RFI targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_rfi_targets.json
+[multi-profile] Wrote locked-policy card: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_locked_policy.json
+[multi-profile] Recommendation source mapping:
+  games -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13.json
+  pitcher props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_13.json
+  hitter props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_13.json
+[ui-daily] Building current-day top-props artifact for 2026-06-13...
+    ... still running (1442s)
+[ui-daily] Building current-day ladders artifact for 2026-06-13...
+[ui-daily] Building current-day ladder audit artifact for 2026-06-13...
+[ui-daily] Building current-day season frontend artifacts for 2026-06-13...
+[ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_13.json
+[ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_12.json

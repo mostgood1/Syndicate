@@ -111,8 +111,8 @@
       }
     },
     "mlb_live_lens:2026-06-12": {
-      "inputHash": "cbfc06b3427995641a581d1771409ea0b682cc287d67f7e891321ecc7a033b1f",
-      "updatedAt": "2026-06-12T18:56:41.256989",
+      "inputHash": "65d72021619fe6d558a6ce7c144133968b16174cb33e18c984ecde43660b8b4e",
+      "updatedAt": "2026-06-12T20:36:14.701002",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_12.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_12.jsonl",
