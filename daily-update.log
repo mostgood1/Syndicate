@@ -305,3 +305,119 @@ Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\dail
 [ui-daily] Building current-day season frontend artifacts for 2026-06-13...
 [ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_13.json
 [ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_12.json
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   fd1a35b..68135e7  main -> main
+==> MLB current-day live-lens refresh
+    cwd: D:\a\Syndicate\Syndicate
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_mlb_oddsapi.py --date 2026-06-12 --source-root data\mlb_source\source_artifacts --artifact-root data\mlb_source --overwrite off
+    env: MLB_BETTING_DATA_ROOT=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data; MLB_LIVE_LENS_DIR=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\live_lens; ODDS_API_KEY=<redacted>
+    pid: 2148
+{
+  "ok": true,
+  "date": "2026-06-12",
+  "artifact_bundle_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source",
+  "refresh": {
+    "market_refresh": {
+      "ok": true,
+      "date": "2026-06-12",
+      "result": {
+        "status": "skipped",
+        "date": "2026-06-12",
+        "out_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi",
+        "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_12.json",
+        "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_12.json",
+        "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_12.json",
+        "reason": "overwrite=off and market files already exist"
+      },
+      "copied": {
+        "oddsapi_game_lines_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-12\\oddsapi_game_lines_2026_06_12.json",
+        "oddsapi_pitcher_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-12\\oddsapi_pitcher_props_2026_06_12.json",
+        "oddsapi_hitter_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-12\\oddsapi_hitter_props_2026_06_12.json"
+      },
+      "archived": {
+        "archiveDir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z",
+        "files": {
+          "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_game_lines_2026_06_12.json",
+          "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_pitcher_props_2026_06_12.json",
+          "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_hitter_props_2026_06_12.json"
+        },
+        "copied": {
+          "oddsapi_game_lines_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_game_lines_2026_06_12.json",
+          "oddsapi_pitcher_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_pitcher_props_2026_06_12.json",
+          "oddsapi_hitter_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_hitter_props_2026_06_12.json"
+        }
+      }
+    },
+    "live_lens": {
+      "ok": true,
+      "date": "2026-06-12",
+      "counts": {
+        "games": 15,
+        "live": 0,
+        "final": 0,
+        "pregame": 15,
+        "props": 14,
+        "archivedLiveProps": 0
+      },
+      "report": {
+        "recordedAt": "2026-06-12T20:36:14+00:00",
+        "date": "2026-06-12",
+        "counts": {
+          "games": 15,
+          "live": 0,
+          "final": 0,
+          "pregame": 15,
+          "props": 14,
+          "archivedLiveProps": 0
+        },
+        "marketsRefreshed": true,
+        "reportPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_12.json",
+        "syncPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_12.json",
+        "logPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_12.jsonl",
+        "propObservationLogPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_12.jsonl",
+        "trigger": "syndicate_refresh",
+        "reused": false,
+        "synced": true
+      }
+    }
+  },
+  "artifact_bundle_files": {
+    "files": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\lineups_last_known_by_team.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_profile_bundle.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_locked_policy.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_hr_targets.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_rfi_targets.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\ladders\\daily_ladders_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\top_props\\daily_top_props_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\ops\\daily_ops_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12\\oddsapi_game_lines_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12\\oddsapi_pitcher_props_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12\\oddsapi_hitter_props_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_06_12.jsonl",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_12.jsonl",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_12.jsonl",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_manifest_2026_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_day_2026_2026_06_12_retuned.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_betting_day_2026_2026_06_12_retuned.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_official_betting_day_2026_2026_06_12_retuned.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\eval\\seasons\\2026\\season_eval_manifest.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\eval\\seasons\\2026\\season_betting_cards_retuned_manifest.json"
+    ],
+    "directories": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\cache",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily_hitter_props",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily_pitcher_props",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\sims\\2026-06-12",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_06_12",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\raw\\statsapi\\feed_live",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\runtime"
+    ]
+  }
+}
