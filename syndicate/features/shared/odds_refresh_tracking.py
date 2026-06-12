@@ -9,6 +9,7 @@ import pandas as pd
 
 from syndicate.features.shared.basketball_props_tracking import sync_basketball_props_tracking_for_source_root
 from syndicate.features.shared.market_id import attach_market_id
+from syndicate.features.shared.odds_framework import normalize_odds_entry
 from syndicate.features.shared.recommendation_engine import build_recommendation_output
 
 
@@ -569,6 +570,20 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 entity=canonical_record.get("entity"),
                 line=current_line,
             )
+            normalized_entry = normalize_odds_entry(
+                row=row,
+                sport=slug,
+                market_key=market_key,
+                timestamp=now,
+                source_path=source_path,
+                market_id=canonical_row.get("market_id"),
+                event_id=canonical_record.get("event_id"),
+                market_type=canonical_record.get("market_type"),
+                entity=canonical_record.get("entity"),
+                line=current_line,
+                odds=_primary_odds_value(row),
+                selection=str(row.get("selection") or "").strip() or None,
+            )
 
             history.append(
                 {
@@ -589,6 +604,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                     "movement": movement,
                     "line": _json_safe(line_snapshot),
                     "row": _json_safe(canonical_row),
+                    "normalized": normalized_entry,
                 }
             )
             if len(history) > _ODDS_HISTORY_LIMIT:
@@ -619,6 +635,7 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
         }
 
     payload = {
+        "schema_version": 1,
         "sport": slug,
         "date": date_str,
         "updated_at": now,

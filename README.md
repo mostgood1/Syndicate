@@ -95,7 +95,7 @@ Hosted state overrides:
 
 Blueprint defaults:
 
-- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=detached_subprocess` on the web service.
+- The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=manifest_only` on the hosted services so the ops refresh endpoint records queued work instead of spawning a local refresh subprocess on Render.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on the web service.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
 - The checked-in [render.yaml](c:/Users/mostg/OneDrive/Coding/Syndicate/render.yaml) leaves `SYNDICATE_DATA_ROOT` unset, so public mirrored artifacts still come from the repo-backed `data/` tree unless you deliberately introduce a separate hosted artifact strategy.

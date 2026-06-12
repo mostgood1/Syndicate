@@ -879,7 +879,7 @@ def _persist_live_lens_report(selected_date: str) -> dict[str, Any] | None:
         return None
 
     try:
-        payload = _live_lens_payload(selected_date, persist=True, refresh_markets=True)
+        payload = _live_lens_payload(selected_date, persist=True)
     except Exception:
         return None
 

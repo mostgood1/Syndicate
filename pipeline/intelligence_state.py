@@ -17,7 +17,6 @@ from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import rank_global_recommendations
-from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.shared.market_id import attach_market_id
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -217,7 +216,7 @@ class IntelligenceStateService:
                 status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
         else:
             status = _profile_stage("data_ingestion", build_intelligence_status, selected_date=selected_date, force_refresh=False)
-        refresh_status = load_latest_refresh_status()
+        refresh_status = status.get("refresh_status") if isinstance(status.get("refresh_status"), dict) else {}
         refresh_manifest = refresh_status.get("refresh_status", {}).get("manifest") if isinstance(refresh_status.get("refresh_status"), dict) else {}
         refresh_runtime = refresh_status.get("refresh_status", {}).get("runtime") if isinstance(refresh_status.get("refresh_status"), dict) else {}
         refresh_artifacts = refresh_status.get("refresh_status", {}).get("artifacts") if isinstance(refresh_status.get("refresh_status"), dict) else {}

@@ -26,69 +26,6 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertFalse(response.get_json()["ok"])
 
-    def test_odds_refresh_run_starts_in_background_and_writes_job_file(self) -> None:
-        with TemporaryDirectory() as tmp_dir:
-            reports_root = Path(tmp_dir) / "reports"
-            reports_root.mkdir(parents=True, exist_ok=True)
-            launch_entered = threading.Event()
-            launch_release = threading.Event()
-
-            def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
-                launch_entered.set()
-                launch_release.wait(timeout=2)
-                return {
-                    "ok": True,
-                    "pid": 4242,
-                    "date": "2026-06-10",
-                    "run_stamp": "20260610_120000",
-                    "state": "running",
-                }
-
-            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
-                "syndicate.blueprints.ops.reports_root",
-                return_value=reports_root,
-            ), patch("syndicate.features.shared.ops_refresh._reports_root", return_value=reports_root), patch(
-                "syndicate.blueprints.ops.launch_refresh_run",
-                side_effect=_fake_launch_refresh_run,
-            ), patch("syndicate.blueprints.ops._pid_is_running", return_value=False), patch(
-                "syndicate.blueprints.ops.load_latest_refresh_status",
-                return_value={"refresh_status": {"runtime": {"state": "finished"}}},
-            ):
-                started_at = time.perf_counter()
-                response = self.client.post(
-                    "/api/ops/odds-refresh/run",
-                    headers={"X-Admin-Token": "secret-token"},
-                    json={"sports": "mlb", "date": "2026-06-10", "dry_run": True},
-                )
-                elapsed = time.perf_counter() - started_at
-                self.assertLess(elapsed, 1.0)
-                self.assertTrue(launch_entered.wait(0.5))
-                launch_release.set()
-
-                jobs_path = reports_root / "ops_jobs.json"
-                deadline = time.time() + 3
-                payload = None
-                while time.time() < deadline:
-                    if jobs_path.exists():
-                        payload = json.loads(jobs_path.read_text(encoding="utf-8"))
-                        job_id = response.get_json()["job_id"]
-                        job = payload.get(job_id) if isinstance(payload, dict) else None
-                        if isinstance(job, dict) and job.get("status") == "done":
-                            break
-                    time.sleep(0.05)
-
-        response_payload = response.get_json()
-        self.assertEqual(response.status_code, 202)
-        self.assertTrue(response_payload["ok"])
-        self.assertEqual(response_payload["status"], "started")
-        self.assertTrue(response_payload["job_id"])
-        self.assertEqual(response_payload["job"]["status"], "running")
-        self.assertEqual(response_payload["job"]["current_step"], "mlb_refresh")
-        self.assertIsInstance(payload, dict)
-        self.assertIn(response_payload["job_id"], payload)
-        self.assertEqual(payload[response_payload["job_id"]]["status"], "done")
-        self.assertEqual(payload[response_payload["job_id"]]["current_step"], "done")
-
     def test_status_reads_latest_refresh_manifest(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
@@ -290,17 +227,17 @@ class OpsRefreshApiTests(unittest.TestCase):
             reports_root = root / "persistent" / "reports"
             data_root = root / "persistent" / "data"
             refresh_latest = reports_root / "refresh_status" / "latest"
-            daily_latest = reports_root / "daily_update" / "latest"
-            artifacts_dir = reports_root / "migration_runs" / "2026-05-22" / "20260522_120000"
-            mirror_manifest_dir = data_root / "mlb_source" / "manifests"
-
-            refresh_latest.mkdir(parents=True, exist_ok=True)
-            daily_latest.mkdir(parents=True, exist_ok=True)
-            artifacts_dir.mkdir(parents=True, exist_ok=True)
-            mirror_manifest_dir.mkdir(parents=True, exist_ok=True)
-
-            (artifacts_dir / "odds_refresh.json").write_text(
-                json.dumps({"ok": True, "dry_run": False, "sports": ["mlb"]}),
+                def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
+                    launch_entered.set()
+                    launch_release.wait(timeout=2)
+                    return {
+                        "ok": True,
+                        "pid": 4242,
+                        "date": "2026-06-10",
+                        "run_stamp": "20260610_120000",
+                        "state": "running",
+                    }
+                with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
                 encoding="utf-8",
             )
             (artifacts_dir / "odds_refresh.stderr.txt").write_text("", encoding="utf-8")
@@ -982,38 +919,6 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("Source context: C:/repos/NCAAFCompare", html)
         self.assertNotIn("Source repo: C:/repos/NCAAFCompare", html)
 
-    def test_run_endpoint_returns_launch_payload(self) -> None:
-        launch_called = threading.Event()
-
-        def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
-            launch_called.set()
-            return {"ok": True, "pid": 4321, "run_stamp": "20260520_123000", "date": "2026-05-20", "state": "running"}
-
-        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
-            "syndicate.blueprints.ops.launch_refresh_run",
-            side_effect=_fake_launch_refresh_run,
-        ) as mocked, patch("syndicate.features.shared.ops_refresh._reports_root", return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports"), patch(
-            "syndicate.blueprints.ops.reports_root",
-            return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports",
-        ), patch("syndicate.blueprints.ops._pid_is_running", return_value=False), patch(
-            "syndicate.blueprints.ops.load_latest_refresh_status",
-            return_value={"refresh_status": {"runtime": {"state": "finished"}}},
-        ):
-            response = self.client.post(
-                "/api/ops/odds-refresh/run",
-                json={"sports": "mlb", "phase": "live", "skip_mirror": True, "dry_run": True},
-                headers={"X-Admin-Token": "secret-token"},
-            )
-
-            self.assertEqual(response.status_code, 202)
-            payload = response.get_json()
-            self.assertTrue(payload["ok"])
-            self.assertEqual(payload["status"], "started")
-            self.assertTrue(payload["job_id"])
-            self.assertTrue(launch_called.wait(1.0))
-            mocked.assert_called_once()
-            self.assertEqual(mocked.call_args.kwargs.get("mode"), "fast")
-
     def test_full_refresh_run_uses_full_mode(self) -> None:
         launch_called = threading.Event()
 
@@ -1046,22 +951,25 @@ class OpsRefreshApiTests(unittest.TestCase):
             mocked.assert_called_once()
             self.assertEqual(mocked.call_args.kwargs.get("mode"), "full")
 
-    def test_run_page_redirects_after_launch(self) -> None:
-        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
-            "syndicate.blueprints.ops.launch_refresh_run",
-            return_value={"ok": True, "pid": 4321, "run_stamp": "20260520_123000", "date": "2026-05-20"},
-        ) as mocked:
+    def test_run_endpoint_is_removed(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.post(
+                "/api/ops/odds-refresh/run",
+                json={"sports": "mlb", "phase": "live", "skip_mirror": True, "dry_run": True},
+                headers={"X-Admin-Token": "secret-token"},
+            )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_run_page_route_is_removed(self) -> None:
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
             response = self.client.post(
                 "/ops/odds-refresh/run",
                 data={"sports": "mlb", "phase": "live", "skip_mirror": "1", "dry_run": "1", "admin_token": "secret-token"},
                 headers={"X-Admin-Token": "secret-token"},
             )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("/ops/odds-refresh", response.headers["Location"])
-        self.assertIn("launched=1", response.headers["Location"])
-        self.assertIn("dry_run=1", response.headers["Location"])
-        mocked.assert_called_once()
+        self.assertEqual(response.status_code, 404)
 
     def test_cancel_endpoint_returns_cancel_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(

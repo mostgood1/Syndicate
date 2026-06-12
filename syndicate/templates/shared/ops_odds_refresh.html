@@ -234,14 +234,13 @@
         <p class="ops-note"><strong>Cancel requested.</strong> The latest refresh manifest has been updated.</p>
       {% endif %}
       <div class="action-row action-row--compact">
-        <span class="ops-badge {% if runtime.get('state') == 'finished' %}ops-badge--ok{% elif runtime.get('state') == 'running' %}ops-badge--running{% else %}ops-badge--error{% endif %}">Run state: {{ runtime.get('state') or 'unknown' }}</span>
+        <span class="ops-badge {% if runtime.get('state') == 'finished' %}ops-badge--ok{% elif runtime.get('state') == 'running' %}ops-badge--running{% else %}ops-badge--error{% endif %}">Refresh state: {{ runtime.get('state') or 'unknown' }}</span>
         {% if runtime.get('pid') %}<span class="ops-note">PID {{ runtime.get('pid') }}</span>{% endif %}
       </div>
       <p class="ops-note">{{ runtime.get('detail') }}</p>
       <div class="action-row action-row--compact">
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/status?admin_token={{ request.args.get('admin_token', '') }}">Status JSON</a>
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/plan?admin_token={{ request.args.get('admin_token', '') }}&sports={{ form_state.sports }}&phase={{ form_state.phase }}&execution_mode={{ form_state.execution_mode }}{% if form_state.date %}&date={{ form_state.date }}{% endif %}{% if form_state.skip_mirror %}&skip_mirror=1{% endif %}{% if form_state.mirror_only %}&mirror_only=1{% endif %}">Plan JSON</a>
-        <a class="cards-nav-pill" href="/api/ops/odds-refresh/run?admin_token={{ request.args.get('admin_token', '') }}">Run API</a>
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/logs?stream=stdout&raw=1&admin_token={{ request.args.get('admin_token', '') }}">Stdout log</a>
         <a class="cards-nav-pill" href="/api/ops/odds-refresh/logs?stream=stderr&raw=1&admin_token={{ request.args.get('admin_token', '') }}">Stderr log</a>
       </div>
@@ -309,26 +308,6 @@
             <a class="cards-nav-pill" href="/ops/odds-refresh{% if request.args.get('admin_token') %}?admin_token={{ request.args.get('admin_token') }}{% endif %}">Reset</a>
           </div>
         </form>
-        <form class="ops-form" method="post" action="/ops/odds-refresh/run">
-          {% if request.args.get('admin_token') %}
-            <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token') }}" />
-          {% endif %}
-          <input type="hidden" name="date" value="{{ form_state.date }}" />
-          <input type="hidden" name="sports" value="{{ form_state.sports }}" />
-          <input type="hidden" name="phase" value="{{ form_state.phase }}" />
-          <input type="hidden" name="execution_mode" value="{{ form_state.execution_mode }}" />
-          <input type="hidden" name="regions" value="{{ form_state.regions }}" />
-          <input type="hidden" name="bookmakers" value="{{ form_state.bookmakers }}" />
-          <input type="hidden" name="markets" value="{{ form_state.markets }}" />
-          <input type="hidden" name="season" value="{{ form_state.season }}" />
-          <input type="hidden" name="week" value="{{ form_state.week }}" />
-          {% if form_state.skip_mirror %}<input type="hidden" name="skip_mirror" value="1" />{% endif %}
-          {% if form_state.mirror_only %}<input type="hidden" name="mirror_only" value="1" />{% endif %}
-          <div class="action-row action-row--compact">
-            <button class="cards-submit-button" type="submit">Launch Refresh</button>
-            <button class="cards-nav-pill" type="submit" name="dry_run" value="1">Launch Dry Run</button>
-          </div>
-        </form>
         <form class="ops-form" method="post" action="/ops/odds-refresh/cancel">
           {% if request.args.get('admin_token') %}
             <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token') }}" />
@@ -350,7 +329,7 @@
           {% set daily_manifest = daily_update.get('manifest') or {} %}
           <div class="ops-meta-grid">
             <div class="ops-meta-item"><span class="ops-meta-label">Refresh date</span><span class="ops-meta-value">{{ refresh_manifest.get('date') or 'Unavailable' }}</span></div>
-            <div class="ops-meta-item"><span class="ops-meta-label">Run state</span><span class="ops-meta-value">{{ runtime.get('state') or 'unknown' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Refresh state</span><span class="ops-meta-value">{{ runtime.get('state') or 'unknown' }}</span></div>
             <div class="ops-meta-item"><span class="ops-meta-label">Refresh odds</span><span class="ops-meta-value">{{ 'on' if refresh_manifest.get('refreshOdds') else 'off' }}</span></div>
             <div class="ops-meta-item"><span class="ops-meta-label">Artifacts dir</span><span class="ops-meta-value">{{ refresh_manifest.get('artifactsDir') or 'Unavailable' }}</span></div>
             <div class="ops-meta-item"><span class="ops-meta-label">Daily update manifest</span><span class="ops-meta-value">{{ daily_manifest.get('date') or 'Unavailable' }}</span></div>

@@ -52,15 +52,6 @@ def main() -> int:
     session = requests.Session()
     results: dict[str, dict] = {}
 
-    results["markets"] = _request(
-        session,
-        "GET",
-        f"{base_url}/api/cron/refresh-oddsapi-markets",
-        token=token,
-        timeout=timeout,
-        params={"republish": "off", "overwrite": "on"},
-    )
-
     results["liveLensTick"] = _request(
         session,
         "GET",
@@ -82,7 +73,7 @@ def main() -> int:
         "ok": True,
         "baseUrl": base_url,
         "marketRefreshIntervalMinutes": market_refresh_interval,
-        "marketsTriggered": True,
+        "marketsTriggered": False,
         "results": results,
     }, separators=(",", ":")))
     return 0

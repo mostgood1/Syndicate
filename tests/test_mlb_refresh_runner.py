@@ -1266,7 +1266,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertTrue((artifact_root / "data" / "daily" / "snapshots" / date_str / f"oddsapi_game_lines_{date_slug}.json").exists())
 
-    def test_render_live_lens_refresh_always_requests_market_refresh(self) -> None:
+    def test_render_live_lens_refresh_requests_live_lens_and_cache_only(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "vendor" / "mlb_bettingv2" / "tools" / "render_live_lens_refresh.py"
         spec = importlib.util.spec_from_file_location("test_render_live_lens_refresh", script_path)
@@ -1301,9 +1301,7 @@ class MlbRefreshRunnerTests(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         self.assertEqual([call["url"] for call in calls], [
-            "http://example.test/api/cron/refresh-oddsapi-markets",
             "http://example.test/api/cron/live-lens-tick",
             "http://example.test/api/cron/warm-cards-cache",
         ])
-        self.assertEqual(calls[0]["params"], {"republish": "off", "overwrite": "on"})
-        self.assertEqual(calls[1]["params"], {"refreshMarkets": "off"})
+        self.assertEqual(calls[0]["params"], {"refreshMarkets": "off"})

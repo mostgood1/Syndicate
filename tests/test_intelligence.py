@@ -3956,7 +3956,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             "data/mlb_source/data/live_lens/live_lens_2026_06_04.jsonl",
         }
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=status_overview):
-            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=tracked_paths):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=tracked_paths), patch(
+                "syndicate.features.intelligence.load_latest_refresh_status",
+                return_value={
+                    "refresh_status": {"runtime": {"state": "finished"}, "manifest": {"date": "2026-06-04"}},
+                    "daily_update": {"manifest": {"date": "2026-06-04", "state": "finished"}},
+                },
+            ):
                 response = self.client.get("/api/intelligence/status?date=2026-06-04")
 
         self.assertEqual(response.status_code, 200)
@@ -3972,6 +3978,10 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertTrue(advanced_inputs)
         self.assertIn("metrics", advanced_inputs[0])
         self.assertIn("readiness_gate", payload)
+        self.assertIn("refresh_status", payload)
+        self.assertEqual((payload.get("refresh_status") or {}).get("refresh_status", {}).get("runtime", {}).get("state"), "finished")
+        self.assertIn("daily_update", payload)
+        self.assertEqual((payload.get("daily_update") or {}).get("manifest", {}).get("state"), "finished")
         self.assertIn("advanced_gate", mlb_row or {})
         self.assertIn("publish_missing_inputs", (mlb_row or {}).get("advanced_gate") or {})
 
@@ -4049,10 +4059,14 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
             with patch(
                 "pipeline.intelligence_state.build_intelligence_status",
-                return_value={"selected_date": "2026-06-07", "sports": [{"slug": "nba", "artifacts": [], "advanced_inputs": []}], "tracked_summary": {}, "advanced_summary": {}, "readiness_gate": {}},
-            ), patch(
-                "pipeline.intelligence_state.load_latest_refresh_status",
-                return_value={"refresh_status": {"manifest": {}, "runtime": {}, "artifacts": {}}},
+                return_value={
+                    "selected_date": "2026-06-07",
+                    "sports": [{"slug": "nba", "artifacts": [], "advanced_inputs": []}],
+                    "tracked_summary": {},
+                    "advanced_summary": {},
+                    "readiness_gate": {},
+                    "refresh_status": {"refresh_status": {"manifest": {}, "runtime": {}, "artifacts": {}}},
+                },
             ), patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
                 first_fingerprint = service._source_state_fingerprint("2026-06-07")
                 manifest_path.write_text('{"sport":"nba","last_updated":"2026-06-07T10:01:00Z","artifact_paths":["a.csv","b.csv"],"status":"complete"}', encoding="utf-8")

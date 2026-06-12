@@ -46,6 +46,7 @@ from syndicate.features.shared.intelligence_evaluation import adjust_confidence
 from syndicate.features.shared.intelligence_evaluation import build_reliability_profile
 from syndicate.features.shared.recommendation_engine import filter_candidates as _shared_filter_candidates
 from syndicate.features.shared.recommendation_engine import rank_recommendations as _shared_rank_recommendations
+from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_key as _runtime_parlay_leg_market_key
 from syndicate.features.intelligence_parlay_correlation import parlay_leg_market_shape as _runtime_parlay_leg_market_shape
 from syndicate.features.intelligence_parlay_correlation import parlay_matches_preferences as _runtime_parlay_matches_preferences
@@ -3123,6 +3124,10 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
         _tracked_repo_files.cache_clear()
     overview = build_intelligence_overview(selected_date=selected_date, force_refresh=force_refresh)
     tracked = _tracked_repo_files()
+    try:
+        refresh_status = load_latest_refresh_status()
+    except Exception:
+        refresh_status = {}
     sports_status: list[dict[str, Any]] = []
     tracked_ok_count = 0
     tracked_total = 0
@@ -3189,6 +3194,8 @@ def build_intelligence_status(*, selected_date: str | None = None, force_refresh
             "tracked_total": advanced_total,
         },
         "readiness_gate": readiness_gate,
+        "refresh_status": refresh_status,
+        "daily_update": refresh_status.get("daily_update") if isinstance(refresh_status, dict) else {},
         "local_only": True,
     }
 

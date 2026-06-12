@@ -16969,7 +16969,7 @@ def _normalize_live_lens_live_prop_row(row: Dict[str, Any], snapshot: Optional[D
 def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool = False) -> Dict[str, Any]:
     started_at = time.perf_counter()
     market_refresh_started_at = time.perf_counter()
-    markets_refreshed = _maybe_refresh_live_oddsapi_markets(d) if refresh_markets else False
+    markets_refreshed = False
     market_refresh_ms = round((time.perf_counter() - market_refresh_started_at) * 1000.0, 1)
     artifacts = _load_cards_artifacts(d)
     archive = _load_cards_archive_context(d) if _should_load_cards_archive_context(d, artifacts) else {}
@@ -17291,7 +17291,7 @@ def _live_lens_reports_payload(d: str, *, include_archive: bool = False) -> Dict
 
 
 def _persist_live_lens_tick(d: str, *, trigger: str = "api", refresh_markets: bool = True) -> Dict[str, Any]:
-    payload = _live_lens_payload(d, persist=True, refresh_markets=refresh_markets)
+    payload = _live_lens_payload(d, persist=True, refresh_markets=False)
     performance = payload.get("performance") if isinstance(payload.get("performance"), dict) else {}
     meta = {
         "recordedAt": _local_timestamp_text(),
@@ -17313,28 +17313,20 @@ def _live_lens_background_loop() -> None:
     report_refresh_interval_seconds = _live_lens_report_refresh_interval_seconds()
     background_report_enabled = _is_live_lens_background_report_enabled()
     status_path = _cron_meta_dir() / "live_lens_loop_status.json"
-    next_oddsapi_refresh_at = 0.0
     next_report_refresh_at = 0.0
     while not _LIVE_LENS_LOOP_STOP.is_set():
         started_at = time.time()
-        refresh_markets = bool(started_at >= next_oddsapi_refresh_at)
         refresh_report = bool(background_report_enabled and started_at >= next_report_refresh_at)
         result: Dict[str, Any] = {}
-        markets_refreshed = False
         try:
             if refresh_report:
                 result = _persist_live_lens_tick(
                     _today_iso(),
                     trigger="background_loop",
-                    refresh_markets=refresh_markets,
+                    refresh_markets=False,
                 )
                 next_report_refresh_at = float(started_at) + float(report_refresh_interval_seconds)
-                markets_refreshed = bool((result.get("report") or {}).get("marketsRefreshed"))
-            elif refresh_markets:
-                markets_refreshed = bool(_maybe_refresh_live_oddsapi_markets(_today_iso()))
             cards_payload = _warm_cards_api_cache(_today_iso())
-            if refresh_markets:
-                next_oddsapi_refresh_at = float(started_at) + float(oddsapi_refresh_interval_seconds)
             latest_tick = _load_json_file(_cron_meta_dir() / "latest_live_lens_tick.json") or {}
             _write_json_file(
                 status_path,
@@ -17346,8 +17338,8 @@ def _live_lens_background_loop() -> None:
                     "backgroundReportEnabled": bool(background_report_enabled),
                     "reportRefreshIntervalSeconds": int(report_refresh_interval_seconds),
                     "reportRefreshTriggered": bool(refresh_report),
-                    "marketsRefreshTriggered": bool(refresh_markets),
-                    "marketsRefreshed": bool(markets_refreshed),
+                    "marketsRefreshTriggered": False,
+                    "marketsRefreshed": False,
                     "date": result.get("date") or latest_tick.get("date"),
                     "counts": result.get("counts") or latest_tick.get("counts"),
                     "cardsCacheDate": str(cards_payload.get("date") or ""),
@@ -17355,8 +17347,6 @@ def _live_lens_background_loop() -> None:
                 },
             )
         except Exception as exc:
-            if refresh_markets:
-                next_oddsapi_refresh_at = float(started_at) + float(oddsapi_refresh_interval_seconds)
             if refresh_report:
                 next_report_refresh_at = float(started_at) + float(report_refresh_interval_seconds)
             _write_json_file(
@@ -17369,7 +17359,7 @@ def _live_lens_background_loop() -> None:
                     "backgroundReportEnabled": bool(background_report_enabled),
                     "reportRefreshIntervalSeconds": int(report_refresh_interval_seconds),
                     "reportRefreshTriggered": bool(refresh_report),
-                    "marketsRefreshTriggered": bool(refresh_markets),
+                    "marketsRefreshTriggered": False,
                     "error": f"{type(exc).__name__}: {exc}",
                 },
             )
@@ -17974,9 +17964,8 @@ def api_cron_live_lens_tick() -> Response:
     if auth_error is not None:
         return auth_error
     d = str(request.args.get("date") or "").strip() or _today_iso()
-    refresh_markets = str(request.args.get("refreshMarkets") or "on").strip().lower() != "off"
     try:
-        return jsonify(_persist_live_lens_tick(d, trigger="api", refresh_markets=refresh_markets))
+        return jsonify(_persist_live_lens_tick(d, trigger="api", refresh_markets=False))
     except Exception as exc:
         return jsonify({"ok": False, "date": d, "error": f"{type(exc).__name__}: {exc}"}), 500
 
