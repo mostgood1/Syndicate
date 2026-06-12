@@ -2659,44 +2659,46 @@ function Get-ForcedPublishArtifactPaths {
     }
 
     if (-not $SkipMLB) {
-        foreach ($relativePath in @(
-            "data/mlb_source/data/daily/daily_summary_${dateSlug}.json",
-            "data/mlb_source/data/daily/daily_summary_${dateSlug}_profile_bundle.json",
-            "data/mlb_source/data/daily/daily_summary_${dateSlug}_locked_policy.json",
-            "data/mlb_source/data/daily/daily_summary_${dateSlug}_hr_targets.json",
-            "data/mlb_source/data/daily/daily_summary_${dateSlug}_rfi_targets.json",
-            "data/mlb_source/data/daily/ladders/daily_ladders_${dateSlug}.json",
-            "data/mlb_source/data/daily/top_props/daily_top_props_${dateSlug}.json",
-            "data/mlb_source/data/daily/ops/daily_ops_${dateSlug}.json",
-            "data/mlb_source/data/daily/snapshots/${DateValue}/lineups.json",
-            "data/mlb_source/data/daily/snapshots/${DateValue}/probables.json",
-            "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_game_lines_${dateSlug}.json",
-            "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_pitcher_props_${dateSlug}.json",
-            "data/mlb_source/data/daily/snapshots/${DateValue}/oddsapi_hitter_props_${dateSlug}.json",
-            "data/mlb_source/data/live_lens/live_lens_${dateSlug}.jsonl",
-            "data/mlb_source/data/live_lens/live_lens_report_${dateSlug}.json",
-            "data/mlb_source/data/live_lens/recaps/live_lens_daily_recap_${dateSlug}.json",
-            "data/mlb_source/data/live_lens/render_sync/live_lens_reports_${dateSlug}.json",
-            "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${dateSlug}.json",
-            "data/mlb_source/data/live_lens/prop_registry/live_prop_registry_${dateSlug}.jsonl",
-            "data/mlb_source/data/live_lens/prop_registry/live_prop_observations_${dateSlug}.jsonl",
-            "data/mlb_source/data/tuning/live_prop_ranking/default.json",
-            "data/mlb_source/sim_engine/live_prop_ranking.py"
-        )) {
-            Add-PathIfPresent -RelativePath $relativePath
-        }
+        foreach ($rootRelative in @('data/mlb_source/data', 'data/mlb_source/source_artifacts/data')) {
+            foreach ($relativePath in @(
+                "$rootRelative/daily/daily_summary_${dateSlug}.json",
+                "$rootRelative/daily/daily_summary_${dateSlug}_profile_bundle.json",
+                "$rootRelative/daily/daily_summary_${dateSlug}_locked_policy.json",
+                "$rootRelative/daily/daily_summary_${dateSlug}_hr_targets.json",
+                "$rootRelative/daily/daily_summary_${dateSlug}_rfi_targets.json",
+                "$rootRelative/daily/ladders/daily_ladders_${dateSlug}.json",
+                "$rootRelative/daily/top_props/daily_top_props_${dateSlug}.json",
+                "$rootRelative/daily/ops/daily_ops_${dateSlug}.json",
+                "$rootRelative/daily/snapshots/${DateValue}/lineups.json",
+                "$rootRelative/daily/snapshots/${DateValue}/probables.json",
+                "$rootRelative/daily/snapshots/${DateValue}/oddsapi_game_lines_${dateSlug}.json",
+                "$rootRelative/daily/snapshots/${DateValue}/oddsapi_pitcher_props_${dateSlug}.json",
+                "$rootRelative/daily/snapshots/${DateValue}/oddsapi_hitter_props_${dateSlug}.json",
+                "$rootRelative/live_lens/live_lens_${dateSlug}.jsonl",
+                "$rootRelative/live_lens/live_lens_report_${dateSlug}.json",
+                "$rootRelative/live_lens/recaps/live_lens_daily_recap_${dateSlug}.json",
+                "$rootRelative/live_lens/render_sync/live_lens_reports_${dateSlug}.json",
+                "$rootRelative/live_lens/prop_registry/live_prop_registry_${dateSlug}.json",
+                "$rootRelative/live_lens/prop_registry/live_prop_registry_${dateSlug}.jsonl",
+                "$rootRelative/live_lens/prop_registry/live_prop_observations_${dateSlug}.jsonl",
+                "$rootRelative/tuning/live_prop_ranking/default.json",
+                "$rootRelative/../sim_engine/live_prop_ranking.py"
+            )) {
+                Add-PathIfPresent -RelativePath $relativePath
+            }
 
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/sims/${DateValue}/sim_*.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_manifest_*_${dateSlug}.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_day_*_${dateSlug}_*.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_betting_day_*_${dateSlug}_*.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/daily/season_frontend/season_official_betting_day_*_${dateSlug}_*.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/season_eval_manifest.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/season_betting_cards_retuned_manifest.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/season_betting_cards_retuned_hrr_manifest.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/betting_day_payloads*/season_betting_day_*_${dateSlug}*.json"
-        Add-PathsByPattern -RelativePattern "data/mlb_source/data/eval/seasons/*/betting_day_recaps*/season_betting_day_*_${dateSlug}*.json"
-        Add-PathsUnderRoot -RelativeRoot 'data/mlb_source/tracking'
+            Add-PathsByPattern -RelativePattern "$rootRelative/daily/sims/${DateValue}/sim_*.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/daily/season_frontend/season_manifest_*_${dateSlug}.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/daily/season_frontend/season_day_*_${dateSlug}_*.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/daily/season_frontend/season_betting_day_*_${dateSlug}_*.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/daily/season_frontend/season_official_betting_day_*_${dateSlug}_*.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/eval/seasons/*/season_eval_manifest.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/eval/seasons/*/season_betting_cards_retuned_manifest.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/eval/seasons/*/season_betting_cards_retuned_hrr_manifest.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/eval/seasons/*/betting_day_payloads*/season_betting_day_*_${dateSlug}*.json"
+            Add-PathsByPattern -RelativePattern "$rootRelative/eval/seasons/*/betting_day_recaps*/season_betting_day_*_${dateSlug}*.json"
+            Add-PathsUnderRoot -RelativeRoot "$rootRelative/../tracking"
+        }
     }
 
     if (-not $SkipNBA) {

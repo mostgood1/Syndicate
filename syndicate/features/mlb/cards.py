@@ -54,7 +54,8 @@ def _path_cache_signature(path: Path | None) -> int:
     try:
         if not path.exists() or not path.is_file():
             return 0
-        return int(path.stat().st_mtime_ns)
+        stat = path.stat()
+        return int((stat.st_mtime_ns << 16) ^ int(stat.st_size))
     except OSError:
         return 0
 

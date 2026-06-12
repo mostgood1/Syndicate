@@ -6,31 +6,26 @@ import json
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
 
 
 def _source_roots() -> list[Path]:
-    roots = preferred_source_roots(
+    return preferred_artifact_roots(
         __file__,
         env_var="SYNDICATE_WNBA_SOURCE_ROOT",
         local_dir_name="wnba_source",
     )
-    expanded: list[Path] = []
-    seen: set[Path] = set()
-    candidate_roots = [*roots, *(root / "source_artifacts" for root in roots)]
-    for candidate in candidate_roots:
-            resolved = candidate.resolve()
-            if resolved in seen:
-                continue
-            seen.add(resolved)
-            expanded.append(resolved)
-    return expanded
 
 
 def default_wnba_source_root() -> Path:
-    return _source_roots()[0]
+    return preferred_source_roots(
+        __file__,
+        env_var="SYNDICATE_WNBA_SOURCE_ROOT",
+        local_dir_name="wnba_source",
+    )[0]
 
 
 def _best_existing_path(candidates: list[Path]) -> Path | None:

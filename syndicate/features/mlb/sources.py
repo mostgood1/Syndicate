@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from syndicate.features.shared.source_roots import preferred_artifact_roots
+
 
 _DATE_TOKEN_RE = re.compile(r"(\d{4})_(\d{2})_(\d{2})")
 
@@ -42,6 +44,22 @@ def _source_roots() -> list[Path]:
     return deduped
 
 
+def _artifact_roots() -> list[Path]:
+    roots = preferred_artifact_roots(
+        __file__,
+        env_var="SYNDICATE_MLB_SOURCE_ROOT",
+        local_dir_name="mlb_source",
+    )
+    deduped: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        if root in seen:
+            continue
+        seen.add(root)
+        deduped.append(root)
+    return deduped
+
+
 def _resolve_data_path(*parts: str) -> Path:
     return _resolve_data_path_with_reconcile(*parts)
 
@@ -51,7 +69,7 @@ def _reconcile_from_repo_enabled() -> bool:
 
 
 def _resolve_data_path_with_reconcile(*parts: str) -> Path:
-    roots = _source_roots()
+    roots = [*_artifact_roots(), *_source_roots()]
     primary = roots[0]
     target = primary.joinpath("data", *parts)
     if not _reconcile_from_repo_enabled() or len(roots) <= 1:
@@ -104,7 +122,7 @@ def daily_artifact_path(selected_date: str, suffix: str = "") -> Path:
 def available_daily_summary_dates() -> list[str]:
     dates: set[str] = set()
     pattern = "daily_summary_*.json"
-    for root in _source_roots():
+    for root in [*_artifact_roots(), *_source_roots()]:
         daily_dir = root / "data" / "daily"
         if not daily_dir.exists() or not daily_dir.is_dir():
             continue
@@ -209,7 +227,7 @@ def raw_feed_live_path(selected_date: str, game_pk: int) -> Path | None:
     season = str(selected_date or "").split("-", 1)[0].strip()
     if not season:
         return None
-    day_dir = default_mlb_source_root() / "data" / "raw" / "statsapi" / "feed_live" / season / selected_date
+    day_dir = _artifact_roots()[0] / "data" / "raw" / "statsapi" / "feed_live" / season / selected_date
     for suffix in (".json.gz", ".json"):
         candidate = day_dir / f"{int(game_pk)}{suffix}"
         if candidate.exists() and candidate.is_file():

@@ -8,6 +8,7 @@ from typing import Any
 from syndicate.features.shared.formatters import format_num
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.formatters import format_signed_price
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 
 
@@ -26,8 +27,16 @@ def default_ncaaf_source_root() -> Path:
     return _source_roots()[0]
 
 
+def _artifact_roots() -> list[Path]:
+    return preferred_artifact_roots(
+        __file__,
+        env_var="SYNDICATE_NCAAF_SOURCE_ROOT",
+        local_dir_name="ncaaf_source",
+    )
+
+
 def data_path(*parts: str) -> Path:
-    return default_ncaaf_source_root() / "data" / Path(*parts)
+    return _artifact_roots()[0] / "data" / Path(*parts)
 
 
 def load_json(path: Path) -> dict[str, Any] | None:

@@ -18,6 +18,7 @@ from scripts.migration_gate import normalize_runtime_dependency_findings
 from scripts.migration_gate import render_text_report
 from scripts.migration_gate import run_command
 from scripts.module_tracker_snapshot import module_snapshot
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 
 
@@ -45,6 +46,27 @@ class MigrationGateRuntimeDependencyTests(unittest.TestCase):
                 )
 
         self.assertEqual(roots, [(repo_root / "data" / "nba_source").resolve()])
+
+    def test_preferred_artifact_roots_prefers_source_artifacts_before_local_mirror(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir) / "repo"
+            file_path = repo_root / "syndicate" / "features" / "nba" / "sources.py"
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with patch.dict(os.environ, {}, clear=False):
+                roots = preferred_artifact_roots(
+                    file_path,
+                    env_var="TEST_SOURCE_ROOT",
+                    local_dir_name="nba_source",
+                )
+
+        self.assertEqual(
+            roots,
+            [
+                (repo_root / "data" / "nba_source" / "source_artifacts").resolve(),
+                (repo_root / "data" / "nba_source").resolve(),
+            ],
+        )
 
     def test_normalize_runtime_dependency_findings_reads_tracker_summary(self) -> None:
         payload = {

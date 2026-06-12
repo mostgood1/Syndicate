@@ -485,15 +485,18 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "mlb_source"
-            external_root = root / "mlb_source_bundle"
-            sibling_file = external_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            artifact_root = local_root / "source_artifacts"
+            sibling_file = artifact_root / "data" / "daily" / "daily_summary_2026_05_17.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
 
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
+            with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[artifact_root]), patch(
+                "syndicate.features.mlb.sources._source_roots",
+                return_value=[local_root],
+            ):
                 self.assertEqual(
                     daily_artifact_path("2026-05-17"),
-                    local_root / "data" / "daily" / "daily_summary_2026_05_17.json",
+                    artifact_root / "data" / "daily" / "daily_summary_2026_05_17.json",
                 )
 
     def test_mlb_today_cache_signature_tracks_file_changes(self) -> None:
@@ -514,12 +517,16 @@ class DateArchiveHelperTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "mlb_source"
-            external_root = root / "mlb_source_bundle"
-            sibling_file = external_root / "data" / "daily" / "daily_summary_2026_05_17.json"
+            artifact_root = local_root / "source_artifacts"
+            sibling_root = root / "mlb_source_bundle"
+            sibling_file = sibling_root / "data" / "daily" / "daily_summary_2026_05_17.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
 
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, external_root]):
+            with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[artifact_root]), patch(
+                "syndicate.features.mlb.sources._source_roots",
+                return_value=[local_root, sibling_root],
+            ):
                 self.assertEqual(available_daily_summary_dates(), [])
 
     def test_mlb_available_daily_summary_dates_include_source_artifacts_mirror(self) -> None:
@@ -531,7 +538,10 @@ class DateArchiveHelperTests(unittest.TestCase):
             mirror_file.parent.mkdir(parents=True, exist_ok=True)
             mirror_file.write_text("{}", encoding="utf-8")
 
-            with patch("syndicate.features.mlb.sources._source_roots", return_value=[local_root, mirror_root]):
+            with patch("syndicate.features.mlb.sources._artifact_roots", return_value=[mirror_root]), patch(
+                "syndicate.features.mlb.sources._source_roots",
+                return_value=[local_root],
+            ):
                 self.assertEqual(available_daily_summary_dates(), ["2026-05-17"])
 
     def test_mlb_daily_sim_artifact_path_reconciles_from_repo_bundle_when_data_root_is_missing(self) -> None:

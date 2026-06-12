@@ -43,12 +43,42 @@ Shared standardization gaps across all sports:
 - weekly sports need to fit the same decision engine as daily sports without hiding cadence differences
 - sport-specific variation should remain visible in the data model, not leaked as ad hoc pipeline behavior
 
+## Phase mapping
+
+This backlog tracks the official implementation plan in execution order.
+
+| Plan phase | Backlog meaning | Current status | Primary validation |
+| --- | --- | --- | --- |
+| Phase 0: Freeze the current contract surface | Lock the current sports inventory, shared contract shapes, and compatibility shims before deeper changes. | Completed | Focused contract and regression coverage on current surfaces. |
+| Phase 1: Make the artifact layer universally reliable | Normalize source_artifacts and mirror roots so every sport resolves the same published data contract. | Next | Root-resolution and refresh-wrapper regression coverage. |
+| Phase 2: Make simulation the compute core | Introduce run planning, run-state, checkpoints, and reproducible sim provenance. | Planned | First-run, incremental-run, no-op-run, and partial-failure tests. |
+| Phase 3: Build the intelligence engine into a real decision layer | Expand query routing, evidence-backed recommendations, and cross-sport reasoning. | Planned | Response-shape and evidence-contract coverage. |
+| Phase 4: Close the evaluation loop | Track accuracy, calibration, CLV, ROI, and drift. | Planned | Outcome persistence and scoring regression coverage. |
+| Phase 5: Harden ops and runtime boundaries | Keep long-running work out of the web request path and make refresh state durable. | Planned | Worker/web separation and restart-safe state coverage. |
+| Phase 6: Expand toward a true world-class product | Add deeper sport-native experiences without fragmenting the shared platform. | Planned | Contract-preserving add-on coverage. |
+
+## Current next slice
+
+The next executable slice is Phase 1 artifact-root normalization with the existing requested-date contract preserved.
+
+Concrete target:
+
+- keep MLB, NBA, WNBA, NHL, NFL, NCAAF, and NCAAB aligned on `source_artifacts` roots wherever hosted artifacts are expected
+- validate the refresh wrapper and daily update paths against the published contract, not against stale repo-local assumptions
+- preserve no-silent-fallback behavior for requested dates while making the artifact layer more reliable
+
+Planned validation for this slice:
+
+- refresh-wrapper path assertions for every supported sport
+- focused MLB archive/cards regression coverage for requested-date semantics
+- a narrow check that the published artifact root remains the source of truth in hosted mode
+
 ## Phase 0 kickoff
 
-- [ ] Inventory the current contract surfaces for MLB, NBA, WNBA, NHL, NFL, NCAAF, and NCAAB.
-- [ ] Confirm the unified standardization rule is explicit in the plan and used as the default decision rule.
-- [ ] Keep the current regression guardrails green before any phase-1 artifact changes.
-- [ ] Preserve every compatibility shim until the replacement path is proven in tests.
+- [x] Inventory the current contract surfaces for MLB, NBA, WNBA, NHL, NFL, NCAAF, and NCAAB.
+- [x] Confirm the unified standardization rule is explicit in the plan and used as the default decision rule.
+- [x] Keep the current regression guardrails green before any phase-1 artifact changes.
+- [x] Preserve every compatibility shim until the replacement path is proven in tests.
 
 ## Phase 1 next slice
 

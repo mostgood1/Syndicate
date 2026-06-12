@@ -10,6 +10,7 @@ import unicodedata
 from syndicate.features.shared.formatters import format_num
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.formatters import format_signed_price
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
@@ -23,6 +24,14 @@ def _source_roots() -> list[Path]:
     )
 
 
+def _artifact_roots() -> list[Path]:
+    return preferred_artifact_roots(
+        __file__,
+        env_var="SYNDICATE_NHL_SOURCE_ROOT",
+        local_dir_name="nhl_source",
+    )
+
+
 def default_nhl_source_root() -> Path:
     return _source_roots()[0]
 
@@ -30,15 +39,12 @@ def default_nhl_source_root() -> Path:
 def _data_roots() -> list[Path]:
     roots: list[Path] = []
     seen: set[Path] = set()
-    for source_root in _source_roots():
-        for candidate in (
-            source_root / "data",
-            source_root / "source_artifacts" / "data",
-        ):
-            if candidate in seen:
-                continue
-            seen.add(candidate)
-            roots.append(candidate)
+    for source_root in _artifact_roots():
+        candidate = source_root / "data"
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        roots.append(candidate)
     return roots
 
 

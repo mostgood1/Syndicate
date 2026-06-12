@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 from typing import Any
 
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import preferred_source_roots
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.shared.timezone import central_today_iso
@@ -17,20 +18,11 @@ def _repo_root() -> Path:
 
 
 def _artifact_roots() -> list[Path]:
-    roots = preferred_source_roots(
+    return preferred_artifact_roots(
         __file__,
         env_var="SYNDICATE_NBA_ARTIFACT_ROOT",
         local_dir_name="nba_source",
     )
-    expanded: list[Path] = []
-    seen: set[Path] = set()
-    candidate_roots = [*roots, *(root / "source_artifacts" for root in roots)]
-    for candidate in candidate_roots:
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        expanded.append(candidate)
-    return expanded
 
 
 def _first_existing_path(candidates: list[Path]) -> Path | None:

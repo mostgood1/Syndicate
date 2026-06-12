@@ -227,19 +227,15 @@ class OpsRefreshApiTests(unittest.TestCase):
             reports_root = root / "persistent" / "reports"
             data_root = root / "persistent" / "data"
             refresh_latest = reports_root / "refresh_status" / "latest"
-                def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
-                    launch_entered.set()
-                    launch_release.wait(timeout=2)
-                    return {
-                        "ok": True,
-                        "pid": 4242,
-                        "date": "2026-06-10",
-                        "run_stamp": "20260610_120000",
-                        "state": "running",
-                    }
-                with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
-                encoding="utf-8",
-            )
+            daily_latest = reports_root / "daily_update" / "latest"
+            mirror_manifest_dir = data_root / "mlb_source" / "manifests"
+            artifacts_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
+
+            refresh_latest.mkdir(parents=True, exist_ok=True)
+            daily_latest.mkdir(parents=True, exist_ok=True)
+            mirror_manifest_dir.mkdir(parents=True, exist_ok=True)
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+
             (artifacts_dir / "odds_refresh.stderr.txt").write_text("", encoding="utf-8")
             (refresh_latest / "refresh_status_latest.json").write_text(
                 json.dumps({"date": "2026-05-22", "artifactsDir": str(artifacts_dir)}),

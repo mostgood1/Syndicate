@@ -47,6 +47,16 @@ class DailyUpdateOddsPassthroughTests(unittest.TestCase):
         self.assertIn("$localNflArtifactRoot = Join-Path $repoRoot 'data\\nfl_source\\source_artifacts'", content)
         self.assertIn("$localNcaafArtifactRoot = Join-Path $repoRoot 'data\\ncaaf_source\\source_artifacts'", content)
 
+    def test_unified_daily_update_force_publishes_mlb_source_artifacts(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "unified_daily_update.ps1"
+        content = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("foreach ($rootRelative in @('data/mlb_source/data', 'data/mlb_source/source_artifacts/data'))", content)
+        self.assertIn('"$rootRelative/daily/daily_summary_${dateSlug}.json"', content)
+        self.assertIn('"$rootRelative/live_lens/live_lens_report_${dateSlug}.json"', content)
+        self.assertIn('"$rootRelative/daily/snapshots/${DateValue}/oddsapi_game_lines_${dateSlug}.json"', content)
+
     def test_world_class_plan_explicitly_requires_unified_standardization(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         script_path = repo_root / "docs" / "syndicate_world_class_implementation_plan.md"
