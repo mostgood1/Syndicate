@@ -209,7 +209,7 @@ function Resolve-OddsApiSourcePath {
     if (-not [string]::IsNullOrWhiteSpace($ArtifactRoot)) {
         $roots += $ArtifactRoot
     }
-    elseif (-not [string]::IsNullOrWhiteSpace($SourceRoot)) {
+    if (-not [string]::IsNullOrWhiteSpace($SourceRoot) -and $SourceRoot -ne $ArtifactRoot) {
         $roots += $SourceRoot
     }
 
