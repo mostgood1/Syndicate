@@ -4,7 +4,7 @@
     "runMode":  "standard",
     "overallStatus":  "started",
     "generatedAt":  "2026-06-13T13:31:25.5946176+00:00",
-    "updatedAt":  "2026-06-13T14:07:30.5998283+00:00",
+    "updatedAt":  "2026-06-13T14:08:10.2127797+00:00",
     "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_133125\\unified_daily_update_run.json",
     "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
     "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_133125\\unified_daily_update_checkpoint.json",
@@ -12,10 +12,10 @@
     "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_133125\\unified_daily_update_run_state.json",
     "latestRunStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
     "trace":  {
-                  "eventSimExecutionCount":  20,
-                  "artifactUpdateCount":  20,
+                  "eventSimExecutionCount":  21,
+                  "artifactUpdateCount":  21,
                   "inputFingerprintCount":  2,
-                  "artifactPathCount":  20,
+                  "artifactPathCount":  21,
                   "inputFingerprints":  [
                                             "48f4877b5d801ec168b2d7056e31583cc0e40542813e1c80b6cdf1918162c077",
                                             "fa91947a4701fad12656e439d0170d67f91131e79df77e377f287d936d8d405d"
@@ -40,7 +40,8 @@
                                         "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_CON_IND.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_LVA_MIN.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_PHX_LAS.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_POR_DAL.json"
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_POR_DAL.json",
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_bundle.json"
                                     ],
                   "simExecutionDecision":  null
               }

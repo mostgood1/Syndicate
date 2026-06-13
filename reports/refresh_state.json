@@ -99,11 +99,11 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "9b633ab7f57f016dc64c8ebc73fa8ea8a6ebef155c166f3077f922b4b841e6c7",
-      "updatedAt": "2026-06-12T20:54:56.386723",
+      "inputHash": "3676d9d17c5ceea243497236d66c45c948e450e0e28b7cf365b9af8fcf2d0aeb",
+      "updatedAt": "2026-06-13T14:08:10.149852",
       "outputs": [
         "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json",
-        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_12.json",
+        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_13.json",
         "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
       ],
       "metadata": {

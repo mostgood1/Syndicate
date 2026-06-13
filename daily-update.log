@@ -887,3 +887,117 @@ To https://github.com/mostgood1/Syndicate
                             "raw\\odds_wnba_player_props_2026-06-13.csv"
                         ]
 }
+warning: in the working copy of 'data/wnba_source/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/data/processed/live_lens_projections_2026-06-13.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/data/live_lens/live_lens_projections_2026-06-13.jsonl', LF will be replaced by CRLF the next time Git touches it
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   5e17b5e..4c8160c  main -> main
+==> NHL vendored daily update
+    cwd: D:\a\Syndicate\Syndicate
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_nhl_oddsapi.py --date 2026-06-13 --source-root vendor\nhl_betting_repo --artifact-root data\nhl_source\source_artifacts --days-ahead 1 --props-boxscore-n-sims 1000
+    env: ODDS_API_KEY=<redacted>
+    pid: 6860
+    ... still running (30s)
+D:\a\Syndicate\Syndicate\syndicate\local_nhl_odds.py:803: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  merged = pd.concat([existing, working], ignore_index=True)
+    ... still running (60s)
+    ... still running (90s)
+    ... still running (120s)
+    ... still running (150s)
+    ... still running (180s)
+    ... still running (210s)
+    ... still running (240s)
+{"phase": "source_cli", "command": ["roster-update", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["lineup-update", "--date", "2026-06-13", "--prefer-source", "none"]}
+{"phase": "source_cli", "command": ["shifts-update", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["injury-update", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["team-odds-collect", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["props-collect", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["props-project-all", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["props-simulate-boxscores", "--date", "2026-06-13", "--n-sims", "1000"]}
+{"phase": "source_cli", "command": ["props-recommendations-boxscores", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["props-recommendations", "--date", "2026-06-13", "--min-ev", "0.0", "--top", "200"]}
+{"phase": "source_cli", "command": ["game-recommendations-sim", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["roster-update", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["lineup-update", "--date", "2026-06-14", "--prefer-source", "none"]}
+{"phase": "source_cli", "command": ["team-odds-collect", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["props-collect", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["props-project-all", "--date", "2026-06-14"]}
+{
+  "ok": true,
+  "date": "2026-06-13",
+  "artifact_bundle_root": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
+  "artifact_bundle_files": {
+    "scoreboard_path": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\games\\date=2026-06-13\\scoreboard.csv",
+    "team_odds_paths": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-13\\oddsapi.csv"
+    ],
+    "props_line_paths": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-13\\oddsapi.csv"
+    ],
+    "processed_files": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_sim_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\recommendations_sim_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_hist_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_samples_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\injuries_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\shifts_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\co_toi_shifts_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-13.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-13.csv"
+    ],
+    "smart_sim_files": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_bundle.json"
+    ]
+  },
+  "lookahead_runs": [
+    {
+      "date": "2026-06-14",
+      "artifact_bundle_files": {
+        "scoreboard_path": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\games\\date=2026-06-14\\scoreboard.csv",
+        "team_odds_paths": [
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-14\\oddsapi.csv"
+        ],
+        "props_line_paths": [
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-14\\oddsapi.csv"
+        ],
+        "processed_files": [
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-14.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-14.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-14.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-14.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-14.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-14.csv"
+        ]
+      }
+    }
+  ],
+  "required_artifacts": [
+    "data/processed/predictions_2026-06-13.csv",
+    "data/processed/predictions_sim_2026-06-13.csv",
+    "data/processed/recommendations_sim_2026-06-13.csv",
+    "data/processed/props_projections_all_2026-06-13.csv",
+    "data/processed/props_boxscores_sim_2026-06-13.csv",
+    "data/processed/props_boxscores_sim_hist_2026-06-13.csv",
+    "data/processed/props_recommendations_2026-06-13.csv",
+    "data/processed/props_predictions_2026-06-13.csv",
+    "data/processed/roster_snapshot_2026-06-13.csv",
+    "data/processed/lineups_2026-06-13.csv",
+    "data/odds/games/date=2026-06-13/scoreboard.csv",
+    "data/odds/team/date=2026-06-13/oddsapi.csv",
+    "data/props/player_props_lines/date=2026-06-13/oddsapi.csv"
+  ],
+  "warnings": [
+    "backfilled compatibility artifacts: predictions, predictions_sim, recommendations_sim, props_boxscores_sim, props_boxscores_sim_hist, props_boxscores_sim_samples"
+  ]
+}
+NHL advanced-data gate: no scheduled games for 2026-06-13 (nhle_schedule); skipping artifact assertions
