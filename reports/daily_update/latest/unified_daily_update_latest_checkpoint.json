@@ -4,10 +4,10 @@
     "runMode":  "standard",
     "overallStatus":  "started",
     "generatedAt":  "2026-06-13T13:31:25.5946176+00:00",
-    "updatedAt":  "2026-06-13T14:02:11.3303120+00:00",
+    "updatedAt":  "2026-06-13T14:02:31.7880368+00:00",
     "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_133125",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-13T14:02:11.3242589+00:00",
+    "lastUpdatedAt":  "2026-06-13T14:02:31.7837586+00:00",
     "currentStage":  "source_update",
     "completedStages":  [
 
@@ -173,12 +173,13 @@
                        "simExecutionDecision":  null
                    },
     "trace":  {
-                  "eventSimExecutionCount":  16,
-                  "artifactUpdateCount":  16,
-                  "inputFingerprintCount":  1,
-                  "artifactPathCount":  16,
+                  "eventSimExecutionCount":  20,
+                  "artifactUpdateCount":  20,
+                  "inputFingerprintCount":  2,
+                  "artifactPathCount":  20,
                   "inputFingerprints":  [
-                                            "48f4877b5d801ec168b2d7056e31583cc0e40542813e1c80b6cdf1918162c077"
+                                            "48f4877b5d801ec168b2d7056e31583cc0e40542813e1c80b6cdf1918162c077",
+                                            "fa91947a4701fad12656e439d0170d67f91131e79df77e377f287d936d8d405d"
                                         ],
                   "artifactPaths":  [
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_0_STL_at_MIN_pk823694_g1.json",
@@ -196,7 +197,11 @@
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_7_TEX_at_BOS_pk824749_g1.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_8_ATL_at_NYM_pk823616_g1.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_9_LAD_at_CWS_pk824587_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_SAS_NYK.json"
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_SAS_NYK.json",
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_CON_IND.json",
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_LVA_MIN.json",
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_PHX_LAS.json",
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_POR_DAL.json"
                                     ],
                   "simExecutionDecision":  null
               },
