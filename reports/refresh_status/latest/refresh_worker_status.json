@@ -1,0 +1,9 @@
+{
+  "state": "finished",
+  "detail": "Queued refresh contract finished successfully.",
+  "latestManifestPath": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpcx0s9q59\\refresh_status_latest.json",
+  "ranJob": true,
+  "runExitCode": 0,
+  "latestManifestState": "pending_external",
+  "updatedAt": "2026-06-13T02:51:54Z"
+}

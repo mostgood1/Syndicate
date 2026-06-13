@@ -1,0 +1,27 @@
+﻿{
+    "scope":  "daily_update",
+    "date":  "2026-06-13",
+    "runMode":  "standard",
+    "overallStatus":  "started",
+    "generatedAt":  "2026-06-13T08:13:49.1939721-05:00",
+    "updatedAt":  "2026-06-13T08:13:49.3741582-05:00",
+    "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_081348\\unified_daily_update_run.json",
+    "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
+    "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_081348\\unified_daily_update_checkpoint.json",
+    "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+    "runStatePath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_081348\\unified_daily_update_run_state.json",
+    "latestRunStatePath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
+    "trace":  {
+                  "eventSimExecutionCount":  1,
+                  "artifactUpdateCount":  1,
+                  "inputFingerprintCount":  0,
+                  "artifactPathCount":  0,
+                  "inputFingerprints":  [
+
+                                        ],
+                  "artifactPaths":  [
+
+                                    ],
+                  "simExecutionDecision":  true
+              }
+}

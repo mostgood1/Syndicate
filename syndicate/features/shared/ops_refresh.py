@@ -129,15 +129,15 @@ def _elapsed_seconds(*, started_at: Any, finished_at: Any = None) -> int | None:
     return elapsed if elapsed >= 0 else 0
 
 
-def _runtime_budget_seconds(env_name: str) -> int | None:
+def _runtime_budget_seconds(env_name: str, default_seconds: int | None = 14400) -> int | None:
     raw = str(os.environ.get(env_name) or "").strip()
     if not raw:
-        return None
+        return default_seconds
     try:
         value = int(raw)
     except ValueError:
-        return None
-    return value if value > 0 else None
+        return default_seconds
+    return value if value > 0 else default_seconds
 
 
 def _remaining_budget_seconds(*, elapsed_seconds: int | None, budget_seconds: int | None) -> int | None:

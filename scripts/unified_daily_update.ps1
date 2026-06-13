@@ -1307,11 +1307,6 @@ function Get-Policy {
         $selectedPolicy = $PolicyConfig.sport[$sport.ToLowerInvariant()]
         $policySource = 'sport'
     }
-            stageDecisions = @($Manifest.stageDecisions)
-            provenance = $Manifest.runProvenance
-            trace = $Manifest.runTrace
-        $policySource = 'market'
-    }
 
     if ($null -eq $selectedPolicy) {
         return $null
