@@ -1001,3 +1001,38 @@ D:\a\Syndicate\Syndicate\syndicate\local_nhl_odds.py:803: FutureWarning: The beh
   ]
 }
 NHL advanced-data gate: no scheduled games for 2026-06-13 (nhle_schedule); skipping artifact assertions
+Pushing to origin main
+To https://github.com/mostgood1/Syndicate
+   4c8160c..630a689  main -> main
+==> NFL local odds refresh
+    cwd: D:\a\Syndicate\Syndicate
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_nfl_oddsapi.py --artifact-root data\nfl_source\source_artifacts
+    env: ODDS_API_KEY=<redacted>
+    pid: 9156
+Using OddsAPI key: ***e36a44
+WARNING: OddsAPI returned 422 for market 'player_rec_yds'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_receptions'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_rush_yds'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_rush_attempts'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_pass_yds'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_pass_tds'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_pass_attempts'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_interceptions'. Skipping this market.
+WARNING: OddsAPI returned 422 for market 'player_anytime_td'. Skipping this market.
+WARNING: No player prop rows parsed from OddsAPI payload.
+Wrote D:\a\Syndicate\Syndicate\data\nfl_source\source_artifacts\oddsapi_player_props_2026_wk1.csv with 0 rows.
+{
+  "ok": true,
+  "season": 2026,
+  "week": 1,
+  "artifact_bundle_root": "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts",
+  "artifact_bundle_files": {
+    "static_files": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json"
+    ],
+    "globbed_files": [
+      "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_13.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
+    ]
+  }
+}
