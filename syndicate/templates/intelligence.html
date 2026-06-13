@@ -810,6 +810,8 @@ function renderIntelligence(response) {
   const pregameRecs = allRecs.filter(isPregameRecommendation);
   const activeTopOpportunities = topOpportunities.filter((item) => recommendationState(item) !== "stale" && recommendationState(item) !== "final");
   const activeTopLiveOpportunities = topLiveOpportunities.filter(isLiveRecommendation);
+  const visibleTopOpportunities = activeTopOpportunities.length ? activeTopOpportunities : topOpportunities.slice(0, 5);
+  const visibleTopLiveOpportunities = activeTopLiveOpportunities.length ? activeTopLiveOpportunities : topLiveOpportunities.slice(0, 5);
 
   function renderSection(title, recs) {
     if (!recs.length) {
@@ -1097,11 +1099,11 @@ function renderIntelligence(response) {
 
   // ✅ Render sections
   if (topOpportunitiesEl) {
-    topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(activeTopOpportunities);
+    topOpportunitiesEl.innerHTML = renderTopOpportunitiesSection(visibleTopOpportunities);
   }
 
   if (scannerEl) {
-    scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", activeTopLiveOpportunities);
+    scannerEl.innerHTML = renderScannerSection("⚡ Top Live Opportunities", visibleTopLiveOpportunities);
   }
 
   picksEl.innerHTML = `
@@ -1164,7 +1166,7 @@ function renderIntelligence(response) {
       return projection !== "—" && projection !== "-";
     }).length;
     const summaryParts = [
-      `${activeTopOpportunities.length} top picks`,
+      `${visibleTopOpportunities.length} top picks`,
       `${liveRecs.length} live`,
       `${pregameRecs.length} pregame`,
       `${parlays.length} parlays`,

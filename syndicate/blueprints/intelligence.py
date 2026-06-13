@@ -503,6 +503,24 @@ def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, ob
     return normalized
 
 
+def _empty_default_intelligence_response() -> dict[str, object]:
+    return {
+        "ok": True,
+        "top_opportunities": [],
+        "by_sport": {},
+        "analysis": None,
+        "response": {
+            "recommendations": [],
+            "picks": [],
+            "top_opportunities": [],
+            "top_live_opportunities": [],
+            "portfolio": {},
+            "parlays": [],
+            "movement": {},
+        },
+    }
+
+
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
     payload = _intelligence_page_payload(central_today_iso())
@@ -543,6 +561,13 @@ def intelligence_query_api():
             response_payload = dict(cached_response)
             if want_refresh:
                 queue_intelligence_state_refresh(dict(payload))
+        elif question == DEFAULT_QUESTION:
+            if want_refresh and not bool(payload.get("background")):
+                queue_intelligence_state_refresh(dict(payload))
+            cached_response = _cached_intelligence_response(dict(payload))
+            if cached_response is None:
+                cached_response = _empty_default_intelligence_response()
+            response_payload = _unwrap_response_payload(cached_response)
         else:
             board_result = run_intelligence_query(
                 question,

@@ -121,11 +121,36 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(response.headers.get("Pragma"), "no-cache")
         self.assertEqual(response.headers.get("Expires"), "0")
         mocked_read.assert_called_once()
-        mocked_queue.assert_not_called()
+        mocked_queue.assert_called_once()
         mocked_print.assert_called_once()
         self.assertEqual(mocked_print.call_args.args[0], "[API READ]")
         self.assertEqual(mocked_print.call_args.args[1]["candidate_count"], 0)
         self.assertEqual(payload["response"]["analysis"]["recommendations"], [])
+
+    def test_query_endpoint_returns_default_fallback_without_synchronous_board_run(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        with app.test_request_context(
+            "/api/intelligence/query",
+            method="POST",
+            json={"question": "top edges today", "force_refresh": False},
+        ):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    with patch("syndicate.blueprints.intelligence.run_intelligence_query") as mocked_run:
+                        response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("version", payload)
+        self.assertIn("timestamp", payload)
+        self.assertIn("response", payload)
+        self.assertEqual(payload["response"]["top_opportunities"], [])
+        self.assertEqual(payload["response"]["response"]["movement"], {})
+        mocked_queue.assert_not_called()
+        mocked_run.assert_not_called()
 
     def test_status_endpoint_falls_back_to_cached_state_when_live_build_fails(self) -> None:
         app = Flask(__name__)
