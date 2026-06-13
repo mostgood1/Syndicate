@@ -141,6 +141,30 @@
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
         "date": "2026-06-13"
       }
+    },
+    "mlb_live_lens:2026-06-13": {
+      "inputHash": "709954254b303bcda63bca0aded073a2531bc07ae0369e318ac2f202092bbe7b",
+      "updatedAt": "2026-06-13T13:50:59.799451",
+      "outputs": [
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_13.json",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_13.jsonl",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_13.json"
+      ],
+      "metadata": {
+        "date": "2026-06-13",
+        "trigger": "syndicate_refresh",
+        "source_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts"
+      }
+    },
+    "nba_artifact_bundle:2026-06-13:1:1": {
+      "inputHash": "6e2c06617fcb288aa3c8c7ba059862c727994f58d29a88e696f5952d521a7076",
+      "updatedAt": "2026-06-13T13:52:47.948248",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-06-13",
+        "reused": false,
+        "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\source_artifacts"
+      }
     }
   }
 }

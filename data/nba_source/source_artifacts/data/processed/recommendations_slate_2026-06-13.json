@@ -1,0 +1,50 @@
+{
+  "date": "2026-06-13",
+  "counts": {
+    "games": 1,
+    "picks": 2
+  },
+  "per_game": [
+    {
+      "home": "SAS",
+      "away": "NYK",
+      "matchup": "NYK @ SAS",
+      "picks": [
+        {
+          "market": "ATS",
+          "team": "San Antonio Spurs",
+          "display_pick": "San Antonio Spurs -5.5",
+          "selection": "San Antonio Spurs",
+          "price": -110.0,
+          "score": 10.725,
+          "ev_pct": 10.725,
+          "win_prob": 0.63106,
+          "p_win": 0.63106,
+          "basketball_summary": "Model margin 5.2 vs market -5.5",
+          "top_play_reasons": [
+            "Edge 10.7",
+            "EV 10.7%"
+          ],
+          "matchup": "NYK @ SAS"
+        },
+        {
+          "market": "TOTAL",
+          "team": "Total",
+          "display_pick": "Over 216.5",
+          "selection": "Over",
+          "price": -110.0,
+          "score": 1.41,
+          "ev_pct": 1.41,
+          "win_prob": 0.53791,
+          "p_win": 0.53791,
+          "basketball_summary": "Model total 217.9 vs line 216.5",
+          "top_play_reasons": [
+            "Edge 1.4",
+            "EV 1.4%"
+          ],
+          "matchup": "NYK @ SAS"
+        }
+      ]
+    }
+  ]
+}
