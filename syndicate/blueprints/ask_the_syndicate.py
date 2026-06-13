@@ -128,6 +128,14 @@ def payload_value(payload: dict[str, Any], key: str) -> Any:
     return value
 
 
+def _with_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response.headers["Vary"] = "Origin"
+    return response
+
+
 def _smart_route_payload(payload: dict[str, Any]) -> dict[str, Any]:
     intelligence_payload = _INTELLIGENCE_ROUTER.route_payload(payload)
     question = str(intelligence_payload.get("question") or payload.get("question") or "").strip()
@@ -368,15 +376,18 @@ def handle_market_summary(payload: dict[str, Any]) -> dict[str, Any]:
     return _build_route_payload(payload, decision)
 
 
-@ask_the_syndicate_bp.post("/api/syndicate/query")
+@ask_the_syndicate_bp.route("/api/syndicate/query", methods=["POST", "OPTIONS"])
 def ask_the_syndicate_query_api():
+    if request.method == "OPTIONS":
+        return _with_cors_headers(jsonify({"ok": True}))
+
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict):
-        return jsonify({"ok": False, "error": "Request body must be a JSON object."}), 400
+        return _with_cors_headers(jsonify({"ok": False, "error": "Request body must be a JSON object."})), 400
 
     question = str(payload.get("question") or "").strip()
     if not question:
-        return jsonify({"ok": False, "error": "question is required."}), 400
+        return _with_cors_headers(jsonify({"ok": False, "error": "question is required."})), 400
 
     shaped_payload = _smart_route_payload(payload)
     decision = _QUERY_ROUTER.route(str(shaped_payload.get("question") or question))
@@ -384,19 +395,19 @@ def ask_the_syndicate_query_api():
     cache_key = _query_cache_key(question, payload, decision)
     cached_response = _read_cached_response(cache_key)
     if cached_response is not None:
-        return jsonify(cached_response)
+        return _with_cors_headers(jsonify(cached_response))
 
     artifact_response = _build_artifact_response(shaped_payload, decision)
     if artifact_response is not None:
         _store_cached_response(cache_key, artifact_response)
         _maybe_queue_exact_refresh(shaped_payload)
-        return jsonify(artifact_response)
+        return _with_cors_headers(jsonify(artifact_response))
 
     fast_state_response = _build_fast_state_result(shaped_payload)
     if fast_state_response is not None:
         _store_cached_response(cache_key, fast_state_response)
         _maybe_queue_exact_refresh(shaped_payload)
-        return jsonify(fast_state_response)
+        return _with_cors_headers(jsonify(fast_state_response))
 
     handler = {
         "handle_bet_analysis": handle_bet_analysis,
@@ -405,4 +416,4 @@ def ask_the_syndicate_query_api():
     }[decision.handler_name]
     response = handler(shaped_payload)
     _store_cached_response(cache_key, response)
-    return jsonify(response)
+    return _with_cors_headers(jsonify(response))

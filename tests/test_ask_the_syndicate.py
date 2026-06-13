@@ -177,6 +177,32 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertFalse(payload["ok"])
         self.assertIn("question is required", payload["error"])
 
+    def test_query_route_sets_cors_headers_for_post_and_preflight(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(ask_the_syndicate_bp)
+
+        with patch("syndicate.blueprints.ask_the_syndicate.run_intelligence_query", return_value={"query_type": "market_summary", "recommendations": []}):
+            post_response = app.test_client().post(
+                "/api/syndicate/query",
+                json={"question": "top edges today", "context": {"sport": "nba"}},
+                headers={"Origin": "https://example.com"},
+            )
+
+        preflight_response = app.test_client().options(
+            "/api/syndicate/query",
+            headers={
+                "Origin": "https://example.com",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+
+        self.assertEqual(post_response.headers.get("Access-Control-Allow-Origin"), "*")
+        self.assertIn("POST", post_response.headers.get("Access-Control-Allow-Methods", ""))
+        self.assertEqual(preflight_response.status_code, 200)
+        self.assertEqual(preflight_response.headers.get("Access-Control-Allow-Origin"), "*")
+        self.assertIn("OPTIONS", preflight_response.headers.get("Access-Control-Allow-Methods", ""))
+
     def test_query_router_routes_by_intent(self) -> None:
         router = SyndicateQueryRouter()
 
