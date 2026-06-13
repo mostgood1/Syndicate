@@ -40,6 +40,7 @@ class RefreshQueueRunnerTests(unittest.TestCase):
                 "manifestPath": str(manifest_path),
                 "latestPath": str(latest_manifest_path),
                 "runSummaryPath": str(run_summary_path),
+                "jobStatusPath": str(run_summary_path.parent / "refresh_job_status.json"),
                 "stdoutPath": str(run_summary_path.parent / "odds_refresh.json"),
                 "stderrPath": str(run_summary_path.parent / "odds_refresh.stderr.txt"),
                 "command": [sys.executable, "-c", "print('ok')"],
@@ -61,6 +62,7 @@ class RefreshQueueRunnerTests(unittest.TestCase):
             self.assertEqual(manifest_payload["state"], "running")
             self.assertEqual(run_summary_payload["state"], "running")
             self.assertEqual(latest_payload["runnerKind"], "external_runner")
+            self.assertEqual(claimed["jobStatusPath"], str(run_summary_path.parent / "refresh_job_status.json"))
 
     def test_build_wrapper_command_uses_persisted_contract_paths(self) -> None:
         repo_root = Path(__file__).resolve().parents[1]
@@ -70,6 +72,7 @@ class RefreshQueueRunnerTests(unittest.TestCase):
             "manifestPath": "manifest.json",
             "latestPath": "latest.json",
             "runSummaryPath": "summary.json",
+            "jobStatusPath": "job_status.json",
             "stdoutPath": "stdout.json",
             "stderrPath": "stderr.txt",
             "command": [sys.executable, "-m", "unittest", "tests.test_ops"],
@@ -102,6 +105,7 @@ class RefreshQueueRunnerTests(unittest.TestCase):
                 "manifestPath": str(manifest_path),
                 "latestPath": str(latest_manifest_path),
                 "runSummaryPath": str(run_summary_path),
+                "jobStatusPath": str(run_summary_path.parent / "refresh_job_status.json"),
                 "stdoutPath": str(run_summary_path.parent / "odds_refresh.json"),
                 "stderrPath": str(run_summary_path.parent / "odds_refresh.stderr.txt"),
                 "command": [sys.executable, "-c", "print('ok')"],

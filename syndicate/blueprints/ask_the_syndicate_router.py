@@ -57,12 +57,23 @@ class SyndicateQueryRouter:
     def _base_score(intent: str) -> int:
         return {
             "market_summary": 400,
+            "comparison": 350,
             "bet_analysis": 300,
             "matchup_analysis": 100,
         }.get(intent, 0)
 
 
 DEFAULT_RULES: tuple[RouteRule, ...] = (
+    RouteRule(
+        intent="comparison",
+        handler_name="handle_matchup_analysis",
+        base_score=350,
+        patterns=(
+            ("compare", re.compile(r"\bcompare\b", re.IGNORECASE)),
+            ("which_is_better", re.compile(r"\bwhich is better\b", re.IGNORECASE)),
+            ("side_by_side", re.compile(r"\bside by side\b", re.IGNORECASE)),
+        ),
+    ),
     RouteRule(
         intent="bet_analysis",
         handler_name="handle_bet_analysis",

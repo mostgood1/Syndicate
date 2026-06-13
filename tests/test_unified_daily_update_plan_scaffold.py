@@ -16,3 +16,6 @@ class UnifiedDailyUpdatePlanScaffoldTests(unittest.TestCase):
         self.assertIn("sourceUpdates = [bool](-not $SkipSourceUpdates)", content)
         self.assertIn("refreshGate = [bool](-not $SkipRefreshGate)", content)
         self.assertIn("publish = [bool](-not $SkipGitPush)", content)
+        self.assertIn("runProvenance = [ordered]@{", content)
+        self.assertIn("latestManifestLoaded = [bool]($null -ne $latestManifest)", content)
+        self.assertIn("sourceStepCount = $sourceSteps.Count", content)

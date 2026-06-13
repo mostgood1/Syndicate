@@ -113,6 +113,16 @@ def _infer_sport(question: str, context: dict[str, Any]) -> str | None:
     return None
 
 
+def _detect_sports(question: str) -> list[str]:
+    normalized_question = str(question or "").strip().lower()
+    detected: list[str] = []
+    for sport, keywords in _SPORT_HINTS:
+        if any(re.search(rf"\b{re.escape(keyword.lower())}\b", normalized_question) for keyword in keywords):
+            if sport not in detected:
+                detected.append(sport)
+    return detected
+
+
 def payload_value(payload: dict[str, Any], key: str) -> Any:
     value = payload.get(key)
     return value
@@ -133,6 +143,10 @@ def _smart_route_payload(payload: dict[str, Any]) -> dict[str, Any]:
     query_type = str(merged.get("query_type") or "").strip()
     if query_type in {"game_preview", "player_analysis"}:
         merged.setdefault("mode", "pregame")
+        merged.setdefault("include_games", True)
+        merged.setdefault("include_props", True)
+    elif query_type == "comparison":
+        merged.setdefault("mode", "comparison")
         merged.setdefault("include_games", True)
         merged.setdefault("include_props", True)
     elif query_type == "live_analysis":
@@ -215,6 +229,32 @@ def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] |
         }
     )
 
+    question = str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip()
+    routing_context = {
+        "question": question,
+        "query_type": analysis.get("query_type"),
+        "mode": shaped_payload.get("mode"),
+        "selected_date": shaped_payload.get("selected_date") or shaped_payload.get("date"),
+        "preview_subject": shaped_payload.get("preview_subject"),
+        "player_subject": shaped_payload.get("player_subject"),
+        "sport": shaped_payload.get("sport") or shaped_payload.get("sport_slug"),
+        "limit": shaped_payload.get("limit"),
+        "include_props": shaped_payload.get("include_props"),
+        "include_games": shaped_payload.get("include_games"),
+    }
+    detected_sports = _detect_sports(question)
+    context_awareness = {
+        "is_vague": not bool(routing_context.get("sport")) and not bool(detected_sports),
+        "confidence": "low" if not bool(routing_context.get("sport")) and not bool(detected_sports) else "medium",
+        "detected_sports": detected_sports,
+        "multi_sport": len(detected_sports) > 1,
+        "assumptions": ["Used the cached intelligence state response and preserved the route metadata."] if latest_state else [],
+        "clarifying_questions": [],
+        "reasoning": "The response was served from cached state, so the API preserved the route and context fields for consistency.",
+        "recommendation_count": len(analysis.get("recommendations") or []),
+        "reasoning_step_count": len(analysis.get("reasoning_steps") or []),
+    }
+
     return {
         "ok": True,
         "top_opportunities": latest_state.get("top_opportunities") if isinstance(latest_state.get("top_opportunities"), list) else list(analysis.get("recommendations") or []),
@@ -222,6 +262,8 @@ def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] |
         "analysis": analysis,
         "candidate_pool": candidate_pool,
         "response": analysis,
+        "routing_context": routing_context,
+        "context_awareness": context_awareness,
         "served_from": "state_cache",
         "served_from_state_cache": True,
         "state_cache_latest_key": latest_state.get("latestKey") if isinstance(latest_state.get("latestKey"), str) else None,
@@ -291,9 +333,10 @@ def _apply_intent_hints(pipeline_payload: dict[str, Any], intent: str) -> dict[s
         enriched_payload.setdefault("mode", "pregame")
         enriched_payload.setdefault("include_props", True)
         enriched_payload.setdefault("include_games", True)
-    elif intent == "matchup_analysis":
+    elif intent in {"matchup_analysis", "comparison"}:
         enriched_payload.setdefault("mode", "comparison")
         enriched_payload.setdefault("include_games", True)
+        enriched_payload.setdefault("include_props", True)
     elif intent == "market_summary":
         enriched_payload.setdefault("mode", "pregame")
     return enriched_payload

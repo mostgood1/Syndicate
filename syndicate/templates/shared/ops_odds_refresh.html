@@ -327,13 +327,31 @@
           {% set runtime = refresh_status.get('runtime') or {} %}
           {% set daily_update = status_payload.get('daily_update') or {} %}
           {% set daily_manifest = daily_update.get('manifest') or {} %}
+          {% set daily_runtime = daily_update.get('runtime') or {} %}
+          {% set daily_checkpoint = daily_update.get('checkpoint') or {} %}
+          {% set daily_run_state = daily_update.get('run_state') or {} %}
+          {% set daily_trace = daily_update.get('trace') or {} %}
           <div class="ops-meta-grid">
             <div class="ops-meta-item"><span class="ops-meta-label">Refresh date</span><span class="ops-meta-value">{{ refresh_manifest.get('date') or 'Unavailable' }}</span></div>
             <div class="ops-meta-item"><span class="ops-meta-label">Refresh state</span><span class="ops-meta-value">{{ runtime.get('state') or 'unknown' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Refresh elapsed</span><span class="ops-meta-value">{{ runtime.get('elapsed_seconds') if runtime.get('elapsed_seconds') is not none else 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Refresh remaining</span><span class="ops-meta-value">{{ runtime.get('remaining_budget_seconds') if runtime.get('remaining_budget_seconds') is not none else 'Unavailable' }}</span></div>
             <div class="ops-meta-item"><span class="ops-meta-label">Refresh odds</span><span class="ops-meta-value">{{ 'on' if refresh_manifest.get('refreshOdds') else 'off' }}</span></div>
             <div class="ops-meta-item"><span class="ops-meta-label">Artifacts dir</span><span class="ops-meta-value">{{ refresh_manifest.get('artifactsDir') or 'Unavailable' }}</span></div>
             <div class="ops-meta-item"><span class="ops-meta-label">Daily update manifest</span><span class="ops-meta-value">{{ daily_manifest.get('date') or 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Daily elapsed</span><span class="ops-meta-value">{{ daily_runtime.get('elapsed_seconds') if daily_runtime.get('elapsed_seconds') is not none else 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Daily remaining</span><span class="ops-meta-value">{{ daily_runtime.get('remaining_budget_seconds') if daily_runtime.get('remaining_budget_seconds') is not none else 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Daily checkpoint stage</span><span class="ops-meta-value">{{ daily_checkpoint.get('currentStage') or 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Daily run-state stage</span><span class="ops-meta-value">{{ daily_run_state.get('currentStage') or 'Unavailable' }}</span></div>
+            <div class="ops-meta-item"><span class="ops-meta-label">Daily trace inputs</span><span class="ops-meta-value">{{ daily_trace.get('trace', {}).get('inputFingerprintCount') if daily_trace.get('trace') else 'Unavailable' }}</span></div>
           </div>
+          <p class="ops-path">Refresh budget: {{ runtime.get('runtime_budget_seconds') if runtime.get('runtime_budget_seconds') is not none else 'Unavailable' }} seconds</p>
+          <p class="ops-path">Refresh remaining: {{ runtime.get('remaining_budget_seconds') if runtime.get('remaining_budget_seconds') is not none else 'Unavailable' }} seconds</p>
+          <p class="ops-path">Daily budget: {{ daily_runtime.get('runtime_budget_seconds') if daily_runtime.get('runtime_budget_seconds') is not none else 'Unavailable' }} seconds</p>
+          <p class="ops-path">Daily remaining: {{ daily_runtime.get('remaining_budget_seconds') if daily_runtime.get('remaining_budget_seconds') is not none else 'Unavailable' }} seconds</p>
+          <p class="ops-path">Daily checkpoint: {{ daily_update.get('checkpoint_path') or 'Unavailable' }}</p>
+          <p class="ops-path">Daily run-state: {{ daily_update.get('run_state_path') or 'Unavailable' }}</p>
+          <p class="ops-path">Daily trace: {{ daily_update.get('trace_path') or 'Unavailable' }}</p>
           <p class="ops-path">Manifest: {{ refresh_status.get('manifest_path') }}</p>
           {% if runtime.get('stderr_preview') %}
             <div class="ops-artifact-item">
@@ -407,6 +425,9 @@
                   </div>
                   <div class="ops-note">{{ item_runtime.get('detail') }}</div>
                   <div class="ops-note">Sports: {{ item.get('sports') }} · Phase: {{ item.get('phase') }}{% if item.get('dry_run') %} · dry run{% endif %}</div>
+                  <div class="ops-path">Elapsed: {{ item_runtime.get('elapsed_seconds') if item_runtime.get('elapsed_seconds') is not none else 'Unavailable' }} seconds</div>
+                  <div class="ops-path">Remaining: {{ item_runtime.get('remaining_budget_seconds') if item_runtime.get('remaining_budget_seconds') is not none else 'Unavailable' }} seconds</div>
+                  <div class="ops-path">Budget: {{ item_runtime.get('runtime_budget_seconds') if item_runtime.get('runtime_budget_seconds') is not none else 'Unavailable' }} seconds</div>
                   {% if item_runtime.get('finished_at') %}<div class="ops-path">Finished: {{ item_runtime.get('finished_at') }}</div>{% endif %}
                 </div>
               {% endfor %}

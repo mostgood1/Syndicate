@@ -1,17 +1,27 @@
 {
   "sport": "ncaab",
-  "last_updated": "2026-06-12T16:29:53+00:00",
+  "last_updated": "2026-06-13T02:22:40+00:00",
   "artifact_paths": [
     "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-06-12",
+    "date": "2026-04-06",
     "phase": "all",
-    "execution_mode": "source",
+    "execution_mode": "ingest",
     "refresh_mode": "full",
-    "ok": false,
+    "ok": true,
     "post_refresh_ok": null,
-    "mirror_ok": null
+    "mirror_ok": true,
+    "odds_control_plane": {
+      "source_precedence": [
+        "artifact_history",
+        "tracking_history"
+      ],
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+      ],
+      "has_post_refresh": false
+    }
   }
 }

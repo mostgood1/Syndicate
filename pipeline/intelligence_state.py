@@ -19,6 +19,9 @@ from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import rank_global_recommendations
 from syndicate.features.shared.market_id import attach_market_id
+from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+from syndicate.features.shared.odds_control_plane import odds_history_roots_for_sport
+from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -175,28 +178,13 @@ class IntelligenceStateService:
         return merged
 
     def _odds_history_roots_for_sport(self, sport_slug: str) -> list[Path]:
-        roots: list[Path] = []
-        for base in (REPO_ROOT / "data" / f"{sport_slug}_source", REPO_ROOT / f"{sport_slug}_source"):
-            if base.exists() and base not in roots:
-                roots.append(base)
-        return roots
+        return odds_history_roots_for_sport(sport_slug)
 
     def _odds_history_paths_for_sport(self, sport_slug: str) -> list[Path]:
-        paths: list[Path] = []
-        for root in self._odds_history_roots_for_sport(sport_slug):
-            for candidate in (root / "artifacts" / sport_slug / "odds_history.json", root / "tracking" / "odds_history.json"):
-                if candidate not in paths:
-                    paths.append(candidate)
-        return paths
+        return odds_history_paths_for_sport(sport_slug)
 
     def _load_odds_history_payload_for_sport(self, sport_slug: str) -> dict[str, Any] | None:
-        for path in self._odds_history_paths_for_sport(sport_slug):
-            if not path.exists():
-                continue
-            payload = read_json_file(path)
-            if isinstance(payload, dict):
-                return payload
-        return None
+        return load_odds_history_payload_for_sport(sport_slug)
 
     @staticmethod
     def _odds_history_market_states(payload: dict[str, Any] | None) -> dict[str, dict[str, Any]]:

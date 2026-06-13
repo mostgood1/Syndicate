@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from pipeline.formatter import format_intelligence_query_response
 from pipeline.intelligence_pipeline import run_intelligence_pipeline
+from pipeline.intelligence_pipeline import _enrich_context
 from pipeline.evidence_builder import build_evidence_records
 from pipeline.intelligence_models import Evidence
 from pipeline.intelligence_models import IntelligenceResult
@@ -84,6 +85,50 @@ class IntelligencePipelineTests(unittest.TestCase):
             force_refresh=True,
         )
 
+    def test_pipeline_includes_odds_control_plane_evidence_when_available(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "What are the best live bets?",
+                "date": "2026-06-04",
+                "sport": "nba",
+            },
+            form={},
+        )
+
+        control_plane_snapshot = {
+            "generated_at": "2026-06-12T22:16:54+00:00",
+            "date": "2026-06-12",
+            "phase": "all",
+            "execution_mode": "source",
+            "dry_run": False,
+            "summary_ok": True,
+            "source_precedence": ["artifact_history", "tracking_history"],
+            "sports": [
+                {"sport": "nba", "ok": True},
+                {"sport": "wnba", "ok": True},
+            ],
+        }
+
+        with patch("pipeline.intelligence_pipeline.load_odds_control_plane_snapshot", return_value=control_plane_snapshot), patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Test headline",
+                "selected_date": "2026-06-04",
+                "recommendations": [{"name": "Darius Garland Over 7.5 Assists", "score": 91.2}],
+                "supporting_evidence": {
+                    "kind": "bundle",
+                    "title": "Supporting evidence",
+                    "sections": [{"kind": "metrics", "title": "Top case evidence", "items": [{"label": "Projection", "value": 8.3}]}],
+                },
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        odds_evidence = next((section for section in structured.get("supporting_evidence", []) if isinstance(section, dict) and section.get("title") == "Odds control plane"), None)
+        self.assertIsNotNone(odds_evidence)
+        self.assertEqual((structured.get("odds_control_plane") or {}).get("source_precedence"), ["artifact_history", "tracking_history"])
+
     def test_intelligence_result_round_trips_top_level_fields(self) -> None:
         raw = {
             "selected_date": "2026-06-04",
@@ -153,6 +198,122 @@ class IntelligencePipelineTests(unittest.TestCase):
         self.assertIn("Best takeaway:", structured["recommended_interpretation"])
         self.assertIn("clear_summary", structured)
         self.assertIn("final_takeaway", structured)
+
+    def test_comparison_queries_include_routing_context_and_multi_sport_signals(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "Compare NBA and WNBA picks tonight",
+                "date": "2026-06-04",
+            },
+            form={},
+        )
+
+        with patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Cross-sport comparison",
+                "summary": "The board compares two basketball slates with similar risk bands.",
+                "recommendations": [
+                    {"candidate_type": "prop", "name": "NBA side", "summary": "Primary NBA angle.", "score": 91.0},
+                    {"candidate_type": "prop", "name": "WNBA side", "summary": "Primary WNBA angle.", "score": 89.0},
+                ],
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        context_awareness = structured["context_awareness"]
+        routing_context = structured["routing_context"]
+
+        self.assertEqual(result.query_type, "comparison")
+        self.assertEqual(routing_context["query_type"], "comparison")
+        self.assertEqual(routing_context["question"], "Compare NBA and WNBA picks tonight")
+        self.assertEqual(context_awareness["detected_sports"], ["nba", "wnba"])
+        self.assertTrue(context_awareness["multi_sport"])
+
+    def test_comparison_queries_include_comparison_evidence_bundle(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "Compare NBA and WNBA picks tonight",
+                "date": "2026-06-04",
+            },
+            form={},
+        )
+
+        with patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Cross-sport comparison",
+                "summary": "The board compares two basketball slates with similar risk bands.",
+                "recommendations": [
+                    {"candidate_type": "prop", "name": "NBA side", "summary": "Primary NBA angle.", "score": 91.0},
+                    {"candidate_type": "prop", "name": "WNBA side", "summary": "Primary WNBA angle.", "score": 89.0},
+                ],
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        comparison_evidence = next(
+            (
+                section
+                for section in structured.get("supporting_evidence", [])
+                if isinstance(section, dict) and section.get("title") == "Comparison evidence"
+            ),
+            None,
+        )
+
+        self.assertIsNotNone(comparison_evidence)
+        self.assertEqual((comparison_evidence or {}).get("kind"), "bundle")
+        self.assertEqual((comparison_evidence or {}).get("sections")[0]["title"], "Detected sports")
+
+    def test_multi_sport_non_comparison_queries_include_cross_sport_reasoning(self) -> None:
+        fake_request = SimpleNamespace(
+            get_json=lambda silent=True: {
+                "question": "NBA and WNBA picks tonight",
+                "date": "2026-06-04",
+            },
+            form={},
+        )
+
+        with patch(
+            "pipeline.intelligence_pipeline.run_intelligence_query",
+            return_value={
+                "headline": "Multi-sport board read",
+                "summary": "The board spans two basketball slates with different risk profiles.",
+                "recommendations": [
+                    {"candidate_type": "prop", "name": "NBA side", "summary": "Primary NBA angle.", "score": 91.0},
+                    {"candidate_type": "prop", "name": "WNBA side", "summary": "Primary WNBA angle.", "score": 89.0},
+                ],
+            },
+        ):
+            result = run_intelligence_pipeline(fake_request)
+
+        structured = result.to_dict()["structured_response"]
+        cross_sport_evidence = next(
+            (
+                section
+                for section in structured.get("supporting_evidence", [])
+                if isinstance(section, dict) and section.get("title") == "Cross-sport reasoning"
+            ),
+            None,
+        )
+
+        self.assertIsNotNone(cross_sport_evidence)
+        self.assertEqual((cross_sport_evidence or {}).get("kind"), "bundle")
+        self.assertEqual((cross_sport_evidence or {}).get("sections")[0]["title"], "Sport mix")
+        self.assertEqual(structured["context_awareness"]["detected_sports"], ["nba", "wnba"])
+
+    def test_router_payload_marks_comparison_for_full_execution_shape(self) -> None:
+        from router.query_router import QueryRouter
+
+        router = QueryRouter()
+        routed = router.route_payload({"question": "Compare NBA and WNBA picks tonight"})
+
+        self.assertEqual(routed["query_type"], "comparison")
+        self.assertEqual(routed["mode"], "comparison")
+        self.assertTrue(routed["include_games"])
+        self.assertTrue(routed["include_props"])
 
     def test_preview_queries_build_game_preview_sections(self) -> None:
         fake_request = SimpleNamespace(

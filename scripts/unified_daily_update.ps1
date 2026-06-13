@@ -32,6 +32,12 @@ New-Item -ItemType Directory -Path $latestDir -Force | Out-Null
 
 $runManifestPath = Join-Path $runDir 'unified_daily_update_run.json'
 $latestManifestPath = Join-Path $latestDir 'unified_daily_update_latest.json'
+$runCheckpointPath = Join-Path $runDir 'unified_daily_update_checkpoint.json'
+$latestCheckpointPath = Join-Path $latestDir 'unified_daily_update_latest_checkpoint.json'
+$runStatePath = Join-Path $runDir 'unified_daily_update_run_state.json'
+$latestRunStatePath = Join-Path $latestDir 'unified_daily_update_latest_run_state.json'
+$runTracePath = Join-Path $runDir 'unified_daily_update_run_trace.json'
+$latestRunTracePath = Join-Path $latestDir 'unified_daily_update_latest_run_trace.json'
 
 $runtimePolicy = [ordered]@{
     MLB = [ordered]@{
@@ -240,9 +246,265 @@ function Test-ProcessIdRunning {
 function Write-RunManifest {
     param([psobject]$Manifest)
 
-    $Manifest.lastUpdatedAt = (Get-Date).ToString('o')
+    Sync-RunStateArtifacts -Manifest $Manifest
     $Manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $runManifestPath -Encoding utf8
     $Manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $latestManifestPath -Encoding utf8
+}
+
+function Write-RunCheckpoint {
+    param([psobject]$Manifest)
+
+    if ($null -eq $Manifest) {
+        return
+    }
+
+    $checkpoint = [ordered]@{
+        scope = 'daily_update'
+        date = $Manifest.date
+        runMode = $Manifest.runMode
+        overallStatus = $Manifest.overallStatus
+        generatedAt = $Manifest.generatedAt
+        updatedAt = (Get-Date).ToString('o')
+        runDir = $Manifest.runDir
+        latestDir = $Manifest.latestDir
+        lastUpdatedAt = $Manifest.lastUpdatedAt
+        currentStage = $Manifest.runState.currentStage
+        completedStages = @($Manifest.runState.completedStages)
+        failedStage = $Manifest.runState.failedStage
+        stageDecisions = @($Manifest.stageDecisions)
+        provenance = $Manifest.runProvenance
+        trace = $Manifest.runTrace
+        replayContext = $Manifest.replayContext
+        runPlan = [ordered]@{
+            simExecution = $Manifest.runPlan.simExecution
+            sourceUpdates = $Manifest.runPlan.sourceUpdates
+            refreshGate = $Manifest.runPlan.refreshGate
+            artifactGeneration = $Manifest.runPlan.artifactGeneration
+            manifestGeneration = $Manifest.runPlan.manifestGeneration
+            publish = $Manifest.runPlan.publish
+            refreshOdds = $Manifest.runPlan.refreshOdds
+            oddsPhase = $Manifest.runPlan.oddsPhase
+            oddsSports = $Manifest.runPlan.oddsSports
+            oddsRegions = $Manifest.runPlan.oddsRegions
+        }
+    }
+
+    $checkpoint | ConvertTo-Json -Depth 8 | Set-Content -Path $runCheckpointPath -Encoding utf8
+    $checkpoint | ConvertTo-Json -Depth 8 | Set-Content -Path $latestCheckpointPath -Encoding utf8
+}
+
+function Write-RunStateArtifact {
+    param([psobject]$Manifest)
+
+    if ($null -eq $Manifest -or $null -eq $Manifest.runState) {
+        return
+    }
+
+    $runStateArtifact = [ordered]@{
+        scope = 'daily_update'
+        date = $Manifest.date
+        runMode = $Manifest.runMode
+        overallStatus = $Manifest.overallStatus
+        generatedAt = $Manifest.generatedAt
+        updatedAt = (Get-Date).ToString('o')
+        runManifestPath = $runManifestPath
+        latestManifestPath = $latestManifestPath
+        runCheckpointPath = $runCheckpointPath
+        latestCheckpointPath = $latestCheckpointPath
+        currentStage = $Manifest.runState.currentStage
+        completedStages = @($Manifest.runState.completedStages)
+        failedStage = $Manifest.runState.failedStage
+        lastUpdatedAt = $Manifest.runState.lastUpdatedAt
+        replayContext = $Manifest.replayContext
+        stageDecisions = @($Manifest.stageDecisions)
+        runTrace = $Manifest.runTrace
+    }
+
+    $runStateArtifact | ConvertTo-Json -Depth 8 | Set-Content -Path $runStatePath -Encoding utf8
+    $runStateArtifact | ConvertTo-Json -Depth 8 | Set-Content -Path $latestRunStatePath -Encoding utf8
+}
+
+function Write-RunTraceArtifact {
+    param([psobject]$Manifest)
+
+    if ($null -eq $Manifest) {
+        return
+    }
+
+    $runTraceArtifact = [ordered]@{
+        scope = 'daily_update'
+        date = $Manifest.date
+        runMode = $Manifest.runMode
+        overallStatus = $Manifest.overallStatus
+        generatedAt = $Manifest.generatedAt
+        updatedAt = (Get-Date).ToString('o')
+        runManifestPath = $runManifestPath
+        latestManifestPath = $latestManifestPath
+        runCheckpointPath = $runCheckpointPath
+        latestCheckpointPath = $latestCheckpointPath
+        runStatePath = $runStatePath
+        latestRunStatePath = $latestRunStatePath
+        trace = $Manifest.runTrace
+    }
+
+    $runTraceArtifact | ConvertTo-Json -Depth 8 | Set-Content -Path $runTracePath -Encoding utf8
+    $runTraceArtifact | ConvertTo-Json -Depth 8 | Set-Content -Path $latestRunTracePath -Encoding utf8
+}
+
+function Get-RunTraceSnapshot {
+    param([psobject]$Manifest)
+
+    if ($null -eq $Manifest) {
+        return $null
+    }
+
+    $eventSimExecutionRecords = @($Manifest.eventSimExecution)
+    $artifactUpdateRecords = @($Manifest.artifactUpdates)
+    $inputFingerprints = @(
+        $eventSimExecutionRecords |
+            ForEach-Object { [string]$_.inputFingerprint } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique
+    )
+    $artifactPaths = @(
+        $artifactUpdateRecords |
+            ForEach-Object { [string]$_.artifactPath } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique
+    )
+
+    return [ordered]@{
+        eventSimExecutionCount = $eventSimExecutionRecords.Count
+        artifactUpdateCount = $artifactUpdateRecords.Count
+        inputFingerprintCount = $inputFingerprints.Count
+        artifactPathCount = $artifactPaths.Count
+        inputFingerprints = $inputFingerprints
+        artifactPaths = $artifactPaths
+        simExecutionDecision = $Manifest.runProvenance.simExecutionDecision
+    }
+}
+
+function Sync-RunStateArtifacts {
+    param([psobject]$Manifest)
+
+    if ($null -eq $Manifest) {
+        return
+    }
+
+    $updatedAt = (Get-Date).ToString('o')
+    $Manifest.lastUpdatedAt = $updatedAt
+
+    if ($Manifest.runState) {
+        $Manifest.runState.lastUpdatedAt = $updatedAt
+    }
+
+    if ($Manifest.statusArtifact -and $Manifest.statusArtifact.state) {
+        $Manifest.statusArtifact.state.runMode = $Manifest.runMode
+        $Manifest.statusArtifact.state.overallStatus = $Manifest.overallStatus
+        $Manifest.statusArtifact.state.currentStage = $Manifest.runState.currentStage
+        $Manifest.statusArtifact.state.completedStages = @($Manifest.runState.completedStages)
+        $Manifest.statusArtifact.state.failedStage = $Manifest.runState.failedStage
+        $Manifest.statusArtifact.state.lastUpdatedAt = $updatedAt
+        $Manifest.statusArtifact.state.policyPerformance = @($Manifest.policyPerformance)
+        $Manifest.statusArtifact.state.replayContext = $Manifest.replayContext
+    }
+
+    $Manifest.runTrace = Get-RunTraceSnapshot -Manifest $Manifest
+
+    Write-RunStateArtifact -Manifest $Manifest
+    Write-RunTraceArtifact -Manifest $Manifest
+    Write-RunCheckpoint -Manifest $Manifest
+}
+
+function Update-RunStateStage {
+    param(
+        [psobject]$Manifest,
+        [string]$Stage,
+        [string]$Status = 'started'
+    )
+
+    if ($null -eq $Manifest -or $null -eq $Manifest.runState -or [string]::IsNullOrWhiteSpace($Stage)) {
+        return
+    }
+
+    $runState = $Manifest.runState
+    $runState.currentStage = $Stage
+
+    if ($Status -eq 'completed') {
+        $completedStages = @($runState.completedStages)
+        if (-not ($completedStages -contains $Stage)) {
+            $runState.completedStages += @($Stage)
+        }
+        $runState.currentStage = 'queued'
+    }
+    elseif ($Status -eq 'failed') {
+        $runState.failedStage = $Stage
+    }
+
+    Sync-RunStateArtifacts -Manifest $Manifest
+}
+
+function Set-RunFailureState {
+    param(
+        [psobject]$Manifest,
+        [string]$Stage,
+        [string]$Message
+    )
+
+    if ($null -eq $Manifest) {
+        return
+    }
+
+    $Manifest.overallStatus = 'error'
+    $Manifest.error = $Message
+    if ($Manifest.runState) {
+        $Manifest.runState.failedStage = $Stage
+        $Manifest.runState.currentStage = if ([string]::IsNullOrWhiteSpace($Stage)) { 'failed' } else { $Stage }
+    }
+
+    Sync-RunStateArtifacts -Manifest $Manifest
+}
+
+function Apply-RunReplayContext {
+    param(
+        [psobject]$Manifest,
+        [psobject]$ReplayContext
+    )
+
+    if ($null -eq $Manifest -or $null -eq $Manifest.runState -or $null -eq $ReplayContext) {
+        return
+    }
+
+    if (-not [bool]$ReplayContext.resumeEligible) {
+        return
+    }
+
+    $currentStage = [string]$ReplayContext.latestCheckpointStage
+    if ([string]::IsNullOrWhiteSpace($currentStage)) {
+        return
+    }
+
+    $Manifest.runState.currentStage = $currentStage
+    $Manifest.runState.completedStages = @($ReplayContext.latestCheckpointCompletedStages)
+    $Manifest.runState.failedStage = [string]$ReplayContext.latestCheckpointFailedStage
+    $Manifest.overallStatus = 'resumed'
+
+    foreach ($stageDecision in @($Manifest.stageDecisions)) {
+        if ([string]::IsNullOrWhiteSpace([string]$stageDecision.stage)) {
+            continue
+        }
+
+        if (@($Manifest.runState.completedStages) -contains [string]$stageDecision.stage) {
+            $stageDecision.decision = 'completed'
+            $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'completed' }
+        }
+        elseif ([string]$stageDecision.stage -eq [string]$Manifest.runState.currentStage) {
+            $stageDecision.decision = 'resumed'
+            $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'resumed' }
+        }
+    }
+
+    Sync-RunStateArtifacts -Manifest $Manifest
 }
 
 function Clear-StaleMlbUiDailyLocks {
@@ -523,6 +785,7 @@ function Get-SimExecutionDecision {
         [string]$RepoRoot,
         [string]$DateValue,
         [string]$LatestManifestPath,
+        [string]$LatestCheckpointPath,
         [object[]]$SourceSteps,
         [bool]$SkipSourceUpdates
     )
@@ -535,7 +798,12 @@ function Get-SimExecutionDecision {
         return $null
     }
 
+    $hasLatestCheckpoint = -not [string]::IsNullOrWhiteSpace($LatestCheckpointPath) -and (Test-Path -LiteralPath $LatestCheckpointPath)
+
     if (-not (Test-Path -LiteralPath $LatestManifestPath)) {
+        if ($hasLatestCheckpoint) {
+            return $null
+        }
         return $true
     }
 
@@ -1039,9 +1307,9 @@ function Get-Policy {
         $selectedPolicy = $PolicyConfig.sport[$sport.ToLowerInvariant()]
         $policySource = 'sport'
     }
-
-    if ($null -eq $selectedPolicy -and -not [string]::IsNullOrWhiteSpace($market) -and $PolicyConfig.market -and $PolicyConfig.market.Contains($market.ToLowerInvariant())) {
-        $selectedPolicy = $PolicyConfig.market[$market.ToLowerInvariant()]
+            stageDecisions = @($Manifest.stageDecisions)
+            provenance = $Manifest.runProvenance
+            trace = $Manifest.runTrace
         $policySource = 'market'
     }
 
@@ -3503,9 +3771,10 @@ if (-not $SkipNCAAB) {
 
 $publishRepos += [pscustomobject]@{ Name = 'Syndicate'; RepoPath = $repoRoot; CommitMessage = "$CommitMessagePrefix $Date (Syndicate mirror + gate)" }
 
-$simExecutionDecision = Get-SimExecutionDecision -RepoRoot $repoRoot -DateValue $Date -LatestManifestPath $latestManifestPath -SourceSteps $sourceSteps -SkipSourceUpdates ([bool]$SkipSourceUpdates)
+$simExecutionDecision = Get-SimExecutionDecision -RepoRoot $repoRoot -DateValue $Date -LatestManifestPath $latestManifestPath -LatestCheckpointPath $latestCheckpointPath -SourceSteps $sourceSteps -SkipSourceUpdates ([bool]$SkipSourceUpdates)
 $latestManifest = $null
 $latestEventSimExecutionPlan = @()
+$latestCheckpoint = $null
 if (Test-Path -LiteralPath $latestManifestPath) {
     try {
         $latestManifest = Get-Content -Path $latestManifestPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
@@ -3514,6 +3783,15 @@ if (Test-Path -LiteralPath $latestManifestPath) {
     catch {
         $latestManifest = $null
         $latestEventSimExecutionPlan = @()
+    }
+}
+
+if (Test-Path -LiteralPath $latestCheckpointPath) {
+    try {
+        $latestCheckpoint = Get-Content -Path $latestCheckpointPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        $latestCheckpoint = $null
     }
 }
 
@@ -3549,6 +3827,25 @@ $runManifest = [ordered]@{
         oddsSports = $OddsSports
         oddsRegions = $OddsRegions
         oddsHistoryTriggerPlan = @($oddsHistoryTriggerPlan)
+    }
+    runProvenance = [ordered]@{
+        sourceStepCount = $sourceSteps.Count
+        sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; name = $_.Name } })
+        latestManifestLoaded = [bool]($null -ne $latestManifest)
+        latestEventSimExecutionPlanCount = $latestEventSimExecutionPlan.Count
+        latestArtifactUpdateCount = @($latestManifest.artifactUpdates).Count
+        oddsHistoryTriggerPlanCount = @($oddsHistoryTriggerPlan).Count
+        simExecutionDecision = $simExecutionDecision
+    }
+    replayContext = [ordered]@{
+        latestCheckpointLoaded = [bool]($null -ne $latestCheckpoint)
+        latestCheckpointPath = $latestCheckpointPath
+        latestCheckpointStage = if ($null -ne $latestCheckpoint) { [string]$latestCheckpoint.currentStage } else { $null }
+        latestCheckpointFailedStage = if ($null -ne $latestCheckpoint) { [string]$latestCheckpoint.failedStage } else { $null }
+        latestCheckpointCompletedStageCount = if ($null -ne $latestCheckpoint) { @($latestCheckpoint.completedStages).Count } else { 0 }
+        latestCheckpointCompletedStages = if ($null -ne $latestCheckpoint) { @($latestCheckpoint.completedStages) } else { @() }
+        resumeEligible = [bool]($null -ne $latestCheckpoint -and -not [string]::IsNullOrWhiteSpace([string]$latestCheckpoint.currentStage) -and [string]$latestCheckpoint.currentStage -ne 'queued')
+        resumedFromCheckpoint = [bool]($null -ne $latestCheckpoint -and $null -eq $latestManifest)
     }
     runState = [ordered]@{
         currentStage = 'queued'
@@ -3595,6 +3892,8 @@ $runManifest = [ordered]@{
         scope = 'daily_update'
         runManifestPath = $runManifestPath
         latestManifestPath = $latestManifestPath
+        runCheckpointPath = $runCheckpointPath
+        latestCheckpointPath = $latestCheckpointPath
         state = [ordered]@{
             runMode = if ($DryRun) { 'dry_run' } else { 'standard' }
             overallStatus = if ($DryRun) { 'dry_run' } else { 'started' }
@@ -3602,6 +3901,7 @@ $runManifest = [ordered]@{
             completedStages = @()
             failedStage = $null
             policyPerformance = @()
+            replayContext = $null
         }
     }
     sportRuns = @()
@@ -3639,7 +3939,15 @@ if ($null -ne $latestManifest) {
     $runManifest.runPlan.artifactUpdates = @($latestManifest.artifactUpdates)
 }
 
+Apply-RunReplayContext -Manifest $runManifest -ReplayContext $runManifest.replayContext
+
 Sync-RunManifestPolicyPerformance -Manifest $runManifest
+
+$sourceUpdateAlreadyCompleted = [bool](
+    $runManifest.replayContext.latestCheckpointLoaded -and
+    @($runManifest.runState.completedStages) -contains 'source_update' -and
+    [string]$runManifest.runState.currentStage -ne 'source_update'
+)
 
 $shouldRunManifestGeneration = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'manifestGeneration' -Fallback $true
 if ($shouldRunManifestGeneration) {
@@ -3679,7 +3987,9 @@ try {
             $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
         }
     }
-    if ($shouldRunSimExecution) {
+    $shouldRunSourceUpdate = [bool]($shouldRunSimExecution -and -not $sourceUpdateAlreadyCompleted)
+    if ($shouldRunSourceUpdate) {
+        Update-RunStateStage -Manifest $runManifest -Stage 'source_update' -Status 'started'
         for ($stepIndex = 0; $stepIndex -lt $sourceSteps.Count; $stepIndex++) {
             $step = $sourceSteps[$stepIndex]
             $sportKey = [string]$step.Sport
@@ -3832,6 +4142,7 @@ try {
                     $sportRun.status = 'error'
                     $sportRun.error = $_.Exception.Message
                     $sportRun.completedAt = (Get-Date).ToString('o')
+                    Set-RunFailureState -Manifest $runManifest -Stage 'source_update' -Message $_.Exception.Message
                     if ($shouldRunManifestGeneration) {
                         Write-RunManifest -Manifest $runManifest
                     }
@@ -3911,8 +4222,14 @@ try {
                 }
             }
         }
+
+        Update-RunStateStage -Manifest $runManifest -Stage 'source_update' -Status 'completed'
+    }
+    elseif ($sourceUpdateAlreadyCompleted) {
+        Write-Host 'Replay checkpoint: source_update already completed; continuing at the next stage.' -ForegroundColor Yellow
     }
 
+    Update-RunStateStage -Manifest $runManifest -Stage 'refresh_gate' -Status 'started'
     $shouldRunRefreshGate = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'refreshGate' -Fallback ([bool](-not $SkipRefreshGate))
     if ($shouldRunRefreshGate) {
         $refreshArgs = @(
@@ -3951,6 +4268,8 @@ try {
             Write-RunManifest -Manifest $runManifest
         }
     }
+
+    Update-RunStateStage -Manifest $runManifest -Stage 'refresh_gate' -Status 'completed'
 
     foreach ($sportRun in @($runManifest.sportRuns)) {
         $mirrorManifestPath = [string]$sportRun.mirrorManifestPath
@@ -4009,8 +4328,7 @@ try {
     }
 }
 catch {
-    $runManifest.overallStatus = 'error'
-    $runManifest.error = $_.Exception.Message
+    Set-RunFailureState -Manifest $runManifest -Stage ([string]$runManifest.runState.failedStage) -Message $_.Exception.Message
     $runManifest.completedAt = (Get-Date).ToString('o')
     if ($shouldRunManifestGeneration) {
         Write-RunManifest -Manifest $runManifest

@@ -11,6 +11,8 @@ class UnifiedDailyUpdateSimNoOpDetectionTests(unittest.TestCase):
         content = script_path.read_text(encoding="utf-8")
 
         self.assertIn("function Get-SimExecutionNoOpDecision", content)
+        self.assertIn("[string]$LatestCheckpointPath", content)
+        self.assertIn("$hasLatestCheckpoint = -not [string]::IsNullOrWhiteSpace($LatestCheckpointPath)", content)
         self.assertIn("Get-OddsHistoryTriggerDecision -RepoRoot $RepoRoot -DateValue $DateValue -Sport $sport -Workflow $workflow", content)
         self.assertIn("skip_heavy_computation", content)
         self.assertIn("$shouldRunSimExecution = $false", content)

@@ -8,6 +8,7 @@ from typing import Any
 
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.formatters import format_signed_price
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import repo_root_from
 
 
@@ -15,30 +16,22 @@ _SNAPSHOT_RE = re.compile(r"^upcoming_recs_(?P<season>\d{4})_wk(?P<week>\d+)(?P<
 
 
 def _source_roots() -> list[Path]:
-    env_value = str(__import__('os').environ.get("SYNDICATE_NFL_SOURCE_ROOT") or "").strip()
-    if env_value:
-        return [Path(env_value).resolve()]
+    return preferred_artifact_roots(
+        __file__,
+        env_var="SYNDICATE_NFL_SOURCE_ROOT",
+        local_dir_name="nfl_source",
+    )
 
-    repo_root = repo_root_from(__file__)
-    data_root = str(__import__('os').environ.get("SYNDICATE_DATA_ROOT") or "").strip()
-    roots: list[Path] = []
-    if data_root:
-        roots.append((Path(data_root).resolve() / "nfl_source").resolve())
-    roots.append((repo_root / "data" / "nfl_source").resolve())
 
-    deduped: list[Path] = []
-    seen: set[Path] = set()
+def _first_existing_root(roots: list[Path]) -> Path:
     for root in roots:
-        if root in seen:
-            continue
-        seen.add(root)
-        deduped.append(root)
-    return deduped
+        if root.exists():
+            return root
+    return roots[0]
 
 
 def default_nfl_source_root() -> Path:
-    roots = _source_roots()
-    return roots[0]
+    return _first_existing_root(_source_roots())
 
 
 def data_path(*parts: str) -> Path:

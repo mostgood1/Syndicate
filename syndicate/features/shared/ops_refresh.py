@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from datetime import timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -102,8 +103,56 @@ def _pid_is_running(pid: int | None) -> bool:
         return True
 
 
-def _resolve_launch_mode() -> str:
-    value = str(os.environ.get("SYNDICATE_REFRESH_LAUNCH_MODE") or "detached_subprocess").strip().lower()
+def _parse_utc_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _elapsed_seconds(*, started_at: Any, finished_at: Any = None) -> int | None:
+    started = _parse_utc_timestamp(started_at)
+    if started is None:
+        return None
+    finished = _parse_utc_timestamp(finished_at) or datetime.now(timezone.utc)
+    elapsed = int((finished - started).total_seconds())
+    return elapsed if elapsed >= 0 else 0
+
+
+def _runtime_budget_seconds(env_name: str) -> int | None:
+    raw = str(os.environ.get(env_name) or "").strip()
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _remaining_budget_seconds(*, elapsed_seconds: int | None, budget_seconds: int | None) -> int | None:
+    if elapsed_seconds is None or budget_seconds is None:
+        return None
+    remaining = int(budget_seconds) - int(elapsed_seconds)
+    return remaining if remaining >= 0 else 0
+
+
+def _resolve_launch_mode(override: str | None = None) -> str:
+    value = str(override or os.environ.get("SYNDICATE_REFRESH_LAUNCH_MODE") or "").strip().lower()
+    if not value and (os.environ.get("RENDER") or os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("RENDER_SERVICE_ID")):
+        value = "manifest_only"
+    if not value:
+        value = "detached_subprocess"
     if value in {"detached_subprocess", "manifest_only", "external_runner"}:
         return value
     return "detached_subprocess"
@@ -184,6 +233,8 @@ def _derive_refresh_runtime_state(
     if isinstance(odds_refresh_stderr, str) and odds_refresh_stderr:
         stderr_preview = odds_refresh_stderr[:800]
 
+    elapsed_seconds = _elapsed_seconds(started_at=manifest.get("generatedAt"), finished_at=manifest.get("finishedAt"))
+
     return {
         "state": state,
         "detail": detail,
@@ -196,6 +247,12 @@ def _derive_refresh_runtime_state(
         "run_stamp": manifest.get("runStamp"),
         "stderr_preview": stderr_preview,
         "manifest_state": manifest_state or None,
+        "elapsed_seconds": elapsed_seconds,
+        "runtime_budget_seconds": _runtime_budget_seconds("SYNDICATE_REFRESH_RUNTIME_BUDGET_SECONDS"),
+        "remaining_budget_seconds": _remaining_budget_seconds(
+            elapsed_seconds=elapsed_seconds,
+            budget_seconds=_runtime_budget_seconds("SYNDICATE_REFRESH_RUNTIME_BUDGET_SECONDS"),
+        ),
     }
 
 
@@ -444,6 +501,20 @@ def load_latest_refresh_status() -> dict[str, Any]:
                 "exists": path_exists(path),
                 "payload": payload,
             }
+    worker_status_path = refresh_latest_dir / "refresh_worker_status.json"
+    refresh_artifacts["refresh_worker_status"] = {
+        "path": str(worker_status_path),
+        "exists": path_exists(worker_status_path),
+        "payload": read_json_file(worker_status_path),
+    }
+    queued_job_status_path = None
+    if artifacts_dir_raw:
+        queued_job_status_path = Path(artifacts_dir_raw) / "refresh_job_status.json"
+        refresh_artifacts["refresh_job_status"] = {
+            "path": str(queued_job_status_path),
+            "exists": path_exists(queued_job_status_path),
+            "payload": read_json_file(queued_job_status_path),
+        }
     runtime_state = _derive_refresh_runtime_state(refresh_manifest, refresh_artifacts)
 
     daily_update_latest_dir = current_reports_root / "daily_update" / "latest"
@@ -460,6 +531,26 @@ def load_latest_refresh_status() -> dict[str, Any]:
             daily_update_manifest = candidate_payload
             break
 
+    daily_update_checkpoint_path = daily_update_latest_dir / "unified_daily_update_latest_checkpoint.json"
+    daily_update_checkpoint = read_json_file(daily_update_checkpoint_path)
+    daily_update_run_state_path = daily_update_latest_dir / "unified_daily_update_latest_run_state.json"
+    daily_update_run_state = read_json_file(daily_update_run_state_path)
+    daily_update_trace_path = daily_update_latest_dir / "unified_daily_update_latest_run_trace.json"
+    daily_update_trace = read_json_file(daily_update_trace_path)
+    daily_update_runtime = {
+        "elapsed_seconds": _elapsed_seconds(
+            started_at=(daily_update_manifest or {}).get("generatedAt"),
+            finished_at=(daily_update_manifest or {}).get("completedAt"),
+        ),
+        "runtime_budget_seconds": _runtime_budget_seconds("SYNDICATE_DAILY_UPDATE_RUNTIME_BUDGET_SECONDS"),
+        "started_at": (daily_update_manifest or {}).get("generatedAt"),
+        "finished_at": (daily_update_manifest or {}).get("completedAt"),
+    }
+    daily_update_runtime["remaining_budget_seconds"] = _remaining_budget_seconds(
+        elapsed_seconds=daily_update_runtime.get("elapsed_seconds"),
+        budget_seconds=daily_update_runtime.get("runtime_budget_seconds"),
+    )
+
     return {
         "reports_root": str(current_reports_root),
         "refresh_status": {
@@ -475,6 +566,16 @@ def load_latest_refresh_status() -> dict[str, Any]:
             "manifest_path": str(daily_update_manifest_path),
             "manifest_exists": path_exists(daily_update_manifest_path),
             "manifest": daily_update_manifest,
+            "runtime": daily_update_runtime,
+            "checkpoint_path": str(daily_update_checkpoint_path),
+            "checkpoint_exists": path_exists(daily_update_checkpoint_path),
+            "checkpoint": daily_update_checkpoint,
+            "run_state_path": str(daily_update_run_state_path),
+            "run_state_exists": path_exists(daily_update_run_state_path),
+            "run_state": daily_update_run_state,
+            "trace_path": str(daily_update_trace_path),
+            "trace_exists": path_exists(daily_update_trace_path),
+            "trace": daily_update_trace,
         },
     }
 
@@ -547,6 +648,7 @@ def launch_refresh_run(
     mirror_only: bool = False,
     execution_mode: str | None = None,
     dry_run: bool = False,
+    launch_mode: str | None = None,
 ) -> dict[str, Any]:
     _assert_no_active_refresh_run()
     selected_date = date or _today_date()
@@ -554,7 +656,7 @@ def launch_refresh_run(
     # Default to in-season sports for the target date rather than running all sports.
     effective_sports = _coerce_slug_list(sports) if sports else _active_sports_for_date(selected_date)
     run_stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    launch_mode = _resolve_launch_mode()
+    launch_mode = _resolve_launch_mode(launch_mode)
     current_reports_root = _reports_root()
     refresh_status_root = current_reports_root / "refresh_status"
     refresh_status_run_dir = refresh_status_root / selected_date / run_stamp

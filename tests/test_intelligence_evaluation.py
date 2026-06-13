@@ -74,6 +74,34 @@ class IntelligenceEvaluationTests(unittest.TestCase):
         self.assertAlmostEqual(metadata["max_delta_detected"], 0.5)
         self.assertEqual(metadata["last_odds_update_timestamp"], "2026-06-11T14:30:00Z")
 
+    def test_build_intelligence_evaluation_bundle_includes_history_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"
+            bundle = build_intelligence_evaluation_bundle(
+                query={
+                    "question": "top edges today",
+                    "selected_date": "2026-06-11",
+                    "sport": "nba",
+                },
+                response={
+                    "selected_date": "2026-06-11",
+                    "recommendations": [
+                        {
+                            "name": "Jayson Tatum Over 28.5",
+                            "market": "points",
+                            "line": 28.5,
+                            "model_probability": 0.63,
+                        }
+                    ],
+                },
+                persist=True,
+                ledger_path=ledger_path,
+            )
+
+        self.assertEqual(bundle["history"]["sport"], "nba")
+        self.assertEqual(bundle["history"]["market_family"], "props")
+        self.assertIn("history_status", bundle["history"])
+
     def test_build_intelligence_evaluation_bundle_appends_only_changed_event_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             ledger_path = Path(tmp_dir) / "evaluation_ledger.jsonl"

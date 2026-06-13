@@ -452,6 +452,29 @@ def _record_sport(record: Mapping[str, Any]) -> str | None:
     )
 
 
+def _record_market_family(record: Mapping[str, Any]) -> str | None:
+    recommendation = _copy_mapping(record.get("recommendation"))
+    response = _copy_mapping(record.get("response"))
+    market = str(
+        recommendation.get("market")
+        or recommendation.get("market_family")
+        or recommendation.get("market_label")
+        or response.get("market")
+        or ""
+    ).strip().lower()
+    if not market:
+        return None
+    if any(token in market for token in ("prop", "player", "point", "rebound", "assist", "steal", "block", "shot")):
+        return "props"
+    if any(token in market for token in ("moneyline", "ml", "money line")):
+        return "moneyline"
+    if any(token in market for token in ("spread", "ats", "spreads")):
+        return "spread"
+    if any(token in market for token in ("total", "over", "under", "o/u")):
+        return "totals"
+    return market
+
+
 def _latest_by_recommendation_id(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     latest: dict[str, dict[str, Any]] = {}
     fallback: dict[str, dict[str, Any]] = {}
@@ -569,6 +592,35 @@ def build_reliability_profile(*, records: Iterable[Mapping[str, Any]] | None = N
     }
 
 
+def build_evaluation_history_summary(*, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None, sport: str | None = None, market_family: str | None = None) -> dict[str, Any]:
+    record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    sport_slug = str(sport or "").strip().lower() or None
+    market_family_slug = str(market_family or "").strip().lower() or None
+    if sport_slug:
+        record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None} or _record_sport(record) == sport_slug]
+    if market_family_slug:
+        record_rows = [record for record in record_rows if _record_market_family(record) in {market_family_slug, None} or _record_market_family(record) == market_family_slug]
+
+    reliability_profile = build_reliability_profile(records=record_rows, sport=sport_slug)
+    metrics = reliability_profile.get("metrics") if isinstance(reliability_profile.get("metrics"), Mapping) else {}
+    settled_count = int(metrics.get("settled_count") or 0)
+    decisive_count = int(metrics.get("decisive_count") or 0)
+    summary = {
+        "sport": sport_slug,
+        "market_family": market_family_slug,
+        "sample_size": int(metrics.get("sample_size") or 0),
+        "settled_count": settled_count,
+        "decisive_count": decisive_count,
+        "win_rate": metrics.get("win_rate"),
+        "roi": metrics.get("roi"),
+        "clv": metrics.get("clv"),
+        "calibration": metrics.get("calibration"),
+        "reliability_multiplier": reliability_profile.get("reliability_multiplier"),
+    }
+    summary["history_status"] = "available" if summary["sample_size"] else "empty"
+    return summary
+
+
 def adjust_confidence(base_confidence: float, *, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None, sport: str | None = None) -> tuple[float, dict[str, Any]]:
     profile = build_reliability_profile(records=records, ledger_path=ledger_path, sport=sport)
     adjusted = float(base_confidence)
@@ -595,12 +647,19 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         )
         for recommendation in recommendation_rows
     ]
+    history_summary = build_evaluation_history_summary(
+        records=None,
+        ledger_path=ledger_path,
+        sport=artifact_metadata.get("sport"),
+        market_family=_record_market_family(recommendation_records[0]) if recommendation_records else None,
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "prediction": prediction_record,
         "recommendations": recommendation_records,
         "artifact_metadata": artifact_metadata,
         "metrics": compute_metrics(records=recommendation_records),
+        "history": history_summary,
     }
 
 
@@ -610,6 +669,7 @@ __all__ = [
     "build_artifact_metadata",
     "build_reliability_profile",
     "build_intelligence_evaluation_bundle",
+    "build_evaluation_history_summary",
     "adjust_confidence",
     "compute_metrics",
     "record_prediction",

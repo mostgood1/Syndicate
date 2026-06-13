@@ -197,7 +197,7 @@ class QueryRouter:
             routed_payload["preview_subject"] = route.preview_subject
         if route.player_subject:
             routed_payload["player_subject"] = route.player_subject
-        if route.query_type in {"game_preview", "player_analysis"}:
+        if route.query_type in {"game_preview", "player_analysis", "comparison"}:
             routed_payload["include_games"] = True
             routed_payload["include_props"] = True
         return routed_payload

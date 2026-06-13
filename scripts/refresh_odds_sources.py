@@ -21,6 +21,7 @@ WORKSPACE_ROOT = REPO_ROOT.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from syndicate.features.shared.odds_control_plane import write_odds_control_plane_snapshot
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
 
@@ -687,6 +688,24 @@ def _sport_artifact_paths(sport_result: dict[str, Any]) -> list[str]:
     return paths
 
 
+def _sport_control_plane_metadata(sport_result: dict[str, Any], *, date: str, phase: str, execution_mode: str, refresh_mode: str) -> dict[str, Any]:
+    artifact_paths = _sport_artifact_paths(sport_result)
+    return {
+        "date": date,
+        "phase": phase,
+        "execution_mode": execution_mode,
+        "refresh_mode": refresh_mode,
+        "ok": bool(sport_result.get("ok")),
+        "post_refresh_ok": bool((sport_result.get("post_refresh") or {}).get("ok")) if isinstance(sport_result.get("post_refresh"), dict) else None,
+        "mirror_ok": bool((sport_result.get("mirror") or {}).get("ok")) if isinstance(sport_result.get("mirror"), dict) else None,
+        "odds_control_plane": {
+            "source_precedence": ["artifact_history", "tracking_history"],
+            "artifact_paths": artifact_paths,
+            "has_post_refresh": bool(sport_result.get("post_refresh")),
+        },
+    }
+
+
 def _validate_source_root(spec: SportSpec) -> str | None:
     if spec.slug == "mlb":
         source_root = _local_mlb_bundle_root()
@@ -880,15 +899,13 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
         published_manifest = _publish_sport_manifest_threadsafe(
             sport=spec.slug,
             artifact_paths=_sport_artifact_paths(sport_result),
-            metadata={
-                "date": args.date,
-                "phase": args.phase,
-                "execution_mode": execution_mode,
-                "refresh_mode": refresh_mode,
-                "ok": bool(sport_result.get("ok")),
-                "post_refresh_ok": None,
-                "mirror_ok": None,
-            },
+            metadata=_sport_control_plane_metadata(
+                sport_result,
+                date=args.date,
+                phase=args.phase,
+                execution_mode=execution_mode,
+                refresh_mode=refresh_mode,
+            ),
         )
         sport_result["sport_manifest"] = published_manifest
         return sport_result
@@ -945,15 +962,13 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
     published_manifest = _publish_sport_manifest_threadsafe(
         sport=spec.slug,
         artifact_paths=_sport_artifact_paths(sport_result),
-        metadata={
-            "date": args.date,
-            "phase": args.phase,
-            "execution_mode": execution_mode,
-            "refresh_mode": refresh_mode,
-            "ok": bool(sport_result.get("ok")),
-            "post_refresh_ok": bool((sport_result.get("post_refresh") or {}).get("ok")) if isinstance(sport_result.get("post_refresh"), dict) else None,
-            "mirror_ok": bool((sport_result.get("mirror") or {}).get("ok")) if isinstance(sport_result.get("mirror"), dict) else None,
-        },
+        metadata=_sport_control_plane_metadata(
+            sport_result,
+            date=args.date,
+            phase=args.phase,
+            execution_mode=execution_mode,
+            refresh_mode=refresh_mode,
+        ),
     )
     sport_result["sport_manifest"] = published_manifest
     return sport_result
@@ -1067,6 +1082,8 @@ def main() -> int:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         print(json.dumps(payload, indent=2))
         return 1
+
+    summary["odds_control_plane"] = write_odds_control_plane_snapshot(summary)
 
     if args.json:
         print(json.dumps(summary, indent=2))

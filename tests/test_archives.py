@@ -1245,6 +1245,9 @@ class DateArchiveHelperTests(unittest.TestCase):
             root = Path(temp_dir)
             local_root = root / "data" / "ncaab_source"
             sibling_root = root / "NCAAB"
+            local_file = local_root / "api" / "display_prediction_dates.json"
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text("{}", encoding="utf-8")
             sibling_file = sibling_root / "api" / "display_prediction_dates.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
@@ -1255,11 +1258,29 @@ class DateArchiveHelperTests(unittest.TestCase):
                     local_root / "api" / "display_prediction_dates.json",
                 )
 
+    def test_ncaab_mirror_path_prefers_artifact_root_when_available(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            artifact_root = root / "data" / "ncaab_source" / "source_artifacts"
+            local_root = root / "data" / "ncaab_source"
+            artifact_file = artifact_root / "api" / "display_prediction_dates.json"
+            artifact_file.parent.mkdir(parents=True, exist_ok=True)
+            artifact_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.ncaab.sources._source_roots", return_value=[artifact_root, local_root]):
+                self.assertEqual(
+                    ncaab_mirror_path("display_prediction_dates.json"),
+                    artifact_root / "api" / "display_prediction_dates.json",
+                )
+
     def test_nfl_data_path_does_not_fall_back_to_sibling_repo(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             local_root = root / "data" / "nfl_source"
             sibling_root = root / "NFL-Betting" / "nfl_compare" / "data"
+            local_file = local_root / "current_week.json"
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text("{}", encoding="utf-8")
             sibling_file = sibling_root / "current_week.json"
             sibling_file.parent.mkdir(parents=True, exist_ok=True)
             sibling_file.write_text("{}", encoding="utf-8")
@@ -1268,6 +1289,21 @@ class DateArchiveHelperTests(unittest.TestCase):
                 self.assertEqual(
                     nfl_data_path("current_week.json"),
                     local_root / "current_week.json",
+                )
+
+    def test_nfl_data_path_prefers_artifact_root_when_available(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            artifact_root = root / "data" / "nfl_source" / "source_artifacts"
+            local_root = root / "data" / "nfl_source"
+            artifact_file = artifact_root / "current_week.json"
+            artifact_file.parent.mkdir(parents=True, exist_ok=True)
+            artifact_file.write_text("{}", encoding="utf-8")
+
+            with patch("syndicate.features.nfl.sources._source_roots", return_value=[artifact_root, local_root]):
+                self.assertEqual(
+                    nfl_data_path("current_week.json"),
+                    artifact_root / "current_week.json",
                 )
 
     def test_nfl_week_summaries_do_not_fall_back_to_sibling_repo(self) -> None:

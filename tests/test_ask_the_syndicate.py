@@ -141,6 +141,8 @@ class AskTheSyndicateApiTests(unittest.TestCase):
             ],
             "analysis_brief": {"kind": "bundle", "title": "Brief"},
             "supporting_evidence": {"kind": "bundle", "title": "Evidence"},
+            "evaluation_record": {"kind": "bundle", "title": "Evaluation record"},
+            "evaluation_history": {"kind": "bundle", "title": "Evaluation history", "history_status": "available"},
             "readiness_gate": {"ok": True},
         }
 
@@ -158,6 +160,11 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(payload["schema_type"], "market_summary")
         self.assertEqual(payload["schema"]["top_opportunities"][0]["selection"], "Jayson Tatum Over 28.5")
         self.assertEqual(payload["schema"]["rationale_summary"]["analysis_brief"]["title"], "Brief")
+        self.assertEqual([section["title"] for section in payload["supporting_evidence"]], ["Brief", "Evidence", "Recommendation evidence"])
+        self.assertEqual(payload["evaluation_record"]["title"], "Evaluation record")
+        self.assertEqual(payload["engine"]["evaluation_record"]["title"], "Evaluation record")
+        self.assertEqual(payload["evaluation_history"]["title"], "Evaluation history")
+        self.assertEqual(payload["engine"]["evaluation_history"]["history_status"], "available")
 
     def test_query_route_requires_question(self) -> None:
         app = Flask(__name__)
@@ -175,8 +182,33 @@ class AskTheSyndicateApiTests(unittest.TestCase):
 
         self.assertEqual(router.route("What do you think of this spread?").intent, "bet_analysis")
         self.assertEqual(router.route("Lakers vs Celtics").intent, "matchup_analysis")
+        self.assertEqual(router.route("Compare NBA and WNBA picks tonight").intent, "comparison")
         self.assertEqual(router.route("best bets today").intent, "market_summary")
         self.assertEqual(router.route("top edges on these player props").intent, "market_summary")
+
+    def test_query_router_prefers_comparison_over_matchup_when_both_match(self) -> None:
+        router = SyndicateQueryRouter()
+
+        self.assertEqual(router.route("Compare Lakers vs Celtics tonight").intent, "comparison")
+
+    def test_blueprint_shapes_comparison_prompts_for_matchup_execution(self) -> None:
+        payload = ask_the_syndicate_bp.view_functions["ask_the_syndicate_query_api"]
+        shaped = payload.__globals__["_smart_route_payload"]({"question": "Compare NBA and WNBA picks tonight", "context": {"sport": "nba"}})
+
+        self.assertEqual(shaped["query_type"], "comparison")
+        self.assertEqual(shaped["mode"], "comparison")
+        self.assertTrue(shaped["include_games"])
+        self.assertTrue(shaped["include_props"])
+
+    def test_query_cache_key_treats_comparison_as_comparison_intent(self) -> None:
+        payload = ask_the_syndicate_bp.view_functions["ask_the_syndicate_query_api"]
+        cache_key = payload.__globals__["_query_cache_key"](
+            "Compare NBA and WNBA picks tonight",
+            {"question": "Compare NBA and WNBA picks tonight", "context": {"sport": "nba"}},
+            RouteDecision(intent="comparison", handler_name="handle_matchup_analysis", matched_terms=("compare",), score=351),
+        )
+
+        self.assertTrue(cache_key)
 
     def test_adapter_uses_engine_explainability(self) -> None:
         result = IntelligenceResult.from_raw(
@@ -207,6 +239,122 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(payload["schema"]["selection"], "Jayson Tatum Over 28.5")
         self.assertEqual(payload["schema"]["explanation"]["analysis_brief"]["title"], "Brief")
         self.assertEqual(payload["schema"]["explanation"]["supporting_evidence"]["title"], "Evidence")
+
+    def test_adapter_exposes_routing_context_and_context_awareness(self) -> None:
+        result = IntelligenceResult.from_raw(
+            {
+                "query_type": "comparison",
+                "summary": "Cross-sport comparison",
+                "structured_response": {
+                    "context_awareness": {
+                        "detected_sports": ["nba", "wnba"],
+                        "multi_sport": True,
+                    }
+                },
+                "recommendations": [{"name": "NBA side", "summary": "Primary NBA angle."}],
+            },
+            pipeline_context={
+                "routing_context": {
+                    "question": "Compare NBA and WNBA picks tonight",
+                    "query_type": "comparison",
+                    "sport": "nba",
+                }
+            },
+        )
+
+        payload = build_syndicate_query_response(
+            question="Compare NBA and WNBA picks tonight",
+            context={"sport": "nba"},
+            decision=RouteDecision(intent="market_summary", handler_name="handle_market_summary", matched_terms=("compare",), score=280),
+            result=result,
+        )
+
+        self.assertEqual(payload["routing_context"]["query_type"], "comparison")
+        self.assertEqual(payload["routing_context"]["question"], "Compare NBA and WNBA picks tonight")
+        self.assertEqual(payload["context_awareness"]["detected_sports"], ["nba", "wnba"])
+        self.assertTrue(payload["context_awareness"]["multi_sport"])
+        self.assertEqual(payload["engine"]["routing_context"]["sport"], "nba")
+
+    def test_query_route_returns_comparison_schema_for_compare_prompts(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(ask_the_syndicate_bp)
+
+        with patch("syndicate.blueprints.ask_the_syndicate.run_routed_intelligence_pipeline") as mocked_pipeline:
+            mocked_pipeline.return_value = {
+                "query_type": "comparison",
+                "summary": "Cross-sport comparison",
+                "recommendations": [
+                    {"name": "NBA side", "summary": "Primary NBA angle."},
+                    {"name": "WNBA side", "summary": "Primary WNBA angle."},
+                ],
+                "structured_response": {
+                    "supporting_evidence": [
+                        {"kind": "bundle", "title": "Comparison evidence"},
+                        {"kind": "bundle", "title": "Cross-sport reasoning"},
+                    ],
+                    "context_awareness": {"detected_sports": ["nba", "wnba"], "multi_sport": True}
+                },
+                "analysis_views": {},
+                "analysis_brief": {"kind": "bundle", "title": "Brief"},
+                "supporting_evidence": {"kind": "bundle", "title": "Evidence"},
+                "readiness_gate": {"ok": True},
+            }
+            response = app.test_client().post(
+                "/api/syndicate/query",
+                json={
+                    "question": "Compare NBA and WNBA picks tonight",
+                    "context": {"sport": "nba"},
+                },
+            )
+
+        payload = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["intent"], "comparison")
+        self.assertEqual(payload["schema_type"], "matchup_analysis")
+        self.assertEqual(payload["routing"]["handler"], "handle_matchup_analysis")
+        self.assertEqual(payload["schema"]["teams"], ["NBA side", "WNBA side"])
+        self.assertEqual([section["title"] for section in payload["supporting_evidence"]], ["Comparison evidence", "Cross-sport reasoning"])
+
+    def test_query_route_preserves_routing_context_on_state_cache_responses(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(ask_the_syndicate_bp)
+
+        cached_state = {
+            "latestKey": "cache-key",
+            "latestComputedAt": "2026-06-12T22:16:54Z",
+            "top_opportunities": [
+                {
+                    "name": "NBA side",
+                    "summary": "Primary NBA angle.",
+                }
+            ],
+            "response": {
+                "recommendations": [
+                    {
+                        "name": "NBA side",
+                        "summary": "Primary NBA angle.",
+                    }
+                ],
+                "analysis_views": {},
+            },
+        }
+
+        with patch("syndicate.blueprints.ask_the_syndicate.read_latest_intelligence_state_response", return_value=cached_state):
+            response = app.test_client().post(
+                "/api/syndicate/query",
+                json={
+                    "question": "Compare NBA and WNBA picks tonight",
+                    "context": {"sport": "nba"},
+                },
+            )
+
+        payload = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["served_from_state_cache"])
+        self.assertEqual(payload["routing_context"]["question"], "Compare NBA and WNBA picks tonight")
+        self.assertEqual(payload["routing_context"]["sport"], "nba")
+        self.assertEqual(payload["context_awareness"]["detected_sports"], ["nba", "wnba"])
+        self.assertTrue(payload["context_awareness"]["multi_sport"])
 
 
 if __name__ == "__main__":

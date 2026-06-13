@@ -40,6 +40,7 @@ from pipeline.intelligence_models import IntelligenceResult
 from router.query_router import QueryRouter
 from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+from syndicate.features.shared.odds_control_plane import load_odds_control_plane_snapshot
 
 
 logger = logging.getLogger(__name__)
@@ -200,6 +201,7 @@ def _normalize_request(request_or_payload: Any) -> IntelligencePipelineRequest:
 
 
 def _enrich_context(normalized_request: IntelligencePipelineRequest) -> dict[str, Any]:
+    odds_control_plane = load_odds_control_plane_snapshot() or {}
     return {
         "enriched": False,
         "notes": ["context enrichment placeholder"],
@@ -210,6 +212,202 @@ def _enrich_context(normalized_request: IntelligencePipelineRequest) -> dict[str
         "sport": normalized_request.sport,
         "mode": normalized_request.mode,
         "timing": normalized_request.timing,
+        "routing_context": {
+            "question": normalized_request.question,
+            "query_type": normalized_request.query_type,
+            "mode": normalized_request.mode,
+            "selected_date": normalized_request.selected_date,
+            "preview_subject": normalized_request.preview_subject,
+            "player_subject": normalized_request.player_subject,
+            "sport": normalized_request.sport,
+            "limit": normalized_request.limit,
+            "include_props": normalized_request.include_props,
+            "include_games": normalized_request.include_games,
+        },
+        "odds_control_plane": odds_control_plane,
+    }
+
+
+def _odds_control_plane_evidence(context: dict[str, Any]) -> dict[str, Any] | None:
+    control_plane = context.get("odds_control_plane")
+    if not isinstance(control_plane, dict) or not control_plane:
+        return None
+    sports = control_plane.get("sports") if isinstance(control_plane.get("sports"), list) else []
+    source_precedence = control_plane.get("source_precedence") if isinstance(control_plane.get("source_precedence"), list) else []
+    sections: list[dict[str, Any]] = []
+    sections.append(
+        {
+            "kind": "metrics",
+            "title": "Control plane summary",
+            "items": [
+                {"label": "generated_at", "value": control_plane.get("generated_at")},
+                {"label": "date", "value": control_plane.get("date")},
+                {"label": "phase", "value": control_plane.get("phase")},
+                {"label": "execution_mode", "value": control_plane.get("execution_mode")},
+                {"label": "summary_ok", "value": control_plane.get("summary_ok")},
+            ],
+        }
+    )
+    if source_precedence:
+        sections.append(
+            {
+                "kind": "list",
+                "title": "Source precedence",
+                "items": [{"label": str(index + 1), "detail": str(item)} for index, item in enumerate(source_precedence)],
+            }
+        )
+    if sports:
+        sections.append(
+            {
+                "kind": "list",
+                "title": "Sport coverage",
+                "items": [
+                    {
+                        "label": str(sport.get("sport") or f"sport_{index + 1}"),
+                        "detail": "ok" if sport.get("ok") else "needs attention",
+                    }
+                    for index, sport in enumerate(sports)
+                    if isinstance(sport, dict)
+                ],
+            }
+        )
+    return {
+        "kind": "bundle",
+        "title": "Odds control plane",
+        "sections": sections,
+    }
+
+
+def _comparison_evidence(context: dict[str, Any], recommendations: list[dict[str, Any]], context_awareness: dict[str, Any]) -> dict[str, Any] | None:
+    if str(context.get("query_type") or "").strip() != "comparison":
+        return None
+
+    detected_sports = context_awareness.get("detected_sports") if isinstance(context_awareness.get("detected_sports"), list) else []
+    top_items: list[dict[str, Any]] = []
+    for index, recommendation in enumerate(recommendations[:2]):
+        top_items.append(
+            {
+                "label": recommendation.get("name") or recommendation.get("pick") or f"Side {index + 1}",
+                "detail": recommendation.get("summary") or recommendation.get("writeup") or recommendation.get("rationale") or "Comparison candidate.",
+            }
+        )
+
+    sections: list[dict[str, Any]] = []
+    if detected_sports:
+        sections.append(
+            {
+                "kind": "list",
+                "title": "Detected sports",
+                "items": [{"label": str(index + 1), "detail": str(sport)} for index, sport in enumerate(detected_sports)],
+            }
+        )
+    if top_items:
+        sections.append(
+            {
+                "kind": "list",
+                "title": "Top sides",
+                "items": top_items,
+            }
+        )
+    sections.append(
+        {
+            "kind": "metrics",
+            "title": "Comparison framing",
+            "items": [
+                {"label": "multi_sport", "value": bool(context_awareness.get("multi_sport"))},
+                {"label": "confidence", "value": context_awareness.get("confidence")},
+            ],
+        }
+    )
+    return {
+        "kind": "bundle",
+        "title": "Comparison evidence",
+        "sections": sections,
+    }
+
+
+def _cross_sport_evidence(context: dict[str, Any], recommendations: list[dict[str, Any]], context_awareness: dict[str, Any]) -> dict[str, Any] | None:
+    if bool(context_awareness.get("multi_sport")) is not True:
+        return None
+    if str(context.get("query_type") or "").strip() == "comparison":
+        return None
+
+    detected_sports = context_awareness.get("detected_sports") if isinstance(context_awareness.get("detected_sports"), list) else []
+    sections: list[dict[str, Any]] = []
+    if detected_sports:
+        sections.append(
+            {
+                "kind": "list",
+                "title": "Sport mix",
+                "items": [{"label": str(index + 1), "detail": str(sport)} for index, sport in enumerate(detected_sports)],
+            }
+        )
+    sections.append(
+        {
+            "kind": "metrics",
+            "title": "Cross-sport framing",
+            "items": [
+                {"label": "recommendation_count", "value": len(recommendations)},
+                {"label": "reasoning_step_count", "value": context_awareness.get("reasoning_step_count")},
+                {"label": "confidence", "value": context_awareness.get("confidence")},
+            ],
+        }
+    )
+    if recommendations:
+        sections.append(
+            {
+                "kind": "list",
+                "title": "Leading candidates",
+                "items": [
+                    {
+                        "label": item.get("name") or item.get("pick") or f"Candidate {index + 1}",
+                        "detail": item.get("summary") or item.get("writeup") or item.get("rationale") or "Cross-sport candidate.",
+                    }
+                    for index, item in enumerate(recommendations[:3])
+                ],
+            }
+        )
+    return {
+        "kind": "bundle",
+        "title": "Cross-sport reasoning",
+        "sections": sections,
+    }
+
+
+def _recommendation_evidence(context: dict[str, Any], recommendations: list[dict[str, Any]], context_awareness: dict[str, Any]) -> dict[str, Any] | None:
+    if str(context.get("query_type") or "").strip() == "comparison":
+        return None
+    if not recommendations:
+        return None
+
+    sections: list[dict[str, Any]] = [
+        {
+            "kind": "metrics",
+            "title": "Recommendation framing",
+            "items": [
+                {"label": "query_type", "value": context.get("query_type") or context_awareness.get("query_type") or "explanation"},
+                {"label": "recommendation_count", "value": len(recommendations)},
+                {"label": "confidence", "value": context_awareness.get("confidence")},
+            ],
+        }
+    ]
+    sections.append(
+        {
+            "kind": "list",
+            "title": "Top recommendations",
+            "items": [
+                {
+                    "label": item.get("name") or item.get("pick") or f"Recommendation {index + 1}",
+                    "detail": item.get("summary") or item.get("writeup") or item.get("rationale") or item.get("market") or "Recommendation candidate.",
+                }
+                for index, item in enumerate(recommendations[:3])
+            ],
+        }
+    )
+    return {
+        "kind": "bundle",
+        "title": "Recommendation evidence",
+        "sections": sections,
     }
 
 
@@ -231,6 +429,9 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
                 "sections": [item.to_dict() for item in result.evidence[:6]],
             }
         )
+    odds_control_plane_evidence = _odds_control_plane_evidence(context)
+    if odds_control_plane_evidence is not None:
+        evidence_sections.append(odds_control_plane_evidence)
 
     risks: list[str] = []
     if result.board_notes:
@@ -285,6 +486,15 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
     player_response = None
     if context.get("query_type") == "player_analysis":
         player_response = _build_player_analysis_response(result, context)
+    comparison_evidence = _comparison_evidence(context, recommendations, context_awareness)
+    if comparison_evidence is not None:
+        evidence_sections.append(comparison_evidence)
+    cross_sport_evidence = _cross_sport_evidence(context, recommendations, context_awareness)
+    if cross_sport_evidence is not None:
+        evidence_sections.append(cross_sport_evidence)
+    recommendation_evidence = _recommendation_evidence(context, recommendations, context_awareness)
+    if recommendation_evidence is not None:
+        evidence_sections.append(recommendation_evidence)
 
     final_takeaway = (
         f"Best takeaway: {top_recommendation.get('name') or top_recommendation.get('pick') or 'the board'} is the primary angle, but size it against the reported risks and treat the evidence as directional, not absolute."
@@ -298,6 +508,8 @@ def _build_structured_response(result: IntelligenceResult, context: dict[str, An
         "clear_summary": clear_summary,
         "deep_analysis": deep_analysis,
         "context_awareness": context_awareness,
+        "routing_context": context.get("routing_context") or {},
+        "odds_control_plane": context.get("odds_control_plane") or {},
         "key_insights": [
             {
                 "label": item.get("name") or item.get("pick") or f"Recommendation {index + 1}",
@@ -597,6 +809,16 @@ def _matches_any(patterns: tuple[re.Pattern[str], ...], value: str) -> bool:
     return any(pattern.search(value) for pattern in patterns)
 
 
+def _detect_sport_signals(question: str) -> list[str]:
+    question_text = str(question or "").strip()
+    sport_labels = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab")
+    detected: list[str] = []
+    for sport_label, pattern in zip(sport_labels, _SPORT_CONTEXT_PATTERNS):
+        if pattern.search(question_text):
+            detected.append(sport_label)
+    return detected
+
+
 def _build_context_awareness(result: IntelligenceResult, context: dict[str, Any], recommendations: list[dict[str, Any]], reasoning_steps: tuple[dict[str, Any], ...]) -> dict[str, Any]:
     pipeline_request = result.pipeline_request if isinstance(result.pipeline_request, Mapping) else {}
     question = str(pipeline_request.get("question") or "").strip()
@@ -604,7 +826,8 @@ def _build_context_awareness(result: IntelligenceResult, context: dict[str, Any]
     mode = str(pipeline_request.get("mode") or "").strip()
     query_type = str(context.get("query_type") or result.query_type or "explanation").strip() or "explanation"
 
-    has_sport = bool(sport) or _matches_any(_SPORT_CONTEXT_PATTERNS, question)
+    detected_sports = _detect_sport_signals(question)
+    has_sport = bool(sport) or bool(detected_sports)
     has_market = _matches_any(_MARKET_CONTEXT_PATTERNS, question)
     vague_prompt = _matches_any(_VAGUE_PROMPT_PATTERNS, f" {question.lower()} ")
     vague = not has_sport or not has_market or vague_prompt
@@ -648,6 +871,8 @@ def _build_context_awareness(result: IntelligenceResult, context: dict[str, Any]
         "is_vague": vague,
         "confidence": confidence,
         "detected_signals": [signal for signal in [f"sport={sport}" if sport else "", f"mode={mode}" if mode else "", f"intent={query_type}" if query_type else "", "market-signal" if has_market else ""] if signal],
+        "detected_sports": detected_sports,
+        "multi_sport": len(detected_sports) > 1,
         "assumptions": assumptions,
         "clarifying_questions": clarifying_questions,
         "reasoning": reasoning,
@@ -929,7 +1154,7 @@ def _call_intelligence(normalized_request: IntelligencePipelineRequest, context:
             query=result.pipeline_request or normalized_request.to_dict(),
             response=result.to_dict(),
         )
-        result = replace(result, evaluation_record=evaluation_record)
+        result = replace(result, evaluation_record=evaluation_record, structured_response={**structured_response, "evaluation_history": evaluation_record.get("history", {})})
 
     return result
 

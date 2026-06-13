@@ -78,7 +78,7 @@ class OpsRefreshApiTests(unittest.TestCase):
             )
 
             (refresh_latest / "refresh_status_latest.json").write_text(
-                json.dumps({"date": "2026-05-19", "artifactsDir": str(artifacts_dir)}),
+                json.dumps({"date": "2026-05-19", "artifactsDir": str(artifacts_dir), "generatedAt": "2026-05-19T12:00:00Z", "finishedAt": "2026-05-19T12:30:00Z"}),
                 encoding="utf-8",
             )
             (mlb_mirror_manifest_dir / "mirror_refresh_latest.json").write_text(
@@ -93,7 +93,7 @@ class OpsRefreshApiTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (daily_latest / "daily_update_latest.json").write_text(
-                json.dumps({"date": "2026-05-19", "latestRunDir": "reports/daily_update/2026-05-19/run"}),
+                json.dumps({"date": "2026-05-19", "latestRunDir": "reports/daily_update/2026-05-19/run", "generatedAt": "2026-05-19T12:00:00Z", "completedAt": "2026-05-19T12:45:00Z"}),
                 encoding="utf-8",
             )
 
@@ -111,10 +111,14 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["status"]["refresh_status"]["manifest"]["date"], "2026-05-19")
         self.assertTrue(payload["status"]["refresh_status"]["artifacts"]["odds_refresh"]["exists"])
         self.assertEqual(payload["status"]["refresh_status"]["runtime"]["state"], "finished")
+        self.assertEqual(payload["status"]["refresh_status"]["runtime"]["elapsed_seconds"], 1800)
+        self.assertEqual(payload["status"]["refresh_status"]["runtime"]["remaining_budget_seconds"], 12600)
         self.assertGreaterEqual(len(payload["status"]["refresh_status"]["history"]), 1)
         self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["sport"], "mlb")
         self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["copied_artifact_count"], 14)
         self.assertEqual(payload["status"]["daily_update"]["manifest"]["date"], "2026-05-19")
+        self.assertEqual(payload["status"]["daily_update"]["runtime"]["elapsed_seconds"], 2700)
+        self.assertEqual(payload["status"]["daily_update"]["runtime"]["remaining_budget_seconds"], 11700)
 
     def test_version_endpoint_returns_render_commit_metadata(self) -> None:
         with patch.dict(
@@ -193,6 +197,14 @@ class OpsRefreshApiTests(unittest.TestCase):
             artifacts_dir = reports_root / "migration_runs" / "2026-05-22" / "odds_refresh_20260522_120000"
             refresh_latest.mkdir(parents=True, exist_ok=True)
             artifacts_dir.mkdir(parents=True, exist_ok=True)
+            (refresh_latest / "refresh_worker_status.json").write_text(
+                json.dumps({"state": "finished", "detail": "worker finished", "ranJob": True, "runExitCode": 0}),
+                encoding="utf-8",
+            )
+            (artifacts_dir / "refresh_job_status.json").write_text(
+                json.dumps({"state": "finished", "exitCode": 0}),
+                encoding="utf-8",
+            )
             (refresh_latest / "refresh_status_latest.json").write_text(
                 json.dumps(
                     {
@@ -220,6 +232,8 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(runtime["state"], "pending_external")
         self.assertEqual(runtime["launch_owner"], "external_runner")
         self.assertEqual((runtime.get("external_runner") or {}).get("queue_state"), "queued")
+        self.assertEqual((payload["status"]["refresh_status"]["artifacts"]["refresh_worker_status"]["payload"] or {}).get("state"), "finished")
+        self.assertEqual((payload["status"]["refresh_status"]["artifacts"]["refresh_job_status"]["payload"] or {}).get("state"), "finished")
 
     def test_status_reads_from_env_configured_reports_and_data_roots(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -245,6 +259,18 @@ class OpsRefreshApiTests(unittest.TestCase):
                 json.dumps({"date": "2026-05-22"}),
                 encoding="utf-8",
             )
+            (daily_latest / "unified_daily_update_latest_checkpoint.json").write_text(
+                json.dumps({"date": "2026-05-22", "currentStage": "refresh_gate", "completedStages": ["source_update"]}),
+                encoding="utf-8",
+            )
+            (daily_latest / "unified_daily_update_latest_run_state.json").write_text(
+                json.dumps({"date": "2026-05-22", "currentStage": "refresh_gate", "completedStages": ["source_update"], "failedStage": None}),
+                encoding="utf-8",
+            )
+            (daily_latest / "unified_daily_update_latest_run_trace.json").write_text(
+                json.dumps({"date": "2026-05-22", "trace": {"inputFingerprintCount": 3, "artifactPathCount": 2}}),
+                encoding="utf-8",
+            )
             (mirror_manifest_dir / "mirror_refresh_latest.json").write_text(
                 json.dumps({"sport": "mlb", "date": "2026-05-22", "copiedArtifactCount": 3}),
                 encoding="utf-8",
@@ -266,9 +292,12 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertEqual(payload["status"]["reports_root"], str(reports_root))
+        self.assertEqual(Path(payload["status"]["reports_root"]).resolve(), reports_root.resolve())
         self.assertEqual(payload["status"]["refresh_status"]["manifest"]["date"], "2026-05-22")
         self.assertEqual(payload["status"]["refresh_status"]["mirror_manifests"][0]["sport"], "mlb")
+        self.assertEqual(payload["status"]["daily_update"]["checkpoint"]["currentStage"], "refresh_gate")
+        self.assertEqual(payload["status"]["daily_update"]["run_state"]["currentStage"], "refresh_gate")
+        self.assertEqual(payload["status"]["daily_update"]["trace"]["trace"]["inputFingerprintCount"], 3)
 
     def test_plan_endpoint_returns_dry_run_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
@@ -793,7 +822,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         fake_status = {
             "refresh_status": {
                 "manifest_path": "reports/refresh_status/latest/refresh_status_latest.json",
-                    "manifest": {"date": "2026-05-22", "refreshOdds": True, "artifactsDir": "reports/x"},
+                    "manifest": {"date": "2026-05-22", "refreshOdds": True, "artifactsDir": "reports/x", "generatedAt": "2026-05-22T12:00:00Z", "finishedAt": "2026-05-22T12:30:00Z"},
                 "artifacts": {"odds_refresh": {"path": "reports/x/odds_refresh.json", "exists": True}},
                 "mirror_manifests": [
                     {
@@ -806,9 +835,16 @@ class OpsRefreshApiTests(unittest.TestCase):
                             "manifest": {"sourceRepo": "C:/repos/mlb_source_bundle"},
                     }
                 ],
-                "runtime": {"state": "finished", "detail": "Latest refresh run completed successfully.", "pid": 4321},
+                "runtime": {"state": "finished", "detail": "Latest refresh run completed successfully.", "pid": 4321, "elapsed_seconds": 1800, "runtime_budget_seconds": 14400},
             },
-            "daily_update": {"manifest": {"date": "2026-05-19"}},
+            "daily_update": {
+                "manifest": {"date": "2026-05-19", "generatedAt": "2026-05-19T12:00:00Z", "completedAt": "2026-05-19T12:45:00Z"},
+                "checkpoint": {"currentStage": "refresh_gate"},
+                "run_state": {"currentStage": "refresh_gate"},
+                "runtime": {"elapsed_seconds": 2700, "runtime_budget_seconds": 14400},
+                "checkpoint_path": "reports/daily_update/latest/unified_daily_update_latest_checkpoint.json",
+                "run_state_path": "reports/daily_update/latest/unified_daily_update_latest_run_state.json",
+            },
         }
         fake_plan = {
             "ok": True,
@@ -916,10 +952,7 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertNotIn("Source repo: C:/repos/NCAAFCompare", html)
 
     def test_full_refresh_run_uses_full_mode(self) -> None:
-        launch_called = threading.Event()
-
         def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
-            launch_called.set()
             return {"ok": True, "pid": 4343, "run_stamp": "20260520_123100", "date": "2026-05-20", "state": "running"}
 
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
@@ -928,9 +961,6 @@ class OpsRefreshApiTests(unittest.TestCase):
         ) as mocked, patch("syndicate.features.shared.ops_refresh._reports_root", return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports"), patch(
             "syndicate.blueprints.ops.reports_root",
             return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports",
-        ), patch("syndicate.blueprints.ops._pid_is_running", return_value=False), patch(
-            "syndicate.blueprints.ops.load_latest_refresh_status",
-            return_value={"refresh_status": {"runtime": {"state": "finished"}}},
         ):
             response = self.client.post(
                 "/api/ops/full-refresh/run",
@@ -943,9 +973,9 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertTrue(payload["ok"])
             self.assertEqual(payload["status"], "started")
             self.assertTrue(payload["job_id"])
-            self.assertTrue(launch_called.wait(1.0))
             mocked.assert_called_once()
             self.assertEqual(mocked.call_args.kwargs.get("mode"), "full")
+            self.assertEqual(mocked.call_args.kwargs.get("launch_mode"), "manifest_only")
 
     def test_run_endpoint_is_removed(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
@@ -1059,6 +1089,26 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertEqual(payload["launchOwner"], "external_runner")
             self.assertEqual((payload.get("externalRunner") or {}).get("queue_state"), "queued")
 
+    def test_launch_refresh_run_defaults_to_manifest_only_on_render(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"RENDER_SERVICE_ID": "svc-123"}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True)
+
+            mocked_popen.assert_not_called()
+            self.assertTrue(result["ok"])
+            self.assertIsNone(result["pid"])
+            self.assertEqual(result["launch_mode"], "manifest_only")
+            self.assertEqual(result["launch_owner"], "external_runner")
+            self.assertEqual(result["state"], "pending_external")
+
     def test_launch_refresh_run_supports_external_runner_mode_alias(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
@@ -1075,6 +1125,25 @@ class OpsRefreshApiTests(unittest.TestCase):
             mocked_popen.assert_not_called()
             self.assertTrue(result["ok"])
             self.assertEqual(result["launch_mode"], "external_runner")
+            self.assertEqual(result["launch_owner"], "external_runner")
+            self.assertEqual(result["state"], "pending_external")
+
+    def test_launch_refresh_run_supports_launch_mode_override(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            with patch.dict(os.environ, {"SYNDICATE_REFRESH_LAUNCH_MODE": "detached_subprocess"}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch(
+                "syndicate.features.shared.ops_refresh.REPORTS_ROOT", reports_root
+            ), patch("syndicate.features.shared.ops_refresh.subprocess.Popen") as mocked_popen:
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.launch_refresh_run(sports="mlb", phase="live", dry_run=True, launch_mode="manifest_only")
+
+            mocked_popen.assert_not_called()
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["launch_mode"], "manifest_only")
             self.assertEqual(result["launch_owner"], "external_runner")
             self.assertEqual(result["state"], "pending_external")
 
@@ -1137,7 +1206,7 @@ class OpsRefreshApiTests(unittest.TestCase):
                         "sports": "mlb",
                         "phase": "live",
                         "dry_run": True,
-                        "runtime": {"state": "failed", "detail": "Latest refresh run finished with a failure payload."},
+                        "runtime": {"state": "failed", "detail": "Latest refresh run finished with a failure payload.", "elapsed_seconds": 600, "remaining_budget_seconds": 13800, "runtime_budget_seconds": 14400},
                     },
                 ],
             },
@@ -1159,8 +1228,20 @@ class OpsRefreshApiTests(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn("Recent Runs", html)
         self.assertIn("2026-05-18 · 20260518_120000", html)
+        self.assertIn("Elapsed: 600 seconds", html)
+        self.assertIn("Remaining: 13800 seconds", html)
+        self.assertIn("Budget: 14400 seconds", html)
         self.assertIn("Stdout log", html)
         self.assertIn("Cancel Latest Refresh", html)
+        self.assertIn("Refresh elapsed", html)
+        self.assertIn("Refresh remaining", html)
+        self.assertIn("Daily checkpoint stage", html)
+        self.assertIn("refresh_gate", html)
+        self.assertIn("Daily run-state", html)
+        self.assertIn("Daily trace inputs", html)
+        self.assertIn("Daily elapsed", html)
+        self.assertIn("Daily remaining", html)
+        self.assertIn("Daily budget", html)
 
     def test_base_shell_shows_ops_link_when_admin_token_present(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):

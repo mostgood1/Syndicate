@@ -231,7 +231,10 @@ def _market_summary_schema(result: Any) -> dict[str, Any]:
 
 def build_syndicate_query_response(*, question: str, context: dict[str, Any], decision: RouteDecision, result: Any) -> dict[str, Any]:
     query_type = _result_value(result, "query_type", None) or decision.intent or "bet_analysis"
-    if decision.intent == "matchup_analysis":
+    pipeline_context = _mapping_or_empty(_result_value(result, "pipeline_context", {}))
+    structured_response = _mapping_or_empty(_result_value(result, "structured_response", {}))
+    routing_context = _mapping_or_empty(pipeline_context.get("routing_context")) or _mapping_or_empty(context)
+    if decision.intent in {"matchup_analysis", "comparison"}:
         schema = _matchup_analysis_schema(question, result)
     elif decision.intent == "market_summary":
         schema = _market_summary_schema(result)
@@ -243,6 +246,11 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
         "surface": "syndicate",
         "question": question,
         "context": dict(context),
+        "routing_context": routing_context,
+        "context_awareness": _mapping_or_empty(structured_response.get("context_awareness")),
+        "supporting_evidence": structured_response.get("supporting_evidence") if isinstance(structured_response.get("supporting_evidence"), list) else [],
+        "evaluation_record": _mapping_or_empty(_result_value(result, "evaluation_record", {})),
+        "evaluation_history": _mapping_or_empty(_result_value(result, "evaluation_history", {})),
         "intent": decision.intent,
         "routing": {
             "handler": decision.handler_name,
@@ -259,6 +267,10 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
             "preferences": _mapping_or_empty(_result_value(result, "preferences", {})),
             "parsed_request": _mapping_or_empty(_result_value(result, "parsed_request", {})),
             "analysis_views": _mapping_or_empty(_result_value(result, "analysis_views", {})),
+            "routing_context": routing_context,
+            "context_awareness": _mapping_or_empty(structured_response.get("context_awareness")),
+            "evaluation_record": _mapping_or_empty(_result_value(result, "evaluation_record", {})),
+            "evaluation_history": _mapping_or_empty(_result_value(result, "evaluation_history", {})),
             "readiness_gate": _mapping_or_empty(_result_value(result, "readiness_gate", {})),
             "local_only": _result_value(result, "local_only", None),
         },

@@ -6,19 +6,24 @@ import json
 from pathlib import Path
 from typing import Any
 
-from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.timezone import central_today_iso
 
 
 def _source_roots() -> list[Path]:
-    return preferred_source_roots(
+    return preferred_artifact_roots(
         __file__,
         env_var="SYNDICATE_NCAAB_SOURCE_ROOT",
         local_dir_name="ncaab_source",
     )
 
 def _mirror_path(*parts: str) -> Path:
-    return _source_roots()[0].joinpath("api", *parts)
+    roots = _source_roots()
+    for root in roots:
+        candidate = root.joinpath("api", *parts)
+        if candidate.exists():
+            return candidate
+    return roots[0].joinpath("api", *parts)
 
 
 def _load_mirror_json(*parts: str) -> dict[str, Any] | None:

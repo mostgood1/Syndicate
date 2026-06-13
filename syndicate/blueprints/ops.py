@@ -24,7 +24,6 @@ from syndicate.features.shared.ops_refresh import cancel_latest_refresh_run
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_log
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
-from syndicate.features.shared.ops_refresh import _pid_is_running
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
@@ -70,94 +69,6 @@ def _job_current_step(payload: dict[str, Any]) -> str:
     return f"{first_sport}_refresh" if first_sport else "odds_refresh"
 
 
-def _refresh_job_worker(job_id: str, payload: dict[str, Any]) -> None:
-    step_name = _job_current_step(payload)
-    _store_ops_job(job_id, {"status": "running", "start_time": _utc_now(), "current_step": step_name})
-
-    try:
-        result = launch_refresh_run(
-            date=_payload_value(payload, "date"),
-            sports=_payload_value(payload, "sports"),
-            phase=_payload_value(payload, "phase"),
-            execution_mode=_payload_value(payload, "execution_mode"),
-            regions=_payload_value(payload, "regions"),
-            bookmakers=_payload_value(payload, "bookmakers"),
-            markets=_payload_value(payload, "markets"),
-            season=_coerce_int(_payload_value(payload, "season")),
-            week=_coerce_int(_payload_value(payload, "week")),
-            skip_mirror=_coerce_bool(_payload_value(payload, "skip_mirror")),
-            mirror_only=_coerce_bool(_payload_value(payload, "mirror_only")),
-            dry_run=_coerce_bool(_payload_value(payload, "dry_run")),
-            mode=str(_payload_value(payload, "mode", "fast") or "fast"),
-        )
-    except Exception as exc:
-        _store_ops_job(
-            job_id,
-            {
-                "status": "failed",
-                "end_time": _utc_now(),
-                "current_step": "failed",
-                "error": f"{type(exc).__name__}: {exc}",
-            },
-        )
-        return
-
-    pid_raw = result.get("pid")
-    pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
-    _store_ops_job(job_id, {"launch_result": result, "pid": pid, "current_step": step_name})
-
-    if pid is None:
-        if str(result.get("state") or "").strip().lower() == "pending_external":
-            _store_ops_job(job_id, {"status": "running", "current_step": "pending_external"})
-            return
-        final_status = "done" if bool(result.get("ok")) else "failed"
-        _store_ops_job(
-            job_id,
-            {
-                "status": final_status,
-                "end_time": _utc_now(),
-                "current_step": final_status,
-            },
-        )
-        return
-
-    while True:
-        if not _pid_is_running(pid):
-            break
-        _store_ops_job(job_id, {"status": "running", "pid": pid, "current_step": step_name})
-        time.sleep(5)
-
-    try:
-        status_payload = load_latest_refresh_status()
-    except Exception as exc:
-        _store_ops_job(
-            job_id,
-            {
-                "status": "failed",
-                "end_time": _utc_now(),
-                "current_step": "failed",
-                "error": f"{type(exc).__name__}: {exc}",
-                "pid": pid,
-            },
-        )
-        return
-
-    runtime = status_payload.get("refresh_status", {}).get("runtime", {}) if isinstance(status_payload, dict) else {}
-    runtime_state = str(runtime.get("state") or "").strip().lower()
-    final_status = "done" if runtime_state in {"finished", "complete", "completed"} else "failed"
-    _store_ops_job(
-        job_id,
-        {
-            "status": final_status,
-            "end_time": _utc_now(),
-            "current_step": final_status,
-            "pid": pid,
-            "refresh_status": status_payload,
-            "refresh_runtime_state": runtime_state or None,
-        },
-    )
-
-
 def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[str, dict[str, Any]]:
     _assert_no_active_refresh_run()
     job_id = uuid.uuid4().hex
@@ -169,15 +80,48 @@ def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[
         "current_step": _job_current_step(launch_payload),
     }
     _store_ops_job(job_id, initial_job)
+    try:
+        result = launch_refresh_run(
+            date=_payload_value(launch_payload, "date"),
+            sports=_payload_value(launch_payload, "sports"),
+            phase=_payload_value(launch_payload, "phase"),
+            execution_mode=_payload_value(launch_payload, "execution_mode"),
+            regions=_payload_value(launch_payload, "regions"),
+            bookmakers=_payload_value(launch_payload, "bookmakers"),
+            markets=_payload_value(launch_payload, "markets"),
+            season=_coerce_int(_payload_value(launch_payload, "season")),
+            week=_coerce_int(_payload_value(launch_payload, "week")),
+            skip_mirror=_coerce_bool(_payload_value(launch_payload, "skip_mirror")),
+            mirror_only=_coerce_bool(_payload_value(launch_payload, "mirror_only")),
+            dry_run=_coerce_bool(_payload_value(launch_payload, "dry_run")),
+            mode=str(_payload_value(launch_payload, "mode", "fast") or "fast"),
+            launch_mode="manifest_only",
+        )
+    except Exception as exc:
+        return job_id, _store_ops_job(
+            job_id,
+            {
+                "status": "failed",
+                "end_time": _utc_now(),
+                "current_step": "failed",
+                "error": f"{type(exc).__name__}: {exc}",
+            },
+        )
 
-    worker = threading.Thread(
-        target=_refresh_job_worker,
-        args=(job_id, launch_payload),
-        daemon=True,
-        name=f"ops-odds-refresh-{job_id[:8]}",
-    )
-    worker.start()
-    return job_id, {"job_id": job_id, **initial_job}
+    pid_raw = result.get("pid")
+    pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
+    state = str(result.get("state") or "").strip().lower()
+    updates: dict[str, Any] = {"launch_result": result, "pid": pid, "current_step": initial_job["current_step"]}
+    if state == "pending_external":
+        updates["status"] = "running"
+        updates["current_step"] = "pending_external"
+    elif pid is None:
+        updates["status"] = "done" if bool(result.get("ok")) else "failed"
+        updates["end_time"] = _utc_now()
+        updates["current_step"] = updates["status"]
+    else:
+        updates["status"] = "running"
+    return job_id, _store_ops_job(job_id, updates)
 
 
 def _git_value(repo_root: Path, *args: str) -> str | None:

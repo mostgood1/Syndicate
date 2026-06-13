@@ -1,17 +1,29 @@
 {
   "sport": "ncaaf",
-  "last_updated": "2026-06-12T16:29:53+00:00",
+  "last_updated": "2026-06-13T02:22:40+00:00",
   "artifact_paths": [
-    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate"
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+    "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source"
   ],
   "status": "complete",
   "metadata": {
-    "date": "2026-06-12",
+    "date": "2026-10-01",
     "phase": "all",
     "execution_mode": "source",
     "refresh_mode": "full",
-    "ok": false,
-    "post_refresh_ok": null,
-    "mirror_ok": null
+    "ok": true,
+    "post_refresh_ok": true,
+    "mirror_ok": true,
+    "odds_control_plane": {
+      "source_precedence": [
+        "artifact_history",
+        "tracking_history"
+      ],
+      "artifact_paths": [
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate",
+        "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\data\\ncaaf_source"
+      ],
+      "has_post_refresh": true
+    }
   }
 }

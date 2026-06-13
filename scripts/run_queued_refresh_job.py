@@ -44,12 +44,17 @@ def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_
             f"Latest queued run does not match expected run stamp {expected_run_stamp}: {contract.get('runStamp') or 'missing'}"
         )
 
-    manifest_path = Path(str(contract.get("manifestPath") or "").strip())
-    run_summary_path = Path(str(contract.get("runSummaryPath") or "").strip())
-    if not str(manifest_path):
+    manifest_path_text = str(contract.get("manifestPath") or "").strip()
+    run_summary_path_text = str(contract.get("runSummaryPath") or "").strip()
+    job_status_path_text = str(contract.get("jobStatusPath") or "").strip()
+    if not manifest_path_text:
         raise ValueError("External runner contract is missing manifestPath.")
-    if not str(run_summary_path):
+    if not run_summary_path_text:
         raise ValueError("External runner contract is missing runSummaryPath.")
+
+    manifest_path = Path(manifest_path_text)
+    run_summary_path = Path(run_summary_path_text)
+    job_status_path = Path(job_status_path_text) if job_status_path_text else run_summary_path.parent / "refresh_job_status.json"
 
     manifest = read_json_file(manifest_path) or {}
     if not manifest:
@@ -73,6 +78,10 @@ def _claim_external_runner_contract(*, latest_manifest_path: Path, expected_run_
         run_summary["runnerKind"] = "external_runner"
         write_json_file(run_summary_path, run_summary)
 
+    contract["jobStatusPath"] = str(job_status_path)
+    contract["runnerClaimedAt"] = claimed_at
+    contract["runnerKind"] = "external_runner"
+
     return contract
 
 
@@ -81,6 +90,7 @@ def _build_wrapper_command(contract: dict[str, Any]) -> list[str]:
         "manifestPath": "manifest path",
         "latestPath": "latest status path",
         "runSummaryPath": "run summary path",
+        "jobStatusPath": "job status path",
         "stdoutPath": "stdout path",
         "stderrPath": "stderr path",
     }
@@ -101,6 +111,8 @@ def _build_wrapper_command(contract: dict[str, Any]) -> list[str]:
         str(contract["latestPath"]),
         "--run-summary-path",
         str(contract["runSummaryPath"]),
+        "--status-path",
+        str(contract["jobStatusPath"]),
         "--stdout-path",
         str(contract["stdoutPath"]),
         "--stderr-path",
