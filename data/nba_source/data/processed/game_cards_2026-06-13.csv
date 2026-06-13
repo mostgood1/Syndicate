@@ -1,0 +1,2 @@
+date,game_id,home_team,visitor_team,commence_time,home_ml,away_ml,home_spread,away_spread,total,bookmaker,home_tri,away_tri
+2026-06-13,1,San Antonio Spurs,New York Knicks,2026-06-14T00:40:00Z,-173.55650276429105,173.5565027642911,-5.5,5.5,216.5,oddsapi_consensus,SAS,NYK
