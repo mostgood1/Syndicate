@@ -1,0 +1,260 @@
+{
+  "date": "2026-06-14",
+  "data": [
+    {
+      "game_key": "WSH@NYL",
+      "game_id": "132",
+      "player": "Sabrina Ionescu",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "WSH",
+      "score": 73.67161454349878,
+      "score_adj": 73.67161454349878,
+      "tier": "High",
+      "model": {
+        "pts": 4.73,
+        "reb": 2.13,
+        "ast": 3.18,
+        "threes": 0.72,
+        "stl": 0.447051,
+        "blk": 0.365769,
+        "tov": 1.21923,
+        "pra": 10.04,
+        "pr": 6.86,
+        "pa": 7.91,
+        "ra": 5.3100000000000005
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "UNDER",
+        "line": 1.5,
+        "price": 122.0,
+        "edge": 0.3318541195653098,
+        "ev": 0.7367161454349878,
+        "ev_pct": 73.67161454349878,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 73.7%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.7 vs line 1.5 (-0.8)"
+    },
+    {
+      "game_key": "WSH@NYL",
+      "game_id": "132",
+      "player": "Marine Johannes",
+      "team": "NYL",
+      "team_tricode": "NYL",
+      "opponent": "WSH",
+      "score": 40.88990573654575,
+      "score_adj": 40.88990573654575,
+      "tier": "High",
+      "model": {
+        "pts": 5.662857142857142,
+        "reb": 2.9871428571428567,
+        "ast": 4.917142857142858,
+        "threes": 1.342857142857143,
+        "stl": 0.554356,
+        "blk": 0.4535639999999999,
+        "tov": 1.51188,
+        "pra": 13.567142857142857,
+        "pr": 8.649999999999999,
+        "pa": 10.58,
+        "ra": 7.904285714285715
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 8.5,
+        "price": -103.0,
+        "edge": 0.2074709502888774,
+        "ev": 0.4088990573654575,
+        "ev_pct": 40.88990573654575,
+        "book": "williamhill_us",
+        "p_win": 0.9162882199270339,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 40.9%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.7 vs line 8.5 (-2.8)"
+    },
+    {
+      "game_key": "WSH@NYL",
+      "game_id": "132",
+      "player": "Michaela Onyenwere",
+      "team": "WSH",
+      "team_tricode": "WSH",
+      "opponent": "NYL",
+      "score": 36.65929203536757,
+      "score_adj": 36.65929203536757,
+      "tier": "High",
+      "model": {
+        "pts": 2.325,
+        "reb": 0.0,
+        "ast": 0.0,
+        "threes": 0.0,
+        "stl": 0.2452999999999999,
+        "blk": 0.2006999999999999,
+        "tov": 0.6689999999999999,
+        "pra": 2.325,
+        "pr": 2.325,
+        "pa": 2.325,
+        "ra": 0.0
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 9.5,
+        "price": -113.0,
+        "edge": 0.1944835680749547,
+        "ev": 0.36659292035367574,
+        "ev_pct": 36.65929203536757,
+        "book": "fanduel",
+        "p_win": 0.8971093522785584,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 36.7%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.3 vs line 9.5 (-7.2)"
+    },
+    {
+      "game_key": "ATL@TOR",
+      "game_id": "66",
+      "player": "Naz Hillmon",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "TOR",
+      "score": 35.386869960862185,
+      "score_adj": 35.386869960862185,
+      "tier": "High",
+      "model": {
+        "pts": 5.506666666666666,
+        "reb": 4.1066666666666665,
+        "ast": 0.75,
+        "threes": 0.2066666666666666,
+        "stl": 0.591943,
+        "blk": 0.484317,
+        "tov": 1.61439,
+        "pra": 10.363333333333332,
+        "pr": 9.613333333333333,
+        "pa": 6.256666666666666,
+        "ra": 4.8566666666666665
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 9.5,
+        "price": -115.0,
+        "edge": 0.1892786067674025,
+        "ev": 0.3538686996086219,
+        "ev_pct": 35.386869960862185,
+        "book": "williamhill_us",
+        "p_win": 0.8887524205388544,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 35.4%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 5.5 vs line 9.5 (-4.0)"
+    },
+    {
+      "game_key": "ATL@TOR",
+      "game_id": "66",
+      "player": "Laura Juskaite",
+      "team": "TOR",
+      "team_tricode": "TOR",
+      "opponent": "ATL",
+      "score": 30.298749190002063,
+      "score_adj": 30.298749190002063,
+      "tier": "High",
+      "model": {
+        "pts": 6.926666666666667,
+        "reb": 3.3600000000000003,
+        "ast": 1.2544444444444445,
+        "threes": 0.7833333333333332,
+        "stl": 0.4848555555555554,
+        "blk": 0.3966999999999999,
+        "tov": 1.322333333333333,
+        "pra": 11.54111111111111,
+        "pr": 10.286666666666667,
+        "pa": 8.181111111111111,
+        "ra": 4.614444444444445
+      },
+      "top_play": {
+        "market": "pts",
+        "side": "UNDER",
+        "line": 9.5,
+        "price": -114.0,
+        "edge": 0.16140455175982416,
+        "ev": 0.3029874919000206,
+        "ev_pct": 30.298749190002063,
+        "book": "fanduel",
+        "p_win": 0.8356977722738523,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 30.3%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 6.9 vs line 9.5 (-2.6)"
+    },
+    {
+      "game_key": "ATL@TOR",
+      "game_id": "66",
+      "player": "Jordin Canada",
+      "team": "ATL",
+      "team_tricode": "ATL",
+      "opponent": "TOR",
+      "score": 18.154190261421334,
+      "score_adj": 18.154190261421334,
+      "tier": "High",
+      "model": {
+        "pts": 11.004285714285714,
+        "reb": 4.944285714285714,
+        "ast": 8.29142857142857,
+        "threes": 0.6214285714285714,
+        "stl": 0.6620412857142856,
+        "blk": 0.5416701428571428,
+        "tov": 1.8055671428571425,
+        "pra": 24.24,
+        "pr": 15.948571428571428,
+        "pa": 19.295714285714283,
+        "ra": 13.235714285714284
+      },
+      "top_play": {
+        "market": "ra",
+        "side": "OVER",
+        "line": 9.5,
+        "price": -106.0,
+        "edge": 0.09341476542284766,
+        "ev": 0.18154190261421332,
+        "ev_pct": 18.154190261421334,
+        "book": "fanduel",
+        "p_win": 0.6961050094103298,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 18.2%",
+        "Regular price range (-150 to +150)",
+        "Best line available"
+      ],
+      "basketball_summary": "model 13.2 vs line 9.5 (+3.7)"
+    }
+  ]
+}

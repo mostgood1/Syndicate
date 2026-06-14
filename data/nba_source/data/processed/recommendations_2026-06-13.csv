@@ -1,0 +1,3 @@
+market,side,home,away,date,ev,price,implied_prob,edge,line,pred_margin,market_home_margin,pred_total,tier
+ATS,San Antonio Spurs,San Antonio Spurs,New York Knicks,2026-06-13,0.10725,-110.0,0.52381,10.725,5.5,5.225,-5.5,,High
+TOTAL,Over,San Antonio Spurs,New York Knicks,2026-06-13,0.0141,-110.0,0.52381,1.41,216.5,,,217.91,Low

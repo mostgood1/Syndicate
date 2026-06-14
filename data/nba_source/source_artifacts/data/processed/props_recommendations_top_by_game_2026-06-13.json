@@ -1,0 +1,134 @@
+{
+  "date": "2026-06-13",
+  "data": [
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
+      "player": "Miles McBride",
+      "team": "NYK",
+      "team_tricode": "NYK",
+      "opponent": "SAS",
+      "score": 88.52590712504632,
+      "score_adj": 88.52590712504632,
+      "tier": "High",
+      "model": {
+        "pts": 10.59,
+        "reb": 2.03,
+        "ast": 1.63,
+        "threes": 2.3200000000000003,
+        "stl": 0.4437399999999999,
+        "blk": 0.3630599999999999,
+        "tov": 1.2102,
+        "pra": 14.25,
+        "pr": 12.62,
+        "pa": 12.219999999999999,
+        "ra": 3.6599999999999997
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 0.5,
+        "price": -105.0,
+        "edge": 0.45342537795755433,
+        "ev": 0.8852590712504632,
+        "ev_pct": 88.52590712504632,
+        "book": "bovada",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 88.5%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 3 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.3 vs line 0.5 (+1.8)"
+    },
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
+      "player": "De'Aaron Fox",
+      "team": "SAS",
+      "team_tricode": "SAS",
+      "opponent": "NYK",
+      "score": 82.92392504050544,
+      "score_adj": 82.92392504050544,
+      "tier": "High",
+      "model": {
+        "pts": 20.08,
+        "reb": 3.92,
+        "ast": 6.19,
+        "threes": 2.46,
+        "stl": 0.69872,
+        "blk": 0.57168,
+        "tov": 1.9056,
+        "pra": 30.19,
+        "pr": 24.0,
+        "pa": 26.27,
+        "ra": 10.11
+      },
+      "top_play": {
+        "market": "threes",
+        "side": "OVER",
+        "line": 1.5,
+        "price": 120.0,
+        "edge": 0.3769269320022975,
+        "ev": 0.8292392504050544,
+        "ev_pct": 82.92392504050544,
+        "book": "bovada",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 82.9%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 5 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 2.5 vs line 1.5 (+1.0)"
+    },
+    {
+      "game_key": "NYK@SAS",
+      "game_id": "1",
+      "player": "Victor Wembanyama",
+      "team": "SAS",
+      "team_tricode": "SAS",
+      "opponent": "NYK",
+      "score": 76.34375,
+      "score_adj": 76.34375,
+      "tier": "High",
+      "model": {
+        "pts": 33.11,
+        "reb": 13.15,
+        "ast": 4.25,
+        "threes": 1.8,
+        "stl": 0.6091799999999999,
+        "blk": 0.4984199999999999,
+        "tov": 1.6613999999999998,
+        "pra": 50.51,
+        "pr": 46.26,
+        "pa": 37.36,
+        "ra": 17.4
+      },
+      "top_play": {
+        "market": "blk",
+        "side": "UNDER",
+        "line": 3.5,
+        "price": -128.0,
+        "edge": 0.4285964912280702,
+        "ev": 0.7634375,
+        "ev_pct": 76.34375,
+        "book": "fanduel",
+        "p_win": 1.0,
+        "snapshot_ts": null
+      },
+      "top_play_reasons": [
+        "EV 76.3%",
+        "Regular price range (-150 to +150)",
+        "Consensus: 4 books aligned",
+        "Best line available"
+      ],
+      "basketball_summary": "model 0.5 vs line 3.5 (-3.0)"
+    }
+  ]
+}

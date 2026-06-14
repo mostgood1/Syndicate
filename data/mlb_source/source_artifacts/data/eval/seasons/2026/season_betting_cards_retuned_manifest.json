@@ -3,9 +3,9 @@
     "season": 2026,
     "generated_at": "2026-06-13T08:14:36.836819",
     "title": "MLB 2026 Betting Card Recap",
-    "batch_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
-    "cards_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
-    "day_payload_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned",
+    "batch_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
+    "cards_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
+    "day_payload_dir": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned",
     "source_mode": "season_eval_batch_reconstruction",
     "prefer_canonical_daily": true,
     "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
@@ -170,12 +170,12 @@
       "median_u": 0.0,
       "std_u": 1.2634,
       "best_day": {
-        "date": "2026-06-07",
-        "profit_u": 2.3096
+        "date": "2026-06-13",
+        "profit_u": 0.0
       },
       "worst_day": {
-        "date": "2026-06-04",
-        "profit_u": -2.0
+        "date": "2026-06-13",
+        "profit_u": 0.0
       }
     },
     "combined": {
@@ -263,8 +263,8 @@
   },
   "months": [
     {
-      "month": "2026-05",
-      "label": "May 2026",
+      "month": "2026-06",
+      "label": "Jun 2026",
       "selected_counts": {
         "totals": 0,
         "ml": 0,
@@ -369,21 +369,21 @@
         }
       },
       "daily": {
-        "cards": 2,
+        "cards": 1,
         "cards_with_bets": 0,
-        "cards_without_bets": 2,
+        "cards_without_bets": 1,
         "positive_days": 0,
         "negative_days": 0,
-        "flat_days": 2,
+        "flat_days": 1,
         "mean_u": 0.0,
         "median_u": 0.0,
         "std_u": 0.0,
         "best_day": {
-          "date": "2026-05-30",
+          "date": "2026-06-13",
           "profit_u": 0.0
         },
         "worst_day": {
-          "date": "2026-05-30",
+          "date": "2026-06-13",
           "profit_u": 0.0
         }
       }
@@ -517,11 +517,11 @@
   ],
   "days": [
     {
-      "date": "2026-05-30",
-      "month": "2026-05",
-      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_05_30_locked_policy.json",
-      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-05-30.json",
-      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_05_30.json",
+      "date": "2026-06-13",
+      "month": "2026-06",
+      "card_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_13_locked_policy.json",
+      "report_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-13.json",
+      "payload_path": "D:/a/Syndicate/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_13.json",
       "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
       "selected_counts": {
         "totals": 0,
@@ -629,8 +629,8 @@
       "settled_n": 0,
       "unresolved_n": 0,
       "warnings": [
-        "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_05_30.json",
-        "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_05_30.json"
+        "Missing game lines: data/market/oddsapi/oddsapi_game_lines_2026_06_13.json",
+        "Missing hitter lines: data/market/oddsapi/oddsapi_hitter_props_2026_06_13.json"
       ],
       "profit_u": 0.0,
       "roi": null

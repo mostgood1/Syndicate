@@ -2,19 +2,22 @@ Unified script using Python: C:\hostedtoolcache\windows\Python\3.11.9\x64\python
 NCAAF local odds refresh skipped: SYNDICATE_SOURCE_ROOT_NCAAF is not set and the NCAAFCompare workspace repo is not available.
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   37c5b45..fd1a35b  main -> main
+   f5e2976..522c4b0  main -> main
 ==> MLB vendored daily update
     cwd: D:\a\Syndicate\Syndicate\vendor\mlb_bettingv2
-    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe tools\daily_update.py --workflow ui-daily --date 2026-06-12 --season 2026 --sims 1000 --workers 3 --git-push off --validate-render-frontend off --build-next-day on
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe tools\daily_update.py --workflow ui-daily --date 2026-06-14 --season 2026 --sims 1000 --workers 3 --git-push off --validate-render-frontend off --build-next-day on
     env: MLB_BETTING_DATA_ROOT=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data; MLB_LIVE_LENS_DIR=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\live_lens; ODDS_API_KEY=<redacted>
-    pid: 3444
-[ui-daily] Starting workflow for 2026-06-12 (season 2026, prior-day reconcile 2026-06-11, next-day on -> 2026-06-13, git-push off)
-[ui-daily] Prior-day reconciliation target: 2026-06-11 (season 2026)
-[ui-daily] Next-day forward build is queued for 2026-06-13 and will start after current-day artifact publication completes.
-[ui-daily] Refreshing prior-day StatsAPI feed/live cache for 2026-06-11...
-[ui-daily] Reconciling prior-day season report for 2026-06-11...
-Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\batches\season_2026_ui_daily_live\sim_vs_actual_2026-06-11.json
-Aggregate (full): {'games': 7, 'brier_home_win': 0.23164214285714288, 'mae_total_runs': 3.5667142857142857, 'mae_run_margin': 3.475857142857143}
+    pid: 1772
+[ui-daily] Starting workflow for 2026-06-14 (season 2026, prior-day reconcile 2026-06-13, next-day on -> 2026-06-15, git-push off)
+[ui-daily] Prior-day reconciliation target: 2026-06-13 (season 2026)
+[ui-daily] Next-day forward build is queued for 2026-06-15 and will start after current-day artifact publication completes.
+[ui-daily] Refreshing prior-day StatsAPI feed/live cache for 2026-06-13...
+[ui-daily] Settling prior-day locked card for 2026-06-13...
+[ui-daily] Live-lens readout for 2026-06-13: No prior-day live-lens activity found for 2026-06-13.
+[ui-daily]   performance: Local live-lens report processed 15 games in 1631.2 ms with 0 ms spent refreshing markets.
+[ui-daily] Reconciling prior-day season report for 2026-06-13...
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\batches\season_2026_ui_daily_live\sim_vs_actual_2026-06-13.json
+Aggregate (full): {'games': 15, 'brier_home_win': 0.2468336, 'mae_total_runs': 3.3762000000000003, 'mae_run_margin': 3.1168666666666667}
 [ui-daily] Publishing rolling season manifests for 2026...
 [subprocess] Running in D:\a\Syndicate\Syndicate\vendor\mlb_bettingv2: C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe D:\a\Syndicate\Syndicate\vendor\mlb_bettingv2\tools\eval\build_season_betting_cards_manifest.py --season 2026 --batch-dir D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\batches\season_2026_ui_daily_live --out D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\season_betting_cards_retuned_manifest.json --recap-md D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\season_betting_cards_retuned_recap.md --cards-dir D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\locked_cards_retuned --day-payload-dir D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\eval\seasons\2026\betting_day_payloads_retuned --profile-name retuned --title MLB 2026 Betting Card Recap --prefer-canonical-daily on
 {
@@ -31,188 +34,185 @@ Aggregate (full): {'games': 7, 'brier_home_win': 0.23164214285714288, 'mae_total
     "roi": null
   }
 }
-[ui-daily] Building prior-day top-props artifact for 2026-06-11...
-[ui-daily] Fetching current-day OddsAPI markets for 2026-06-12...
-[ui-daily] Building current-day multi-profile outputs for 2026-06-12...
-[core] Starting daily update for 2026-06-12 (season=2026, sims=1000, workers=3)
-[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\snapshots\2026-06-12...
-[core] Fetching schedule for 2026-06-12...
-[core] Loaded 15 scheduled game(s) for 2026-06-12.
+[ui-daily] Building prior-day top-props artifact for 2026-06-13...
+[ui-daily] Fetching current-day OddsAPI markets for 2026-06-14...
+[ui-daily] Building current-day multi-profile outputs for 2026-06-14...
+[core] Starting daily update for 2026-06-14 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\snapshots\2026-06-14...
+[core] Fetching schedule for 2026-06-14...
+[core] Loaded 15 scheduled game(s) for 2026-06-14.
     ... still running (30s)
-[1/15] Preparing rosters: gamePk=823370 MIA @ PIT
-    ... still running (62s)
+[1/15] Preparing rosters: gamePk=823368 MIA @ PIT
+    ... still running (60s)
+    ... still running (90s)
 [1/15] Simulating (1000, workers=3): MIA @ PIT
-    ... still running (92s)
-[2/15] Preparing rosters: gamePk=822726 SEA @ WSH
-    ... still running (122s)
-[2/15] Simulating (1000, workers=3): SEA @ WSH
-    ... still running (152s)
-[3/15] Preparing rosters: gamePk=824826 SD @ BAL
-    ... still running (182s)
-[3/15] Simulating (1000, workers=3): SD @ BAL
-[4/15] Preparing rosters: gamePk=824425 DET @ CLE
-    ... still running (212s)
-    ... still running (242s)
-[4/15] Simulating (1000, workers=3): DET @ CLE
-[5/15] Preparing rosters: gamePk=824752 TEX @ BOS
-    ... still running (272s)
-    ... still running (302s)
-[5/15] Simulating (1000, workers=3): TEX @ BOS
-[6/15] Preparing rosters: gamePk=824507 AZ @ CIN
-    ... still running (332s)
-[6/15] Simulating (1000, workers=3): AZ @ CIN
-    ... still running (362s)
-[7/15] Preparing rosters: gamePk=823617 ATL @ NYM
-    ... still running (392s)
+[2/15] Preparing rosters: gamePk=824823 SD @ BAL
+    ... still running (120s)
+[2/15] Simulating (1000, workers=3): SD @ BAL
+    ... still running (150s)
+[3/15] Preparing rosters: gamePk=822722 SEA @ WSH
+    ... still running (180s)
+[3/15] Simulating (1000, workers=3): SEA @ WSH
+[4/15] Preparing rosters: gamePk=822801 NYY @ TOR
+    ... still running (210s)
+[4/15] Simulating (1000, workers=3): NYY @ TOR
+    ... still running (240s)
+[5/15] Preparing rosters: gamePk=824506 AZ @ CIN
+    ... still running (270s)
+[5/15] Simulating (1000, workers=3): AZ @ CIN
+[6/15] Preparing rosters: gamePk=824424 DET @ CLE
+    ... still running (300s)
+    ... still running (330s)
+[6/15] Simulating (1000, workers=3): DET @ CLE
+[7/15] Preparing rosters: gamePk=823615 ATL @ NYM
+    ... still running (360s)
+    ... still running (390s)
 [7/15] Simulating (1000, workers=3): ATL @ NYM
-    ... still running (422s)
-[8/15] Preparing rosters: gamePk=822803 NYY @ TOR
-    ... still running (452s)
-[8/15] Simulating (1000, workers=3): NYY @ TOR
-[9/15] Preparing rosters: gamePk=824588 LAD @ CWS
-    ... still running (482s)
-    ... still running (512s)
-[9/15] Simulating (1000, workers=3): LAD @ CWS
-[10/15] Preparing rosters: gamePk=823778 PHI @ MIL
-    ... still running (542s)
-    ... still running (572s)
-[10/15] Simulating (1000, workers=3): PHI @ MIL
-[11/15] Preparing rosters: gamePk=824102 HOU @ KC
-    ... still running (602s)
-    ... still running (632s)
-[11/15] Simulating (1000, workers=3): HOU @ KC
-[12/15] Preparing rosters: gamePk=823695 STL @ MIN
-    ... still running (662s)
-[12/15] Simulating (1000, workers=3): STL @ MIN
-    ... still running (692s)
-[13/15] Preparing rosters: gamePk=824020 TB @ LAA
-    ... still running (722s)
-[13/15] Simulating (1000, workers=3): TB @ LAA
-[14/15] Preparing rosters: gamePk=824997 COL @ ATH
-    ... still running (752s)
-    ... still running (782s)
-[14/15] Simulating (1000, workers=3): COL @ ATH
-[15/15] Preparing rosters: gamePk=823211 CHC @ SF
-    ... still running (812s)
-    ... still running (842s)
-[15/15] Simulating (1000, workers=3): CHC @ SF
-Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12.json
-[core] Starting daily update for 2026-06-12 (season=2026, sims=1000, workers=3)
-[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\snapshots\2026-06-12...
-[core] Fetching schedule for 2026-06-12...
-[core] Loaded 15 scheduled game(s) for 2026-06-12.
-[1/15] Preparing rosters: gamePk=823370 MIA @ PIT
+[8/15] Preparing rosters: gamePk=824099 HOU @ KC
+    ... still running (420s)
+[8/15] Simulating (1000, workers=3): HOU @ KC
+    ... still running (450s)
+[9/15] Preparing rosters: gamePk=823693 STL @ MIN
+    ... still running (480s)
+[9/15] Simulating (1000, workers=3): STL @ MIN
+[10/15] Preparing rosters: gamePk=824586 LAD @ CWS
+    ... still running (510s)
+[10/15] Simulating (1000, workers=3): LAD @ CWS
+    ... still running (540s)
+[11/15] Preparing rosters: gamePk=823777 PHI @ MIL
+    ... still running (570s)
+[11/15] Simulating (1000, workers=3): PHI @ MIL
+[12/15] Preparing rosters: gamePk=824994 COL @ ATH
+    ... still running (600s)
+    ... still running (630s)
+[12/15] Simulating (1000, workers=3): COL @ ATH
+[13/15] Preparing rosters: gamePk=823212 CHC @ SF
+    ... still running (660s)
+[13/15] Simulating (1000, workers=3): CHC @ SF
+    ... still running (690s)
+[14/15] Preparing rosters: gamePk=824021 TB @ LAA
+    ... still running (720s)
+[14/15] Simulating (1000, workers=3): TB @ LAA
+[15/15] Preparing rosters: gamePk=824751 TEX @ BOS
+    ... still running (750s)
+[15/15] Simulating (1000, workers=3): TEX @ BOS
+    ... still running (780s)
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14.json
+[core] Starting daily update for 2026-06-14 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\snapshots\2026-06-14...
+[core] Fetching schedule for 2026-06-14...
+[core] Loaded 15 scheduled game(s) for 2026-06-14.
+[1/15] Preparing rosters: gamePk=823368 MIA @ PIT
 [1/15] Simulating (1000, workers=3): MIA @ PIT
-    ... still running (872s)
-[2/15] Preparing rosters: gamePk=822726 SEA @ WSH
-[2/15] Simulating (1000, workers=3): SEA @ WSH
-[3/15] Preparing rosters: gamePk=824826 SD @ BAL
-[3/15] Simulating (1000, workers=3): SD @ BAL
-[4/15] Preparing rosters: gamePk=824425 DET @ CLE
-[4/15] Simulating (1000, workers=3): DET @ CLE
-    ... still running (902s)
-[5/15] Preparing rosters: gamePk=824752 TEX @ BOS
-[5/15] Simulating (1000, workers=3): TEX @ BOS
-[6/15] Preparing rosters: gamePk=824507 AZ @ CIN
-[6/15] Simulating (1000, workers=3): AZ @ CIN
-[7/15] Preparing rosters: gamePk=823617 ATL @ NYM
+[2/15] Preparing rosters: gamePk=824823 SD @ BAL
+[2/15] Simulating (1000, workers=3): SD @ BAL
+[3/15] Preparing rosters: gamePk=822722 SEA @ WSH
+[3/15] Simulating (1000, workers=3): SEA @ WSH
+    ... still running (810s)
+[4/15] Preparing rosters: gamePk=822801 NYY @ TOR
+[4/15] Simulating (1000, workers=3): NYY @ TOR
+[5/15] Preparing rosters: gamePk=824506 AZ @ CIN
+[5/15] Simulating (1000, workers=3): AZ @ CIN
+[6/15] Preparing rosters: gamePk=824424 DET @ CLE
+[6/15] Simulating (1000, workers=3): DET @ CLE
+    ... still running (840s)
+[7/15] Preparing rosters: gamePk=823615 ATL @ NYM
 [7/15] Simulating (1000, workers=3): ATL @ NYM
-    ... still running (932s)
-[8/15] Preparing rosters: gamePk=822803 NYY @ TOR
-[8/15] Simulating (1000, workers=3): NYY @ TOR
-[9/15] Preparing rosters: gamePk=824588 LAD @ CWS
-[9/15] Simulating (1000, workers=3): LAD @ CWS
-[10/15] Preparing rosters: gamePk=823778 PHI @ MIL
-[10/15] Simulating (1000, workers=3): PHI @ MIL
-    ... still running (962s)
-[11/15] Preparing rosters: gamePk=824102 HOU @ KC
-[11/15] Simulating (1000, workers=3): HOU @ KC
-[12/15] Preparing rosters: gamePk=823695 STL @ MIN
-[12/15] Simulating (1000, workers=3): STL @ MIN
-[13/15] Preparing rosters: gamePk=824020 TB @ LAA
-[13/15] Simulating (1000, workers=3): TB @ LAA
-[14/15] Preparing rosters: gamePk=824997 COL @ ATH
-[14/15] Simulating (1000, workers=3): COL @ ATH
-    ... still running (992s)
-[15/15] Preparing rosters: gamePk=823211 CHC @ SF
-[15/15] Simulating (1000, workers=3): CHC @ SF
-Wrote top-props artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\top_props\daily_top_props_2026_06_12.json
-Wrote ladders artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\ladders\daily_ladders_2026_06_12.json
-Wrote ladder audit artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\ladders\daily_ladder_audit_2026_06_12.json
-Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_12.json
-[core] Starting daily update for 2026-06-12 (season=2026, sims=1000, workers=3)
-[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\snapshots\2026-06-12...
-[core] Fetching schedule for 2026-06-12...
-[core] Loaded 15 scheduled game(s) for 2026-06-12.
-    ... still running (1022s)
-[1/15] Preparing rosters: gamePk=823370 MIA @ PIT
+[8/15] Preparing rosters: gamePk=824099 HOU @ KC
+[8/15] Simulating (1000, workers=3): HOU @ KC
+[9/15] Preparing rosters: gamePk=823693 STL @ MIN
+[9/15] Simulating (1000, workers=3): STL @ MIN
+    ... still running (870s)
+[10/15] Preparing rosters: gamePk=824586 LAD @ CWS
+[10/15] Simulating (1000, workers=3): LAD @ CWS
+[11/15] Preparing rosters: gamePk=823777 PHI @ MIL
+[11/15] Simulating (1000, workers=3): PHI @ MIL
+[12/15] Preparing rosters: gamePk=824994 COL @ ATH
+[12/15] Simulating (1000, workers=3): COL @ ATH
+    ... still running (900s)
+[13/15] Preparing rosters: gamePk=823212 CHC @ SF
+[13/15] Simulating (1000, workers=3): CHC @ SF
+[14/15] Preparing rosters: gamePk=824021 TB @ LAA
+[14/15] Simulating (1000, workers=3): TB @ LAA
+[15/15] Preparing rosters: gamePk=824751 TEX @ BOS
+[15/15] Simulating (1000, workers=3): TEX @ BOS
+    ... still running (930s)
+Wrote top-props artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\top_props\daily_top_props_2026_06_14.json
+Wrote ladders artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\ladders\daily_ladders_2026_06_14.json
+Wrote ladder audit artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\ladders\daily_ladder_audit_2026_06_14.json
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_14.json
+[core] Starting daily update for 2026-06-14 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\snapshots\2026-06-14...
+[core] Fetching schedule for 2026-06-14...
+[core] Loaded 15 scheduled game(s) for 2026-06-14.
+[1/15] Preparing rosters: gamePk=823368 MIA @ PIT
 [1/15] Simulating (1000, workers=3): MIA @ PIT
-[2/15] Preparing rosters: gamePk=822726 SEA @ WSH
-[2/15] Simulating (1000, workers=3): SEA @ WSH
-[3/15] Preparing rosters: gamePk=824826 SD @ BAL
-[3/15] Simulating (1000, workers=3): SD @ BAL
-[4/15] Preparing rosters: gamePk=824425 DET @ CLE
-    ... still running (1052s)
-[4/15] Simulating (1000, workers=3): DET @ CLE
-[5/15] Preparing rosters: gamePk=824752 TEX @ BOS
-[5/15] Simulating (1000, workers=3): TEX @ BOS
-[6/15] Preparing rosters: gamePk=824507 AZ @ CIN
-[6/15] Simulating (1000, workers=3): AZ @ CIN
-[7/15] Preparing rosters: gamePk=823617 ATL @ NYM
-    ... still running (1082s)
+[2/15] Preparing rosters: gamePk=824823 SD @ BAL
+[2/15] Simulating (1000, workers=3): SD @ BAL
+    ... still running (960s)
+[3/15] Preparing rosters: gamePk=822722 SEA @ WSH
+[3/15] Simulating (1000, workers=3): SEA @ WSH
+[4/15] Preparing rosters: gamePk=822801 NYY @ TOR
+[4/15] Simulating (1000, workers=3): NYY @ TOR
+[5/15] Preparing rosters: gamePk=824506 AZ @ CIN
+[5/15] Simulating (1000, workers=3): AZ @ CIN
+    ... still running (990s)
+[6/15] Preparing rosters: gamePk=824424 DET @ CLE
+[6/15] Simulating (1000, workers=3): DET @ CLE
+[7/15] Preparing rosters: gamePk=823615 ATL @ NYM
 [7/15] Simulating (1000, workers=3): ATL @ NYM
-[8/15] Preparing rosters: gamePk=822803 NYY @ TOR
-[8/15] Simulating (1000, workers=3): NYY @ TOR
-[9/15] Preparing rosters: gamePk=824588 LAD @ CWS
-[9/15] Simulating (1000, workers=3): LAD @ CWS
-[10/15] Preparing rosters: gamePk=823778 PHI @ MIL
-[10/15] Simulating (1000, workers=3): PHI @ MIL
-    ... still running (1112s)
-[11/15] Preparing rosters: gamePk=824102 HOU @ KC
-[11/15] Simulating (1000, workers=3): HOU @ KC
-[12/15] Preparing rosters: gamePk=823695 STL @ MIN
-[12/15] Simulating (1000, workers=3): STL @ MIN
-[13/15] Preparing rosters: gamePk=824020 TB @ LAA
-[13/15] Simulating (1000, workers=3): TB @ LAA
-    ... still running (1142s)
-[14/15] Preparing rosters: gamePk=824997 COL @ ATH
-[14/15] Simulating (1000, workers=3): COL @ ATH
-[15/15] Preparing rosters: gamePk=823211 CHC @ SF
-[15/15] Simulating (1000, workers=3): CHC @ SF
-    ... still running (1172s)
-Wrote top-props artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\top_props\daily_top_props_2026_06_12.json
-Wrote ladders artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\ladders\daily_ladders_2026_06_12.json
-Wrote ladder audit artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\ladders\daily_ladder_audit_2026_06_12.json
-Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_12.json
-    ... still running (1202s)
-[multi-profile] Starting daily multi-profile build for 2026-06-12 (season 2026)
+[8/15] Preparing rosters: gamePk=824099 HOU @ KC
+[8/15] Simulating (1000, workers=3): HOU @ KC
+    ... still running (1020s)
+[9/15] Preparing rosters: gamePk=823693 STL @ MIN
+[9/15] Simulating (1000, workers=3): STL @ MIN
+[10/15] Preparing rosters: gamePk=824586 LAD @ CWS
+[10/15] Simulating (1000, workers=3): LAD @ CWS
+[11/15] Preparing rosters: gamePk=823777 PHI @ MIL
+[11/15] Simulating (1000, workers=3): PHI @ MIL
+    ... still running (1050s)
+[12/15] Preparing rosters: gamePk=824994 COL @ ATH
+[12/15] Simulating (1000, workers=3): COL @ ATH
+[13/15] Preparing rosters: gamePk=823212 CHC @ SF
+[13/15] Simulating (1000, workers=3): CHC @ SF
+[14/15] Preparing rosters: gamePk=824021 TB @ LAA
+[14/15] Simulating (1000, workers=3): TB @ LAA
+    ... still running (1080s)
+[15/15] Preparing rosters: gamePk=824751 TEX @ BOS
+[15/15] Simulating (1000, workers=3): TEX @ BOS
+Wrote top-props artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\top_props\daily_top_props_2026_06_14.json
+Wrote ladders artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\ladders\daily_ladders_2026_06_14.json
+Wrote ladder audit artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\ladders\daily_ladder_audit_2026_06_14.json
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_14.json
+    ... still running (1110s)
+[multi-profile] Starting daily multi-profile build for 2026-06-14 (season 2026)
 [multi-profile] Running profile 'game_roi' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily
-[multi-profile] Finished profile 'game_roi' in 14m 07.7s (exit=0)
+[multi-profile] Finished profile 'game_roi' in 12m 39.3s (exit=0)
 [multi-profile] Running profile 'pitcher_props' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props
-[multi-profile] Finished profile 'pitcher_props' in 2m 37.2s (exit=0)
+[multi-profile] Finished profile 'pitcher_props' in 2m 38.2s (exit=0)
 [multi-profile] Running profile 'hitter_props' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props
-[multi-profile] Finished profile 'hitter_props' in 2m 39.5s (exit=0)
+[multi-profile] Finished profile 'hitter_props' in 2m 38.2s (exit=0)
 [multi-profile] Starting locked-policy card assembly
-[multi-profile] Building locked-policy card for 2026-06-12
-[multi-profile] Locked-policy stage: game candidates (3.0s, totals=7, ml=14)
-[multi-profile] Locked-policy stage: pitcher candidates (1.0s, rows=29)
-[multi-profile] Locked-policy stage: shadow pitcher candidates (0.0s, rows=8)
-[multi-profile] Locked-policy stage: hitter candidates (39.3s, rows=420)
+[multi-profile] Building locked-policy card for 2026-06-14
+[multi-profile] Locked-policy stage: game candidates (2.8s, totals=9, ml=11)
+[multi-profile] Locked-policy stage: pitcher candidates (0.8s, rows=31)
+[multi-profile] Locked-policy stage: shadow pitcher candidates (0.0s, rows=6)
+[multi-profile] Locked-policy stage: hitter candidates (22.6s, rows=228)
 [multi-profile] Locked-policy stage: shadow hitter candidates (0.2s, rows=0)
-[multi-profile] Locked-policy stage: selection and support filters (0.0s, selected=13)
+[multi-profile] Locked-policy stage: selection and support filters (0.0s, selected=12)
 [multi-profile] Locked-policy stage: explanation diagnostics (0.0s)
-[multi-profile] Locked-policy card ready in 43.5s
-[multi-profile] Wrote locked-policy card to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_locked_policy.json in 43.6s
-[multi-profile] Wrote HR targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_hr_targets.json
-[multi-profile] Wrote RFI targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_rfi_targets.json
-[multi-profile] Wrote bundle manifest to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_profile_bundle.json in 20m 08.5s
-[multi-profile] Wrote HR targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_hr_targets.json
-[multi-profile] Wrote RFI targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_rfi_targets.json
-[multi-profile] Wrote locked-policy card: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12_locked_policy.json
+[multi-profile] Locked-policy card ready in 26.4s
+[multi-profile] Wrote locked-policy card to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14_locked_policy.json in 26.4s
+[multi-profile] Wrote HR targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14_hr_targets.json
+[multi-profile] Wrote RFI targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14_rfi_targets.json
+[multi-profile] Wrote bundle manifest to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14_profile_bundle.json in 18m 22.7s
+[multi-profile] Wrote HR targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14_hr_targets.json
+[multi-profile] Wrote RFI targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14_rfi_targets.json
+[multi-profile] Wrote locked-policy card: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14_locked_policy.json
 [multi-profile] Recommendation source mapping:
-  games -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_12.json
-  pitcher props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_12.json
-  hitter props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_12.json
+  games -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_14.json
+  pitcher props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_14.json
+  hitter props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_14.json
 {
   "season": 2026,
   "dates": [],
@@ -220,162 +220,149 @@ Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitt
   "dates_changed": 0,
   "changed_dates": []
 }
-[ui-daily] Building current-day top-props artifact for 2026-06-12...
-[ui-daily] Building current-day ladders artifact for 2026-06-12...
-    ... still running (1232s)
-[ui-daily] Building current-day ladder audit artifact for 2026-06-12...
-[ui-daily] Building current-day season frontend artifacts for 2026-06-12...
-[ui-daily] Building next-day forward outputs for 2026-06-13...
-[ui-daily] Starting workflow for 2026-06-13 (season 2026, prior-day reconcile 2026-06-12, next-day off -> 2026-06-14, git-push off)
-[ui-daily] Prior-day reconciliation target: 2026-06-12 (season 2026)
-[ui-daily] Building prior-day top-props artifact for 2026-06-12...
-[ui-daily] Fetching current-day OddsAPI markets for 2026-06-13...
-[ui-daily] Building current-day multi-profile outputs for 2026-06-13...
-[core] Starting daily update for 2026-06-13 (season=2026, sims=1000, workers=3)
-[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\snapshots\2026-06-13...
-[core] Fetching schedule for 2026-06-13...
-[core] Loaded 15 scheduled game(s) for 2026-06-13.
-    ... still running (1262s)
-[1/15] Preparing rosters: gamePk=823694 STL @ MIN
-[1/15] Simulating (1000, workers=3): STL @ MIN
-[2/15] Preparing rosters: gamePk=822802 NYY @ TOR
-[2/15] Simulating (1000, workers=3): NYY @ TOR
-[3/15] Preparing rosters: gamePk=824828 SD @ BAL
-[3/15] Simulating (1000, workers=3): SD @ BAL
-    ... still running (1292s)
-[4/15] Preparing rosters: gamePk=822725 SEA @ WSH
-[4/15] Simulating (1000, workers=3): SEA @ WSH
-[5/15] Preparing rosters: gamePk=823369 MIA @ PIT
-[5/15] Simulating (1000, workers=3): MIA @ PIT
-    ... still running (1322s)
-[6/15] Preparing rosters: gamePk=824508 AZ @ CIN
-[6/15] Simulating (1000, workers=3): AZ @ CIN
-[7/15] Preparing rosters: gamePk=824426 DET @ CLE
-[7/15] Simulating (1000, workers=3): DET @ CLE
-[8/15] Preparing rosters: gamePk=824749 TEX @ BOS
-[8/15] Simulating (1000, workers=3): TEX @ BOS
-    ... still running (1352s)
-[9/15] Preparing rosters: gamePk=823616 ATL @ NYM
-[9/15] Simulating (1000, workers=3): ATL @ NYM
-[10/15] Preparing rosters: gamePk=824587 LAD @ CWS
-[10/15] Simulating (1000, workers=3): LAD @ CWS
-    ... still running (1382s)
-[11/15] Preparing rosters: gamePk=824100 HOU @ KC
-[11/15] Simulating (1000, workers=3): HOU @ KC
-[12/15] Preparing rosters: gamePk=823776 PHI @ MIL
-[12/15] Simulating (1000, workers=3): PHI @ MIL
-[13/15] Preparing rosters: gamePk=824995 COL @ ATH
-[13/15] Simulating (1000, workers=3): COL @ ATH
-    ... still running (1412s)
-[14/15] Preparing rosters: gamePk=823213 CHC @ SF
-[14/15] Simulating (1000, workers=3): CHC @ SF
-[15/15] Preparing rosters: gamePk=824019 TB @ LAA
-[15/15] Simulating (1000, workers=3): TB @ LAA
-Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13.json
-[multi-profile] Starting daily multi-profile build for 2026-06-13 (season 2026)
+[ui-daily] Building current-day top-props artifact for 2026-06-14...
+[ui-daily] Building current-day ladders artifact for 2026-06-14...
+    ... still running (1140s)
+[ui-daily] Building current-day ladder audit artifact for 2026-06-14...
+[ui-daily] Building current-day season frontend artifacts for 2026-06-14...
+[ui-daily] Building next-day forward outputs for 2026-06-15...
+[ui-daily] Starting workflow for 2026-06-15 (season 2026, prior-day reconcile 2026-06-14, next-day off -> 2026-06-16, git-push off)
+[ui-daily] Prior-day reconciliation target: 2026-06-14 (season 2026)
+[ui-daily] Live-lens readout for 2026-06-14: No prior-day live-lens activity found for 2026-06-14.
+[ui-daily]   performance: Local live-lens report processed 15 games in 1471.3 ms with 0 ms spent refreshing markets.
+[ui-daily] Building prior-day top-props artifact for 2026-06-14...
+[ui-daily] Fetching current-day OddsAPI markets for 2026-06-15...
+[ui-daily] Building current-day multi-profile outputs for 2026-06-15...
+[core] Starting daily update for 2026-06-15 (season=2026, sims=1000, workers=3)
+[core] Syncing OddsAPI market snapshots into D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\snapshots\2026-06-15...
+[core] Fetching schedule for 2026-06-15...
+[core] Loaded 10 scheduled game(s) for 2026-06-15.
+[1/10] Preparing rosters: gamePk=823452 MIA @ PHI
+[1/10] Simulating (1000, workers=3): MIA @ PHI
+    ... still running (1170s)
+[2/10] Preparing rosters: gamePk=822724 KC @ WSH
+[2/10] Simulating (1000, workers=3): KC @ WSH
+[3/10] Preparing rosters: gamePk=824505 NYM @ CIN
+[3/10] Simulating (1000, workers=3): NYM @ CIN
+[4/10] Preparing rosters: gamePk=823046 SD @ STL
+[4/10] Simulating (1000, workers=3): SD @ STL
+    ... still running (1200s)
+[5/10] Preparing rosters: gamePk=824666 COL @ CHC
+[5/10] Simulating (1000, workers=3): COL @ CHC
+[6/10] Preparing rosters: gamePk=822887 MIN @ TEX
+[6/10] Simulating (1000, workers=3): MIN @ TEX
+[7/10] Preparing rosters: gamePk=824181 DET @ HOU
+    ... still running (1230s)
+[7/10] Simulating (1000, workers=3): DET @ HOU
+[8/10] Preparing rosters: gamePk=825071 LAA @ AZ
+[8/10] Simulating (1000, workers=3): LAA @ AZ
+[9/10] Preparing rosters: gamePk=824993 PIT @ ATH
+[9/10] Simulating (1000, workers=3): PIT @ ATH
+    ... still running (1260s)
+[10/10] Preparing rosters: gamePk=823938 TB @ LAD
+[10/10] Simulating (1000, workers=3): TB @ LAD
+Wrote: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15.json
+[multi-profile] Starting daily multi-profile build for 2026-06-15 (season 2026)
 [multi-profile] Running profile 'game_roi' -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily
-[multi-profile] Finished profile 'game_roi' in 3m 01.8s (exit=0)
-[multi-profile] Skipping profile 'pitcher_props' -> no pitcher prop market entries in D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\market\oddsapi\oddsapi_pitcher_props_2026_06_13.json
-[multi-profile] Skipping profile 'hitter_props' -> no hitter prop market entries in D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\market\oddsapi\oddsapi_hitter_props_2026_06_13.json
+[multi-profile] Finished profile 'game_roi' in 2m 05.1s (exit=0)
+[multi-profile] Skipping profile 'pitcher_props' -> no pitcher prop market entries in D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\market\oddsapi\oddsapi_pitcher_props_2026_06_15.json
+[multi-profile] Skipping profile 'hitter_props' -> no hitter prop market entries in D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\market\oddsapi\oddsapi_hitter_props_2026_06_15.json
 [multi-profile] Starting locked-policy card assembly
-[multi-profile] Building locked-policy card for 2026-06-13
-[multi-profile] Locked-policy stage: game candidates (2.5s, totals=8, ml=10)
+[multi-profile] Building locked-policy card for 2026-06-15
+[multi-profile] Locked-policy stage: game candidates (0.0s, totals=0, ml=0)
 [multi-profile] Locked-policy stage: pitcher candidates (0.0s, rows=0)
 [multi-profile] Locked-policy stage: shadow pitcher candidates (0.0s, rows=0)
 [multi-profile] Locked-policy stage: hitter candidates (0.0s, rows=0)
 [multi-profile] Locked-policy stage: shadow hitter candidates (0.0s, rows=0)
-[multi-profile] Locked-policy stage: selection and support filters (0.0s, selected=1)
+[multi-profile] Locked-policy stage: selection and support filters (0.0s, selected=0)
 [multi-profile] Locked-policy stage: explanation diagnostics (0.0s)
-[multi-profile] Locked-policy card ready in 2.5s
-[multi-profile] Wrote locked-policy card to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_locked_policy.json in 2.5s
-[multi-profile] Wrote HR targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_hr_targets.json
-[multi-profile] Wrote RFI targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_rfi_targets.json
-[multi-profile] Wrote bundle manifest to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_profile_bundle.json in 3m 04.7s
-[multi-profile] Wrote HR targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_hr_targets.json
-[multi-profile] Wrote RFI targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_rfi_targets.json
-[multi-profile] Wrote locked-policy card: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13_locked_policy.json
+[multi-profile] Locked-policy card ready in 0.0s
+[multi-profile] Wrote locked-policy card to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15_locked_policy.json in 0.0s
+[multi-profile] Wrote HR targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15_hr_targets.json
+[multi-profile] Wrote RFI targets artifact: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15_rfi_targets.json
+[multi-profile] Wrote bundle manifest to D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15_profile_bundle.json in 2m 05.5s
+[multi-profile] Wrote HR targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15_hr_targets.json
+[multi-profile] Wrote RFI targets: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15_rfi_targets.json
+[multi-profile] Wrote locked-policy card: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15_locked_policy.json
 [multi-profile] Recommendation source mapping:
-  games -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_13.json
-  pitcher props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_13.json
-  hitter props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_13.json
-[ui-daily] Building current-day top-props artifact for 2026-06-13...
-    ... still running (1442s)
-[ui-daily] Building current-day ladders artifact for 2026-06-13...
-[ui-daily] Building current-day ladder audit artifact for 2026-06-13...
-[ui-daily] Building current-day season frontend artifacts for 2026-06-13...
-[ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_13.json
-[ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_12.json
-Pushing to origin main
-To https://github.com/mostgood1/Syndicate
-   fd1a35b..68135e7  main -> main
+  games -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\daily_summary_2026_06_15.json
+  pitcher props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_pitcher_props\daily_summary_2026_06_15.json
+  hitter props -> D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily_hitter_props\daily_summary_2026_06_15.json
+[ui-daily] Building current-day top-props artifact for 2026-06-15...
+    ... still running (1290s)
+[ui-daily] Building current-day ladders artifact for 2026-06-15...
+[ui-daily] Building current-day ladder audit artifact for 2026-06-15...
+[ui-daily] Building current-day season frontend artifacts for 2026-06-15...
+[ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_15.json
+[ui-daily] Wrote ops report: D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\daily\ops\daily_ops_2026_06_14.json
 ==> MLB current-day live-lens refresh
     cwd: D:\a\Syndicate\Syndicate
-    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_mlb_oddsapi.py --date 2026-06-12 --source-root data\mlb_source\source_artifacts --artifact-root data\mlb_source --overwrite off
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_mlb_oddsapi.py --date 2026-06-14 --source-root data\mlb_source\source_artifacts --artifact-root data\mlb_source --overwrite off
     env: MLB_BETTING_DATA_ROOT=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data; MLB_LIVE_LENS_DIR=D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts\data\live_lens; ODDS_API_KEY=<redacted>
-    pid: 2148
+    pid: 1496
 {
   "ok": true,
-  "date": "2026-06-12",
+  "date": "2026-06-14",
   "artifact_bundle_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source",
   "refresh": {
     "market_refresh": {
       "ok": true,
-      "date": "2026-06-12",
+      "date": "2026-06-14",
       "result": {
         "status": "skipped",
-        "date": "2026-06-12",
+        "date": "2026-06-14",
         "out_dir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi",
-        "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_12.json",
-        "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_12.json",
-        "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_12.json",
+        "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_game_lines_2026_06_14.json",
+        "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_pitcher_props_2026_06_14.json",
+        "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\oddsapi_hitter_props_2026_06_14.json",
         "reason": "overwrite=off and market files already exist"
       },
       "copied": {
-        "oddsapi_game_lines_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-12\\oddsapi_game_lines_2026_06_12.json",
-        "oddsapi_pitcher_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-12\\oddsapi_pitcher_props_2026_06_12.json",
-        "oddsapi_hitter_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-12\\oddsapi_hitter_props_2026_06_12.json"
+        "oddsapi_game_lines_2026_06_14.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-14\\oddsapi_game_lines_2026_06_14.json",
+        "oddsapi_pitcher_props_2026_06_14.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-14\\oddsapi_pitcher_props_2026_06_14.json",
+        "oddsapi_hitter_props_2026_06_14.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\snapshots\\2026-06-14\\oddsapi_hitter_props_2026_06_14.json"
       },
       "archived": {
-        "archiveDir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z",
+        "archiveDir": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_14\\20260614T075712_531911Z",
         "files": {
-          "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_game_lines_2026_06_12.json",
-          "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_pitcher_props_2026_06_12.json",
-          "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_hitter_props_2026_06_12.json"
+          "game_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_14\\20260614T075712_531911Z\\oddsapi_game_lines_2026_06_14.json",
+          "pitcher_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_14\\20260614T075712_531911Z\\oddsapi_pitcher_props_2026_06_14.json",
+          "hitter_props_path": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_14\\20260614T075712_531911Z\\oddsapi_hitter_props_2026_06_14.json"
         },
         "copied": {
-          "oddsapi_game_lines_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_game_lines_2026_06_12.json",
-          "oddsapi_pitcher_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_pitcher_props_2026_06_12.json",
-          "oddsapi_hitter_props_2026_06_12.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_12\\20260612T203612_418945Z\\oddsapi_hitter_props_2026_06_12.json"
+          "oddsapi_game_lines_2026_06_14.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_14\\20260614T075712_531911Z\\oddsapi_game_lines_2026_06_14.json",
+          "oddsapi_pitcher_props_2026_06_14.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_14\\20260614T075712_531911Z\\oddsapi_pitcher_props_2026_06_14.json",
+          "oddsapi_hitter_props_2026_06_14.json": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\market\\oddsapi\\refresh_history\\2026_06_14\\20260614T075712_531911Z\\oddsapi_hitter_props_2026_06_14.json"
         }
       }
     },
     "live_lens": {
       "ok": true,
-      "date": "2026-06-12",
+      "date": "2026-06-14",
       "counts": {
         "games": 15,
         "live": 0,
         "final": 0,
         "pregame": 15,
-        "props": 14,
+        "props": 0,
         "archivedLiveProps": 0
       },
       "report": {
-        "recordedAt": "2026-06-12T20:36:14+00:00",
-        "date": "2026-06-12",
+        "recordedAt": "2026-06-14T07:57:12+00:00",
+        "date": "2026-06-14",
         "counts": {
           "games": 15,
           "live": 0,
           "final": 0,
           "pregame": 15,
-          "props": 14,
+          "props": 0,
           "archivedLiveProps": 0
         },
         "marketsRefreshed": true,
-        "reportPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_12.json",
-        "syncPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_12.json",
-        "logPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_12.jsonl",
-        "propObservationLogPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_12.jsonl",
+        "reportPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_14.json",
+        "syncPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_14.json",
+        "logPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_14.jsonl",
+        "propObservationLogPath": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_14.jsonl",
         "trigger": "syndicate_refresh",
         "reused": false,
         "synced": true
@@ -385,50 +372,50 @@ To https://github.com/mostgood1/Syndicate
   "artifact_bundle_files": {
     "files": [
       "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\lineups_last_known_by_team.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_profile_bundle.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_locked_policy.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_hr_targets.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_12_rfi_targets.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\ladders\\daily_ladders_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\top_props\\daily_top_props_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\ops\\daily_ops_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12\\oddsapi_game_lines_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12\\oddsapi_pitcher_props_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12\\oddsapi_hitter_props_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_06_12.jsonl",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_12.jsonl",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_12.jsonl",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_manifest_2026_2026_06_12.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_day_2026_2026_06_12_retuned.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_betting_day_2026_2026_06_12_retuned.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_official_betting_day_2026_2026_06_12_retuned.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_14_profile_bundle.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_14_locked_policy.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_14_hr_targets.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\daily_summary_2026_06_14_rfi_targets.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\ladders\\daily_ladders_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\top_props\\daily_top_props_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\ops\\daily_ops_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-14\\oddsapi_game_lines_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-14\\oddsapi_pitcher_props_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-14\\oddsapi_hitter_props_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_2026_06_14.jsonl",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\live_lens_report_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\render_sync\\live_lens_reports_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_14.jsonl",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\live_lens\\prop_registry\\live_prop_observations_2026_06_14.jsonl",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\tuning\\live_prop_ranking\\default.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\sim_engine\\live_prop_ranking.py",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_manifest_2026_2026_06_14.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_day_2026_2026_06_14_retuned.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_betting_day_2026_2026_06_14_retuned.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\season_frontend\\season_official_betting_day_2026_2026_06_14_retuned.json",
       "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\eval\\seasons\\2026\\season_eval_manifest.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\eval\\seasons\\2026\\season_betting_cards_retuned_manifest.json"
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\eval\\seasons\\2026\\season_betting_cards_retuned_manifest.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\eval\\seasons\\2026\\season_betting_cards_retuned_hrr_manifest.json"
     ],
     "directories": [
       "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\cache",
       "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily_hitter_props",
       "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily_pitcher_props",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-12",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\sims\\2026-06-12",
-      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_06_12",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\snapshots\\2026-06-14",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\daily\\sims\\2026-06-14",
+      "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\market\\oddsapi\\refresh_history\\2026_06_14",
       "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\raw\\statsapi\\feed_live",
       "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\data\\runtime"
     ]
   }
 }
-Pushing to origin main
-To https://github.com/mostgood1/Syndicate
-   68135e7..e9a8134  main -> main
 ==> NBA vendored daily update
     cwd: D:\a\Syndicate\Syndicate
-    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_nba_oddsapi_props.py --date 2026-06-12 --source-root vendor\nba_betting_repo --artifact-root data\nba_source\source_artifacts --log-file D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-12\20260612_201043\nba_props_refresh.log --force-refresh --days-ahead 0 --do-edges --do-export
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_nba_oddsapi_props.py --date 2026-06-14 --source-root vendor\nba_betting_repo --artifact-root data\nba_source\source_artifacts --log-file D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-14\20260614_073503\nba_props_refresh.log --force-refresh --days-ahead 0 --do-edges --do-export
     env: APP_TZ=America/Chicago; APP_TZ_OFFSET_HOURS=-6; ODDS_API_KEY=<redacted>; REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS=1000; REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS=3
-    pid: 8
+    pid: 7836
     ... still running (30s)
     ... still running (60s)
     ... still running (90s)
@@ -473,7 +460,7 @@ Training Data:
 [1/3] Training Win Probability Model...
    Testing regularization strengths (smaller C = stronger regularization)...
    Best C: 0.01 (LogLoss: 0.6229)
-   All C results: {0.01: 0.62289340665, 0.05: 0.6364872334494172, 0.1: 0.6442067531200297, 0.25: 0.6524549458885076, 0.5: 0.6566613370917146}
+   All C results: {0.01: 0.6229215242585012, 0.05: 0.6364839947399932, 0.1: 0.6442139757257854, 0.25: 0.6524488259653379, 0.5: 0.6566400545933376}
 
    Probability calibration check:
    - Mean probability: 0.512
@@ -516,17 +503,17 @@ Metrics:
 
 {
   "cards_sim_detail_games": 0,
-  "date": "2026-06-12",
-  "duration_s": 1.0720746517181396,
-  "edges_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\props_edges_2026-06-12.csv",
+  "date": "2026-06-14",
+  "duration_s": 0.9864392280578613,
+  "edges_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\props_edges_2026-06-14.csv",
   "edges_rows": 0,
-  "ended_at": "2026-06-12T20:37:18.872687",
+  "ended_at": "2026-06-14T07:57:18.089204",
   "error": "export-props-recommendations failed with exit code 1",
   "game_cards_rows": 0,
-  "heartbeat_at": "2026-06-12T20:37:18.872687",
+  "heartbeat_at": "2026-06-14T07:57:18.089204",
   "mode": "full",
   "phase": "done",
-  "phase_started_at": "2026-06-12T20:37:18.872687",
+  "phase_started_at": "2026-06-14T07:57:18.089204",
   "playoff_transition": {
     "status": "ok",
     "summary": {
@@ -554,7 +541,7 @@ Metrics:
         "quarters_models": 0,
         "sample_weight_min": 0.35,
         "total_rmse_cv_mean": 19.551491319483176,
-        "win_logloss_cv_mean": 0.62289340665
+        "win_logloss_cv_mean": 0.6229215242585012
       },
       "game_probability_calibration": {
         "command": [
@@ -641,34 +628,34 @@ Metrics:
       "regular_season_end": "2026-04-12",
       "regular_season_start": "2024-10-22",
       "season": "2025-26",
-      "summary_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\playoff_transition_2025-26_2026-06-12.json"
+      "summary_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\playoff_transition_2025-26_2026-06-14.json"
     }
   },
-  "predictions_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\props_predictions_2026-06-12.csv",
+  "predictions_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\props_predictions_2026-06-14.csv",
   "predictions_rows": 0,
   "rc_edges": null,
   "rc_export": 1,
   "rc_snapshot": 2,
-  "recs_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\props_recommendations_2026-06-12.csv",
+  "recs_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\props_recommendations_2026-06-14.csv",
   "recs_rows": 0,
   "smart_sim_files": 0,
-  "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\oddsapi_player_props_2026-06-12.csv",
+  "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\processed\\oddsapi_player_props_2026-06-14.csv",
   "snapshot_alias_rows": 0,
-  "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\raw\\odds_nba_player_props_2026-06-12.csv",
+  "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\nba_betting_repo\\data\\raw\\odds_nba_player_props_2026-06-14.csv",
   "snapshot_rows": 0,
-  "started_at": "2026-06-12T20:37:17.800613"
+  "started_at": "2026-06-14T07:57:17.102765"
 }
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   e9a8134..6dd4ddb  main -> main
+   522c4b0..2a1c797  main -> main
 ==> NBA source mirror refresh
     cwd: D:\a\Syndicate\Syndicate
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\refresh_nba_source_mirror.ps1 -Date 2026-06-12
-    pid: 1988
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\refresh_nba_source_mirror.ps1 -Date 2026-06-14
+    pid: 8948
 {
     "sport":  "nba",
-    "date":  "2026-06-12",
-    "refreshedAtUtc":  "2026-06-12T20:39:21.3569418Z",
+    "date":  "2026-06-14",
+    "refreshedAtUtc":  "2026-06-14T07:59:21.3028639Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NBA",
@@ -676,49 +663,52 @@ To https://github.com/mostgood1/Syndicate
     "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nba_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  23,
+    "copiedArtifactCount":  26,
     "artifactGroups":  {
-                           "processed":  13,
-                           "live_lens":  9,
+                           "processed":  14,
+                           "live_lens":  11,
                            "raw":  1,
                            "web":  0,
                            "other":  0
                        },
     "copiedArtifacts":  [
-                            "game_cards_2026-06-10.csv",
-                            "recommendations_2026-06-10.csv",
-                            "recommendations_slate_2026-06-10.json",
-                            "cards_sim_detail_2026-06-10.json",
-                            "cards_props_snapshot_2026-06-10.json",
-                            "props_recommendations_top_by_game_2026-06-10.json",
-                            "oddsapi_player_props_2026-06-10.csv",
-                            "props_predictions_2026-06-10.csv",
-                            "props_edges_2026-06-10.csv",
-                            "props_recommendations_2026-06-10.csv",
+                            "game_cards_2026-06-13.csv",
+                            "recommendations_2026-06-13.csv",
+                            "recommendations_slate_2026-06-13.json",
+                            "cards_sim_detail_2026-06-13.json",
+                            "cards_props_snapshot_2026-06-13.json",
+                            "props_recommendations_top_by_game_2026-06-13.json",
+                            "oddsapi_player_props_2026-06-13.csv",
+                            "props_predictions_2026-06-13.csv",
+                            "props_edges_2026-06-13.csv",
+                            "props_recommendations_2026-06-13.csv",
                             "recon_games_2026-05-28.csv",
+                            "recon_props_2026-06-13.csv",
                             "live_player_lens_tuning_2026-05-28.csv",
-                            "live_lens_projections_2026-06-10.jsonl",
+                            "live_lens_projections_2026-06-13.jsonl",
+                            "live_lens_signals_2026-06-13.jsonl",
                             "live_lens_tuning_override.json",
                             "boxscores_history.csv",
-                            "live_lens\\live_lens_projections_2026-06-10.jsonl",
+                            "live_lens\\live_lens_projections_2026-06-13.jsonl",
+                            "live_lens\\live_lens_signals_2026-06-13.jsonl",
                             "live_lens\\live_lens_tuning_override.json",
-                            "live_snapshots\\live_state_2026-06-10.jsonl",
-                            "live_snapshots\\live_pbp_stats_2026-06-10.jsonl",
-                            "live_snapshots\\live_lines_2026-06-10.jsonl",
+                            "live_snapshots\\live_state_2026-06-13.jsonl",
+                            "live_snapshots\\live_pbp_stats_2026-06-13.jsonl",
+                            "live_snapshots\\live_lines_2026-06-13.jsonl",
                             "live_snapshots\\live_player_boxscore_2026-06-05.jsonl",
-                            "live_snapshots\\live_player_lens_2026-06-10.jsonl",
+                            "live_snapshots\\live_player_lens_2026-06-13.jsonl",
                             "raw\\odds_nba_player_props_2026-06-05.csv"
                         ]
 }
-NBA advanced-data gate: no scheduled games for 2026-06-12 (espn_nba_scoreboard); skipping artifact assertions
+NBA advanced-data gate: no scheduled games for 2026-06-14 (espn_nba_scoreboard); skipping artifact assertions
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   6dd4ddb..ee3636d  main -> main
+   2a1c797..974d27d  main -> main
 ==> WNBA vendored daily update
     cwd: D:\a\Syndicate\Syndicate
-    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_wnba_oddsapi_props.py --date 2026-06-12 --source-root vendor\wnba_betting_repo --artifact-root data\wnba_source\source_artifacts --log-file D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-12\20260612_201043\wnba_props_refresh.log --force-refresh --days-ahead 0 --do-edges --do-export
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_wnba_oddsapi_props.py --date 2026-06-14 --source-root vendor\wnba_betting_repo --artifact-root data\wnba_source\source_artifacts --log-file D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-14\20260614_073503\wnba_props_refresh.log --force-refresh --days-ahead 0 --do-edges --do-export
     env: APP_TZ=America/Chicago; APP_TZ_OFFSET_HOURS=-6; ODDS_API_KEY=<redacted>; REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS=1000; REFRESH_PREDICT_PROPS_SMART_SIM_WORKERS=3; SYNDICATE_WNBA_SOURCE_APP_FALLBACK=1
-    pid: 3992
+    pid: 8440
     ... still running (30s)
     ... still running (60s)
     ... still running (90s)
@@ -733,80 +723,79 @@ To https://github.com/mostgood1/Syndicate
     ... still running (360s)
     ... still running (390s)
     ... still running (420s)
-    ... still running (450s)
 {
   "artifact_bundle_files": {
     "boxscores_history_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\boxscores_history.csv",
-    "cards_props_snapshot_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_props_snapshot_2026-06-12.json",
-    "cards_sim_detail_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_sim_detail_2026-06-12.json",
-    "edges_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_edges_2026-06-12.csv",
-    "game_cards_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-12.csv",
-    "live_lens_projections_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_projections_2026-06-12.jsonl",
+    "cards_props_snapshot_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_props_snapshot_2026-06-14.json",
+    "cards_sim_detail_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\cards_sim_detail_2026-06-14.json",
+    "edges_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_edges_2026-06-14.csv",
+    "game_cards_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\game_cards_2026-06-14.csv",
+    "live_lens_projections_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_projections_2026-06-14.jsonl",
     "live_lens_tuning_override_live_lens_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\live_lens\\live_lens_tuning_override.json",
     "live_lens_tuning_override_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_lens_tuning_override.json",
-    "live_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_lines_2026-06-12.jsonl",
-    "live_pbp_stats_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_pbp_stats_2026-06-12.jsonl",
-    "live_player_lens_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_player_lens_2026-06-12.jsonl",
-    "live_state_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_state_2026-06-12.jsonl",
-    "predictions_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-12.csv",
-    "recommendations_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_2026-06-12.csv",
-    "recommendations_slate_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_slate_2026-06-12.json",
-    "recs_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-12.csv",
+    "live_lines_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_lines_2026-06-14.jsonl",
+    "live_pbp_stats_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_pbp_stats_2026-06-14.jsonl",
+    "live_player_lens_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_player_lens_2026-06-14.jsonl",
+    "live_state_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\live_snapshots\\live_state_2026-06-14.jsonl",
+    "predictions_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-14.csv",
+    "recommendations_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_2026-06-14.csv",
+    "recommendations_slate_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\recommendations_slate_2026-06-14.json",
+    "recs_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-14.csv",
     "smart_sim_paths": [
-      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-12_SEA_GSV.json",
-      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-12_WSH_TOR.json"
+      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_NYL_WSH.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_TOR_ATL.json"
     ],
-    "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\oddsapi_player_props_2026-06-12.csv",
-    "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\raw\\odds_wnba_player_props_2026-06-12.csv",
+    "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\oddsapi_player_props_2026-06-14.csv",
+    "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\raw\\odds_wnba_player_props_2026-06-14.csv",
     "team_advanced_stats_paths": [
       "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026_asof_20260612.csv"
+      "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\team_advanced_stats_2026_asof_20260614.csv"
     ],
-    "top_by_game_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_top_by_game_2026-06-12.json"
+    "top_by_game_path": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\props_recommendations_top_by_game_2026-06-14.json"
   },
   "artifact_bundle_root": "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts",
-  "date": "2026-06-12",
-  "duration_s": 430.0781886577606,
-  "edges_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_edges_2026-06-12.csv",
-  "edges_rows": 233,
-  "ended_at": "2026-06-12T20:47:24.809617",
+  "date": "2026-06-14",
+  "duration_s": 390.19543409347534,
+  "edges_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_edges_2026-06-14.csv",
+  "edges_rows": 228,
+  "ended_at": "2026-06-14T08:06:34.900092",
   "error": "export-props-recommendations failed with exit code 1",
-  "heartbeat_at": "2026-06-12T20:47:24.809617",
+  "heartbeat_at": "2026-06-14T08:06:34.900092",
   "mode": "full",
   "phase": "done",
-  "phase_started_at": "2026-06-12T20:47:24.809617",
+  "phase_started_at": "2026-06-14T08:06:34.900092",
   "playoff_transition": {
     "reason": "No regular-season schedule rows found for 2025-26",
     "status": "skipped"
   },
-  "predictions_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_predictions_2026-06-12.csv",
-  "predictions_rows": 78,
+  "predictions_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_predictions_2026-06-14.csv",
+  "predictions_rows": 80,
   "rc_edges": 0,
   "rc_export": 1,
   "rc_snapshot": 0,
-  "recs_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_recommendations_2026-06-12.csv",
-  "recs_rows": 17,
-  "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\oddsapi_player_props_2026-06-12.csv",
-  "snapshot_alias_rows": 575,
-  "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\raw\\odds_wnba_player_props_2026-06-12.csv",
-  "snapshot_rows": 575,
-  "started_at": "2026-06-12T20:40:14.731428"
+  "recs_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\props_recommendations_2026-06-14.csv",
+  "recs_rows": 18,
+  "snapshot_alias_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\processed\\oddsapi_player_props_2026-06-14.csv",
+  "snapshot_alias_rows": 538,
+  "snapshot_path": "D:\\a\\Syndicate\\Syndicate\\vendor\\wnba_betting_repo\\data\\raw\\odds_wnba_player_props_2026-06-14.csv",
+  "snapshot_rows": 538,
+  "started_at": "2026-06-14T08:00:04.704657"
 }
-warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_projections_2026-06-12.jsonl', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_projections_2026-06-12.jsonl', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/processed/live_lens_projections_2026-06-14.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/source_artifacts/data/live_lens/live_lens_projections_2026-06-14.jsonl', LF will be replaced by CRLF the next time Git touches it
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   ee3636d..0c68406  main -> main
+   974d27d..4bb23c6  main -> main
 ==> WNBA source mirror refresh
     cwd: D:\a\Syndicate\Syndicate
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\refresh_wnba_source_mirror.ps1 -Date 2026-06-12
-    pid: 3460
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\refresh_wnba_source_mirror.ps1 -Date 2026-06-14
+    pid: 6052
 {
     "sport":  "wnba",
-    "date":  "2026-06-12",
-    "refreshedAtUtc":  "2026-06-12T20:48:31.7546717Z",
+    "date":  "2026-06-14",
+    "refreshedAtUtc":  "2026-06-14T08:07:34.9665757Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_WNBA",
@@ -822,42 +811,44 @@ To https://github.com/mostgood1/Syndicate
                            "other":  0
                        },
     "copiedArtifacts":  [
-                            "game_cards_2026-06-12.csv",
-                            "recommendations_2026-06-12.csv",
-                            "recommendations_slate_2026-06-12.json",
-                            "cards_sim_detail_2026-06-12.json",
-                            "cards_props_snapshot_2026-06-12.json",
-                            "props_recommendations_top_by_game_2026-06-12.json",
-                            "oddsapi_player_props_2026-06-12.csv",
-                            "props_predictions_2026-06-12.csv",
-                            "props_edges_2026-06-12.csv",
-                            "props_recommendations_2026-06-12.csv",
+                            "game_cards_2026-06-14.csv",
+                            "recommendations_2026-06-14.csv",
+                            "recommendations_slate_2026-06-14.json",
+                            "cards_sim_detail_2026-06-14.json",
+                            "cards_props_snapshot_2026-06-14.json",
+                            "props_recommendations_top_by_game_2026-06-14.json",
+                            "oddsapi_player_props_2026-06-14.csv",
+                            "props_predictions_2026-06-14.csv",
+                            "props_edges_2026-06-14.csv",
+                            "props_recommendations_2026-06-14.csv",
                             "boxscores_history.csv",
-                            "live_lens_projections_2026-06-12.jsonl",
+                            "live_lens_projections_2026-06-14.jsonl",
                             "live_lens_tuning_override.json",
-                            "smart_sim_2026-06-12_SEA_GSV.json",
-                            "smart_sim_2026-06-12_WSH_TOR.json",
-                            "live_lens\\live_lens_projections_2026-06-12.jsonl",
+                            "smart_sim_2026-06-14_NYL_WSH.json",
+                            "smart_sim_2026-06-14_TOR_ATL.json",
+                            "live_lens\\live_lens_projections_2026-06-14.jsonl",
                             "live_lens\\live_lens_tuning_override.json",
-                            "live_snapshots\\live_state_2026-06-12.jsonl",
-                            "live_snapshots\\live_pbp_stats_2026-06-12.jsonl",
-                            "live_snapshots\\live_lines_2026-06-12.jsonl",
-                            "live_snapshots\\live_player_lens_2026-06-12.jsonl",
-                            "raw\\odds_wnba_player_props_2026-06-12.csv"
+                            "live_snapshots\\live_state_2026-06-14.jsonl",
+                            "live_snapshots\\live_pbp_stats_2026-06-14.jsonl",
+                            "live_snapshots\\live_lines_2026-06-14.jsonl",
+                            "live_snapshots\\live_player_lens_2026-06-14.jsonl",
+                            "raw\\odds_wnba_player_props_2026-06-14.csv"
                         ]
 }
-warning: in the working copy of 'data/wnba_source/data/live_lens/live_lens_projections_2026-06-12.jsonl', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'data/wnba_source/data/live_lens/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'data/wnba_source/data/processed/live_lens_projections_2026-06-12.jsonl', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'data/wnba_source/data/processed/live_lens_tuning_override.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/data/processed/live_lens_projections_2026-06-14.jsonl', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'data/wnba_source/data/live_lens/live_lens_projections_2026-06-14.jsonl', LF will be replaced by CRLF the next time Git touches it
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   0c68406..e04513c  main -> main
+   4bb23c6..0496293  main -> main
 ==> NHL vendored daily update
     cwd: D:\a\Syndicate\Syndicate
-    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_nhl_oddsapi.py --date 2026-06-12 --source-root vendor\nhl_betting_repo --artifact-root data\nhl_source\source_artifacts --days-ahead 1 --props-boxscore-n-sims 1000
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_nhl_oddsapi.py --date 2026-06-14 --source-root vendor\nhl_betting_repo --artifact-root data\nhl_source\source_artifacts --days-ahead 1 --props-boxscore-n-sims 1000
     env: ODDS_API_KEY=<redacted>
-    pid: 8528
+    pid: 3428
+D:\a\Syndicate\Syndicate\syndicate\local_nhl_odds.py:803: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  merged = pd.concat([existing, working], ignore_index=True)
     ... still running (30s)
     ... still running (60s)
     ... still running (90s)
@@ -867,106 +858,105 @@ To https://github.com/mostgood1/Syndicate
     ... still running (210s)
     ... still running (240s)
     ... still running (270s)
-{"phase": "source_cli", "command": ["roster-update", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["lineup-update", "--date", "2026-06-12", "--prefer-source", "none"]}
-{"phase": "source_cli", "command": ["shifts-update", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["injury-update", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["team-odds-collect", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["props-collect", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["props-project-all", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["props-simulate-boxscores", "--date", "2026-06-12", "--n-sims", "1000"]}
-{"phase": "source_cli", "command": ["props-recommendations-boxscores", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["props-recommendations", "--date", "2026-06-12", "--min-ev", "0.0", "--top", "200"]}
-{"phase": "source_cli", "command": ["game-recommendations-sim", "--date", "2026-06-12"]}
-{"phase": "source_cli", "command": ["roster-update", "--date", "2026-06-13"]}
-{"phase": "source_cli", "command": ["lineup-update", "--date", "2026-06-13", "--prefer-source", "none"]}
-{"phase": "source_cli", "command": ["team-odds-collect", "--date", "2026-06-13"]}
-{"phase": "source_cli", "command": ["props-collect", "--date", "2026-06-13"]}
-{"phase": "source_cli", "command": ["props-project-all", "--date", "2026-06-13"]}
+{"phase": "source_cli", "command": ["roster-update", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["lineup-update", "--date", "2026-06-14", "--prefer-source", "none"]}
+{"phase": "source_cli", "command": ["shifts-update", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["injury-update", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["team-odds-collect", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["props-collect", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["props-project-all", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["props-simulate-boxscores", "--date", "2026-06-14", "--n-sims", "1000"]}
+{"phase": "source_cli", "command": ["props-recommendations-boxscores", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["props-recommendations", "--date", "2026-06-14", "--min-ev", "0.0", "--top", "200"]}
+{"phase": "source_cli", "command": ["game-recommendations-sim", "--date", "2026-06-14"]}
+{"phase": "source_cli", "command": ["roster-update", "--date", "2026-06-15"]}
+{"phase": "source_cli", "command": ["lineup-update", "--date", "2026-06-15", "--prefer-source", "none"]}
+{"phase": "source_cli", "command": ["team-odds-collect", "--date", "2026-06-15"]}
+{"phase": "source_cli", "command": ["props-collect", "--date", "2026-06-15"]}
+{"phase": "source_cli", "command": ["props-project-all", "--date", "2026-06-15"]}
 {
   "ok": true,
-  "date": "2026-06-12",
+  "date": "2026-06-14",
   "artifact_bundle_root": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
   "artifact_bundle_files": {
-    "scoreboard_path": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\games\\date=2026-06-12\\scoreboard.csv",
+    "scoreboard_path": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\games\\date=2026-06-14\\scoreboard.csv",
     "team_odds_paths": [
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-12\\oddsapi.csv"
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-14\\oddsapi.csv"
     ],
     "props_line_paths": [
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-12\\oddsapi.csv"
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-14\\oddsapi.csv"
     ],
     "processed_files": [
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_sim_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\recommendations_sim_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_hist_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_samples_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\injuries_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\shifts_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\co_toi_shifts_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-12.csv",
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-12.csv"
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\predictions_sim_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\recommendations_sim_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_hist_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_boxscores_sim_samples_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_recommendations_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\injuries_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\shifts_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\co_toi_shifts_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-14.csv",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-14.csv"
     ],
     "smart_sim_files": [
-      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-12_bundle.json"
+      "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_bundle.json"
     ]
   },
   "lookahead_runs": [
     {
-      "date": "2026-06-13",
+      "date": "2026-06-15",
       "artifact_bundle_files": {
-        "scoreboard_path": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\games\\date=2026-06-13\\scoreboard.csv",
+        "scoreboard_path": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\games\\date=2026-06-15\\scoreboard.csv",
         "team_odds_paths": [
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-13\\oddsapi.csv"
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\odds\\team\\date=2026-06-15\\oddsapi.csv"
         ],
         "props_line_paths": [
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-13\\oddsapi.csv"
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\props\\player_props_lines\\date=2026-06-15\\oddsapi.csv"
         ],
         "processed_files": [
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-13.csv",
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-13.csv",
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-13.csv",
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-13.csv",
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-13.csv",
-          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-13.csv"
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_projections_all_2026-06-15.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\roster_snapshot_2026-06-15.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_2026-06-15.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\lineups_co_toi_2026-06-15.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\starting_goalies_2026-06-15.csv",
+          "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\props_predictions_2026-06-15.csv"
         ]
       }
     }
   ],
   "required_artifacts": [
-    "data/processed/predictions_2026-06-12.csv",
-    "data/processed/predictions_sim_2026-06-12.csv",
-    "data/processed/recommendations_sim_2026-06-12.csv",
-    "data/processed/props_projections_all_2026-06-12.csv",
-    "data/processed/props_boxscores_sim_2026-06-12.csv",
-    "data/processed/props_boxscores_sim_hist_2026-06-12.csv",
-    "data/processed/props_recommendations_2026-06-12.csv",
-    "data/processed/props_predictions_2026-06-12.csv",
-    "data/processed/roster_snapshot_2026-06-12.csv",
-    "data/processed/lineups_2026-06-12.csv",
-    "data/odds/games/date=2026-06-12/scoreboard.csv",
-    "data/odds/team/date=2026-06-12/oddsapi.csv",
-    "data/props/player_props_lines/date=2026-06-12/oddsapi.csv"
+    "data/processed/predictions_2026-06-14.csv",
+    "data/processed/predictions_sim_2026-06-14.csv",
+    "data/processed/recommendations_sim_2026-06-14.csv",
+    "data/processed/props_projections_all_2026-06-14.csv",
+    "data/processed/props_boxscores_sim_2026-06-14.csv",
+    "data/processed/props_boxscores_sim_hist_2026-06-14.csv",
+    "data/processed/props_recommendations_2026-06-14.csv",
+    "data/processed/props_predictions_2026-06-14.csv",
+    "data/processed/roster_snapshot_2026-06-14.csv",
+    "data/processed/lineups_2026-06-14.csv",
+    "data/odds/games/date=2026-06-14/scoreboard.csv",
+    "data/odds/team/date=2026-06-14/oddsapi.csv",
+    "data/props/player_props_lines/date=2026-06-14/oddsapi.csv"
   ],
   "warnings": [
     "backfilled compatibility artifacts: predictions, predictions_sim, recommendations_sim, props_boxscores_sim, props_boxscores_sim_hist, props_boxscores_sim_samples"
   ]
 }
-NHL advanced-data gate: no scheduled games for 2026-06-12 (nhle_schedule); skipping artifact assertions
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   e04513c..6674e51  main -> main
+   0496293..a1e64e6  main -> main
 ==> NFL local odds refresh
     cwd: D:\a\Syndicate\Syndicate
     C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\refresh_nfl_oddsapi.py --artifact-root data\nfl_source\source_artifacts
     env: ODDS_API_KEY=<redacted>
-    pid: 2384
+    pid: 4360
 Using OddsAPI key: ***e36a44
 WARNING: OddsAPI returned 422 for market 'player_rec_yds'. Skipping this market.
 WARNING: OddsAPI returned 422 for market 'player_receptions'. Skipping this market.
@@ -989,20 +979,20 @@ Wrote D:\a\Syndicate\Syndicate\data\nfl_source\source_artifacts\oddsapi_player_p
       "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json"
     ],
     "globbed_files": [
-      "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_12.json",
+      "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_14.json",
       "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
     ]
   }
 }
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   6674e51..89ff0cd  main -> main
+   a1e64e6..2fa10ba  main -> main
 ==> NCAAB source mirror export
     cwd: D:\a\Syndicate\Syndicate
-    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\export_ncaab_source_mirror.py data\ncaab_source\api 2026-06-12 --raw-root data\ncaab_source\raw_outputs
-    pid: 4552
+    C:\hostedtoolcache\windows\Python\3.11.9\x64\python.exe scripts\export_ncaab_source_mirror.py data\ncaab_source\api 2026-06-14 --raw-root data\ncaab_source\raw_outputs
+    pid: 6328
 {
-  "date": "2026-06-12",
+  "date": "2026-06-14",
   "display_dates": [
     "2025-11-03",
     "2025-11-04",
@@ -1299,7 +1289,7 @@ To https://github.com/mostgood1/Syndicate
   "latest_results": "2026-05-22",
   "copied_artifacts": [
     "api/live_lens_tuning.json",
-    "api/live_lines/live_lines_2026-06-12.json"
+    "api/live_lines/live_lines_2026-06-14.json"
   ],
   "source": "local_raw_outputs",
   "source_repo": null,
@@ -1313,28 +1303,28 @@ To https://github.com/mostgood1/Syndicate
 }
 Pushing to origin main
 To https://github.com/mostgood1/Syndicate
-   89ff0cd..16ce4ca  main -> main
-Intelligence readiness audit skipped in CI for ncaab: Recommendations mirror, Live state mirror
+   2fa10ba..2c80751  main -> main
+Intelligence readiness audit skipped in CI for ncaab: Recommendations mirror, Play-by-play derived live recap, Live state mirror, Pace and live-line context
 ==> Syndicate refresh and gate
     cwd: D:\a\Syndicate\Syndicate
-    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_and_gate.ps1 -Date 2026-06-12 -ArtifactsDir D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-12\20260612_201043\migration
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_and_gate.ps1 -Date 2026-06-14 -ArtifactsDir D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-14\20260614_073503\migration
     env: SYNDICATE_USE_LOCAL_ARTIFACT_MIRRORS=1
-    pid: 7348
+    pid: 7720
 ==> MLB mirror refresh
-    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_mlb_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_mlb_source_mirror.ps1 -Date 2026-06-14 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\mlb_source\source_artifacts
 ==> NBA mirror refresh
-    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nba_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nba_source\source_artifacts
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nba_source_mirror.ps1 -Date 2026-06-14 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nba_source\source_artifacts
 ==> NHL mirror refresh
-    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nhl_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nhl_source\source_artifacts
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nhl_source_mirror.ps1 -Date 2026-06-14 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nhl_source\source_artifacts
 ==> WNBA mirror refresh
-    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_wnba_source_mirror.ps1 -Date 2026-06-12 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\wnba_source\source_artifacts
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_wnba_source_mirror.ps1 -Date 2026-06-14 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\wnba_source\source_artifacts
 ==> NFL mirror refresh
     powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_nfl_source_mirror.ps1 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\nfl_source\source_artifacts
 ==> NCAAF mirror refresh
     powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_ncaaf_source_mirror.ps1 -SourceArtifactRoot D:\a\Syndicate\Syndicate\data\ncaaf_source\source_artifacts
 ==> NCAAB mirror refresh
-    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_ncaab_source_mirror.ps1 -Date 2026-06-12
+    powershell.exe -ExecutionPolicy Bypass -File D:\a\Syndicate\Syndicate\scripts\refresh_ncaab_source_mirror.ps1 -Date 2026-06-14
 ==> Migration gate
-    py .\scripts\migration_gate.py --command-timeout-sec 600 --tests-timeout-sec 900 --smoke-timeout-sec 900 --write-dir D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-12\20260612_201043\migration
+    py .\scripts\migration_gate.py --command-timeout-sec 600 --tests-timeout-sec 900 --smoke-timeout-sec 900 --write-dir D:\a\Syndicate\Syndicate\reports\daily_update\2026-06-14\20260614_073503\migration
 âš ï¸ Step threw exception but continuing...
 Gate command returned non-zero exit code: 1
