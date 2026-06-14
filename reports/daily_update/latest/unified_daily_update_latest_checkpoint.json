@@ -4,10 +4,10 @@
     "runMode":  "standard",
     "overallStatus":  "started",
     "generatedAt":  "2026-06-14T07:35:04.2029024+00:00",
-    "updatedAt":  "2026-06-14T08:13:09.1432017+00:00",
+    "updatedAt":  "2026-06-14T08:13:56.3385385+00:00",
     "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-14\\20260614_073503",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-14T08:13:09.1338487+00:00",
+    "lastUpdatedAt":  "2026-06-14T08:13:56.3324593+00:00",
     "currentStage":  "source_update",
     "completedStages":  [
 
@@ -173,10 +173,10 @@
                        "simExecutionDecision":  null
                    },
     "trace":  {
-                  "eventSimExecutionCount":  17,
-                  "artifactUpdateCount":  17,
+                  "eventSimExecutionCount":  18,
+                  "artifactUpdateCount":  18,
                   "inputFingerprintCount":  1,
-                  "artifactPathCount":  17,
+                  "artifactPathCount":  18,
                   "inputFingerprints":  [
                                             "abb0882eb8312756925d95d319a1354ce81da3e8ad75057d7ba80579d2b63450"
                                         ],
@@ -197,7 +197,8 @@
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_8_STL_at_MIN_pk823693_g1.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_9_LAD_at_CWS_pk824586_g1.json",
                                         "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_NYL_WSH.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_TOR_ATL.json"
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_TOR_ATL.json",
+                                        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_bundle.json"
                                     ],
                   "simExecutionDecision":  null
               },
