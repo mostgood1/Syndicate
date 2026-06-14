@@ -2045,10 +2045,12 @@
       <div class="cards-live-lens-tile ${signal.klass === 'BET' ? 'is-bet' : (signal.klass === 'WATCH' ? 'is-watch' : '')}">
         <div class="cards-live-lens-tile__head">
           <div class="cards-market-kicker">${escapeHtml(`${sliceLabel} · ${marketLabel}`)}</div>
-          <span class="${liveSignalChipClass(signal)}">${escapeHtml(signal.klass)}</span>
+          <div class="cards-live-lens-badge-row">
+            <span class="${liveSignalChipClass(signal)}">${escapeHtml(signal.klass)}</span>
+            <span class="cards-live-lens-tile__edge">${escapeHtml(edgeText)}</span>
+          </div>
         </div>
         <div class="cards-market-main">${escapeHtml(signal.side || marketLabel)}</div>
-        <div class="cards-live-lens-tile__edge">${escapeHtml(edgeText)}</div>
         <div class="cards-mini-copy" title="${escapeHtml(copyTitle)}">${escapeHtml(copyText)}</div>
       </div>
     `;
@@ -3502,6 +3504,12 @@
     const betting = game?.betting || {};
     const home = game?.home_tri || 'HOME';
     const away = game?.away_tri || 'AWAY';
+    const liveState = getLiveState(game);
+    const isLiveGame = hasStartedGame(liveState) || String(game?.gameType || '').trim().toLowerCase() === 'live' || /live/i.test(String(game?.status || ''));
+    const liveScoreSource = liveState || game?.live_state || {};
+    const liveScoreText = isLiveGame && Number.isFinite(Number(liveScoreSource?.away_pts)) && Number.isFinite(Number(liveScoreSource?.home_pts))
+      ? `Live score ${away} ${fmtInteger(Number(liveScoreSource.away_pts))} - ${fmtInteger(Number(liveScoreSource.home_pts))} ${home}`
+      : 'Live line pending.';
 
     function candidateScore(candidate) {
       if (Number.isFinite(candidate?.ev)) {
@@ -3528,7 +3536,18 @@
         { detail: `${home} ML ${fmtAmerican(betting.home_ml)}`, ev: toFiniteNumber(betting.home_ml_ev), probability: betting.p_home_win, tabTarget: 'game', available: Number.isFinite(toFiniteNumber(betting.home_ml)) },
         { detail: `${away} ML ${fmtAmerican(betting.away_ml)}`, ev: toFiniteNumber(betting.away_ml_ev), probability: betting.p_away_win, tabTarget: 'game', available: Number.isFinite(toFiniteNumber(betting.away_ml)) },
       ];
-      return chooseCandidate(candidates);
+      const pick = chooseCandidate(candidates);
+      if (pick || !isLiveGame) {
+        return pick;
+      }
+      return {
+        detail: liveScoreText,
+        ev: null,
+        probability: null,
+        meta: 'Live line pending',
+        tabTarget: 'game',
+        available: true,
+      };
     }
     if (marketKey === 'spread') {
       const spread = toFiniteNumber(betting.home_spread);
@@ -3536,7 +3555,18 @@
         { detail: `${home} ${Number.isFinite(spread) ? fmtSigned(spread) : '--'}`, ev: toFiniteNumber(betting.home_spread_ev), probability: betting.p_home_cover, tabTarget: 'game', available: Number.isFinite(spread) },
         { detail: `${away} ${Number.isFinite(spread) ? fmtSigned(-spread) : '--'}`, ev: toFiniteNumber(betting.away_spread_ev), probability: betting.p_away_cover, tabTarget: 'game', available: Number.isFinite(spread) },
       ];
-      return chooseCandidate(candidates);
+      const pick = chooseCandidate(candidates);
+      if (pick || !isLiveGame) {
+        return pick;
+      }
+      return {
+        detail: liveScoreText,
+        ev: null,
+        probability: null,
+        meta: 'Live line pending',
+        tabTarget: 'game',
+        available: true,
+      };
     }
     if (marketKey === 'total') {
       const total = toFiniteNumber(betting.total);
@@ -3544,7 +3574,18 @@
         { detail: `Over ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.over_ev), probability: betting.p_total_over, tabTarget: 'game', available: Number.isFinite(total) },
         { detail: `Under ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: toFiniteNumber(betting.under_ev), probability: betting.p_total_under, tabTarget: 'game', available: Number.isFinite(total) },
       ];
-      return chooseCandidate(candidates);
+      const pick = chooseCandidate(candidates);
+      if (pick || !isLiveGame) {
+        return pick;
+      }
+      return {
+        detail: liveScoreText,
+        ev: null,
+        probability: null,
+        meta: 'Live line pending',
+        tabTarget: 'game',
+        available: true,
+      };
     }
     return null;
   }
@@ -4194,8 +4235,8 @@
     const halfSlots = featured.filter((slot) => String(slot?.sliceLabel || '').toLowerCase() === 'current half');
     const fullSlots = featured.filter((slot) => String(slot?.sliceLabel || '').toLowerCase() === 'full game');
     const groups = [
-      renderLiveSegmentGroup(game, liveLens, 'Current period', periodSlots),
-      renderLiveSegmentGroup(game, liveLens, 'Current half', halfSlots),
+      renderLiveSegmentGroup(game, liveLens, 'Live period', periodSlots),
+      renderLiveSegmentGroup(game, liveLens, 'Live half', halfSlots),
       renderLiveSegmentGroup(game, liveLens, 'Full game', fullSlots),
     ].filter(Boolean);
     return groups.length ? groups.join('') : renderGameLens(game);
@@ -4309,11 +4350,12 @@
   }
 
   function emptyLensMarket(shortLabel, note) {
+    const waitingForLive = /waiting for live lines/i.test(String(note || ''));
     return {
       shortLabel,
       klass: '',
-      main: `${shortLabel} off card`,
-      sub: note || 'No tracked market line.',
+      main: waitingForLive ? `${shortLabel} live` : `${shortLabel} off card`,
+      sub: note || (waitingForLive ? 'Waiting for live lines.' : 'No tracked market line.'),
       note: '',
       edgeValue: null,
       edgeText: '-',
@@ -4324,7 +4366,57 @@
 
   function liveLensMarketFromSignal(game, marketType, shortLabel, signal) {
     if (!signal) {
-      return emptyLensMarket(shortLabel, 'Waiting for live market data.');
+      const betting = game?.betting || {};
+      if (marketType === 'moneyline') {
+        const homeMl = Number(betting.home_ml);
+        const awayMl = Number(betting.away_ml);
+        if (Number.isFinite(homeMl) || Number.isFinite(awayMl)) {
+          const useHome = Number.isFinite(homeMl);
+          const line = useHome ? homeMl : awayMl;
+          const side = useHome ? String(game?.home_tri || 'HOME') : String(game?.away_tri || 'AWAY');
+          return {
+            shortLabel,
+            klass: 'WATCH',
+            main: `${side} ML ${fmtAmerican(line)}`,
+            sub: `Market ${fmtAmerican(line)}`,
+            note: 'Live line pending.',
+            edgeValue: null,
+            edgeText: '-',
+            edgeClass: '',
+            isEmpty: false,
+          };
+        }
+      }
+      if (marketType === 'spread' && Number.isFinite(Number(betting.home_spread))) {
+        const line = Number(betting.home_spread);
+        const side = line >= 0 ? String(game?.home_tri || 'HOME') : String(game?.away_tri || 'AWAY');
+        const displayLine = line >= 0 ? fmtSigned(line, 1) : fmtSigned(-line, 1);
+        return {
+          shortLabel,
+          klass: 'WATCH',
+          main: `${side} ${displayLine}`,
+          sub: `Market ${fmtSigned(line, 1)}`,
+          note: 'Live line pending.',
+          edgeValue: null,
+          edgeText: '-',
+          edgeClass: '',
+          isEmpty: false,
+        };
+      }
+      if (marketType === 'total' && Number.isFinite(Number(betting.total))) {
+        return {
+          shortLabel,
+          klass: 'WATCH',
+          main: `Total ${fmtNumber(Number(betting.total), 1)}`,
+          sub: `Market ${fmtNumber(Number(betting.total), 1)}`,
+          note: 'Live line pending.',
+          edgeValue: null,
+          edgeText: '-',
+          edgeClass: '',
+          isEmpty: false,
+        };
+      }
+      return emptyLensMarket(shortLabel, 'Waiting for live lines.', hasStartedGame(getLiveState(game)));
     }
     const klass = String(signal?.klass || '').trim().toUpperCase();
     const side = String(signal?.side || '').trim();
@@ -4613,6 +4705,7 @@
       return '<div class="cards-empty-copy">No game lens projections available.</div>';
     }
     function marketTileMarkup(market) {
+      const isLiveWaiting = /waiting for live lines/i.test(String(market?.main || market?.sub || market?.note || ''));
       const badgeClass = market?.klass === 'BET'
         ? 'cards-chip cards-chip--accent'
         : (market?.klass === 'WATCH' ? 'cards-chip cards-chip--warm' : 'cards-chip');
@@ -4623,7 +4716,7 @@
         <div class="cards-market-tile ${tileClass}">
           <div class="cards-live-lens-tile__head">
             <div class="cards-market-kicker">${escapeHtml(market?.shortLabel || 'Market')}</div>
-            <span class="${badgeClass}">${escapeHtml(market?.klass || (market?.isEmpty ? 'Off card' : 'Live'))}</span>
+            <span class="${badgeClass}">${escapeHtml(isLiveWaiting ? 'Live' : (market?.klass || (market?.isEmpty ? 'Off card' : 'Live')))}</span>
           </div>
           <div class="cards-market-main">${escapeHtml(market?.main || 'No surfaced bet')}</div>
           <div class="cards-market-sub ${escapeHtml(market?.edgeClass || '')}">${escapeHtml(market?.sub || 'No tracked edge.')}</div>

@@ -5,6 +5,7 @@ from typing import Any
 from pipeline.intelligence_models import IntelligenceResult
 
 from syndicate.blueprints.ask_the_syndicate_router import RouteDecision
+from syndicate.features.intelligence_board import build_intelligence_board_contract
 
 
 def _mapping_or_empty(value: Any) -> dict[str, Any]:
@@ -234,6 +235,7 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
     pipeline_context = _mapping_or_empty(_result_value(result, "pipeline_context", {}))
     structured_response = _mapping_or_empty(_result_value(result, "structured_response", {}))
     routing_context = _mapping_or_empty(pipeline_context.get("routing_context")) or _mapping_or_empty(context)
+    board_contract = build_intelligence_board_contract(_result_payload(result))
     if decision.intent in {"matchup_analysis", "comparison"}:
         schema = _matchup_analysis_schema(question, result)
     elif decision.intent == "market_summary":
@@ -261,6 +263,7 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
         "schema_type": schema.get("schema_type", decision.intent),
         "schema": schema,
         "structured_response": schema,
+        "board_contract": board_contract,
         "engine": {
             "selected_date": _result_value(result, "selected_date", None),
             "query_type": _result_value(result, "query_type", None),
@@ -273,5 +276,6 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
             "evaluation_history": _mapping_or_empty(_result_value(result, "evaluation_history", {})),
             "readiness_gate": _mapping_or_empty(_result_value(result, "readiness_gate", {})),
             "local_only": _result_value(result, "local_only", None),
+            "board_contract": board_contract,
         },
     }

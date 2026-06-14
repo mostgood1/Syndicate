@@ -19,6 +19,9 @@ from syndicate.features.intelligence import _market_focus_labels
 from syndicate.features.intelligence import _parlay_request_summary
 from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import run_intelligence_query
+from syndicate.features.intelligence import _attach_intelligence_response_aliases
+from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
 from syndicate.features.shared.ops_refresh import load_latest_refresh_status
@@ -578,6 +581,7 @@ def intelligence_query_api():
                 timing=str(payload.get("timing") or "").strip() or None,
                 include_props=payload.get("include_props"),
                 include_games=payload.get("include_games"),
+                policy=str(payload.get("policy") or "").strip() or None,
                 force_refresh=bool(payload.get("force_refresh")) if payload.get("force_refresh") is not None else False,
             )
             if isinstance(board_result, dict):
@@ -643,6 +647,8 @@ def intelligence_query_api():
         response = dict(response)
         if "response" not in response:
             response["response"] = dict(response)
+        response["board_contract"] = build_intelligence_board_contract(response)
+        _attach_intelligence_response_aliases(response)
         LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
         debug_source = cached_source if cached_response is not None else "fallback"
         versioned_response = _versioned_query_response(response)
@@ -661,6 +667,54 @@ def intelligence_query_warm_api():
     payload = _normalize_default_query_payload(payload)
     queue_intelligence_state_refresh(dict(payload))
     return jsonify({"ok": True, "queued": True})
+
+
+@intelligence_bp.post("/api/intelligence/portfolio-event")
+def intelligence_portfolio_event_api():
+    try:
+        payload = request.get_json(silent=True) or {}
+        portfolio_event = payload.get("portfolio_event")
+        if not isinstance(portfolio_event, dict):
+            portfolio_event = payload.get("event") if isinstance(payload.get("event"), dict) else None
+        if not isinstance(portfolio_event, dict):
+            response = jsonify({"ok": False, "error": "portfolio_event is required."})
+            response.status_code = 400
+            return _no_cache_response(response)
+
+        selected_date = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+        question = str(payload.get("question") or "manual portfolio event").strip() or "manual portfolio event"
+        sport = str(payload.get("sport") or "").strip() or None
+        persist = bool(payload.get("persist", True))
+
+        bundle = build_intelligence_evaluation_bundle(
+            query={"question": question, "selected_date": selected_date, "sport": sport},
+            response={
+                "selected_date": selected_date,
+                "sport": sport,
+                "recommendations": [],
+                "portfolio_events": [dict(portfolio_event)],
+            },
+            persist=persist,
+        )
+        response_payload = {
+            "ok": True,
+            "selected_date": selected_date,
+            "question": question,
+            "portfolio_event": dict(portfolio_event),
+            "evaluation_bundle": bundle,
+            "evaluationBundle": dict(bundle),
+            "portfolio_tracking": dict(bundle.get("portfolio_tracking") or {}),
+            "portfolioTracking": dict(bundle.get("portfolio_tracking") or {}),
+            "portfolio_events": dict(bundle.get("portfolio_events") or {}),
+            "portfolioEvents": dict(bundle.get("portfolio_events") or {}),
+            "portfolio_event_records": list(bundle.get("portfolio_event_records") or []),
+            "portfolioEventRecords": list(bundle.get("portfolio_event_records") or []),
+            "recommendation_history": dict(bundle.get("history") or {}),
+            "recommendationHistory": dict(bundle.get("history") or {}),
+        }
+        return _no_cache_response(jsonify(response_payload))
+    except Exception as exc:
+        return _api_error_response(exc)
 
 
 @intelligence_bp.get("/intelligence/run")

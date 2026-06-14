@@ -363,6 +363,16 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     normalized["shared_box_sections"] = _build_box_sections(normalized)
     normalized["shared_prop_rows"] = _build_prop_rows(normalized)
     normalized["shared_top_play_rows"] = _build_top_play_rows(normalized)
+    if normalized["shared_is_live"] and not normalized.get("market_tiles") and period_rows:
+        normalized["market_tiles"] = [
+            {
+                "label": str(row.get("label") or "Live"),
+                "title": str(row.get("main") or row.get("subtitle") or "Live game lens"),
+                "sub": str(row.get("subtitle") or normalized.get("detail") or normalized.get("summary") or "Live game lens"),
+            }
+            for row in period_rows[:4]
+            if isinstance(row, dict)
+        ]
     normalized["shared_tab_game_title"] = "Live game lens" if normalized["shared_is_live"] else "Period odds and game lens"
     normalized["shared_tab_props_title"] = "Live props" if normalized["shared_is_live"] else "Official and playable props"
     return normalized

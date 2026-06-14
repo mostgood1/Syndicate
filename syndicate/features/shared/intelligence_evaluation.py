@@ -58,7 +58,12 @@ def _ledger_index(path: Path) -> dict[str, dict[str, Any]]:
         return {}
     index: dict[str, dict[str, Any]] = {}
     for record in _iter_record_payloads(ledger_path=path):
-        record_id = str(record.get("recommendation_id") or record.get("prediction_id") or "").strip()
+        record_id = str(
+            record.get("portfolio_event_id")
+            or record.get("recommendation_id")
+            or record.get("prediction_id")
+            or ""
+        ).strip()
         if record_id:
             index[record_id] = record
     return index
@@ -210,6 +215,84 @@ def build_artifact_metadata(*, query: Any, response: Any) -> dict[str, Any]:
     }
 
 
+def _portfolio_tracking_summary(*, response: Mapping[str, Any], recommendations: list[Mapping[str, Any]]) -> dict[str, Any]:
+    portfolio = _copy_mapping(response.get("portfolio"))
+    return {
+        "open_exposure": _coerce_float(portfolio.get("total_exposure")),
+        "risk_level": str(portfolio.get("risk_level") or "").strip() or None,
+        "expected_return": _coerce_float(portfolio.get("expected_return")),
+        "average_correlation": _coerce_float(portfolio.get("average_correlation")),
+        "diversification_score": _coerce_float(portfolio.get("diversification_score")),
+        "recommendation_count": len(recommendations),
+        "wager_count": len(recommendations),
+    }
+
+
+def _portfolio_event_summary(*, response: Mapping[str, Any]) -> dict[str, Any]:
+    event_rows = response.get("portfolio_events")
+    if not isinstance(event_rows, list):
+        event_rows = response.get("portfolio_actions")
+    if not isinstance(event_rows, list):
+        event_rows = response.get("watchlist_events")
+    if not isinstance(event_rows, list):
+        event_rows = []
+
+    counts = {"added": 0, "removed": 0, "adjusted": 0, "open": 0, "closed": 0}
+    for row in event_rows:
+        if not isinstance(row, Mapping):
+            continue
+        action = str(row.get("action") or row.get("event_type") or row.get("type") or "").strip().lower()
+        status = str(row.get("status") or row.get("state") or "").strip().lower()
+        open_flag = row.get("open")
+        if action in {"add", "added", "open", "opened"}:
+            counts["added"] += 1
+        elif action in {"remove", "removed", "close", "closed"}:
+            counts["removed"] += 1
+        elif action in {"adjust", "adjusted", "edit", "edited", "update", "updated"}:
+            counts["adjusted"] += 1
+        if status in {"open", "opened", "active"} or bool(open_flag) is True:
+            counts["open"] += 1
+        if status in {"closed", "settled", "removed"} or bool(open_flag) is False and status:
+            counts["closed"] += 1
+
+    return {
+        "event_count": len(event_rows),
+        "added_count": counts["added"],
+        "removed_count": counts["removed"],
+        "adjusted_count": counts["adjusted"],
+        "open_count": counts["open"],
+        "closed_count": counts["closed"],
+    }
+
+
+def _portfolio_event_identity(event: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "event_id": str(event.get("event_id") or event.get("id") or "").strip() or None,
+        "prediction_id": str(event.get("prediction_id") or "").strip() or None,
+        "recommendation_id": str(event.get("recommendation_id") or "").strip() or None,
+        "action": str(event.get("action") or event.get("event_type") or event.get("type") or "").strip().lower() or None,
+        "status": str(event.get("status") or event.get("state") or "").strip().lower() or None,
+        "name": str(event.get("name") or event.get("market") or event.get("label") or "").strip() or None,
+    }
+
+
+def _policy_control_summary(*, response: Mapping[str, Any], recommendations: list[Mapping[str, Any]]) -> dict[str, Any]:
+    top_recommendation = recommendations[0] if recommendations else {}
+    historical_profile = top_recommendation.get("historical_profile") if isinstance(top_recommendation.get("historical_profile"), Mapping) else {}
+    policy_comparison = historical_profile.get("policy_comparison") if isinstance(historical_profile, Mapping) else None
+    selected_policy = str(top_recommendation.get("decision_strategy") or "").strip() or None
+    if not selected_policy and isinstance(response.get("policy_control"), Mapping):
+        selected_policy = str(response.get("policy_control", {}).get("selected_policy") or "").strip() or None
+    comparison_rows = policy_comparison if isinstance(policy_comparison, list) else []
+    leader_policy = str(comparison_rows[0].get("policy") or "").strip() if comparison_rows and isinstance(comparison_rows[0], Mapping) else None
+    return {
+        "selected_policy": selected_policy,
+        "leader_policy": leader_policy,
+        "policy_comparison": comparison_rows,
+        "policy_status": "available" if comparison_rows or selected_policy else "empty",
+    }
+
+
 @dataclass(frozen=True)
 class IntelligencePredictionRecord:
     prediction_id: str
@@ -293,6 +376,38 @@ class IntelligenceRecommendationRecord:
         )
         if self.settled_at is not None:
             payload["settled_at"] = self.settled_at
+        return payload
+
+
+@dataclass(frozen=True)
+class IntelligencePortfolioEventRecord:
+    prediction_id: str
+    portfolio_event_id: str
+    recommendation_id: str | None = None
+    query: dict[str, Any] = field(default_factory=dict)
+    response: dict[str, Any] = field(default_factory=dict)
+    portfolio_event: dict[str, Any] = field(default_factory=dict)
+    artifact_metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=_utc_now)
+    record_type: str = "portfolio_event"
+    raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = dict(self.raw)
+        payload.update(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "record_type": self.record_type,
+                "prediction_id": self.prediction_id,
+                "portfolio_event_id": self.portfolio_event_id,
+                "recommendation_id": self.recommendation_id,
+                "query": dict(self.query),
+                "response": dict(self.response),
+                "portfolio_event": dict(self.portfolio_event),
+                "artifact_metadata": dict(self.artifact_metadata),
+                "created_at": self.created_at,
+            }
+        )
         return payload
 
 
@@ -407,6 +522,42 @@ def record_recommendation(*, prediction_record: Mapping[str, Any], recommendatio
     return payload
 
 
+def record_portfolio_event(*, prediction_record: Mapping[str, Any], portfolio_event: Any, artifact_metadata: Any = None, persist: bool = True, ledger_path: Path | str | None = None) -> dict[str, Any]:
+    prediction_payload = _copy_mapping(prediction_record)
+    portfolio_event_payload = _copy_mapping(portfolio_event)
+    prediction_id = str(prediction_payload.get("prediction_id") or _new_id("pred"))
+    recommendation_id = str(portfolio_event_payload.get("recommendation_id") or prediction_payload.get("recommendation_id") or "").strip() or None
+    portfolio_event_identity = _portfolio_event_identity(portfolio_event_payload)
+    payload = IntelligencePortfolioEventRecord(
+        prediction_id=prediction_id,
+        portfolio_event_id=_stable_id(
+            "evt",
+            {
+                "prediction_id": prediction_id,
+                "identity": portfolio_event_identity,
+                "portfolio_event": portfolio_event_payload,
+                "artifact_metadata": _copy_mapping(artifact_metadata) or _copy_mapping(prediction_payload.get("artifact_metadata")),
+            },
+        ),
+        query=_copy_mapping(prediction_payload.get("query")),
+        response=_copy_mapping(prediction_payload.get("response")),
+        recommendation_id=recommendation_id,
+        portfolio_event=portfolio_event_payload,
+        artifact_metadata=_copy_mapping(artifact_metadata) or _copy_mapping(prediction_payload.get("artifact_metadata")),
+        created_at=_utc_now(),
+        raw={
+            "prediction": prediction_payload,
+            "portfolio_event": portfolio_event_payload,
+            "recommendation_id": recommendation_id,
+        },
+    ).to_dict()
+    if persist:
+        target_path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+        if _ledger_index(target_path).get(str(payload.get("portfolio_event_id") or "")) is None:
+            _append_jsonl(target_path, payload)
+    return payload
+
+
 def settle_result(*, record: Mapping[str, Any], result: Any, pnl: Any, closing_line: Any, implied_probability: Any | None = None, settled_at: str | None = None, persist: bool = True, ledger_path: Path | str | None = None) -> dict[str, Any]:
     payload = _copy_mapping(record)
     settled_record = {
@@ -480,6 +631,8 @@ def _latest_by_recommendation_id(records: list[dict[str, Any]]) -> list[dict[str
     fallback: dict[str, dict[str, Any]] = {}
     ordered_fallback: list[str] = []
     for record in records:
+        if str(record.get("record_type") or "").strip().lower() == "portfolio_event":
+            continue
         recommendation_id = str(record.get("recommendation_id") or "").strip()
         if not recommendation_id:
             prediction_id = str(record.get("prediction_id") or "").strip()
@@ -636,6 +789,9 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
     response_payload = _copy_mapping(response)
     recommendation_rows = [item for item in response_payload.get("recommendations") or [] if isinstance(item, Mapping)]
     artifact_metadata = build_artifact_metadata(query=query_payload, response=response_payload)
+    policy_control = _policy_control_summary(response=response_payload, recommendations=recommendation_rows)
+    portfolio_tracking = _portfolio_tracking_summary(response=response_payload, recommendations=recommendation_rows)
+    portfolio_events = _portfolio_event_summary(response=response_payload)
     prediction_record = record_prediction(query=query_payload, response=response_payload, artifact_metadata=artifact_metadata, persist=persist, ledger_path=ledger_path)
     recommendation_records = [
         record_recommendation(
@@ -646,6 +802,17 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
             ledger_path=ledger_path,
         )
         for recommendation in recommendation_rows
+    ]
+    portfolio_event_rows = [item for item in response_payload.get("portfolio_events") or [] if isinstance(item, Mapping)]
+    portfolio_event_records = [
+        record_portfolio_event(
+            prediction_record=prediction_record,
+            portfolio_event=portfolio_event,
+            artifact_metadata=artifact_metadata,
+            persist=persist,
+            ledger_path=ledger_path,
+        )
+        for portfolio_event in portfolio_event_rows
     ]
     history_summary = build_evaluation_history_summary(
         records=None,
@@ -658,6 +825,10 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
         "prediction": prediction_record,
         "recommendations": recommendation_records,
         "artifact_metadata": artifact_metadata,
+        "policy_control": policy_control,
+        "portfolio_tracking": portfolio_tracking,
+        "portfolio_events": portfolio_events,
+        "portfolio_event_records": portfolio_event_records,
         "metrics": compute_metrics(records=recommendation_records),
         "history": history_summary,
     }
@@ -674,5 +845,6 @@ __all__ = [
     "compute_metrics",
     "record_prediction",
     "record_recommendation",
+    "record_portfolio_event",
     "settle_result",
 ]

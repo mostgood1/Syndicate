@@ -558,10 +558,10 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
-        self.assertEqual(result["generation_mode"], "source_cli_with_local_bundle_reuse")
-        self.assertEqual((result.get("generation") or {}).get("kind"), "source_cli_with_local_bundle_reuse")
-        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle_or_source_cli")
-        self.assertFalse((result.get("generation") or {}).get("hosted_safe"))
+        self.assertEqual(result["generation_mode"], "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle")
+        self.assertTrue((result.get("generation") or {}).get("hosted_safe"))
         self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
@@ -621,10 +621,10 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         self.assertTrue(plan["ok"])
         result = plan["results"][0]
-        self.assertEqual(result["generation_mode"], "source_cli_with_local_bundle_reuse")
-        self.assertEqual((result.get("generation") or {}).get("kind"), "source_cli_with_local_bundle_reuse")
-        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle_or_source_cli")
-        self.assertFalse((result.get("generation") or {}).get("hosted_safe"))
+        self.assertEqual(result["generation_mode"], "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("kind"), "local_artifact_bundle")
+        self.assertEqual((result.get("generation") or {}).get("source_dependency"), "local_artifact_bundle")
+        self.assertTrue((result.get("generation") or {}).get("hosted_safe"))
         self.assertEqual((result.get("ingestion") or {}).get("source_dependency"), "local_artifact_bundle")
         refresh_steps = result.get("refresh_steps") or []
         self.assertEqual(len(refresh_steps), 1)
@@ -895,8 +895,8 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertIn("Dry-run execution plan", html)
         self.assertIn("mlb_oddsapi_refresh", html)
         self.assertIn("skip mirror", html.lower())
-        self.assertIn("Launch Refresh", html)
-        self.assertIn("Run state: finished", html)
+        self.assertIn("Refresh Plan View", html)
+        self.assertIn("Refresh state: finished", html)
         self.assertIn("Mirror manifests", html)
         self.assertIn("Copied 14 artifacts", html)
         self.assertIn("Contract: artifact_bundle_or_existing_mirror", html)
@@ -1210,7 +1210,12 @@ class OpsRefreshApiTests(unittest.TestCase):
                     },
                 ],
             },
-            "daily_update": {"manifest": {"date": "2026-05-19"}},
+            "daily_update": {
+                "manifest": {"date": "2026-05-19"},
+                "checkpoint": {"currentStage": "refresh_gate"},
+                "run_state": {"currentStage": "refresh_gate"},
+                "trace": {"trace": {"inputFingerprintCount": 3}},
+            },
         }
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
             "syndicate.blueprints.ops.load_latest_refresh_status",

@@ -1,7 +1,7 @@
 {
   "meta": {
     "season": 2026,
-    "generated_at": "2026-06-08T08:50:50.134859",
+    "generated_at": "2026-06-13T08:14:36.836819",
     "title": "MLB 2026 Betting Card Recap",
     "batch_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live",
     "cards_dir": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned",
@@ -47,17 +47,17 @@
       "hitter_rbis": 0
     },
     "partial": false,
-    "processed_reports": 9,
-    "available_reports": 9
+    "processed_reports": 10,
+    "available_reports": 10
   },
   "status": "complete",
   "summary": {
-    "cards": 9,
-    "cards_processed": 9,
+    "cards": 10,
+    "cards_processed": 10,
     "selected_counts": {
       "totals": 0,
-      "ml": 4,
-      "pitcher_props": 4,
+      "ml": 5,
+      "pitcher_props": 5,
       "hitter_props": 0,
       "hitter_home_runs": 0,
       "hitter_hits": 0,
@@ -65,9 +65,9 @@
       "hitter_total_bases": 0,
       "hitter_runs": 0,
       "hitter_rbis": 0,
-      "combined": 8
+      "combined": 10
     },
-    "settled_recommendations": 8,
+    "settled_recommendations": 10,
     "unresolved_recommendations": 0,
     "results": {
       "totals": {
@@ -79,20 +79,20 @@
         "roi": null
       },
       "ml": {
-        "n": 4,
-        "wins": 1,
+        "n": 5,
+        "wins": 2,
         "losses": 3,
-        "stake_u": 4.0,
-        "profit_u": -1.56,
-        "roi": -0.39
+        "stake_u": 5.0,
+        "profit_u": -0.6076,
+        "roi": -0.1215
       },
       "pitcher_props": {
-        "n": 4,
-        "wins": 2,
+        "n": 5,
+        "wins": 3,
         "losses": 2,
-        "stake_u": 4.0,
-        "profit_u": -0.2213,
-        "roi": -0.0553
+        "stake_u": 5.0,
+        "profit_u": 0.4454,
+        "roi": 0.0891
       },
       "hitter_home_runs": {
         "n": 0,
@@ -151,24 +151,24 @@
         "roi": null
       },
       "combined": {
-        "n": 8,
-        "wins": 3,
+        "n": 10,
+        "wins": 5,
         "losses": 5,
-        "stake_u": 8.0,
-        "profit_u": -1.7813,
-        "roi": -0.2227
+        "stake_u": 10.0,
+        "profit_u": -0.1622,
+        "roi": -0.0162
       }
     },
     "daily": {
-      "cards": 9,
-      "cards_with_bets": 4,
+      "cards": 10,
+      "cards_with_bets": 5,
       "cards_without_bets": 5,
-      "positive_days": 1,
+      "positive_days": 2,
       "negative_days": 3,
       "flat_days": 5,
-      "mean_u": -0.1979,
+      "mean_u": -0.0162,
       "median_u": 0.0,
-      "std_u": 1.2014,
+      "std_u": 1.2634,
       "best_day": {
         "date": "2026-06-07",
         "profit_u": 2.3096
@@ -179,12 +179,12 @@
       }
     },
     "combined": {
-      "n": 8,
-      "wins": 3,
+      "n": 10,
+      "wins": 5,
       "losses": 5,
-      "stake_u": 8.0,
-      "profit_u": -1.7813,
-      "roi": -0.2227
+      "stake_u": 10.0,
+      "profit_u": -0.1622,
+      "roi": -0.0162
     },
     "market_results": {
       "totals": {
@@ -196,20 +196,20 @@
         "roi": null
       },
       "ml": {
-        "n": 4,
-        "wins": 1,
+        "n": 5,
+        "wins": 2,
         "losses": 3,
-        "stake_u": 4.0,
-        "profit_u": -1.56,
-        "roi": -0.39
+        "stake_u": 5.0,
+        "profit_u": -0.6076,
+        "roi": -0.1215
       },
       "pitcher_props": {
-        "n": 4,
-        "wins": 2,
+        "n": 5,
+        "wins": 3,
         "losses": 2,
-        "stake_u": 4.0,
-        "profit_u": -0.2213,
-        "roi": -0.0553
+        "stake_u": 5.0,
+        "profit_u": 0.4454,
+        "roi": 0.0891
       },
       "hitter_home_runs": {
         "n": 0,
@@ -393,8 +393,8 @@
       "label": "Jun 2026",
       "selected_counts": {
         "totals": 0,
-        "ml": 4,
-        "pitcher_props": 4,
+        "ml": 5,
+        "pitcher_props": 5,
         "hitter_props": 0,
         "hitter_home_runs": 0,
         "hitter_hits": 0,
@@ -402,7 +402,7 @@
         "hitter_total_bases": 0,
         "hitter_runs": 0,
         "hitter_rbis": 0,
-        "combined": 8
+        "combined": 10
       },
       "results": {
         "totals": {
@@ -414,20 +414,20 @@
           "roi": null
         },
         "ml": {
-          "n": 4,
-          "wins": 1,
+          "n": 5,
+          "wins": 2,
           "losses": 3,
-          "stake_u": 4.0,
-          "profit_u": -1.56,
-          "roi": -0.39
+          "stake_u": 5.0,
+          "profit_u": -0.6076,
+          "roi": -0.1215
         },
         "pitcher_props": {
-          "n": 4,
-          "wins": 2,
+          "n": 5,
+          "wins": 3,
           "losses": 2,
-          "stake_u": 4.0,
-          "profit_u": -0.2213,
-          "roi": -0.0553
+          "stake_u": 5.0,
+          "profit_u": 0.4454,
+          "roi": 0.0891
         },
         "hitter_home_runs": {
           "n": 0,
@@ -486,24 +486,24 @@
           "roi": null
         },
         "combined": {
-          "n": 8,
-          "wins": 3,
+          "n": 10,
+          "wins": 5,
           "losses": 5,
-          "stake_u": 8.0,
-          "profit_u": -1.7813,
-          "roi": -0.2227
+          "stake_u": 10.0,
+          "profit_u": -0.1622,
+          "roi": -0.0162
         }
       },
       "daily": {
-        "cards": 7,
-        "cards_with_bets": 4,
+        "cards": 8,
+        "cards_with_bets": 5,
         "cards_without_bets": 3,
-        "positive_days": 1,
+        "positive_days": 2,
         "negative_days": 3,
         "flat_days": 3,
-        "mean_u": -0.2545,
+        "mean_u": -0.0203,
         "median_u": 0.0,
-        "std_u": 1.357,
+        "std_u": 1.4125,
         "best_day": {
           "date": "2026-06-07",
           "profit_u": 2.3096
@@ -1598,6 +1598,122 @@
       ],
       "profit_u": 2.3096,
       "roi": 1.1548
+    },
+    {
+      "date": "2026-06-12",
+      "month": "2026-06",
+      "card_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/locked_cards_retuned/daily_summary_2026_06_12_locked_policy.json",
+      "report_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/batches/season_2026_ui_daily_live/sim_vs_actual_2026-06-12.json",
+      "payload_path": "C:/Users/tempadmin/OneDrive/Coding/Syndicate/data/mlb_source/source_artifacts/data/eval/seasons/2026/betting_day_payloads_retuned/season_betting_day_2026_06_12.json",
+      "cap_profile": "nototals_p1_tbheavy11_r1_nohr",
+      "selected_counts": {
+        "totals": 0,
+        "ml": 1,
+        "pitcher_props": 1,
+        "hitter_props": 0,
+        "hitter_home_runs": 0,
+        "hitter_hits": 0,
+        "hitter_hits_runs_rbis": 0,
+        "hitter_total_bases": 0,
+        "hitter_runs": 0,
+        "hitter_rbis": 0,
+        "combined": 2
+      },
+      "results": {
+        "totals": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "ml": {
+          "n": 1,
+          "wins": 1,
+          "losses": 0,
+          "stake_u": 1.0,
+          "profit_u": 0.9524,
+          "roi": 0.9524
+        },
+        "pitcher_props": {
+          "n": 1,
+          "wins": 1,
+          "losses": 0,
+          "stake_u": 1.0,
+          "profit_u": 0.6667,
+          "roi": 0.6667
+        },
+        "hitter_home_runs": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_hits": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_hits_runs_rbis": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_total_bases": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_runs": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_rbis": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "hitter_props": {
+          "n": 0,
+          "wins": 0,
+          "losses": 0,
+          "stake_u": 0.0,
+          "profit_u": 0.0,
+          "roi": null
+        },
+        "combined": {
+          "n": 2,
+          "wins": 2,
+          "losses": 0,
+          "stake_u": 2.0,
+          "profit_u": 1.6191,
+          "roi": 0.8095
+        }
+      },
+      "settled_n": 2,
+      "unresolved_n": 0,
+      "warnings": [],
+      "profit_u": 1.6191,
+      "roi": 0.8095
     }
   ]
 }

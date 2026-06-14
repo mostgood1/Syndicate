@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+from typing import Any, Mapping
+
+
+def _copy_mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _safe_text(*values: Any, default: str = "") -> str:
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return default
+
+
+def _number(*values: Any) -> float | None:
+    for value in values:
+        if value is None or isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip()
+        if not text:
+            continue
+        try:
+            return float(text.replace("%", ""))
+        except Exception:
+            continue
+    return None
+
+
+def _movement_summary(item: Mapping[str, Any]) -> str:
+    movement = item.get("movement") if isinstance(item.get("movement"), Mapping) else {}
+    delta = _number(
+        movement.get("delta") if isinstance(movement, Mapping) else None,
+        movement.get("edge_delta") if isinstance(movement, Mapping) else None,
+        item.get("line_movement_impact"),
+        item.get("ev_delta"),
+        item.get("ev_change"),
+    )
+    trend = _safe_text(
+        movement.get("trend") if isinstance(movement, Mapping) else None,
+        movement.get("recent_movement_trend") if isinstance(movement, Mapping) else None,
+        item.get("movement_label"),
+        default="flat",
+    ).lower()
+    if delta is not None and delta != 0:
+        prefix = "+" if delta > 0 else ""
+        return f"{prefix}{delta:.1f} ({trend})"
+    if trend:
+        return trend
+    return "flat"
+
+
+def _recommendation_lane(item: Mapping[str, Any]) -> str:
+    status = _safe_text(
+        item.get("status_display"),
+        item.get("status_context"),
+        item.get("game_state", {}).get("detailed") if isinstance(item.get("game_state"), Mapping) else None,
+        item.get("game_state", {}).get("abstract") if isinstance(item.get("game_state"), Mapping) else None,
+        default="",
+    ).lower()
+    if "final" in status or "completed" in status or "settled" in status:
+        return "archived"
+    if bool(item.get("is_live")) or "live" in status or "in progress" in status or _safe_text(item.get("live_projection"), default="") not in {"", "-"}:
+        return "live"
+    return "pregame"
+
+
+def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
+    card = _copy_mapping(item)
+    lane = _recommendation_lane(card)
+    line = _number(card.get("line"), card.get("line_open"), card.get("market_data", {}).get("current_line") if isinstance(card.get("market_data"), Mapping) else None)
+    edge = _number(card.get("edge"), card.get("adjusted_edge"), card.get("expected_value"), card.get("ev_current"))
+    card.update(
+        {
+            "lane": lane,
+            "sport": _safe_text(card.get("sport"), card.get("sport_slug"), default="sport").lower(),
+            "team": _safe_text(card.get("team"), card.get("team_name"), default="—"),
+            "player": _safe_text(card.get("player_name"), card.get("name"), default="—"),
+            "market": _safe_text(card.get("market"), card.get("market_label"), default="—"),
+            "line": line,
+            "movement": _movement_summary(card),
+            "simulated_edge": edge,
+        }
+    )
+    return card
+
+
+def build_intelligence_board_contract(response: Mapping[str, Any] | None) -> dict[str, Any]:
+    payload = _copy_mapping(response)
+    recommendations = payload.get("recommendations") if isinstance(payload.get("recommendations"), list) else []
+    cards = [_recommendation_card(item) for item in recommendations if isinstance(item, Mapping)]
+    lane_counts = {
+        "live": sum(1 for card in cards if card.get("lane") == "live"),
+        "pregame": sum(1 for card in cards if card.get("lane") == "pregame"),
+        "archived": sum(1 for card in cards if card.get("lane") == "archived"),
+    }
+    active_lanes = [lane for lane in ("live", "pregame") if lane_counts.get(lane)]
+    board_summary = {
+        "headline": _safe_text(payload.get("headline"), payload.get("summary"), default="The Syndicate board"),
+        "recommendation_count": len(cards),
+        "live_count": lane_counts["live"],
+        "pregame_count": lane_counts["pregame"],
+        "archived_count": lane_counts["archived"],
+        "active_lanes": active_lanes,
+    }
+    return {
+        "schema": "intelligence_board_v1",
+        "card_fields": ["sport", "team", "player", "market", "line", "movement", "simulated_edge"],
+        "recommendation_count": len(cards),
+        "lane_counts": lane_counts,
+        "active_lanes": active_lanes,
+        "board_summary": board_summary,
+        "cards": cards[:10],
+    }
+
+
+__all__ = ["build_intelligence_board_contract"]

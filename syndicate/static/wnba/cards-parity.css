@@ -1902,7 +1902,7 @@ body[data-viewport='phone'] .cards-scoreboard {
 
 .cards-live-opportunity-list--segment {
   gap: 6px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .cards-live-lens-card .cards-market-tile {
@@ -1999,9 +1999,16 @@ body[data-viewport='phone'] .cards-scoreboard {
 
 .cards-data-pair strong {
   font-family: 'Space Grotesk', 'IBM Plex Sans', sans-serif;
-  font-size: 15px;
+  font-size: 11px;
   line-height: 1.08;
   overflow-wrap: anywhere;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(132, 166, 196, 0.18);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .cards-prop-overview-card .cards-data-pair {

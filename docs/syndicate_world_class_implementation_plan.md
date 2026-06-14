@@ -279,7 +279,19 @@ Scope:
 - broader sport coverage as the platform grows
 - product choices that preserve latency budgets and runtime predictability
 - a live board surface that continuously surfaces fresh options from pregame projections, live lines, and movement data
+- the `/intelligence` live board remains the canonical shared decision surface for the platform
+- Ask the Syndicate keeps reading the same board inputs and evidence bundle that power the live board
+- live lens surfaces for games and props that keep interval lines, live odds, and projections aligned with the shared board contract instead of falling back to off-board intervals
+- a Syndicate home command center at `/` that acts as the daily hub for all sports, surfacing games for the day, live game updates, pregame props, live props, and other high-value central actions
 - shared decision inputs so Ask the Syndicate explains the same board state the live board is using
+- a world-class UI system with dense but readable recommendation cards, clear visual hierarchy, responsive layouts, and accessible contrast
+- consistent interaction patterns for filters, drill-downs, live-state chips, movement badges, and action affordances
+- recommendation cards that clearly identify sport, team, player, prop or game market, line, movement, and simulated edge
+- separate pregame and live lanes so users can tell whether a recommendation is for a pregame edge, a live in-game edge, or a market move already in flight
+- live-game linkage that shows how a recommendation is performing once the game starts, including the current game state and the recommendation's status
+- recommendation history that records what was recommended, what was placed, what won or lost, and how the policy should learn from the result
+- portfolio and bet tracking that lets the operator add and remove actual wagers, maintain an open bet ledger, and see current exposure alongside recommendations
+- a future-ready ledger model that can later expand to named user accounts without rewriting the core recommendation and tracking contract
 
 Deliverables:
 
@@ -287,12 +299,125 @@ Deliverables:
 - advanced features can be added without changing the baseline rails
 - visible performance guardrails for new experiences
 - the live board stays fresh throughout the day and during games as new projections and line movement arrive
+- the intelligence board stays the source of truth for recommendation, lane, and evidence presentation
+- the home command center gives users one clear entry point for the day across all sports, with live games, pregame props, live props, and other priority surfaces grouped into a premium daily hub
 - Ask the Syndicate reads from the same board contract so explanation and surfacing stay aligned
+- the Ask surface stays semantically and visually aligned with the intelligence board and home command center
+- the live board exposes explicit pregame and live recommendation lanes with clear game, team, and prop context
+- game and prop live lenses stay consistent with live interval lines, odds, and projection updates across sports
+- the live lens surfaces never fall back to off-board intervals when live state exists
+- recommendation tracking captures outcome state, live-game performance, and policy learning signals
+- portfolio tracking supports manual add/remove of actual bets and current exposure state
+- the UI reads as a polished decision surface rather than a generic data dashboard, with clear hierarchy and mobile-safe layouts
 
 Exit criteria:
 
 - new sports can join the platform by following the same artifact, sim, and intelligence contracts
 - the live board and Ask the Syndicate both reflect the same current decision logic and live movement inputs
+- every recommendation card can be traced to its sport, market, edge, and the live or pregame lane it belongs to
+- live recommendations stay tied to the active game state while the game is in progress
+- the system can record placed bets and update portfolio exposure without breaking the recommendation feed
+- recommendation history exists well enough to support later learning, optimization, and eventual per-user ledgers
+- the live board and Ask surfaces stay visually coherent, accessible, and fast enough to feel premium on desktop and mobile
+
+Workstreams:
+
+1. Board contract and data model.
+2. Live and pregame lane separation.
+3. Recommendation history, outcome feedback, and policy learning hooks.
+4. Portfolio and bet ledger tracking.
+5. UI composition and interaction design.
+6. Home command-center orchestration for the daily sports hub.
+7. Ask The Syndicate parity with the shared decision surface.
+
+Phase 7 execution slices:
+
+1. Home command center shell: make `/` the daily hub entry point with a clear slate, summary header, and prioritized navigation into sports surfaces.
+2. Shared daily board contract: keep the intelligence board as the canonical recommendation payload and make the home hub consume the same normalized lane and card data.
+3. Live-game surface: expose live games, live props, and in-progress updates with lane-specific presentation and game-state awareness.
+4. Pregame surface: expose pregame props, daily games, and pregame recommendations with explicit market, line, and edge metadata.
+5. Live-lens interval and projection consistency: keep NBA and prop live lenses on the same live interval lines, odds, and projection inputs that power the board contract.
+6. Ask parity: make Ask the Syndicate read the same board inputs so explanations, summaries, and surfaced recommendations stay aligned.
+7. Outcome and ledger tracking: record recommended, placed, settled, and open items so the platform can learn from results and show portfolio exposure.
+8. UI polish and accessibility: finish responsive hierarchy, card density, contrast, and action affordances so the home and intelligence pages feel like one premium command center.
+9. Deeper learning and policy control: keep adaptive strategy, policy selection, and richer explainers attached to the same board contract.
+
+Phase 7 progress snapshot:
+
+- completed: home command center shell
+- completed: shared daily board contract
+- completed: live-game and pregame lane separation
+- remaining: live-lens interval/projection consistency
+- completed: Ask parity with the shared board inputs
+- completed: outcome and ledger tracking
+- remaining: UI polish, accessibility refinement, deeper learning, and policy control
+
+Concrete file targets:
+
+- [syndicate/blueprints/intelligence.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/blueprints/intelligence.py)
+- [syndicate/templates/intelligence.html](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/templates/intelligence.html)
+- [syndicate/blueprints/home.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/blueprints/home.py)
+- [syndicate/templates/home.html](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/templates/home.html)
+- [syndicate/blueprints/ask_the_syndicate.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/blueprints/ask_the_syndicate.py)
+- [syndicate/templates/syndicate.html](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/templates/syndicate.html)
+- [syndicate/features/nba/live_lens.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/nba/live_lens.py)
+- [syndicate/features/wnba/live_lens.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/wnba/live_lens.py)
+- [syndicate/features/nba/cards.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/nba/cards.py)
+- [syndicate/features/intelligence.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/intelligence.py)
+- [syndicate/features/intelligence_reasoning.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/intelligence_reasoning.py)
+- [syndicate/features/intelligence_evaluation.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/intelligence_evaluation.py)
+- [syndicate/features/intelligence_analysis_views.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/intelligence_analysis_views.py)
+- [reports/intelligence/evaluation_ledger.jsonl](c:/Users/tempadmin/OneDrive/Coding/Syndicate/reports/intelligence/evaluation_ledger.jsonl)
+- [tests/test_intelligence.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_intelligence.py)
+- [tests/test_intelligence_state.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_intelligence_state.py)
+- [tests/test_ask_the_syndicate.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_ask_the_syndicate.py)
+
+## Phase 9: Add identity, permissions, and user-scoped state
+
+Goal: introduce unique logins and permissions so portfolio tracking, saved views, and recommendation history can become user-specific without rewriting the live-board contract.
+
+Scope:
+
+- authentication and session management for named users
+- role-based permissions for admin, operator, analyst, and read-only access
+- per-user portfolios, bet ledgers, watchlists, and saved recommendation history
+- auditability for user actions such as add bet, remove bet, pin, hide, or archive
+- safe multi-user state boundaries for recommendations and portfolio exposure
+
+Deliverables:
+
+- a user identity model that can scope portfolios and recommendation history
+- permission checks for protected operations and admin tooling
+- a path to migrate the current operator-managed ledger into user-scoped storage later
+- audit events for portfolio and recommendation changes
+
+Exit criteria:
+
+- a named user can sign in and see only their own scoped portfolio and saved state
+- admin and operator capabilities are explicitly separated from normal user access
+- the existing live-board and Ask contracts continue to work while user scoping is added
+- the system can grow from a single operator ledger to per-user ledgers without changing the recommendation model
+
+Workstreams:
+
+1. Authentication, session persistence, and account bootstrap.
+2. Role-based permissions and access gates.
+3. User-scoped portfolios, watchlists, and saved recommendations.
+4. Audit trail and admin oversight for user actions.
+5. Migration path from operator-managed state to user-owned state.
+
+Concrete file targets:
+
+- [syndicate/blueprints/auth.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/blueprints/auth.py)
+- [syndicate/templates/auth_login.html](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/templates/auth_login.html)
+- [syndicate/templates/auth_permissions.html](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/templates/auth_permissions.html)
+- [syndicate/features/auth/session.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/auth/session.py)
+- [syndicate/features/auth/permissions.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/auth/permissions.py)
+- [syndicate/features/auth/audit.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/auth/audit.py)
+- [syndicate/features/auth/user_state.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/syndicate/features/auth/user_state.py)
+- [tests/test_auth.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_auth.py)
+- [tests/test_permissions.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_permissions.py)
+- [tests/test_user_state.py](c:/Users/tempadmin/OneDrive/Coding/Syndicate/tests/test_user_state.py)
 
 ## Phase 8: Optimize execution and platform efficiency
 
@@ -327,6 +452,7 @@ Exit criteria:
 7. Finish Phase 6 before expanding the hosted runtime model further.
 8. Use Phase 7 only after the platform contract is stable and observable.
 9. Add Phase 8 only after the platform is stable enough for execution-focused optimization.
+10. Add Phase 9 only after the live-board and Ask surfaces are coherent enough to justify user-scoped state.
 
 ## Change-control rules
 

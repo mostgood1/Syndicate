@@ -72,6 +72,8 @@ from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.sources import live_snapshot_path as wnba_live_snapshot_path
 from syndicate.features.wnba.sources import processed_path as wnba_processed_path
+from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
+from syndicate.features.intelligence_board import build_intelligence_board_contract
 
 
 ENABLE_PREDICTION_TRACKING = True
@@ -100,7 +102,18 @@ def _read_cached_query_response(cache_key: str) -> dict[str, Any] | None:
         return json.loads(json.dumps(cached, default=str))
 
 
-def _query_cache_key(*, question: str, selected_date: str, mode: str | None, sport: str | None, limit: int | None, timing: str | None, include_props: bool | None, include_games: bool | None, overview: list[dict[str, Any]]) -> str:
+def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str, Any]:
+    response["boardContract"] = dict(response.get("board_contract") or {})
+    response["evaluationBundle"] = dict(response.get("evaluation_bundle") or {})
+    response["policyControl"] = dict(response.get("policy_control") or {})
+    response["recommendationHistory"] = dict(response.get("recommendation_history") or {})
+    response["portfolioTracking"] = dict(response.get("portfolio_tracking") or {})
+    response["portfolioEvents"] = dict(response.get("portfolio_events") or {})
+    response["portfolioEventRecords"] = list(response.get("portfolio_event_records") or [])
+    return response
+
+
+def _query_cache_key(*, question: str, selected_date: str, mode: str | None, sport: str | None, limit: int | None, timing: str | None, include_props: bool | None, include_games: bool | None, policy: str | None, overview: list[dict[str, Any]]) -> str:
     payload = {
         "question": str(question or "").strip(),
         "selected_date": str(selected_date or "").strip(),
@@ -110,6 +123,7 @@ def _query_cache_key(*, question: str, selected_date: str, mode: str | None, spo
         "timing": str(timing or "").strip().lower(),
         "include_props": None if include_props is None else bool(include_props),
         "include_games": None if include_games is None else bool(include_games),
+        "policy": str(policy or "").strip().lower() or None,
         "overview": overview,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
@@ -2114,6 +2128,7 @@ def _query_preferences(
     timing: str | None = None,
     include_props: bool | None = None,
     include_games: bool | None = None,
+    policy: str | None = None,
 ) -> dict[str, Any]:
     lowered = str(question or "").lower()
     explicit_mode = str(mode or "").strip().lower()
@@ -2121,6 +2136,7 @@ def _query_preferences(
     if explicit_sport in {"all", "any", "everything", "*"}:
         explicit_sport = ""
     explicit_timing = str(timing or "").strip().lower()
+    explicit_policy = str(policy or "").strip().lower() or None
     explicit_include_props = include_props
     explicit_include_games = include_games
     parlay_structure = _extract_parlay_structure_preferences(lowered)
@@ -2225,6 +2241,7 @@ def _query_preferences(
         "requested_markets": requested_markets,
         "include_props": include_props,
         "include_games": include_games,
+        "policy": explicit_policy,
         "live_only": live_only,
         "pregame_only": pregame_only,
         "plus_money_only": plus_money_only,
@@ -5880,6 +5897,7 @@ def run_intelligence_query(
     timing: str | None = None,
     include_props: bool | None = None,
     include_games: bool | None = None,
+    policy: str | None = None,
     force_refresh: bool = False,
 ) -> dict[str, Any]:
     preferences = _query_preferences(
@@ -5890,6 +5908,7 @@ def run_intelligence_query(
         timing=timing,
         include_props=include_props,
         include_games=include_games,
+        policy=policy,
     )
     effective_date = _effective_date(selected_date or preferences.get("requested_date"))
     overview = build_intelligence_overview(selected_date=effective_date, force_refresh=force_refresh)
@@ -5909,10 +5928,17 @@ def run_intelligence_query(
         timing=timing,
         include_props=include_props,
         include_games=include_games,
+        policy=preferences.get("policy"),
         overview=overview,
     )
     if not force_refresh:
         cached_response = _read_cached_query_response(cache_key)
+        if cached_response is not None and not (
+            isinstance(cached_response.get("analysis_views"), dict)
+            and isinstance(cached_response.get("analysis_brief"), dict)
+            and isinstance(cached_response.get("parsed_request"), dict)
+        ):
+            cached_response = None
         if cached_response is not None:
             return cached_response
     shared_recommendations = collect_all_recommendations(selected_date=effective_date, force_refresh=force_refresh, log_pipeline=False)
@@ -5933,12 +5959,20 @@ def run_intelligence_query(
     candidates = _enrich_candidates_with_odds_history(candidates, odds_history_by_sport)
     candidates = _score_candidates(candidates, advanced_by_sport, preferences)
     filtered_candidates = filter_candidates(candidates, sport=_safe_text(preferences.get("sport"), "") or None)
-    ranked_recommendations = rank_candidates(filtered_candidates, sport=_safe_text(preferences.get("sport"), "") or None, limit=None)
+    ranked_recommendations = rank_candidates(
+        filtered_candidates,
+        sport=_safe_text(preferences.get("sport"), "") or None,
+        policy=_safe_text(preferences.get("policy"), "") or None,
+        limit=None,
+    )
     recommendations = _greedy_low_correlation_selection(
         [dict(candidate) for candidate in ranked_recommendations],
         limit=preferences["limit"],
         threshold=MAX_CORRELATION_THRESHOLD,
     )
+    for recommendation in recommendations:
+        if not recommendation.get("advanced_inputs") and recommendation.get("advanced_context"):
+            recommendation["advanced_inputs"] = recommendation.get("advanced_context")
     _log_candidate_pipeline(
         candidates=candidates,
         filtered_candidates=filtered_candidates,
@@ -6058,6 +6092,45 @@ def run_intelligence_query(
         overview,
     )
     final_response = build_response(recommendations=recommendations, parlays=parlays)
+    final_response["selected_date"] = effective_date
+    final_response["query_type"] = preferences.get("intent") or preferences.get("query_type")
+    final_response["parsed_request"] = dict(preferences)
+    final_response["parsed_request"]["question"] = question
+    final_response["parsed_request"]["selected_date"] = effective_date
+    final_response["headline"] = headline
+    final_response["summary"] = structured_response.get("summary") or summary
+    final_response["analysis_views"] = dict(analysis_views or {})
+    final_response["analysis_brief"] = dict(analysis_brief or {})
+    final_response["supporting_evidence"] = dict(supporting_evidence or {})
+    final_response["local_only"] = True
+    final_response["key_factors"] = list(structured_response.get("key_factors") or [])
+    final_response["risks"] = list(structured_response.get("risks") or [])
+    final_response["confidence"] = structured_response.get("confidence")
+    final_response["recommended_bet_size"] = structured_response.get("recommended_bet_size")
+    final_response["risk_level"] = structured_response.get("risk_level")
+    final_response["supporting_data"] = list(structured_response.get("supporting_data") or [])
+    final_response["clear_summary"] = structured_response.get("clear_summary")
+    final_response["deep_analysis"] = list(structured_response.get("deep_analysis") or [])
+    final_response["risks_uncertainty"] = list(structured_response.get("risks_uncertainty") or [])
+    final_response["recommended_interpretation"] = structured_response.get("recommended_interpretation")
+    final_response["final_takeaway"] = structured_response.get("final_takeaway")
+    final_response["board_contract"] = build_intelligence_board_contract(final_response)
+    final_response["evaluation_bundle"] = build_intelligence_evaluation_bundle(
+        query={
+            "question": question,
+            "selected_date": effective_date,
+            "sport": preferences.get("sport"),
+            "query_type": preferences.get("intent") or preferences.get("query_type"),
+        },
+        response=final_response,
+        persist=True,
+    )
+    final_response["policy_control"] = dict(final_response.get("evaluation_bundle", {}).get("policy_control") or {})
+    final_response["recommendation_history"] = dict(final_response.get("evaluation_bundle", {}).get("history") or {})
+    final_response["portfolio_tracking"] = dict(final_response.get("evaluation_bundle", {}).get("portfolio_tracking") or {})
+    final_response["portfolio_events"] = dict(final_response.get("evaluation_bundle", {}).get("portfolio_events") or {})
+    final_response["portfolio_event_records"] = list(final_response.get("evaluation_bundle", {}).get("portfolio_event_records") or [])
+    _attach_intelligence_response_aliases(final_response)
     if not force_refresh:
         _cache_query_response(cache_key, final_response)
     return final_response

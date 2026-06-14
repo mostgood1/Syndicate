@@ -55,15 +55,21 @@ This backlog tracks the official implementation plan in execution order.
 | Phase 3: Build a central odds management system | Own odds ingestion, refresh, hydration, replay, line movement, and snapshot precedence across sports. | Completed | Odds-control-plane, freshness, and reconciliation coverage. |
 | Phase 4: Build the intelligence engine into a real decision layer | Expand query routing, evidence-backed recommendations, and cross-sport reasoning. | Completed | Response-shape and evidence-contract coverage. |
 | Phase 5: Close the evaluation loop | Track accuracy, calibration, CLV, ROI, and drift. | Completed | Outcome persistence and scoring regression coverage. |
-| Phase 6: Harden ops and runtime boundaries | Keep long-running work out of the web request path and make refresh state durable. | In progress | Worker/web separation and restart-safe state coverage. |
-| Phase 7: Expand toward a true world-class product | Add deeper sport-native experiences without fragmenting the shared platform. | Planned | Contract-preserving add-on coverage. |
+| Phase 6: Harden ops and runtime boundaries | Keep long-running work out of the web request path and make refresh state durable. | Completed | Worker/web separation and restart-safe state coverage. |
+| Phase 7: Expand toward a true world-class product | Add deeper sport-native experiences without fragmenting the shared platform. | Active | Contract-preserving add-on coverage. |
 | Phase 8: Optimize execution and platform efficiency | Reduce time-to-answer, time-to-refresh, and throughput bottlenecks without weakening correctness. | Planned | Profiling-driven latency and throughput coverage. |
 
 ## Current next slice
 
-Phase 4 is complete. The next executable slice is Phase 6 ops and runtime hardening.
+Phase 6 is complete. The next executable slice is now the remaining Phase 7 UI polish, deeper learning, and recommendation-learning work.
 
-Phase 6 is active now. Start with worker-owned refresh execution and hosted-safe read/write boundaries, then push checkpoint and replay handling into restart-safe run-state updates.
+Phase 7 is active now. The home command center, shared board contract, live and pregame lanes, Ask parity, and outcome / ledger tracking slices are complete. The remaining work is UI polish, accessibility, and deeper recommendation learning.
+
+The restored live-board and Ask workstreams remain part of Phase 7:
+
+- the `/intelligence` live board stays the canonical decision surface for the shared contract
+- Ask the Syndicate keeps using the same board inputs and evidence bundle for explanations
+- game and prop live lenses stay aligned with live interval lines, live odds, and in-game projections
 
 First workstream:
 
@@ -180,32 +186,53 @@ Known validation detail:
 
 ## Phase 6 next slice
 
-- [ ] Separate worker-owned refresh execution from web request handling.
-- [ ] Keep hosted-safe read/write boundaries explicit for refresh state.
-- [ ] Move long-running work out of the web request path.
-- [ ] Keep refresh-state storage durable and recoverable.
-- [ ] Persist durable run checkpoints.
-- [ ] Load replay context from the latest checkpoint.
-- [ ] Restore run-state safely after restart.
-- [ ] Publish latest checkpoint and run-state artifacts alongside the manifest.
-- [ ] Preserve stable ops endpoints while the backend evolves.
-- [ ] Keep execution-time visibility and runtime budgets explicit for long-running jobs.
+- [x] Separate worker-owned refresh execution from web request handling.
+- [x] Keep hosted-safe read/write boundaries explicit for refresh state.
+- [x] Move long-running work out of the web request path.
+- [x] Keep refresh-state storage durable and recoverable.
+- [x] Persist durable run checkpoints.
+- [x] Load replay context from the latest checkpoint.
+- [x] Restore run-state safely after restart.
+- [x] Publish latest checkpoint and run-state artifacts alongside the manifest.
+- [x] Preserve stable ops endpoints while the backend evolves.
+- [x] Keep execution-time visibility and runtime budgets explicit for long-running jobs.
 
 ## Phase 7 next slice
 
-- [ ] Build the `/intelligence` live board decision surface from the shared board contract.
-- [ ] Make Ask the Syndicate reuse the same live board decision inputs for explanations.
-- [ ] Add deeper sport-native explainers and richer live decisioning.
+1. Home command center shell.
+- [x] Make `/` the daily entry point for all sports.
+- [x] Give the page a clear command-center header and a fast route into today’s highest-value surfaces.
+- [x] Preserve a simple, premium landing experience before adding deeper controls.
+
+2. Shared daily board contract.
+- [x] Build the `/intelligence` live board decision surface from the shared board contract.
+- [x] Normalize the same lane and card data for the home hub and the intelligence surface.
+- [x] Keep recommendation cards explicit about sport, team, player, market, line, movement, and simulated edge.
+
+3. Live-game surface.
+- [x] Surface live games and live props as the in-progress decision lane.
+- [x] Link live recommendations to current game state so the board can show live performance context.
+- [x] Surface pregame props and daily games as the pregame decision lane.
+- [x] Preserve the live-versus-pregame split so the UI never blurs a live edge with a pregame edge.
+- [x] Make Ask the Syndicate reuse the same live board decision inputs for explanations.
+- [x] Keep the Ask surface visually and semantically coherent with the home hub and intelligence board.
+- [x] Add recommendation history that records what was recommended, what was placed, what won or lost, and what the policy should learn.
+- [x] Add bet and portfolio tracking for actual wagers, open exposure, and manual add/remove actions.
+[x] Make game and prop live lenses use live interval lines, live odds, and in-game projections consistently instead of falling back to off-board intervals.
+- [ ] Make the live board feel like a world-class product with strong hierarchy, readable cards, responsive layouts, and accessible contrast.
+- [ ] Make the home page feel like a world-class daily command center with a clear slate, strong hierarchy, and fast access to the day’s highest-value sports surfaces.
+
+4. Recommendation learning.
+- [ ] Add deeper sport-native explainers and richer live decisioning as part of Phase 7 deeper learning.
 - [ ] Support policy selection and adaptive recommendation strategy.
 - [ ] Preserve the baseline contract while extending platform coverage.
 - [ ] Preserve time-to-answer and latency budgets while adding richer experiences.
 
+5. Identity and scoped state.
+- [ ] Add audit events for portfolio and recommendation changes.
+- [ ] Keep the existing operator-managed ledger usable until user-scoped state is ready.
+
 ## Phase 8 next slice
 
-- [ ] Profile the highest-cost refresh, sim, and intelligence paths.
-- [ ] Reduce time-to-answer and time-to-refresh for the key flows.
-- [ ] Add regression coverage for latency and throughput-sensitive behavior.
-
-## Operating rule
 
 Do not mark a phase complete until the current product surface, the new contract surface, and the focused regression tests all agree.

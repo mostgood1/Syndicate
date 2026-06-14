@@ -156,10 +156,15 @@ def _signal_items(game: dict[str, Any], *, limit: int = 6) -> list[str]:
 def _rank_card(game: dict[str, Any], selected_date: str, *, live_line: float | None = None) -> dict[str, Any]:
     away = game.get("away") if isinstance(game.get("away"), dict) else {}
     home = game.get("home") if isinstance(game.get("home"), dict) else {}
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
     top_rows = game.get("shared_top_play_rows") if isinstance(game.get("shared_top_play_rows"), list) else []
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     away_score = _safe_number(away.get("score"))
     home_score = _safe_number(home.get("score"))
+    if away_score is None:
+        away_score = _safe_number(live_state.get("away_pts"))
+    if home_score is None:
+        home_score = _safe_number(live_state.get("home_pts"))
     current_total = (away_score + home_score) if away_score is not None and home_score is not None else None
     live_total = _safe_number(live_line)
     badge = _safe_text((((top_rows or [None])[0] or {}).get("value") if top_rows else None), "Watch")

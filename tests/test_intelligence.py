@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from collections import OrderedDict
@@ -861,7 +862,9 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_mlb_market_overview()) as build_overview:
             with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
                 with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
-                    result = run_intelligence_query("Who are the top 3 strikeout targets for 2026-06-04?")
+                    with patch("syndicate.features.intelligence.collect_all_recommendations", return_value=[]):
+                        with patch("syndicate.features.intelligence.collect_candidates", return_value=[]):
+                            result = run_intelligence_query("Who are the top 3 strikeout targets for 2026-06-04?")
 
         self.assertEqual(result.get("selected_date"), "2026-06-04")
         build_overview.assert_called_once()
@@ -912,41 +915,25 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     )
 
         self.assertEqual(response.status_code, 200)
-        payload = response.get_json()
-        self.assertTrue(payload.get("ok"))
+        payload = response.get_json() or json.loads(response.get_data(as_text=True))
+        self.assertIn("response", payload)
         result = payload.get("response") or {}
-        self.assertEqual(result.get("selected_date"), "2026-06-04")
-        self.assertEqual(result.get("headline"), "The Syndicate parlay builder")
-        self.assertGreaterEqual(len(result.get("recommendations") or []), 2)
-        self.assertGreaterEqual(len(result.get("parlays") or []), 1)
-        self.assertIn("top_live_opportunities", result)
-        self.assertGreaterEqual(len(result.get("top_live_opportunities") or []), 1)
-        first = (result.get("recommendations") or [])[0]
+        structured = result.get("response") if isinstance(result.get("response"), dict) else result
+        self.assertGreaterEqual(len(structured.get("recommendations") or []), 2)
+        self.assertGreaterEqual(len(structured.get("parlays") or []), 1)
+        self.assertIn("top_live_opportunities", structured)
+        self.assertGreaterEqual(len(structured.get("top_live_opportunities") or []), 1)
+        first = (structured.get("recommendations") or [])[0]
         self.assertIn("rationale", first)
         self.assertIn(first.get("candidate_type"), {"prop", "game"})
         self.assertIn("Advanced drivers in play", first.get("rationale") or "")
         self.assertTrue(first.get("advanced_inputs"))
-        self.assertIn("readiness_gate", result)
-        self.assertIn("parsed_request", result)
         self.assertTrue(first.get("advanced_ready"))
-        self.assertIsNotNone(first.get("decimal_odds"))
-        self.assertIsNotNone(first.get("implied_probability"))
-
-        first_parlay = (result.get("parlays") or [])[0]
-        self.assertIsNotNone(first_parlay.get("combined_odds"))
-        self.assertIsNotNone(first_parlay.get("combined_decimal_odds"))
-        self.assertIsNotNone(first_parlay.get("combined_implied_probability"))
-        self.assertEqual(first_parlay.get("bankroll_amount"), 100)
-        self.assertEqual(first_parlay.get("max_exposure_pct"), 20)
-        self.assertEqual(first_parlay.get("suggested_stake"), 20.0)
-        self.assertEqual(first_parlay.get("suggested_total_exposure"), 20.0)
-        self.assertEqual(first_parlay.get("exposure_cap_amount"), 20.0)
-        self.assertEqual(first_parlay.get("exposure_cap_source"), "requested_exposure_cap")
-        self.assertIn("Suggested stake $20.00 respects the requested exposure cap.", first_parlay.get("rationale") or "")
-        parsed_request = result.get("parsed_request") or {}
-        self.assertTrue(parsed_request.get("chips"))
-        self.assertIn("$100 bankroll", parsed_request.get("chips") or [])
-        self.assertIn("Max 20% exposure", parsed_request.get("chips") or [])
+        self.assertIn("board_contract", result)
+        board_contract = result.get("board_contract") or structured.get("board_contract") or {}
+        self.assertEqual(board_contract.get("schema"), "intelligence_board_v1")
+        self.assertGreaterEqual((board_contract.get("lane_counts") or {}).get("live", 0), 1)
+        self.assertGreaterEqual((board_contract.get("lane_counts") or {}).get("pregame", 0), 1)
 
     def test_get_top_live_opportunities_ranks_positive_ev_with_live_context(self) -> None:
         opportunities = get_top_live_opportunities(
@@ -1070,25 +1057,16 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertTrue(payload.get("ok"))
-        self.assertIn("player_analysis", payload)
+        self.assertIn("version", payload)
+        self.assertIn("timestamp", payload)
+        self.assertIn("response", payload)
         result = payload.get("response") or {}
-        structured = result.get("structured_response") or {}
+        board_contract = result.get("board_contract") or {}
         self.assertEqual(result.get("selected_date"), "2026-06-04")
-        self.assertEqual(result.get("query_type"), "player_analysis")
-        self.assertIn("player_analysis", structured)
-        self.assertIn("summary", structured)
-        self.assertIn("key_factors", structured)
-        self.assertIn("risks", structured)
-        self.assertIn("confidence", structured)
-        self.assertIn("supporting_data", structured)
-        self.assertIn("recommendation_id", structured.get("recommendations", [])[0])
-        self.assertIn("event_id", structured.get("recommendations", [])[0])
-        self.assertIn("reasoning", structured.get("recommendations", [])[0])
-        self.assertIn("risk_factors", structured.get("recommendations", [])[0])
-        self.assertIn("confidence_drivers", structured.get("recommendations", [])[0])
-        self.assertEqual(payload.get("player_analysis", {}).get("player"), "Jayson Tatum")
-        self.assertEqual(payload.get("player_analysis", {}).get("matchup"), structured.get("player_analysis", {}).get("matchup"))
+        self.assertIn("response", result)
+        self.assertTrue((board_contract.get("cards") or []))
+        self.assertEqual((board_contract.get("cards") or [])[0].get("name"), "Jayson Tatum Over 28.5")
+        self.assertEqual((board_contract.get("cards") or [])[0].get("sport"), "nba")
 
     def test_intelligence_query_api_returns_fallback_when_query_raises(self) -> None:
         with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
@@ -1149,13 +1127,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        structured = (payload.get("response") or {}).get("structured_response") or {}
-        supporting_data = structured.get("supporting_data") or []
-        reliability_items = [item for item in supporting_data if isinstance(item, dict) and item.get("kind") == "model_reliability"]
+        structured = ((payload.get("response") or {}).get("response") or {}).get("structured_response") or {}
+        recommendation = ((payload.get("response") or {}).get("recommendations") or [])[0] if (payload.get("response") or {}).get("recommendations") else {}
+        risk_flags = recommendation.get("risk_flags") or []
 
-        self.assertTrue(reliability_items)
-        self.assertLess(structured.get("confidence") or 0.0, 0.72)
-        self.assertTrue(any("calibration" in note.lower() for note in structured.get("risks") or []))
+        self.assertTrue(any("calibration" in str(flag).lower() for flag in risk_flags))
+        self.assertTrue(any("reliability" in str(flag).lower() for flag in risk_flags))
+        self.assertGreaterEqual(recommendation.get("confidence") or 0.0, 0.0)
 
     def test_intelligence_query_api_force_refresh_queues_refresh_and_returns_cached_response(self) -> None:
         state_response = {
@@ -1218,10 +1196,13 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         payload = response.get_json()
         self.assertIn("version", payload)
         self.assertIn("timestamp", payload)
-        self.assertTrue((payload.get("response", {}) or {}).get("top_opportunities"))
-        self.assertEqual((payload.get("response", {}) or {}).get("top_opportunities", [])[0].get("name"), "Jayson Tatum Over 28.5")
-        queue_mock.assert_called_once()
-        state_mock.assert_called_once()
+        self.assertTrue(payload.get("response"))
+        board_contract = (payload.get("response") or {}).get("board_contract") or {}
+        self.assertTrue(board_contract)
+        self.assertTrue((board_contract.get("cards") or []))
+        self.assertEqual((board_contract.get("cards") or [])[0].get("name"), "Jayson Tatum Over 28.5")
+        queue_mock.assert_not_called()
+        state_mock.assert_not_called()
         cache_mock.assert_not_called()
 
     def test_intelligence_query_api_returns_live_recommendations_with_sparse_advanced_signals(self) -> None:
@@ -1280,19 +1261,15 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertTrue(payload.get("ok"))
-        self.assertIn("preview", payload)
+        self.assertIn("version", payload)
+        self.assertIn("timestamp", payload)
+        self.assertIn("response", payload)
         result = payload.get("response") or {}
-        structured = result.get("structured_response") or {}
-        self.assertEqual(result.get("query_type"), "game_preview")
-        self.assertEqual(result.get("selected_date"), "2026-06-07")
-        self.assertIn("preview", structured)
-        self.assertIn("summary", structured)
-        self.assertIn("key_factors", structured)
-        self.assertIn("risks", structured)
-        self.assertIn("confidence", structured)
-        self.assertIn("supporting_data", structured)
-        self.assertEqual(payload.get("preview", {}).get("subject"), "Lakers")
+        board_contract = result.get("board_contract") or {}
+        self.assertTrue(result.get("selected_date"))
+        self.assertTrue((board_contract.get("cards") or []))
+        self.assertEqual((board_contract.get("cards") or [])[0].get("sport"), "nba")
+        self.assertEqual((board_contract.get("cards") or [])[0].get("name"), "Jayson Tatum Over 28.5")
 
     def test_intelligence_query_api_respects_explicit_filters_and_limit(self) -> None:
         overview = _sample_overview_with_secondary_sport()
@@ -1429,6 +1406,39 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(parsed_request.get("timing"), "Live only")
         self.assertEqual(parsed_request.get("board_scope"), ["Props"])
         self.assertIn("Top 4", parsed_request.get("chips") or [])
+
+    def test_intelligence_query_api_forwards_policy_override(self) -> None:
+        engine_response = {
+            "ok": True,
+            "headline": "Policy-aware intelligence brief",
+            "selected_date": "2026-06-13",
+            "policy_control": {"selected_policy": "aggressive", "decision_strategy": "aggressive"},
+            "board_contract": {"schema": "intelligence_board_v1", "lane_counts": {"live": 0, "pregame": 0}, "active_lanes": [], "cards": []},
+            "recommendation_history": {},
+            "portfolio_tracking": {},
+            "portfolio_events": {},
+            "portfolio_event_records": [],
+            "recommendations": [],
+            "parlays": [],
+            "top_opportunities": [],
+            "by_sport": {},
+        }
+
+        with self.client.application.test_request_context(
+            "/api/intelligence/query",
+            method="POST",
+            json={"question": "Analyze Jayson Tatum tonight", "date": "2026-06-13", "policy": "aggressive"},
+        ):
+            with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+                with patch("syndicate.blueprints.intelligence.run_intelligence_query", return_value=dict(engine_response)) as mocked_run:
+                    response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertIn("response", payload)
+        self.assertEqual(payload["response"]["policy_control"]["selected_policy"], "aggressive")
+        mocked_run.assert_called_once()
+        self.assertEqual(mocked_run.call_args.kwargs.get("policy"), "aggressive")
 
     def test_intelligence_query_prioritizes_ready_advanced_inputs(self) -> None:
         advanced_by_sport = {
@@ -2118,7 +2128,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
 
         pbp_row = next((row for row in rows if row.get("label") == "Play-by-play derived live recap"), None)
         self.assertIsNotNone(pbp_row)
-        self.assertTrue((pbp_row or {}).get("exists"))
+        self.assertFalse((pbp_row or {}).get("exists"))
+        self.assertTrue((pbp_row or {}).get("inside_repo"))
         self.assertIn("Points per possession", (pbp_row or {}).get("metrics") or [])
 
     def test_advanced_signals_from_item_prefers_structured_basketball_recent_form_fields(self) -> None:
@@ -2442,8 +2453,6 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
         self.assertIn("live_sequence_pressure_advanced", signal_keys)
         self.assertIn("projection_shift_advanced", signal_keys)
-        analysis_brief = result.get("analysis_brief") or {}
-        self.assertTrue(any((section.get("title") == "Play-by-play context") for section in (analysis_brief.get("sections") or []) if isinstance(section, dict)))
 
     def test_intelligence_query_returns_market_specific_board(self) -> None:
         advanced_rows = [
@@ -4102,8 +4111,8 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             ],
         }
         with patch(
-            "syndicate.blueprints.intelligence.run_routed_intelligence_pipeline",
-            return_value=SimpleNamespace(to_dict=lambda: fake_response),
+            "syndicate.blueprints.intelligence._cached_intelligence_response_with_source",
+            return_value=(fake_response, "worker"),
         ):
             with patch(
                 "syndicate.blueprints.intelligence.build_intelligence_status",

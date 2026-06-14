@@ -381,6 +381,7 @@ class AskTheSyndicateApiTests(unittest.TestCase):
         self.assertEqual(payload["routing_context"]["sport"], "nba")
         self.assertEqual(payload["context_awareness"]["detected_sports"], ["nba", "wnba"])
         self.assertTrue(payload["context_awareness"]["multi_sport"])
+        self.assertEqual(payload["board_contract"]["schema"], "intelligence_board_v1")
 
 
 if __name__ == "__main__":

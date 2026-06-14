@@ -4,14 +4,100 @@
 {% block page_title %}Intelligence{% endblock %}
 
 {% block content %}
-<section style="max-width:1200px; margin:auto; margin-bottom:18px;">
-  <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10); border-radius:16px; padding:16px 18px; color:#e5e7eb;">
+<style>
+  .intelligence-shell {
+    max-width: 1200px;
+    margin: auto;
+  }
+
+  .intelligence-hero,
+  .intelligence-lane {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 16px;
+    color: #e5e7eb;
+  }
+
+  .intelligence-lane__intro {
+    display: grid;
+    gap: 0.4rem;
+    margin-bottom: 0.9rem;
+  }
+
+  .intelligence-lane__kicker {
+    opacity: 0.72;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 11px;
+  }
+
+  .intelligence-lane__title {
+    margin: 0;
+    font-size: clamp(1.08rem, 2vw, 1.28rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .intelligence-lane__lede {
+    margin: 0;
+    opacity: 0.72;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .intelligence-hero {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+  }
+
+  .intelligence-hero__actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0;
+  }
+
+  .intelligence-layout {
+    max-width: 1200px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .intelligence-panel {
+    min-width: 0;
+  }
+
+  @media (max-width: 900px) {
+    .intelligence-hero {
+      align-items: flex-start;
+    }
+
+    .intelligence-hero__actions {
+      width: 100%;
+    }
+
+    .intelligence-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<section class="intelligence-shell" style="margin-bottom:18px;">
+  <div class="intelligence-hero">
     <div>
       <div style="opacity:.72; text-transform:uppercase; letter-spacing:.04em; font-size:11px;">Initial board</div>
       <div style="font-size:18px; font-weight:700; margin-top:4px;">Prompt The Syndicate</div>
       <div style="opacity:.72; font-size:13px; margin-top:4px;">Portfolio summary and live recommendations load from the routed intelligence response.</div>
     </div>
-    <form id="intel-query-form" style="display:flex; gap:10px; align-items:center; margin:0;">
+    <form id="intel-query-form" class="intelligence-hero__actions">
       <a href="/intelligence/status" style="color:#dbeafe; text-decoration:none; font-size:13px; opacity:.9;">View data coverage page</a>
       <button type="submit" style="appearance:none; border:none; border-radius:999px; padding:10px 16px; background:linear-gradient(135deg, #7c3aed, #2563eb); color:white; font-weight:700; cursor:pointer;">Prompt The Syndicate</button>
     </form>
@@ -19,22 +105,24 @@
   <script id="initial-intelligence-response" type="application/json">{{ initial_intelligence_response | default({}) | tojson }}</script>
 </section>
 
-<section style="max-width:1200px; margin:auto; margin-bottom:20px;">
-  <div id="intelligence-refresh-status" style="margin-bottom:10px;"></div>
+<section class="intelligence-shell intelligence-lane" style="margin-bottom:20px; padding:14px 16px;">
+  <div class="intelligence-lane__intro">
+    <div class="intelligence-lane__kicker">Board snapshot</div>
+    <h2 class="intelligence-lane__title">Live and pregame lanes</h2>
+    <p class="intelligence-lane__lede">The summary strip below keeps the active board contract, recommendation ledger, and portfolio state in one readable lane.</p>
+    <p class="intelligence-lane__lede">Decision lanes, policy control, and live refresh context stay visible without leaving the board.</p>
+  </div>
+  <div id="intelligence-refresh-status" role="status" aria-live="polite" aria-atomic="true" style="margin-bottom:10px;"></div>
   <div id="intelligence-board-summary" style="margin-bottom:10px;"></div>
   <div id="top-opportunities"></div>
 </section>
 
-<section style="
-  max-width:1200px;
-  margin:auto;
+<section class="intelligence-layout" style="
   display:grid;
-  grid-template-columns: 320px 1fr;
-  gap:20px;
 ">
 
   <!-- LEFT COLUMN -->
-  <div>
+  <div class="intelligence-panel">
 
     <div id="portfolio"></div>
 
@@ -46,7 +134,7 @@
   </div>
 
   <!-- RIGHT COLUMN -->
-  <div>
+  <div class="intelligence-panel">
 
     <div id="scanner"></div>
 
@@ -85,6 +173,7 @@ function setRefreshStatus(message, tone = "idle") {
   if (!element) {
     return;
   }
+  element.setAttribute("aria-busy", tone === "loading" || tone === "refreshing" ? "true" : "false");
   const styles = {
     idle: { background: "rgba(255,255,255,.06)", border: "rgba(255,255,255,.12)", color: "#e5e7eb" },
     loading: { background: "rgba(59,130,246,.14)", border: "rgba(59,130,246,.28)", color: "#dbeafe" },
@@ -205,6 +294,23 @@ function renderSupportingEvidence(response) {
   const headline = String(data.headline || data.summary || "").trim();
   const summary = String(data.summary || "").trim();
   const portfolio = data.portfolio && typeof data.portfolio === "object" ? data.portfolio : {};
+  const policyControl = data.policyControl && typeof data.policyControl === "object"
+    ? data.policyControl
+    : (data.policy_control && typeof data.policy_control === "object" ? data.policy_control : {});
+  const recommendationHistory = data.recommendationHistory && typeof data.recommendationHistory === "object"
+    ? data.recommendationHistory
+    : (data.recommendation_history && typeof data.recommendation_history === "object" ? data.recommendation_history : {});
+  const portfolioTracking = data.portfolioTracking && typeof data.portfolioTracking === "object"
+    ? data.portfolioTracking
+    : (data.portfolio_tracking && typeof data.portfolio_tracking === "object" ? data.portfolio_tracking : {});
+  const portfolioEvents = data.portfolioEvents && typeof data.portfolioEvents === "object"
+    ? data.portfolioEvents
+    : (data.portfolio_events && typeof data.portfolio_events === "object" ? data.portfolio_events : {});
+  const boardContract = data.boardContract && typeof data.boardContract === "object"
+    ? data.boardContract
+    : (data.board_contract && typeof data.board_contract === "object" ? data.board_contract : {});
+  const laneCounts = boardContract.lane_counts && typeof boardContract.lane_counts === "object" ? boardContract.lane_counts : {};
+  const cardFields = Array.isArray(boardContract.card_fields) ? boardContract.card_fields : [];
   const evidenceBits = [];
   if (headline) {
     evidenceBits.push(`<div style="font-size:18px; font-weight:700; margin-bottom:6px;">${escapeHtml(headline)}</div>`);
@@ -228,6 +334,59 @@ function renderSupportingEvidence(response) {
       portfolio.diversification_score !== undefined && portfolio.diversification_score !== null && portfolio.diversification_score !== "" ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Diversification ${escapeHtml(portfolio.diversification_score)}</span>` : "",
     ].filter(Boolean).join("") +
     `</div>`);
+  if (boardContract.schema) {
+    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Board contract</div>`);
+    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
+      [
+        laneCounts.live !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(59,130,246,.16);">Live ${escapeHtml(laneCounts.live)}</span>` : "",
+        laneCounts.pregame !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(168,85,247,.16);">Pregame ${escapeHtml(laneCounts.pregame)}</span>` : "",
+        laneCounts.archived !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(148,163,184,.16);">Archived ${escapeHtml(laneCounts.archived)}</span>` : "",
+        cardFields.length ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Fields ${escapeHtml(cardFields.join(", "))}</span>` : "",
+      ].filter(Boolean).join("") +
+      `</div>`);
+  }
+  if (recommendationHistory.history_status) {
+    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Recommendation history</div>`);
+    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
+      [
+        `<span style="padding:5px 8px; border-radius:999px; background:rgba(34,197,94,.16);">${escapeHtml(String(recommendationHistory.history_status || "empty"))}</span>`,
+        recommendationHistory.sample_size !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Samples ${escapeHtml(recommendationHistory.sample_size)}</span>` : "",
+        recommendationHistory.settled_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Settled ${escapeHtml(recommendationHistory.settled_count)}</span>` : "",
+        recommendationHistory.win_rate !== undefined && recommendationHistory.win_rate !== null ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Win rate ${escapeHtml(Number(recommendationHistory.win_rate).toFixed(2))}</span>` : "",
+      ].filter(Boolean).join("") +
+      `</div>`);
+  }
+  if (portfolioTracking.open_exposure !== undefined || portfolioTracking.wager_count !== undefined) {
+    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Portfolio tracking</div>`);
+    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
+      [
+        portfolioTracking.open_exposure !== undefined && portfolioTracking.open_exposure !== null ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(59,130,246,.16);">Open exposure ${escapeHtml(Number(portfolioTracking.open_exposure).toFixed(2))}</span>` : "",
+        portfolioTracking.risk_level ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Risk ${escapeHtml(String(portfolioTracking.risk_level))}</span>` : "",
+        portfolioTracking.wager_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Wagers ${escapeHtml(portfolioTracking.wager_count)}</span>` : "",
+      ].filter(Boolean).join("") +
+      `</div>`);
+  }
+  if (portfolioEvents.event_count !== undefined) {
+    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Portfolio events</div>`);
+    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
+      [
+        `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Events ${escapeHtml(portfolioEvents.event_count)}</span>`,
+        portfolioEvents.added_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(59,130,246,.16);">Added ${escapeHtml(portfolioEvents.added_count)}</span>` : "",
+        portfolioEvents.removed_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(239,68,68,.16);">Removed ${escapeHtml(portfolioEvents.removed_count)}</span>` : "",
+        portfolioEvents.adjusted_count !== undefined ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(245,158,11,.16);">Adjusted ${escapeHtml(portfolioEvents.adjusted_count)}</span>` : "",
+      ].filter(Boolean).join("") +
+      `</div>`);
+  }
+  if (policyControl.policy_status) {
+    evidenceBits.push(`<div style="margin-top:12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.7;">Policy control</div>`);
+    evidenceBits.push(`<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:12px;">` +
+      [
+        `<span style="padding:5px 8px; border-radius:999px; background:rgba(168,85,247,.16);">${escapeHtml(String(policyControl.selected_policy || "default"))}</span>`,
+        policyControl.leader_policy ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Leader ${escapeHtml(String(policyControl.leader_policy))}</span>` : "",
+        Array.isArray(policyControl.policy_comparison) && policyControl.policy_comparison.length ? `<span style="padding:5px 8px; border-radius:999px; background:rgba(255,255,255,.08);">Comparisons ${escapeHtml(policyControl.policy_comparison.length)}</span>` : "",
+      ].filter(Boolean).join("") +
+      `</div>`);
+  }
   return evidenceBits.join("");
 }
 
@@ -519,8 +678,46 @@ function renderCardBadges(item) {
   return `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">${badges.join("")}</div>`;
 }
 
+function renderBoardMetaRow(item) {
+  const chips = [];
+  const sport = String(item.sport || item.sport_slug || "").trim();
+  const team = displayTeam(item);
+  const player = String(item.player_name || item.name || "").trim();
+  const market = String(item.market || item.market_label || "").trim();
+  const line = displayLine(item);
+  const movement = String(item.movement || item.movement_label || item.line_movement_label || "").trim();
+  const simulatedEdge = edgeValue(item);
+
+  if (sport) chips.push(`Sport: ${escapeHtml(sport.toUpperCase())}`);
+  if (team && team !== "—") chips.push(`Team: ${escapeHtml(team)}`);
+  if (player && player !== "—") chips.push(`Player: ${escapeHtml(player)}`);
+  if (market) chips.push(`Market: ${escapeHtml(market)}`);
+  if (line && line !== "—") chips.push(`Line: ${escapeHtml(line)}`);
+  if (movement) chips.push(`Movement: ${escapeHtml(movement)}`);
+  if (simulatedEdge) chips.push(`Sim edge: ${escapeHtml((simulatedEdge * 100).toFixed(1))}%`);
+
+  return chips.length
+    ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:11px; opacity:.84;">${chips.map((chip) => `<span style="padding:4px 8px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);">${chip}</span>`).join("")}</div>`
+    : "";
+}
+
 function normalizeIntelligenceResponse(response) {
   const analysis = response && typeof response.analysis === "object" && response.analysis ? response.analysis : (response && typeof response.response === "object" && response.response ? response.response : {});
+  const recommendationHistory = response.recommendation_history && typeof response.recommendation_history === "object"
+    ? response.recommendation_history
+    : (analysis.recommendation_history && typeof analysis.recommendation_history === "object" ? analysis.recommendation_history : {});
+  const portfolioTracking = response.portfolio_tracking && typeof response.portfolio_tracking === "object"
+    ? response.portfolio_tracking
+    : (analysis.portfolio_tracking && typeof analysis.portfolio_tracking === "object" ? analysis.portfolio_tracking : {});
+  const portfolioEvents = response.portfolio_events && typeof response.portfolio_events === "object"
+    ? response.portfolio_events
+    : (analysis.portfolio_events && typeof analysis.portfolio_events === "object" ? analysis.portfolio_events : {});
+  const portfolioEventRecords = Array.isArray(response.portfolio_event_records) && response.portfolio_event_records.length
+    ? response.portfolio_event_records
+    : (Array.isArray(analysis.portfolio_event_records) ? analysis.portfolio_event_records : []);
+  const boardContract = response.board_contract && typeof response.board_contract === "object"
+    ? response.board_contract
+    : (analysis.board_contract && typeof analysis.board_contract === "object" ? analysis.board_contract : {});
   const recommendations = Array.isArray(response.recommendations) && response.recommendations.length
     ? response.recommendations
     : (Array.isArray(analysis.recommendations) ? analysis.recommendations : (Array.isArray(analysis.picks) ? analysis.picks : []));
@@ -544,6 +741,11 @@ function normalizeIntelligenceResponse(response) {
     topLiveOpportunities,
     portfolio,
     parlays,
+    recommendationHistory,
+    portfolioTracking,
+    portfolioEvents,
+    portfolioEventRecords,
+    boardContract,
     state_last_updated: response.state_last_updated ?? analysis.state_last_updated ?? null,
     candidate_count: response.candidate_count ?? analysis.candidate_count ?? null,
     debug_source: response.debug_source ?? analysis.debug_source ?? null,
@@ -779,8 +981,63 @@ function renderIntelligence(response) {
 
   // ===== PORTFOLIO =====
   const portfolio = data.portfolio || {};
+  const recommendationHistory = data.recommendationHistory || {};
+  const policyControl = data.policyControl || {};
+  const portfolioTracking = data.portfolioTracking || {};
+  const portfolioEvents = data.portfolioEvents || {};
+  const portfolioEventRecords = Array.isArray(data.portfolioEventRecords) ? data.portfolioEventRecords : [];
+  const boardContract = data.boardContract || {};
   const portfolioEl = document.getElementById("portfolio");
   const topOpportunitiesEl = document.getElementById("top-opportunities");
+
+  async function submitPortfolioEvent(action, item = {}) {
+    const defaultName = String(item.display_name || item.player_name || item.name || item.selection || item.pick || "").trim();
+    const defaultMarket = String(item.market || item.market_key || item.market_label || "").trim();
+    const name = defaultName || window.prompt(`Portfolio event name for ${action} (for example, Boston Celtics Over 28.5):`, "") || "";
+    const market = defaultMarket || window.prompt("Market label for this event:", "") || "";
+    if (!String(name).trim()) {
+      setRefreshStatus("Portfolio event cancelled", "idle");
+      return;
+    }
+    setRefreshStatus(`Recording ${action} event…`, "refreshing");
+    try {
+      const payload = {
+        question: `manual ${action} portfolio event`,
+        selected_date: String(response.selected_date || response.date || "").trim() || undefined,
+        portfolio_event: {
+          action,
+          status: action === "remove" ? "closed" : "open",
+          name: String(name).trim(),
+          market: String(market).trim() || undefined,
+          prediction_id: String(item.prediction_id || "").trim() || undefined,
+          recommendation_id: String(item.recommendation_id || "").trim() || undefined,
+        },
+      };
+      const apiResponse = await fetch("/api/intelligence/portfolio-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await apiResponse.json();
+      if (!apiResponse.ok || !data || data.ok === false) {
+        throw new Error((data && data.error) || "Failed to record portfolio event");
+      }
+      renderIntelligence({
+        ...response,
+        ...data,
+        evaluation_bundle: data.evaluation_bundle || response.evaluation_bundle,
+        board_contract: data.board_contract || response.board_contract || response.boardContract,
+        recommendation_history: data.recommendation_history || response.recommendation_history,
+        portfolio_tracking: data.portfolio_tracking || response.portfolio_tracking,
+        portfolio_events: data.portfolio_events || response.portfolio_events,
+        portfolio_event_records: data.portfolio_event_records || response.portfolio_event_records,
+      });
+      setRefreshStatus(`Recorded ${action} event for ${String(name).trim()}`, "idle");
+    } catch (error) {
+      console.error("[PORTFOLIO EVENT ERROR]", error);
+      setRefreshStatus(error && error.message ? error.message : "Failed to record portfolio event", "error");
+    }
+  }
 
   portfolioEl.innerHTML = `
     <div style="background:#111;color:white;padding:16px;border-radius:12px;">
@@ -789,8 +1046,26 @@ function renderIntelligence(response) {
         <div><strong>Exposure:</strong> ${portfolio.total_exposure || "—"}</div>
         <div><strong>Risk:</strong> ${portfolio.risk_level || "—"}</div>
       </div>
+      ${recommendationHistory.history_status ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Ledger: ${escapeHtml(recommendationHistory.history_status)} · ${escapeHtml(String(recommendationHistory.sample_size ?? 0))} samples</div>` : ""}
+      ${portfolioTracking.wager_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Portfolio: ${escapeHtml(String(portfolioTracking.wager_count))} wagers · ${escapeHtml(String(portfolioTracking.open_exposure ?? "—"))} open exposure</div>` : ""}
+      ${portfolioEvents.event_count !== undefined ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Events: ${escapeHtml(String(portfolioEvents.event_count))} · added ${escapeHtml(String(portfolioEvents.added_count ?? 0))} · removed ${escapeHtml(String(portfolioEvents.removed_count ?? 0))}</div>` : ""}
+      ${portfolioEventRecords.length ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Recent: ${escapeHtml(portfolioEventRecords.slice(0, 3).map((event) => `${String(event.action || event.event_type || event.type || "event").toUpperCase()} ${String(event.status || event.state || "").toUpperCase() || "OPEN"} ${String(event.name || event.market || event.label || "").trim()}`.trim()).join(" · "))}</div>` : ""}
+      ${boardContract.schema ? `<div style="margin-top:10px; font-size:11px; opacity:.78;">Board: ${escapeHtml(boardContract.schema)} · ${escapeHtml((boardContract.active_lanes || []).join(" / ") || "no active lanes")}</div>` : ""}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+        <button type="button" id="portfolio-event-add" aria-label="Add a manual portfolio event" style="appearance:none; border:none; border-radius:999px; padding:8px 12px; background:linear-gradient(135deg, #2563eb, #0ea5e9); color:white; font-weight:700; cursor:pointer;">Add Event</button>
+        <button type="button" id="portfolio-event-remove" aria-label="Remove a manual portfolio event" style="appearance:none; border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:8px 12px; background:rgba(255,255,255,.06); color:#fff; font-weight:700; cursor:pointer;">Remove Event</button>
+      </div>
     </div>
   `;
+
+  const portfolioAddButton = document.getElementById("portfolio-event-add");
+  const portfolioRemoveButton = document.getElementById("portfolio-event-remove");
+  if (portfolioAddButton) {
+    portfolioAddButton.addEventListener("click", () => { void submitPortfolioEvent("add"); });
+  }
+  if (portfolioRemoveButton) {
+    portfolioRemoveButton.addEventListener("click", () => { void submitPortfolioEvent("remove"); });
+  }
 
   // ===== PICKS =====
   const scannerEl = document.getElementById("scanner");
@@ -876,6 +1151,7 @@ function renderIntelligence(response) {
             <div
               role="link"
               tabindex="0"
+              aria-label="Open recommendation card for ${escapeHtml(displayTitle(p))}"
               data-syndicate-question="${escapeHtml(question)}"
               data-syndicate-sport="${escapeHtml(syndicateContext.sport)}"
               data-syndicate-sport-slug="${escapeHtml(syndicateContext.sport_slug)}"
@@ -885,6 +1161,8 @@ function renderIntelligence(response) {
               data-syndicate-matchup="${escapeHtml(syndicateContext.matchup)}"
               data-syndicate-player-name="${escapeHtml(syndicateContext.player_name)}"
               data-syndicate-name="${escapeHtml(syndicateContext.name)}"
+              data-syndicate-prediction-id="${escapeHtml(String(p.prediction_id || p.predictionId || "").trim())}"
+              data-syndicate-recommendation-id="${escapeHtml(String(p.recommendation_id || p.recommendationId || "").trim())}"
               style="
               background:${theme.background};
               color:white;
@@ -915,6 +1193,7 @@ function renderIntelligence(response) {
                 <div>Bet Size: ${betSize}</div>
               </div>
 
+              ${renderBoardMetaRow(p)}
               ${renderPropFacts(p, true)}
               ${renderUpdatedLine(p)}
               ${renderCardBadges(p)}
@@ -922,6 +1201,11 @@ function renderIntelligence(response) {
               ${liveIndicatorChips(p)}
 
               <div style="margin-top:10px; font-size:11px; opacity:.75; letter-spacing:.02em; text-transform:uppercase;">Open in Ask The Syndicate</div>
+
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                <button type="button" data-portfolio-action="add" aria-label="Add this recommendation to the portfolio ledger" style="appearance:none; border:none; border-radius:999px; padding:7px 10px; background:rgba(37,99,235,.18); color:#dbeafe; font-weight:700; cursor:pointer;">Add Event</button>
+                <button type="button" data-portfolio-action="remove" aria-label="Remove this recommendation from the portfolio ledger" style="appearance:none; border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:7px 10px; background:rgba(255,255,255,.06); color:#fff; font-weight:700; cursor:pointer;">Remove Event</button>
+              </div>
 
             </div>
           `;
@@ -1008,6 +1292,7 @@ function renderIntelligence(response) {
                 ${lineImpact ? `<div>Line impact: ${Number(lineImpact) > 0 ? "+" : ""}${lineImpact}%</div>` : ""}
               </div>
 
+              ${renderBoardMetaRow(p)}
               ${renderCardBadges(p)}
 
               ${liveIndicatorChips(p)}
@@ -1085,6 +1370,7 @@ function renderIntelligence(response) {
               <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:6px; font-size:12px; opacity:.82;">
                 <div><strong>Confidence:</strong> ${confidence}</div>
               </div>
+              ${renderBoardMetaRow(item)}
               ${renderPropFacts(item, true)}
               ${renderUpdatedLine(item)}
               ${renderCardBadges(item)}
@@ -1145,6 +1431,35 @@ function renderIntelligence(response) {
     });
   });
 
+  const portfolioActionButtons = picksEl.querySelectorAll("[data-portfolio-action]");
+  portfolioActionButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const action = String(button.getAttribute("data-portfolio-action") || "").trim();
+      const card = button.closest("[data-syndicate-question]");
+      if (!action || !card) {
+        return;
+      }
+      const selectedItem = {
+        question: String(card.getAttribute("data-syndicate-question") || "").trim(),
+        sport: String(card.getAttribute("data-syndicate-sport") || "").trim(),
+        sport_slug: String(card.getAttribute("data-syndicate-sport-slug") || "").trim(),
+        market: String(card.getAttribute("data-syndicate-market") || "").trim(),
+        candidate_type: String(card.getAttribute("data-syndicate-candidate-type") || "").trim(),
+        selection: String(card.getAttribute("data-syndicate-selection") || "").trim(),
+        matchup: String(card.getAttribute("data-syndicate-matchup") || "").trim(),
+        player_name: String(card.getAttribute("data-syndicate-player-name") || "").trim(),
+        name: String(card.getAttribute("data-syndicate-name") || "").trim(),
+        display_name: String(card.getAttribute("data-syndicate-name") || card.getAttribute("data-syndicate-selection") || "").trim(),
+        pick: String(card.getAttribute("data-syndicate-selection") || "").trim(),
+        prediction_id: String(card.getAttribute("data-syndicate-prediction-id") || "").trim(),
+        recommendation_id: String(card.getAttribute("data-syndicate-recommendation-id") || "").trim(),
+      };
+      void submitPortfolioEvent(action, selectedItem);
+    });
+  });
+
   // ===== PARLAYS =====
   const parlaysEl = document.getElementById("parlays");
   const parlays = data.parlays || [];
@@ -1171,6 +1486,24 @@ function renderIntelligence(response) {
       `${pregameRecs.length} pregame`,
       `${parlays.length} parlays`,
     ];
+    if (boardContract && boardContract.schema) {
+      const boardLaneCounts = boardContract.lane_counts && typeof boardContract.lane_counts === "object" ? boardContract.lane_counts : {};
+      if (boardLaneCounts.live !== undefined || boardLaneCounts.pregame !== undefined) {
+        summaryParts.push(`Contract ${boardLaneCounts.live ?? 0} live / ${boardLaneCounts.pregame ?? 0} pregame`);
+      }
+    }
+    if (recommendationHistory && recommendationHistory.history_status) {
+      summaryParts.push(`Ledger ${recommendationHistory.history_status}`);
+    }
+    if (portfolioTracking && portfolioTracking.wager_count !== undefined) {
+      summaryParts.push(`Portfolio ${portfolioTracking.wager_count} wagers`);
+    }
+    if (portfolioEvents && portfolioEvents.event_count !== undefined) {
+      summaryParts.push(`Events ${portfolioEvents.event_count}`);
+    }
+    if (policyControl && policyControl.policy_status) {
+      summaryParts.push(`Policy ${policyControl.selected_policy || "default"}`);
+    }
     if (trackedOddsCount > 0) {
       summaryParts.push(`${trackedOddsCount} odds tracked`);
     }
@@ -1180,11 +1513,23 @@ function renderIntelligence(response) {
     if (portfolio.total_exposure !== undefined && portfolio.total_exposure !== null && portfolio.total_exposure !== "") {
       summaryParts.push(`Exposure ${portfolio.total_exposure}`);
     }
+    const summaryChips = summaryParts.map((part) => `
+      <span style="display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.10); color:#f3f4f6; font-size:11px; font-weight:600; letter-spacing:.01em;">
+        ${escapeHtml(part)}
+      </span>
+    `).join("");
     boardSummaryEl.innerHTML = `
-      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10); color:#e5e7eb; font-size:12px; font-weight:600;">
-        <span style="opacity:.72; text-transform:uppercase; letter-spacing:.04em;">Board</span>
-        <span>${summaryParts.join(" · ")}</span>
-        <span style="opacity:.72;">Odds/opps refresh every 30s</span>
+      <div style="display:grid; gap:10px; padding:12px 14px; border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04)); border:1px solid rgba(255,255,255,.12); color:#e5e7eb;">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; justify-content:space-between;">
+          <div style="min-width:0;">
+            <div style="opacity:.72; text-transform:uppercase; letter-spacing:.04em; font-size:11px;">Decision lanes</div>
+            <div style="margin-top:4px; font-size:14px; font-weight:700; letter-spacing:-.02em;">${escapeHtml(String(boardContract.board_summary && boardContract.board_summary.headline || "Live and pregame lanes"))}</div>
+          </div>
+          <div style="opacity:.72; font-size:11px; white-space:nowrap;">Odds/opps refresh every 30s</div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          ${summaryChips}
+        </div>
       </div>
     `;
   }

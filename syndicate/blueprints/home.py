@@ -1811,6 +1811,37 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
     }
 
 
+def _build_home_command_center_contract(
+    dashboard: dict[str, Any],
+    *,
+    selected_date: str,
+    polled_at: float,
+) -> dict[str, Any]:
+    summary_cards = dashboard.get("summary_cards") if isinstance(dashboard.get("summary_cards"), list) else []
+    live_watch = dashboard.get("live_watch") if isinstance(dashboard.get("live_watch"), list) else []
+    top_props = dashboard.get("top_props") if isinstance(dashboard.get("top_props"), list) else []
+    top_game_bets = dashboard.get("top_game_bets") if isinstance(dashboard.get("top_game_bets"), list) else []
+    sport_summaries = dashboard.get("sport_summaries") if isinstance(dashboard.get("sport_summaries"), list) else []
+    return {
+        "schema": "home_command_center_v1",
+        "headline": "Syndicate main page",
+        "lede": "One hub for the day across all sports, with games, live game updates, pregame props, live props, and the highest-value actions surfaced first.",
+        "selected_date": selected_date,
+        "polled_at": polled_at,
+        "summary_cards": summary_cards,
+        "live_watch": live_watch,
+        "top_props": top_props,
+        "top_game_bets": top_game_bets,
+        "sport_summaries": sport_summaries,
+        "shortcuts": [
+            {"label": "Live games", "href": "#home-live-lane"},
+            {"label": "Pregame props", "href": "#home-pregame-lane"},
+            {"label": "Game bets", "href": "#home-game-bets-lane"},
+            {"label": "All sports", "href": "#syndicate-home-sport-stack"},
+        ],
+    }
+
+
 def _parse_timestamp_epoch(value: Any) -> float:
     text = str(value or "").strip()
     if not text:
@@ -4143,9 +4174,11 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
             continue
         sport["freshness_label"] = f"Live \u00b7 {polled_label}" if bool(sport.get("active_today")) else "Stored slate"
     dashboard = _build_home_dashboard(overview, selected_date=effective_date, polled_at=polled_at)
+    command_center = _build_home_command_center_contract(dashboard, selected_date=effective_date, polled_at=polled_at)
     payload = {
         "sports": overview,
         "dashboard": dashboard,
+        "command_center": command_center,
         "selected_date": effective_date,
         "html": render_template("shared/_home_dashboard.html", sports=overview, dashboard=dashboard),
         "polled_at": polled_at,
@@ -4162,6 +4195,7 @@ def home():
         selected_home_date=payload.get("selected_date") or "",
         sports=payload.get("sports") or [],
         dashboard=payload.get("dashboard") or {},
+        command_center=payload.get("command_center") or {},
     )
 
 
@@ -4178,6 +4212,7 @@ def api_home():
             "ok": True,
             "sports": payload["sports"],
             "dashboard": payload.get("dashboard"),
+            "command_center": payload.get("command_center"),
             "selected_date": payload.get("selected_date"),
             "html": payload["html"],
             "polled_at": payload["polled_at"],

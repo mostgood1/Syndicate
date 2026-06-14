@@ -21,6 +21,7 @@ from syndicate.blueprints.ask_the_syndicate_adapter import build_syndicate_query
 from syndicate.blueprints.ask_the_syndicate_router import SyndicateQueryRouter
 from syndicate.blueprints.ask_the_syndicate_router import RouteDecision
 from syndicate.features.intelligence import run_intelligence_query
+from syndicate.features.intelligence_board import build_intelligence_board_contract
 
 
 ask_the_syndicate_bp = Blueprint("ask_the_syndicate", __name__)
@@ -237,6 +238,11 @@ def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] |
         }
     )
 
+    board_contract_source = dict(latest_state)
+    board_contract_source.setdefault("analysis", analysis)
+    board_contract_source.setdefault("response", analysis)
+    board_contract = build_intelligence_board_contract(board_contract_source)
+
     question = str(shaped_payload.get("original_question") or shaped_payload.get("question") or "").strip()
     routing_context = {
         "question": question,
@@ -270,6 +276,7 @@ def _build_fast_state_result(shaped_payload: dict[str, Any]) -> dict[str, Any] |
         "analysis": analysis,
         "candidate_pool": candidate_pool,
         "response": analysis,
+        "board_contract": board_contract,
         "routing_context": routing_context,
         "context_awareness": context_awareness,
         "served_from": "state_cache",

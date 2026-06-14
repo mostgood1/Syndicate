@@ -3750,12 +3750,29 @@
     const betting = game?.betting || {};
     const home = game?.home_tri || 'HOME';
     const away = game?.away_tri || 'AWAY';
+    const liveState = getLiveState(game);
+    const isLiveGame = hasStartedGame(liveState) || String(game?.gameType || '').trim().toLowerCase() === 'live' || /live/i.test(String(game?.status || ''));
+    const liveScoreSource = liveState || game?.live_state || {};
+    const liveScoreText = isLiveGame && Number.isFinite(Number(liveScoreSource?.away_pts)) && Number.isFinite(Number(liveScoreSource?.home_pts))
+      ? `Live score ${away} ${fmtInteger(Number(liveScoreSource.away_pts))} - ${fmtInteger(Number(liveScoreSource.home_pts))} ${home}`
+      : 'Live line pending.';
     if (marketKey === 'moneyline') {
       const candidates = [
         { detail: `${home} ML ${fmtAmerican(betting.home_ml)}`, ev: Number(betting.home_ml_ev), probability: betting.p_home_win, tabTarget: 'game' },
         { detail: `${away} ML ${fmtAmerican(betting.away_ml)}`, ev: Number(betting.away_ml_ev), probability: betting.p_away_win, tabTarget: 'game' },
       ].filter((item) => Number.isFinite(item.ev));
-      return candidates.sort((a, b) => b.ev - a.ev)[0] || null;
+      const pick = candidates.sort((a, b) => b.ev - a.ev)[0] || null;
+      if (pick || !isLiveGame) {
+        return pick;
+      }
+      return {
+        detail: liveScoreText,
+        ev: null,
+        probability: null,
+        meta: 'Live line pending',
+        tabTarget: 'game',
+        available: true,
+      };
     }
     if (marketKey === 'spread') {
       const spread = Number(betting.home_spread);
@@ -3763,7 +3780,18 @@
         { detail: `${home} ${Number.isFinite(spread) ? fmtSigned(spread) : '--'}`, ev: Number(betting.home_spread_ev), probability: betting.p_home_cover, tabTarget: 'game' },
         { detail: `${away} ${Number.isFinite(spread) ? fmtSigned(-spread) : '--'}`, ev: Number(betting.away_spread_ev), probability: betting.p_away_cover, tabTarget: 'game' },
       ].filter((item) => Number.isFinite(item.ev));
-      return candidates.sort((a, b) => b.ev - a.ev)[0] || null;
+      const pick = candidates.sort((a, b) => b.ev - a.ev)[0] || null;
+      if (pick || !isLiveGame) {
+        return pick;
+      }
+      return {
+        detail: liveScoreText,
+        ev: null,
+        probability: null,
+        meta: 'Live line pending',
+        tabTarget: 'game',
+        available: true,
+      };
     }
     if (marketKey === 'total') {
       const total = Number(betting.total);
@@ -3771,7 +3799,18 @@
         { detail: `Over ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: Number(betting.over_ev), probability: betting.p_total_over, tabTarget: 'game' },
         { detail: `Under ${Number.isFinite(total) ? fmtNumber(total, 1) : '--'}`, ev: Number(betting.under_ev), probability: betting.p_total_under, tabTarget: 'game' },
       ].filter((item) => Number.isFinite(item.ev));
-      return candidates.sort((a, b) => b.ev - a.ev)[0] || null;
+      const pick = candidates.sort((a, b) => b.ev - a.ev)[0] || null;
+      if (pick || !isLiveGame) {
+        return pick;
+      }
+      return {
+        detail: liveScoreText,
+        ev: null,
+        probability: null,
+        meta: 'Live line pending',
+        tabTarget: 'game',
+        available: true,
+      };
     }
     return null;
   }
@@ -4418,8 +4457,8 @@
     const halfSlots = featured.filter((slot) => String(slot?.sliceLabel || '').toLowerCase() === 'current half');
     const fullSlots = featured.filter((slot) => String(slot?.sliceLabel || '').toLowerCase() === 'full game');
     const groups = [
-      renderLiveSegmentGroup(game, liveLens, 'Current period', periodSlots),
-      renderLiveSegmentGroup(game, liveLens, 'Current half', halfSlots),
+      renderLiveSegmentGroup(game, liveLens, 'Live period', periodSlots),
+      renderLiveSegmentGroup(game, liveLens, 'Live half', halfSlots),
       renderLiveSegmentGroup(game, liveLens, 'Full game', fullSlots),
     ].filter(Boolean);
     return groups.length ? groups.join('') : renderGameLens(game);
@@ -4532,12 +4571,13 @@
     return null;
   }
 
-  function emptyLensMarket(shortLabel, note) {
+  function emptyLensMarket(shortLabel, note, livePending = false) {
+    const waitingForLive = livePending || /waiting for live lines/i.test(String(note || ''));
     return {
       shortLabel,
       klass: '',
-      main: `${shortLabel} off card`,
-      sub: note || 'No tracked market line.',
+      main: waitingForLive ? `${shortLabel} live` : `${shortLabel} off card`,
+      sub: note || (waitingForLive ? 'Waiting for live lines.' : 'No tracked market line.'),
       note: '',
       edgeValue: null,
       edgeText: '-',
@@ -4548,7 +4588,61 @@
 
   function liveLensMarketFromSignal(game, marketType, shortLabel, signal) {
     if (!signal) {
-      return emptyLensMarket(shortLabel, 'Waiting for live market data.');
+      const betting = game?.betting || {};
+      if (marketType === 'moneyline') {
+        const homeMl = Number(betting.home_ml);
+        const awayMl = Number(betting.away_ml);
+        if (Number.isFinite(homeMl) || Number.isFinite(awayMl)) {
+          const useHome = Number.isFinite(homeMl);
+          const line = useHome ? homeMl : awayMl;
+          const side = useHome ? String(game?.home_tri || 'HOME') : String(game?.away_tri || 'AWAY');
+          return {
+            shortLabel,
+            klass: 'WATCH',
+            main: `${side} ML ${fmtAmerican(line)}`,
+            sub: `Market ${fmtAmerican(line)}`,
+            note: 'Live line pending.',
+            edgeValue: null,
+            edgeText: '-',
+            edgeClass: '',
+            isEmpty: false,
+          };
+        }
+      }
+      if (marketType === 'spread' && Number.isFinite(Number(betting.home_spread))) {
+        const line = Number(betting.home_spread);
+        const side = line >= 0 ? String(game?.home_tri || 'HOME') : String(game?.away_tri || 'AWAY');
+        const displayLine = line >= 0 ? fmtSigned(line, 1) : fmtSigned(-line, 1);
+        return {
+          shortLabel,
+          klass: 'WATCH',
+          main: `${side} ${displayLine}`,
+          sub: `Market ${fmtSigned(line, 1)}`,
+          note: 'Live line pending.',
+          edgeValue: null,
+          edgeText: '-',
+          edgeClass: '',
+          isEmpty: false,
+        };
+      }
+      if (marketType === 'total' && Number.isFinite(Number(betting.total))) {
+        return {
+          shortLabel,
+          klass: 'WATCH',
+          main: `Total ${fmtNumber(Number(betting.total), 1)}`,
+          sub: `Market ${fmtNumber(Number(betting.total), 1)}`,
+          note: 'Live line pending.',
+          edgeValue: null,
+          edgeText: '-',
+          edgeClass: '',
+          isEmpty: false,
+        };
+      }
+      return emptyLensMarket(
+        shortLabel,
+        'Waiting for live lines.',
+        hasStartedGame(getLiveState(game))
+      );
     }
     const klass = String(signal?.klass || '').trim().toUpperCase();
     const side = String(signal?.side || '').trim();
@@ -4711,6 +4805,7 @@
     const score = game?.sim?.score || {};
     const periods = game?.sim?.periods || {};
     const periodLines = game?.lines || {};
+    const livePending = hasStartedGame(getLiveState(game));
 
     function periodTotalLine(periodKey) {
       const rawLine = periodLines?.period_totals?.[periodKey]
@@ -4829,7 +4924,7 @@
               edgeClass: spreadEdgeRaw >= 0 ? 'is-positive' : 'is-negative',
               isEmpty: false,
             }
-            : emptyLensMarket('ATS', 'No tracked spread line.'),
+            : emptyLensMarket('ATS', livePending ? 'Waiting for live lines.' : 'No tracked spread line.', livePending),
           total: Number.isFinite(totalEdgeRaw)
             ? {
               shortLabel: 'Total',
@@ -4842,7 +4937,7 @@
               edgeClass: totalEdgeRaw >= 0 ? 'is-positive' : 'is-negative',
               isEmpty: false,
             }
-            : emptyLensMarket('Total', 'No tracked total line.'),
+            : emptyLensMarket('Total', livePending ? 'Waiting for live lines.' : 'No tracked total line.', livePending),
         },
       };
     });
@@ -4854,6 +4949,8 @@
       return '<div class="cards-empty-copy">No game lens projections available.</div>';
     }
     function marketTileMarkup(market) {
+      const isLiveWaiting = /waiting for live lines/i.test(String(market?.main || market?.sub || market?.note || ''));
+      const badgeText = isLiveWaiting ? 'Live' : (market?.klass || (market?.isEmpty ? 'Off card' : 'Live'));
       const badgeClass = market?.klass === 'BET'
         ? 'cards-chip cards-chip--accent'
         : (market?.klass === 'WATCH' ? 'cards-chip cards-chip--warm' : 'cards-chip');
@@ -4889,7 +4986,7 @@
             <div class="cards-market-kicker">${escapeHtml(market?.shortLabel || 'Market')}</div>
             <div class="cards-live-lens-badge-row">
               ${confidence ? `<span class="cards-live-lens-confidence cards-live-lens-confidence--${escapeHtml(confidence.tone)}">${escapeHtml(confidence.label)}</span>` : ''}
-              <span class="${badgeClass}">${escapeHtml(market?.klass || (market?.isEmpty ? 'Off card' : 'Live'))}</span>
+              <span class="${badgeClass}">${escapeHtml(badgeText)}</span>
             </div>
           </div>
           <div class="cards-market-main">${escapeHtml(market?.main || 'No surfaced bet')}</div>

@@ -3608,6 +3608,24 @@ class HomeBoardTests(unittest.TestCase):
         self.assertIn('id="cardsScoreboard"', html)
         self.assertIn('id="cardsGrid"', html)
 
+    def test_nba_cards_source_live_lens_keeps_odds_on_tile(self) -> None:
+        js_content = (REPO_ROOT / "syndicate" / "static" / "nba" / "cards_source.js").read_text(encoding="utf-8")
+        css_content = (REPO_ROOT / "syndicate" / "static" / "nba" / "cards_source.css").read_text(encoding="utf-8")
+
+        self.assertIn("Live period", js_content)
+        self.assertIn("Live half", js_content)
+        self.assertIn("cards-live-lens-tile__edge", js_content)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css_content)
+
+    def test_wnba_cards_parity_live_lens_keeps_odds_on_tile(self) -> None:
+        js_content = (REPO_ROOT / "syndicate" / "static" / "wnba" / "cards-parity.js").read_text(encoding="utf-8")
+        css_content = (REPO_ROOT / "syndicate" / "static" / "wnba" / "cards-parity.css").read_text(encoding="utf-8")
+
+        self.assertIn("Live period", js_content)
+        self.assertIn("Live half", js_content)
+        self.assertIn("cards-live-lens-tile__edge", js_content)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css_content)
+
     def test_wnba_live_lens_embed_mode_omits_standalone_header(self) -> None:
         response = self.client.get('/wnba/live-lens?date=2026-05-16&embed=home-live-wnba')
         html = response.get_data(as_text=True)
@@ -4063,6 +4081,92 @@ class HomeBoardTests(unittest.TestCase):
 
         self.assertEqual(payload.get("date"), "2026-05-28")
         self.assertEqual((payload.get("games") or [{}])[0].get("gamePk"), "game-2")
+
+    def test_wnba_live_lens_page_context_prefers_live_line(self) -> None:
+        from syndicate.features.wnba.live_lens import build_live_lens_page_context as build_wnba_live_lens_page_context
+
+        cards_context = {
+            "date": "2026-05-28",
+            "requested_date": "2026-05-28",
+            "games": [
+                {
+                    "event_id": "evt-wnba-1",
+                    "status": "Live",
+                    "detail": "Q3 05:12",
+                    "summary": "Consensus market snapshot",
+                    "away": {"abbr": "LAS", "score": 48},
+                    "home": {"abbr": "NYL", "score": 50},
+                    "betting": {"total": 156.5},
+                    "metrics": [{"label": "Live line", "value": "156.5"}],
+                    "shared_top_play_rows": [],
+                    "shared_prop_rows": [],
+                }
+            ],
+            "source_path": "wnba_cards.csv",
+        }
+        live_lines_payload = {
+            "games": [
+                {
+                    "event_id": "evt-wnba-1",
+                    "lines": {"total": 161.5},
+                }
+            ]
+        }
+
+        with patch("syndicate.features.wnba.live_lens.build_cards_page_context", return_value=cards_context), patch(
+            "syndicate.features.wnba.live_lens.build_live_lines_payload", return_value=live_lines_payload
+        ):
+            context = build_wnba_live_lens_page_context("2026-05-28")
+
+        rank_cards = context.get("rank_cards") or []
+        self.assertTrue(rank_cards)
+        metrics = rank_cards[0].get("metrics") or []
+        self.assertTrue(any(metric.get("label") == "Live line" and metric.get("value") == "161.5" for metric in metrics))
+        self.assertIn("Live line 161.5", rank_cards[0].get("summary") or "")
+
+    def test_wnba_live_lens_rank_card_uses_live_state_scores_when_team_scores_missing(self) -> None:
+        from syndicate.features.wnba.live_lens import build_live_lens_page_context as build_wnba_live_lens_page_context
+
+        cards_context = {
+            "date": "2026-05-28",
+            "requested_date": "2026-05-28",
+            "games": [
+                {
+                    "event_id": "evt-wnba-2",
+                    "status": "Live",
+                    "detail": "Q3 05:12",
+                    "summary": "Consensus market snapshot",
+                    "away": {"abbr": "LAS"},
+                    "home": {"abbr": "NYL"},
+                    "live_state": {"away_pts": 41, "home_pts": 53},
+                    "betting": {"total": 156.5},
+                    "metrics": [{"label": "Live line", "value": "156.5"}],
+                    "shared_top_play_rows": [],
+                    "shared_prop_rows": [],
+                }
+            ],
+            "source_path": "wnba_cards.csv",
+        }
+        live_lines_payload = {
+            "games": [
+                {
+                    "event_id": "evt-wnba-2",
+                    "lines": {"total": 161.5},
+                }
+            ]
+        }
+
+        with patch("syndicate.features.wnba.live_lens.build_cards_page_context", return_value=cards_context), patch(
+            "syndicate.features.wnba.live_lens.build_live_lines_payload", return_value=live_lines_payload
+        ):
+            context = build_wnba_live_lens_page_context("2026-05-28")
+
+        rank_cards = context.get("rank_cards") or []
+        self.assertTrue(rank_cards)
+        metrics = rank_cards[0].get("metrics") or []
+        self.assertTrue(any(metric.get("label") == "Total pts" and metric.get("value") == "94" for metric in metrics))
+        self.assertIn("Total pts 94", rank_cards[0].get("summary") or "")
+        self.assertIn("Live line 161.5", rank_cards[0].get("summary") or "")
 
     def test_wnba_cards_page_uses_live_state_fallback_when_artifacts_empty(self) -> None:
         from syndicate.features.wnba.cards import build_cards_page_context as build_wnba_cards_page_context

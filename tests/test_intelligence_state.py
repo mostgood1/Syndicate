@@ -15,7 +15,9 @@ from syndicate.features.shared import refresh_state_store
 from pipeline.intelligence_state import IntelligenceSnapshot
 from pipeline.intelligence_state import IntelligenceStateService
 from pipeline.intelligence_state import _payload_key
+from syndicate.app import create_app
 from syndicate.blueprints.intelligence import intelligence_bp
+from syndicate.blueprints.intelligence import intelligence_portfolio_event_api
 from syndicate.blueprints.intelligence import intelligence_status_api
 from syndicate.blueprints.intelligence import intelligence_query_api
 
@@ -151,6 +153,104 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertEqual(payload["response"]["response"]["movement"], {})
         mocked_queue.assert_not_called()
         mocked_run.assert_not_called()
+
+    def test_intelligence_home_renders_initial_board_shell(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        with app.test_client() as client:
+            with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    response = client.get("/intelligence")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Initial board", html)
+        self.assertIn("Prompt The Syndicate", html)
+        self.assertIn("Board snapshot", html)
+        self.assertIn("Live and pregame lanes", html)
+        self.assertIn("Decision lanes", html)
+        self.assertIn("intelligence-hero", html)
+        self.assertIn("intelligence-lane__intro", html)
+        mocked_queue.assert_called_once()
+
+    def test_query_endpoint_preserves_recommendation_history_from_engine_response(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        engine_response = {
+            "ok": True,
+            "headline": "The Syndicate brief",
+            "selected_date": "2026-06-13",
+            "board_contract": {"schema": "intelligence_board_v1", "lane_counts": {"live": 1, "pregame": 0}, "active_lanes": ["live"], "cards": []},
+            "recommendation_history": {"history_status": "available", "sample_size": 4, "settled_count": 3},
+            "portfolio_tracking": {"open_exposure": 0.12, "risk_level": "low", "wager_count": 1},
+            "portfolio_events": {"event_count": 2, "added_count": 1, "removed_count": 1, "adjusted_count": 0},
+            "portfolio_event_records": [{"portfolio_event_id": "evt_1", "record_type": "portfolio_event"}],
+            "recommendations": [],
+            "parlays": [],
+            "top_opportunities": [],
+            "by_sport": {},
+        }
+
+        with app.test_request_context(
+            "/api/intelligence/query",
+            method="POST",
+            json={"question": "Analyze Jayson Tatum tonight", "date": "2026-06-13"},
+        ):
+            with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+                with patch("syndicate.blueprints.intelligence.run_intelligence_query", return_value=dict(engine_response)) as mocked_run:
+                    response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertIn("response", payload)
+        self.assertEqual(payload["response"]["recommendation_history"]["history_status"], "available")
+        self.assertEqual(payload["response"]["portfolio_tracking"]["risk_level"], "low")
+        self.assertEqual(payload["response"]["portfolio_events"]["event_count"], 2)
+        self.assertEqual(payload["response"]["portfolio_event_records"][0]["portfolio_event_id"], "evt_1")
+        self.assertEqual(payload["response"]["board_contract"]["schema"], "intelligence_board_v1")
+        mocked_run.assert_called_once()
+
+    def test_portfolio_event_endpoint_records_manual_event_bundle(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        bundle = {
+            "schema_version": 1,
+            "prediction": {"prediction_id": "pred_123"},
+            "recommendations": [],
+            "artifact_metadata": {},
+            "portfolio_tracking": {"open_exposure": 0.25, "risk_level": "medium", "wager_count": 1},
+            "portfolio_events": {"event_count": 1, "added_count": 1, "removed_count": 0, "adjusted_count": 0},
+            "portfolio_event_records": [{"portfolio_event_id": "evt_123", "prediction_id": "pred_123", "recommendation_id": "rec_123", "record_type": "portfolio_event"}],
+            "history": {"history_status": "empty", "sample_size": 0},
+        }
+
+        with app.test_request_context(
+            "/api/intelligence/portfolio-event",
+            method="POST",
+            json={
+                "question": "manual add",
+                "selected_date": "2026-06-13",
+                "portfolio_event": {"action": "add", "status": "open", "name": "Boston Celtics", "market": "points", "prediction_id": "pred_123", "recommendation_id": "rec_123"},
+            },
+        ):
+            with patch("syndicate.blueprints.intelligence.build_intelligence_evaluation_bundle", return_value=dict(bundle)) as mocked_build:
+                response = intelligence_portfolio_event_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["ok"], True)
+        self.assertEqual(payload["portfolio_event"]["action"], "add")
+        self.assertEqual(payload["portfolio_event"]["prediction_id"], "pred_123")
+        self.assertEqual(payload["portfolio_event"]["recommendation_id"], "rec_123")
+        self.assertEqual(payload["portfolio_events"]["event_count"], 1)
+        self.assertEqual(payload["portfolio_event_records"][0]["portfolio_event_id"], "evt_123")
+        self.assertEqual(payload["portfolio_event_records"][0]["prediction_id"], "pred_123")
+        self.assertEqual(payload["portfolio_event_records"][0]["recommendation_id"], "rec_123")
+        mocked_build.assert_called_once()
 
     def test_status_endpoint_falls_back_to_cached_state_when_live_build_fails(self) -> None:
         app = Flask(__name__)

@@ -4,11 +4,11 @@
     "runMode":  "standard",
     "overallStatus":  "started",
     "generatedAt":  "2026-06-13T08:13:49.1939721-05:00",
-    "updatedAt":  "2026-06-13T08:13:49.3771588-05:00",
+    "updatedAt":  "2026-06-13T08:14:24.1267528-05:00",
     "runDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_081348",
     "latestDir":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-13T08:13:49.3085329-05:00",
-    "currentStage":  "queued",
+    "lastUpdatedAt":  "2026-06-13T08:14:24.1187480-05:00",
+    "currentStage":  "source_update",
     "completedStages":  [
 
                         ],

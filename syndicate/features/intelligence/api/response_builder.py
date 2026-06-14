@@ -285,8 +285,9 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
 
     def _frontend_recommendation(candidate: dict[str, Any]) -> dict[str, Any]:
         recommendation = dict(candidate)
+        writeup = _safe_text(recommendation.get("writeup"), "")
         if not _safe_text(recommendation.get("rationale"), ""):
-            rationale = recommendation.get("reasoning_text") or recommendation.get("summary") or recommendation.get("writeup")
+            rationale = recommendation.get("reasoning_text") or recommendation.get("summary") or writeup
             if rationale:
                 recommendation["rationale"] = rationale
         if not recommendation.get("advanced_inputs") and recommendation.get("advanced_context"):
@@ -297,6 +298,10 @@ def build_response(*, recommendations: list[dict[str, Any]], parlays: list[dict[
             rationale_text = _safe_text(recommendation.get("rationale"), "")
             if rationale_text and "advanced drivers in play" not in rationale_text.lower():
                 recommendation["rationale"] = f"Advanced drivers in play. {rationale_text}"
+        if writeup:
+            rationale_text = _safe_text(recommendation.get("rationale"), "")
+            if writeup not in rationale_text:
+                recommendation["rationale"] = f"{rationale_text} {writeup}".strip()
         if "explanation" not in recommendation:
             recommendation["explanation"] = _frontend_explanation(candidate)
         if not recommendation.get("display_name"):
