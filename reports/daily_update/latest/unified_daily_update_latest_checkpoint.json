@@ -1,17 +1,16 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-13",
+    "date":  "2026-06-14",
     "runMode":  "standard",
-    "overallStatus":  "ok",
-    "generatedAt":  "2026-06-13T13:31:25.5946176+00:00",
-    "updatedAt":  "2026-06-13T14:09:33.4091277+00:00",
-    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_133125",
+    "overallStatus":  "started",
+    "generatedAt":  "2026-06-14T07:35:04.2029024+00:00",
+    "updatedAt":  "2026-06-14T07:35:04.3278017+00:00",
+    "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-14\\20260614_073503",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-13T14:09:33.4045885+00:00",
+    "lastUpdatedAt":  "2026-06-14T07:35:04.2800765+00:00",
     "currentStage":  "queued",
     "completedStages":  [
-                            "source_update",
-                            "refresh_gate"
+
                         ],
     "failedStage":  null,
     "stageDecisions":  [
@@ -174,36 +173,15 @@
                        "simExecutionDecision":  null
                    },
     "trace":  {
-                  "eventSimExecutionCount":  21,
-                  "artifactUpdateCount":  21,
-                  "inputFingerprintCount":  2,
-                  "artifactPathCount":  21,
+                  "eventSimExecutionCount":  0,
+                  "artifactUpdateCount":  0,
+                  "inputFingerprintCount":  0,
+                  "artifactPathCount":  0,
                   "inputFingerprints":  [
-                                            "48f4877b5d801ec168b2d7056e31583cc0e40542813e1c80b6cdf1918162c077",
-                                            "fa91947a4701fad12656e439d0170d67f91131e79df77e377f287d936d8d405d"
+
                                         ],
                   "artifactPaths":  [
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_0_STL_at_MIN_pk823694_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_10_HOU_at_KC_pk824100_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_11_PHI_at_MIL_pk823776_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_12_COL_at_ATH_pk824995_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_13_CHC_at_SF_pk823213_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_14_TB_at_LAA_pk824019_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_1_NYY_at_TOR_pk822802_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_2_SD_at_BAL_pk824828_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_3_SEA_at_WSH_pk822725_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_4_MIA_at_PIT_pk823369_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_5_AZ_at_CIN_pk824508_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_6_DET_at_CLE_pk824426_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_7_TEX_at_BOS_pk824749_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_8_ATL_at_NYM_pk823616_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-13\\sim_9_LAD_at_CWS_pk824587_g1.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\nba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_SAS_NYK.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_CON_IND.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_LVA_MIN.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_PHX_LAS.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_POR_DAL.json",
-                                        "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-13_bundle.json"
+
                                     ],
                   "simExecutionDecision":  null
               },
@@ -212,10 +190,11 @@
                           "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
                           "latestCheckpointStage":  "queued",
                           "latestCheckpointFailedStage":  "",
-                          "latestCheckpointCompletedStageCount":  0,
-                          "latestCheckpointCompletedStages":  {
-
-                                                              },
+                          "latestCheckpointCompletedStageCount":  2,
+                          "latestCheckpointCompletedStages":  [
+                                                                  "source_update",
+                                                                  "refresh_gate"
+                                                              ],
                           "resumeEligible":  false,
                           "resumedFromCheckpoint":  true
                       },
