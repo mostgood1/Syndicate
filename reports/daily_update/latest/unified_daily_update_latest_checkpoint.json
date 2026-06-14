@@ -4,13 +4,14 @@
     "runMode":  "standard",
     "overallStatus":  "started",
     "generatedAt":  "2026-06-14T07:35:04.2029024+00:00",
-    "updatedAt":  "2026-06-14T08:14:20.4513702+00:00",
+    "updatedAt":  "2026-06-14T08:15:13.2271472+00:00",
     "runDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-14\\20260614_073503",
     "latestDir":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest",
-    "lastUpdatedAt":  "2026-06-14T08:14:20.4430501+00:00",
-    "currentStage":  "source_update",
+    "lastUpdatedAt":  "2026-06-14T08:15:13.2205418+00:00",
+    "currentStage":  "queued",
     "completedStages":  [
-
+                            "source_update",
+                            "refresh_gate"
                         ],
     "failedStage":  null,
     "stageDecisions":  [
