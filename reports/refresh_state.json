@@ -193,6 +193,20 @@
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
         "date": "2026-06-14"
       }
+    },
+    "mlb_live_lens:2026-06-14": {
+      "inputHash": "be72003d2245ae3e923b1567bf49aa6b3ecf4a1148a68aa347984e9b5f464f37",
+      "updatedAt": "2026-06-14T07:57:12.745575",
+      "outputs": [
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_report_2026_06_14.json",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\live_lens_2026_06_14.jsonl",
+        "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\live_lens\\prop_registry\\live_prop_registry_2026_06_14.json"
+      ],
+      "metadata": {
+        "date": "2026-06-14",
+        "trigger": "syndicate_refresh",
+        "source_root": "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts"
+      }
     }
   }
 }
