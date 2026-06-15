@@ -2992,13 +2992,26 @@ function Get-ForcedPublishArtifactPaths {
         }
     }
 
-    $forcedPublishArtifactPaths = @(
-        Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
-    )
-    $intelligencePublishArtifactPaths = @(
-        Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
-    )
-    $publishParitySummary = Get-PublishParitySummary -DateValue $Date -ForcedPublishArtifactPaths $forcedPublishArtifactPaths -IntelligencePublishArtifactPaths $intelligencePublishArtifactPaths
+    $forcedPublishArtifactPaths = @()
+    $intelligencePublishArtifactPaths = @()
+    $publishParitySummary = [ordered]@{
+        date = $Date
+        skipped = [bool]$SkipGitPush
+        forcedPublishArtifactPathCount = 0
+        intelligencePublishArtifactPathCount = 0
+        missingForcedPublishArtifactPaths = @()
+        missingIntelligencePublishArtifactPaths = @()
+        status = if ($SkipGitPush) { 'skipped' } else { 'pending' }
+    }
+    if (-not $SkipGitPush) {
+        $forcedPublishArtifactPaths = @(
+            Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+        )
+        $intelligencePublishArtifactPaths = @(
+            Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+        )
+        $publishParitySummary = Get-PublishParitySummary -DateValue $Date -ForcedPublishArtifactPaths $forcedPublishArtifactPaths -IntelligencePublishArtifactPaths $intelligencePublishArtifactPaths
+    }
 
     if (-not $SkipMLB) {
         foreach ($rootRelative in @('data/mlb_source/data', 'data/mlb_source/source_artifacts/data')) {
@@ -4036,7 +4049,7 @@ try {
         throw 'Cannot push git updates when -SkipRefreshGate is set. Run the gate or pass -SkipGitPush.'
     }
 
-    $shouldRunArtifactGeneration = Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'artifactGeneration' -Fallback ([bool](-not $SkipGitPush))
+    $shouldRunArtifactGeneration = if ($SkipGitPush) { $false } else { Get-RunPlanDecisionValue -Plan $runManifest.runPlan -Key 'artifactGeneration' -Fallback $true }
     if ($shouldRunArtifactGeneration) {
         foreach ($repo in $publishRepos) {
             $result = Invoke-GitPublish -Name $repo.Name -RepoPath $repo.RepoPath -CommitMessage "$CommitMessagePrefix $Date (pre-source publish)" -RemoteName $GitRemote -ForceIncludePaths (& $resolveForcedPublishArtifactPaths)
@@ -4413,7 +4426,16 @@ catch {
 }
 finally {
     $artifactUpdatePaths = @($runManifest.artifactUpdates | ForEach-Object { [string]$_.artifactPath } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
-    if ($artifactGenerationFallbackToFullPublish -or $artifactUpdatePaths.Count -eq 0) {
+    if ($SkipGitPush) {
+        if ($artifactUpdatePaths.Count -eq 0 -and -not $artifactGenerationFallbackToFullPublish) {
+            Write-Host 'Artifact stage no-op: no event-level artifact updates were scheduled; skipping artifact publish.' -ForegroundColor Yellow
+            foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'artifact_generation' })) {
+                $stageDecision.decision = 'skipped'
+                $stageDecision.status = if ($DryRun) { 'dry_run' } else { 'skipped' }
+            }
+        }
+    }
+    elseif ($artifactGenerationFallbackToFullPublish -or $artifactUpdatePaths.Count -eq 0) {
         if ($artifactUpdatePaths.Count -eq 0 -and -not $artifactGenerationFallbackToFullPublish) {
             Write-Host 'Artifact stage no-op: no event-level artifact updates were scheduled; skipping artifact publish.' -ForegroundColor Yellow
             foreach ($stageDecision in @($runManifest.stageDecisions | Where-Object { [string]$_.stage -eq 'artifact_generation' })) {

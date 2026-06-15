@@ -107,6 +107,7 @@ jobs:
               -OddsPhase all `
               -OddsSports all `
               -OddsRegions us `
+              -SkipGitPush `
               -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
           else {
@@ -117,6 +118,7 @@ jobs:
               -OddsPhase all `
               -OddsSports all `
               -OddsRegions us `
+              -SkipGitPush `
               -EventSimForceWindowMinutes $forceWindowMinutes 2>&1 | Tee-Object -FilePath daily-update.log
           }
 
