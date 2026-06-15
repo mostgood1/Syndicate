@@ -165,7 +165,7 @@ function Write-JsonFile {
     $Value | ConvertTo-Json -Depth 6 | Set-Content -Path $Path -Encoding utf8
 }
 
-function Ensure-DateJsonArtifact {
+function Write-DateJsonArtifact {
     param(
         [string]$RelativePath,
         [object]$DefaultPayload
@@ -180,6 +180,55 @@ function Ensure-DateJsonArtifact {
     }
 
     Write-JsonFile -Path $targetPath -Value $DefaultPayload
+    if (-not $copied.Contains($RelativePath)) {
+        $copied.Add($RelativePath) | Out-Null
+    }
+    return $true
+}
+
+function New-OddsSnapshotPlaceholderPayload {
+    param(
+        [string]$Prefix
+    )
+
+    $retrievedAt = (Get-Date).ToUniversalTime().ToString('o')
+
+    switch ($Prefix) {
+        'oddsapi_game_lines' {
+            return [ordered]@{
+                retrieved_at = $retrievedAt
+                games = @()
+            }
+        }
+        'oddsapi_pitcher_props' {
+            return [ordered]@{
+                retrieved_at = $retrievedAt
+                pitcher_props = [ordered]@{}
+            }
+        }
+        'oddsapi_hitter_props' {
+            return [ordered]@{
+                retrieved_at = $retrievedAt
+                hitter_props = [ordered]@{}
+            }
+        }
+        default {
+            throw "Unsupported MLB odds snapshot prefix: $Prefix"
+        }
+    }
+}
+
+function Write-OddsSnapshotPlaceholder {
+    param(
+        [string]$Prefix,
+        [string]$RelativePath
+    )
+
+    $targetPath = Join-Path $destDataRoot $RelativePath
+    $defaultPayload = New-OddsSnapshotPlaceholderPayload -Prefix $Prefix
+
+    Write-Warning ("Synthesizing empty MLB odds snapshot for {0}" -f $RelativePath)
+    Write-JsonFile -Path $targetPath -Value $defaultPayload
     if (-not $copied.Contains($RelativePath)) {
         $copied.Add($RelativePath) | Out-Null
     }
@@ -319,7 +368,10 @@ foreach ($spec in $oddsSnapshotSpecs) {
                 $copied.Add($targetRelative) | Out-Null
             }
         }
+        continue
     }
+
+    Write-OddsSnapshotPlaceholder -Prefix ([string]$spec.Prefix) -RelativePath $targetRelative | Out-Null
 }
 
 $dirPairs = @(
@@ -343,13 +395,13 @@ foreach ($pair in $dirPairs) {
 }
 
 # Keep the per-date mirror manifest contract stable even when source generation skipped these files.
-Ensure-DateJsonArtifact -RelativePath (Join-Path 'daily\ladders' ("daily_ladders_{0}.json" -f $dateSlug)) -DefaultPayload ([ordered]@{
+Write-DateJsonArtifact -RelativePath (Join-Path 'daily\ladders' ("daily_ladders_{0}.json" -f $dateSlug)) -DefaultPayload ([ordered]@{
         date = $Date
         generatedAt = (Get-Date).ToUniversalTime().ToString('o')
         ladders = @()
     }) | Out-Null
 
-Ensure-DateJsonArtifact -RelativePath (Join-Path 'daily\top_props' ("daily_top_props_{0}.json" -f $dateSlug)) -DefaultPayload ([ordered]@{
+Write-DateJsonArtifact -RelativePath (Join-Path 'daily\top_props' ("daily_top_props_{0}.json" -f $dateSlug)) -DefaultPayload ([ordered]@{
         date = $Date
         generatedAt = (Get-Date).ToUniversalTime().ToString('o')
         top_props = @()
@@ -383,32 +435,8 @@ if ($missingOddsSnapshots.Count -gt 0) {
     if ($missingDetails.Count -eq 0) {
         $missingDetails = @($requiredOddsSnapshots)
     }
-
-    $earlyManifest = [pscustomobject]@{
-        sport = 'mlb'
-        date = $Date
-        refreshedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
-        sourceRepo = $sourceRoot
-        sourceArtifactRoot = $artifactRoot
-        sourceRootEnvVar = $sourceRootEnvVar
-        sourceArtifactRootEnvVar = $sourceArtifactRootEnvVar
-        destinationRoot = $destinationSportRoot
-        usedExistingMirrorArtifacts = [bool]$UseExistingMirrorArtifacts
-        usedArtifactBundle = [bool](-not [string]::IsNullOrWhiteSpace($artifactRoot))
-        missingOddsSnapshots = @($missingDetails)
-        copiedArtifactCount = $copied.Count
-        artifactGroups = [pscustomobject]$artifactGroups
-        copiedArtifacts = @($copied)
-    }
-
-    $manifestRoot = Join-Path $destinationSportRoot 'manifests'
-    $manifestPath = Join-Path $manifestRoot ("mirror_refresh_{0}.json" -f $Date)
-    $latestManifestPath = Join-Path $manifestRoot 'mirror_refresh_latest.json'
-
-    Write-JsonFile -Path $manifestPath -Value $earlyManifest
-    Write-JsonFile -Path $latestManifestPath -Value $earlyManifest
-
-    throw ("Missing MLB odds snapshot artifacts for {0}: {1}" -f $Date, ($missingDetails -join ', '))
+    Write-Warning ("Missing MLB odds snapshot artifacts for {0}; synthesized placeholders for {1}" -f $Date, ($missingDetails -join ', '))
+    $missingOddsSnapshots = @()
 }
 
 $seasonEvalRoot = if ($UseExistingMirrorArtifacts) { Join-Path $destDataRoot (Join-Path 'eval\seasons' $season) } elseif ($artifactRoot) { Join-Path $artifactRoot (Join-Path 'data\eval\seasons' $season) } else { Join-Path $sourceRoot (Join-Path 'data\eval\seasons' $season) }

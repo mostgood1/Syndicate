@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
@@ -3013,7 +3014,7 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
-    is_today = str(selected_date).strip() == central_today_iso()
+    is_today = str(selected_date).strip() == date.today().isoformat()
 
     # Live-state is operationally critical for in-progress scoreboards on WNBA and Home.
     # For today's slate, prefer fresher remote/public live sources ahead of the local snapshot
@@ -3242,7 +3243,7 @@ def build_live_player_lens_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_player_lens", resolved_date, normalized_event_ids)
-    is_today = str(selected_date).strip() == central_today_iso()
+    is_today = str(selected_date).strip() == date.today().isoformat()
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None
@@ -3354,7 +3355,7 @@ def build_live_lines_payload(
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     resolved_date = str(context.get("date") or selected_date).strip() or selected_date
     local_payload = _filtered_local_live_snapshot_payload("live_lines", resolved_date, normalized_event_ids)
-    is_today = str(selected_date).strip() == central_today_iso()
+    is_today = str(selected_date).strip() == date.today().isoformat()
     local_timestamp = _parse_payload_timestamp((local_payload or {}).get("odds_refreshed_at") or (local_payload or {}).get("generated_at"))
     if is_today and local_timestamp and (datetime.now(timezone.utc) - local_timestamp) > timedelta(minutes=20):
         local_payload = None

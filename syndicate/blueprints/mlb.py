@@ -230,13 +230,27 @@ def _season_betting_day_payload(season: int, date_str: str, profile: str) -> tup
         out["found"] = True
         out["source_path"] = _path_label(season_frontend_day_path(int(season), date_str, profile=profile))
         return out, 200
-    return {
-        "season": int(season),
-        "date": str(date_str),
-        "found": False,
-        "source_path": None,
-        "games": [],
-    }, 404
+    fallback_context = build_betting_card_page_context(int(season), str(date_str), profile=profile)
+    fallback_payload = _rank_payload(fallback_context)
+    fallback_payload["season"] = int(season)
+    fallback_payload["date"] = str(date_str)
+    fallback_payload["found"] = False
+    fallback_payload["source_path"] = _path_label(season_frontend_day_path(int(season), date_str, profile=profile))
+    fallback_payload["games"] = []
+    fallback_payload["module_links"] = build_module_links(str(date_str), "Betting Card")
+    fallback_payload["warning_panel"] = {
+        "eyebrow": "Official betting card",
+        "title": "MLB betting card is unavailable for the requested date",
+        "body": "The API still keeps archive navigation and route metadata on the dedicated MLB betting-card route, even when no stored season-day artifact exists.",
+        "list_items": [
+            f"Requested date: {date_str}",
+            "Try a stored betting-card date from the archive or season navigation.",
+        ],
+    }
+    fallback_payload["route_path"] = f"/mlb/season/{int(season)}/betting-card"
+    fallback_payload["cards_url"] = f"/mlb/cards?date={date_str}"
+    fallback_payload["app"] = _app_meta()
+    return fallback_payload, 200
 
 
 def _season_betting_manifest_payload(season: int, profile: str) -> dict:

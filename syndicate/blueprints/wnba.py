@@ -383,7 +383,7 @@ def api_game_detail(game_pk: str):
 @wnba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
-    context = build_cards_page_context(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
+    context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
     return jsonify(build_game_board_api_payload(context))
 
 
