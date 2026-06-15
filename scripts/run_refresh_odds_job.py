@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from datetime import datetime
@@ -73,6 +74,20 @@ def _update_job_status(
     write_json_file(status_path, payload)
 
 
+def _safe_write_text(path: Path, payload: str) -> None:
+    try:
+        write_text_file(path, payload)
+    except Exception:
+        pass
+
+
+def _safe_write_json(path: Path, payload: dict[str, Any]) -> None:
+    try:
+        write_text_file(path, json.dumps(payload, indent=2))
+    except Exception:
+        pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the shared odds refresh command and update Syndicate status manifests on completion.")
     parser.add_argument("--manifest-path", required=True)
@@ -107,18 +122,58 @@ def main() -> int:
         started_at=started_at,
         command=command,
     )
-    result = subprocess.run(command, capture_output=True, text=True)
-    write_text_file(stdout_path, result.stdout or "")
-    write_text_file(stderr_path, result.stderr or "")
+    return_code = 1
+    stdout_text = ""
+    stderr_text = ""
+    failure_error = None
+    try:
+        result = subprocess.run(command, capture_output=True, text=True)
+        return_code = int(result.returncode)
+        stdout_text = str(result.stdout or "")
+        stderr_text = str(result.stderr or "")
+    except Exception as exc:
+        failure_error = f"{type(exc).__name__}: {exc}"
+        stdout_text = json.dumps(
+            {
+                "ok": False,
+                "error": failure_error,
+                "command": command,
+                "startedAt": started_at,
+            },
+            indent=2,
+        )
+        stderr_text = failure_error
 
-    state = "finished" if result.returncode == 0 else "failed"
+    state = "finished" if return_code == 0 else "failed"
     finished_at = _utc_now()
+    stdout_payload: dict[str, Any]
+    try:
+        stdout_payload = json.loads(stdout_text) if stdout_text.strip() else {}
+    except Exception:
+        stdout_payload = {}
+
+    failure_payload: dict[str, Any] = {
+        "ok": return_code == 0,
+        "returnCode": int(return_code),
+        "startedAt": started_at,
+        "finishedAt": finished_at,
+        "command": command,
+    }
+    if failure_error:
+        failure_payload["error"] = failure_error
+    if return_code == 0 and stdout_payload:
+        _safe_write_json(stdout_path, stdout_payload)
+    else:
+        if stdout_text.strip() and not stdout_payload:
+            failure_payload["stdout"] = stdout_text
+        _safe_write_json(stdout_path, failure_payload)
+    _safe_write_text(stderr_path, stderr_text)
     _update_state(
         manifest_path=manifest_path,
         latest_path=latest_path,
         run_summary_path=run_summary_path,
         state=state,
-        exit_code=int(result.returncode),
+        exit_code=int(return_code),
     )
     _update_job_status(
         status_path=status_path,
@@ -126,12 +181,12 @@ def main() -> int:
         latest_path=latest_path,
         run_summary_path=run_summary_path,
         state=state,
-        exit_code=int(result.returncode),
+        exit_code=int(return_code),
         started_at=started_at,
         finished_at=finished_at,
         command=command,
     )
-    return int(result.returncode)
+    return int(return_code)
 
 
 if __name__ == "__main__":
