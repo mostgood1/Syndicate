@@ -15,6 +15,7 @@ from syndicate.features.nhl.sources import scoreboard_snapshot_path
 from syndicate.features.nhl.sources import slate_summaries
 from syndicate.features.nhl.sources import team_abbreviation
 from syndicate.features.nhl.sources import team_odds_snapshot_path
+from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 from syndicate.features.shared.timezone import central_today_iso
@@ -648,7 +649,7 @@ def build_live_lens_page_context(selected_date: str | None) -> dict[str, Any]:
     context["odds_refreshed_at"] = odds_refreshed_at
     context["oddsRefreshedAt"] = odds_refreshed_at
     context["games"] = live_games
-    return context
+    return attach_live_lens_contract(context, sport="nhl", module="live_lens")
 
 
 def build_live_lens_api_payload(selected_date: str | None) -> dict[str, Any]:

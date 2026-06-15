@@ -6,6 +6,7 @@ from typing import Any
 from syndicate.features.ncaaf.cards import build_cards_page_context
 from syndicate.features.ncaaf.sources import available_weeks
 from syndicate.features.ncaaf.sources import build_module_links
+from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_page_context
 
 
@@ -110,4 +111,4 @@ def build_live_lens_page_context(selected_week: int) -> dict[str, object]:
     context["data"] = rank_cards
     context["groups"] = {"Games": rank_cards}
     context["have_data"] = bool(rank_cards)
-    return context
+    return attach_live_lens_contract(context, sport="ncaaf", module="live_lens")

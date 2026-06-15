@@ -132,6 +132,10 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
 
+          # NHL mirror artifacts are ignored locally, but the daily GitHub Action
+          # must publish them explicitly so Render receives the updated bundle.
+          git add -f -- data/nhl_source/source_artifacts data/nhl_source/manifests/mirror_refresh_latest.json
+
           git add -A -- . ':(exclude)daily-update.log'
 
           $status = git status --short

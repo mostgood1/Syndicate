@@ -347,7 +347,7 @@ Phase 7 progress snapshot:
 - completed: home command center shell
 - completed: shared daily board contract
 - completed: live-game and pregame lane separation
-- remaining: live-lens interval/projection consistency
+- completed: live-lens interval/projection consistency
 - completed: Ask parity with the shared board inputs
 - completed: outcome and ledger tracking
 - remaining: UI polish, accessibility refinement, deeper learning, and policy control

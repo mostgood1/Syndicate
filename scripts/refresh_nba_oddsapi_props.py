@@ -44,6 +44,15 @@ def _json_ready(value):
     return value
 
 
+def _refresh_state_scope_path(path: Path | None) -> str:
+    if path is None:
+        return ""
+    try:
+        return str(Path(path).resolve())
+    except Exception:
+        return str(Path(path))
+
+
 def _source_app_fallback_enabled() -> bool:
     return str(os.environ.get("SYNDICATE_NBA_SOURCE_APP_FALLBACK") or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -2445,9 +2454,6 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return None
 
-    if input_hash and should_recompute(f"nba_refresh:{date_str}:{int(do_edges)}:{int(do_export)}", input_hash):
-        return None
-
     started = str(started_at or dt.datetime.utcnow().isoformat())
     ended = dt.datetime.utcnow().isoformat()
     return {
@@ -2504,9 +2510,6 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
     if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
-        return None
-
-    if input_hash and should_recompute(f"nba_artifact_bundle:{date_str}:{int(do_edges)}:{int(do_export)}", input_hash):
         return None
 
     started = str(started_at or dt.datetime.utcnow().isoformat())
@@ -3826,7 +3829,7 @@ def main() -> int:
                 state["artifact_bundle_files"] = copied
         if state and not state.get("error"):
             record_refresh_state(
-                f"nba_artifact_bundle:{target_date}:{int(bool(args.do_edges))}:{int(bool(args.do_export))}",
+                f"nba_artifact_bundle:{_refresh_state_scope_path(artifact_root_path)}:{target_date}:{int(bool(args.do_edges))}:{int(bool(args.do_export))}",
                 refresh_input_hash,
                 outputs=[str(path) for path in (artifact_root_path / "data" / "processed").glob("*")][:0] if artifact_root_path else [],
                 metadata={

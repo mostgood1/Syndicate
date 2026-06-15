@@ -2744,6 +2744,77 @@ function Get-CurrentBranch {
     }
 }
 
+function Get-PublishParitySummary {
+    param(
+        [string]$DateValue,
+        [string[]]$ForcedPublishArtifactPaths,
+        [string[]]$IntelligencePublishArtifactPaths
+    )
+
+    $forcedPaths = @($ForcedPublishArtifactPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    $intelligencePaths = @($IntelligencePublishArtifactPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+
+    $forcedTempPath = Join-Path $runDir ('.tmp_publish_parity_forced_{0}.json' -f ([System.Guid]::NewGuid().ToString('N')))
+    $intelligenceTempPath = Join-Path $runDir ('.tmp_publish_parity_intelligence_{0}.json' -f ([System.Guid]::NewGuid().ToString('N')))
+    $scriptTempPath = Join-Path $runDir ('.tmp_publish_parity_{0}.py' -f ([System.Guid]::NewGuid().ToString('N')))
+    $scriptContent = @'
+import json
+import sys
+from pathlib import Path
+
+from syndicate.features.shared.publish_parity import build_publish_parity_summary
+
+
+def main() -> int:
+    date_value = str(sys.argv[1] or '').strip()
+    forced_path = Path(sys.argv[2])
+    intelligence_path = Path(sys.argv[3])
+    forced_paths = json.loads(forced_path.read_text(encoding='utf-8'))
+    intelligence_paths = json.loads(intelligence_path.read_text(encoding='utf-8'))
+    summary = build_publish_parity_summary(
+        date=date_value,
+        forced_paths=forced_paths,
+        intelligence_paths=intelligence_paths,
+    )
+    print(json.dumps(summary, separators=(',', ':')))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+'@
+
+    Set-Content -Path $forcedTempPath -Value (@($forcedPaths) | ConvertTo-Json -Depth 4) -Encoding utf8
+    Set-Content -Path $intelligenceTempPath -Value (@($intelligencePaths) | ConvertTo-Json -Depth 4) -Encoding utf8
+    Set-Content -Path $scriptTempPath -Value $scriptContent -Encoding utf8
+
+    try {
+        Push-Location $repoRoot
+        try {
+            $pythonExe = Resolve-Python $repoRoot
+            $rawOutput = & $pythonExe $scriptTempPath $DateValue $forcedTempPath $intelligenceTempPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "publish parity helper exited with code $LASTEXITCODE"
+            }
+        }
+        finally {
+            Pop-Location
+        }
+
+        try {
+            return ($rawOutput | Out-String | ConvertFrom-Json -ErrorAction Stop)
+        }
+        catch {
+            throw 'Unable to parse publish parity payload'
+        }
+    }
+    finally {
+        Remove-Item -Path $forcedTempPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $intelligenceTempPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $scriptTempPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Get-ForcedPublishArtifactPaths {
     param(
         [string]$RepoPath,
@@ -2920,6 +2991,14 @@ function Get-ForcedPublishArtifactPaths {
             Add-DateGameBoxscoreCachePaths -GameCardsRelativePath "${rootRelative}/data/processed/game_cards_${DateValue}.csv" -BoxscoreRelativeRoot "${rootRelative}/data/processed/boxscores"
         }
     }
+
+    $forcedPublishArtifactPaths = @(
+        Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+    )
+    $intelligencePublishArtifactPaths = @(
+        Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+    )
+    $publishParitySummary = Get-PublishParitySummary -DateValue $Date -ForcedPublishArtifactPaths $forcedPublishArtifactPaths -IntelligencePublishArtifactPaths $intelligencePublishArtifactPaths
 
     if (-not $SkipMLB) {
         foreach ($rootRelative in @('data/mlb_source/data', 'data/mlb_source/source_artifacts/data')) {
@@ -3823,6 +3902,7 @@ $runManifest = [ordered]@{
         oddsRegions = $OddsRegions
         oddsHistoryTriggerPlan = @($oddsHistoryTriggerPlan)
     }
+    publishParity = $publishParitySummary
     runProvenance = [ordered]@{
         sourceStepCount = $sourceSteps.Count
         sourceSteps = @($sourceSteps | ForEach-Object { [ordered]@{ sport = $_.Sport; workflow = $_.Workflow; name = $_.Name } })
@@ -3897,6 +3977,7 @@ $runManifest = [ordered]@{
             failedStage = $null
             policyPerformance = @()
             replayContext = $null
+            publishParity = $publishParitySummary
         }
     }
     sportRuns = @()

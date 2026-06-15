@@ -22,6 +22,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.odds_control_plane import write_odds_control_plane_snapshot
+from syndicate.features.shared.publish_parity import build_publish_parity_summary
 from syndicate.features.shared.odds_refresh_tracking import sync_sport_post_refresh_tracking
 from syndicate.features.shared.manifest import publish_sport_manifest
 
@@ -1082,6 +1083,18 @@ def main() -> int:
         payload = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         print(json.dumps(payload, indent=2))
         return 1
+
+        publish_parity_paths: list[str] = []
+        for sport_result in summary.get("results", []) if isinstance(summary.get("results"), list) else []:
+            if not isinstance(sport_result, dict):
+                continue
+            publish_parity_paths.extend(_sport_artifact_paths(sport_result))
+
+        summary["publish_parity"] = build_publish_parity_summary(
+            date=summary.get("date"),
+            forced_paths=publish_parity_paths,
+            intelligence_paths=[],
+        )
 
     summary["odds_control_plane"] = write_odds_control_plane_snapshot(summary)
 

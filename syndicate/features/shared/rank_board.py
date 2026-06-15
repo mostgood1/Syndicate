@@ -103,6 +103,8 @@ def build_rank_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         "generated_at",
         "oddsRefreshedAt",
         "odds_refreshed_at",
+        "live_lens_contract",
+        "refresh_policy",
         "header_stats",
         "route_path",
         "module_links",

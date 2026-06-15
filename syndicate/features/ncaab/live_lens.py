@@ -6,6 +6,7 @@ from syndicate.features.ncaab.sources import build_module_links
 from syndicate.features.ncaab.sources import live_lines_payload
 from syndicate.features.ncaab.sources import live_lens_tuning_payload
 from syndicate.features.ncaab.sources import live_state_payload
+from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 
@@ -151,7 +152,7 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
         context["generatedAt"] = refresh_ts
         context["odds_refreshed_at"] = refresh_ts
         context["oddsRefreshedAt"] = refresh_ts
-    return context
+    return attach_live_lens_contract(context, sport="ncaab", module="live_lens")
 
 
 def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:

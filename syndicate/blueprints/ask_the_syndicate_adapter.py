@@ -106,6 +106,28 @@ def _explanation_payload(result: Any) -> dict[str, Any]:
     }
 
 
+def _supporting_evidence_sections(result: Any, structured_response: dict[str, Any]) -> list[dict[str, Any]]:
+    sections = structured_response.get("supporting_evidence")
+    if isinstance(sections, list) and sections:
+        return _items_to_dicts(sections)
+
+    explanation = _explanation_payload(result)
+    fallback_sections: list[dict[str, Any]] = []
+
+    analysis_brief = explanation.get("analysis_brief")
+    if analysis_brief:
+        fallback_sections.append(dict(analysis_brief))
+
+    supporting_evidence = explanation.get("supporting_evidence")
+    if supporting_evidence:
+        fallback_sections.append(dict(supporting_evidence))
+
+    if _items_to_dicts(_result_value(result, "recommendations", ())):
+        fallback_sections.append({"kind": "bundle", "title": "Recommendation evidence"})
+
+    return fallback_sections
+
+
 def _bet_analysis_schema(result: Any) -> dict[str, Any]:
     top = _first_recommendation(result)
     explanation = _explanation_payload(result)
@@ -250,7 +272,7 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
         "context": dict(context),
         "routing_context": routing_context,
         "context_awareness": _mapping_or_empty(structured_response.get("context_awareness")),
-        "supporting_evidence": structured_response.get("supporting_evidence") if isinstance(structured_response.get("supporting_evidence"), list) else [],
+        "supporting_evidence": _supporting_evidence_sections(result, structured_response),
         "evaluation_record": _mapping_or_empty(_result_value(result, "evaluation_record", {})),
         "evaluation_history": _mapping_or_empty(_result_value(result, "evaluation_history", {})),
         "intent": decision.intent,

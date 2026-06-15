@@ -25,6 +25,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from syndicate.features.shared.basketball_props_edges import export_props_edges_local
+from syndicate.features.shared.basketball_live_artifacts import build_live_player_lens_payload_from_artifacts
 from syndicate.features.shared.basketball_props_predictions import export_props_predictions_local
 from syndicate.features.shared.basketball_props_recommendations import export_props_recommendations_local
 from syndicate.features.shared.basketball_props_smart_sim import _to_tricode_local
@@ -42,6 +43,15 @@ def _json_ready(value):
     if isinstance(value, (list, tuple)):
         return [_json_ready(item) for item in value]
     return value
+
+
+def _refresh_state_scope_path(path: Path | None) -> str:
+    if path is None:
+        return ""
+    try:
+        return str(Path(path).resolve())
+    except Exception:
+        return str(Path(path))
 
 
 def _canonical_wnba_tri(value: object) -> str:
@@ -453,6 +463,41 @@ def _build_bundle_local_live_snapshot_payload(*, kind: str, date_str: str, event
             os.environ[env_name] = previous_value
 
 
+def _build_bundle_local_live_player_lens_payload(*, processed_root: Path, date_str: str) -> dict[str, object] | None:
+    game_cards_path = processed_root / f"game_cards_{date_str}.csv"
+    if not game_cards_path.exists() or not game_cards_path.is_file():
+        return None
+    event_games: dict[str, dict[str, object]] = {}
+    try:
+        with game_cards_path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if not isinstance(row, dict):
+                    continue
+                event_id = str(row.get("event_id") or "").strip()
+                home_tri = str(row.get("home_tri") or "").strip().upper()
+                away_tri = str(row.get("away_tri") or "").strip().upper()
+                if not event_id or not home_tri or not away_tri:
+                    continue
+                event_games[event_id] = {
+                    "event_id": event_id,
+                    "home_tri": home_tri,
+                    "away_tri": away_tri,
+                }
+    except Exception:
+        return None
+    if not event_games:
+        return None
+    try:
+        return build_live_player_lens_payload_from_artifacts(
+            processed_root=processed_root,
+            date_str=date_str,
+            event_games=event_games,
+            source="syndicate_live_lens_projection_artifact",
+        )
+    except Exception:
+        return None
+
+
 def _boxscores_history_sources(*, source_root: Path, processed_root: Path) -> list[Path]:
     candidates: list[Path] = []
     seen: set[str] = set()
@@ -637,6 +682,8 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
             payload = _prefer_live_lines_payload(payload, bundle_payload)
         elif not _payload_has_snapshot_content(kind, payload):
             payload = bundle_payload
+        if kind == "live_player_lens" and not _payload_has_snapshot_content(kind, payload):
+            payload = _build_bundle_local_live_player_lens_payload(processed_root=processed_root, date_str=date_str)
         if isinstance(payload, dict) and _payload_has_snapshot_content(kind, payload) and _write_live_snapshot_payload(destination, payload):
             if copied_key:
                 copied[copied_key] = str(destination)
@@ -2890,9 +2937,6 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
         return None
 
-    if input_hash and should_recompute(f"wnba_refresh:{date_str}:{int(do_edges)}:{int(do_export)}", input_hash):
-        return None
-
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
     ended = str(dt.datetime.utcnow().isoformat())
     return {
@@ -2949,9 +2993,6 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     cards_sim_detail_games = int(_count_cards_sim_detail_games(cards_sim_detail_path))
     smart_sim_files = int(_count_matching_files(processed_root, f"smart_sim_{date_str}_*.json"))
     if bool(do_export) and int(_count_csv_rows_quick(snapshot_path)) > 0 and game_cards_rows > 0 and cards_sim_detail_games <= 0 and smart_sim_files <= 0:
-        return None
-
-    if input_hash and should_recompute(f"wnba_artifact_bundle:{date_str}:{int(do_edges)}:{int(do_export)}", input_hash):
         return None
 
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
@@ -3987,7 +4028,7 @@ def main() -> int:
                 state["artifact_bundle_files"] = copied
         if state and not state.get("error"):
             record_refresh_state(
-                f"wnba_artifact_bundle:{target_date}:{int(bool(args.do_edges))}:{int(bool(args.do_export))}",
+                f"wnba_artifact_bundle:{_refresh_state_scope_path(artifact_root_path)}:{target_date}:{int(bool(args.do_edges))}:{int(bool(args.do_export))}",
                 refresh_input_hash,
                 metadata={
                     "date": target_date,

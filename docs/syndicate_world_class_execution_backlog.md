@@ -61,9 +61,9 @@ This backlog tracks the official implementation plan in execution order.
 
 ## Current next slice
 
-Phase 6 is complete. The next executable slice is now the remaining Phase 7 UI polish, deeper learning, and recommendation-learning work.
+Phase 6 is complete. The next executable slice is now the remaining Phase 7 UI polish, accessibility, deeper learning, and policy-control work.
 
-Phase 7 is active now. The home command center, shared board contract, live and pregame lanes, Ask parity, and outcome / ledger tracking slices are complete. The remaining work is UI polish, accessibility, and deeper recommendation learning.
+Phase 7 is active now. The home command center, shared board contract, live and pregame lanes, Ask parity, outcome / ledger tracking, and live-lens consistency slices are complete. The remaining work is UI polish, accessibility, and deeper recommendation learning.
 
 The restored live-board and Ask workstreams remain part of Phase 7:
 
@@ -218,7 +218,7 @@ Known validation detail:
 - [x] Keep the Ask surface visually and semantically coherent with the home hub and intelligence board.
 - [x] Add recommendation history that records what was recommended, what was placed, what won or lost, and what the policy should learn.
 - [x] Add bet and portfolio tracking for actual wagers, open exposure, and manual add/remove actions.
-[x] Make game and prop live lenses use live interval lines, live odds, and in-game projections consistently instead of falling back to off-board intervals.
+- [x] Make game and prop live lenses use live interval lines, live odds, and in-game projections consistently instead of falling back to off-board intervals.
 - [ ] Make the live board feel like a world-class product with strong hierarchy, readable cards, responsive layouts, and accessible contrast.
 - [ ] Make the home page feel like a world-class daily command center with a clear slate, strong hierarchy, and fast access to the day’s highest-value sports surfaces.
 

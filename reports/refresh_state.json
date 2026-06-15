@@ -12,23 +12,23 @@
     },
     "nhl_artifact_bundle:2026-05-22": {
       "inputHash": "13133df73de397075cf1bcea730b4ca753fa12b3e21d8eb5da0bac37261b6b11",
-      "updatedAt": "2026-06-11T17:48:32.811376",
+      "updatedAt": "2026-06-15T00:01:53.123048",
       "outputs": [
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_projections_all_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_boxscores_sim_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_boxscores_sim_hist_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_boxscores_sim_samples_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_recommendations_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\roster_snapshot_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\injuries_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\shifts_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\co_toi_shifts_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\processed\\props_predictions_2026-05-22.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\odds\\team\\date=2026-05-22\\oddsapi.csv",
-        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle\\data\\props\\player_props_lines\\date=2026-05-22\\oddsapi.csv"
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_projections_all_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_boxscores_sim_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_boxscores_sim_hist_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_boxscores_sim_samples_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_recommendations_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\roster_snapshot_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\injuries_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\shifts_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\co_toi_shifts_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\processed\\props_predictions_2026-05-22.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\odds\\team\\date=2026-05-22\\oddsapi.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle\\data\\props\\player_props_lines\\date=2026-05-22\\oddsapi.csv"
       ],
       "metadata": {
-        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpr98635mu\\bundle",
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp8e9jusf2\\bundle",
         "date": "2026-05-22"
       }
     },
@@ -99,15 +99,15 @@
       }
     },
     "nfl_artifact_bundle": {
-      "inputHash": "9ffa9ad7bbaf8bebd0a3ee9edc652a25f9f0238a4936bfe4d837269789e758dd",
-      "updatedAt": "2026-06-14T08:13:56.267062",
+      "inputHash": "c9dffb43044e6baf28c9e3a34e01e7b15c9a59d3af7230811e3085ad0c047fd0",
+      "updatedAt": "2026-06-15T00:11:29.286301",
       "outputs": [
-        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\current_week.json",
-        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\real_betting_lines_2026_06_14.json",
-        "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts\\oddsapi_player_props_2026_wk1.csv"
+        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpynx8ynj2\\bundle\\current_week.json",
+        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpynx8ynj2\\bundle\\real_betting_lines_2026_10_01.json",
+        "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpynx8ynj2\\bundle\\oddsapi_player_props_2026_wk4.csv"
       ],
       "metadata": {
-        "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts"
+        "artifact_root": "C:\\Users\\TEMPAD~1\\AppData\\Local\\Temp\\tmpynx8ynj2\\bundle"
       }
     },
     "mlb_live_lens:2026-06-12": {
@@ -234,6 +234,200 @@
       "metadata": {
         "artifact_root": "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
         "date": "2026-06-15"
+      }
+    },
+    "mlb_live_lens:2026-05-22": {
+      "inputHash": "2bf22f9b78d0ab9f834064a0b38c8c74d2d6a60a6676f7b4ba3a79af099b2fb4",
+      "updatedAt": "2026-06-14T23:59:33.636670",
+      "outputs": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp6hf7oxp3\\source\\data\\live_lens\\live_lens_report_2026_05_22.json",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp6hf7oxp3\\source\\data\\live_lens\\live_lens_2026_05_22.jsonl",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp6hf7oxp3\\source\\data\\live_lens\\prop_registry\\live_prop_registry_2026_05_22.json"
+      ],
+      "metadata": {
+        "date": "2026-05-22",
+        "trigger": "syndicate_refresh",
+        "source_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp6hf7oxp3\\source"
+      }
+    },
+    "nba_artifact_bundle:2026-05-22:1:1": {
+      "inputHash": "5cd7e3581e2c8946b7cb8a5bc6f60285e0e6fcaa3620cf951a21ca3e090ebc0d",
+      "updatedAt": "2026-06-15T00:00:09.537324",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmptlmq6b9h\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:2026-05-22:1:1": {
+      "inputHash": "c56fe68de316d9e9dbd43efa9fec3c87ade9cecd6dd54f9db690127ce9c66b99",
+      "updatedAt": "2026-06-15T00:02:56.392025",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp16657cik\\bundle"
+      }
+    },
+    "ncaaf_artifact_bundle": {
+      "inputHash": "ce03d06fb8ca5928ce18f6ce0209f67ef0a8c30a42e5f7fbab2a0a7cce8f57ae",
+      "updatedAt": "2026-06-15T00:00:02.428988",
+      "outputs": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\recommendations_latest.json",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\recommendations_2025.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\college_football_betting_lines_2025.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\college_football_schedule_2025_predicted_totals_enhanced.csv",
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle\\recommendations_summary"
+      ],
+      "metadata": {
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpqvce3a5p\\bundle",
+        "season": 2025
+      }
+    },
+    "ncaab_odds_current:2026-05-22": {
+      "inputHash": "6be4503f50d2b5665237c1be5fbae5746d04c4bbdf73a998e9867069bf24fee0",
+      "updatedAt": "2026-06-15T00:00:03.005226",
+      "outputs": [
+        "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp3p7ljy99\\odds_history\\odds_2026-05-22.csv"
+      ],
+      "metadata": {
+        "date": "2026-05-22",
+        "mode": "current",
+        "region": "us",
+        "bookmakers": "",
+        "markets": "h2h,spreads,totals,spreads_h1,totals_h1,spreads_h2,totals_h2",
+        "rows": 1
+      }
+    },
+    "nba_artifact_bundle::2026-05-22:1:1": {
+      "inputHash": "28edb1ff192262cc94246956478ae99bbbacac99892f120dc6e7a6bcc206d975",
+      "updatedAt": "2026-06-15T00:08:17.434168",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": null
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpbjbna5za\\bundle:2026-05-22:1:1": {
+      "inputHash": "338138020059a86db79e31416b51d2910db6ffbdd2c7c028d56ac148f8b68e0b",
+      "updatedAt": "2026-06-15T00:06:08.894325",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpbjbna5za\\bundle"
+      }
+    },
+    "wnba_artifact_bundle::2026-05-22:1:1": {
+      "inputHash": "a449fd542d7c50940e594a5cfdfb51cface77b71f2f989e2afb5fd56d4d97f6c",
+      "updatedAt": "2026-06-15T00:10:51.175638",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": null
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp7qcgfyi9\\bundle:2026-05-22:1:1": {
+      "inputHash": "ad0fc3cf923ae93d62b78fd3018621df3453330eedd9204c9d9159a6c8d96208",
+      "updatedAt": "2026-06-15T00:06:29.189536",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp7qcgfyi9\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp_dsdfkik\\bundle:2026-05-22:1:1": {
+      "inputHash": "7bbb6a29a87c9f45ab0677ce33a9c3ace33754b57e3f13421ecc204fe9f729a8",
+      "updatedAt": "2026-06-15T00:08:19.690907",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp_dsdfkik\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpf4a6t1de\\bundle:2026-05-22:1:1": {
+      "inputHash": "aab0c942f52fe43001a7feb7100cfda535c8b31b73d9d9b20c4bfa44f044c1a0",
+      "updatedAt": "2026-06-15T00:08:20.305455",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpf4a6t1de\\bundle"
+      }
+    },
+    "nba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp2lzhq15e\\bundle:2026-05-22:1:1": {
+      "inputHash": "b9892985b27304179ef5acd1b1aff37f0f1c8c6b2da5c3ad63a7f436204c7736",
+      "updatedAt": "2026-06-15T00:08:21.014731",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp2lzhq15e\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp38y4xl68\\bundle:2026-05-22:1:1": {
+      "inputHash": "866ef6adc79c5036b59fb0b434b9ee2dce606733396d90fe37b4aa789c1d1350",
+      "updatedAt": "2026-06-15T00:09:12.510666",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp38y4xl68\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpu_x3_8p5\\bundle:2026-05-22:1:1": {
+      "inputHash": "a472f019662229e09a4b33822303c906fc8096d3ce96ab13ed49e05502b16ea4",
+      "updatedAt": "2026-06-15T00:09:12.551106",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpu_x3_8p5\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp3iz8scob\\bundle:2026-05-22:1:1": {
+      "inputHash": "de2f5504e171a0e7b594c1d3ee5a5c3675b63f131bdcbf0b2bc2b23e1daf84db",
+      "updatedAt": "2026-06-15T00:09:12.628856",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmp3iz8scob\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpek94664i\\bundle:2026-05-22:1:1": {
+      "inputHash": "5b6998130a9c13b63b9fe0a77f028e90b97a9b5b66a41dd41d91597c1b80880b",
+      "updatedAt": "2026-06-15T00:10:59.577798",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": false,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpek94664i\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmprj7ll1x5\\bundle:2026-05-22:1:1": {
+      "inputHash": "f325524bf50b58ba409a80c8d07b7500a61d6133d3f2e1b8fc904074b5182c43",
+      "updatedAt": "2026-06-15T00:10:59.622998",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmprj7ll1x5\\bundle"
+      }
+    },
+    "wnba_artifact_bundle:C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpnra0qj8n\\bundle:2026-05-22:1:1": {
+      "inputHash": "dd4c77b7b8db209d666b525bb5a921304c71ddf524612248f3ab4449cb3017e0",
+      "updatedAt": "2026-06-15T00:10:59.734048",
+      "outputs": [],
+      "metadata": {
+        "date": "2026-05-22",
+        "reused": true,
+        "artifact_root": "C:\\Users\\tempadmin\\AppData\\Local\\Temp\\tmpnra0qj8n\\bundle"
       }
     }
   }

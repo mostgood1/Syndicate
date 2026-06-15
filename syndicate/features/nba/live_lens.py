@@ -7,6 +7,7 @@ from syndicate.features.nba.cards import build_cards_page_context
 from syndicate.features.nba.cards import build_live_lines_payload
 from syndicate.features.nba.sources import build_module_links
 from syndicate.features.nba.sources import parse_iso_date
+from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
 
@@ -276,7 +277,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
         prev_href = f"{route_path}?date={cards_context.get('prev_date') or requested_date}{query_suffix}"
         next_href = f"{route_path}?date={cards_context.get('next_date') or requested_date}{query_suffix}"
 
-    return build_rank_page_context(
+    context = build_rank_page_context(
         selected_date=resolved_date,
         route_path=route_path,
         intro_title="NBA Live Lens",
@@ -304,6 +305,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
             "list_items": [f"Requested date: {requested_date}"],
         } if not rank_cards else None,
     )
+    return attach_live_lens_contract(context, sport="nba", module="live_lens")
 
 
 def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:

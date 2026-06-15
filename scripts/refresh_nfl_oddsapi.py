@@ -204,7 +204,7 @@ def _materialize_artifact_bundle(*, source_data_root: Path, artifact_root: Path)
 
 def _resolve_source_data_root(*, source_root: str | None, artifact_root: Path) -> Path:
     if source_root:
-        return Path(source_root).resolve() / "nfl_compare" / "data"
+        return Path(source_root) / "nfl_compare" / "data"
     return artifact_root
 
 
@@ -242,7 +242,7 @@ def main() -> int:
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
 
-    artifact_root = Path(args.artifact_root).resolve()
+    artifact_root = Path(args.artifact_root)
     artifact_root.mkdir(parents=True, exist_ok=True)
     source_data_root = _resolve_source_data_root(source_root=args.source_root, artifact_root=artifact_root)
     source_data_root.mkdir(parents=True, exist_ok=True)

@@ -222,6 +222,29 @@ def _is_board_response(payload: dict[str, object] | None) -> bool:
     return False
 
 
+def _response_has_content(payload: dict[str, object] | None) -> bool:
+    current = dict(payload or {})
+    if not current:
+        return False
+    if _response_candidate_count(current) > 0:
+        return True
+    for key in ("top_opportunities", "by_sport", "portfolio", "parlays"):
+        value = current.get(key)
+        if isinstance(value, dict) and value:
+            return True
+        if isinstance(value, list) and value:
+            return True
+    analysis = current.get("analysis") if isinstance(current.get("analysis"), dict) else None
+    if isinstance(analysis, dict):
+        for key in ("recommendations", "picks", "top_live_opportunities", "parlays", "portfolio"):
+            value = analysis.get(key)
+            if isinstance(value, dict) and value:
+                return True
+            if isinstance(value, list) and value:
+                return True
+    return False
+
+
 def _cached_intelligence_response_with_source(payload: dict[str, object]) -> tuple[dict[str, object] | None, str]:
     cached_response = read_latest_intelligence_state_response(payload, force_refresh=False)
     if _is_board_response(cached_response):
@@ -532,7 +555,7 @@ def intelligence_home():
             cached_response, _ = _cached_intelligence_response_with_source(payload)
             if cached_response is not None:
                 initial_response = dict(cached_response)
-            if not initial_response:
+            if not _response_has_content(initial_response):
                 queue_intelligence_state_refresh(dict(payload))
     except Exception:
         initial_response = {}
@@ -562,7 +585,7 @@ def intelligence_query_api():
         _log_api_state_read(cached_response if isinstance(cached_response, dict) else {})
         if question == DEFAULT_QUESTION and cached_response is not None:
             response_payload = dict(cached_response)
-            if want_refresh:
+            if want_refresh or not _response_has_content(response_payload):
                 queue_intelligence_state_refresh(dict(payload))
         elif question == DEFAULT_QUESTION:
             if want_refresh and not bool(payload.get("background")):
@@ -571,6 +594,8 @@ def intelligence_query_api():
             if cached_response is None:
                 cached_response = _empty_default_intelligence_response()
             response_payload = _unwrap_response_payload(cached_response)
+            if not _response_has_content(response_payload):
+                queue_intelligence_state_refresh(dict(payload))
         else:
             board_result = run_intelligence_query(
                 question,
@@ -589,7 +614,7 @@ def intelligence_query_api():
 
         if not isinstance(response_payload, dict) or not response_payload:
             if question == DEFAULT_QUESTION:
-                if want_refresh and not bool(payload.get("background")):
+                if (want_refresh or not _response_has_content(cached_response)) and not bool(payload.get("background")):
                     queue_intelligence_state_refresh(dict(payload))
                 cached_response = _cached_intelligence_response(dict(payload))
                 if cached_response is None:

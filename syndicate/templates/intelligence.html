@@ -5,144 +5,435 @@
 
 {% block content %}
 <style>
+  :root {
+    --intel-bg0: #060913;
+    --intel-bg1: #0b1020;
+    --intel-panel: rgba(13, 20, 38, 0.94);
+    --intel-panel-2: rgba(16, 26, 49, 0.94);
+    --intel-line: rgba(148, 163, 184, 0.18);
+    --intel-line-strong: rgba(148, 163, 184, 0.3);
+    --intel-text: #f6f8ff;
+    --intel-muted: #a8b3cf;
+    --intel-muted-soft: #7f8aaa;
+    --intel-teal: #9af3de;
+    --intel-gold: #ffbf69;
+    --intel-blue: #8eb6ff;
+    --intel-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    --intel-shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.26);
+  }
+
+  body.syndicate-body {
+    background:
+      radial-gradient(circle at top left, rgba(154, 243, 222, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 191, 105, 0.1), transparent 24%),
+      radial-gradient(circle at 50% 0%, rgba(142, 182, 255, 0.1), transparent 28%),
+      linear-gradient(180deg, var(--intel-bg0), var(--intel-bg1) 42%, #060910 100%);
+    color: var(--intel-text);
+  }
+
+  body.syndicate-body .cards-shell {
+    max-width: 1560px;
+    margin: 0 auto;
+    padding: 28px 18px 36px;
+  }
+
+  .intelligence-page {
+    display: grid;
+    gap: 18px;
+  }
+
   .intelligence-shell {
-    max-width: 1200px;
-    margin: auto;
+    max-width: 1560px;
+    margin: 0 auto;
   }
 
   .intelligence-hero,
+  .intelligence-lane,
+  .intelligence-card {
+    border: 1px solid var(--intel-line);
+    background: linear-gradient(180deg, var(--intel-panel), var(--intel-panel-2));
+    box-shadow: var(--intel-shadow);
+    border-radius: 22px;
+    backdrop-filter: blur(16px);
+    color: var(--intel-text);
+  }
+
+  .intelligence-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) auto;
+    gap: 16px;
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .intelligence-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at top right, rgba(255, 191, 105, 0.14), transparent 24%),
+      radial-gradient(circle at bottom left, rgba(154, 243, 222, 0.08), transparent 34%);
+    pointer-events: none;
+  }
+
+  .intelligence-hero__copy,
+  .intelligence-hero__actions,
+  .intelligence-lane__content,
+  .intelligence-panel,
+  .intelligence-card__content {
+    position: relative;
+    z-index: 1;
+  }
+
+  .intelligence-hero__copy {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  .intelligence-hero__kicker,
+  .intelligence-lane__kicker,
+  .intelligence-card__kicker {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--intel-gold);
+  }
+
+  .intelligence-hero__title {
+    margin: 0;
+    font-size: clamp(2rem, 4vw, 3.4rem);
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+  }
+
+  .intelligence-hero__lede,
+  .intelligence-lane__lede {
+    margin: 0;
+    color: var(--intel-muted);
+    font-size: 14px;
+    line-height: 1.65;
+    max-width: 78ch;
+  }
+
+  .intelligence-hero__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .intelligence-chip,
+  .intelligence-action,
+  .intelligence-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--intel-line);
+    background: rgba(255, 255, 255, 0.04);
+    color: #edf3ff;
+    font-size: 12px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .intelligence-action {
+    border: 0;
+    background: linear-gradient(135deg, var(--intel-teal), var(--intel-gold));
+    color: #061018;
+    font-weight: 800;
+    box-shadow: 0 16px 28px rgba(255, 191, 105, 0.18);
+    cursor: pointer;
+  }
+
+  .intelligence-link {
+    color: #dbeafe;
+    opacity: 0.95;
+  }
+
+  .intelligence-hero__actions {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    justify-items: end;
+  }
+
+  .intelligence-hero__actions-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
   .intelligence-lane {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 16px;
-    color: #e5e7eb;
+    padding: 18px;
+  }
+
+  .intelligence-lane__content {
+    display: grid;
+    gap: 12px;
   }
 
   .intelligence-lane__intro {
     display: grid;
     gap: 0.4rem;
-    margin-bottom: 0.9rem;
-  }
-
-  .intelligence-lane__kicker {
-    opacity: 0.72;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-size: 11px;
   }
 
   .intelligence-lane__title {
     margin: 0;
-    font-size: clamp(1.08rem, 2vw, 1.28rem);
-    font-weight: 700;
+    font-size: clamp(1.15rem, 2vw, 1.5rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+
+  .intelligence-lane__rail {
+    display: grid;
+    gap: 10px;
+  }
+
+  .intelligence-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .intelligence-summary-card {
+    border: 1px solid var(--intel-line);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 14px;
+    display: grid;
+    gap: 6px;
+  }
+
+  .intelligence-summary-card__label {
+    color: var(--intel-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+
+  .intelligence-summary-card__value {
+    font-size: 18px;
+    color: var(--intel-text);
     letter-spacing: -0.03em;
+    font-weight: 800;
   }
 
-  .intelligence-lane__lede {
-    margin: 0;
-    opacity: 0.72;
-    font-size: 13px;
-    line-height: 1.45;
+  .intelligence-summary-card__meta {
+    color: var(--intel-muted);
+    font-size: 12px;
+    line-height: 1.55;
   }
 
-  .intelligence-hero {
+  .intelligence-status-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 18px;
-  }
-
-  .intelligence-hero__actions {
-    display: flex;
     gap: 10px;
     align-items: center;
-    flex-wrap: wrap;
-    margin: 0;
   }
 
   .intelligence-layout {
-    max-width: 1200px;
-    margin: auto;
+    max-width: 1560px;
+    margin: 0 auto;
     display: grid;
-    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
     gap: 20px;
     align-items: start;
   }
 
   .intelligence-panel {
     min-width: 0;
+    display: grid;
+    gap: 18px;
   }
 
-  @media (max-width: 900px) {
-    .intelligence-hero {
-      align-items: flex-start;
+  .intelligence-card {
+    padding: 18px;
+  }
+
+  .intelligence-card__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: end;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .intelligence-card__title {
+    margin: 0;
+    font-size: 1.04rem;
+    letter-spacing: -0.03em;
+  }
+
+  .intelligence-card__lede {
+    margin: 4px 0 0;
+    color: var(--intel-muted);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .intelligence-card__body {
+    display: grid;
+    gap: 12px;
+  }
+
+  .intelligence-surface {
+    border: 1px solid var(--intel-line);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 14px;
+  }
+
+  #intelligence-board-summary:empty,
+  #top-opportunities:empty,
+  #portfolio:empty,
+  #parlays:empty,
+  #scanner:empty,
+  #picks:empty {
+    min-height: 64px;
+  }
+
+  @media (max-width: 980px) {
+    .intelligence-hero,
+    .intelligence-layout {
+      grid-template-columns: 1fr;
     }
 
     .intelligence-hero__actions {
-      width: 100%;
+      justify-items: start;
     }
 
-    .intelligence-layout {
-      grid-template-columns: 1fr;
+    .intelligence-hero__actions-row {
+      justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 720px) {
+    body.syndicate-body .cards-shell {
+      padding: 16px 12px 28px;
+    }
+
+    .intelligence-hero,
+    .intelligence-lane,
+    .intelligence-card {
+      border-radius: 18px;
     }
   }
 </style>
 
-<section class="intelligence-shell" style="margin-bottom:18px;">
+<main class="intelligence-page">
+<section class="intelligence-shell">
   <div class="intelligence-hero">
-    <div>
-      <div style="opacity:.72; text-transform:uppercase; letter-spacing:.04em; font-size:11px;">Initial board</div>
-      <div style="font-size:18px; font-weight:700; margin-top:4px;">Prompt The Syndicate</div>
-      <div style="opacity:.72; font-size:13px; margin-top:4px;">Portfolio summary and live recommendations load from the routed intelligence response.</div>
+    <div class="intelligence-hero__copy">
+      <div class="intelligence-hero__kicker">Initial board</div>
+      <h1 class="intelligence-hero__title">Prompt The Syndicate</h1>
+      <p class="intelligence-hero__lede">Portfolio summary and live recommendations load from the routed intelligence response.</p>
+      <div class="intelligence-hero__meta" aria-label="Board capabilities">
+        <span class="intelligence-chip">Structured evidence</span>
+        <span class="intelligence-chip">Live + pregame lanes</span>
+        <span class="intelligence-chip">Portfolio and policy</span>
+      </div>
     </div>
     <form id="intel-query-form" class="intelligence-hero__actions">
-      <a href="/intelligence/status" style="color:#dbeafe; text-decoration:none; font-size:13px; opacity:.9;">View data coverage page</a>
-      <button type="submit" style="appearance:none; border:none; border-radius:999px; padding:10px 16px; background:linear-gradient(135deg, #7c3aed, #2563eb); color:white; font-weight:700; cursor:pointer;">Prompt The Syndicate</button>
+      <a href="/intelligence/status" class="intelligence-link">View data coverage page</a>
+      <div class="intelligence-hero__actions-row">
+        <button type="submit" class="intelligence-action">Prompt The Syndicate</button>
+      </div>
     </form>
   </div>
   <script id="initial-intelligence-response" type="application/json">{{ initial_intelligence_response | default({}) | tojson }}</script>
 </section>
 
-<section class="intelligence-shell intelligence-lane" style="margin-bottom:20px; padding:14px 16px;">
-  <div class="intelligence-lane__intro">
-    <div class="intelligence-lane__kicker">Board snapshot</div>
-    <h2 class="intelligence-lane__title">Live and pregame lanes</h2>
-    <p class="intelligence-lane__lede">The summary strip below keeps the active board contract, recommendation ledger, and portfolio state in one readable lane.</p>
-    <p class="intelligence-lane__lede">Decision lanes, policy control, and live refresh context stay visible without leaving the board.</p>
-  </div>
-  <div id="intelligence-refresh-status" role="status" aria-live="polite" aria-atomic="true" style="margin-bottom:10px;"></div>
-  <div id="intelligence-board-summary" style="margin-bottom:10px;"></div>
-  <div id="top-opportunities"></div>
-</section>
-
-<section class="intelligence-layout" style="
-  display:grid;
-">
-
-  <!-- LEFT COLUMN -->
-  <div class="intelligence-panel">
-
-    <div id="portfolio"></div>
-
-    <div style="margin-top:20px;">
-      <h3>Parlays</h3>
-      <div id="parlays"></div>
+<section class="intelligence-shell intelligence-lane">
+  <div class="intelligence-lane__content">
+    <div class="intelligence-lane__intro">
+      <div class="intelligence-lane__kicker">Board snapshot</div>
+      <h2 class="intelligence-lane__title">Live and pregame lanes</h2>
+      <p class="intelligence-lane__lede">The summary strip below keeps the active board contract, recommendation ledger, and portfolio state in one readable lane.</p>
+      <p class="intelligence-lane__lede">Decision lanes, policy control, and live refresh context stay visible without leaving the board.</p>
     </div>
-
+    <div class="intelligence-status-row">
+      <div id="intelligence-refresh-status" role="status" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    <div class="intelligence-surface">
+      <div id="intelligence-board-summary"></div>
+    </div>
+    <div class="intelligence-surface">
+      <div class="intelligence-card__head">
+        <div>
+          <div class="intelligence-card__kicker">Top opportunities</div>
+          <h3 class="intelligence-card__title">Shared board output</h3>
+          <p class="intelligence-card__lede">This lane reflects the active response payload that powers Ask, the home command center, and the live board.</p>
+        </div>
+      </div>
+      <div id="top-opportunities"></div>
+    </div>
   </div>
-
-  <!-- RIGHT COLUMN -->
-  <div class="intelligence-panel">
-
-    <div id="scanner"></div>
-
-    <div id="picks"></div>
-
-  </div>
-
 </section>
+
+<section class="intelligence-layout">
+  <div class="intelligence-panel">
+    <section class="intelligence-card">
+      <div class="intelligence-card__head">
+        <div>
+          <div class="intelligence-card__kicker">Portfolio</div>
+          <h3 class="intelligence-card__title">Exposure and tracking</h3>
+          <p class="intelligence-card__lede">Keep the active ledger, open exposure, and saved recommendation state in view.</p>
+        </div>
+      </div>
+      <div class="intelligence-card__body">
+        <div id="portfolio"></div>
+      </div>
+    </section>
+
+    <section class="intelligence-card">
+      <div class="intelligence-card__head">
+        <div>
+          <div class="intelligence-card__kicker">Parlays</div>
+          <h3 class="intelligence-card__title">Correlation-aware tickets</h3>
+          <p class="intelligence-card__lede">Combination cards stay grouped here so the board can explain them in one place.</p>
+        </div>
+      </div>
+      <div class="intelligence-card__body">
+        <div id="parlays"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="intelligence-panel">
+    <section class="intelligence-card">
+      <div class="intelligence-card__head">
+        <div>
+          <div class="intelligence-card__kicker">Scanner</div>
+          <h3 class="intelligence-card__title">Live board scan</h3>
+          <p class="intelligence-card__lede">Surface the best current board reads without leaving the intelligence surface.</p>
+        </div>
+      </div>
+      <div class="intelligence-card__body">
+        <div id="scanner"></div>
+      </div>
+    </section>
+
+    <section class="intelligence-card">
+      <div class="intelligence-card__head">
+        <div>
+          <div class="intelligence-card__kicker">Picks</div>
+          <h3 class="intelligence-card__title">Recommendation detail</h3>
+          <p class="intelligence-card__lede">Cards and rationale stay grouped here for the focused evaluation path.</p>
+        </div>
+      </div>
+      <div class="intelligence-card__body">
+        <div id="picks"></div>
+      </div>
+    </section>
+  </div>
+</section>
+ </main>
 {% endblock %}
 
 {% block extra_scripts %}

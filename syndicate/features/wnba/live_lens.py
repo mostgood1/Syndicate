@@ -5,6 +5,7 @@ from typing import Any
 
 from syndicate.features.shared.rank_board import build_rank_api_payload
 from syndicate.features.shared.rank_board import build_rank_page_context
+from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.sources import build_module_links
@@ -224,7 +225,7 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
             "list_items": [f"Requested date: {selected_date}"],
         }
 
-    return build_rank_page_context(
+    context = build_rank_page_context(
         selected_date=resolved_date,
         route_path="/wnba/live-lens",
         intro_title="WNBA Live Lens",
@@ -248,6 +249,7 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
             "list_items": [f"Requested date: {selected_date}"],
         } if not rank_cards else None,
     )
+    return attach_live_lens_contract(context, sport="wnba", module="live_lens")
 
 
 def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:

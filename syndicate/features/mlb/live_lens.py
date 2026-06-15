@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.mlb.cards import build_cards_page_context
 from syndicate.features.mlb.ladders_common import build_module_links
 from syndicate.features.mlb.ladders_common import format_num
@@ -15,6 +14,8 @@ from syndicate.features.mlb.ladders_common import parse_iso_date
 from syndicate.features.mlb.sources import live_lens_log_path
 from syndicate.features.mlb.sources import live_lens_report_path
 from syndicate.features.mlb.sources import load_json_file
+from syndicate.features.shared.game_board_contract import apply_game_board_contract
+from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
 
 try:
     from vendor.mlb_bettingv2.tools.web.flask_frontend import _client as _mlb_vendor_client
@@ -273,6 +274,30 @@ def _first_present(raw: dict[str, Any], keys: tuple[str, ...]) -> Any:
     return None
 
 
+def _live_prop_market_label(market: Any, prop: Any, market_label: Any) -> str:
+    market_key = str(market or "").strip().lower()
+    prop_key = str(prop or "").strip().lower()
+    label = str(market_label or "").strip()
+    if market_key == "pitcher_props":
+        mapping = {
+            "strikeouts": "Strikeouts",
+            "outs": "Outs Recorded",
+            "hits_allowed": "Hits Allowed",
+            "walks_allowed": "Walks Allowed",
+            "earned_runs": "Earned Runs",
+        }
+        if prop_key in mapping:
+            return mapping[prop_key]
+        if label and label.lower() not in {"pitcher props", "pitcher_props", market_key}:
+            return label
+        return "Pitcher Props"
+    if label:
+        return label
+    if prop_key:
+        return prop_key.replace("_", " ").title()
+    return str(market_key or "Market").replace("_", " ").title() or "Market"
+
+
 def _market_has_signal(market: dict[str, Any]) -> bool:
     if not isinstance(market, dict):
         return False
@@ -416,17 +441,42 @@ def _parse_number_text(value: Any) -> float | None:
 def _normalize_live_prop_row(row: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(row, dict):
         return None
+    raw_market = str(row.get("market") or row.get("marketGroup") or row.get("group") or "").strip()
+    raw_prop = str(row.get("prop") or row.get("marketProp") or row.get("prop_key") or "").strip()
+    market_label = _live_prop_market_label(
+        raw_market,
+        raw_prop,
+        row.get("marketLabel") or row.get("market_label") or row.get("label") or row.get("market"),
+    )
     selection = str(row.get("selection") or row.get("side") or row.get("betSide") or row.get("marketSide") or row.get("over_under") or "").strip().title()
     return {
         "playerName": str(row.get("playerName") or row.get("player_name") or row.get("batter_name") or row.get("pitcher_name") or row.get("name") or row.get("title") or "Prop").strip() or "Prop",
+        "prop": raw_prop,
         "selection": selection,
-        "marketLabel": str(row.get("marketLabel") or row.get("market_label") or row.get("label") or row.get("market") or "Market").strip() or "Market",
-        "market": str(row.get("market") or row.get("marketGroup") or row.get("group") or "").strip(),
+        "marketLabel": market_label,
+        "market": raw_market,
         "line": row.get("line") if row.get("line") is not None else row.get("threshold") if row.get("threshold") is not None else row.get("market_line"),
         "odds": row.get("odds") if row.get("odds") is not None else row.get("price") if row.get("price") is not None else row.get("americanOdds") if row.get("americanOdds") is not None else row.get("american_odds"),
         "modelProbOver": row.get("modelProbOver") if row.get("modelProbOver") is not None else row.get("model_prob_over") if row.get("model_prob_over") is not None else row.get("estimatedWinProb") if row.get("estimatedWinProb") is not None else row.get("estimated_win_prob"),
         "estimatedWinProb": row.get("estimatedWinProb") if row.get("estimatedWinProb") is not None else row.get("estimated_win_prob") if row.get("estimated_win_prob") is not None else row.get("modelProbOver") if row.get("modelProbOver") is not None else row.get("model_prob_over"),
         "rankingScore": row.get("rankingScore") if row.get("rankingScore") is not None else row.get("ranking_score") if row.get("ranking_score") is not None else row.get("edge") if row.get("edge") is not None else row.get("live_edge"),
+        "actual": row.get("actual") if row.get("actual") is not None else row.get("actual_value") if row.get("actual_value") is not None else row.get("actualSoFar") if row.get("actualSoFar") is not None else row.get("actual_so_far"),
+        "actualSoFar": row.get("actualSoFar") if row.get("actualSoFar") is not None else row.get("actual_so_far"),
+        "actualValue": row.get("actualValue") if row.get("actualValue") is not None else row.get("actual_value"),
+        "liveProjection": row.get("liveProjection") if row.get("liveProjection") is not None else row.get("live_projection") if row.get("live_projection") is not None else row.get("projection"),
+        "liveEdge": row.get("liveEdge") if row.get("liveEdge") is not None else row.get("live_edge"),
+        "projectionGap": row.get("projectionGap") if row.get("projectionGap") is not None else row.get("projection_gap"),
+        "modelMean": row.get("modelMean") if row.get("modelMean") is not None else row.get("model_mean"),
+        "outsMean": row.get("outsMean") if row.get("outsMean") is not None else row.get("outs_mean"),
+        "outsRecorded": row.get("outsRecorded") if row.get("outsRecorded") is not None else row.get("outs_recorded"),
+        "strikeoutRate": row.get("strikeoutRate") if row.get("strikeoutRate") is not None else row.get("strikeout_rate"),
+        "strikeRate": row.get("strikeRate") if row.get("strikeRate") is not None else row.get("strike_rate"),
+        "pitchCount": row.get("pitchCount") if row.get("pitchCount") is not None else row.get("pitch_count"),
+        "pitchCountBuffer": row.get("pitchCountBuffer") if row.get("pitchCountBuffer") is not None else row.get("pitch_count_buffer"),
+        "pitchesPerBatter": row.get("pitchesPerBatter") if row.get("pitchesPerBatter") is not None else row.get("pitches_per_batter"),
+        "expectedPitchesPerBatter": row.get("expectedPitchesPerBatter") if row.get("expectedPitchesPerBatter") is not None else row.get("expected_pitches_per_batter"),
+        "staminaPitches": row.get("staminaPitches") if row.get("staminaPitches") is not None else row.get("stamina_pitches"),
+        "timesThroughOrder": row.get("timesThroughOrder") if row.get("timesThroughOrder") is not None else row.get("times_through_order"),
     }
 
 
@@ -1007,7 +1057,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
     teaser_cta = "Open betting card" if season is not None else "Open cards"
     teaser_body = "Use the betting-card board for the official pregame slate, then compare it against the intraday live-lens monitor for the same date." if season is not None else "Use the MLB cards board to compare the pregame slate against this live-lens snapshot."
 
-    return apply_game_board_contract({
+    context = apply_game_board_contract({
         "season": season,
         "date": selected_date,
         "prev_date": prev_date,
@@ -1052,6 +1102,7 @@ def build_live_lens_page_context(selected_date: str, *, season: int | None = Non
             "cta": teaser_cta,
         },
     }, sport="mlb", module="live_lens")
+    return attach_live_lens_contract(context, sport="mlb", module="live_lens")
 
 
 def build_live_lens_api_payload(context: dict[str, Any]) -> dict[str, Any]:

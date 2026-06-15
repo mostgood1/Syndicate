@@ -13,12 +13,15 @@ from syndicate.features.nhl.betting_recap import build_betting_recap_payload as 
 from syndicate.features.nhl.player_props_reconciliation import build_player_props_reconciliation_payload as build_nhl_props_reconciliation
 from syndicate.features.nhl.props_lines import build_props_lines_payload as build_nhl_props_lines
 from syndicate.features.mlb.cards import _normalize_live_name as normalize_mlb_live_name
+from syndicate.features.mlb.live_lens import _normalize_live_prop_row as normalize_mlb_live_prop_row
 from syndicate.features.mlb.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload as build_mlb_daily_accuracy
 from syndicate.features.nba.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload as build_nba_daily_accuracy
 from syndicate.features.wnba.live_lens_daily_accuracy import build_live_lens_daily_accuracy_payload as build_wnba_daily_accuracy
 from syndicate.features.wnba.live_game_accuracy import build_live_game_accuracy_payload as build_wnba_game_accuracy
 from syndicate.features.wnba.live_prop_accuracy import build_live_prop_accuracy_payload as build_wnba_prop_accuracy
 from syndicate.features.wnba.live_prop_audit import build_live_prop_audit_payload as build_wnba_prop_audit
+from syndicate.features.shared.live_lens_contract import attach_live_lens_contract
+from syndicate.features.shared.rank_board import build_rank_api_payload
 
 
 def _write_daily_accuracy_artifacts(root: Path, date_str: str) -> None:
@@ -164,6 +167,55 @@ class LocalDailyAccuracyTests(unittest.TestCase):
     def test_mlb_live_name_normalization_strips_accents(self) -> None:
         self.assertEqual(normalize_mlb_live_name("José Siri"), "jose siri")
         self.assertEqual(normalize_mlb_live_name("Andrés Giménez"), "andres gimenez")
+
+    def test_mlb_live_prop_row_normalization_preserves_pitcher_projection_fields(self) -> None:
+        row = {
+            "market": "pitcher_props",
+            "prop": "strikeouts",
+            "marketLabel": "pitcher_props",
+            "playerName": "Nathan Eovaldi",
+            "selection": "Over",
+            "line": 18.5,
+            "odds": "+125",
+            "modelProbOver": 0.682,
+            "estimatedWinProb": 0.682,
+            "actual": 5.0,
+            "live_projection": 6.2,
+            "live_edge": 1.2,
+            "projection_gap": 1.2,
+        }
+
+        normalized = normalize_mlb_live_prop_row(row)
+
+        self.assertIsInstance(normalized, dict)
+        self.assertEqual(normalized.get("marketLabel"), "Strikeouts")
+        self.assertEqual(normalized.get("actual"), 5.0)
+        self.assertEqual(normalized.get("liveProjection"), 6.2)
+        self.assertEqual(normalized.get("liveEdge"), 1.2)
+
+    def test_shared_live_lens_contract_normalizes_refresh_metadata(self) -> None:
+        context = attach_live_lens_contract(
+            {
+                "date": "2026-06-14",
+                "source_path": "live_lens.json",
+                "source_title": "MLB Live Lens",
+                "generatedAt": "2026-06-14T12:00:00-05:00",
+            },
+            sport="mlb",
+            module="live_lens",
+            refresh_interval_ms=45000,
+        )
+
+        contract = context.get("live_lens_contract") or {}
+        self.assertEqual(contract.get("schema"), "live_lens_v1")
+        self.assertEqual(contract.get("sport"), "mlb")
+        self.assertEqual(contract.get("module"), "live_lens")
+        self.assertEqual((contract.get("refresh") or {}).get("intervalMs"), 45000)
+        self.assertEqual(context.get("oddsRefreshedAt"), "2026-06-14T12:00:00-05:00")
+
+        payload = build_rank_api_payload(context)
+        self.assertEqual((payload.get("live_lens_contract") or {}).get("schema"), "live_lens_v1")
+        self.assertEqual(payload.get("oddsRefreshedAt"), "2026-06-14T12:00:00-05:00")
 
     def test_mlb_daily_accuracy_matches_accented_feed_names_for_total_bases(self) -> None:
         build_mlb_daily_accuracy.cache_clear()
