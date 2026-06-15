@@ -134,9 +134,19 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
 
-          # NHL mirror artifacts are ignored locally, but the daily GitHub Action
+          # Every sport mirror writes ignored source_artifacts locally, but the daily GitHub Action
           # must publish them explicitly so Render receives the updated bundle.
-          git add -f -- data/nhl_source/source_artifacts data/nhl_source/manifests/mirror_refresh_latest.json
+          foreach ($sportRoot in @(Get-ChildItem -Path data -Directory -Filter '*_source' -ErrorAction SilentlyContinue)) {
+            $sourceArtifactsPath = Join-Path $sportRoot.FullName 'source_artifacts'
+            if (Test-Path $sourceArtifactsPath) {
+              git add -f -- (($sourceArtifactsPath -replace '\\', '/'))
+            }
+
+            $mirrorManifestPath = Join-Path $sportRoot.FullName 'manifests\mirror_refresh_latest.json'
+            if (Test-Path $mirrorManifestPath) {
+              git add -f -- (($mirrorManifestPath -replace '\\', '/'))
+            }
+          }
 
           git add -A -- . ':(exclude)daily-update.log'
 
