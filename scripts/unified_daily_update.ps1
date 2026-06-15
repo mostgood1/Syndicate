@@ -1,7 +1,8 @@
 param(
     [string]$Date,
     [string]$BaseUrl,
-    [int]$EventSimForceWindowMinutes = 30
+    [int]$EventSimForceWindowMinutes = 30,
+    [switch]$SkipGitPush
 )
 
 
