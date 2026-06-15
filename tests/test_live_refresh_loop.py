@@ -36,6 +36,35 @@ class LiveRefreshLoopTests(unittest.TestCase):
             phase="live",
             regions="us",
             execution_mode="source",
+            launch_mode="detached_subprocess",
+            skip_mirror=True,
+            mirror_only=False,
+            dry_run=False,
+        )
+
+    def test_run_tick_uses_explicit_launch_mode_override(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
+                "SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE": "manifest_only",
+            },
+            clear=False,
+        ), patch.object(live_refresh_loop, "central_today_iso", return_value="2026-06-07"), patch.object(
+            live_refresh_loop,
+            "launch_refresh_run",
+            return_value={"ok": True, "state": "running"},
+        ) as mocked_launch:
+            payload = live_refresh_loop._run_live_refresh_tick()
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once_with(
+            date="2026-06-07",
+            sports=None,
+            phase="live",
+            regions="us",
+            execution_mode="source",
+            launch_mode="manifest_only",
             skip_mirror=True,
             mirror_only=False,
             dry_run=False,

@@ -141,6 +141,16 @@ def _live_refresh_loop_execution_mode() -> str:
 	return mode if mode in {"source", "ingest"} else "source"
 
 
+def _live_refresh_loop_launch_mode() -> str:
+	raw = str(os.environ.get("SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE") or "").strip().lower()
+	if raw in {"detached_subprocess", "manifest_only", "external_runner"}:
+		return raw
+	fallback = str(os.environ.get("SYNDICATE_REFRESH_LAUNCH_MODE") or "").strip().lower()
+	if fallback in {"detached_subprocess", "manifest_only", "external_runner"}:
+		return fallback
+	return "detached_subprocess"
+
+
 def _live_refresh_loop_skip_mirror() -> bool:
 	return _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR", default=True)
 
@@ -161,6 +171,7 @@ def _status_payload() -> dict[str, Any]:
 		"phase": _live_refresh_loop_phase(),
 		"regions": _live_refresh_loop_regions(),
 		"executionMode": _live_refresh_loop_execution_mode(),
+		"launchMode": _live_refresh_loop_launch_mode(),
 		"skipMirror": bool(_live_refresh_loop_skip_mirror()),
 		"sports": _live_refresh_loop_sports() or "active",
 		"threadAlive": bool(_LIVE_REFRESH_LOOP_THREAD is not None and _LIVE_REFRESH_LOOP_THREAD.is_alive()),
@@ -186,6 +197,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			phase=str(meta["phase"]),
 			regions=str(meta["regions"]),
 			execution_mode=str(meta["executionMode"]),
+			launch_mode=_live_refresh_loop_launch_mode(),
 			skip_mirror=bool(meta["skipMirror"]),
 			mirror_only=False,
 			dry_run=False,
