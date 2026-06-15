@@ -73,6 +73,12 @@ def _iso_or_today(value: str | None) -> str:
     return central_today_iso()
 
 
+def _latest_available_cards_date() -> str:
+    context = build_hub_context()
+    launch_date = str(context.get("launch_date") or "").strip()
+    return launch_date or central_today_iso()
+
+
 def _query_bool(value: str | None, *, default: bool = False) -> bool:
     text = str(value or "").strip().lower()
     if not text:
@@ -286,12 +292,17 @@ def hub():
 
 @mlb_bp.get("")
 def root_cards():
-    return cards()
+    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else _latest_available_cards_date()
+    return _render_cards_page(selected_date)
 
 
 @mlb_bp.get("/cards")
 def cards():
     selected_date = _iso_or_today(request.args.get("date"))
+    return _render_cards_page(selected_date)
+
+
+def _render_cards_page(selected_date: str):
     context = dict(build_cards_page_context(selected_date))
     context["show_home_link"] = False
     embed_mode = (request.args.get("embed") or "").strip().lower()
