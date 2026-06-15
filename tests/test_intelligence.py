@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from syndicate.app import create_app
+from syndicate.blueprints.intelligence import intelligence_bp
+from syndicate.blueprints.intelligence import intelligence_query_api
 from syndicate.features.intelligence import _advanced_signals_from_item
 from syndicate.features.intelligence import _advanced_input_rows_for_sport
 from syndicate.features.intelligence import _advanced_signals_from_item
@@ -1439,6 +1441,37 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertEqual(payload["response"]["policy_control"]["selected_policy"], "aggressive")
         mocked_run.assert_called_once()
         self.assertEqual(mocked_run.call_args.kwargs.get("policy"), "aggressive")
+
+    def test_intelligence_query_api_forwards_game_state_override(self) -> None:
+        engine_response = {
+            "ok": True,
+            "headline": "Live board brief",
+            "selected_date": "2026-06-13",
+            "board_contract": {"schema": "intelligence_board_v1", "lane_counts": {"live": 0, "pregame": 0}, "active_lanes": [], "cards": []},
+            "recommendation_history": {},
+            "portfolio_tracking": {},
+            "portfolio_events": {},
+            "portfolio_event_records": [],
+            "recommendations": [],
+            "parlays": [],
+            "top_opportunities": [],
+            "by_sport": {},
+        }
+
+        with self.client.application.test_request_context(
+            "/api/intelligence/query",
+            method="POST",
+            json={"question": "Analyze the live board", "date": "2026-06-13", "sport": "nba", "game_state": "live"},
+        ):
+            with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+                with patch("syndicate.blueprints.intelligence.run_intelligence_query", return_value=dict(engine_response)) as mocked_run:
+                    response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertIn("response", payload)
+        mocked_run.assert_called_once()
+        self.assertEqual(mocked_run.call_args.kwargs.get("game_state"), "live")
 
     def test_intelligence_query_prioritizes_ready_advanced_inputs(self) -> None:
         advanced_by_sport = {

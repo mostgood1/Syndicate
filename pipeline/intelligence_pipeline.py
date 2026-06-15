@@ -7,7 +7,7 @@ is treated as a black box.
 
 Documented black-box contract:
 - run_intelligence_query(question, *, selected_date=None, mode=None, sport=None,
-  limit=None, timing=None, include_props=None, include_games=None,
+  game_state=None, limit=None, timing=None, include_props=None, include_games=None,
   force_refresh=False) -> dict[str, Any]
   Returns a response dict with keys such as selected_date, preferences,
   headline, summary, parsed_request, recommendations, parlays,
@@ -117,6 +117,7 @@ class IntelligencePipelineRequest:
     preview_subject: str | None = None
     player_subject: str | None = None
     sport: str | None = None
+    game_state: str | None = None
     limit: int | None = None
     timing: str | None = None
     include_props: bool | None = None
@@ -132,6 +133,7 @@ class IntelligencePipelineRequest:
             "preview_subject": self.preview_subject,
             "player_subject": self.player_subject,
             "sport": self.sport,
+            "game_state": self.game_state,
             "limit": self.limit,
             "timing": self.timing,
             "include_props": self.include_props,
@@ -192,6 +194,7 @@ def _normalize_request(request_or_payload: Any) -> IntelligencePipelineRequest:
         preview_subject=str(payload.get("preview_subject") or "").strip() or (routed.preview_subject if routed is not None else None),
         player_subject=str(payload.get("player_subject") or "").strip() or (routed.player_subject if routed is not None else None),
         sport=str(payload.get("sport") or "").strip() or None,
+        game_state=str(payload.get("game_state") or "").strip() or None,
         limit=_optional_int(payload.get("limit")),
         timing=str(payload.get("timing") or "").strip() or None,
         include_props=_optional_bool(payload.get("include_props")),
@@ -210,6 +213,7 @@ def _enrich_context(normalized_request: IntelligencePipelineRequest) -> dict[str
         "preview_subject": normalized_request.preview_subject,
         "player_subject": normalized_request.player_subject,
         "sport": normalized_request.sport,
+        "game_state": normalized_request.game_state,
         "mode": normalized_request.mode,
         "timing": normalized_request.timing,
         "routing_context": {
@@ -220,6 +224,7 @@ def _enrich_context(normalized_request: IntelligencePipelineRequest) -> dict[str
             "preview_subject": normalized_request.preview_subject,
             "player_subject": normalized_request.player_subject,
             "sport": normalized_request.sport,
+            "game_state": normalized_request.game_state,
             "limit": normalized_request.limit,
             "include_props": normalized_request.include_props,
             "include_games": normalized_request.include_games,
@@ -1164,6 +1169,7 @@ def _call_black_box_intelligence(normalized_request: IntelligencePipelineRequest
         selected_date=normalized_request.selected_date,
         mode=normalized_request.mode,
         sport=normalized_request.sport,
+        game_state=normalized_request.game_state,
         limit=normalized_request.limit,
         timing=normalized_request.timing,
         include_props=normalized_request.include_props,

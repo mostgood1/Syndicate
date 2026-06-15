@@ -22,6 +22,7 @@ from syndicate.features.intelligence import _query_preferences
 from syndicate.features.intelligence import run_intelligence_query
 from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.intelligence_evaluation import build_intelligence_evaluation_bundle
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.ops_refresh import launch_refresh_run
@@ -73,6 +74,22 @@ def _api_error_response(error: Exception):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+def _latest_available_intelligence_date() -> str:
+    latest_date = ""
+    try:
+        manifests = load_artifact_manifests()
+    except Exception:
+        manifests = []
+    for manifest in manifests:
+        for collection_name in ("predictions", "edges", "recommendations", "live_data"):
+            collection = getattr(manifest, collection_name, ())
+            for artifact in collection or ():
+                artifact_date = str(getattr(artifact, "date", "") or "").strip()
+                if artifact_date and artifact_date > latest_date:
+                    latest_date = artifact_date
+    return latest_date or central_today_iso()
 
 
 def _no_cache_response(response):
@@ -515,6 +532,7 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
         "date": selected_date,
         "mode": "live",
         "sport": "all",
+        "game_state": "all",
         "timing": "",
         "limit": 5,
         "include_props": True,
@@ -526,7 +544,7 @@ def _intelligence_page_payload(selected_date: str) -> dict[str, object]:
 def _normalize_default_query_payload(payload: dict[str, object]) -> dict[str, object]:
     normalized = dict(payload or {})
     if str(normalized.get("question") or "").strip() == DEFAULT_QUESTION:
-        normalized["date"] = str(normalized.get("date") or normalized.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+        normalized["date"] = str(normalized.get("date") or normalized.get("selected_date") or _latest_available_intelligence_date()).strip() or _latest_available_intelligence_date()
     return normalized
 
 
@@ -550,7 +568,7 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    selected_date = str(request.args.get("date") or "").strip() or _latest_available_intelligence_date()
     payload = _intelligence_page_payload(selected_date)
     initial_response: dict[str, Any] = {}
     try:
@@ -561,7 +579,11 @@ def intelligence_home():
                 queue_intelligence_state_refresh(dict(payload))
     except Exception:
         initial_response = {}
-    return render_template("intelligence.html", initial_intelligence_response=initial_response)
+    return render_template(
+        "intelligence.html",
+        initial_intelligence_response=initial_response,
+        initial_intelligence_selected_date=selected_date,
+    )
 
 
 @intelligence_bp.post("/api/intelligence/query")
@@ -608,6 +630,7 @@ def intelligence_query_api():
                 selected_date=selected_date,
                 mode=str(payload.get("mode") or "").strip() or None,
                 sport=str(payload.get("sport") or "").strip() or None,
+                game_state=str(payload.get("game_state") or "").strip() or None,
                 limit=payload.get("limit"),
                 timing=str(payload.get("timing") or "").strip() or None,
                 include_props=payload.get("include_props"),
@@ -750,7 +773,7 @@ def intelligence_portfolio_event_api():
 
 @intelligence_bp.get("/intelligence/run")
 def run_intelligence():
-    selected_date = central_today_iso()
+    selected_date = _latest_available_intelligence_date()
     launch_result: dict[str, Any] | None = None
     launched = False
     try:

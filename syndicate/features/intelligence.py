@@ -113,12 +113,13 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
     return response
 
 
-def _query_cache_key(*, question: str, selected_date: str, mode: str | None, sport: str | None, limit: int | None, timing: str | None, include_props: bool | None, include_games: bool | None, policy: str | None, overview: list[dict[str, Any]]) -> str:
+def _query_cache_key(*, question: str, selected_date: str, mode: str | None, sport: str | None, game_state: str | None, limit: int | None, timing: str | None, include_props: bool | None, include_games: bool | None, policy: str | None, overview: list[dict[str, Any]]) -> str:
     payload = {
         "question": str(question or "").strip(),
         "selected_date": str(selected_date or "").strip(),
         "mode": str(mode or "").strip().lower(),
         "sport": str(sport or "").strip().lower(),
+        "game_state": str(game_state or "").strip().lower(),
         "limit": int(limit) if limit is not None else None,
         "timing": str(timing or "").strip().lower(),
         "include_props": None if include_props is None else bool(include_props),
@@ -2124,6 +2125,7 @@ def _query_preferences(
     *,
     mode: str | None = None,
     sport: str | None = None,
+    game_state: str | None = None,
     limit: int | None = None,
     timing: str | None = None,
     include_props: bool | None = None,
@@ -2133,8 +2135,11 @@ def _query_preferences(
     lowered = str(question or "").lower()
     explicit_mode = str(mode or "").strip().lower()
     explicit_sport = str(sport or "").strip().lower()
+    explicit_game_state = str(game_state or "").strip().lower()
     if explicit_sport in {"all", "any", "everything", "*"}:
         explicit_sport = ""
+    if explicit_game_state in {"all", "any", "everything", "*"}:
+        explicit_game_state = ""
     explicit_timing = str(timing or "").strip().lower()
     explicit_policy = str(policy or "").strip().lower() or None
     explicit_include_props = include_props
@@ -2165,6 +2170,12 @@ def _query_preferences(
 
     live_requested = bool(re.search(r"\b(?:live|in-game|in game|live board)\b", lowered)) or explicit_mode in {"live", "live_bets"}
     pregame_requested = "pregame" in lowered or explicit_mode in {"pregame", "pregame_bets"}
+    if explicit_game_state == "live":
+        live_requested = True
+        pregame_requested = False
+    elif explicit_game_state == "pregame":
+        pregame_requested = True
+        live_requested = False
     live_only = intent == "live_bets" or (live_requested and not pregame_requested)
     pregame_only = intent == "pregame_bets" or (pregame_requested and not live_requested)
     if "live and pregame" in lowered or "pregame and live" in lowered:
@@ -2239,6 +2250,7 @@ def _query_preferences(
         "intent": intent,
         "requested_sports": sorted(requested_sports),
         "requested_markets": requested_markets,
+        "game_state": explicit_game_state or None,
         "include_props": include_props,
         "include_games": include_games,
         "policy": explicit_policy,
@@ -5895,6 +5907,7 @@ def run_intelligence_query(
     selected_date: str | None = None,
     mode: str | None = None,
     sport: str | None = None,
+    game_state: str | None = None,
     limit: int | None = None,
     timing: str | None = None,
     include_props: bool | None = None,
@@ -5906,6 +5919,7 @@ def run_intelligence_query(
         question,
         mode=mode,
         sport=sport,
+        game_state=game_state,
         limit=limit,
         timing=timing,
         include_props=include_props,
@@ -5926,6 +5940,7 @@ def run_intelligence_query(
         selected_date=effective_date,
         mode=mode,
         sport=sport,
+        game_state=game_state,
         limit=limit,
         timing=timing,
         include_props=include_props,

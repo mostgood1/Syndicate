@@ -341,6 +341,33 @@
     </div>
     <form id="intel-query-form" class="intelligence-hero__actions">
       <a href="/intelligence/status" class="intelligence-link">View data coverage page</a>
+      <div style="display:grid; gap:10px; width:min(100%, 360px);">
+        <label style="display:grid; gap:5px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--intel-muted);">
+          Date
+          <input id="intel-date" name="date" type="date" value="{{ initial_intelligence_selected_date | default('', true) }}" style="appearance:none; width:100%; min-height:38px; padding:0 12px; border-radius:12px; border:1px solid var(--intel-line-strong); background:rgba(255,255,255,.05); color:var(--intel-text);">
+        </label>
+        <label style="display:grid; gap:5px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--intel-muted);">
+          Sport
+          <select id="intel-sport" name="sport" style="appearance:none; width:100%; min-height:38px; padding:0 12px; border-radius:12px; border:1px solid var(--intel-line-strong); background:rgba(255,255,255,.05); color:var(--intel-text);">
+            <option value="all" selected>All sports</option>
+            <option value="mlb">MLB</option>
+            <option value="nba">NBA</option>
+            <option value="wnba">WNBA</option>
+            <option value="nfl">NFL</option>
+            <option value="ncaaf">NCAAF</option>
+            <option value="ncaab">NCAAB</option>
+            <option value="nhl">NHL</option>
+          </select>
+        </label>
+        <label style="display:grid; gap:5px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--intel-muted);">
+          Game state
+          <select id="intel-game-state" name="game_state" style="appearance:none; width:100%; min-height:38px; padding:0 12px; border-radius:12px; border:1px solid var(--intel-line-strong); background:rgba(255,255,255,.05); color:var(--intel-text);">
+            <option value="all" selected>All states</option>
+            <option value="live">Live</option>
+            <option value="pregame">Pregame</option>
+          </select>
+        </label>
+      </div>
       <div class="intelligence-hero__actions-row">
         <button type="submit" class="intelligence-action">Prompt The Syndicate</button>
       </div>
@@ -446,6 +473,10 @@ let hasRenderedIntelligence = false;
 let currentIntelligenceRequest = null;
 const initialIntelligenceResponseScript = document.getElementById("initial-intelligence-response");
 let initialIntelligenceResponse = {};
+const defaultIntelligenceQuestion = "top edges today";
+const defaultIntelligenceSport = "all";
+const defaultIntelligenceGameState = "all";
+const initialIntelligenceSelectedDate = String({{ initial_intelligence_selected_date | default('', true) | tojson }} || "").trim();
 
 try {
   initialIntelligenceResponse = initialIntelligenceResponseScript && initialIntelligenceResponseScript.textContent
@@ -457,6 +488,41 @@ try {
 
 function refreshStatusElement() {
   return document.getElementById("intelligence-refresh-status");
+}
+
+function intelligenceFormElement() {
+  return document.getElementById("intel-query-form");
+}
+
+function intelligenceFormValue(fieldId) {
+  const element = document.getElementById(fieldId);
+  return element && typeof element.value === "string" ? element.value.trim() : "";
+}
+
+function intelligenceQueryPayload(options = {}) {
+  const date = intelligenceFormValue("intel-date") || initialIntelligenceSelectedDate;
+  const sport = intelligenceFormValue("intel-sport") || defaultIntelligenceSport;
+  const gameState = intelligenceFormValue("intel-game-state") || defaultIntelligenceGameState;
+  const hasCustomFilters = Boolean(
+    (date && date !== initialIntelligenceSelectedDate) ||
+    (sport && sport !== defaultIntelligenceSport) ||
+    (gameState && gameState !== defaultIntelligenceGameState)
+  );
+  const payload = {
+    question: hasCustomFilters ? "What are the best edges for this board?" : defaultIntelligenceQuestion,
+    background: Boolean(options.background),
+    force_refresh: Boolean(options.forceRefresh),
+  };
+  if (date) {
+    payload.date = date;
+  }
+  if (sport) {
+    payload.sport = sport;
+  }
+  if (gameState) {
+    payload.game_state = gameState;
+  }
+  return payload;
 }
 
 function setRefreshStatus(message, tone = "idle") {
@@ -1863,7 +1929,7 @@ function kickOffWarmQuery() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     cache: "no-store",
-    body: JSON.stringify({ question: "top edges today", background: true, force_refresh: false }),
+    body: JSON.stringify(intelligenceQueryPayload({ background: true, forceRefresh: false })),
   }).catch(() => {}).finally(() => {
     warmKickoffInFlight = false;
   });
@@ -1888,11 +1954,12 @@ async function loadIntelligence(options = {}) {
     if (!hasRenderedIntelligence && lastVersion === null) {
       renderLoadingState();
     }
+    const queryPayload = intelligenceQueryPayload({ background, forceRefresh: Boolean(options.forceRefresh) });
     const res = await fetch("/api/intelligence/query", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       cache: "no-store",
-      body: JSON.stringify({ question: "top edges today", background, force_refresh: false })
+      body: JSON.stringify(queryPayload)
     });
 
     if (!res.ok) {
@@ -1949,6 +2016,14 @@ async function loadIntelligence(options = {}) {
   })();
 
   return currentIntelligenceRequest;
+}
+
+const intelligenceQueryForm = intelligenceFormElement();
+if (intelligenceQueryForm) {
+  intelligenceQueryForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void loadIntelligence({ forceRefresh: true });
+  });
 }
 
 function scheduleIntelligencePolling() {

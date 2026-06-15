@@ -22,6 +22,7 @@ class IntelligencePipelineTests(unittest.TestCase):
                 "date": "2026-06-04",
                 "mode": "live",
                 "sport": "nba",
+                "game_state": "live",
                 "limit": "3",
                 "timing": "live",
                 "include_props": "true",
@@ -48,6 +49,7 @@ class IntelligencePipelineTests(unittest.TestCase):
         self.assertIsInstance(result, IntelligenceResult)
         self.assertEqual(result.pipeline_request["question"], "What are the best live bets?")
         self.assertEqual(result.pipeline_request["selected_date"], "2026-06-04")
+        self.assertEqual(result.pipeline_request["game_state"], "live")
         self.assertEqual(result.pipeline_request["limit"], 3)
         self.assertTrue(result.pipeline_request["include_props"])
         self.assertFalse(result.pipeline_request["include_games"])
@@ -78,6 +80,7 @@ class IntelligencePipelineTests(unittest.TestCase):
             selected_date="2026-06-04",
             mode="live",
             sport="nba",
+            game_state="live",
             limit=3,
             timing="live",
             include_props=True,

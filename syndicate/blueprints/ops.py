@@ -261,6 +261,18 @@ def api_ops_odds_refresh_plan() -> Any:
     return jsonify({"ok": True, "plan": payload})
 
 
+@ops_bp.post("/api/ops/odds-refresh/run")
+def api_ops_odds_refresh_run() -> Any:
+    payload = _request_data()
+    try:
+        job_id, job = _start_refresh_job(payload, mode="fast")
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+    return jsonify({"ok": True, "status": "started", "job_id": job_id, "job": job}), 202
+
+
 @ops_bp.post("/api/ops/full-refresh/run")
 def api_ops_full_refresh_run() -> Any:
     payload = _request_data()
@@ -353,6 +365,43 @@ def page_ops_odds_refresh() -> Any:
         },
         form_state=form_state,
     )
+
+
+@ops_bp.post("/ops/odds-refresh/run")
+def page_ops_odds_refresh_run() -> Any:
+    payload = _request_data()
+    try:
+        result = launch_refresh_run(
+            date=_payload_value(payload, "date"),
+            sports=_payload_value(payload, "sports"),
+            phase=_payload_value(payload, "phase"),
+            execution_mode=_payload_value(payload, "execution_mode"),
+            regions=_payload_value(payload, "regions"),
+            bookmakers=_payload_value(payload, "bookmakers"),
+            markets=_payload_value(payload, "markets"),
+            season=_coerce_int(_payload_value(payload, "season")),
+            week=_coerce_int(_payload_value(payload, "week")),
+            skip_mirror=_coerce_bool(_payload_value(payload, "skip_mirror")),
+            mirror_only=_coerce_bool(_payload_value(payload, "mirror_only")),
+            dry_run=_coerce_bool(_payload_value(payload, "dry_run")),
+            mode=str(_payload_value(payload, "mode", "fast") or "fast"),
+            launch_mode="manifest_only",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    args = {
+        "launched": "1",
+        "pid": str(result.get("pid") or "").strip(),
+        "run_stamp": str(result.get("run_stamp") or "").strip(),
+        "dry_run": "1" if _coerce_bool(_payload_value(payload, "dry_run")) else "0",
+    }
+    admin_token = _request_admin_token()
+    if admin_token:
+        args["admin_token"] = admin_token
+    return redirect(url_for("ops.page_ops_odds_refresh", **args))
 
 
 @ops_bp.post("/ops/odds-refresh/cancel")

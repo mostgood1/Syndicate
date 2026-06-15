@@ -977,25 +977,52 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertEqual(mocked.call_args.kwargs.get("mode"), "full")
             self.assertEqual(mocked.call_args.kwargs.get("launch_mode"), "manifest_only")
 
-    def test_run_endpoint_is_removed(self) -> None:
-        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+    def test_run_endpoint_starts_odds_refresh_job(self) -> None:
+        def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
+            return {"ok": True, "pid": 4242, "run_stamp": "20260520_123100", "date": "2026-05-20", "state": "running"}
+
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.blueprints.ops.launch_refresh_run",
+            side_effect=_fake_launch_refresh_run,
+        ) as mocked, patch("syndicate.features.shared.ops_refresh._reports_root", return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports"), patch(
+            "syndicate.blueprints.ops.reports_root",
+            return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports",
+        ):
             response = self.client.post(
                 "/api/ops/odds-refresh/run",
                 json={"sports": "mlb", "phase": "live", "skip_mirror": True, "dry_run": True},
                 headers={"X-Admin-Token": "secret-token"},
             )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 202)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "started")
+        self.assertTrue(payload["job_id"])
+        mocked.assert_called_once()
+        self.assertEqual(mocked.call_args.kwargs.get("mode"), "fast")
 
-    def test_run_page_route_is_removed(self) -> None:
-        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+    def test_run_page_route_starts_odds_refresh_job_and_redirects(self) -> None:
+        def _fake_launch_refresh_run(**_: object) -> dict[str, object]:
+            return {"ok": True, "pid": 5252, "run_stamp": "20260520_123100", "date": "2026-05-20", "state": "running"}
+
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+            "syndicate.blueprints.ops.launch_refresh_run",
+            side_effect=_fake_launch_refresh_run,
+        ) as mocked, patch("syndicate.features.shared.ops_refresh._reports_root", return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports"), patch(
+            "syndicate.blueprints.ops.reports_root",
+            return_value=Path(tempfile.gettempdir()) / "syndicate-test-reports",
+        ):
             response = self.client.post(
                 "/ops/odds-refresh/run",
                 data={"sports": "mlb", "phase": "live", "skip_mirror": "1", "dry_run": "1", "admin_token": "secret-token"},
                 headers={"X-Admin-Token": "secret-token"},
             )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/ops/odds-refresh?", response.headers.get("Location") or "")
+        mocked.assert_called_once()
+        self.assertEqual(mocked.call_args.kwargs.get("mode"), "fast")
 
     def test_cancel_endpoint_returns_cancel_payload(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
