@@ -1,7 +1,7 @@
 ﻿{
     "sport":  "nfl",
-    "date":  "2026-06-14",
-    "refreshedAtUtc":  "2026-06-14T08:15:09.6501886Z",
+    "date":  "2026-06-15",
+    "refreshedAtUtc":  "2026-06-15T15:17:41.0925725Z",
     "sourceRepo":  null,
     "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source\\source_artifacts",
     "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NFL",
@@ -10,17 +10,16 @@
     "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nfl_source",
     "usedExistingMirrorArtifacts":  false,
     "usedArtifactBundle":  true,
-    "copiedArtifactCount":  4,
+    "copiedArtifactCount":  3,
     "artifactGroups":  {
                            "calibration":  1,
-                           "recommendations":  1,
+                           "recommendations":  0,
                            "props":  1,
                            "manifests":  0,
                            "other":  1
                        },
     "copiedArtifacts":  [
                             "current_week.json",
-                            "real_betting_lines_2026_06_14.json",
                             "oddsapi_player_props_2026_wk1.csv",
                             "tracking"
                         ]

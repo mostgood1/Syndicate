@@ -2,18 +2,18 @@
     "scope":  "daily_update",
     "date":  "2026-06-15",
     "runMode":  "standard",
-    "overallStatus":  "error",
-    "generatedAt":  "2026-06-14T23:26:24.8259253-05:00",
-    "updatedAt":  "2026-06-14T23:26:28.3795071-05:00",
-    "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-15\\20260614_232620\\unified_daily_update_run.json",
-    "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-15\\20260614_232620\\unified_daily_update_checkpoint.json",
-    "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "runStatePath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-15\\20260614_232620\\unified_daily_update_run_state.json",
-    "latestRunStatePath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
+    "overallStatus":  "ok",
+    "generatedAt":  "2026-06-15T15:17:36.5274592+00:00",
+    "updatedAt":  "2026-06-15T15:17:45.0712452+00:00",
+    "runManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-15\\20260615_151735\\unified_daily_update_run.json",
+    "latestManifestPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
+    "runCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-15\\20260615_151735\\unified_daily_update_checkpoint.json",
+    "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+    "runStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\2026-06-15\\20260615_151735\\unified_daily_update_run_state.json",
+    "latestRunStatePath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_run_state.json",
     "trace":  {
-                  "eventSimExecutionCount":  1,
-                  "artifactUpdateCount":  1,
+                  "eventSimExecutionCount":  0,
+                  "artifactUpdateCount":  0,
                   "inputFingerprintCount":  0,
                   "artifactPathCount":  0,
                   "inputFingerprints":  [
@@ -22,6 +22,6 @@
                   "artifactPaths":  [
 
                                     ],
-                  "simExecutionDecision":  true
+                  "simExecutionDecision":  null
               }
 }

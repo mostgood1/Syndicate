@@ -1,0 +1,23 @@
+﻿{
+    "sport":  "nhl",
+    "date":  "2026-06-15",
+    "refreshedAtUtc":  "2026-06-15T15:17:40.3505017Z",
+    "sourceRepo":  null,
+    "sourceArtifactRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts",
+    "sourceRootEnvVar":  "SYNDICATE_SOURCE_ROOT_NHL",
+    "sourceArtifactRootEnvVar":  "SYNDICATE_ARTIFACT_ROOT_NHL",
+    "destinationRoot":  "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source",
+    "usedExistingMirrorArtifacts":  false,
+    "usedArtifactBundle":  true,
+    "copiedArtifactCount":  1,
+    "artifactGroups":  {
+                           "processed":  1,
+                           "live_lens":  0,
+                           "odds":  0,
+                           "props":  0,
+                           "other":  0
+                       },
+    "copiedArtifacts":  [
+                            "tracking"
+                        ]
+}
