@@ -315,7 +315,38 @@ def api_ops_odds_refresh_logs() -> Any:
 def page_ops_odds_refresh() -> Any:
     plan_error: str | None = None
     plan_payload: dict[str, Any] | None = None
-    status_payload = load_latest_refresh_status()
+    status_payload: dict[str, Any] = {
+        "refresh_status": {
+            "manifest_path": "",
+            "manifest_exists": False,
+            "manifest": {},
+            "artifacts": {},
+            "mirror_manifests": [],
+            "runtime": {"state": "unknown", "detail": "Refresh status is unavailable."},
+            "history": [],
+        },
+        "daily_update": {
+            "manifest_path": "",
+            "manifest_exists": False,
+            "manifest": {},
+            "runtime": {"state": "unknown", "detail": "Daily update status is unavailable."},
+            "checkpoint_path": "",
+            "checkpoint_exists": False,
+            "checkpoint": {},
+            "run_state_path": "",
+            "run_state_exists": False,
+            "run_state": {},
+            "trace_path": "",
+            "trace_exists": False,
+            "trace": {},
+        },
+    }
+    try:
+        loaded_status = load_latest_refresh_status()
+        if isinstance(loaded_status, dict):
+            status_payload = loaded_status
+    except Exception as exc:
+        plan_error = f"{type(exc).__name__}: {exc}"
     try:
         plan_payload = build_refresh_plan(
             date=request.args.get("date"),
@@ -333,7 +364,7 @@ def page_ops_odds_refresh() -> Any:
     except ValueError as exc:
         plan_error = str(exc)
     except Exception as exc:
-        plan_error = f"{type(exc).__name__}: {exc}"
+        plan_error = plan_error or f"{type(exc).__name__}: {exc}"
 
     form_state = {
         "date": str(request.args.get("date") or "").strip(),
