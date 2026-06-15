@@ -835,10 +835,15 @@
     .home-summary-card__meta,
     .home-decision-card__meta,
     .home-prop-table__confidence,
-    .home-sport-summary-card__line {
+    .home-sport-summary-card__line,
+    .home-sport-summary-card__note {
       color: rgba(191, 208, 223, 0.84);
       font-size: 0.78rem;
       line-height: 1.35;
+    }
+
+    .home-sport-summary-card__note {
+      color: rgba(154, 243, 222, 0.76);
     }
 
     .home-decision-grid {
@@ -1270,6 +1275,15 @@
             <div><span>Top prop</span><strong>{{ sport.top_prop }}</strong></div>
           </div>
           <div class="home-sport-summary-card__line">{{ sport.best_signal }} · {{ sport.status }}</div>
+          {% if sport.availability_reason %}
+            <div class="home-sport-summary-card__note">{{ sport.availability_reason }}</div>
+          {% endif %}
+          {% if sport.game_availability_reason and sport.game_availability_reason != sport.availability_reason %}
+            <div class="home-sport-summary-card__note">Game lane: {{ sport.game_availability_reason }}</div>
+          {% endif %}
+          {% if sport.props_availability_reason and sport.props_availability_reason != sport.availability_reason %}
+            <div class="home-sport-summary-card__note">Props lane: {{ sport.props_availability_reason }}</div>
+          {% endif %}
           {% if sport.hub_href %}<a class="home-opportunity-row__link" href="{{ sport.hub_href }}">Open sport hub</a>{% endif %}
         </article>
       {% endfor %}

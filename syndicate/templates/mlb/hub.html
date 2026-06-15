@@ -12,6 +12,16 @@
     {% include 'shared/_content_panel.html' %}
   {% endwith %}
 
+  {% if availability_note %}
+    <section class="cards-grid cards-grid--sports" aria-label="MLB lane availability note">
+      <article class="sport-card">
+        <div class="section-label">Lane check</div>
+        <h3>Top props availability</h3>
+        <p>{{ availability_note }}</p>
+      </article>
+    </section>
+  {% endif %}
+
   <section class="cards-grid cards-grid--sports" aria-label="MLB route groups">
     {% for group in route_groups %}
       <article class="sport-card">

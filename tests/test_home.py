@@ -4,6 +4,8 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.app import create_app
+from syndicate.blueprints.home import _home_prop_hero_metrics
+from syndicate.blueprints.home import _sport_availability_reason
 
 
 class HomePageCommandCenterTests(unittest.TestCase):
@@ -73,6 +75,7 @@ class HomePageCommandCenterTests(unittest.TestCase):
                         "best_signal": "Momentum +12.3%",
                         "status": "Live",
                         "hub_href": "/nba",
+                        "availability_reason": "NBA props are active on this slate.",
                     }
                 ],
             },
@@ -139,6 +142,7 @@ class HomePageCommandCenterTests(unittest.TestCase):
                         "best_signal": "Momentum +12.3%",
                         "status": "Live",
                         "hub_href": "/nba",
+                        "availability_reason": "NBA props are active on this slate.",
                     }
                 ],
             },
@@ -157,6 +161,40 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertIn("Pregame props", html)
         self.assertIn("Game bets", html)
         self.assertIn("Open sport hub", html)
+        self.assertIn("NBA props are active on this slate.", html)
+
+    def test_sport_availability_reason_explains_missing_mlb_and_wnba_lanes(self) -> None:
+        mlb_reason = _sport_availability_reason(
+            {"slug": "mlb", "name": "MLB"},
+            active_today=True,
+            games_count=0,
+            props_count=1,
+            mlb_top_prop_counts={"pitcher_count": 4, "hitter_count": 0},
+        )
+        wnba_reason = _sport_availability_reason(
+            {"slug": "wnba", "name": "WNBA"},
+            active_today=True,
+            games_count=0,
+            props_count=0,
+        )
+
+        self.assertIn("hitter top-props rows were not present", mlb_reason["props_availability_reason"] or "")
+        self.assertIn("live-state feed returned no event IDs", wnba_reason["game_availability_reason"] or "")
+
+    def test_home_prop_hero_metrics_prefers_explicit_sim_projection(self) -> None:
+        live_box, sim_box = _home_prop_hero_metrics(
+            {
+                "market_display": "Hits",
+                "actual": "1",
+                "sim_projection": "2",
+                "projected": "9",
+                "live_projection": "7",
+                "line": "0.5",
+            }
+        )
+
+        self.assertEqual(live_box, "1 H")
+        self.assertEqual(sim_box, "2 H")
 
     def test_api_home_exposes_command_center_contract(self) -> None:
         payload = {

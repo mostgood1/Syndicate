@@ -1364,6 +1364,19 @@ class DateArchiveHelperTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), local_payload)
 
+    def test_wnba_hub_renders_archive_first_availability_note(self) -> None:
+        app = create_app()
+        app.config.update(TESTING=True)
+        client = app.test_client()
+
+        with patch("syndicate.blueprints.wnba.available_dates", return_value=["2026-06-14"]):
+            response = client.get("/wnba/hub")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("archive-first", html)
+        self.assertIn("2026-06-14", html)
+
     def test_wnba_api_live_lines_allows_missing_event_ids(self) -> None:
         app = create_app()
         app.config.update(TESTING=True)
@@ -4496,6 +4509,21 @@ class HomeBoardTests(unittest.TestCase):
         self.assertFalse(context.get("using_sample_data"))
         self.assertEqual(context.get("source_title"), "MLB top props unavailable")
         self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB top props")
+
+    def test_mlb_hub_context_exposes_top_props_lane_availability(self) -> None:
+        summary = {
+            "groups": {
+                "pitcher": {"sections": [{"rows": [{"playerName": "Pitcher 1"}, {"playerName": "Pitcher 2"}]}]},
+                "hitter": {"sections": [{"rows": []}]},
+            }
+        }
+
+        with patch("syndicate.features.mlb.hub.available_daily_summary_dates", return_value=["2026-06-14"]):
+            with patch("syndicate.features.mlb.hub.load_json_file", return_value=summary):
+                context = build_mlb_hub_context()
+
+        self.assertIn("no hitter rows yet", context.get("availability_note") or "")
+        self.assertEqual(context.get("launch_date"), "2026-06-14")
 
     def test_mlb_pitcher_ladders_empty_date_does_not_inject_fake_rank_card(self) -> None:
         with patch("syndicate.features.mlb.ladders_common.load_json_file", return_value=None):

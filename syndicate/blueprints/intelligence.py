@@ -287,6 +287,57 @@ def _response_candidate_count(response_payload: dict[str, object] | None) -> int
     return 0
 
 
+def _line_move_tracking_fields(response_payload: dict[str, object] | None) -> dict[str, object]:
+    current = dict(response_payload or {})
+    recommendations = current.get("recommendations") if isinstance(current.get("recommendations"), list) else []
+    candidate_pool = current.get("candidate_pool") if isinstance(current.get("candidate_pool"), dict) else {}
+    candidates = candidate_pool.get("candidates") if isinstance(candidate_pool, dict) else current.get("candidates")
+    if not isinstance(candidates, list):
+        candidates = []
+
+    tracked_recommendations = 0
+    tracked_histories = 0
+    tracked_sources = 0
+    seen_tracking_keys: set[str] = set()
+
+    def _tracking_key(item: dict[str, object]) -> str:
+        candidate_id = str(item.get("candidate_id") or "").strip().lower()
+        prediction_id = str(item.get("prediction_id") or "").strip().lower()
+        recommendation_id = str(item.get("recommendation_id") or "").strip().lower()
+        name = str(item.get("name") or item.get("display_name") or item.get("selection") or item.get("market") or "").strip().lower()
+        market = str(item.get("market_key") or item.get("market") or "").strip().lower()
+        return "|".join(part for part in (candidate_id, prediction_id, recommendation_id, name, market) if part)
+
+    for item in [*recommendations, *candidates]:
+        if not isinstance(item, dict):
+            continue
+        tracking_key = _tracking_key(item)
+        if tracking_key and tracking_key in seen_tracking_keys:
+            continue
+        if tracking_key:
+            seen_tracking_keys.add(tracking_key)
+        movement = item.get("movement") if isinstance(item.get("movement"), dict) else {}
+        movement_history = item.get("movement_history") if isinstance(item.get("movement_history"), list) else []
+        market_data = item.get("market_data") if isinstance(item.get("market_data"), dict) else {}
+        market_history = market_data.get("movement_history") if isinstance(market_data, dict) and isinstance(market_data.get("movement_history"), list) else []
+        line_delta = movement.get("line_delta") if isinstance(movement, dict) else None
+        line_movement_impact = item.get("line_movement_impact")
+        if movement_history or market_history or line_delta not in (None, 0) or line_movement_impact not in (None, 0):
+            tracked_sources += 1
+        if movement_history:
+            tracked_histories += len(movement_history)
+        elif market_history:
+            tracked_histories += len(market_history)
+        if movement_history or market_history or line_delta not in (None, 0) or line_movement_impact not in (None, 0):
+            tracked_recommendations += 1
+
+    return {
+        "line_moves_tracked": tracked_recommendations,
+        "line_move_history_count": tracked_histories,
+        "line_move_source_count": tracked_sources,
+    }
+
+
 def _debug_state_fields(response_payload: dict[str, object] | None, *, source: str, state_last_updated: str | None = None) -> dict[str, object]:
     current = dict(response_payload or {})
     derived_last_updated = str(
@@ -297,11 +348,13 @@ def _debug_state_fields(response_payload: dict[str, object] | None, *, source: s
         or current.get("updated_at")
         or ""
     ).strip() or None
-    return {
+    debug_fields = {
         "state_last_updated": derived_last_updated,
         "candidate_count": _response_candidate_count(current),
         "debug_source": source,
     }
+    debug_fields.update(_line_move_tracking_fields(current))
+    return debug_fields
 
 
 def _store_response_cache_state(state: dict[str, object]) -> None:
@@ -576,6 +629,10 @@ def intelligence_home():
             if cached_response is not None:
                 initial_response = dict(cached_response)
             if not _response_has_content(initial_response):
+                computed_response = compute_intelligence_state_response(dict(payload))
+                if isinstance(computed_response, dict):
+                    initial_response = _unwrap_response_payload(computed_response)
+            if not _response_has_content(initial_response):
                 queue_intelligence_state_refresh(dict(payload))
     except Exception:
         initial_response = {}
@@ -609,6 +666,10 @@ def intelligence_query_api():
         _log_api_state_read(cached_response if isinstance(cached_response, dict) else {})
         if question == DEFAULT_QUESTION and cached_response is not None:
             response_payload = dict(cached_response)
+            if not _response_has_content(response_payload):
+                computed_response = compute_intelligence_state_response(dict(payload))
+                if isinstance(computed_response, dict):
+                    response_payload = _unwrap_response_payload(computed_response)
             if want_refresh or not _response_has_content(response_payload):
                 queue_intelligence_state_refresh(dict(payload))
         elif question == DEFAULT_QUESTION:

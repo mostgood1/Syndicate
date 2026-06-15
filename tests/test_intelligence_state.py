@@ -163,6 +163,122 @@ class IntelligenceStateTests(unittest.TestCase):
         mocked_compute.assert_called_once()
         mocked_queue.assert_not_called()
 
+    def test_query_endpoint_computes_when_default_cache_exists_but_is_empty(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        empty_cached_response = {
+            "ok": True,
+            "top_opportunities": [],
+            "by_sport": {},
+            "analysis": {"recommendations": [], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+        computed_response = {
+            "ok": True,
+            "last_updated": "2026-06-11T16:08:00Z",
+            "candidate_pool": {"candidate_count": 1, "candidates": [{"name": "Play 1"}]},
+            "top_opportunities": [{"name": "Play 1"}],
+            "by_sport": {},
+            "analysis": {"recommendations": [{"name": "Play 1"}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        with app.test_request_context(
+            "/api/intelligence/query",
+            method="POST",
+            json={"question": "top edges today", "force_refresh": False},
+        ):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(empty_cached_response)):
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response", return_value=dict(computed_response)) as mocked_compute:
+                        response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("version", payload)
+        self.assertIn("timestamp", payload)
+        self.assertIn("response", payload)
+        self.assertEqual(payload["response"]["top_opportunities"][0]["name"], "Play 1")
+        self.assertEqual(payload["response"]["candidate_pool"]["candidate_count"], 1)
+        self.assertEqual(payload["candidate_count"], 1)
+        mocked_compute.assert_called_once()
+        mocked_queue.assert_not_called()
+
+    def test_query_endpoint_exposes_line_move_tracking_fields(self) -> None:
+        app = Flask(__name__)
+        app.register_blueprint(intelligence_bp)
+
+        cached_response = {
+            "ok": True,
+            "candidate_pool": {
+                "candidate_count": 1,
+                "candidates": [
+                    {
+                        "name": "Play 1",
+                        "movement": {"line_delta": 0.5, "trend": "up"},
+                        "movement_history": [
+                            {"line": 6.5, "timestamp": "2026-06-11T16:00:00Z"},
+                            {"line": 7.0, "timestamp": "2026-06-11T16:05:00Z"},
+                        ],
+                    }
+                ],
+            },
+            "top_opportunities": [{"name": "Play 1", "movement": {"line_delta": 0.5, "trend": "up"}}],
+            "by_sport": {},
+            "analysis": {"recommendations": [{"name": "Play 1", "movement": {"line_delta": 0.5, "trend": "up"}}], "picks": [], "top_live_opportunities": [], "portfolio": {}, "parlays": []},
+        }
+
+        with app.test_request_context(
+            "/api/intelligence/query",
+            method="POST",
+            json={"question": "top edges today", "force_refresh": False},
+        ):
+            with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=dict(cached_response)):
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    with patch("syndicate.blueprints.intelligence.compute_intelligence_state_response") as mocked_compute:
+                        response = intelligence_query_api()
+
+        payload = response.get_json()
+        self.assertIsNotNone(payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["line_moves_tracked"], 1)
+        self.assertEqual(payload["line_move_history_count"], 2)
+        self.assertEqual(payload["line_move_source_count"], 1)
+        self.assertEqual(payload["debug_source"], "worker")
+        mocked_queue.assert_not_called()
+        mocked_compute.assert_not_called()
+
+    def test_state_compute_backfills_empty_engine_recommendations_from_top_opportunities(self) -> None:
+        service = IntelligenceStateService()
+
+        candidate_pool = {
+            "selected_date": "2026-06-15",
+            "source_fingerprint": "fingerprint-1",
+            "candidate_count": 1,
+            "candidate_pools": {},
+            "global_pool": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}],
+            "candidates": [{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}],
+        }
+        analysis_result = {
+            "ok": True,
+            "headline": "The Syndicate brief",
+            "recommendations": [],
+            "picks": [],
+            "top_live_opportunities": [],
+            "portfolio": {},
+            "parlays": [],
+        }
+
+        with patch.object(service, "_build_candidate_pool", return_value=dict(candidate_pool)):
+            with patch("pipeline.intelligence_state.rank_global_recommendations", return_value=[{"name": "Play 1", "sport_slug": "mlb", "market": "Hits"}]):
+                with patch("pipeline.intelligence_state.run_routed_intelligence_pipeline", return_value=dict(analysis_result)):
+                    response = service._compute_response({"question": "top edges today", "date": "2026-06-15"}, force_refresh=True)
+
+        self.assertEqual(response["top_opportunities"][0]["name"], "Play 1")
+        self.assertEqual(response["analysis"]["recommendations"][0]["name"], "Play 1")
+        self.assertEqual(response["analysis"]["picks"][0]["name"], "Play 1")
+        self.assertEqual(response["analysis"]["top_live_opportunities"][0]["name"], "Play 1")
+
     def test_intelligence_home_renders_initial_board_shell(self) -> None:
         app = create_app()
         app.testing = True

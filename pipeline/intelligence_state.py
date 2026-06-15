@@ -748,6 +748,16 @@ class IntelligenceStateService:
         else:
             analysis = {}
 
+        analysis_recommendations = analysis.get("recommendations") if isinstance(analysis.get("recommendations"), list) else []
+        if not any(isinstance(item, dict) for item in analysis_recommendations):
+            fallback_recommendations = [dict(item) for item in top_opportunities if isinstance(item, dict)]
+            if fallback_recommendations:
+                analysis["recommendations"] = fallback_recommendations
+                if not isinstance(analysis.get("picks"), list) or not analysis.get("picks"):
+                    analysis["picks"] = [dict(item) for item in fallback_recommendations]
+                if not isinstance(analysis.get("top_live_opportunities"), list) or not analysis.get("top_live_opportunities"):
+                    analysis["top_live_opportunities"] = [dict(item) for item in fallback_recommendations]
+
         response: dict[str, Any] = {
             "ok": True,
             "top_opportunities": top_opportunities,

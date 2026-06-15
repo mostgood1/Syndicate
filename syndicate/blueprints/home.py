@@ -969,7 +969,13 @@ def _home_prop_hero_metrics(item: dict[str, Any]) -> tuple[str | None, str | Non
         live_box = _home_prop_metric_line(item.get("live_total"), market_label)
 
     sim_box = _home_prop_metric_line(
-        item.get("projected") if item.get("projected") not in {None, "", "-"} else item.get("live_projection"),
+        item.get("sim_projection")
+        if item.get("sim_projection") not in {None, "", "-"}
+        else item.get("sim_mu")
+        if item.get("sim_mu") not in {None, "", "-"}
+        else item.get("sim_box")
+        if item.get("sim_box") not in {None, "", "-"}
+        else item.get("projected"),
         market_label,
     )
     if not sim_box:
@@ -1730,6 +1736,84 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
     }
 
 
+def _mlb_top_prop_lane_counts(context_label: str) -> dict[str, int]:
+    summary = load_json_or_gz_file(daily_top_props_path(context_label))
+    if not isinstance(summary, dict):
+        return {"pitcher_count": 0, "hitter_count": 0}
+    pitcher_rows = _mlb_top_prop_rows_from_group(
+        summary,
+        group_key="pitcher",
+        fallback_href=f"/mlb/pitcher-top-props?date={context_label}",
+        limit=999,
+    )
+    hitter_rows = _mlb_top_prop_rows_from_group(
+        summary,
+        group_key="hitter",
+        fallback_href=f"/mlb/hitter-top-props?date={context_label}",
+        limit=999,
+    )
+    return {"pitcher_count": len(pitcher_rows), "hitter_count": len(hitter_rows)}
+
+
+def _sport_availability_reason(
+    sport: dict[str, Any],
+    *,
+    active_today: bool,
+    games_count: int,
+    props_count: int,
+    mlb_top_prop_counts: dict[str, int] | None = None,
+) -> dict[str, str | None]:
+    slug = _safe_text(sport.get("slug"), "sport").lower()
+    sport_name = _safe_text(sport.get("name"), slug.upper())
+    counts = mlb_top_prop_counts or {}
+    pitcher_count = int(counts.get("pitcher_count") or 0)
+    hitter_count = int(counts.get("hitter_count") or 0)
+
+    game_reason: str | None = None
+    props_reason: str | None = None
+
+    if games_count <= 0:
+        if slug == "wnba" and active_today:
+            game_reason = "WNBA live-state feed returned no event IDs or game rows for this slate."
+        elif slug == "mlb" and active_today:
+            game_reason = "MLB game rows were not surfaced from the live board snapshot for this slate."
+        elif active_today:
+            game_reason = f"{sport_name} game rows were not surfaced from the current board snapshot."
+        else:
+            game_reason = f"{sport_name} is not active for the selected slate, so game rows are hidden."
+
+    if props_count <= 0:
+        if slug == "mlb" and active_today:
+            if pitcher_count and not hitter_count:
+                props_reason = "MLB pitcher rows surfaced, but the hitter top-props lane was empty in the current daily artifact."
+            elif hitter_count and not pitcher_count:
+                props_reason = "MLB hitter rows surfaced, but the pitcher top-props lane was empty in the current daily artifact."
+            elif pitcher_count or hitter_count:
+                props_reason = "MLB top-props rows surfaced, but the combined home board did not produce any prop rows for display."
+            else:
+                props_reason = "MLB top-props artifact returned no pitcher or hitter rows for this slate."
+        elif slug == "wnba" and active_today:
+            props_reason = "WNBA prop rows were not surfaced from the betting-card payload for this slate."
+        elif active_today:
+            props_reason = f"{sport_name} prop rows were not surfaced from the current board snapshot."
+        else:
+            props_reason = f"{sport_name} prop rows are hidden until the slate is active."
+    elif slug == "mlb" and active_today:
+        if pitcher_count and not hitter_count:
+            props_reason = "MLB pitcher rows surfaced; hitter top-props rows were not present in the daily top-props artifact."
+        elif hitter_count and not pitcher_count:
+            props_reason = "MLB hitter rows surfaced; pitcher top-props rows were not present in the daily top-props artifact."
+        elif pitcher_count and hitter_count:
+            props_reason = "MLB pitcher and hitter top-props rows are both present in the daily artifact."
+
+    availability_reason = props_reason or game_reason
+    return {
+        "availability_reason": availability_reason,
+        "game_availability_reason": game_reason,
+        "props_availability_reason": props_reason,
+    }
+
+
 def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str, polled_at: float) -> dict[str, Any]:
     live_watch: list[dict[str, Any]] = []
     game_bets: list[dict[str, Any]] = []
@@ -1771,6 +1855,14 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
                 if isinstance(item, dict):
                     prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="HR targets"))
         sport_slug = _safe_text(sport.get("slug"), "").lower()
+        mlb_top_prop_counts = _mlb_top_prop_lane_counts(_safe_text(sport.get("context_label"), selected_date)) if sport_slug == "mlb" else None
+        availability_reasons = _sport_availability_reason(
+            sport,
+            active_today=bool(sport.get("active_today")),
+            games_count=len(game_items),
+            props_count=_dashboard_prop_count(sport),
+            mlb_top_prop_counts=mlb_top_prop_counts,
+        )
         summary_signals = next((row.get("signal") for row in live_watch if row.get("sport_slug") == sport_slug), "-")
         top_game_bet = next((row for row in game_bets if row.get("sport_slug") == sport_slug), None)
         top_prop = next((row for row in prop_rows if row.get("sport_slug") == _safe_text(sport.get("slug"), "").lower()), None)
@@ -1787,6 +1879,9 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
                 "top_game_bet": top_game_bet.get("pick") if isinstance(top_game_bet, dict) else "-",
                 "top_prop": top_prop.get("name") if isinstance(top_prop, dict) else "-",
                 "hub_href": str(sport.get("hub_href") or sport.get("primary_href") or "").strip() or None,
+                "availability_reason": availability_reasons.get("availability_reason"),
+                "game_availability_reason": availability_reasons.get("game_availability_reason"),
+                "props_availability_reason": availability_reasons.get("props_availability_reason"),
             }
         )
 
@@ -3331,6 +3426,7 @@ def _mlb_top_prop_rows_from_group(
                         "detail": f"{pick} {market} | Daily top props fallback".strip(),
                         "value": f"{probability * 100:.1f}% win" if probability is not None else heading,
                         "projected": _prop_metric_text(value.get("mean")),
+                        "sim_projection": _prop_metric_text(value.get("mean")),
                         "line": _prop_metric_text(value.get("line")) or _safe_text(value.get("line"), "-"),
                         "odds": odds_text or _prop_metric_text(value.get("odds")),
                         "edge": _pct_text(edge),

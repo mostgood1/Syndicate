@@ -1106,6 +1106,9 @@ function normalizeIntelligenceResponse(response) {
     state_last_updated: response.state_last_updated ?? analysis.state_last_updated ?? null,
     candidate_count: response.candidate_count ?? analysis.candidate_count ?? null,
     debug_source: response.debug_source ?? analysis.debug_source ?? null,
+    line_moves_tracked: response.line_moves_tracked ?? analysis.line_moves_tracked ?? 0,
+    line_move_history_count: response.line_move_history_count ?? analysis.line_move_history_count ?? 0,
+    line_move_source_count: response.line_move_source_count ?? analysis.line_move_source_count ?? 0,
   };
 }
 
@@ -1219,8 +1222,6 @@ function renderLoadingState() {
   }
 
   setRefreshStatus("Loading intelligence…", "loading");
-
-  setRefreshStatus("Loading intelligence…", "loading");
 }
 
 function renderEmptyState() {
@@ -1327,14 +1328,6 @@ function renderIntelligence(response) {
 
   const data = normalizeIntelligenceResponse(response);
   console.log("[FRONTEND DATA]", data.state_last_updated, data.candidate_count);
-  const initialEvidenceEl = document.getElementById("top-opportunities");
-  if (initialEvidenceEl) {
-    initialEvidenceEl.innerHTML = `
-      <div style="background:#101010;color:white;padding:18px;border-radius:14px;border:1px solid rgba(255,255,255,.08);">
-        ${renderSupportingEvidence(data)}
-      </div>
-    `;
-  }
 
   // ===== PORTFOLIO =====
   const portfolio = data.portfolio || {};
@@ -1687,8 +1680,11 @@ function renderIntelligence(response) {
         border:1px solid rgba(255,255,255,.08);
         margin-bottom:20px;
       ">
+        <div style="margin-bottom:14px; padding:14px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);">
+          ${renderSupportingEvidence(data)}
+        </div>
         <h3 style="margin:0 0 12px 0;">Top Opportunities Right Now</h3>
-          ${renderRefreshStamp()}
+        ${renderRefreshStamp()}
         ${recs.map((item, index) => {
           const theme = edgeTheme(item);
           const expectedValue = typeof item.expected_value === "number"
@@ -1860,6 +1856,12 @@ function renderIntelligence(response) {
     }
     if (policyControl && policyControl.policy_status) {
       summaryParts.push(`Policy ${policyControl.selected_policy || "default"}`);
+    }
+    if (data.line_moves_tracked) {
+      summaryParts.push(`${data.line_moves_tracked} line moves tracked`);
+    }
+    if (data.line_move_history_count) {
+      summaryParts.push(`${data.line_move_history_count} movement entries`);
     }
     if (trackedOddsCount > 0) {
       summaryParts.push(`${trackedOddsCount} odds tracked`);

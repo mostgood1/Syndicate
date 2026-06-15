@@ -223,11 +223,18 @@ def hub():
     latest_date = dates[-1] if dates else default_date()
     today_date = central_today_iso()
     recent_slates = list(reversed(dates[-12:]))
+    if not dates:
+        availability_note = "No stored WNBA slates are available yet, so the game, props, and live-lens lanes remain empty."
+    elif latest_date == today_date:
+        availability_note = f"Latest stored slate is {latest_date}; open that date to populate the WNBA game, props, and live-lens lanes."
+    else:
+        availability_note = f"Latest stored slate is {latest_date}; WNBA game, props, and live-lens lanes are date-specific and stay archive-first until a fresh slate is processed."
     return render_template(
         "wnba/hub.html",
         latest_date=latest_date,
         today_date=today_date,
         recent_slates=recent_slates,
+        availability_note=availability_note,
         summary_stats=[
             {"label": "Stored slates", "value": str(len(dates))},
             {"label": "Latest", "value": latest_date},

@@ -6,7 +6,9 @@ import re
 from typing import Any
 
 from syndicate.features.mlb.sources import available_daily_summary_dates
+from syndicate.features.mlb.sources import daily_top_props_path
 from syndicate.features.mlb.sources import default_mlb_source_root
+from syndicate.features.mlb.sources import load_json_file
 
 
 _DATE_TOKEN_RE = re.compile(r"(\d{4})_(\d{2})_(\d{2})")
@@ -50,6 +52,24 @@ def _available_betting_profiles(season: str) -> list[dict[str, str]]:
     return profiles
 
 
+def _top_prop_lane_counts(selected_date: str) -> dict[str, int]:
+    summary = load_json_file(daily_top_props_path(selected_date))
+    groups = summary.get("groups") if isinstance(summary, dict) else {}
+    pitcher_group = groups.get("pitcher") if isinstance(groups, dict) else {}
+    hitter_group = groups.get("hitter") if isinstance(groups, dict) else {}
+    pitcher_sections = pitcher_group.get("sections") if isinstance(pitcher_group, dict) else []
+    hitter_sections = hitter_group.get("sections") if isinstance(hitter_group, dict) else []
+
+    def _section_row_count(sections: Any) -> int:
+        if not isinstance(sections, list) or not sections:
+            return 0
+        first_section = sections[0] if isinstance(sections[0], dict) else {}
+        rows = first_section.get("rows") if isinstance(first_section, dict) else []
+        return len(rows) if isinstance(rows, list) else 0
+
+    return {"pitcher_rows": _section_row_count(pitcher_sections), "hitter_rows": _section_row_count(hitter_sections)}
+
+
 def build_hub_context() -> dict[str, Any]:
     archive_dates = available_daily_summary_dates()
     today_date = date.today().isoformat()
@@ -59,8 +79,27 @@ def build_hub_context() -> dict[str, Any]:
     live_lens_date = latest_archive_date
     hr_targets_date = latest_archive_date
     rfi_targets_date = latest_archive_date
+    top_prop_counts = _top_prop_lane_counts(cards_date)
     profiles = _available_betting_profiles(season)
     default_profile = next((item["profile"] for item in profiles if item["profile"] == "retuned"), profiles[0]["profile"] if profiles else "retuned")
+
+    if top_prop_counts["pitcher_rows"] and top_prop_counts["hitter_rows"]:
+        availability_note = (
+            f"Latest MLB top-props artifact has {top_prop_counts['pitcher_rows']} pitcher rows and "
+            f"{top_prop_counts['hitter_rows']} hitter rows for {cards_date}."
+        )
+    elif top_prop_counts["pitcher_rows"]:
+        availability_note = (
+            f"Latest MLB top-props artifact has {top_prop_counts['pitcher_rows']} pitcher rows, but no hitter rows yet, "
+            f"so the Hitter Top Props lane stays empty for {cards_date}."
+        )
+    elif top_prop_counts["hitter_rows"]:
+        availability_note = (
+            f"Latest MLB top-props artifact has {top_prop_counts['hitter_rows']} hitter rows, but no pitcher rows yet, "
+            f"so the Pitcher Top Props lane stays empty for {cards_date}."
+        )
+    else:
+        availability_note = f"Latest MLB top-props artifact has no pitcher or hitter rows yet for {cards_date}."
 
     route_groups = [
         {
@@ -117,6 +156,7 @@ def build_hub_context() -> dict[str, Any]:
         "rfi_targets_date": rfi_targets_date,
         "default_profile": default_profile,
         "profiles": profiles,
+        "availability_note": availability_note,
         "summary_stats": [
             {"label": "Launch date", "value": cards_date},
             {"label": "Latest stored date", "value": latest_archive_date},
