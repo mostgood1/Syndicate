@@ -1,6 +1,6 @@
 team,goalie,status,confidence,source
 ANA,Vyacheslav Buteyets,Derived,0.5,lineup_snapshot
-ARI,Jaxson Stauber,Derived,0.5,lineup_snapshot
+ARI,Karel Vejmelka,Derived,0.5,lineup_snapshot
 BOS,Jeremy Swayman,Derived,0.5,lineup_snapshot
 BUF,Colten Ellis,Derived,0.5,lineup_snapshot
 CAR,Frederik Andersen,Derived,0.5,lineup_snapshot
@@ -27,7 +27,7 @@ SJS,Yaroslav Askarov,Derived,0.5,lineup_snapshot
 STL,Jordan Binnington,Derived,0.5,lineup_snapshot
 TBL,Andrei Vasilevskiy,Derived,0.5,lineup_snapshot
 TOR,Anthony Stolarz,Derived,0.5,lineup_snapshot
-UTA,Jaxson Stauber,Derived,0.5,lineup_snapshot
+UTA,Karel Vejmelka,Derived,0.5,lineup_snapshot
 VAN,Thatcher Demko,Derived,0.5,lineup_snapshot
 VGK,Carter Hart,Derived,0.5,lineup_snapshot
 WPG,Eric Comrie,Derived,0.5,lineup_snapshot
