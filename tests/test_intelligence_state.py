@@ -174,6 +174,20 @@ class IntelligenceStateTests(unittest.TestCase):
         self.assertIn("intelligence-lane__intro", html)
         mocked_queue.assert_called_once()
 
+    def test_intelligence_home_honors_explicit_date_query_param(self) -> None:
+        app = create_app()
+        app.testing = True
+
+        with app.test_client() as client:
+            with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")):
+                with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
+                    response = client.get("/intelligence?date=2026-06-13")
+
+        self.assertEqual(response.status_code, 200)
+        mocked_queue.assert_called_once()
+        queued_payload = mocked_queue.call_args.args[0]
+        self.assertEqual(queued_payload["date"], "2026-06-13")
+
     def test_query_endpoint_preserves_recommendation_history_from_engine_response(self) -> None:
         app = Flask(__name__)
         app.register_blueprint(intelligence_bp)

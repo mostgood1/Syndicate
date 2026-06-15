@@ -549,7 +549,8 @@ def _empty_default_intelligence_response() -> dict[str, object]:
 
 @intelligence_bp.get("/intelligence")
 def intelligence_home():
-    payload = _intelligence_page_payload(central_today_iso())
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    payload = _intelligence_page_payload(selected_date)
     initial_response: dict[str, Any] = {}
     try:
             cached_response, _ = _cached_intelligence_response_with_source(payload)
