@@ -5861,6 +5861,8 @@ def collect_all_recommendations(*, selected_date: str | None = None, force_refre
         sport=_safe_text(preferences.get("sport"), "") or None,
         limit=None,
     )
+    if not ranked_recommendations:
+        ranked_recommendations = rank_global_recommendations(candidates, limit=None)
     if log_pipeline:
         _log_candidate_pipeline(
             candidates=candidates,
@@ -5965,6 +5967,8 @@ def run_intelligence_query(
         policy=_safe_text(preferences.get("policy"), "") or None,
         limit=None,
     )
+    if not ranked_recommendations:
+        ranked_recommendations = rank_global_recommendations(candidates, limit=None)
     recommendations = _greedy_low_correlation_selection(
         [dict(candidate) for candidate in ranked_recommendations],
         limit=preferences["limit"],

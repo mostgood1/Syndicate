@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from syndicate.features.intelligence_board import build_intelligence_board_contract
+from syndicate.features.intelligence import collect_all_recommendations
 from syndicate.features.intelligence import run_intelligence_query
 
 
@@ -118,6 +119,30 @@ class IntelligenceBoardContractTests(unittest.TestCase):
         self.assertEqual(result.get("evaluation_bundle", {}).get("schema_version"), 1)
         self.assertEqual(result.get("recommendation_history", {}).get("history_status"), "empty")
         mocked_bundle.assert_called_once()
+
+    def test_collect_all_recommendations_falls_back_when_edge_filter_drops_everything(self) -> None:
+        candidate = {
+            "name": "Jayson Tatum Over 28.5",
+            "sport": "NBA",
+            "sport_slug": "nba",
+            "market": "points",
+            "pick": "Over 28.5",
+            "score": 91.0,
+            "odds": "-",
+            "edge": "-",
+        }
+
+        with patch("syndicate.features.intelligence.build_intelligence_overview", return_value=_sample_overview()):
+            with patch("syndicate.features.intelligence._tracked_repo_files", return_value=set()):
+                with patch("syndicate.features.intelligence._advanced_input_rows_for_sport", return_value=[]):
+                    with patch("syndicate.features.intelligence.collect_candidates", return_value=[candidate]):
+                        with patch("syndicate.features.intelligence.filter_candidates", return_value=[]):
+                            with patch("syndicate.features.intelligence.rank_candidates", return_value=[]):
+                                with patch("syndicate.features.intelligence.rank_global_recommendations", return_value=[candidate]) as mocked_fallback:
+                                    recommendations = collect_all_recommendations(selected_date="2026-06-04")
+
+        self.assertEqual(recommendations, [candidate])
+        mocked_fallback.assert_called_once()
 
 
 if __name__ == "__main__":
