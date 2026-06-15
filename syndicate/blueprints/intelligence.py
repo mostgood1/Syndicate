@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask import redirect
 
 from pipeline.intelligence_state import get_intelligence_state_response
+from pipeline.intelligence_state import compute_intelligence_state_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
 from pipeline.intelligence_state import intelligence_state_status
 from pipeline.intelligence_state import queue_intelligence_state_refresh
@@ -592,6 +593,10 @@ def intelligence_query_api():
             if want_refresh and not bool(payload.get("background")):
                 queue_intelligence_state_refresh(dict(payload))
             cached_response = _cached_intelligence_response(dict(payload))
+            if cached_response is None or not _response_has_content(cached_response):
+                computed_response = compute_intelligence_state_response(dict(payload))
+                if isinstance(computed_response, dict):
+                    cached_response = computed_response
             if cached_response is None:
                 cached_response = _empty_default_intelligence_response()
             response_payload = _unwrap_response_payload(cached_response)
