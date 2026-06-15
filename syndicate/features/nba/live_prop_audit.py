@@ -9,11 +9,11 @@ from typing import Any
 from urllib.parse import parse_qs
 
 from syndicate.features.nba.sources import parse_iso_date
-from syndicate.features.nba.sources import processed_path
+from syndicate.features.nba.sources import artifact_processed_root
 
 
 def _artifact_root() -> Path:
-    return processed_path("game_cards_2099-01-01.csv").parent
+    return artifact_processed_root()
 
 
 def _artifact_path(filename: str) -> Path:

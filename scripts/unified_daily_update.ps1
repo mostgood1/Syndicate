@@ -2819,6 +2819,7 @@ function Get-ForcedPublishArtifactPaths {
     param(
         [string]$RepoPath,
         [string]$DateValue,
+        [bool]$SkipGitPush,
         [bool]$SkipMLB,
         [bool]$SkipNBA,
         [bool]$SkipNHL,
@@ -2828,7 +2829,11 @@ function Get-ForcedPublishArtifactPaths {
         [bool]$SkipNCAAB
     )
 
-    $paths = New-Object System.Collections.Generic.List[string]
+    if ($SkipGitPush) {
+        return @()
+    }
+
+    $paths = [System.Collections.Generic.List[string]]::new()
     $dateSlug = $DateValue -replace '-', '_'
 
     function Add-PathIfPresent {
@@ -2872,10 +2877,37 @@ function Get-ForcedPublishArtifactPaths {
             return
         }
 
-        foreach ($match in @(Get-ChildItem -Path $fullRoot -File -Recurse -ErrorAction SilentlyContinue)) {
-            $relativePath = $match.FullName.Substring($RepoPath.Length).TrimStart('\', '/') -replace '\\', '/'
-            if (-not [string]::IsNullOrWhiteSpace($relativePath)) {
-                $paths.Add($relativePath) | Out-Null
+        $pendingRoots = [System.Collections.Generic.List[string]]::new()
+        $visitedRoots = @{}
+        $pendingRoots.Add($fullRoot) | Out-Null
+
+        for ($index = 0; $index -lt $pendingRoots.Count; $index++) {
+            $currentRoot = $pendingRoots[$index]
+            if ([string]::IsNullOrWhiteSpace($currentRoot) -or $visitedRoots.ContainsKey($currentRoot)) {
+                continue
+            }
+            $visitedRoots[$currentRoot] = $true
+
+            foreach ($match in @(Get-ChildItem -LiteralPath $currentRoot -File -ErrorAction SilentlyContinue)) {
+                $relativePath = $match.FullName.Substring($RepoPath.Length).TrimStart('\', '/') -replace '\\', '/'
+                if (-not [string]::IsNullOrWhiteSpace($relativePath)) {
+                    $paths.Add($relativePath) | Out-Null
+                }
+            }
+
+            foreach ($childRoot in @(Get-ChildItem -LiteralPath $currentRoot -Directory -ErrorAction SilentlyContinue)) {
+                try {
+                    if (($childRoot.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                        continue
+                    }
+                }
+                catch {
+                    continue
+                }
+                $childPath = $childRoot.FullName
+                if (-not [string]::IsNullOrWhiteSpace($childPath) -and -not $visitedRoots.ContainsKey($childPath)) {
+                    $pendingRoots.Add($childPath) | Out-Null
+                }
             }
         }
     }
@@ -3005,7 +3037,7 @@ function Get-ForcedPublishArtifactPaths {
     }
     if (-not $SkipGitPush) {
         $forcedPublishArtifactPaths = @(
-            Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+            Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipGitPush ([bool]$SkipGitPush) -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
         )
         $intelligencePublishArtifactPaths = @(
             Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
@@ -3555,9 +3587,13 @@ print(json.dumps(result))
 $sourceSteps = @()
 $publishRepos = @()
 $preferLocalMirrorArtifactsForGate = $false
+$skipGitPushMode = $PSBoundParameters.ContainsKey('SkipGitPush') -and [bool]$SkipGitPush
 $resolveForcedPublishArtifactPaths = {
+    if ($skipGitPushMode) {
+        return @()
+    }
     @(
-        Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
+        Get-ForcedPublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipGitPush $skipGitPushMode -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
         Get-IntelligencePublishArtifactPaths -RepoPath $repoRoot -DateValue $Date -SkipMLB ([bool]$SkipMLB) -SkipNBA ([bool]$SkipNBA) -SkipNHL ([bool]$SkipNHL) -SkipWNBA ([bool]$SkipWNBA) -SkipNFL ([bool]$SkipNFL) -SkipNCAAF ([bool]$SkipNCAAF) -SkipNCAAB ([bool]$SkipNCAAB)
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 }

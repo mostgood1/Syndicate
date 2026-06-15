@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date
 from datetime import datetime
 import json
@@ -32,6 +33,21 @@ def _artifact_roots() -> list[Path]:
         seen.add(resolved)
         deduped.append(resolved)
     return deduped
+
+
+def artifact_processed_root() -> Path:
+    env_value = str(os.environ.get("SYNDICATE_NBA_ARTIFACT_ROOT") or "").strip()
+    if env_value:
+        root = Path(env_value).resolve()
+        if root.name == "processed" and root.parent.name == "data":
+            return root
+        if root.name == "data" and root.parent.name != "processed":
+            return (root / "processed").resolve()
+        return (root / "data" / "processed").resolve()
+    roots = _artifact_roots()
+    if roots:
+        return (roots[0] / "data" / "processed").resolve()
+    return (Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed").resolve()
 
 
 def _first_existing_path(candidates: list[Path]) -> Path | None:

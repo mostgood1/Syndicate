@@ -1,33 +1,33 @@
 ﻿{
     "scope":  "daily_update",
-    "date":  "2026-06-14",
+    "date":  "2026-06-15",
     "runMode":  "standard",
-    "overallStatus":  "started",
-    "generatedAt":  "2026-06-13T08:13:49.1939721-05:00",
-    "updatedAt":  "2026-06-13T08:14:24.1197531-05:00",
-    "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_081348\\unified_daily_update_run.json",
+    "overallStatus":  "error",
+    "generatedAt":  "2026-06-14T23:26:24.8259253-05:00",
+    "updatedAt":  "2026-06-14T23:26:28.3755010-05:00",
+    "runManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-15\\20260614_232620\\unified_daily_update_run.json",
     "latestManifestPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest.json",
-    "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-13\\20260613_081348\\unified_daily_update_checkpoint.json",
+    "runCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\2026-06-15\\20260614_232620\\unified_daily_update_checkpoint.json",
     "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-    "currentStage":  "source_update",
+    "currentStage":  "failed",
     "completedStages":  [
                             "source_update",
                             "refresh_gate"
                         ],
-    "failedStage":  null,
-    "lastUpdatedAt":  "2026-06-13T08:14:24.1187480-05:00",
+    "failedStage":  "",
+    "lastUpdatedAt":  "2026-06-14T23:26:28.3755010-05:00",
     "replayContext":  {
                           "latestCheckpointLoaded":  true,
-                          "latestCheckpointPath":  "D:\\a\\Syndicate\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
-                          "latestCheckpointStage":  "queued",
+                          "latestCheckpointPath":  "C:\\Users\\tempadmin\\OneDrive\\Coding\\Syndicate\\reports\\daily_update\\latest\\unified_daily_update_latest_checkpoint.json",
+                          "latestCheckpointStage":  "failed",
                           "latestCheckpointFailedStage":  "",
                           "latestCheckpointCompletedStageCount":  2,
                           "latestCheckpointCompletedStages":  [
                                                                   "source_update",
                                                                   "refresh_gate"
                                                               ],
-                          "resumeEligible":  false,
-                          "resumedFromCheckpoint":  true
+                          "resumeEligible":  true,
+                          "resumedFromCheckpoint":  false
                       },
     "stageDecisions":  [
                            {
@@ -35,72 +35,80 @@
                                "sport":  "mlb",
                                "workflow":  "vendored_daily_update",
                                "name":  "MLB vendored daily update",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "mlb",
                                "workflow":  "syndicate_refresh",
                                "name":  "MLB current-day live-lens refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "nba",
                                "workflow":  "vendored_daily_update",
                                "name":  "NBA vendored daily update",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "nba",
                                "workflow":  "syndicate_mirror",
                                "name":  "NBA source mirror refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "wnba",
                                "workflow":  "vendored_daily_update",
                                "name":  "WNBA vendored daily update",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "wnba",
                                "workflow":  "syndicate_mirror",
                                "name":  "WNBA source mirror refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "nhl",
                                "workflow":  "vendored_daily_update",
                                "name":  "NHL vendored daily update",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  null,
                                "workflow":  null,
                                "name":  "NFL local odds refresh",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
+                           },
+                           {
+                               "stage":  "source_update",
+                               "sport":  null,
+                               "workflow":  null,
+                               "name":  "NCAAF local odds refresh",
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "source_update",
                                "sport":  "ncaab",
                                "workflow":  "syndicate_mirror",
                                "name":  "NCAAB source mirror export",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "sim_execution",
@@ -114,8 +122,8 @@
                            },
                            {
                                "stage":  "refresh_gate",
-                               "decision":  "planned",
-                               "status":  "pending"
+                               "decision":  "completed",
+                               "status":  "completed"
                            },
                            {
                                "stage":  "artifact_generation",
@@ -134,33 +142,16 @@
                            }
                        ],
     "runTrace":  {
-                     "eventSimExecutionCount":  18,
-                     "artifactUpdateCount":  18,
-                     "inputFingerprintCount":  1,
-                     "artifactPathCount":  18,
+                     "eventSimExecutionCount":  1,
+                     "artifactUpdateCount":  1,
+                     "inputFingerprintCount":  0,
+                     "artifactPathCount":  0,
                      "inputFingerprints":  [
-                                               "abb0882eb8312756925d95d319a1354ce81da3e8ad75057d7ba80579d2b63450"
+
                                            ],
                      "artifactPaths":  [
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_0_MIA_at_PIT_pk823368_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_10_PHI_at_MIL_pk823777_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_11_COL_at_ATH_pk824994_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_12_CHC_at_SF_pk823212_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_13_TB_at_LAA_pk824021_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_14_TEX_at_BOS_pk824751_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_1_SD_at_BAL_pk824823_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_2_SEA_at_WSH_pk822722_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_3_NYY_at_TOR_pk822801_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_4_AZ_at_CIN_pk824506_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_5_DET_at_CLE_pk824424_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_6_ATL_at_NYM_pk823615_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_7_HOU_at_KC_pk824099_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_8_STL_at_MIN_pk823693_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\mlb_source\\source_artifacts\\data\\daily\\sims\\2026-06-14\\sim_9_LAD_at_CWS_pk824586_g1.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_NYL_WSH.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\wnba_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_TOR_ATL.json",
-                                           "D:\\a\\Syndicate\\Syndicate\\data\\nhl_source\\source_artifacts\\data\\processed\\smart_sim_2026-06-14_bundle.json"
+
                                        ],
-                     "simExecutionDecision":  null
+                     "simExecutionDecision":  true
                  }
 }

@@ -24,6 +24,15 @@ def _source_roots() -> list[Path]:
 
 
 def _first_existing_root(roots: list[Path]) -> Path:
+    for root in roots:
+        try:
+            normalized_parts = {part.lower() for part in root.parts}
+            if "nfl_source" not in normalized_parts:
+                continue
+            if any(root.glob("upcoming_recs_*.csv")) or any(root.glob("upcoming_recs_*_publish.csv")):
+                return root
+        except OSError:
+            continue
     return roots[0]
 
 

@@ -122,7 +122,7 @@ def daily_artifact_path(selected_date: str, suffix: str = "") -> Path:
 def available_daily_summary_dates() -> list[str]:
     dates: set[str] = set()
     pattern = "daily_summary_*.json"
-    for root in [*_artifact_roots(), *_source_roots()]:
+    for root in _artifact_roots():
         daily_dir = root / "data" / "daily"
         if not daily_dir.exists() or not daily_dir.is_dir():
             continue
@@ -202,14 +202,18 @@ def daily_ops_report_path(selected_date: str) -> Path:
 
 
 def daily_sim_artifact_path(selected_date: str, game_pk: int) -> Path | None:
-    sims_dir = _resolve_data_path_with_reconcile("daily", "sims", selected_date)
+    roots = _source_roots()
+    if not roots:
+        return None
+
+    sims_dir = roots[0] / "data" / "daily" / "sims" / selected_date
     if sims_dir.exists() and sims_dir.is_dir():
         matches = sorted(sims_dir.glob(f"sim_*_pk{int(game_pk)}_*.json"))
         if matches:
             return matches[0]
 
     relative_dir = Path("data", "daily", "sims", selected_date)
-    for root in _source_roots()[1:]:
+    for root in roots[1:]:
         fallback_dir = root / relative_dir
         if not fallback_dir.exists() or not fallback_dir.is_dir():
             continue

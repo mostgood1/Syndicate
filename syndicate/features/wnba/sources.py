@@ -109,7 +109,7 @@ def default_date() -> str:
 
 
 def default_date_for_season(season: int) -> str:
-    today_value = central_today_iso()
+    today_value = date.today().isoformat()
     if today_value.startswith(f"{int(season)}-"):
         return today_value
     season_str = str(int(season))
